@@ -1,0 +1,1 @@
+"""Public provider contract placeholder."""

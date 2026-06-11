@@ -1,0 +1,10 @@
+action_type: text.compose_reply
+version: 1
+description: "Compose a professional reply by intent, tone, and constraints."
+input_schema_ref: kernel.schemas.compose_reply_input_v1
+output_schema_ref: kernel.schemas.compose_reply_output_v1
+executor: structured_llm
+emits_events:
+  - action.started
+  - action.succeeded
+  - action.failed

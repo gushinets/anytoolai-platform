@@ -1,0 +1,9 @@
+handoffs:
+  - handoff_id: kernel_demo_source_to_target_v1
+    source_product_id: kernel_demo
+    source_scenario_id: kernel_demo.handoff_smoke_source_v1
+    target_product_id: kernel_demo
+    target_scenario_id: kernel_demo.handoff_smoke_target_v1
+    consent_required: true
+    context_mapping:
+      source_artifact_id: $.source_artifact_id

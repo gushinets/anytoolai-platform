@@ -1,0 +1,10 @@
+action_type: text.generate_gap_rewrites
+version: 1
+description: "Generate targeted rewrites to close a gap."
+input_schema_ref: kernel.schemas.generate_gap_rewrites_input_v1
+output_schema_ref: kernel.schemas.generate_gap_rewrites_output_v1
+executor: structured_llm
+emits_events:
+  - action.started
+  - action.succeeded
+  - action.failed

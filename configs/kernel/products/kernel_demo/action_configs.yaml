@@ -1,0 +1,15 @@
+action_configs:
+  - action_config_id: kernel_demo.extract_structured_fields_v1
+    action_type: text.extract_structured_fields
+    prompt_ref: kernel_demo.extract_structured_fields.v1
+    provider_policy_ref: default_fake_provider_v1
+
+  - action_config_id: kernel_demo.detect_issues_v1
+    action_type: text.detect_issues_by_taxonomy
+    prompt_ref: kernel_demo.detect_issues.v1
+    provider_policy_ref: default_fake_provider_v1
+
+  - action_config_id: kernel_demo.generate_report_v1
+    action_type: document.generate_from_template
+    prompt_ref: kernel_demo.generate_report.v1
+    provider_policy_ref: default_fake_provider_v1

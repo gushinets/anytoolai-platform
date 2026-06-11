@@ -1,0 +1,14 @@
+/AGENTS.md @tech-lead
+/ARCHITECTURE.md @tech-lead
+/docs/architecture/ @tech-lead
+/docs/product-specs/ @tech-lead
+/docs/agent/ @tech-lead
+/packages/backend/platform-core/ @backend @tech-lead
+/packages/backend/platform-actions/ @backend @tech-lead
+/packages/backend/platform-sdk/ @backend @tech-lead
+/packages/backend/product-platforms/ @tech-lead
+/packages/frontend/ce-kit/ @fullstack @tech-lead
+/apps/web-mirror/ @fullstack
+/extensions/ @fullstack
+/configs/ @backend @tech-lead
+/tests/architecture/ @tech-lead

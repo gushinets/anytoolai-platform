@@ -1,0 +1,7 @@
+frontends:
+  - frontend_id: kernel_demo_ce
+    type: chrome_extension
+    enabled: true
+  - frontend_id: web_mirror
+    type: web
+    enabled: true

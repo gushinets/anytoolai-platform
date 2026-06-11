@@ -1,0 +1,10 @@
+action_type: text.detect_issues_by_taxonomy
+version: 1
+description: "Detect risks, gaps, ambiguity, and blockers by taxonomy."
+input_schema_ref: kernel.schemas.issue_detection_input_v1
+output_schema_ref: kernel.schemas.issue_detection_output_v1
+executor: structured_llm
+emits_events:
+  - action.started
+  - action.succeeded
+  - action.failed

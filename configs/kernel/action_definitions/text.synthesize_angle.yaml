@@ -1,0 +1,10 @@
+action_type: text.synthesize_angle
+version: 1
+description: "Synthesize strategic recommendation from analysis."
+input_schema_ref: kernel.schemas.synthesize_angle_input_v1
+output_schema_ref: kernel.schemas.synthesize_angle_output_v1
+executor: structured_llm
+emits_events:
+  - action.started
+  - action.succeeded
+  - action.failed

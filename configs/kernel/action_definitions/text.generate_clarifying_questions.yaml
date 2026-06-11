@@ -1,0 +1,10 @@
+action_type: text.generate_clarifying_questions
+version: 1
+description: "Generate clarifying questions from issues and context."
+input_schema_ref: kernel.schemas.generate_questions_input_v1
+output_schema_ref: kernel.schemas.generate_questions_output_v1
+executor: structured_llm
+emits_events:
+  - action.started
+  - action.succeeded
+  - action.failed

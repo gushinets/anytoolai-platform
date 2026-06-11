@@ -1,0 +1,10 @@
+action_type: text.score_multidimensional_axes
+version: 1
+description: "Score text across independent axes."
+input_schema_ref: kernel.schemas.score_multidim_input_v1
+output_schema_ref: kernel.schemas.score_multidim_output_v1
+executor: structured_llm
+emits_events:
+  - action.started
+  - action.succeeded
+  - action.failed

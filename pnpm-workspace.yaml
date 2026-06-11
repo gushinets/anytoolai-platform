@@ -1,0 +1,4 @@
+packages:
+  - "apps/web-mirror"
+  - "extensions/*"
+  - "packages/frontend/*"

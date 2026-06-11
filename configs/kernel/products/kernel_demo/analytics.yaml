@@ -1,0 +1,4 @@
+product_events:
+  - kernel_demo.result_viewed
+  - kernel_demo.result_copied
+  - kernel_demo.handoff_clicked

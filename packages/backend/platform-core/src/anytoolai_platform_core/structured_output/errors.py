@@ -1,0 +1,2 @@
+class StructuredOutputValidationError(ValueError):
+    pass

@@ -1,0 +1,1 @@
+{"name":"@anytoolai/web-result-kit","version":"0.1.0","private":true,"type":"module","scripts":{"build":"tsc -p tsconfig.json","typecheck":"tsc --noEmit","lint":"echo lint web-result-kit"},"devDependencies":{"typescript":"^5.6.0"}}

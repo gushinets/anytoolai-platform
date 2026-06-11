@@ -1,0 +1,15 @@
+provider_policies:
+  - provider_policy_id: default_fake_provider_v1
+    provider: fake
+    model: fake-json-v1
+    temperature: 0.0
+    timeout_seconds: 30
+    max_retries: 1
+    structured_output_mode: json_schema
+  - provider_policy_id: default_text_generation_v1
+    provider: openai
+    model: gpt-4.1-mini
+    temperature: 0.3
+    timeout_seconds: 60
+    max_retries: 2
+    structured_output_mode: json_schema

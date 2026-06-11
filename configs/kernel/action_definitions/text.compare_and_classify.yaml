@@ -1,0 +1,10 @@
+action_type: text.compare_and_classify
+version: 1
+description: "Compare text against criteria and classify verdict."
+input_schema_ref: kernel.schemas.compare_classify_input_v1
+output_schema_ref: kernel.schemas.compare_classify_output_v1
+executor: structured_llm
+emits_events:
+  - action.started
+  - action.succeeded
+  - action.failed

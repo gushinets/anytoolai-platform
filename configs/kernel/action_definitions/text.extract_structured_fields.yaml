@@ -1,0 +1,10 @@
+action_type: text.extract_structured_fields
+version: 1
+description: "Extract typed fields from arbitrary text by schema."
+input_schema_ref: kernel.schemas.extract_input_v1
+output_schema_ref: kernel.schemas.extract_output_v1
+executor: structured_llm
+emits_events:
+  - action.started
+  - action.succeeded
+  - action.failed

@@ -1,0 +1,1 @@
+"""Queue abstraction placeholder."""

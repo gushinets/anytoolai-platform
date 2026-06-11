@@ -1,0 +1,17 @@
+{
+  "name": "@anytoolai/web-mirror",
+  "private": true,
+  "scripts": {
+    "build": "echo build web-mirror",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo lint web-mirror"
+  },
+  "dependencies": {
+    "@anytoolai/web-result-kit": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

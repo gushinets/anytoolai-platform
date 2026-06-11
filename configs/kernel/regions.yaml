@@ -1,0 +1,4 @@
+default_region: default
+regions:
+  - region: default
+    display_name: Default MVP Region

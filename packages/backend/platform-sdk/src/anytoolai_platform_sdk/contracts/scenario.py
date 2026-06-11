@@ -1,0 +1,1 @@
+"""Public scenario contract placeholder."""

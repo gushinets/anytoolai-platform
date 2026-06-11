@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: anytoolai
+      POSTGRES_PASSWORD: anytoolai
+      POSTGRES_DB: anytoolai
+    ports:
+      - "5432:5432"
+  platform-api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/platform-api.Dockerfile
+    environment:
+      DATABASE_URL: postgresql://anytoolai:anytoolai@postgres:5432/anytoolai
+    depends_on:
+      - postgres
+    ports:
+      - "8000:8000"
+  platform-worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/platform-worker.Dockerfile
+    depends_on:
+      - postgres

@@ -1,0 +1,29 @@
+scenarios:
+  - scenario_id: kernel_demo.single_action_smoke_v1
+    version: 1
+    workflow_id: kernel_demo.single_action_extract_v1
+    allowed_next_actions:
+      - copy_result
+      - create_handoff
+  - scenario_id: kernel_demo.multi_step_workflow_smoke_v1
+    version: 1
+    workflow_id: kernel_demo.extract_detect_report_v1
+    allowed_next_actions:
+      - copy_result
+      - create_handoff
+  - scenario_id: kernel_demo.quota_exhausted_smoke_v1
+    version: 1
+    workflow_id: kernel_demo.single_action_extract_v1
+    allowed_next_actions:
+      - capture_email
+      - view_paywall
+  - scenario_id: kernel_demo.handoff_smoke_source_v1
+    version: 1
+    workflow_id: kernel_demo.single_action_extract_v1
+    allowed_next_actions:
+      - continue_to_target
+  - scenario_id: kernel_demo.handoff_smoke_target_v1
+    version: 1
+    workflow_id: kernel_demo.single_action_extract_v1
+    allowed_next_actions:
+      - copy_result

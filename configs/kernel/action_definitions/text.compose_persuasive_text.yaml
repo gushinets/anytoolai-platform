@@ -1,0 +1,10 @@
+action_type: text.compose_persuasive_text
+version: 1
+description: "Compose persuasive text from context, angle, and constraints."
+input_schema_ref: kernel.schemas.compose_persuasive_text_input_v1
+output_schema_ref: kernel.schemas.compose_persuasive_text_output_v1
+executor: structured_llm
+emits_events:
+  - action.started
+  - action.succeeded
+  - action.failed

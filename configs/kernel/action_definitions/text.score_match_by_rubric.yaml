@@ -1,0 +1,10 @@
+action_type: text.score_match_by_rubric
+version: 1
+description: "Score match between two texts using rubric."
+input_schema_ref: kernel.schemas.score_match_input_v1
+output_schema_ref: kernel.schemas.score_match_output_v1
+executor: structured_llm
+emits_events:
+  - action.started
+  - action.succeeded
+  - action.failed

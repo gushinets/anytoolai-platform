@@ -1,0 +1,1 @@
+"""Public handoff contract placeholder."""

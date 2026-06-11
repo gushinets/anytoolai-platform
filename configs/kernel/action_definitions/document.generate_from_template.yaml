@@ -1,0 +1,10 @@
+action_type: document.generate_from_template
+version: 1
+description: "Generate a structured document from typed data and template."
+input_schema_ref: kernel.schemas.generate_document_input_v1
+output_schema_ref: kernel.schemas.generate_document_output_v1
+executor: structured_llm
+emits_events:
+  - action.started
+  - action.succeeded
+  - action.failed

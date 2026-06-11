@@ -1,0 +1,10 @@
+name: docs
+on: [pull_request]
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: test -f docs/index.md
+      - run: test -f docs/agent/harness-engineering-map.md
+      - run: test -f docs/exec-plans/template.md

@@ -1,0 +1,1 @@
+"""OpenAPI generation helper placeholder."""
