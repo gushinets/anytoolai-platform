@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-python scripts/agent/validate_configs.py
-python scripts/agent/validate_architecture.py
-PYTHONPATH=packages/backend/platform-core/src python -m pytest tests/architecture
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+exec "${PYTHON:-python}" "${REPO_ROOT}/scripts/agent/runner.py" quick-check

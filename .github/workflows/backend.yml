@@ -9,4 +9,4 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install pytest pyyaml
-      - run: python -m pytest tests/architecture
+      - run: python scripts/agent/runner.py full-check

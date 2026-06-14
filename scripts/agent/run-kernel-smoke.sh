@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-echo "Kernel smoke placeholder: runtime implementation will be added in MVP-A slices."
-PYTHONPATH=packages/backend/platform-core/src python -m pytest tests/e2e -q
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+exec "${PYTHON:-python}" "${REPO_ROOT}/scripts/agent/runner.py" kernel-smoke

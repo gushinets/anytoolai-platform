@@ -1,22 +1,31 @@
-.PHONY: doctor quick-check full-check validate-configs validate-architecture kernel-smoke generate-docs
+.PHONY: doctor quick-check full-check validate-configs validate-architecture kernel-smoke generate-docs dev-up dev-down reset-db
 
 doctor:
-	bash scripts/agent/doctor.sh
+	python scripts/agent/runner.py doctor
 
 quick-check:
-	bash scripts/agent/quick-check.sh
+	python scripts/agent/runner.py quick-check
 
 full-check:
-	bash scripts/agent/full-check.sh
+	python scripts/agent/runner.py full-check
 
 validate-configs:
-	bash scripts/agent/validate-configs.sh
+	python scripts/agent/runner.py validate-configs
 
 validate-architecture:
-	bash scripts/agent/validate-architecture.sh
+	python scripts/agent/runner.py validate-architecture
 
 kernel-smoke:
-	bash scripts/agent/run-kernel-smoke.sh
+	python scripts/agent/runner.py kernel-smoke
 
 generate-docs:
-	bash scripts/agent/generate-docs.sh
+	python scripts/agent/runner.py generate-docs
+
+dev-up:
+	python scripts/agent/runner.py dev-up
+
+dev-down:
+	python scripts/agent/runner.py dev-down
+
+reset-db:
+	python scripts/agent/runner.py reset-db

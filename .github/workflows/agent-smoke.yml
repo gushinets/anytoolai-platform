@@ -9,4 +9,4 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install pytest pyyaml
-      - run: bash scripts/agent/run-kernel-smoke.sh
+      - run: python scripts/agent/runner.py kernel-smoke

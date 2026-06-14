@@ -13,6 +13,14 @@ just validate-configs
 just validate-architecture
 ```
 
+`just` is the preferred command interface. On systems where `just` or shell integration is unavailable,
+run the cross-platform Python runner directly:
+
+```bash
+python scripts/agent/runner.py doctor
+python scripts/agent/runner.py quick-check
+```
+
 ## MVPs
 
 - MVP-A: Platform Kernel — execution runtime for typed atoms, workflows, scenario sessions, artifacts, events, guest quota, email capture, and handoff.

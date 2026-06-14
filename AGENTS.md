@@ -50,6 +50,9 @@ For any non-trivial work:
 3. Read the relevant architecture docs.
 4. Keep changes small and reviewable.
 
+`just` is the preferred local command interface. If `just` is unavailable or a shell integration fails,
+use the shell-independent fallback: `python scripts/agent/runner.py <command>`.
+
 ## Validation commands
 
 Fast check:
@@ -80,6 +83,12 @@ Kernel smoke:
 
 ```bash
 just kernel-smoke
+```
+
+Fallback form:
+
+```bash
+python scripts/agent/runner.py quick-check
 ```
 
 ## If stuck

@@ -12,6 +12,10 @@ This repository is built for AI-assisted development with Codex. Humans steer; a
 6. Run `just validate-architecture` after touching imports, package layout, providers, extensions, or product bundles.
 7. Update generated docs when schemas, OpenAPI, actions, or events change.
 
+`just` is the preferred local interface. If `just` is unavailable or shell integration fails, use
+`python scripts/agent/runner.py <command>` with the same command names, for example
+`python scripts/agent/runner.py quick-check`.
+
 ## Guardrails
 
 - Do not add product-specific logic to `platform-core`.

@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-docker compose -f infra/compose/docker-compose.yml up -d
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+exec "${PYTHON:-python}" "${REPO_ROOT}/scripts/agent/runner.py" dev-up
