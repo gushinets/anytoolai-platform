@@ -28,4 +28,6 @@ class EventEnvelope:
     result_status: str | None = None
     error_code: str | None = None
     acquisition_source: str | None = None
+    schema_version: int = 1
+    metadata: dict[str, Any] = field(default_factory=dict)
     properties: dict[str, Any] = field(default_factory=dict)
