@@ -2,10 +2,10 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-06-14
-- Last updated: 2026-06-14
+- Last updated: 2026-06-15
 
 ## Goal
 
@@ -79,6 +79,7 @@ Make agent and local utility commands run on Windows, Linux, and CI without requ
 | 2026-06-14 | Added Windows shell configuration for Just and verified `just doctor` plus `just quick-check`. | Ready for review. |
 | 2026-06-14 | Identified remaining Bash-backed recipes: `generate-docs`, `dev-up`, `dev-down`, and `reset-db`. | Extend the runner to own all `just` recipes. |
 | 2026-06-14 | Added `generate-docs`, `dev-up`, `dev-down`, and `reset-db` runner commands and removed Bash-backed Just recipes. | Avoid running Docker lifecycle commands unless explicitly needed. |
+| 2026-06-15 | Re-checked runner validation: `doctor`, `quick-check`, `full-check`, and `kernel-smoke` passed. Direct `just --summary` remains blocked by local Windows access to `just.exe`, not repo wiring. | Move plan to completed. |
 
 ## Open questions
 

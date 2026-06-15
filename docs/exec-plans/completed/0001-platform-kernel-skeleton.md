@@ -2,10 +2,11 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: mixed
 - Created: 2026-06-11
-- Last updated: 2026-06-11
+- Last updated: 2026-06-15
+- Completed: 2026-06-15
 
 ## Goal
 
@@ -29,9 +30,11 @@ Create the first-commit skeleton for AnytoolAI MVP-A with agent-friendly docs, c
 
 ## Validation
 
-- [ ] `just quick-check`
-- [ ] `just validate-configs`
-- [ ] `just validate-architecture`
+- [x] `just quick-check` equivalent: `python scripts/agent/runner.py quick-check`
+- [x] `just validate-configs` equivalent: `python scripts/agent/runner.py validate-configs`
+- [x] `just validate-architecture` equivalent: `python scripts/agent/runner.py validate-architecture`
+
+Note: direct `just` invocation was blocked by local Windows access permissions for `just.exe`; the repo-documented runner fallback passed.
 
 ## Decision log
 
@@ -45,3 +48,4 @@ Create the first-commit skeleton for AnytoolAI MVP-A with agent-friendly docs, c
 | Date | Progress | Next |
 |---|---|---|
 | 2026-06-11 | First skeleton created | Implement runtime slices |
+| 2026-06-15 | Verified skeleton scope and validation commands; moved plan to completed | Continue active runtime slice plans |
