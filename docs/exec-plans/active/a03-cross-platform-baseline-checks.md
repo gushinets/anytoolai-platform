@@ -75,6 +75,7 @@ Make baseline backend checks reproducible through one Python-owned command on Wi
 | 2026-06-16 | `python3.12 scripts/agent/quick_check.py`, `python3.12 scripts/agent/runner.py quick-check`, and `python3.12 scripts/agent/runner.py full-check` passed. Local `just quick-check` could not be executed here because `just` is not installed. | Move plan to completed. |
 | 2026-06-16 | Follow-up review found two gaps: quick-check could stay inside an unrelated active virtualenv, and docs did not spell out the `full-check`/test DB contract. Tightened re-exec semantics and documented that `quick-check` stays DB-free while DB-backed e2e must use an explicit test-only DB contract. | Re-run validation and close the review follow-up. |
 | 2026-06-16 | PR review found that narrowing `full-check` to `tests/e2e` dropped `freelancer-suite` bundle coverage. Added packaging metadata for the product bundle and restored that test to `full-check` without expanding baseline quick-check. | Re-run `full-check` and keep baseline scope unchanged. |
+| 2026-06-16 | Additional review flagged two bootstrap hygiene issues: stale unsupported quick-check venvs could survive across Python upgrades, and editable installs left `*.egg-info` metadata visible in the worktree. Added Python-version validation/recreation behavior for the quick-check venv and ignored editable-install metadata. | Re-run quick-check/full-check and verify git status stays clean. |
 
 ## Open questions
 

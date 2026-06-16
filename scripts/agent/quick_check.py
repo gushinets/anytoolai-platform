@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -9,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 VENV_DIR = ROOT / ".venv" / "quick-check"
+MINIMUM_PYTHON = (3, 12)
 EDITABLE_PROJECTS = [
     ROOT / "packages" / "backend" / "platform-sdk",
     ROOT / "packages" / "backend" / "platform-core",
@@ -75,6 +77,36 @@ def venv_python() -> Path:
     return VENV_DIR / scripts_dir / python_name
 
 
+def python_version(python_executable: Path) -> tuple[int, int] | None:
+    try:
+        completed = subprocess.run(
+            [str(python_executable), "-c", "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')"],
+            cwd=ROOT,
+            shell=False,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return None
+    if completed.returncode != 0:
+        return None
+    version_text = completed.stdout.strip()
+    try:
+        major, minor = version_text.split(".", maxsplit=1)
+        return int(major), int(minor)
+    except ValueError:
+        return None
+
+
+def recreate_virtualenv() -> None:
+    shutil.rmtree(VENV_DIR, ignore_errors=True)
+
+
+def invoking_python_supported() -> bool:
+    return sys.version_info >= MINIMUM_PYTHON
+
+
 def is_quick_check_environment() -> bool:
     try:
         return Path(sys.prefix).resolve() == VENV_DIR.resolve()
@@ -84,6 +116,40 @@ def is_quick_check_environment() -> bool:
 
 def ensure_virtualenv() -> int | None:
     expected_python = venv_python()
+    existing_version = python_version(expected_python) if expected_python.exists() else None
+    if is_quick_check_environment():
+        minimum_version = ".".join(str(part) for part in MINIMUM_PYTHON)
+        if sys.version_info < MINIMUM_PYTHON:
+            print(
+                f"Active {VENV_DIR} uses Python {sys.version_info[0]}.{sys.version_info[1]}, "
+                f"but quick-check requires >= {minimum_version}. Re-run the command with a "
+                "supported interpreter to recreate the environment.",
+                file=sys.stderr,
+            )
+            return 1
+        return None
+
+    if existing_version is not None and existing_version < MINIMUM_PYTHON:
+        recreate_virtualenv()
+        expected_python = venv_python()
+        existing_version = None
+    elif expected_python.exists() and existing_version is None:
+        recreate_virtualenv()
+        expected_python = venv_python()
+
+    if not invoking_python_supported():
+        minimum_version = ".".join(str(part) for part in MINIMUM_PYTHON)
+        if existing_version is not None:
+            env = os.environ.copy()
+            env["ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED"] = "1"
+            return run_with_env([str(expected_python), str(Path(__file__).resolve())], env)
+        print(
+            f"Quick-check requires Python >= {minimum_version} to create {VENV_DIR}. "
+            f"Run it with python{minimum_version} or py -{minimum_version}.",
+            file=sys.stderr,
+        )
+        return 1
+
     if not expected_python.exists():
         exit_code = run([sys.executable, "-m", "venv", str(VENV_DIR)])
         if exit_code != 0:
