@@ -14,6 +14,12 @@ def load_quick_check_module():
     return module
 
 
+def venv_python_path(venv_root: Path, *, windows: bool) -> Path:
+    scripts_dir = "Scripts" if windows else "bin"
+    python_name = "python.exe" if windows else "python"
+    return venv_root / scripts_dir / python_name
+
+
 def test_environment_detection_distinguishes_new_and_legacy_venvs(monkeypatch, tmp_path) -> None:
     quick_check = load_quick_check_module()
     repo_root = tmp_path / "repo"
@@ -40,7 +46,8 @@ def test_ensure_virtualenv_keeps_active_legacy_environment_until_reexec(
     repo_root = tmp_path / "repo"
     new_venv = repo_root / ".quick-check-venv"
     legacy_venv = repo_root / ".venv" / "quick-check"
-    expected_python = new_venv / "bin" / "python"
+    expected_python = venv_python_path(new_venv, windows=quick_check.os.name == "nt")
+    legacy_python = venv_python_path(legacy_venv, windows=quick_check.os.name == "nt")
     script_path = Path(quick_check.__file__).resolve()
 
     new_venv.mkdir(parents=True)
@@ -52,7 +59,7 @@ def test_ensure_virtualenv_keeps_active_legacy_environment_until_reexec(
     monkeypatch.setattr(quick_check, "VENV_DIR", new_venv)
     monkeypatch.setattr(quick_check, "LEGACY_VENV_DIR", legacy_venv)
     monkeypatch.setattr(quick_check.sys, "prefix", str(legacy_venv))
-    monkeypatch.setattr(quick_check.sys, "executable", str(legacy_venv / "bin" / "python"))
+    monkeypatch.setattr(quick_check.sys, "executable", str(legacy_python))
     monkeypatch.setattr(quick_check.sys, "version_info", (3, 12, 1))
 
     migrate_calls: list[str] = []
@@ -89,7 +96,7 @@ def test_ensure_virtualenv_cleans_legacy_environment_once_new_environment_is_act
     repo_root = tmp_path / "repo"
     new_venv = repo_root / ".quick-check-venv"
     legacy_venv = repo_root / ".venv" / "quick-check"
-    expected_python = new_venv / "bin" / "python"
+    expected_python = venv_python_path(new_venv, windows=quick_check.os.name == "nt")
 
     new_venv.mkdir(parents=True)
     expected_python.parent.mkdir(parents=True)
