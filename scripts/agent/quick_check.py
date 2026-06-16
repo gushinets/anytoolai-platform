@@ -121,18 +121,30 @@ def invoking_python_supported() -> bool:
     return sys.version_info >= MINIMUM_PYTHON
 
 
+def environment_root() -> Path:
+    return Path(sys.prefix).resolve()
+
+
 def is_quick_check_environment() -> bool:
     try:
-        return Path(sys.prefix).resolve() == VENV_DIR.resolve()
+        return environment_root() == VENV_DIR.resolve()
+    except OSError:
+        return False
+
+
+def is_legacy_quick_check_environment() -> bool:
+    try:
+        return environment_root() == LEGACY_VENV_DIR.resolve()
     except OSError:
         return False
 
 
 def ensure_virtualenv() -> int | None:
-    migrate_legacy_virtualenv()
     expected_python = venv_python()
+    active_legacy_environment = is_legacy_quick_check_environment()
     existing_version = python_version(expected_python) if expected_python.exists() else None
     if is_quick_check_environment():
+        migrate_legacy_virtualenv()
         minimum_version = ".".join(str(part) for part in MINIMUM_PYTHON)
         if sys.version_info < MINIMUM_PYTHON:
             print(
@@ -171,6 +183,7 @@ def ensure_virtualenv() -> int | None:
             return exit_code
 
     if is_quick_check_environment():
+        migrate_legacy_virtualenv()
         return None
     if os.environ.get("ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED") == "1":
         print(
@@ -178,6 +191,9 @@ def ensure_virtualenv() -> int | None:
             file=sys.stderr,
         )
         return 1
+
+    if not active_legacy_environment:
+        migrate_legacy_virtualenv()
 
     env = os.environ.copy()
     env["ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED"] = "1"
