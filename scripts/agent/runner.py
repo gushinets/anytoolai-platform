@@ -19,7 +19,7 @@ SOURCE_ROOTS = [
     ROOT / "apps" / "platform-api" / "src",
     ROOT / "apps" / "platform-worker" / "src",
 ]
-REQUIRED_MODULES = ["pytest", "yaml"]
+REQUIRED_MODULES = ["pytest", "yaml", "pydantic"]
 OPTIONAL_TOOLS = ["node", "pnpm", "just", "docker"]
 ACTION_REGISTRY_ROWS = [
     ("A01 `extract_structured`", "`text.extract_structured_fields`"),
