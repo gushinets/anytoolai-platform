@@ -163,3 +163,21 @@ def test_loader_fails_on_missing_schema_reference(tmp_path: Path) -> None:
         ref_type="input_schema_ref",
         ref_value="kernel_demo.missing_schema_v1",
     )
+
+
+def test_loader_fails_on_missing_provider_policy_fallback_reference(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "provider_policies.yaml"
+    data = _load_yaml(path)
+    data["provider_policies"][0]["fallback_policy"] = "missing_provider_policy_v1"
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_broken_reference(
+        exc_info.value.errors,
+        config_id="default_fake_provider_v1",
+        ref_type="fallback_policy",
+        ref_value="missing_provider_policy_v1",
+    )

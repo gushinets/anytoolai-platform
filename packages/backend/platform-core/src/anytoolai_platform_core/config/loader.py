@@ -798,6 +798,23 @@ class ConfigLoader:
                 ref_value=action_def.output_schema_ref,
             )
 
+        for policy_id, provider_policy in self.provider_policies.items():
+            if provider_policy.fallback_policy is None:
+                continue
+            source_path = self._source_for(
+                "provider_policy",
+                policy_id,
+                self.config_root / "provider_policies.yaml",
+            )
+            self._validate_reference(
+                config_id=policy_id,
+                file_path=source_path,
+                ref_type="fallback_policy",
+                ref_value=provider_policy.fallback_policy,
+                target_registry=self.provider_policies,
+                target_type="provider_policy",
+            )
+
         for config_id, action_config in self.action_configurations.items():
             source_path = self._source_for(
                 "action_config",
