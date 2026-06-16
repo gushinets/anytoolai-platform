@@ -1,11 +1,12 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+SKIP_PATH_PARTS = {".venv", ".quick-check-venv", "tests", "scripts"}
 
 
 def test_no_direct_openai_imports_outside_provider_adapter() -> None:
     for path in ROOT.rglob("*.py"):
-        if ".venv" in path.parts or "tests" in path.parts or "scripts" in path.parts:
+        if any(part in SKIP_PATH_PARTS for part in path.parts):
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
         if "import openai" in text or "from openai" in text:
