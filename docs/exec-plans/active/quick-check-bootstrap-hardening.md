@@ -43,6 +43,7 @@ Harden the quick-check bootstrap and legacy-venv migration flow so review-discov
 
 - [x] Fix legacy active-venv migration ordering in `scripts/agent/quick_check.py`.
 - [x] Add tests for safe cleanup and legacy/new environment detection.
+- [x] Ensure the new quick-check bootstrap tests are included in the baseline target list.
 - [x] Run focused pytest coverage for quick-check bootstrap and architecture exclusions.
 
 ## Validation
@@ -63,6 +64,7 @@ Harden the quick-check bootstrap and legacy-venv migration flow so review-discov
 |---|---|---|
 | 2026-06-16 | Reviewed the latest MR comment and current `quick_check.py` flow. Confirmed `migrate_legacy_virtualenv()` currently runs before any active-environment guard and can delete the interpreter backing the current process. | Patch migration ordering and add focused tests. |
 | 2026-06-16 | Reordered legacy cleanup so active legacy environments survive until re-exec, added focused tests for environment detection and cleanup timing, and re-ran the targeted architecture and bundle regressions. | No further required fix found in the reviewed quick-check bootstrap paths. |
+| 2026-06-16 | Follow-up review pointed out that the new bootstrap regression tests were not part of `quick-check` or `full-check`. Added `tests/test_quick_check.py` to the baseline pytest target list without broadening coverage to unrelated root tests. | Re-run the focused bootstrap and regression checks. |
 
 ## Open questions
 

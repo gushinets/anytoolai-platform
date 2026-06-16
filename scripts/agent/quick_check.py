@@ -21,6 +21,7 @@ EDITABLE_PROJECTS = [
 ]
 PYTEST_TARGETS = [
     "tests/architecture",
+    "tests/test_quick_check.py",
     "packages/backend/platform-sdk/tests",
     "packages/backend/platform-core/tests",
     "packages/backend/platform-actions/tests",
