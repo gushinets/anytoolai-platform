@@ -69,6 +69,7 @@ just quick-check
 Baseline quick-check includes config validation, architecture validation, and a DB-free backend pytest subset.
 It does not provision a test DB and does not include frontend checks, `tests/e2e`, or `kernel-smoke`.
 The Python entrypoint self-manages `.venv/quick-check` instead of installing into a system interpreter.
+It must re-exec into that environment even if the caller already has another virtualenv active.
 
 Full check:
 
@@ -77,6 +78,8 @@ just full-check
 ```
 
 Use full check or dedicated smoke commands for broader validation outside the baseline gate.
+`just full-check` currently runs the same baseline and then `tests/e2e`.
+Those e2e placeholders are DB-free today; when DB-backed coverage is introduced, use an explicit test-only DB contract there instead of changing quick-check.
 
 Config validation:
 

@@ -75,17 +75,28 @@ def venv_python() -> Path:
     return VENV_DIR / scripts_dir / python_name
 
 
-def ensure_virtualenv() -> int | None:
-    if sys.prefix != sys.base_prefix:
-        return None
-    if os.environ.get("ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED") == "1":
-        return None
+def is_quick_check_environment() -> bool:
+    try:
+        return Path(sys.prefix).resolve() == VENV_DIR.resolve()
+    except OSError:
+        return False
 
+
+def ensure_virtualenv() -> int | None:
     expected_python = venv_python()
     if not expected_python.exists():
         exit_code = run([sys.executable, "-m", "venv", str(VENV_DIR)])
         if exit_code != 0:
             return exit_code
+
+    if is_quick_check_environment():
+        return None
+    if os.environ.get("ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED") == "1":
+        print(
+            "Quick-check bootstrap expected to re-enter via .venv/quick-check but did not.",
+            file=sys.stderr,
+        )
+        return 1
 
     env = os.environ.copy()
     env["ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED"] = "1"

@@ -73,6 +73,7 @@ Make baseline backend checks reproducible through one Python-owned command on Wi
 | 2026-06-16 | Ran `python3 scripts/agent/runner.py doctor`; local shell has Python 3.10 and lacks `pytest`/`pyyaml`. | Use the new quick-check bootstrap to install dependencies, then run validation. |
 | 2026-06-16 | Implemented Python-owned quick-check, switched package installs to editable mode, added self-managed `.venv/quick-check`, rewired runner/CI/docs, and updated `justfile` to use `python3` or `py -3` by platform. | Validate sequentially with the new entrypoint and close the plan. |
 | 2026-06-16 | `python3.12 scripts/agent/quick_check.py`, `python3.12 scripts/agent/runner.py quick-check`, and `python3.12 scripts/agent/runner.py full-check` passed. Local `just quick-check` could not be executed here because `just` is not installed. | Move plan to completed. |
+| 2026-06-16 | Follow-up review found two gaps: quick-check could stay inside an unrelated active virtualenv, and docs did not spell out the `full-check`/test DB contract. Tightened re-exec semantics and documented that `quick-check` stays DB-free while DB-backed e2e must use an explicit test-only DB contract. | Re-run validation and close the review follow-up. |
 
 ## Open questions
 
