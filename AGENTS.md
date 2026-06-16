@@ -68,7 +68,7 @@ just quick-check
 
 Baseline quick-check includes config validation, architecture validation, and a DB-free backend pytest subset.
 It does not provision a test DB and does not include frontend checks, `tests/e2e`, or `kernel-smoke`.
-The Python entrypoint self-manages `.venv/quick-check` instead of installing into a system interpreter.
+The Python entrypoint self-manages `.quick-check-venv` instead of installing into a system interpreter.
 It must re-exec into that environment even if the caller already has another virtualenv active.
 
 Full check:

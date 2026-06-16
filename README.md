@@ -22,8 +22,8 @@ just validate-architecture
 - a DB-free backend pytest subset
 
 It intentionally excludes frontend checks, `tests/e2e`, `kernel-smoke`, and any test DB provisioning.
-The script self-manages `.venv/quick-check` so it does not need to install packages into a system Python.
-It always re-execs into `.venv/quick-check`, even if you started from another active virtualenv.
+The script self-manages `.quick-check-venv` so it does not need to install packages into a system Python.
+It always re-execs into `.quick-check-venv`, even if you started from another active virtualenv.
 
 On systems where `just` or shell integration is unavailable, run the Python baseline entrypoint directly:
 

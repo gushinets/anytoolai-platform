@@ -9,7 +9,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-VENV_DIR = ROOT / ".venv" / "quick-check"
+VENV_DIR = ROOT / ".quick-check-venv"
+LEGACY_VENV_DIR = ROOT / ".venv" / "quick-check"
 MINIMUM_PYTHON = (3, 12)
 EDITABLE_PROJECTS = [
     ROOT / "packages" / "backend" / "platform-sdk",
@@ -103,6 +104,19 @@ def recreate_virtualenv() -> None:
     shutil.rmtree(VENV_DIR, ignore_errors=True)
 
 
+def migrate_legacy_virtualenv() -> None:
+    if not LEGACY_VENV_DIR.exists():
+        return
+
+    shutil.rmtree(LEGACY_VENV_DIR, ignore_errors=True)
+
+    legacy_parent = LEGACY_VENV_DIR.parent
+    try:
+        legacy_parent.rmdir()
+    except OSError:
+        pass
+
+
 def invoking_python_supported() -> bool:
     return sys.version_info >= MINIMUM_PYTHON
 
@@ -115,6 +129,7 @@ def is_quick_check_environment() -> bool:
 
 
 def ensure_virtualenv() -> int | None:
+    migrate_legacy_virtualenv()
     expected_python = venv_python()
     existing_version = python_version(expected_python) if expected_python.exists() else None
     if is_quick_check_environment():
@@ -159,7 +174,7 @@ def ensure_virtualenv() -> int | None:
         return None
     if os.environ.get("ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED") == "1":
         print(
-            "Quick-check bootstrap expected to re-enter via .venv/quick-check but did not.",
+            "Quick-check bootstrap expected to re-enter via .quick-check-venv but did not.",
             file=sys.stderr,
         )
         return 1
