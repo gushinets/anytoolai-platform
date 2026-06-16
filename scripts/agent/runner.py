@@ -19,6 +19,8 @@ SOURCE_ROOTS = [
     ROOT / "apps" / "platform-api" / "src",
     ROOT / "apps" / "platform-worker" / "src",
 ]
+QUICK_CHECK_VENV = ROOT / ".quick-check-venv"
+FREELANCER_SUITE_ROOT = ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite"
 REQUIRED_MODULES = ["pytest", "yaml", "pydantic"]
 OPTIONAL_TOOLS = ["node", "pnpm", "just", "docker"]
 ACTION_REGISTRY_ROWS = [
@@ -67,6 +69,15 @@ def runner_env() -> dict[str, str]:
 
 def print_command(command: Sequence[str]) -> None:
     print("+ " + " ".join(command), flush=True)
+
+
+def quick_check_python() -> str:
+    scripts_dir = "Scripts" if os.name == "nt" else "bin"
+    python_name = "python.exe" if os.name == "nt" else "python"
+    candidate = QUICK_CHECK_VENV / scripts_dir / python_name
+    if candidate.exists():
+        return str(candidate)
+    return sys.executable
 
 
 def run(command: Sequence[str]) -> int:
@@ -129,20 +140,36 @@ def validate_architecture() -> int:
 
 
 def quick_check() -> int:
-    return run_sequence(
-        [
-            [sys.executable, "scripts/agent/validate_configs.py"],
-            [sys.executable, "scripts/agent/validate_architecture.py"],
-            [sys.executable, "-m", "pytest", "tests/architecture"],
-        ]
-    )
+    return run([sys.executable, "scripts/agent/quick_check.py"])
 
 
 def full_check() -> int:
     exit_code = quick_check()
     if exit_code != 0:
         return exit_code
-    return run([sys.executable, "-m", "pytest"])
+    exit_code = run(
+        [
+            quick_check_python(),
+            "-m",
+            "pip",
+            "install",
+            "--no-build-isolation",
+            "--no-deps",
+            "-e",
+            str(FREELANCER_SUITE_ROOT),
+        ]
+    )
+    if exit_code != 0:
+        return exit_code
+    return run(
+        [
+            quick_check_python(),
+            "-m",
+            "pytest",
+            "tests/e2e",
+            "packages/backend/product-platforms/freelancer-suite/tests",
+        ]
+    )
 
 
 def kernel_smoke() -> int:

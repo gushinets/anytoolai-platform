@@ -51,7 +51,12 @@ For any non-trivial work:
 4. Keep changes small and reviewable.
 
 `just` is the preferred local command interface. If `just` is unavailable or a shell integration fails,
-use the shell-independent fallback: `python scripts/agent/runner.py <command>`.
+use the shell-independent fallback command that matches the task:
+
+- baseline backend checks: `python3 scripts/agent/quick_check.py`
+- other repo commands: `python3 scripts/agent/runner.py <command>`
+
+Windows fallback for baseline backend checks: `py -3 scripts/agent/quick_check.py`
 
 ## Validation commands
 
@@ -61,11 +66,17 @@ Fast check:
 just quick-check
 ```
 
+Baseline quick-check includes config validation, architecture validation, and a DB-free backend pytest subset.
+It does not provision a test DB and does not include frontend checks, `tests/e2e`, or `kernel-smoke`.
+The Python entrypoint self-manages `.venv/quick-check` instead of installing into a system interpreter.
+
 Full check:
 
 ```bash
 just full-check
 ```
+
+Use full check or dedicated smoke commands for broader validation outside the baseline gate.
 
 Config validation:
 
@@ -88,7 +99,7 @@ just kernel-smoke
 Fallback form:
 
 ```bash
-python scripts/agent/runner.py quick-check
+python3 scripts/agent/quick_check.py
 ```
 
 ## If stuck

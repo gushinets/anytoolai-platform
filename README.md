@@ -13,12 +13,34 @@ just validate-configs
 just validate-architecture
 ```
 
-`just` is the preferred command interface. On systems where `just` or shell integration is unavailable,
-run the cross-platform Python runner directly:
+`just` is the preferred human-facing command interface.
+
+`just quick-check` is the baseline backend gate. It includes:
+
+- config validation
+- architecture validation
+- a DB-free backend pytest subset
+
+It intentionally excludes frontend checks, `tests/e2e`, `kernel-smoke`, and any test DB provisioning.
+The script self-manages `.venv/quick-check` so it does not need to install packages into a system Python.
+
+On systems where `just` or shell integration is unavailable, run the Python baseline entrypoint directly:
 
 ```bash
-python scripts/agent/runner.py doctor
-python scripts/agent/runner.py quick-check
+python3 scripts/agent/quick_check.py
+```
+
+Windows fallback:
+
+```powershell
+py -3 scripts/agent/quick_check.py
+```
+
+Other Python-owned commands still route through the runner:
+
+```bash
+python3 scripts/agent/runner.py doctor
+python3 scripts/agent/runner.py full-check
 ```
 
 ## MVPs
