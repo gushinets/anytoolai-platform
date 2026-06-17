@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=82", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "anytoolai-monorepo"
 version = "0.1.0"
@@ -28,6 +32,9 @@ dev = [
   "mypy>=1.10",
   "httpx>=0.27",
 ]
+
+[tool.setuptools]
+py-modules = []
 
 [tool.uv]
 default-groups = ["dev"]
