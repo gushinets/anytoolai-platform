@@ -13,6 +13,7 @@ VENV_DIR = ROOT / ".quick-check-venv"
 LEGACY_VENV_DIR = ROOT / ".venv" / "quick-check"
 TMP_ROOT = ROOT / ".quick-check-tmp"
 MINIMUM_PYTHON = (3, 12)
+ROOT_BUILD_REQUIREMENTS = ["setuptools>=82", "wheel"]
 EDITABLE_PROJECTS = [
     ROOT / "packages" / "backend" / "platform-sdk",
     ROOT / "packages" / "backend" / "platform-core",
@@ -233,7 +234,7 @@ def ensure_virtualenv() -> int | None:
 
 def bootstrap() -> int:
     commands: list[list[str]] = [
-        uv_install_command("setuptools>=68", "wheel", python=sys.executable),
+        uv_install_command("--upgrade", *ROOT_BUILD_REQUIREMENTS, python=sys.executable),
         uv_install_command("--no-build-isolation", "-e", ".[dev]", python=sys.executable),
     ]
     for project in EDITABLE_PROJECTS:

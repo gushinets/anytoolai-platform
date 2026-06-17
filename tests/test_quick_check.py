@@ -152,7 +152,8 @@ def test_bootstrap_uses_uv_for_all_install_steps(monkeypatch, tmp_path) -> None:
             "install",
             "--python",
             "/tmp/.quick-check-venv/bin/python",
-            "setuptools>=68",
+            "--upgrade",
+            "setuptools>=82",
             "wheel",
         ],
         [
