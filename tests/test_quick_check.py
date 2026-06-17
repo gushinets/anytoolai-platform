@@ -121,3 +121,70 @@ def test_ensure_virtualenv_cleans_legacy_environment_once_new_environment_is_act
 
     assert exit_code is None
     assert migrate_calls == ["migrate"]
+
+
+def test_bootstrap_uses_uv_for_all_install_steps(monkeypatch, tmp_path) -> None:
+    quick_check = load_quick_check_module()
+    project_one = tmp_path / "project-one"
+    project_two = tmp_path / "project-two"
+    commands: list[list[str]] = []
+
+    monkeypatch.setattr(quick_check.sys, "executable", "/tmp/.quick-check-venv/bin/python")
+    monkeypatch.setattr(quick_check, "EDITABLE_PROJECTS", [project_one, project_two])
+    monkeypatch.setattr(
+        quick_check.shutil,
+        "which",
+        lambda name: "/usr/local/bin/uv" if name == "uv" else None,
+    )
+    monkeypatch.setattr(
+        quick_check,
+        "run_sequence",
+        lambda sequence: commands.extend(list(command) for command in sequence) or 0,
+    )
+
+    exit_code = quick_check.bootstrap()
+
+    assert exit_code == 0
+    assert commands == [
+        [
+            "/usr/local/bin/uv",
+            "pip",
+            "install",
+            "--python",
+            "/tmp/.quick-check-venv/bin/python",
+            "setuptools>=68",
+            "wheel",
+        ],
+        [
+            "/usr/local/bin/uv",
+            "pip",
+            "install",
+            "--python",
+            "/tmp/.quick-check-venv/bin/python",
+            "--no-build-isolation",
+            "-e",
+            ".[dev]",
+        ],
+        [
+            "/usr/local/bin/uv",
+            "pip",
+            "install",
+            "--python",
+            "/tmp/.quick-check-venv/bin/python",
+            "--no-build-isolation",
+            "--no-deps",
+            "-e",
+            str(project_one),
+        ],
+        [
+            "/usr/local/bin/uv",
+            "pip",
+            "install",
+            "--python",
+            "/tmp/.quick-check-venv/bin/python",
+            "--no-build-isolation",
+            "--no-deps",
+            "-e",
+            str(project_two),
+        ],
+    ]

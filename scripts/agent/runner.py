@@ -22,7 +22,7 @@ SOURCE_ROOTS = [
 QUICK_CHECK_VENV = ROOT / ".quick-check-venv"
 FREELANCER_SUITE_ROOT = ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite"
 REQUIRED_MODULES = ["pytest", "yaml", "pydantic"]
-OPTIONAL_TOOLS = ["node", "pnpm", "just", "docker"]
+OPTIONAL_TOOLS = ["uv", "node", "pnpm", "just", "docker"]
 ACTION_REGISTRY_ROWS = [
     ("A01 `extract_structured`", "`text.extract_structured_fields`"),
     ("A04 `detect_issues`", "`text.detect_issues_by_taxonomy`"),
@@ -69,6 +69,15 @@ def runner_env() -> dict[str, str]:
 
 def print_command(command: Sequence[str]) -> None:
     print("+ " + " ".join(command), flush=True)
+
+
+def uv_executable() -> str:
+    candidate = shutil.which("uv")
+    return candidate if candidate is not None else "uv"
+
+
+def uv_install_command(*args: str, python: str) -> list[str]:
+    return [uv_executable(), "pip", "install", "--python", python, *args]
 
 
 def quick_check_python() -> str:
@@ -148,16 +157,13 @@ def full_check() -> int:
     if exit_code != 0:
         return exit_code
     exit_code = run(
-        [
-            quick_check_python(),
-            "-m",
-            "pip",
-            "install",
+        uv_install_command(
             "--no-build-isolation",
             "--no-deps",
             "-e",
             str(FREELANCER_SUITE_ROOT),
-        ]
+            python=quick_check_python(),
+        )
     )
     if exit_code != 0:
         return exit_code

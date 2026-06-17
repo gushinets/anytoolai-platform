@@ -79,6 +79,15 @@ def venv_python() -> Path:
     return VENV_DIR / scripts_dir / python_name
 
 
+def uv_executable() -> str:
+    candidate = shutil.which("uv")
+    return candidate if candidate is not None else "uv"
+
+
+def uv_install_command(*args: str, python: str) -> list[str]:
+    return [uv_executable(), "pip", "install", "--python", python, *args]
+
+
 def python_version(python_executable: Path) -> tuple[int, int] | None:
     try:
         completed = subprocess.run(
@@ -203,21 +212,18 @@ def ensure_virtualenv() -> int | None:
 
 def bootstrap() -> int:
     commands: list[list[str]] = [
-        [sys.executable, "-m", "pip", "install", "setuptools>=68", "wheel"],
-        [sys.executable, "-m", "pip", "install", "--no-build-isolation", "-e", ".[dev]"],
+        uv_install_command("setuptools>=68", "wheel", python=sys.executable),
+        uv_install_command("--no-build-isolation", "-e", ".[dev]", python=sys.executable),
     ]
     for project in EDITABLE_PROJECTS:
         commands.append(
-            [
-                sys.executable,
-                "-m",
-                "pip",
-                "install",
+            uv_install_command(
                 "--no-build-isolation",
                 "--no-deps",
                 "-e",
                 str(project),
-            ]
+                python=sys.executable,
+            )
         )
     return run_sequence(commands)
 
