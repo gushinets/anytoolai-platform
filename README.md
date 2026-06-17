@@ -34,6 +34,12 @@ python3 scripts/agent/quick_check.py
 Windows fallback:
 
 ```powershell
+python scripts/agent/quick_check.py
+```
+
+Secondary Windows fallback when the Python launcher is configured:
+
+```powershell
 py -3 scripts/agent/quick_check.py
 ```
 

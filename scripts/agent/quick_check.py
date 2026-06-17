@@ -11,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 VENV_DIR = ROOT / ".quick-check-venv"
 LEGACY_VENV_DIR = ROOT / ".venv" / "quick-check"
+TMP_ROOT = ROOT / ".quick-check-tmp"
 MINIMUM_PYTHON = (3, 12)
 EDITABLE_PROJECTS = [
     ROOT / "packages" / "backend" / "platform-sdk",
@@ -22,6 +23,7 @@ EDITABLE_PROJECTS = [
 PYTEST_TARGETS = [
     "tests/architecture",
     "tests/test_quick_check.py",
+    "tests/test_runner.py",
     "packages/backend/platform-sdk/tests",
     "packages/backend/platform-core/tests",
     "packages/backend/platform-actions/tests",
@@ -34,12 +36,30 @@ def print_command(command: Sequence[str]) -> None:
     print("+ " + " ".join(command), flush=True)
 
 
+def runtime_env(base: dict[str, str] | None = None) -> dict[str, str]:
+    env = os.environ.copy() if base is None else dict(base)
+    tmp_dir = TMP_ROOT / "tmp"
+    uv_cache_dir = TMP_ROOT / "uv-cache"
+    pip_cache_dir = TMP_ROOT / "pip-cache"
+    pytest_tmp_dir = TMP_ROOT / "pytest"
+    for path in (tmp_dir, uv_cache_dir, pip_cache_dir, pytest_tmp_dir):
+        path.mkdir(parents=True, exist_ok=True)
+    env["TMPDIR"] = str(tmp_dir)
+    env["TMP"] = str(tmp_dir)
+    env["TEMP"] = str(tmp_dir)
+    env["UV_CACHE_DIR"] = str(uv_cache_dir)
+    env["PIP_CACHE_DIR"] = str(pip_cache_dir)
+    env["PYTEST_DEBUG_TEMPROOT"] = str(pytest_tmp_dir)
+    return env
+
+
 def run(command: Sequence[str]) -> int:
     print_command(command)
     try:
         completed = subprocess.run(
             list(command),
             cwd=ROOT,
+            env=runtime_env(),
             shell=False,
             check=False,
         )
@@ -55,7 +75,7 @@ def run_with_env(command: Sequence[str], env: dict[str, str]) -> int:
         completed = subprocess.run(
             list(command),
             cwd=ROOT,
-            env=env,
+            env=runtime_env(env),
             shell=False,
             check=False,
         )
@@ -93,6 +113,7 @@ def python_version(python_executable: Path) -> tuple[int, int] | None:
         completed = subprocess.run(
             [str(python_executable), "-c", "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')"],
             cwd=ROOT,
+            env=runtime_env(),
             shell=False,
             check=False,
             capture_output=True,

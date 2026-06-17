@@ -1,5 +1,5 @@
 set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-Command"]
-python_cmd := if os() == "windows" { "py -3" } else { "python3" }
+python_cmd := if os() == "windows" { "python" } else { "python3" }
 
 doctor:
     {{python_cmd}} scripts/agent/runner.py doctor

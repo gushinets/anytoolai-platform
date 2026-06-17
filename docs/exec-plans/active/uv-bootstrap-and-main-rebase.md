@@ -69,6 +69,7 @@ Replace remaining direct `pip` usage in the repo's Python bootstrap/check flows 
 |---|---|---|
 | 2026-06-17 | Read required architecture docs, confirmed `just` is unavailable in this environment, and located the remaining direct `pip` usage in `scripts/agent/quick_check.py` and `scripts/agent/runner.py`. | Patch the scripts, add focused tests, validate, and rebase. |
 | 2026-06-17 | Migrated the remaining direct install calls to `uv`, updated CI to bootstrap `uv`, added focused regression tests, and rebased `cross-platform` onto `origin/main`. | Share the result and note the local validation blockers caused by the current Python/tooling environment. |
+| 2026-06-17 | Follow-up PR review flagged Windows launcher assumptions, missing workspace-owned temp/cache dirs, baseline-only PR CI, missing `test_runner.py` gate coverage, and `doctor` treating `uv` as optional. | Patch the fallback/docs/CI/bootstrap behavior and extend the focused regression tests. |
 
 ## Open questions
 

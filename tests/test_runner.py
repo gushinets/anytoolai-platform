@@ -45,3 +45,40 @@ def test_full_check_uses_uv_for_freelancer_suite_install(monkeypatch) -> None:
         "tests/e2e",
         "packages/backend/product-platforms/freelancer-suite/tests",
     ]
+
+
+def test_runner_env_uses_workspace_owned_temp_and_cache_dirs(monkeypatch, tmp_path) -> None:
+    runner = load_runner_module()
+    repo_root = tmp_path / "repo"
+    tmp_root = repo_root / ".quick-check-tmp"
+
+    monkeypatch.setattr(runner, "ROOT", repo_root)
+    monkeypatch.setattr(runner, "TMP_ROOT", tmp_root)
+    monkeypatch.setenv("PYTHONPATH", "/existing/path")
+
+    env = runner.runner_env()
+
+    assert env["TMPDIR"] == str(tmp_root / "tmp")
+    assert env["TMP"] == str(tmp_root / "tmp")
+    assert env["TEMP"] == str(tmp_root / "tmp")
+    assert env["UV_CACHE_DIR"] == str(tmp_root / "uv-cache")
+    assert env["PIP_CACHE_DIR"] == str(tmp_root / "pip-cache")
+    assert env["PYTEST_DEBUG_TEMPROOT"] == str(tmp_root / "pytest")
+    assert str(repo_root / "packages" / "backend" / "platform-core" / "src") in env["PYTHONPATH"]
+    assert "/existing/path" in env["PYTHONPATH"]
+
+
+def test_doctor_requires_uv(monkeypatch) -> None:
+    runner = load_runner_module()
+
+    monkeypatch.setattr(runner.sys, "version_info", (3, 12, 1))
+    monkeypatch.setattr(runner.importlib.util, "find_spec", lambda module: object())
+    monkeypatch.setattr(
+        runner.shutil,
+        "which",
+        lambda name: None if name == "uv" else f"/usr/local/bin/{name}",
+    )
+
+    exit_code = runner.doctor()
+
+    assert exit_code == 1

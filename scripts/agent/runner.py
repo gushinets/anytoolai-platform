@@ -20,9 +20,11 @@ SOURCE_ROOTS = [
     ROOT / "apps" / "platform-worker" / "src",
 ]
 QUICK_CHECK_VENV = ROOT / ".quick-check-venv"
+TMP_ROOT = ROOT / ".quick-check-tmp"
 FREELANCER_SUITE_ROOT = ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite"
 REQUIRED_MODULES = ["pytest", "yaml", "pydantic"]
-OPTIONAL_TOOLS = ["uv", "node", "pnpm", "just", "docker"]
+REQUIRED_TOOLS = ["uv"]
+OPTIONAL_TOOLS = ["node", "pnpm", "just", "docker"]
 ACTION_REGISTRY_ROWS = [
     ("A01 `extract_structured`", "`text.extract_structured_fields`"),
     ("A04 `detect_issues`", "`text.detect_issues_by_taxonomy`"),
@@ -62,8 +64,20 @@ def build_pythonpath() -> str:
 
 
 def runner_env() -> dict[str, str]:
+    tmp_dir = TMP_ROOT / "tmp"
+    uv_cache_dir = TMP_ROOT / "uv-cache"
+    pip_cache_dir = TMP_ROOT / "pip-cache"
+    pytest_tmp_dir = TMP_ROOT / "pytest"
+    for path in (tmp_dir, uv_cache_dir, pip_cache_dir, pytest_tmp_dir):
+        path.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     env["PYTHONPATH"] = build_pythonpath()
+    env["TMPDIR"] = str(tmp_dir)
+    env["TMP"] = str(tmp_dir)
+    env["TEMP"] = str(tmp_dir)
+    env["UV_CACHE_DIR"] = str(uv_cache_dir)
+    env["PIP_CACHE_DIR"] = str(pip_cache_dir)
+    env["PYTEST_DEBUG_TEMPROOT"] = str(pytest_tmp_dir)
     return env
 
 
@@ -126,6 +140,12 @@ def doctor() -> int:
         print(f"Python module {module}: {'ok' if found else 'missing'}")
         if not found:
             errors.append(f"Missing required Python module: {module}")
+
+    for tool in REQUIRED_TOOLS:
+        path = shutil.which(tool)
+        print(f"Required tool {tool}: {path if path else 'not found'}")
+        if not path:
+            errors.append(f"Missing required tool: {tool}")
 
     for tool in OPTIONAL_TOOLS:
         path = shutil.which(tool)

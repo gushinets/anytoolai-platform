@@ -188,3 +188,26 @@ def test_bootstrap_uses_uv_for_all_install_steps(monkeypatch, tmp_path) -> None:
             str(project_two),
         ],
     ]
+
+
+def test_runtime_env_uses_workspace_owned_temp_and_cache_dirs(monkeypatch, tmp_path) -> None:
+    quick_check = load_quick_check_module()
+    repo_root = tmp_path / "repo"
+    tmp_root = repo_root / ".quick-check-tmp"
+
+    monkeypatch.setattr(quick_check, "ROOT", repo_root)
+    monkeypatch.setattr(quick_check, "TMP_ROOT", tmp_root)
+
+    env = quick_check.runtime_env({"ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED": "1"})
+
+    assert env["ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED"] == "1"
+    assert env["TMPDIR"] == str(tmp_root / "tmp")
+    assert env["TMP"] == str(tmp_root / "tmp")
+    assert env["TEMP"] == str(tmp_root / "tmp")
+    assert env["UV_CACHE_DIR"] == str(tmp_root / "uv-cache")
+    assert env["PIP_CACHE_DIR"] == str(tmp_root / "pip-cache")
+    assert env["PYTEST_DEBUG_TEMPROOT"] == str(tmp_root / "pytest")
+    assert (tmp_root / "tmp").is_dir()
+    assert (tmp_root / "uv-cache").is_dir()
+    assert (tmp_root / "pip-cache").is_dir()
+    assert (tmp_root / "pytest").is_dir()
