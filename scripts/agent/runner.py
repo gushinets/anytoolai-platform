@@ -11,14 +11,6 @@ from collections.abc import Sequence
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOTS = [
-    ROOT / "packages" / "backend" / "platform-core" / "src",
-    ROOT / "packages" / "backend" / "platform-actions" / "src",
-    ROOT / "packages" / "backend" / "platform-sdk" / "src",
-    ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite" / "src",
-    ROOT / "apps" / "platform-api" / "src",
-    ROOT / "apps" / "platform-worker" / "src",
-]
 QUICK_CHECK_VENV = ROOT / ".quick-check-venv"
 TMP_ROOT = ROOT / ".quick-check-tmp"
 FREELANCER_SUITE_ROOT = ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite"
@@ -47,8 +39,19 @@ def _path_key(value: str) -> str:
         return os.path.normcase(value)
 
 
+def source_roots() -> list[Path]:
+    return [
+        ROOT / "packages" / "backend" / "platform-core" / "src",
+        ROOT / "packages" / "backend" / "platform-actions" / "src",
+        ROOT / "packages" / "backend" / "platform-sdk" / "src",
+        ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite" / "src",
+        ROOT / "apps" / "platform-api" / "src",
+        ROOT / "apps" / "platform-worker" / "src",
+    ]
+
+
 def build_pythonpath() -> str:
-    paths: list[str] = [str(path) for path in SOURCE_ROOTS]
+    paths: list[str] = [str(path) for path in source_roots()]
     existing = os.environ.get("PYTHONPATH")
     if existing:
         paths.extend(path for path in existing.split(os.pathsep) if path)
