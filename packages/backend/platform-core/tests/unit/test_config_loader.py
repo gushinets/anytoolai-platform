@@ -16,6 +16,7 @@ if str(PLATFORM_CORE_SRC) not in sys.path:
 from anytoolai_platform_core.config.errors import (
     BrokenReferenceError,
     DuplicateConfigIdError,
+    InvalidConfigShapeError,
     RegistryLoadError,
 )
 from anytoolai_platform_core.config.loader import ConfigLoader
@@ -180,4 +181,23 @@ def test_loader_fails_on_missing_provider_policy_fallback_reference(tmp_path: Pa
         config_id="default_fake_provider_v1",
         ref_type="fallback_policy",
         ref_value="missing_provider_policy_v1",
+    )
+
+
+def test_loader_fails_on_invalid_structured_output_mode(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "provider_policies.yaml"
+    data = _load_yaml(path)
+    data["provider_policies"][0]["structured_output_mode"] = "xml_schema"
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, InvalidConfigShapeError)
+        and error.file_path == path
+        and error.config_id == "default_fake_provider_v1"
+        and "structured_output_mode" in error.message
+        for error in exc_info.value.errors
     )
