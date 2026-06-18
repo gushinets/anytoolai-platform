@@ -66,7 +66,19 @@ def load_yaml_file(path: Path) -> dict[str, Any]:
 
 
 def load_json_file(path: Path) -> dict[str, Any]:
-    """Load and parse a JSON file."""
+    """
+    Load and validate a JSON file.
+    
+    Parameters:
+        path (Path): The file path to load
+    
+    Returns:
+        dict[str, Any]: The parsed JSON object
+    
+    Raises:
+        MissingConfigFileError: If the file does not exist
+        InvalidConfigShapeError: If the root element is not a JSON object
+    """
     if not path.exists():
         raise MissingConfigFileError(path)
 
@@ -89,7 +101,26 @@ def parse_enum_value(
     file_path: Path,
     config_id: str | None = None,
 ) -> Any:
-    """Parse an enum value and raise a structured config error on failure."""
+    """
+    Convert a raw value to an enum instance.
+    
+    Attempts to construct an enum from the provided value. On conversion failure,
+    raises an error that includes the configuration context and lists all allowed
+    enum member values.
+    
+    Parameters:
+        field_name (str): The name of the configuration field being parsed.
+        file_path (Path): The path to the configuration file being loaded.
+        config_id (str | None): Optional identifier for the specific configuration
+            being parsed, included in error messages for context.
+    
+    Returns:
+        Any: An instance of the specified enum type.
+    
+    Raises:
+        InvalidConfigShapeError: If the raw value is not a valid member of the enum.
+            The error message includes the field name and list of allowed values.
+    """
     try:
         return enum_type(raw_value)
     except ValueError as exc:
@@ -234,6 +265,14 @@ class ConfigLoader:
             self._append_error(error)
 
     def _load_provider_policies(self) -> None:
+        """
+        Load and populate provider policies from provider_policies.yaml.
+        
+        Validates that each policy has required fields (provider_policy_id, provider, model),
+        detects duplicate policy IDs, constructs ProviderPolicy instances with appropriate
+        defaults and enum parsing, and records source locations for error reporting.
+        Collects non-fatal errors to the error list rather than raising immediately.
+        """
         path = self.config_root / "provider_policies.yaml"
         try:
             data = load_yaml_file(path)
@@ -281,6 +320,13 @@ class ConfigLoader:
             self._append_error(error)
 
     def _load_action_definitions(self) -> None:
+        """
+        Load and register action definitions from configuration files.
+        
+        Loads action definition configurations from the action_definitions directory,
+        validates required fields, and populates the internal action_definitions registry.
+        Errors are accumulated in the registry's error collection rather than raised immediately.
+        """
         action_dir = self.config_root / "action_definitions"
         if not action_dir.exists():
             self._append_error(
@@ -437,6 +483,21 @@ class ConfigLoader:
         path: Path,
         fallback_frontends: list[dict[str, Any]],
     ) -> list[FrontendDefinition]:
+        """
+        Load frontend definitions from a file or fallback configuration.
+        
+        Frontends are loaded from the specified path if it exists; otherwise,
+        the fallback frontends are used. Parses frontend type enums and validates
+        required fields.
+        
+        Parameters:
+            path: Path to the frontends.yaml file.
+            fallback_frontends: Frontend definitions from product configuration,
+                used if the frontends file does not exist.
+        
+        Returns:
+            list[FrontendDefinition]: Parsed frontend definitions.
+        """
         frontends_data = fallback_frontends
         source_path = path
 
@@ -613,6 +674,12 @@ class ConfigLoader:
             self._append_error(error)
 
     def _load_quotas(self, path: Path) -> list[str]:
+        """
+        Load quota policy definitions from a YAML file.
+        
+        Returns:
+            list[str]: Quota policy IDs from the file; an empty list if the file does not exist.
+        """
         if not path.exists():
             return []
 
