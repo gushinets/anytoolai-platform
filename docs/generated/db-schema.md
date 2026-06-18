@@ -88,6 +88,7 @@ id
 tenant_id
 region
 product_id
+frontend_id
 scenario_session_id
 job_id
 workflow_id
@@ -98,10 +99,45 @@ status
 input_artifact_id nullable
 output_artifact_id nullable
 error_code nullable
+created_at
 started_at nullable
 completed_at nullable
 metadata jsonb
 ```
+
+Initial statuses: `created`, `running`, `succeeded`, `failed`, `canceled`, `skipped`.
+
+## `platform.provider_calls`
+
+```text
+id
+tenant_id
+region
+product_id
+frontend_id
+scenario_session_id
+job_id
+action_run_id
+workflow_id
+step_id
+action_type
+action_config_id
+provider_policy_id
+provider
+model
+status
+input_tokens
+output_tokens
+latency_ms
+estimated_cost
+error_code nullable
+created_at
+started_at nullable
+completed_at nullable
+metadata jsonb
+```
+
+Initial statuses: `created`, `running`, `succeeded`, `failed`, `timed_out`.
 
 ## `platform.artifacts`
 
@@ -115,6 +151,7 @@ scenario_session_id
 job_id nullable
 action_run_id nullable
 artifact_type
+status
 content_text nullable
 content_json jsonb nullable
 object_storage_key nullable
@@ -123,6 +160,7 @@ created_at
 ```
 
 MVP-A may store text and JSON directly in PostgreSQL. Keep object storage as an interface.
+Initial statuses: `created`, `stored`, `failed`.
 
 ## `platform.event_log`
 
