@@ -9,6 +9,16 @@ from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
 from anytoolai_platform_core.storage.db import scenario_sessions_table
 
 
+def _require_stored_scenario_session(
+    stored: ScenarioSessionRecord | None, record_id: str, operation: str
+) -> ScenarioSessionRecord:
+    if stored is None:
+        raise RuntimeError(
+            f"scenario session round-trip failed after {operation}: {record_id}"
+        )
+    return stored
+
+
 class ScenarioSessionRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -17,8 +27,7 @@ class ScenarioSessionRepository:
         self._session.execute(sa.insert(scenario_sessions_table).values(asdict(record)))
         self._session.flush()
         stored = self.get(record.id)
-        assert stored is not None
-        return stored
+        return _require_stored_scenario_session(stored, record.id, "create")
 
     def get(self, scenario_session_id: str) -> ScenarioSessionRecord | None:
         row = (
@@ -44,5 +53,4 @@ class ScenarioSessionRepository:
             raise LookupError(f"scenario session not found: {record.id}")
         self._session.flush()
         stored = self.get(record.id)
-        assert stored is not None
-        return stored
+        return _require_stored_scenario_session(stored, record.id, "update")

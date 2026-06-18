@@ -9,6 +9,14 @@ from anytoolai_platform_core.actions.models import ActionRunRecord
 from anytoolai_platform_core.storage.db import action_runs_table
 
 
+def _require_stored_action_run(
+    stored: ActionRunRecord | None, record_id: str, operation: str
+) -> ActionRunRecord:
+    if stored is None:
+        raise RuntimeError(f"action run round-trip failed after {operation}: {record_id}")
+    return stored
+
+
 class ActionRunRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -17,8 +25,7 @@ class ActionRunRepository:
         self._session.execute(sa.insert(action_runs_table).values(asdict(record)))
         self._session.flush()
         stored = self.get(record.id)
-        assert stored is not None
-        return stored
+        return _require_stored_action_run(stored, record.id, "create")
 
     def get(self, action_run_id: str) -> ActionRunRecord | None:
         row = (
@@ -42,5 +49,4 @@ class ActionRunRepository:
             raise LookupError(f"action run not found: {record.id}")
         self._session.flush()
         stored = self.get(record.id)
-        assert stored is not None
-        return stored
+        return _require_stored_action_run(stored, record.id, "update")

@@ -163,6 +163,40 @@ def seed_runtime_chain(
     return scenario_session, job, action_run
 
 
+ROUND_TRIP_REPOSITORY_CASES = [
+    pytest.param(
+        ScenarioSessionRepository,
+        make_scenario_session,
+        lambda record: replace(record, status=ScenarioSessionStatus.running),
+        id="scenario_session",
+    ),
+    pytest.param(
+        JobRepository,
+        lambda: make_job("scenario_session_demo"),
+        lambda record: replace(record, status=JobStatus.running),
+        id="job",
+    ),
+    pytest.param(
+        ActionRunRepository,
+        lambda: make_action_run("scenario_session_demo", "job_demo"),
+        lambda record: replace(record, status=ActionRunStatus.running),
+        id="action_run",
+    ),
+    pytest.param(
+        ProviderCallRepository,
+        lambda: make_provider_call("scenario_session_demo", "job_demo", "action_run_demo"),
+        lambda record: replace(record, status=ProviderCallStatus.running),
+        id="provider_call",
+    ),
+    pytest.param(
+        ArtifactRepository,
+        lambda: make_artifact("scenario_session_demo"),
+        lambda record: replace(record, status=ArtifactStatus.stored),
+        id="artifact",
+    ),
+]
+
+
 def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine) -> None:
     with runtime_engine.connect() as connection:
         table_names = set(
@@ -216,6 +250,66 @@ def test_repositories_respect_explicit_transaction_boundary(
             committed_session.close()
     finally:
         write_session.close()
+
+
+@pytest.mark.parametrize(
+    ("repository_type", "record_factory", "update_factory"),
+    ROUND_TRIP_REPOSITORY_CASES,
+)
+def test_repositories_raise_explicit_error_when_round_trip_read_missing_on_create(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    monkeypatch: pytest.MonkeyPatch,
+    repository_type: type[
+        ScenarioSessionRepository
+        | JobRepository
+        | ActionRunRepository
+        | ProviderCallRepository
+        | ArtifactRepository
+    ],
+    record_factory: Any,
+    update_factory: Any,
+) -> None:
+    del update_factory
+    session = session_factory()
+    try:
+        repository = repository_type(session)
+        monkeypatch.setattr(repository, "get", lambda _record_id: None)
+
+        with pytest.raises(RuntimeError, match="round-trip failed after create"):
+            repository.create(record_factory())
+    finally:
+        session.rollback()
+        session.close()
+
+
+@pytest.mark.parametrize(
+    ("repository_type", "record_factory", "update_factory"),
+    ROUND_TRIP_REPOSITORY_CASES,
+)
+def test_repositories_raise_explicit_error_when_round_trip_read_missing_on_update(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    monkeypatch: pytest.MonkeyPatch,
+    repository_type: type[
+        ScenarioSessionRepository
+        | JobRepository
+        | ActionRunRepository
+        | ProviderCallRepository
+        | ArtifactRepository
+    ],
+    record_factory: Any,
+    update_factory: Any,
+) -> None:
+    session = session_factory()
+    try:
+        repository = repository_type(session)
+        created = repository.create(record_factory())
+        monkeypatch.setattr(repository, "get", lambda _record_id: None)
+
+        with pytest.raises(RuntimeError, match="round-trip failed after update"):
+            repository.update(update_factory(created))
+    finally:
+        session.rollback()
+        session.close()
 
 
 def test_scenario_session_repository_create_read_update(

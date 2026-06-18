@@ -9,6 +9,16 @@ from anytoolai_platform_core.providers.models import ProviderCallRecord
 from anytoolai_platform_core.storage.db import provider_calls_table
 
 
+def _require_stored_provider_call(
+    stored: ProviderCallRecord | None, record_id: str, operation: str
+) -> ProviderCallRecord:
+    if stored is None:
+        raise RuntimeError(
+            f"provider call round-trip failed after {operation}: {record_id}"
+        )
+    return stored
+
+
 class ProviderCallRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -17,8 +27,7 @@ class ProviderCallRepository:
         self._session.execute(sa.insert(provider_calls_table).values(asdict(record)))
         self._session.flush()
         stored = self.get(record.id)
-        assert stored is not None
-        return stored
+        return _require_stored_provider_call(stored, record.id, "create")
 
     def get(self, provider_call_id: str) -> ProviderCallRecord | None:
         row = (
@@ -42,5 +51,4 @@ class ProviderCallRepository:
             raise LookupError(f"provider call not found: {record.id}")
         self._session.flush()
         stored = self.get(record.id)
-        assert stored is not None
-        return stored
+        return _require_stored_provider_call(stored, record.id, "update")

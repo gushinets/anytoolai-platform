@@ -9,6 +9,12 @@ from anytoolai_platform_core.storage.db import jobs_table
 from anytoolai_platform_core.workflows.models import JobRecord
 
 
+def _require_stored_job(stored: JobRecord | None, record_id: str, operation: str) -> JobRecord:
+    if stored is None:
+        raise RuntimeError(f"job round-trip failed after {operation}: {record_id}")
+    return stored
+
+
 class JobRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -17,8 +23,7 @@ class JobRepository:
         self._session.execute(sa.insert(jobs_table).values(asdict(record)))
         self._session.flush()
         stored = self.get(record.id)
-        assert stored is not None
-        return stored
+        return _require_stored_job(stored, record.id, "create")
 
     def get(self, job_id: str) -> JobRecord | None:
         row = (
@@ -38,5 +43,4 @@ class JobRepository:
             raise LookupError(f"job not found: {record.id}")
         self._session.flush()
         stored = self.get(record.id)
-        assert stored is not None
-        return stored
+        return _require_stored_job(stored, record.id, "update")

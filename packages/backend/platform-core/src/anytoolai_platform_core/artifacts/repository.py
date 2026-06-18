@@ -9,6 +9,14 @@ from anytoolai_platform_core.artifacts.models import ArtifactRecord
 from anytoolai_platform_core.storage.db import artifacts_table
 
 
+def _require_stored_artifact(
+    stored: ArtifactRecord | None, record_id: str, operation: str
+) -> ArtifactRecord:
+    if stored is None:
+        raise RuntimeError(f"artifact round-trip failed after {operation}: {record_id}")
+    return stored
+
+
 class ArtifactRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -17,8 +25,7 @@ class ArtifactRepository:
         self._session.execute(sa.insert(artifacts_table).values(asdict(record)))
         self._session.flush()
         stored = self.get(record.id)
-        assert stored is not None
-        return stored
+        return _require_stored_artifact(stored, record.id, "create")
 
     def get(self, artifact_id: str) -> ArtifactRecord | None:
         row = (
@@ -40,5 +47,4 @@ class ArtifactRepository:
             raise LookupError(f"artifact not found: {record.id}")
         self._session.flush()
         stored = self.get(record.id)
-        assert stored is not None
-        return stored
+        return _require_stored_artifact(stored, record.id, "update")
