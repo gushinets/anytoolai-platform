@@ -84,6 +84,12 @@ def runner_env() -> dict[str, str]:
     return env
 
 
+def baseline_env() -> dict[str, str]:
+    env = runner_env()
+    env.pop("PYTHONPATH", None)
+    return env
+
+
 def print_command(command: Sequence[str]) -> None:
     print("+ " + " ".join(command), flush=True)
 
@@ -113,6 +119,22 @@ def run(command: Sequence[str]) -> int:
             list(command),
             cwd=ROOT,
             env=runner_env(),
+            shell=False,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        print(f"Command not found: {exc.filename}", file=sys.stderr)
+        return 127
+    return completed.returncode
+
+
+def run_with_env(command: Sequence[str], env: dict[str, str]) -> int:
+    print_command(command)
+    try:
+        completed = subprocess.run(
+            list(command),
+            cwd=ROOT,
+            env=env,
             shell=False,
             check=False,
         )
@@ -172,32 +194,35 @@ def validate_architecture() -> int:
 
 
 def quick_check() -> int:
-    return run([sys.executable, "scripts/agent/quick_check.py"])
+    return run_with_env([sys.executable, "scripts/agent/quick_check.py"], baseline_env())
 
 
 def full_check() -> int:
     exit_code = quick_check()
     if exit_code != 0:
         return exit_code
-    exit_code = run(
+    env = baseline_env()
+    exit_code = run_with_env(
         uv_install_command(
             "--no-build-isolation",
             "--no-deps",
             "-e",
             str(FREELANCER_SUITE_ROOT),
             python=quick_check_python(),
-        )
+        ),
+        env,
     )
     if exit_code != 0:
         return exit_code
-    return run(
+    return run_with_env(
         [
             quick_check_python(),
             "-m",
             "pytest",
             "tests/e2e",
             "packages/backend/product-platforms/freelancer-suite/tests",
-        ]
+        ],
+        env,
     )
 
 

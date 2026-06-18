@@ -2,10 +2,10 @@
 
 ## Status
 
-- State: completed
+- State: in_progress
 - Owner: agent
 - Created: 2026-06-16
-- Last updated: 2026-06-16
+- Last updated: 2026-06-18
 
 ## Goal
 
@@ -54,7 +54,9 @@ Make baseline backend checks reproducible through one Python-owned command on Wi
 ## Validation
 
 - [x] `python3.12 scripts/agent/quick_check.py`
-- [x] `python3.12 scripts/agent/runner.py quick-check`
+- [ ] `python3 scripts/agent/runner.py quick-check`
+- [ ] `python3 scripts/agent/runner.py full-check`
+- [ ] `python3 -m pytest tests/test_runner.py tests/test_quick_check.py`
 - [ ] `just quick-check` blocked locally because `just` is not installed in this shell
 
 ## Decision log
@@ -64,6 +66,7 @@ Make baseline backend checks reproducible through one Python-owned command on Wi
 | 2026-06-16 | Keep quick-check backend-only. | Frontend reproducibility already has separate workflow concerns and would widen the P0 slice. |
 | 2026-06-16 | Use editable installs instead of `PYTHONPATH`. | The task explicitly requires removing manual path injection while keeping one Python-owned flow. |
 | 2026-06-16 | Keep `just quick-check` as the preferred human command. | `python` binary naming is not stable across platforms, while `just` is a simple human-facing wrapper. |
+| 2026-06-18 | Preserve `runner_env()` path injection for legacy commands, but bypass it for `quick-check` and `full-check`. | The A03 contract is specifically about the canonical baseline and its direct wrappers proving editable installs work without `PYTHONPATH`. |
 
 ## Progress log
 
@@ -78,10 +81,18 @@ Make baseline backend checks reproducible through one Python-owned command on Wi
 | 2026-06-16 | Additional review flagged two bootstrap hygiene issues: stale unsupported quick-check venvs could survive across Python upgrades, and editable installs left `*.egg-info` metadata visible in the worktree. Added Python-version validation/recreation behavior for the quick-check venv and ignored editable-install metadata. | Re-run quick-check/full-check and verify git status stays clean. |
 | 2026-06-16 | Follow-up review flagged that nesting quick-check under `.venv/quick-check` confused `uv` by making `.venv` exist without being a real project virtualenv. Moved the bootstrap environment to `.quick-check-venv`, updated repo docs, and added cleanup of the legacy nested path. | Re-run quick-check/full-check and confirm the legacy nested path no longer remains after bootstrap. |
 | 2026-06-16 | Another review found that architecture scans still skipped only `.venv`, so moving the bootstrap environment to `.quick-check-venv` could make repo scans recurse into third-party site-packages. Updated the provider-import architecture test to exclude `.quick-check-venv` explicitly. | Re-run the focused architecture test and keep future scan exclusions aligned with bootstrap path changes. |
+| 2026-06-18 | Follow-up review found one remaining A03 mismatch: `runner.py quick-check` still inherited `PYTHONPATH` through `runner_env()`, and `just`/`make` still routed through that path. | Narrow the fix to baseline entrypoints, add a regression test, and leave other runner commands unchanged for now. |
+| 2026-06-18 | Implemented the narrow follow-up: `quick-check` and `full-check` now run with a baseline env that strips `PYTHONPATH`, and `just`/`make` quick-check call `quick_check.py` directly. | Re-run the affected entrypoints once `uv` and `pytest` are available in the local environment. |
 
 ## Open questions
 
 - None at implementation start.
+
+## Current blockers
+
+- Local shell does not have `just`.
+- Local shell does not have `uv`, so `quick_check.py` bootstrap stops before dependency install.
+- Local `python3` and `python3.12` do not have `pytest`, so the focused regression tests could not be executed outside the bootstrap flow.
 
 ## Follow-up debt
 
