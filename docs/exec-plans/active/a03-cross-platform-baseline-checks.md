@@ -67,6 +67,7 @@ Make baseline backend checks reproducible through one Python-owned command on Wi
 | 2026-06-16 | Use editable installs instead of `PYTHONPATH`. | The task explicitly requires removing manual path injection while keeping one Python-owned flow. |
 | 2026-06-16 | Keep `just quick-check` as the preferred human command. | `python` binary naming is not stable across platforms, while `just` is a simple human-facing wrapper. |
 | 2026-06-18 | Preserve `runner_env()` path injection for legacy commands, but bypass it for `quick-check` and `full-check`. | The A03 contract is specifically about the canonical baseline and its direct wrappers proving editable installs work without `PYTHONPATH`. |
+| 2026-06-18 | Strip `PYTHONPATH` inside `quick_check.py` itself, not only in `runner.py`. | Direct `just quick-check` and `make quick-check` must also prove the editable-install baseline works without caller-provided path injection. |
 
 ## Progress log
 
@@ -83,6 +84,7 @@ Make baseline backend checks reproducible through one Python-owned command on Wi
 | 2026-06-16 | Another review found that architecture scans still skipped only `.venv`, so moving the bootstrap environment to `.quick-check-venv` could make repo scans recurse into third-party site-packages. Updated the provider-import architecture test to exclude `.quick-check-venv` explicitly. | Re-run the focused architecture test and keep future scan exclusions aligned with bootstrap path changes. |
 | 2026-06-18 | Follow-up review found one remaining A03 mismatch: `runner.py quick-check` still inherited `PYTHONPATH` through `runner_env()`, and `just`/`make` still routed through that path. | Narrow the fix to baseline entrypoints, add a regression test, and leave other runner commands unchanged for now. |
 | 2026-06-18 | Implemented the narrow follow-up: `quick-check` and `full-check` now run with a baseline env that strips `PYTHONPATH`, and `just`/`make` quick-check call `quick_check.py` directly. | Re-run the affected entrypoints once `uv` and `pytest` are available in the local environment. |
+| 2026-06-18 | Additional MR review pointed out that direct `quick_check.py` invocation still inherited caller `PYTHONPATH` through `runtime_env()`. Updated `quick_check.py` to strip `PYTHONPATH` for all bootstrap/runtime subprocesses and added a focused regression test for the direct invocation path. | Re-run the focused regression tests and canonical baseline entrypoints when the bootstrap tools are available locally. |
 
 ## Open questions
 
