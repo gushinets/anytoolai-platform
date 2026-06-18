@@ -13,13 +13,46 @@ just validate-configs
 just validate-architecture
 ```
 
-`just` is the preferred command interface. On systems where `just` or shell integration is unavailable,
-run the cross-platform Python runner directly:
+`just` is the preferred human-facing command interface.
+
+`just quick-check` is the baseline backend gate. It includes:
+
+- config validation
+- architecture validation
+- a DB-free backend pytest subset
+
+It intentionally excludes frontend checks, `tests/e2e`, `kernel-smoke`, and any test DB provisioning.
+The script self-manages `.quick-check-venv` so it does not need to install packages into a system Python.
+It always re-execs into `.quick-check-venv`, even if you started from another active virtualenv.
+
+On systems where `just` or shell integration is unavailable, run the Python baseline entrypoint directly:
 
 ```bash
-python scripts/agent/runner.py doctor
-python scripts/agent/runner.py quick-check
+python3 scripts/agent/quick_check.py
 ```
+
+Windows fallback:
+
+```powershell
+python scripts/agent/quick_check.py
+```
+
+Secondary Windows fallback when the Python launcher is configured:
+
+```powershell
+py -3 scripts/agent/quick_check.py
+```
+
+Other Python-owned commands still route through the runner:
+
+```bash
+python3 scripts/agent/runner.py doctor
+python3 scripts/agent/runner.py full-check
+```
+
+`just full-check` runs the same baseline first and then runs `tests/e2e`.
+Today those e2e placeholders are DB-free, so no extra test DB settings are required.
+When DB-backed e2e coverage is added, it must use an explicit test-only database configuration; `quick-check` will remain DB-free and must not provision or select a test DB implicitly.
 
 ## MVPs
 

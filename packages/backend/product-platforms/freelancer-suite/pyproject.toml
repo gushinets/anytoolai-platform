@@ -3,10 +3,10 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "anytoolai-platform-core"
+name = "anytoolai-freelancer-suite"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["pydantic==2.13.4", "pyyaml"]
+dependencies = ["anytoolai-platform-sdk==0.1.0"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
