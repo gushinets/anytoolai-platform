@@ -37,8 +37,14 @@ def print_command(command: Sequence[str]) -> None:
     print("+ " + " ".join(command), flush=True)
 
 
-def runtime_env(base: dict[str, str] | None = None) -> dict[str, str]:
+def baseline_env(base: dict[str, str] | None = None) -> dict[str, str]:
     env = os.environ.copy() if base is None else dict(base)
+    env.pop("PYTHONPATH", None)
+    return env
+
+
+def runtime_env(base: dict[str, str] | None = None) -> dict[str, str]:
+    env = baseline_env(base)
     tmp_dir = TMP_ROOT / "tmp"
     uv_cache_dir = TMP_ROOT / "uv-cache"
     pip_cache_dir = TMP_ROOT / "pip-cache"
@@ -199,7 +205,7 @@ def ensure_virtualenv() -> int | None:
     if not invoking_python_supported():
         minimum_version = ".".join(str(part) for part in MINIMUM_PYTHON)
         if existing_version is not None:
-            env = os.environ.copy()
+            env = baseline_env()
             env["ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED"] = "1"
             return run_with_env([str(expected_python), str(Path(__file__).resolve())], env)
         print(
@@ -227,7 +233,7 @@ def ensure_virtualenv() -> int | None:
     if not active_legacy_environment:
         migrate_legacy_virtualenv()
 
-    env = os.environ.copy()
+    env = baseline_env()
     env["ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED"] = "1"
     return run_with_env([str(expected_python), str(Path(__file__).resolve())], env)
 

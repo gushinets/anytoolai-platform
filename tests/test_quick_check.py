@@ -212,3 +212,17 @@ def test_runtime_env_uses_workspace_owned_temp_and_cache_dirs(monkeypatch, tmp_p
     assert (tmp_root / "uv-cache").is_dir()
     assert (tmp_root / "pip-cache").is_dir()
     assert (tmp_root / "pytest").is_dir()
+
+
+def test_runtime_env_strips_pythonpath_from_direct_invocation(monkeypatch, tmp_path) -> None:
+    quick_check = load_quick_check_module()
+    repo_root = tmp_path / "repo"
+    tmp_root = repo_root / ".quick-check-tmp"
+
+    monkeypatch.setattr(quick_check, "ROOT", repo_root)
+    monkeypatch.setattr(quick_check, "TMP_ROOT", tmp_root)
+    monkeypatch.setenv("PYTHONPATH", "/some/path")
+
+    env = quick_check.runtime_env()
+
+    assert "PYTHONPATH" not in env

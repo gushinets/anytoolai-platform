@@ -17,17 +17,30 @@ def load_runner_module():
 def test_full_check_uses_uv_for_freelancer_suite_install(monkeypatch) -> None:
     runner = load_runner_module()
     quick_check_python = "/tmp/.quick-check-venv/bin/python"
-    commands: list[list[str]] = []
+    commands: list[tuple[list[str], dict[str, str] | None]] = []
 
     monkeypatch.setattr(runner, "quick_check", lambda: 0)
     monkeypatch.setattr(runner, "quick_check_python", lambda: quick_check_python)
     monkeypatch.setattr(runner.shutil, "which", lambda name: "/usr/local/bin/uv" if name == "uv" else None)
-    monkeypatch.setattr(runner, "run", lambda command: commands.append(list(command)) or 0)
+    monkeypatch.setattr(
+        runner,
+        "baseline_env",
+        lambda: {
+            "TMPDIR": "/tmp/quick-check",
+            "TMP": "/tmp/quick-check",
+            "TEMP": "/tmp/quick-check",
+        },
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env: commands.append((list(command), dict(env))) or 0,
+    )
 
     exit_code = runner.full_check()
 
     assert exit_code == 0
-    assert commands[0] == [
+    assert commands[0][0] == [
         "/usr/local/bin/uv",
         "pip",
         "install",
@@ -38,13 +51,15 @@ def test_full_check_uses_uv_for_freelancer_suite_install(monkeypatch) -> None:
         "-e",
         str(runner.FREELANCER_SUITE_ROOT),
     ]
-    assert commands[1] == [
+    assert "PYTHONPATH" not in commands[0][1]
+    assert commands[1][0] == [
         quick_check_python,
         "-m",
         "pytest",
         "tests/e2e",
         "packages/backend/product-platforms/freelancer-suite/tests",
     ]
+    assert "PYTHONPATH" not in commands[1][1]
 
 
 def test_runner_env_uses_workspace_owned_temp_and_cache_dirs(monkeypatch, tmp_path) -> None:
@@ -82,3 +97,20 @@ def test_doctor_requires_uv(monkeypatch) -> None:
     exit_code = runner.doctor()
 
     assert exit_code == 1
+
+
+def test_quick_check_strips_pythonpath_from_subprocess_env(monkeypatch) -> None:
+    runner = load_runner_module()
+    recorded: dict[str, str] = {}
+
+    monkeypatch.setenv("PYTHONPATH", "/some/path")
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env: recorded.update(env) or 0,
+    )
+
+    exit_code = runner.quick_check()
+
+    assert exit_code == 0
+    assert "PYTHONPATH" not in recorded
