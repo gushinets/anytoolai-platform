@@ -5,7 +5,7 @@
 - State: active
 - Owner: agent
 - Created: 2026-06-16
-- Last updated: 2026-06-16
+- Last updated: 2026-06-19
 
 ## Goal
 
@@ -96,6 +96,7 @@ and is reused by both API startup and `validate_configs.py`.
 |---|---|---|
 | 2026-06-16 | Reviewed architecture docs, MVP scope docs, current loader placeholders, startup wiring, and config layout. | Draft implementation and rollout sequence. |
 | 2026-06-16 | Ran repo checks with the documented Python fallback; config and architecture validation passed from `.venv`. | Implement loader, tests, and startup failure wiring in small reviewable slices. |
+| 2026-06-19 | Confirmed invalid enum values now enter `RegistryLoadError.errors`, but still lack `ref_type` and `ref_value` on the nested `InvalidConfigShapeError`. | Add structured enum diagnostics and focused regression tests for every enum conversion path called out in review. |
 
 ## Open questions
 

@@ -42,7 +42,7 @@ class ConfigError(PlatformError):
             parts.append(f"  File: {self.file_path}")
         if self.config_id:
             parts.append(f"  Config ID: {self.config_id}")
-        if self.ref_type and self.ref_value:
+        if self.ref_type is not None and self.ref_value is not None:
             parts.append(f"  {self.ref_type}: {self.ref_value}")
         return "\n".join(parts)
 
@@ -125,6 +125,8 @@ class InvalidConfigShapeError(ConfigError):
         file_path: Path,
         reason: str,
         config_id: str | None = None,
+        ref_type: str | None = None,
+        ref_value: str | None = None,
     ) -> None:
         message = f"Invalid config shape in {file_path}: {reason}"
         super().__init__(
@@ -132,6 +134,8 @@ class InvalidConfigShapeError(ConfigError):
             message=message,
             file_path=file_path,
             config_id=config_id,
+            ref_type=ref_type,
+            ref_value=ref_value,
         )
 
 
