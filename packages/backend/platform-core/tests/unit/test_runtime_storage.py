@@ -39,6 +39,8 @@ from sqlalchemy.exc import IntegrityError
 PROVIDER_INPUT_TOKENS = 128
 PROVIDER_OUTPUT_TOKENS = 64
 PROVIDER_LATENCY_MS = 950
+LEGACY_SCENARIO_SESSION_STARTED_AT = "2026-06-19 12:34:56+00:00"
+LEGACY_SCENARIO_SESSION_LAST_EVENT_AT = "2026-06-19 12:40:00+00:00"
 
 
 def _repo_root() -> Path:
@@ -49,31 +51,159 @@ def _sqlite_url(database_path: Path) -> str:
     return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
 
 
-@pytest.fixture
-def runtime_engine(tmp_path: Path) -> sa.Engine:
-    main_db = tmp_path / "runtime-main.sqlite3"
-    platform_db = tmp_path / "runtime-platform.sqlite3"
-
+def _build_runtime_engine(main_db: Path, platform_db: Path) -> sa.Engine:
     engine = sa.create_engine(_sqlite_url(main_db), future=True)
 
     @event.listens_for(engine, "connect")
     def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
+        del connection_record
         dbapi_connection.execute(
             f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
         )
 
+    return engine
+
+
+def _build_alembic_config(database_url: str) -> Config:
     alembic_config = Config()
     alembic_config.set_main_option(
         "script_location", str(_repo_root() / "migrations" / "platform")
     )
-    alembic_config.set_main_option("sqlalchemy.url", _sqlite_url(main_db))
+    alembic_config.set_main_option("sqlalchemy.url", database_url)
+    return alembic_config
+
+
+@pytest.fixture
+def runtime_engine(tmp_path: Path) -> sa.Engine:
+    main_db = tmp_path / "runtime-main.sqlite3"
+    platform_db = tmp_path / "runtime-platform.sqlite3"
+    engine = _build_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(_sqlite_url(main_db))
 
     with engine.begin() as connection:
         alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "0001")
+        command.upgrade(alembic_config, "head")
 
     yield engine
     engine.dispose()
+
+
+def _create_legacy_scenario_sessions_table(connection: sa.Connection) -> None:
+    connection.execute(
+        sa.text(
+            """
+            CREATE TABLE platform.scenario_sessions (
+                id VARCHAR(128) NOT NULL PRIMARY KEY,
+                tenant_id VARCHAR(128) NOT NULL,
+                region VARCHAR(64) NOT NULL,
+                product_id VARCHAR(128) NOT NULL,
+                frontend_id VARCHAR(128) NOT NULL,
+                scenario_id VARCHAR(128) NOT NULL,
+                scenario_version INTEGER NOT NULL,
+                guest_id VARCHAR(128),
+                user_id VARCHAR(128),
+                status VARCHAR(64) NOT NULL,
+                current_checkpoint_id VARCHAR(128),
+                current_step VARCHAR(128),
+                scenario_chain_id VARCHAR(128),
+                parent_scenario_session_id VARCHAR(128),
+                source_frontend_instance_id VARCHAR(128),
+                metadata JSON NOT NULL,
+                started_at DATETIME NOT NULL,
+                last_event_at DATETIME NOT NULL,
+                completed_at DATETIME,
+                expires_at DATETIME
+            )
+            """
+        )
+    )
+    connection.execute(
+        sa.text(
+            """
+            CREATE INDEX platform.ix_scenario_sessions_product_id
+            ON scenario_sessions (product_id)
+            """
+        )
+    )
+    connection.execute(
+        sa.text(
+            """
+            CREATE INDEX platform.ix_scenario_sessions_status
+            ON scenario_sessions (status)
+            """
+        )
+    )
+    connection.execute(
+        sa.text(
+            """
+            INSERT INTO platform.scenario_sessions (
+                id,
+                tenant_id,
+                region,
+                product_id,
+                frontend_id,
+                scenario_id,
+                scenario_version,
+                guest_id,
+                user_id,
+                status,
+                current_checkpoint_id,
+                current_step,
+                scenario_chain_id,
+                parent_scenario_session_id,
+                source_frontend_instance_id,
+                metadata,
+                started_at,
+                last_event_at,
+                completed_at,
+                expires_at
+            ) VALUES (
+                :id,
+                :tenant_id,
+                :region,
+                :product_id,
+                :frontend_id,
+                :scenario_id,
+                :scenario_version,
+                :guest_id,
+                :user_id,
+                :status,
+                :current_checkpoint_id,
+                :current_step,
+                :scenario_chain_id,
+                :parent_scenario_session_id,
+                :source_frontend_instance_id,
+                :metadata,
+                :started_at,
+                :last_event_at,
+                :completed_at,
+                :expires_at
+            )
+            """
+        ),
+        {
+            "id": "scenario_session_legacy",
+            "tenant_id": "tenant_demo",
+            "region": "eu-central",
+            "product_id": "kernel_demo",
+            "frontend_id": "kernel_demo_ce",
+            "scenario_id": "smoke_start",
+            "scenario_version": 1,
+            "guest_id": None,
+            "user_id": None,
+            "status": "started",
+            "current_checkpoint_id": None,
+            "current_step": None,
+            "scenario_chain_id": None,
+            "parent_scenario_session_id": None,
+            "source_frontend_instance_id": None,
+            "metadata": "{}",
+            "started_at": LEGACY_SCENARIO_SESSION_STARTED_AT,
+            "last_event_at": LEGACY_SCENARIO_SESSION_LAST_EVENT_AT,
+            "completed_at": None,
+            "expires_at": None,
+        },
+    )
 
 
 @pytest.fixture
@@ -255,6 +385,54 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "ix_artifacts_job_id",
         "ix_jobs_status",
     }.issubset(index_names)
+
+
+def test_runtime_migration_upgrades_legacy_scenario_sessions_created_at_path(
+    tmp_path: Path,
+) -> None:
+    main_db = tmp_path / "legacy-main.sqlite3"
+    platform_db = tmp_path / "legacy-platform.sqlite3"
+    engine = _build_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+
+    try:
+        with engine.begin() as connection:
+            _create_legacy_scenario_sessions_table(connection)
+            alembic_config.attributes["connection"] = connection
+            command.stamp(alembic_config, "0004")
+            command.upgrade(alembic_config, "head")
+
+            columns = {
+                column["name"]: column
+                for column in sa.inspect(connection).get_columns(
+                    "scenario_sessions",
+                    schema="platform",
+                )
+            }
+            indexes = {
+                index["name"]
+                for index in sa.inspect(connection).get_indexes(
+                    "scenario_sessions",
+                    schema="platform",
+                )
+            }
+            created_at_value = connection.execute(
+                sa.text(
+                    """
+                    SELECT created_at
+                    FROM platform.scenario_sessions
+                    WHERE id = :scenario_session_id
+                    """
+                ),
+                {"scenario_session_id": "scenario_session_legacy"},
+            ).scalar_one()
+
+        assert "created_at" in columns
+        assert columns["created_at"]["nullable"] is False
+        assert "ix_scenario_sessions_created_at" in indexes
+        assert created_at_value == LEGACY_SCENARIO_SESSION_STARTED_AT
+    finally:
+        engine.dispose()
 
 
 def test_repositories_respect_explicit_transaction_boundary(
