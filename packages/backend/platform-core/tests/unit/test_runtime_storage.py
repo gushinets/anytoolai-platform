@@ -248,6 +248,7 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "artifacts",
     }.issubset(table_names)
     assert {
+        "ix_scenario_sessions_created_at",
         "ix_jobs_scenario_session_id",
         "ix_action_runs_job_id",
         "ix_provider_calls_job_id",
@@ -375,6 +376,7 @@ def test_scenario_session_repository_create_read_update(
 
         assert created.id.startswith("scenario_session_")
         assert created.status is ScenarioSessionStatus.started
+        assert created.created_at.tzinfo is not None
         assert created.started_at.tzinfo is not None
 
         stored = repository.get(created.id, **scenario_session_scope(created))
@@ -391,6 +393,8 @@ def test_scenario_session_repository_create_read_update(
         )
 
         assert completed.status is ScenarioSessionStatus.completed
+        assert completed.created_at == created.created_at
+        assert completed.created_at.tzinfo is not None
         assert completed.current_step == "done"
         assert completed.completed_at is not None
 

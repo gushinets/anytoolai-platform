@@ -88,11 +88,13 @@ scenario_sessions_table = sa.Table(
     sa.Column("parent_scenario_session_id", sa.String(length=128)),
     sa.Column("source_frontend_instance_id", sa.String(length=128)),
     sa.Column("metadata", json_document, nullable=False),
+    sa.Column("created_at", utc_datetime, nullable=False),
     sa.Column("started_at", utc_datetime, nullable=False),
     sa.Column("last_event_at", utc_datetime, nullable=False),
     sa.Column("completed_at", utc_datetime),
     sa.Column("expires_at", utc_datetime),
     sa.Index("ix_scenario_sessions_product_id", "product_id"),
+    sa.Index("ix_scenario_sessions_created_at", "created_at"),
     sa.Index("ix_scenario_sessions_status", "status"),
 )
 
