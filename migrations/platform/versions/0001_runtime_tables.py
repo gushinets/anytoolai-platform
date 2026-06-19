@@ -15,7 +15,10 @@ PLATFORM_SCHEMA = "platform"
 
 
 def _json_document_type() -> sa.TypeEngine:
-    return sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), "postgresql")
+    return sa.JSON(none_as_null=True).with_variant(
+        postgresql.JSONB(none_as_null=True, astext_type=sa.Text()),
+        "postgresql",
+    )
 
 
 def _enum_type(name: str, *values: str) -> sa.Enum:

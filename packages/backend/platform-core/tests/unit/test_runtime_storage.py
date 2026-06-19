@@ -615,6 +615,14 @@ def test_artifact_repository_text_storage_and_status_transition(
         assert stored.status is ArtifactStatus.stored
         assert stored.content_text == "rendered text artifact"
         assert stored.content_json is None
+        assert (
+            session.execute(
+                sa.select(artifacts_table.c.content_json.is_(None)).where(
+                    artifacts_table.c.id == created.id
+                )
+            ).scalar_one()
+            is True
+        )
 
 
 def test_artifact_repository_json_storage(

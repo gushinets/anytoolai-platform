@@ -44,7 +44,10 @@ def create_sync_engine(database_url: str, **kwargs: Any) -> Engine:
 
 
 def _json_document_type() -> sa.TypeEngine[Any]:
-    return sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), "postgresql")
+    return sa.JSON(none_as_null=True).with_variant(
+        postgresql.JSONB(none_as_null=True, astext_type=sa.Text()),
+        "postgresql",
+    )
 
 
 def _enum_type(enum_type: type[Any], name: str) -> sa.Enum:
