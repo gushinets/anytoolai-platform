@@ -249,7 +249,53 @@ def test_event_log_migration_creates_table_at_0002(tmp_path: Path) -> None:
 
 def test_platform_migration_chain_is_single_head() -> None:
     script = ScriptDirectory.from_config(_build_alembic_config("sqlite+pysqlite://"))
-    assert script.get_heads() == ["0005"]
+    assert script.get_heads() == ["0006"]
+
+
+def test_event_log_upgrade_from_old_placeholder_stamped_0004_creates_table(
+    tmp_path: Path,
+) -> None:
+    main_db = tmp_path / "placeholder-main.sqlite3"
+    platform_db = tmp_path / "placeholder-platform.sqlite3"
+    engine = _build_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    try:
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "0001")
+            command.stamp(alembic_config, "0004")
+
+            table_names_before = set(
+                connection.execute(
+                    sa.text("SELECT name FROM platform.sqlite_master WHERE type = 'table'")
+                ).scalars()
+            )
+            assert "event_log" not in table_names_before
+
+            command.upgrade(alembic_config, "head")
+
+            table_names_after = set(
+                connection.execute(
+                    sa.text("SELECT name FROM platform.sqlite_master WHERE type = 'table'")
+                ).scalars()
+            )
+            index_names_after = set(
+                connection.execute(
+                    sa.text("SELECT name FROM platform.sqlite_master WHERE type = 'index'")
+                ).scalars()
+            )
+
+        assert "event_log" in table_names_after
+        assert {
+            "ix_event_log_timestamp",
+            "ix_event_log_event_type",
+            "ix_event_log_product_id",
+            "ix_event_log_scenario_session_id",
+            "ix_event_log_job_id",
+            "ix_event_log_handoff_id",
+        }.issubset(index_names_after)
+    finally:
+        engine.dispose()
 
 
 def test_event_emitter_persists_round_trip_and_maps_dimensions(
