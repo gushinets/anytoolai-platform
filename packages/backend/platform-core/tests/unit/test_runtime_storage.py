@@ -20,6 +20,13 @@ from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionStatus,
 )
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
+from anytoolai_platform_core.storage.db import (
+    action_runs_table,
+    artifacts_table,
+    jobs_table,
+    provider_calls_table,
+    scenario_sessions_table,
+)
 from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
@@ -195,6 +202,20 @@ ROUND_TRIP_REPOSITORY_CASES = [
         id="artifact",
     ),
 ]
+
+
+def test_runtime_table_enums_create_check_constraints() -> None:
+    status_columns = [
+        scenario_sessions_table.c.status,
+        jobs_table.c.status,
+        action_runs_table.c.status,
+        provider_calls_table.c.status,
+        artifacts_table.c.status,
+    ]
+
+    for column in status_columns:
+        assert isinstance(column.type, sa.Enum)
+        assert column.type.create_constraint is True
 
 
 def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine) -> None:

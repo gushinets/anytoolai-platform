@@ -51,6 +51,7 @@ def _enum_type(enum_type: type[Any], name: str) -> sa.Enum:
     return sa.Enum(
         enum_type,
         name=name,
+        create_constraint=True,
         native_enum=False,
         validate_strings=True,
         values_callable=lambda enum_cls: [member.value for member in enum_cls],
