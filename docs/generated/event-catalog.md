@@ -1,38 +1,66 @@
 # Event Catalog
 
-Generated-doc mirror of the MVP-A event taxonomy from `docs/product-specs/mvp-scope-source-of-truth.md`.
+Generated-doc mirror of the MVP-A platform event taxonomy from `configs/kernel/platform_events.yaml`.
 
-## Platform Events
+## Platform Events By Group
+
+### guest
 
 - `guest.created`
-- `product.opened`
+
+### quota
+
 - `quota.checked`
 - `quota.consumed`
 - `quota.exhausted`
-- `email_capture.submitted`
-- `paywall.shown`
-- `waitlist.intent_submitted`
+
+### scenario
+
 - `scenario.started`
 - `scenario.checkpoint_reached`
 - `scenario.completed`
 - `scenario.failed`
+
+### workflow
+
 - `workflow.started`
 - `workflow.succeeded`
 - `workflow.failed`
+
+### action
+
 - `action.started`
 - `action.succeeded`
 - `action.failed`
+
+### provider
+
 - `provider.request_started`
 - `provider.request_succeeded`
 - `provider.request_failed`
+
+### artifact
+
 - `artifact.created`
+
+### handoff
+
 - `handoff.created`
 - `handoff.viewed`
 - `handoff.accepted`
 - `handoff.declined`
 - `handoff.consumed`
+
+### client
+
 - `client.result_copied`
 - `client.next_action_clicked`
+
+### access_lite
+
+- `email_capture.submitted`
+- `paywall.shown`
+- `waitlist.intent_submitted`
 
 ## Required Dimensions Where Applicable
 
@@ -43,7 +71,8 @@ Generated-doc mirror of the MVP-A event taxonomy from `docs/product-specs/mvp-sc
 - `region`
 - `product_id`
 - `frontend_id`
-- `guest_id` / `user_id`
+- `guest_id`
+- `user_id`
 - `scenario_session_id`
 - `scenario_chain_id`
 - `job_id`
