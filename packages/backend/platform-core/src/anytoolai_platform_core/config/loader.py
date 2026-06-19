@@ -81,6 +81,29 @@ def load_json_file(path: Path) -> dict[str, Any]:
     return data
 
 
+def parse_enum_value(
+    enum_type: type[Any],
+    raw_value: Any,
+    *,
+    field_name: str,
+    file_path: Path,
+    config_id: str | None = None,
+) -> Any:
+    """Parse an enum value and raise a structured config error on failure."""
+    try:
+        return enum_type(raw_value)
+    except ValueError as exc:
+        allowed_values = ", ".join(member.value for member in enum_type)
+        raise InvalidConfigShapeError(
+            file_path,
+            (
+                f"Invalid {field_name} value {raw_value!r}; "
+                f"expected one of: {allowed_values}"
+            ),
+            config_id=config_id,
+        ) from exc
+
+
 class ConfigLoader:
     """Build an immutable ``ConfigRegistry`` from the repo config tree."""
 
@@ -241,11 +264,15 @@ class ConfigLoader:
                     timeout_seconds=policy_data.get("timeout_seconds", 60),
                     max_retries=policy_data.get("max_retries", 2),
                     fallback_policy=policy_data.get("fallback_policy"),
-                    structured_output_mode=StructuredOutputMode(
+                    structured_output_mode=parse_enum_value(
+                        StructuredOutputMode,
                         policy_data.get(
                             "structured_output_mode",
                             StructuredOutputMode.json_schema,
-                        )
+                        ),
+                        field_name="structured_output_mode",
+                        file_path=path,
+                        config_id=policy_id,
                     ),
                     metadata={"_file_path": str(path)},
                 )
@@ -303,7 +330,13 @@ class ConfigLoader:
                     version=version,
                     input_schema_ref=input_schema_ref,
                     output_schema_ref=output_schema_ref,
-                    executor=ActionExecutor(executor),
+                    executor=parse_enum_value(
+                        ActionExecutor,
+                        executor,
+                        field_name="executor",
+                        file_path=path,
+                        config_id=action_type,
+                    ),
                     emits_events=data.get("emits_events", []),
                     description=data.get("description"),
                     metadata={"_file_path": str(path)},
@@ -426,7 +459,13 @@ class ConfigLoader:
             frontends.append(
                 FrontendDefinition(
                     frontend_id=frontend_id,
-                    type=FrontendType(frontend_type),
+                    type=parse_enum_value(
+                        FrontendType,
+                        frontend_type,
+                        field_name="frontend type",
+                        file_path=source_path,
+                        config_id=frontend_id,
+                    ),
                     enabled=frontend_data.get("enabled", True),
                     metadata={"_file_path": str(source_path)},
                 )
@@ -602,9 +641,21 @@ class ConfigLoader:
 
                 self.quotas[quota_id] = QuotaPolicy(
                     quota_policy_id=quota_id,
-                    unit=QuotaUnit(unit),
+                    unit=parse_enum_value(
+                        QuotaUnit,
+                        unit,
+                        field_name="quota unit",
+                        file_path=path,
+                        config_id=quota_id,
+                    ),
                     limit_count=limit_count,
-                    period=QuotaPeriod(period),
+                    period=parse_enum_value(
+                        QuotaPeriod,
+                        period,
+                        field_name="quota period",
+                        file_path=path,
+                        config_id=quota_id,
+                    ),
                     metadata={"_file_path": str(path)},
                 )
                 self._remember_source("quota_policy", quota_id, path)
