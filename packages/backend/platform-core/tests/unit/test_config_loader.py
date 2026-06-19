@@ -57,6 +57,26 @@ def _assert_broken_reference(
     )
 
 
+def _assert_invalid_shape(
+    errors: tuple[Exception, ...],
+    *,
+    file_path: Path,
+    config_id: str,
+    ref_type: str,
+    ref_value: str,
+    message_part: str,
+) -> None:
+    assert any(
+        isinstance(error, InvalidConfigShapeError)
+        and error.file_path == file_path
+        and error.config_id == config_id
+        and error.ref_type == ref_type
+        and error.ref_value == ref_value
+        and message_part in error.message
+        for error in errors
+    )
+
+
 def test_loader_builds_registry_from_current_tree() -> None:
     registry = ConfigLoader(CONFIG_ROOT).load()
 
@@ -194,10 +214,91 @@ def test_loader_fails_on_invalid_structured_output_mode(tmp_path: Path) -> None:
     with pytest.raises(RegistryLoadError) as exc_info:
         ConfigLoader(config_root).load()
 
-    assert any(
-        isinstance(error, InvalidConfigShapeError)
-        and error.file_path == path
-        and error.config_id == "default_fake_provider_v1"
-        and "structured_output_mode" in error.message
-        for error in exc_info.value.errors
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="default_fake_provider_v1",
+        ref_type="structured_output_mode",
+        ref_value="xml_schema",
+        message_part="structured_output_mode",
+    )
+
+
+def test_loader_fails_on_invalid_action_executor(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "action_definitions" / "text.extract_structured_fields.yaml"
+    data = _load_yaml(path)
+    data["executor"] = "python"
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="text.extract_structured_fields",
+        ref_type="executor",
+        ref_value="python",
+        message_part="executor",
+    )
+
+
+def test_loader_fails_on_invalid_frontend_type(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "frontends.yaml"
+    data = _load_yaml(path)
+    data["frontends"][0]["type"] = "desktop_app"
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo_ce",
+        ref_type="type",
+        ref_value="desktop_app",
+        message_part="frontend type",
+    )
+
+
+def test_loader_fails_on_invalid_quota_unit(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "quotas.yaml"
+    data = _load_yaml(path)
+    data["quota_policies"][0]["unit"] = "token"
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo.guest_quota_v1",
+        ref_type="unit",
+        ref_value="token",
+        message_part="quota unit",
+    )
+
+
+def test_loader_fails_on_invalid_quota_period(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "quotas.yaml"
+    data = _load_yaml(path)
+    data["quota_policies"][0]["period"] = "daily"
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo.guest_quota_v1",
+        ref_type="period",
+        ref_value="daily",
+        message_part="quota period",
     )

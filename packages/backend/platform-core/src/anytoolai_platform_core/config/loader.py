@@ -88,6 +88,7 @@ def parse_enum_value(
     field_name: str,
     file_path: Path,
     config_id: str | None = None,
+    ref_type: str | None = None,
 ) -> Any:
     """Parse an enum value and raise a structured config error on failure."""
     try:
@@ -101,6 +102,8 @@ def parse_enum_value(
                 f"expected one of: {allowed_values}"
             ),
             config_id=config_id,
+            ref_type=ref_type or field_name,
+            ref_value=str(raw_value),
         ) from exc
 
 
@@ -465,6 +468,7 @@ class ConfigLoader:
                         field_name="frontend type",
                         file_path=source_path,
                         config_id=frontend_id,
+                        ref_type="type",
                     ),
                     enabled=frontend_data.get("enabled", True),
                     metadata={"_file_path": str(source_path)},
@@ -647,6 +651,7 @@ class ConfigLoader:
                         field_name="quota unit",
                         file_path=path,
                         config_id=quota_id,
+                        ref_type="unit",
                     ),
                     limit_count=limit_count,
                     period=parse_enum_value(
@@ -655,6 +660,7 @@ class ConfigLoader:
                         field_name="quota period",
                         file_path=path,
                         config_id=quota_id,
+                        ref_type="period",
                     ),
                     metadata={"_file_path": str(path)},
                 )
