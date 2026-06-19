@@ -547,3 +547,35 @@ def test_provider_gateway_failure_uses_safe_platform_error_code(
         ).mappings().one()
 
     assert failed_event["error_code"] == "provider_unavailable"
+
+
+@pytest.mark.parametrize(("field_name", "value"), [("tenant_id", ""), ("region", "")])
+def test_provider_gateway_does_not_persist_provider_call_when_event_dimensions_are_invalid(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    field_name: str,
+    value: str,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        emitter = _build_emitter(session)
+        gateway = ProviderGateway(
+            {"openai": SuccessfulAdapter()},
+            provider_call_repository=ProviderCallRepository(session),
+            event_emitter=emitter,
+        )
+        context = make_execution_context()
+        invalid_context = replace(context, **{field_name: value})
+
+        with pytest.raises(EventValidationError, match=field_name):
+            gateway.execute(
+                "openai",
+                ProviderRequest(prompt="hello", model="gpt-5-mini"),
+                invalid_context,
+                provider_policy_id="policy_primary",
+                action_run_id="action_run_demo",
+            )
+
+        provider_call_count = session.execute(
+            sa.select(sa.func.count()).select_from(provider_calls_table)
+        ).scalar_one()
+
+    assert provider_call_count == 0

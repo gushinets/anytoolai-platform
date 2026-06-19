@@ -6,7 +6,7 @@ from typing import Protocol
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.context.execution_context import ExecutionContext
-from anytoolai_platform_core.events.emitter import EventEmitter
+from anytoolai_platform_core.events.emitter import EventEmitter, EventValidationError
 from anytoolai_platform_core.providers.models import ProviderCallRecord, ProviderCallStatus
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 
@@ -60,6 +60,8 @@ class ProviderGateway:
         if self._provider_call_repository is None or self._event_emitter is None:
             raise RuntimeError("provider runtime execution requires repository and event emitter")
 
+        _require_event_dimension(context.tenant_id, "tenant_id")
+        _require_event_dimension(context.region, "region")
         runtime_context = replace(context, provider=provider, model=request.model)
         provider_call = self._provider_call_repository.create(
             ProviderCallRecord(
@@ -160,6 +162,12 @@ class ProviderGateway:
 def _require_context_field(value: str | None, field_name: str) -> str:
     if value is None or not value.strip():
         raise ValueError(f"provider runtime context missing {field_name}")
+    return value
+
+
+def _require_event_dimension(value: str | None, field_name: str) -> str:
+    if value is None or not value.strip():
+        raise EventValidationError(f"missing required event dimension: {field_name}")
     return value
 
 
