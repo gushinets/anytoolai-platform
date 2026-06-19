@@ -170,6 +170,15 @@ def seed_runtime_chain(
     return scenario_session, job, action_run
 
 
+def scenario_session_scope(record: ScenarioSessionRecord) -> dict[str, str]:
+    return {
+        "tenant_id": record.tenant_id,
+        "region": record.region,
+        "product_id": record.product_id,
+        "frontend_id": record.frontend_id,
+    }
+
+
 ROUND_TRIP_REPOSITORY_CASES = [
     pytest.param(
         ScenarioSessionRepository,
@@ -258,7 +267,13 @@ def test_repositories_respect_explicit_transaction_boundary(
 
         read_session = session_factory()
         try:
-            assert ScenarioSessionRepository(read_session).get(created.id) is None
+            assert (
+                ScenarioSessionRepository(read_session).get(
+                    created.id,
+                    **scenario_session_scope(created),
+                )
+                is None
+            )
         finally:
             read_session.close()
 
@@ -266,7 +281,13 @@ def test_repositories_respect_explicit_transaction_boundary(
 
         committed_session = session_factory()
         try:
-            assert ScenarioSessionRepository(committed_session).get(created.id) == created
+            assert (
+                ScenarioSessionRepository(committed_session).get(
+                    created.id,
+                    **scenario_session_scope(created),
+                )
+                == created
+            )
         finally:
             committed_session.close()
     finally:
@@ -294,7 +315,7 @@ def test_repositories_raise_explicit_error_when_round_trip_read_missing_on_creat
     session = session_factory()
     try:
         repository = repository_type(session)
-        monkeypatch.setattr(repository, "get", lambda _record_id: None)
+        monkeypatch.setattr(repository, "get", lambda *_args, **_kwargs: None)
 
         with pytest.raises(RuntimeError, match="round-trip failed after create"):
             repository.create(record_factory())
@@ -324,10 +345,22 @@ def test_repositories_raise_explicit_error_when_round_trip_read_missing_on_updat
     try:
         repository = repository_type(session)
         created = repository.create(record_factory())
-        monkeypatch.setattr(repository, "get", lambda _record_id: None)
 
         with pytest.raises(RuntimeError, match="round-trip failed after update"):
-            repository.update(update_factory(created))
+            if isinstance(repository, ScenarioSessionRepository):
+                get_results = iter([created, None])
+                monkeypatch.setattr(
+                    repository,
+                    "get",
+                    lambda *_args, **_kwargs: next(get_results),
+                )
+                repository.update(
+                    update_factory(created),
+                    **scenario_session_scope(created),
+                )
+            else:
+                monkeypatch.setattr(repository, "get", lambda *_args, **_kwargs: None)
+                repository.update(update_factory(created))
     finally:
         session.rollback()
         session.close()
@@ -344,7 +377,7 @@ def test_scenario_session_repository_create_read_update(
         assert created.status is ScenarioSessionStatus.started
         assert created.started_at.tzinfo is not None
 
-        stored = repository.get(created.id)
+        stored = repository.get(created.id, **scenario_session_scope(created))
         assert stored == created
 
         completed = repository.update(
@@ -353,12 +386,59 @@ def test_scenario_session_repository_create_read_update(
                 status=ScenarioSessionStatus.completed,
                 completed_at=utc_now(),
                 current_step="done",
-            )
+            ),
+            **scenario_session_scope(created),
         )
 
         assert completed.status is ScenarioSessionStatus.completed
         assert completed.current_step == "done"
         assert completed.completed_at is not None
+
+
+def test_scenario_session_repository_get_is_scope_bound(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        repository = ScenarioSessionRepository(session)
+        created = repository.create(make_scenario_session())
+
+        assert repository.get(created.id, **scenario_session_scope(created)) == created
+        assert (
+            repository.get(
+                created.id,
+                tenant_id="tenant_other",
+                region=created.region,
+                product_id=created.product_id,
+                frontend_id=created.frontend_id,
+            )
+            is None
+        )
+
+
+def test_scenario_session_repository_update_does_not_mutate_scope_columns(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        repository = ScenarioSessionRepository(session)
+        created = repository.create(make_scenario_session())
+
+        updated = repository.update(
+            replace(
+                created,
+                tenant_id="tenant_other",
+                region="us-west",
+                product_id="product_other",
+                frontend_id="frontend_other",
+                current_step="done",
+            ),
+            **scenario_session_scope(created),
+        )
+
+        assert updated.tenant_id == created.tenant_id
+        assert updated.region == created.region
+        assert updated.product_id == created.product_id
+        assert updated.frontend_id == created.frontend_id
+        assert updated.current_step == "done"
 
 
 def test_scenario_session_repository_required_fields(
