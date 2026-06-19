@@ -4,7 +4,7 @@ Source-aligned table:
 - platform.product_handoffs
 """
 revision = "0004"
-down_revision = None
+down_revision = "0003"
 
 def upgrade():
     pass

@@ -7,7 +7,7 @@ Source-aligned tables:
 - platform.paywall_intents
 """
 revision = "0003"
-down_revision = None
+down_revision = "0002"
 
 def upgrade():
     pass
