@@ -1,0 +1,495 @@
+# Runtime Storage
+
+This document describes the first SQLAlchemy-backed runtime storage slice for MVP-A.
+
+It covers the design that was implemented for:
+
+- `platform.scenario_sessions`
+- `platform.jobs`
+- `platform.action_runs`
+- `platform.provider_calls`
+- `platform.artifacts`
+
+This is the durable runtime state layer for execution. It is not config storage.
+
+## Scope
+
+The runtime storage slice lives in these files:
+
+- `migrations/platform/env.py`
+- `migrations/platform/versions/0001_runtime_tables.py`
+- `packages/backend/platform-core/src/anytoolai_platform_core/storage/db.py`
+- `packages/backend/platform-core/src/anytoolai_platform_core/storage/transactions.py`
+- `packages/backend/platform-core/src/anytoolai_platform_core/scenarios/repository.py`
+- `packages/backend/platform-core/src/anytoolai_platform_core/workflows/repository.py`
+- `packages/backend/platform-core/src/anytoolai_platform_core/actions/repository.py`
+- `packages/backend/platform-core/src/anytoolai_platform_core/providers/repository.py`
+- `packages/backend/platform-core/src/anytoolai_platform_core/artifacts/repository.py`
+- `packages/backend/platform-core/tests/unit/test_runtime_storage.py`
+
+The runtime storage slice does not cover:
+
+- config registry storage
+- `platform.event_log`
+- quota tables
+- handoff tables
+- product definition tables
+- billing tables
+- admin editing flows
+
+## SQLAlchemy Choice
+
+The implementation uses SQLAlchemy Core tables plus small repository classes.
+
+It does not use SQLAlchemy ORM mapped classes.
+
+That choice was intentional:
+
+- the repo already used simple frozen dataclasses for core models
+- there was no existing ORM convention to preserve
+- the MVP-A storage requirements are CRUD-oriented and explicit
+- the task required caller-owned transaction boundaries
+- Core tables are enough for inserts, selects, updates, indexes, and migration DDL
+
+The current package dependency is `sqlalchemy>=2.0`, and the repo lock currently resolves to the
+SQLAlchemy `2.0.x` line.
+
+## Storage Layers
+
+The implementation is split into four layers.
+
+### 1. Migration layer
+
+`migrations/platform/versions/0001_runtime_tables.py` defines the durable schema for the runtime
+tables.
+
+Responsibilities:
+
+- create the `platform` schema when the backend dialect supports schemas
+- create the five runtime tables
+- create indexes for common runtime lookups
+- define the initial enum constraints at the database level
+- support downgrade for the same tables
+
+`migrations/platform/env.py` was also turned from a placeholder into a minimal working Alembic env
+so tests and future commands can execute migrations programmatically.
+
+### 2. Shared SQLAlchemy table layer
+
+`packages/backend/platform-core/src/anytoolai_platform_core/storage/db.py` is the shared storage
+source of truth for table objects.
+
+Responsibilities:
+
+- define `PLATFORM_SCHEMA`
+- define a shared `MetaData`
+- define all five `Table(...)` objects
+- define reusable SQLAlchemy types
+- expose a small engine factory
+
+Important shared helpers in this file:
+
+- `UtcDateTime`
+  - requires timezone-aware datetimes on write
+  - normalizes result values back to UTC-aware datetimes
+- `_json_document_type()`
+  - uses generic SQLAlchemy `JSON`
+  - swaps to PostgreSQL `JSONB` on the PostgreSQL dialect
+- `_enum_type(...)`
+  - stores enum values as validated strings
+  - avoids depending on database-native enums for this MVP slice
+
+### 3. Repository layer
+
+Each runtime entity has a small repository class:
+
+- `ScenarioSessionRepository`
+- `JobRepository`
+- `ActionRunRepository`
+- `ProviderCallRepository`
+- `ArtifactRepository`
+
+Repository responsibilities:
+
+- `create(record)`
+- `get(id)`
+- `update(record)`
+
+Repository non-responsibilities:
+
+- opening the database engine
+- owning transactions
+- calling `commit()`
+- handling cross-entity orchestration
+- doing business-level validation beyond what the DB schema enforces
+
+### 4. Record model layer
+
+The repository return type is a frozen dataclass record, not an ORM instance.
+
+These records live next to the rest of the domain models:
+
+- `scenarios/models.py` -> `ScenarioSessionRecord`
+- `workflows/models.py` -> `JobRecord`
+- `actions/models.py` -> `ActionRunRecord`
+- `providers/models.py` -> `ProviderCallRecord`
+- `artifacts/models.py` -> `ArtifactRecord`
+
+This keeps the runtime storage surface aligned with the repo's existing model style.
+
+## Why Frozen Dataclass Records
+
+The runtime records are database-backed, but they are not treated as active ORM entities.
+
+They are immutable snapshots passed into and out of repositories.
+
+That has a few advantages for this repo:
+
+- no hidden session-attached object behavior leaks into domain code
+- no lazy loading or implicit flushes
+- repository outputs are easy to compare in tests
+- transaction ownership stays explicit
+- the runtime record style matches the existing config/domain dataclass style
+
+The tradeoff is also explicit:
+
+- the dataclass fields and SQLAlchemy table columns must be kept in sync manually
+
+For MVP-A that tradeoff was acceptable because the storage slice is still small and explicit.
+
+## Transaction Boundary Pattern
+
+Transaction ownership belongs to the caller.
+
+This is implemented in:
+
+- `packages/backend/platform-core/src/anytoolai_platform_core/storage/transactions.py`
+
+The main helpers are:
+
+- `build_session_factory(engine)`
+- `transaction_boundary(session_factory)`
+
+Rules:
+
+- repositories may `flush()`
+- repositories must not `commit()`
+- callers decide whether a unit of work commits or rolls back
+
+This was chosen because the task explicitly required an explicit transaction boundary and no hidden
+commit behavior inside repositories.
+
+## Common Runtime Dimensions
+
+Every runtime row carries the shared execution dimensions required by MVP-A where applicable.
+
+These include:
+
+- `tenant_id`
+- `region`
+- `product_id`
+- `frontend_id`
+- `scenario_session_id`
+- `job_id`
+- `action_run_id`
+- workflow and step identifiers where applicable
+
+This keeps runtime state queryable along the same dimensions used across execution, events, and API
+contracts.
+
+## Table Design
+
+### `platform.scenario_sessions`
+
+Purpose:
+
+- the root durable record for every scenario start
+
+Key columns:
+
+- identity and tenant dimensions
+- `scenario_id`
+- `scenario_version`
+- `status`
+- checkpoint/step progression fields
+- `metadata`
+- lifecycle timestamps
+
+Scenario session status values:
+
+- `started`
+- `waiting_for_user`
+- `running`
+- `completed`
+- `failed`
+- `expired`
+
+### `platform.jobs`
+
+Purpose:
+
+- track workflow execution attempts linked to a scenario session
+
+Key columns:
+
+- `scenario_session_id`
+- `workflow_id`
+- `workflow_version`
+- `status`
+- `input_artifact_id`
+- `result_artifact_id`
+- safe error fields
+- lifecycle timestamps
+- `metadata`
+
+Job status values:
+
+- `created`
+- `running`
+- `succeeded`
+- `failed`
+- `canceled`
+
+### `platform.action_runs`
+
+Purpose:
+
+- track execution of a specific workflow step/action configuration
+
+Key columns:
+
+- `scenario_session_id`
+- `job_id`
+- `workflow_id`
+- `step_id`
+- `action_type`
+- `action_config_id`
+- `status`
+- input/output artifact links
+- timestamps
+
+Action run status values:
+
+- `created`
+- `running`
+- `succeeded`
+- `failed`
+- `canceled`
+- `skipped`
+
+### `platform.provider_calls`
+
+Purpose:
+
+- persist provider gateway calls and their safe operational metadata
+
+Key columns:
+
+- all common dimensions through action-run granularity
+- `provider_policy_id`
+- `provider`
+- `model`
+- `status`
+- `input_tokens`
+- `output_tokens`
+- `latency_ms`
+- `estimated_cost`
+- `error_code`
+- timestamps
+
+Provider call status values:
+
+- `created`
+- `running`
+- `succeeded`
+- `failed`
+- `timed_out`
+
+These fields were chosen to match the provider-gateway contract: even before billing, provider
+calls must log provider, model, tokens, latency, cost when known, and success/failure state.
+
+### `platform.artifacts`
+
+Purpose:
+
+- persist runtime outputs and intermediate materialized results
+
+Key columns:
+
+- `artifact_type`
+- `status`
+- `content_text`
+- `content_json`
+- `object_storage_key`
+- `metadata`
+- `created_at`
+
+Artifact status values:
+
+- `created`
+- `stored`
+- `failed`
+
+Artifact content behavior:
+
+- text stays in `content_text`
+- structured JSON stays in `content_json`
+- object storage remains a future extension point through `object_storage_key`
+
+## JSON And Text Strategy
+
+The artifact and metadata strategy was kept intentionally simple.
+
+Rules:
+
+- generic metadata columns use JSON
+- PostgreSQL uses `JSONB` through SQLAlchemy type variants
+- text artifacts are not coerced into JSON
+- structured outputs can be stored directly as JSON
+
+This supports MVP-A structured output work without introducing object storage or a custom document
+layer too early.
+
+## ID And Timestamp Conventions
+
+The implementation reused existing repo helpers instead of inventing a new storage convention.
+
+IDs:
+
+- generated through `anytoolai_platform_core.common.ids.new_id(prefix)`
+- current format is `prefix_<uuid4 hex>`
+
+Examples:
+
+- `scenario_session_<hex>`
+- `job_<hex>`
+- `action_run_<hex>`
+- `provider_call_<hex>`
+- `artifact_<hex>`
+
+Timestamps:
+
+- generated through `anytoolai_platform_core.common.time.utc_now()`
+- expected to be timezone-aware UTC datetimes
+- normalized at the SQLAlchemy type layer by `UtcDateTime`
+
+## Index Strategy
+
+Indexes were added for the runtime query paths explicitly called out in the task.
+
+The implemented pattern covers:
+
+- `scenario_session_id`
+- `job_id`
+- `product_id`
+- `created_at`
+- `status`
+
+Not every table gets every index blindly. The indexes are applied where the column exists and where
+that lookup is expected to matter for runtime querying.
+
+## Repository Behavior
+
+The repositories are intentionally boring and explicit.
+
+`create(...)`:
+
+- inserts the full record
+- calls `flush()`
+- reads the row back through `get(...)`
+- returns the stored record snapshot
+
+`get(...)`:
+
+- selects by primary key
+- returns `None` if not found
+- maps SQLAlchemy row data into the frozen record dataclass
+
+`update(...)`:
+
+- updates by primary key
+- raises `LookupError` when the row is missing
+- calls `flush()`
+- reads the row back
+- returns the updated snapshot
+
+This keeps behavior easy to read, easy to test, and easy to replace later if the runtime grows.
+
+## Testing Strategy
+
+The storage slice is covered in:
+
+- `packages/backend/platform-core/tests/unit/test_runtime_storage.py`
+
+The test approach is important:
+
+- it runs the real Alembic `0001` migration
+- it verifies CRUD against the migrated schema
+- it uses SQLite for lightweight CI compatibility
+- it attaches a second SQLite database as the `platform` schema so schema-qualified table names are
+  still exercised
+
+What the tests cover:
+
+- migration applies on a clean database
+- required fields fail at the DB layer
+- create/read/update for all five repositories
+- status transitions
+- artifact text storage
+- artifact JSON storage
+- explicit transaction-boundary behavior
+
+This does not fully replace a PostgreSQL integration test, but it gives strong coverage of the
+implemented SQLAlchemy layer while keeping the repo's current baseline checks fast and local.
+
+## Known Compromises
+
+The current design intentionally accepts a few compromises:
+
+### SQLite-based verification
+
+The migration was validated through real Alembic execution on SQLite with an attached schema, not on
+a live PostgreSQL server.
+
+Why:
+
+- the current repo baseline is DB-light
+- the task still needed real schema and repository verification
+
+Consequence:
+
+- PostgreSQL-specific behavior is represented through SQLAlchemy variants, but not fully exercised by
+  a live PostgreSQL engine in the current baseline suite
+
+### Manual sync between tables and record dataclasses
+
+Because the implementation uses SQLAlchemy Core plus frozen dataclass records, schema and record
+shapes must stay aligned manually.
+
+Why this was still acceptable:
+
+- the runtime surface is still small
+- the fields are explicit
+- the repositories are simple
+- the tests catch most drift quickly
+
+## When To Revisit This Design
+
+This SQLAlchemy design is appropriate while MVP-A storage remains:
+
+- explicit
+- small
+- CRUD-oriented
+- repository-driven
+
+It should be revisited if the platform later needs:
+
+- richer relational graphs
+- ORM identity/session semantics
+- complex query composition
+- optimistic locking/versioned writes
+- bulk execution patterns
+- many cross-table workflows inside one storage layer
+
+If those pressures appear, the likely next step is not to abandon SQLAlchemy, but to decide whether
+the repo has grown enough to justify ORM mapped classes or a more formal storage service layer.
