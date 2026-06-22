@@ -252,6 +252,31 @@ def generate_docs() -> int:
         "",
     ]
     action_registry.write_text("\n".join(lines), encoding="utf-8")
+
+    taxonomy_module_path = (
+        ROOT
+        / "packages"
+        / "backend"
+        / "platform-core"
+        / "src"
+        / "anytoolai_platform_core"
+        / "events"
+        / "taxonomy.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "anytoolai_platform_core.events.taxonomy",
+        taxonomy_module_path,
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError("unable to load platform event taxonomy module for docs generation")
+    taxonomy_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(taxonomy_module)
+
+    event_catalog = generated_dir / "event-catalog.md"
+    event_catalog.write_text(
+        taxonomy_module.render_event_catalog_markdown(),
+        encoding="utf-8",
+    )
     print("Generated docs refreshed")
     return 0
 
