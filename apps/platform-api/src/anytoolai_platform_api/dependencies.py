@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import Depends, Request
 
 from anytoolai_platform_api.bootstrap import RuntimeBootstrapResult
@@ -19,6 +21,6 @@ def get_runtime(request: Request) -> RuntimeBootstrapResult:
 
 
 def get_config_registry(
-    runtime: RuntimeBootstrapResult = Depends(get_runtime),
+    runtime: Annotated[RuntimeBootstrapResult, Depends(get_runtime)],
 ) -> ConfigRegistry:
     return runtime.config_registry
