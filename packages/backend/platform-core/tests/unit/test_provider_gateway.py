@@ -382,12 +382,51 @@ def test_fake_provider_rejects_fixture_path_traversal() -> None:
         "prompt": "identical prompt",
     }
 
-    with pytest.raises(ValueError, match="escapes fixture root"):
+    for fixture_key in ("..\\..\\secret", "../secret", "C:\\secret", "/secret"):
+        with pytest.raises(PlatformError, match="fake provider fixture key is invalid") as exc_info:
+            asyncio.run(
+                adapter.complete(
+                    ResolvedProviderRequest(
+                        **common_kwargs,
+                        fixture_key=fixture_key,
+                    )
+                )
+            )
+        assert exc_info.value.code == "provider_fixture_key_invalid"
+
+
+def test_fake_provider_missing_fixture_uses_normal_not_found_behavior() -> None:
+    adapter = FakeProviderAdapter(FIXTURE_ROOT)
+    common_kwargs = {
+        "provider_policy_id": "default_fake_provider_v1",
+        "provider": "fake",
+        "model": "fake-json-v1",
+        "temperature": 0.0,
+        "timeout_seconds": 30,
+        "max_retries": 1,
+        "structured_output_mode": build_config_registry(CONFIG_ROOT)
+        .get_provider_policy("default_fake_provider_v1")
+        .structured_output_mode,
+        "tenant_id": "tenant_demo",
+        "region": "eu-central",
+        "product_id": "kernel_demo",
+        "frontend_id": "kernel_demo_ce",
+        "scenario_session_id": "scenario_session_demo",
+        "job_id": "job_demo",
+        "workflow_id": "workflow_demo",
+        "step_id": "extract",
+        "action_run_id": "action_run_demo",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "kernel_demo.extract_structured_fields_v1",
+        "prompt": "identical prompt",
+    }
+
+    with pytest.raises(FileNotFoundError, match="fake provider fixture not found: missing_fixture"):
         asyncio.run(
             adapter.complete(
                 ResolvedProviderRequest(
                     **common_kwargs,
-                    fixture_key="..\\..\\secret",
+                    fixture_key="missing_fixture",
                 )
             )
         )

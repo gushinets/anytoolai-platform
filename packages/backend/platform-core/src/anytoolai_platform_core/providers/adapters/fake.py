@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
+from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.providers.models import (
     ProviderCallStatus,
     ProviderResponse,
@@ -60,9 +61,13 @@ class FakeProviderAdapter:
 
     def _load_fixture(self, fixture_key: str) -> dict[str, Any]:
         fixture_root = self._fixture_root.resolve()
+        self._validate_fixture_key(fixture_key)
         fixture_path = (fixture_root / f"{fixture_key}.json").resolve()
         if not fixture_path.is_relative_to(fixture_root):
-            raise ValueError(f"fake provider fixture key escapes fixture root: {fixture_key}")
+            raise PlatformError(
+                "provider_fixture_key_invalid",
+                "fake provider fixture key is invalid",
+            )
         if not fixture_path.exists():
             raise FileNotFoundError(f"fake provider fixture not found: {fixture_key}")
         with fixture_path.open("r", encoding="utf-8") as handle:
@@ -70,6 +75,22 @@ class FakeProviderAdapter:
         if not isinstance(data, dict):
             raise ValueError(f"fake provider fixture must be a JSON object: {fixture_key}")
         return data
+
+    def _validate_fixture_key(self, fixture_key: str) -> None:
+        posix_path = PurePosixPath(fixture_key)
+        windows_path = PureWindowsPath(fixture_key)
+
+        if posix_path.is_absolute() or windows_path.is_absolute() or windows_path.drive:
+            raise PlatformError(
+                "provider_fixture_key_invalid",
+                "fake provider fixture key is invalid",
+            )
+
+        if ".." in posix_path.parts or ".." in windows_path.parts:
+            raise PlatformError(
+                "provider_fixture_key_invalid",
+                "fake provider fixture key is invalid",
+            )
 
     def _response_text(self, fixture: dict[str, Any]) -> str:
         content = fixture.get("output_text")
