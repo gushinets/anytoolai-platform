@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
-from starlette.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import Response
 
 from anytoolai_platform_api.bootstrap import build_runtime
 from anytoolai_platform_api.errors import (
@@ -57,7 +59,10 @@ def _configured_cors_origins() -> list[str]:
 
 def _install_request_context(app: FastAPI) -> None:
     @app.middleware("http")
-    async def request_context_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
+    async def request_context_middleware(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         request_id = request.headers.get(REQUEST_ID_HEADER) or f"req_{uuid4().hex}"
         request.state.request_id = request_id
         response = await call_next(request)
