@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from http import HTTPStatus
 from pathlib import Path
-import sys
 
 import httpx
 
