@@ -46,9 +46,12 @@ py -3 scripts/agent/quick_check.py
 Other Python-owned commands still route through the runner:
 
 ```bash
-python3 scripts/agent/runner.py doctor
-python3 scripts/agent/runner.py full-check
+uv run python scripts/agent/runner.py doctor
+uv run python scripts/agent/runner.py full-check
 ```
+
+Python dependency management uses `uv`, not `pip`. Use `uv add <package>` for runtime dependencies,
+`uv add --dev <package>` for dev dependencies, and do not hand-edit `uv.lock`.
 
 `just full-check` runs the same baseline first and then runs `tests/e2e`.
 Today those e2e placeholders are DB-free, so no extra test DB settings are required.
