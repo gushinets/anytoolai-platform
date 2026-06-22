@@ -59,7 +59,10 @@ class FakeProviderAdapter:
         return fixture_key
 
     def _load_fixture(self, fixture_key: str) -> dict[str, Any]:
-        fixture_path = self._fixture_root / f"{fixture_key}.json"
+        fixture_root = self._fixture_root.resolve()
+        fixture_path = (fixture_root / f"{fixture_key}.json").resolve()
+        if not fixture_path.is_relative_to(fixture_root):
+            raise ValueError(f"fake provider fixture key escapes fixture root: {fixture_key}")
         if not fixture_path.exists():
             raise FileNotFoundError(f"fake provider fixture not found: {fixture_key}")
         with fixture_path.open("r", encoding="utf-8") as handle:

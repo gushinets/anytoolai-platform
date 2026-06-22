@@ -356,6 +356,43 @@ def test_fake_provider_selects_fixtures_by_metadata_not_prompt_text() -> None:
     assert json.loads(beta.output_text)["fixture"] == "beta"
 
 
+def test_fake_provider_rejects_fixture_path_traversal() -> None:
+    adapter = FakeProviderAdapter(FIXTURE_ROOT)
+    common_kwargs = {
+        "provider_policy_id": "default_fake_provider_v1",
+        "provider": "fake",
+        "model": "fake-json-v1",
+        "temperature": 0.0,
+        "timeout_seconds": 30,
+        "max_retries": 1,
+        "structured_output_mode": build_config_registry(CONFIG_ROOT)
+        .get_provider_policy("default_fake_provider_v1")
+        .structured_output_mode,
+        "tenant_id": "tenant_demo",
+        "region": "eu-central",
+        "product_id": "kernel_demo",
+        "frontend_id": "kernel_demo_ce",
+        "scenario_session_id": "scenario_session_demo",
+        "job_id": "job_demo",
+        "workflow_id": "workflow_demo",
+        "step_id": "extract",
+        "action_run_id": "action_run_demo",
+        "action_type": "text.extract_structured_fields",
+        "action_config_id": "kernel_demo.extract_structured_fields_v1",
+        "prompt": "identical prompt",
+    }
+
+    with pytest.raises(ValueError, match="escapes fixture root"):
+        asyncio.run(
+            adapter.complete(
+                ResolvedProviderRequest(
+                    **common_kwargs,
+                    fixture_key="..\\..\\secret",
+                )
+            )
+        )
+
+
 def test_gateway_captures_retry_metadata_and_retries_once(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
     config_registry: Any,
