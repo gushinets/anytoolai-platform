@@ -16,6 +16,7 @@ ALLOWED_ADAPTER_MODULE_ROOT = (
     / "adapters"
 )
 FORBIDDEN_ADAPTER_IMPORT_PREFIX = "anytoolai_platform_core.providers.adapters"
+FORBIDDEN_PROVIDER_IMPORT_PARENT = "anytoolai_platform_core.providers"
 ALLOWED_GATEWAY_MODULE = (
     ROOT
     / "packages"
@@ -49,6 +50,10 @@ def _imports_provider_adapter(path: Path) -> bool:
         if isinstance(node, ast.ImportFrom) and node.module is not None:
             if node.module == FORBIDDEN_ADAPTER_IMPORT_PREFIX or node.module.startswith(
                 f"{FORBIDDEN_ADAPTER_IMPORT_PREFIX}."
+            ):
+                return True
+            if node.module == FORBIDDEN_PROVIDER_IMPORT_PARENT and any(
+                alias.name == "adapters" for alias in node.names
             ):
                 return True
     return False
