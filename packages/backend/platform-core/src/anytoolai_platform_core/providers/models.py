@@ -100,6 +100,7 @@ class ProviderResponse:
     latency_ms: int = 0
     estimated_cost: float = 0.0
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    error_code: str | None = None
     error_type: str | None = None
     error_message_safe: str | None = None
 

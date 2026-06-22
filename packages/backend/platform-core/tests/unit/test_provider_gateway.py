@@ -213,6 +213,20 @@ class PlatformFailureAdapter:
         raise PlatformError("provider_unavailable", "safe provider failure")
 
 
+class ResponseErrorCodeAdapter:
+    async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
+        return ProviderResponse(
+            provider_policy_id=request.provider_policy_id,
+            provider=request.provider,
+            model=request.model,
+            output_text=json.dumps({"ok": True}, sort_keys=True),
+            usage=ProviderUsage(input_tokens=7, output_tokens=3),
+            error_code="provider_response_warning",
+            error_type="IgnoredErrorType",
+            error_message_safe="safe warning",
+        )
+
+
 class CancelledAdapter:
     async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
         del request
@@ -486,6 +500,30 @@ def test_gateway_supports_explicit_provider_call_repository_dependency(
     assert len(repository.created) == 1
     assert len(repository.updated) == 1
     assert repository.updated[0].status is ProviderCallStatus.succeeded
+
+
+def test_gateway_persists_response_error_code_not_error_type(
+    config_registry: Any,
+) -> None:
+    repository = RecordingProviderCallRepository()
+    gateway = ProviderGateway(
+        {"fake": ResponseErrorCodeAdapter()},
+        ProviderPolicyResolver(config_registry),
+        provider_call_repository=repository,
+    )
+    scenario_session = make_scenario_session()
+    job = make_job(scenario_session.id)
+    action_run = make_action_run(scenario_session.id, job.id)
+
+    response = asyncio.run(
+        gateway.request(build_request(scenario_session, job, action_run))
+    )
+
+    assert json.loads(response.output_text)["ok"] is True
+    assert len(repository.updated) == 1
+    assert repository.updated[0].error_code == "provider_response_warning"
+    assert repository.updated[0].error_code != "IgnoredErrorType"
+    assert repository.updated[0].error_message_safe == "safe warning"
 
 
 def test_gateway_skips_provider_call_persistence_when_required_dimensions_invalid(

@@ -370,7 +370,7 @@ class ProviderGateway:
                         output_tokens=stored_response.usage.output_tokens,
                         latency_ms=stored_response.latency_ms,
                         estimated_cost=stored_response.estimated_cost,
-                        error_code=stored_response.error_type,
+                        error_code=stored_response.error_code,
                         error_message_safe=stored_response.error_message_safe,
                         completed_at=utc_now(),
                         metadata=self._build_provider_call_metadata(
