@@ -325,6 +325,10 @@ dimensions such as `tenant_id` or `region` are missing or blank, the gateway sho
 Failure rows should persist safe platform-facing error codes, not raw exception class names, while
 still keeping safe operational metadata for debugging.
 
+When the shared event emitter is configured on `ProviderGateway`, provider request lifecycle events
+should be emitted through that emitter before or alongside persistence work, so invalid required
+event dimensions fail fast and do not leave behind unsafe provider-call rows.
+
 ### `platform.artifacts`
 
 Purpose:

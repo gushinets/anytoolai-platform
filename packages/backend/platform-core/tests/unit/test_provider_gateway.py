@@ -12,6 +12,9 @@ from alembic.config import Config
 from anytoolai_platform_core.actions.models import ActionRunRecord
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
+from anytoolai_platform_core.common.errors import PlatformError
+from anytoolai_platform_core.events.emitter import EventEmitter, EventValidationError
+from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.gateway import (
     ProviderGateway,
@@ -28,7 +31,7 @@ from anytoolai_platform_core.providers.models import (
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
-from anytoolai_platform_core.storage.db import provider_calls_table
+from anytoolai_platform_core.storage.db import event_log_table, provider_calls_table
 from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
@@ -68,7 +71,7 @@ def runtime_engine(tmp_path: Path) -> sa.Engine:
 
     with engine.begin() as connection:
         alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "0001")
+        command.upgrade(alembic_config, "head")
 
     yield engine
     engine.dispose()
@@ -202,6 +205,12 @@ class RecordingProviderCallRepository:
     def update(self, record: ProviderCallRecord) -> ProviderCallRecord:
         self.updated.append(record)
         return record
+
+
+class PlatformFailureAdapter:
+    async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
+        del request
+        raise PlatformError("provider_unavailable", "safe provider failure")
 
 
 def test_provider_policy_resolution_uses_config_registry(config_registry: Any) -> None:
@@ -417,3 +426,93 @@ def test_gateway_skips_provider_call_persistence_when_required_dimensions_invali
     assert json.loads(response.output_text)["title"] == "Kernel Demo Source Summary"
     assert repository.created == []
     assert repository.updated == []
+
+
+def test_gateway_request_emits_provider_events_when_event_emitter_configured(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        emitter = EventEmitter(EventLogRepository(session))
+        gateway = ProviderGateway(
+            {"fake": FakeProviderAdapter(FIXTURE_ROOT)},
+            ProviderPolicyResolver(config_registry),
+            event_emitter=emitter,
+        )
+        scenario_session, job, action_run = seed_runtime_chain(session)
+
+        asyncio.run(
+            gateway.request(build_request(scenario_session, job, action_run), session=session)
+        )
+
+        event_types = list(
+            session.execute(
+                sa.select(event_log_table.c.event_type).order_by(event_log_table.c.timestamp)
+            ).scalars()
+        )
+
+    assert {"provider.request_started", "provider.request_succeeded"} <= set(event_types)
+
+
+def test_gateway_request_failure_emits_failed_event_with_safe_platform_error_code(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        emitter = EventEmitter(EventLogRepository(session))
+        gateway = ProviderGateway(
+            {"fake": PlatformFailureAdapter()},
+            ProviderPolicyResolver(config_registry),
+            event_emitter=emitter,
+        )
+        scenario_session, job, action_run = seed_runtime_chain(session)
+
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+            asyncio.run(
+                gateway.request(build_request(scenario_session, job, action_run), session=session)
+            )
+
+        failed_event = (
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.event_type == "provider.request_failed")
+                .order_by(event_log_table.c.timestamp.desc(), event_log_table.c.event_id.desc())
+            )
+            .mappings()
+            .first()
+        )
+
+    assert failed_event is not None
+    assert exc_info.value.error_code == "provider_unavailable"
+    assert failed_event["error_code"] == "provider_unavailable"
+
+
+@pytest.mark.parametrize(("field_name", "value"), [("tenant_id", ""), ("region", "")])
+def test_gateway_request_invalid_event_dimensions_raise_and_skip_persistence(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
+    field_name: str,
+    value: str,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        emitter = EventEmitter(EventLogRepository(session))
+        gateway = ProviderGateway(
+            {"fake": FakeProviderAdapter(FIXTURE_ROOT)},
+            ProviderPolicyResolver(config_registry),
+            event_emitter=emitter,
+        )
+        scenario_session, job, action_run = seed_runtime_chain(session)
+        request = build_request(scenario_session, job, action_run, **{field_name: value})
+
+        with pytest.raises(EventValidationError, match=field_name):
+            asyncio.run(gateway.request(request, session=session))
+
+        provider_call_count = session.execute(
+            sa.select(sa.func.count()).select_from(provider_calls_table)
+        ).scalar_one()
+        event_count = session.execute(
+            sa.select(sa.func.count()).select_from(event_log_table)
+        ).scalar_one()
+
+    assert provider_call_count == 0
+    assert event_count == 0

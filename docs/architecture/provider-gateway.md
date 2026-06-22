@@ -58,8 +58,18 @@ gateway.
 - caller-owned SQLAlchemy `session` passed to `request(...)`, with the gateway constructing
   `ProviderCallRepository(session)`
 
+For runtime event emission, `ProviderGateway` may also receive the shared `event_emitter`
+dependency. Provider request events must go through that shared emitter, not through an ad-hoc
+provider-specific event path.
+
 This preserves the explicit transaction-boundary pattern from runtime storage. The gateway does not
 own commits and does not introduce hidden commit behavior.
+
+The gateway currently exposes:
+
+- async `request(...)` for the current provider-runtime path
+- sync `execute(...)` as a compatibility seam for event-log/runtime service tests that still use the
+  earlier provider execution shape
 
 Minimum provider policy fields:
 
@@ -104,6 +114,15 @@ bodies.
 
 Required event dimensions gate persistence for provider calls. If required dimensions such as
 `tenant_id` or `region` are missing or blank, the gateway must not write a `provider_calls` row.
+
+When the shared event emitter is configured, the gateway should emit:
+
+- `provider.request_started`
+- `provider.request_succeeded`
+- `provider.request_failed`
+
+If required event dimensions are invalid, event emission should fail fast and provider-call
+persistence should not proceed.
 
 ## Fake provider behavior
 
