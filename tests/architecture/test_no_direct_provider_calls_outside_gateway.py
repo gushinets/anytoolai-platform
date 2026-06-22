@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SKIP_PATH_PARTS = {".venv", ".quick-check-venv", "scripts"}
-ALLOWED_ADAPTER_IMPORT_ROOT = (
+ALLOWED_ADAPTER_MODULE_ROOT = (
     ROOT
     / "packages"
     / "backend"
@@ -13,8 +13,19 @@ ALLOWED_ADAPTER_IMPORT_ROOT = (
     / "src"
     / "anytoolai_platform_core"
     / "providers"
+    / "adapters"
 )
 FORBIDDEN_ADAPTER_IMPORT_PREFIX = "anytoolai_platform_core.providers.adapters"
+ALLOWED_GATEWAY_MODULE = (
+    ROOT
+    / "packages"
+    / "backend"
+    / "platform-core"
+    / "src"
+    / "anytoolai_platform_core"
+    / "providers"
+    / "gateway.py"
+)
 
 
 def _python_files() -> list[Path]:
@@ -46,7 +57,9 @@ def _imports_provider_adapter(path: Path) -> bool:
 def test_no_direct_provider_adapter_imports_outside_provider_boundary() -> None:
     offenders: list[Path] = []
     for path in _python_files():
-        if path.is_relative_to(ALLOWED_ADAPTER_IMPORT_ROOT):
+        if path.is_relative_to(ALLOWED_ADAPTER_MODULE_ROOT):
+            continue
+        if path == ALLOWED_GATEWAY_MODULE:
             continue
         if "tests" in path.parts:
             continue
@@ -61,7 +74,7 @@ def test_no_direct_provider_adapter_imports_outside_provider_boundary() -> None:
 def test_no_direct_openai_imports_outside_provider_adapter() -> None:
     offenders: list[Path] = []
     for path in _python_files():
-        if path.is_relative_to(ALLOWED_ADAPTER_IMPORT_ROOT):
+        if path.is_relative_to(ALLOWED_ADAPTER_MODULE_ROOT):
             continue
         if "tests" in path.parts:
             continue
