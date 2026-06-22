@@ -254,7 +254,7 @@ def test_gateway_success_persists_provider_call(
     assert json.loads(response.output_text)["title"] == "Kernel Demo Source Summary"
     assert len(rows) == 1
     row = rows[0]
-    assert row["status"] is ProviderCallStatus.succeeded
+    assert row["status"] == ProviderCallStatus.succeeded
     assert row["provider"] == "fake"
     assert row["model"] == "fake-json-v1"
     assert row["input_tokens"] == 120
@@ -302,8 +302,8 @@ def test_gateway_failure_persists_failed_provider_call(
     assert exc_info.value.error_type == "RuntimeError"
     assert exc_info.value.error_code == "provider_request_failed"
     assert len(rows) == 2
-    assert rows[0]["status"] is ProviderCallStatus.failed
-    assert rows[1]["status"] is ProviderCallStatus.failed
+    assert rows[0]["status"] == ProviderCallStatus.failed
+    assert rows[1]["status"] == ProviderCallStatus.failed
     assert rows[1]["error_code"] == "provider_request_failed"
     assert rows[1]["error_message_safe"] == "[redacted provider error]"
 
@@ -595,7 +595,7 @@ def test_gateway_request_cancellation_cleans_up_running_provider_call(
 
     assert len(rows) == 1
     row = rows[0]
-    assert row["status"] is ProviderCallStatus.failed
+    assert row["status"] == ProviderCallStatus.failed
     assert row["completed_at"] is not None
     assert row["latency_ms"] >= 0
     assert row["error_code"] == "provider_request_cancelled"
