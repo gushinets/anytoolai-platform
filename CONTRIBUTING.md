@@ -13,8 +13,11 @@ This repository is built for AI-assisted development with Codex. Humans steer; a
 7. Update generated docs when schemas, OpenAPI, actions, or events change.
 
 `just` is the preferred local interface. If `just` is unavailable or shell integration fails, use
-`python scripts/agent/runner.py <command>` with the same command names, for example
-`python scripts/agent/runner.py quick-check`.
+`uv run python scripts/agent/runner.py <command>` with the same command names, for example
+`uv run python scripts/agent/runner.py quick-check`.
+
+For Python dependencies, use `uv`, not `pip`: `uv add <package>` for runtime dependencies,
+`uv add --dev <package>` for dev dependencies, and never hand-edit `uv.lock`.
 
 ## Guardrails
 

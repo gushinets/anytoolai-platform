@@ -54,7 +54,14 @@ For any non-trivial work:
 use the shell-independent fallback command that matches the task:
 
 - baseline backend checks: `python3 scripts/agent/quick_check.py`
-- other repo commands: `python3 scripts/agent/runner.py <command>`
+- repo checks in the managed environment: `uv run python scripts/agent/runner.py <command>`
+
+Python package management uses `uv`, not `pip`.
+
+- Use `uv add <package>` for runtime dependencies.
+- Use `uv add --dev <package>` for dev dependencies.
+- Use `uv run python scripts/agent/runner.py <command>` for repo checks through the managed environment.
+- Do not hand-edit `uv.lock`.
 
 Windows fallback for baseline backend checks: `python scripts/agent/quick_check.py`
 Secondary Windows fallback when the Python launcher is configured: `py -3 scripts/agent/quick_check.py`
