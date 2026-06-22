@@ -132,6 +132,11 @@ def test_bootstrap_uses_uv_for_all_install_steps(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(quick_check.sys, "executable", "/tmp/.quick-check-venv/bin/python")
     monkeypatch.setattr(quick_check, "EDITABLE_PROJECTS", [project_one, project_two])
     monkeypatch.setattr(
+        quick_check,
+        "dev_dependency_group",
+        lambda: ["pytest>=8.0", "ruff>=0.5"],
+    )
+    monkeypatch.setattr(
         quick_check.shutil,
         "which",
         lambda name: "/usr/local/bin/uv" if name == "uv" else None,
@@ -164,7 +169,16 @@ def test_bootstrap_uses_uv_for_all_install_steps(monkeypatch, tmp_path) -> None:
             "/tmp/.quick-check-venv/bin/python",
             "--no-build-isolation",
             "-e",
-            ".[dev]",
+            ".",
+        ],
+        [
+            "/usr/local/bin/uv",
+            "pip",
+            "install",
+            "--python",
+            "/tmp/.quick-check-venv/bin/python",
+            "pytest>=8.0",
+            "ruff>=0.5",
         ],
         [
             "/usr/local/bin/uv",

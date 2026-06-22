@@ -115,6 +115,26 @@ def uv_install_command(*args: str, python: str) -> list[str]:
     return [uv_executable(), "pip", "install", "--python", python, *args]
 
 
+def dev_dependency_group() -> list[str]:
+    import tomllib
+
+    pyproject_path = ROOT / "pyproject.toml"
+    try:
+        pyproject = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise RuntimeError(f"Unable to read {pyproject_path}: {exc}") from exc
+
+    groups = pyproject.get("dependency-groups")
+    if not isinstance(groups, dict):
+        raise RuntimeError("pyproject.toml is missing [dependency-groups].")
+
+    dev_group = groups.get("dev")
+    if not isinstance(dev_group, list) or not all(isinstance(item, str) for item in dev_group):
+        raise RuntimeError("pyproject.toml is missing a string-only [dependency-groups].dev list.")
+
+    return dev_group
+
+
 def python_version(python_executable: Path) -> tuple[int, int] | None:
     try:
         completed = subprocess.run(
@@ -239,9 +259,16 @@ def ensure_virtualenv() -> int | None:
 
 
 def bootstrap() -> int:
+    try:
+        dev_requirements = dev_dependency_group()
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
     commands: list[list[str]] = [
         uv_install_command("--upgrade", *ROOT_BUILD_REQUIREMENTS, python=sys.executable),
-        uv_install_command("--no-build-isolation", "-e", ".[dev]", python=sys.executable),
+        uv_install_command("--no-build-isolation", "-e", ".", python=sys.executable),
+        uv_install_command(*dev_requirements, python=sys.executable),
     ]
     for project in EDITABLE_PROJECTS:
         commands.append(
