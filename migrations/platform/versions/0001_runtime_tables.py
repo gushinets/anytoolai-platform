@@ -62,6 +62,7 @@ def upgrade() -> None:
         sa.Column("parent_scenario_session_id", sa.String(length=128)),
         sa.Column("source_frontend_instance_id", sa.String(length=128)),
         sa.Column("metadata", json_document, nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("last_event_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("completed_at", sa.DateTime(timezone=True)),
@@ -72,6 +73,12 @@ def upgrade() -> None:
         "ix_scenario_sessions_product_id",
         "scenario_sessions",
         ["product_id"],
+        schema=PLATFORM_SCHEMA,
+    )
+    op.create_index(
+        "ix_scenario_sessions_created_at",
+        "scenario_sessions",
+        ["created_at"],
         schema=PLATFORM_SCHEMA,
     )
     op.create_index(

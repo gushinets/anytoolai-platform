@@ -49,6 +49,7 @@ scenario_chain_id nullable
 parent_scenario_session_id nullable
 source_frontend_instance_id nullable
 metadata jsonb
+created_at
 started_at
 last_event_at
 completed_at nullable
