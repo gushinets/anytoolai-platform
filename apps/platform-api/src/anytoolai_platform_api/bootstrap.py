@@ -12,7 +12,8 @@ from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.storage.db import create_sync_engine
 from anytoolai_platform_core.storage.transactions import build_session_factory
 
-DATABASE_URL_ENV = "ANYTOOLAI_DATABASE_URL"
+PROJECT_DATABASE_URL_ENV = "ANYTOOLAI_DATABASE_URL"
+GENERIC_DATABASE_URL_ENV = "DATABASE_URL"
 
 
 @dataclass(frozen=True)
@@ -43,9 +44,20 @@ def build_runtime(
 
 
 def _build_storage_dependencies(database_url: str | None) -> RuntimeStorageDependencies:
-    resolved_database_url = database_url if database_url is not None else os.getenv(DATABASE_URL_ENV)
+    resolved_database_url = _resolve_database_url(database_url)
     if not resolved_database_url:
         return RuntimeStorageDependencies()
 
     engine = create_sync_engine(resolved_database_url)
     return RuntimeStorageDependencies(session_factory=build_session_factory(engine))
+
+
+def _resolve_database_url(database_url: str | None) -> str | None:
+    if database_url is not None:
+        return database_url
+
+    project_database_url = os.getenv(PROJECT_DATABASE_URL_ENV)
+    if project_database_url:
+        return project_database_url
+
+    return os.getenv(GENERIC_DATABASE_URL_ENV)

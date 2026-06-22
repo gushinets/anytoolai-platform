@@ -89,9 +89,10 @@ Wire the FastAPI composition root to config registry and runtime storage bootstr
 |---|---|---|
 | 2026-06-22 | Put the projection in `platform-core/bootstrap`, not product-specific code. | The API needs product-neutral runtime metadata from the registry without importing product bundles. |
 | 2026-06-22 | Return schema refs/version hints instead of schema bodies. | The endpoint should guide renderers without exposing larger internal config documents. |
-| 2026-06-22 | Keep storage wiring optional unless `ANYTOOLAI_DATABASE_URL` is set. | This slice does not start scenarios or jobs, but the composition root should still be ready for runtime storage. |
+| 2026-06-22 | Keep storage wiring optional unless a database URL is configured. | This slice does not start scenarios or jobs, but the composition root should still be ready for runtime storage when runtime DB access is available. |
 | 2026-06-22 | Treat prompt text, provider selection details, internal paths, and secrets as forbidden response data. | Frontend surfaces need runtime metadata only, not backend execution internals. |
 | 2026-06-22 | Fix only the shared config error path needed for startup-failure validation; leave broader config-loader API/test cleanup out of A06. | The API acceptance test needs invalid config to raise a stable `RegistryLoadError`, but the remaining registry helper/test mismatches are separate work. |
+| 2026-06-23 | Resolve runtime storage DB URL with precedence `database_url` arg > `ANYTOOLAI_DATABASE_URL` > `DATABASE_URL`. | Default compose exports `DATABASE_URL`, while project-specific overrides should still win for local/dev and tests. |
 
 ## Progress log
 
@@ -100,6 +101,7 @@ Wire the FastAPI composition root to config registry and runtime storage bootstr
 | 2026-06-22 | Audited the branch against A06. The runtime bootstrap, dependency wiring, CORS, request ID propagation, safe error handler, runtime-config router, and `docs/generated/openapi.md` were already present. | Validate the branch against the actual acceptance criteria and fix only what is still blocking A06. |
 | 2026-06-22 | Fixed the shared config error path so invalid config cleanly fails `create_app()` with `RegistryLoadError`, and tightened the API test to assert the OpenAPI example payloads for `200` and safe `404`. | Keep A06 scoped to the API slice; log the remaining unrelated `platform-core` test failures separately. |
 | 2026-06-22 | `.quick-check-venv\Scripts\python.exe -m pytest -q apps/platform-api/tests` passed. `python -m py_compile` for touched files passed. `python scripts/agent/quick_check.py` still fails, but now only on unrelated `platform-core` config-loader registry helper/test expectations. | Leave repo-wide green as an external blocker for this task unless those base failures are assigned separately. |
+| 2026-06-23 | Fixed the compose/dev bootstrap mismatch so runtime storage resolves `DATABASE_URL` as a fallback while keeping `ANYTOOLAI_DATABASE_URL` support and explicit precedence. Added focused bootstrap tests for env resolution. | Keep the compose/default DB wiring aligned with the app bootstrap contract and preserve project-specific overrides. |
 
 ## Open questions
 
@@ -110,6 +112,7 @@ Wire the FastAPI composition root to config registry and runtime storage bootstr
 - The endpoint should return only frontend-safe runtime metadata: IDs, enabled frontends/scenarios, renderer hints, quota summary, and allowed UI capabilities.
 - Do not expose prompt text, system prompts, provider policy/model, internal file paths, or secrets in the response body or OpenAPI example.
 - Keep the API behavior product-neutral. The runtime projection belongs in `platform-core/bootstrap`, while `apps/platform-api` stays the composition and transport layer.
+- Runtime storage DB URL resolution is: explicit `database_url` argument first, then `ANYTOOLAI_DATABASE_URL`, then compose/default `DATABASE_URL`.
 - A startup-failure test already exists in `apps/platform-api/tests/test_startup_config_validation.py`; use it as the acceptance check for invalid config preventing serving.
 - If CORS and extension-origin handling are already present locally, preserve and extend them rather than adding a second mechanism.
 - `just doctor` is not available in the current shell, so task validation used the documented Python fallbacks and the managed `.quick-check-venv`.
