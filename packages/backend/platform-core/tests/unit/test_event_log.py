@@ -249,7 +249,7 @@ def test_event_log_migration_creates_table_at_0002(tmp_path: Path) -> None:
 
 def test_platform_migration_chain_is_single_head() -> None:
     script = ScriptDirectory.from_config(_build_alembic_config("sqlite+pysqlite://"))
-    assert script.get_heads() == ["0004"]
+    assert script.get_heads() == ["0005"]
 
 
 def test_event_emitter_persists_round_trip_and_maps_dimensions(

@@ -248,10 +248,17 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
                 sa.text("SELECT name FROM platform.sqlite_master WHERE type = 'index'")
             ).scalars()
         )
-        columns = {
+        scenario_session_columns = {
             column["name"]: column
             for column in sa.inspect(connection).get_columns(
                 "scenario_sessions",
+                schema="platform",
+            )
+        }
+        provider_call_columns = {
+            column["name"]: column
+            for column in sa.inspect(connection).get_columns(
+                "provider_calls",
                 schema="platform",
             )
         }
@@ -263,8 +270,10 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "provider_calls",
         "artifacts",
     }.issubset(table_names)
-    assert "created_at" in columns
-    assert columns["created_at"]["nullable"] is False
+    assert "created_at" in scenario_session_columns
+    assert scenario_session_columns["created_at"]["nullable"] is False
+    assert "error_message_safe" in provider_call_columns
+    assert provider_call_columns["error_message_safe"]["nullable"] is True
     assert {
         "ix_scenario_sessions_created_at",
         "ix_jobs_scenario_session_id",
@@ -273,6 +282,39 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "ix_artifacts_job_id",
         "ix_jobs_status",
     }.issubset(index_names)
+
+
+def test_runtime_migration_upgrade_from_0004_adds_provider_call_error_message_safe(
+    tmp_path: Path,
+) -> None:
+    main_db = tmp_path / "runtime-upgrade-main.sqlite3"
+    platform_db = tmp_path / "runtime-upgrade-platform.sqlite3"
+    engine = _build_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+
+    try:
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "0004")
+            connection.execute(
+                sa.text("ALTER TABLE platform.provider_calls DROP COLUMN error_message_safe")
+            )
+
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "head")
+            provider_call_columns = {
+                column["name"]: column
+                for column in sa.inspect(connection).get_columns(
+                    "provider_calls",
+                    schema="platform",
+                )
+            }
+
+        assert "error_message_safe" in provider_call_columns
+        assert provider_call_columns["error_message_safe"]["nullable"] is True
+    finally:
+        engine.dispose()
 
 
 def test_repositories_respect_explicit_transaction_boundary(
