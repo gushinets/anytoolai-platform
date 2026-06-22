@@ -295,6 +295,7 @@ Key columns:
 - `latency_ms`
 - `estimated_cost`
 - `error_code`
+- `error_message_safe`
 - timestamps
 
 Provider call status values:
@@ -307,6 +308,10 @@ Provider call status values:
 
 These fields were chosen to match the provider-gateway contract: even before billing, provider
 calls must log provider, model, tokens, latency, cost when known, and success/failure state.
+
+Additional safe operational details such as timeout metadata, retry metadata, request/correlation
+ids, fixture selection, and response annotations may be stored in the row `metadata` JSON. Raw
+prompt bodies, secrets, and unsafe payloads should not be persisted there.
 
 ### `platform.artifacts`
 

@@ -183,6 +183,7 @@ provider_calls_table = sa.Table(
     sa.Column("latency_ms", sa.Integer(), nullable=False),
     sa.Column("estimated_cost", sa.Float(), nullable=False),
     sa.Column("error_code", sa.String(length=128)),
+    sa.Column("error_message_safe", sa.Text()),
     sa.Column("created_at", utc_datetime, nullable=False),
     sa.Column("started_at", utc_datetime),
     sa.Column("completed_at", utc_datetime),

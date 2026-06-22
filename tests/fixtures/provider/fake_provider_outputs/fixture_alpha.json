@@ -1,0 +1,12 @@
+{
+  "response_json": {
+    "fixture": "alpha"
+  },
+  "input_tokens": 10,
+  "output_tokens": 5,
+  "latency_ms": 7,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "fixture_alpha"
+  }
+}

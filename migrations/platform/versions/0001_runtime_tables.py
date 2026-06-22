@@ -231,6 +231,7 @@ def upgrade() -> None:
         sa.Column("latency_ms", sa.Integer(), nullable=False),
         sa.Column("estimated_cost", sa.Float(), nullable=False),
         sa.Column("error_code", sa.String(length=128)),
+        sa.Column("error_message_safe", sa.Text()),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("started_at", sa.DateTime(timezone=True)),
         sa.Column("completed_at", sa.DateTime(timezone=True)),
