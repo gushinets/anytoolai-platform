@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from http import HTTPStatus
+from typing import Any
 
 import httpx
 
@@ -19,6 +19,22 @@ FORBIDDEN_RESPONSE_TOKENS = (
     "_file_path",
     "secret",
 )
+
+
+def _collect_response_keys(payload: Any) -> set[str]:
+    if isinstance(payload, dict):
+        keys = {str(key).lower() for key in payload}
+        for value in payload.values():
+            keys.update(_collect_response_keys(value))
+        return keys
+
+    if isinstance(payload, list):
+        keys: set[str] = set()
+        for item in payload:
+            keys.update(_collect_response_keys(item))
+        return keys
+
+    return set()
 
 
 async def _runtime_config_response(product_id: str) -> httpx.Response:
@@ -67,9 +83,9 @@ def test_runtime_config_returns_frontend_safe_metadata() -> None:
     assert first_scenario["output_renderer_hint"]["renderer"] == "json_schema"
     assert first_scenario["output_renderer_hint"]["schema_ref"].startswith("kernel_demo.")
 
-    serialized = json.dumps(data, sort_keys=True).lower()
+    response_keys = _collect_response_keys(data)
     for forbidden_token in FORBIDDEN_RESPONSE_TOKENS:
-        assert forbidden_token not in serialized
+        assert forbidden_token not in response_keys
 
 
 def test_unknown_runtime_config_product_returns_safe_404() -> None:
@@ -109,5 +125,7 @@ def test_runtime_config_allows_chrome_extension_cors_origin() -> None:
 
 def test_openapi_contains_runtime_config_endpoint() -> None:
     app = create_app()
+    operation = app.openapi()["paths"]["/v1/products/{product_id}/runtime-config"]["get"]
 
-    assert "/v1/products/{product_id}/runtime-config" in app.openapi()["paths"]
+    assert operation["responses"]["200"]["content"]["application/json"]["example"]["product_id"] == "kernel_demo"
+    assert operation["responses"]["404"]["content"]["application/json"]["example"]["error"]["code"] == "product_not_found"

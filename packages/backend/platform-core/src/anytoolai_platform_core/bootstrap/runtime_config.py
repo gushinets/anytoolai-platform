@@ -76,12 +76,12 @@ def build_product_runtime_config(
         for frontend in product.frontends
         if frontend.enabled
     )
-    scenarios = tuple(
-        scenario_metadata
-        for scenario_id in product.scenarios
-        if (scenario_metadata := _build_scenario_metadata(registry, scenario_id))
-        is not None
-    )
+    scenario_metadata_items: list[RuntimeScenarioMetadata] = []
+    for scenario_id in product.scenarios:
+        scenario_metadata = _build_scenario_metadata(registry, scenario_id)
+        if scenario_metadata is not None:
+            scenario_metadata_items.append(scenario_metadata)
+    scenarios = tuple(scenario_metadata_items)
 
     return RuntimeProductConfig(
         product_id=product.product_id,
