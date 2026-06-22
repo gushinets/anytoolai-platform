@@ -49,32 +49,41 @@ def _sqlite_url(database_path: Path) -> str:
     return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
 
 
-@pytest.fixture
-def runtime_engine(tmp_path: Path) -> sa.Engine:
-    main_db = tmp_path / "runtime-main.sqlite3"
-    platform_db = tmp_path / "runtime-platform.sqlite3"
-
+def _build_runtime_engine(main_db: Path, platform_db: Path) -> sa.Engine:
     engine = sa.create_engine(_sqlite_url(main_db), future=True)
 
     @event.listens_for(engine, "connect")
     def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
+        del connection_record
         dbapi_connection.execute(
             f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
         )
 
+    return engine
+
+
+def _build_alembic_config(database_url: str) -> Config:
     alembic_config = Config()
     alembic_config.set_main_option(
         "script_location", str(_repo_root() / "migrations" / "platform")
     )
-    alembic_config.set_main_option("sqlalchemy.url", _sqlite_url(main_db))
+    alembic_config.set_main_option("sqlalchemy.url", database_url)
+    return alembic_config
+
+
+@pytest.fixture
+def runtime_engine(tmp_path: Path) -> sa.Engine:
+    main_db = tmp_path / "runtime-main.sqlite3"
+    platform_db = tmp_path / "runtime-platform.sqlite3"
+    engine = _build_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(_sqlite_url(main_db))
 
     with engine.begin() as connection:
         alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "0001")
+        command.upgrade(alembic_config, "head")
 
     yield engine
     engine.dispose()
-
 
 @pytest.fixture
 def session_factory(runtime_engine: sa.Engine) -> sa.orm.sessionmaker[sa.orm.Session]:
@@ -239,6 +248,13 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
                 sa.text("SELECT name FROM platform.sqlite_master WHERE type = 'index'")
             ).scalars()
         )
+        columns = {
+            column["name"]: column
+            for column in sa.inspect(connection).get_columns(
+                "scenario_sessions",
+                schema="platform",
+            )
+        }
 
     assert {
         "scenario_sessions",
@@ -247,7 +263,10 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "provider_calls",
         "artifacts",
     }.issubset(table_names)
+    assert "created_at" in columns
+    assert columns["created_at"]["nullable"] is False
     assert {
+        "ix_scenario_sessions_created_at",
         "ix_jobs_scenario_session_id",
         "ix_action_runs_job_id",
         "ix_provider_calls_job_id",
@@ -375,6 +394,7 @@ def test_scenario_session_repository_create_read_update(
 
         assert created.id.startswith("scenario_session_")
         assert created.status is ScenarioSessionStatus.started
+        assert created.created_at.tzinfo is not None
         assert created.started_at.tzinfo is not None
 
         stored = repository.get(created.id, **scenario_session_scope(created))
@@ -391,6 +411,8 @@ def test_scenario_session_repository_create_read_update(
         )
 
         assert completed.status is ScenarioSessionStatus.completed
+        assert completed.created_at == created.created_at
+        assert completed.created_at.tzinfo is not None
         assert completed.current_step == "done"
         assert completed.completed_at is not None
 

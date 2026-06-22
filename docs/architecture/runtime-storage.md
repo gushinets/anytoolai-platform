@@ -213,6 +213,7 @@ Key columns:
 - `status`
 - checkpoint/step progression fields
 - `metadata`
+- `created_at`
 - lifecycle timestamps
 
 Scenario session status values:
@@ -388,6 +389,8 @@ Timestamps:
 - generated through `anytoolai_platform_core.common.time.utc_now()`
 - expected to be timezone-aware UTC datetimes
 - normalized at the SQLAlchemy type layer by `UtcDateTime`
+- scenario sessions now carry both `created_at` and the existing lifecycle timestamps
+  `started_at`, `last_event_at`, `completed_at`, and `expires_at`
 
 ## Index Strategy
 

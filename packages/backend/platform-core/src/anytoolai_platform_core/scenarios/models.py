@@ -46,6 +46,7 @@ class ScenarioSessionRecord:
     parent_scenario_session_id: str | None = None
     source_frontend_instance_id: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=utc_now)
     started_at: datetime = field(default_factory=utc_now)
     last_event_at: datetime = field(default_factory=utc_now)
     completed_at: datetime | None = None

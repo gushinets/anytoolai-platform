@@ -20,6 +20,7 @@ Scenario session stores:
 - `parent_scenario_session_id` nullable;
 - `source_frontend_instance_id` nullable;
 - `metadata` JSON;
+- `created_at`;
 - `started_at`;
 - `last_event_at`;
 - `completed_at` nullable;

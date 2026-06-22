@@ -14,3 +14,13 @@ class ExecutionContext:
     step_id: str | None = None
     guest_id: str | None = None
     user_id: str | None = None
+    scenario_chain_id: str | None = None
+    action_type: str | None = None
+    action_config_id: str | None = None
+    artifact_id: str | None = None
+    handoff_id: str | None = None
+    provider: str | None = None
+    model: str | None = None
+    acquisition_source: str | None = None
+    action_run_id: str | None = None
+    provider_policy_id: str | None = None
