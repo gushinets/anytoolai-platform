@@ -313,6 +313,17 @@ Additional safe operational details such as timeout metadata, retry metadata, re
 ids, fixture selection, and response annotations may be stored in the row `metadata` JSON. Raw
 prompt bodies, secrets, and unsafe payloads should not be persisted there.
 
+Provider-call persistence is gateway-owned. The gateway may receive an explicit
+`provider_call_repository` dependency or may construct `ProviderCallRepository(session)` from a
+caller-owned session, but it must not own commits.
+
+Provider-call rows should be written only when required execution dimensions are valid. If required
+dimensions such as `tenant_id` or `region` are missing or blank, the gateway should skip
+`provider_calls` persistence rather than writing an invalid row.
+
+Failure rows should persist safe platform-facing error codes, not raw exception class names, while
+still keeping safe operational metadata for debugging.
+
 ### `platform.artifacts`
 
 Purpose:

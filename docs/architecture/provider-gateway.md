@@ -50,6 +50,17 @@ The runtime provider path uses async DTOs:
 Concrete adapters implement one shared async interface and remain implementation details behind the
 gateway.
 
+## Dependency shape
+
+`ProviderGateway` supports two persistence wiring modes:
+
+- explicit `provider_call_repository` injection
+- caller-owned SQLAlchemy `session` passed to `request(...)`, with the gateway constructing
+  `ProviderCallRepository(session)`
+
+This preserves the explicit transaction-boundary pattern from runtime storage. The gateway does not
+own commits and does not introduce hidden commit behavior.
+
 Minimum provider policy fields:
 
 ```text
@@ -91,6 +102,9 @@ Persisted data includes:
 The gateway must not persist secrets, raw credentials, or large unsafe payloads such as raw prompt
 bodies.
 
+Required event dimensions gate persistence for provider calls. If required dimensions such as
+`tenant_id` or `region` are missing or blank, the gateway must not write a `provider_calls` row.
+
 ## Fake provider behavior
 
 The fake provider is deterministic and selects fixtures by request metadata, not prompt text.
@@ -103,3 +117,16 @@ Selection order:
 4. `request.metadata["action_config_id"]`
 
 Fixture files live in `tests/fixtures/provider/fake_provider_outputs/`.
+
+## Failure safety
+
+Gateway failures must use safe platform-facing error codes.
+
+Current behavior:
+
+- use `PlatformError.code` when the underlying exception is a platform error
+- use `provider_request_timed_out` for timeout failures
+- use `provider_request_failed` for other provider failures
+
+The gateway may still keep the underlying exception type for internal metadata, but persisted
+failure rows and surfaced safe errors should use the safe platform error code.

@@ -18,6 +18,7 @@ from anytoolai_platform_core.providers.gateway import (
     ProviderGatewayExecutionError,
 )
 from anytoolai_platform_core.providers.models import (
+    ProviderCallRecord,
     ProviderCallStatus,
     ProviderRequest,
     ProviderResponse,
@@ -189,6 +190,20 @@ class FlakyAdapter:
         )
 
 
+class RecordingProviderCallRepository:
+    def __init__(self) -> None:
+        self.created: list[ProviderCallRecord] = []
+        self.updated: list[ProviderCallRecord] = []
+
+    def create(self, record: ProviderCallRecord) -> ProviderCallRecord:
+        self.created.append(record)
+        return record
+
+    def update(self, record: ProviderCallRecord) -> ProviderCallRecord:
+        self.updated.append(record)
+        return record
+
+
 def test_provider_policy_resolution_uses_config_registry(config_registry: Any) -> None:
     resolver = ProviderPolicyResolver(config_registry)
 
@@ -270,10 +285,11 @@ def test_gateway_failure_persists_failed_provider_call(
         )
 
     assert exc_info.value.error_type == "RuntimeError"
+    assert exc_info.value.error_code == "provider_request_failed"
     assert len(rows) == 2
     assert rows[0]["status"] is ProviderCallStatus.failed
     assert rows[1]["status"] is ProviderCallStatus.failed
-    assert rows[1]["error_code"] == "RuntimeError"
+    assert rows[1]["error_code"] == "provider_request_failed"
     assert rows[1]["error_message_safe"] == "[redacted provider error]"
 
 
@@ -356,3 +372,48 @@ def test_gateway_captures_retry_metadata_and_retries_once(
     ]
     assert rows[0]["metadata"]["retry"] == {"attempt_number": 1, "max_retries": 1}
     assert rows[1]["metadata"]["retry"] == {"attempt_number": 2, "max_retries": 1}
+
+
+def test_gateway_supports_explicit_provider_call_repository_dependency(
+    config_registry: Any,
+) -> None:
+    repository = RecordingProviderCallRepository()
+    gateway = ProviderGateway(
+        {"fake": FakeProviderAdapter(FIXTURE_ROOT)},
+        ProviderPolicyResolver(config_registry),
+        provider_call_repository=repository,
+    )
+    scenario_session = make_scenario_session()
+    job = make_job(scenario_session.id)
+    action_run = make_action_run(scenario_session.id, job.id)
+
+    response = asyncio.run(
+        gateway.request(build_request(scenario_session, job, action_run))
+    )
+
+    assert json.loads(response.output_text)["title"] == "Kernel Demo Source Summary"
+    assert len(repository.created) == 1
+    assert len(repository.updated) == 1
+    assert repository.updated[0].status is ProviderCallStatus.succeeded
+
+
+def test_gateway_skips_provider_call_persistence_when_required_dimensions_invalid(
+    config_registry: Any,
+) -> None:
+    repository = RecordingProviderCallRepository()
+    gateway = ProviderGateway(
+        {"fake": FakeProviderAdapter(FIXTURE_ROOT)},
+        ProviderPolicyResolver(config_registry),
+        provider_call_repository=repository,
+    )
+    scenario_session = make_scenario_session(tenant_id="")
+    job = make_job(scenario_session.id)
+    action_run = make_action_run(scenario_session.id, job.id)
+
+    response = asyncio.run(
+        gateway.request(build_request(scenario_session, job, action_run, tenant_id=""))
+    )
+
+    assert json.loads(response.output_text)["title"] == "Kernel Demo Source Summary"
+    assert repository.created == []
+    assert repository.updated == []
