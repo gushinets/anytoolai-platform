@@ -213,6 +213,12 @@ class PlatformFailureAdapter:
         raise PlatformError("provider_unavailable", "safe provider failure")
 
 
+class CancelledAdapter:
+    async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
+        del request
+        raise asyncio.CancelledError()
+
+
 def test_provider_policy_resolution_uses_config_registry(config_registry: Any) -> None:
     resolver = ProviderPolicyResolver(config_registry)
 
@@ -485,6 +491,39 @@ def test_gateway_request_failure_emits_failed_event_with_safe_platform_error_cod
     assert failed_event is not None
     assert exc_info.value.error_code == "provider_unavailable"
     assert failed_event["error_code"] == "provider_unavailable"
+
+
+def test_gateway_request_cancellation_cleans_up_running_provider_call(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        gateway = ProviderGateway(
+            {"fake": CancelledAdapter()},
+            ProviderPolicyResolver(config_registry),
+        )
+        scenario_session, job, action_run = seed_runtime_chain(session)
+
+        with pytest.raises(asyncio.CancelledError):
+            asyncio.run(
+                gateway.request(build_request(scenario_session, job, action_run), session=session)
+            )
+
+        rows = (
+            session.execute(
+                sa.select(provider_calls_table).order_by(provider_calls_table.c.created_at)
+            )
+            .mappings()
+            .all()
+        )
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["status"] is ProviderCallStatus.failed
+    assert row["completed_at"] is not None
+    assert row["latency_ms"] >= 0
+    assert row["error_code"] == "provider_request_cancelled"
+    assert row["error_message_safe"] == "provider request cancelled"
 
 
 @pytest.mark.parametrize(("field_name", "value"), [("tenant_id", ""), ("region", "")])

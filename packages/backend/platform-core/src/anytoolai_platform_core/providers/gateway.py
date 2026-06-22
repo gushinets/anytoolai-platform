@@ -284,6 +284,40 @@ class ProviderGateway:
                 if attempt_number == max_attempts:
                     break
                 continue
+            except asyncio.CancelledError:
+                latency_ms = self._latency_ms(attempt_started)
+                safe_message = "provider request cancelled"
+                last_error = ProviderGatewayExecutionError(
+                    provider_policy_id=policy.provider_policy_id,
+                    provider=policy.provider,
+                    model=policy.model,
+                    error_code="provider_request_cancelled",
+                    error_type="CancelledError",
+                    message=safe_message,
+                )
+                if repository is not None and stored is not None:
+                    repository.update(
+                        replace(
+                            stored,
+                            status=ProviderCallStatus.failed,
+                            latency_ms=latency_ms,
+                            error_code=last_error.error_code,
+                            error_message_safe=safe_message,
+                            completed_at=utc_now(),
+                            metadata=self._build_provider_call_metadata(
+                                resolved_request,
+                                error_type=last_error.error_type,
+                                error_code=last_error.error_code,
+                                error_message_safe=safe_message,
+                            ),
+                        )
+                    )
+                self._emit_provider_failed(
+                    event_context,
+                    error_code=last_error.error_code,
+                    result_status=ProviderCallStatus.failed.value,
+                )
+                raise
             except Exception as exc:  # pragma: no cover - exercised by tests via fake adapter.
                 latency_ms = self._latency_ms(attempt_started)
                 safe_message = self._safe_error_message(exc)
