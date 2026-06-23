@@ -113,6 +113,30 @@ def test_loader_preserves_provider_policy_yaml_metadata() -> None:
     assert policy.metadata["_file_path"].endswith("provider_policies.yaml")
 
 
+@pytest.mark.parametrize("metadata_value", [None, ["not", "a", "dict"], "scalar-metadata"])
+def test_loader_fails_on_non_mapping_provider_policy_metadata(
+    tmp_path: Path,
+    metadata_value: object,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "provider_policies.yaml"
+    data = _load_yaml(path)
+    data["provider_policies"][0]["metadata"] = metadata_value
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="default_fake_provider_v1",
+        ref_type="metadata",
+        ref_value=str(metadata_value),
+        message_part="metadata must be a dictionary object",
+    )
+
+
 def test_loader_fails_on_duplicate_ids(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "products" / "kernel_demo" / "action_configs.yaml"

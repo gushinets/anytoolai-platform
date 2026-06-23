@@ -259,6 +259,16 @@ class ConfigLoader:
                         path,
                     )
 
+                metadata = policy_data.get("metadata", {})
+                if not isinstance(metadata, dict):
+                    raise InvalidConfigShapeError(
+                        path,
+                        "Provider policy metadata must be a dictionary object",
+                        config_id=policy_id,
+                        ref_type="metadata",
+                        ref_value=str(metadata),
+                    )
+
                 self.provider_policies[policy_id] = ProviderPolicy(
                     provider_policy_id=policy_id,
                     provider=provider,
@@ -278,7 +288,7 @@ class ConfigLoader:
                         config_id=policy_id,
                     ),
                     metadata={
-                        **dict(policy_data.get("metadata", {})),
+                        **metadata,
                         "_file_path": str(path),
                     },
                 )
