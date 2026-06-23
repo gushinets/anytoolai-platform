@@ -161,6 +161,7 @@ class ProviderGateway:
             )
             failure_context = replace(
                 initial_context,
+                provider_policy_id=failure_request.provider_policy_id,
                 provider=failure_request.provider,
                 model=failure_request.model,
             )
@@ -203,6 +204,7 @@ class ProviderGateway:
         stored_response = replace(response, latency_ms=latency_ms)
         success_context = replace(
             initial_context,
+            provider_policy_id=resolved_request.provider_policy_id,
             provider=stored_response.provider,
             model=stored_response.model,
         )

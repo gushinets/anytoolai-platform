@@ -23,10 +23,12 @@ from anytoolai_platform_core.providers.gateway import (
 from anytoolai_platform_core.providers.models import (
     ProviderCallRecord,
     ProviderCallStatus,
+    ProviderPolicy,
     ProviderRequest,
     ProviderResponse,
     ProviderUsage,
     ResolvedProviderRequest,
+    StructuredOutputMode,
 )
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
@@ -199,6 +201,14 @@ class RecordingProviderCallRepository:
         return record
 
 
+class RecordingEventEmitter:
+    def __init__(self) -> None:
+        self.emitted: list[tuple[str, Any, dict[str, Any]]] = []
+
+    def emit(self, event_type: str, context: Any, **kwargs: Any) -> None:
+        self.emitted.append((event_type, context, kwargs))
+
+
 class PlatformFailureAdapter:
     async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
         del request
@@ -223,6 +233,55 @@ class CancelledAdapter:
     async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
         del request
         raise asyncio.CancelledError()
+
+
+class FallbackSuccessAdapter:
+    async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
+        return ProviderResponse(
+            provider_policy_id=request.provider_policy_id,
+            provider=request.provider,
+            model=request.model,
+            output_text=json.dumps({"ok": True}, sort_keys=True),
+            usage=ProviderUsage(input_tokens=5, output_tokens=2),
+        )
+
+
+def build_policy_resolver_with_fallback() -> ProviderPolicyResolver:
+    return ProviderPolicyResolver(
+        build_config_registry(CONFIG_ROOT).__class__(
+            loaded_from=CONFIG_ROOT,
+            tenants={},
+            regions={},
+            provider_policies={
+                "primary_policy_v1": ProviderPolicy(
+                    provider_policy_id="primary_policy_v1",
+                    provider="primary",
+                    model="primary-model",
+                    timeout_seconds=30,
+                    max_retries=1,
+                    fallback_policy="fallback_policy_v1",
+                    structured_output_mode=StructuredOutputMode.json_schema,
+                ),
+                "fallback_policy_v1": ProviderPolicy(
+                    provider_policy_id="fallback_policy_v1",
+                    provider="fallback",
+                    model="fallback-model",
+                    timeout_seconds=30,
+                    max_retries=1,
+                    structured_output_mode=StructuredOutputMode.json_schema,
+                ),
+            },
+            action_definitions={},
+            action_configurations={},
+            workflows={},
+            scenarios={},
+            products={},
+            prompts={},
+            schemas={},
+            quotas={},
+            handoffs={},
+        )
+    )
 
 
 def test_provider_policy_resolution_uses_config_registry(config_registry: Any) -> None:
@@ -595,6 +654,71 @@ def test_gateway_request_failure_emits_failed_event_with_safe_platform_error_cod
     assert failed_event is not None
     assert exc_info.value.error_code == "provider_unavailable"
     assert failed_event["error_code"] == "provider_unavailable"
+
+
+def test_gateway_fallback_success_event_context_uses_resolved_provider_policy_id() -> None:
+    repository = RecordingProviderCallRepository()
+    emitter = RecordingEventEmitter()
+    gateway = ProviderGateway(
+        {"primary": AlwaysFailAdapter(), "fallback": FallbackSuccessAdapter()},
+        build_policy_resolver_with_fallback(),
+        provider_call_repository=repository,
+        event_emitter=emitter,
+    )
+    scenario_session = make_scenario_session()
+    job = make_job(scenario_session.id)
+    action_run = make_action_run(scenario_session.id, job.id)
+
+    response = asyncio.run(
+        gateway.request(
+            build_request(
+                scenario_session,
+                job,
+                action_run,
+                provider_policy_id="primary_policy_v1",
+            )
+        )
+    )
+
+    assert json.loads(response.output_text)["ok"] is True
+    assert repository.updated[0].provider_policy_id == "fallback_policy_v1"
+    succeeded_events = [
+        event for event in emitter.emitted if event[0] == "provider.request_succeeded"
+    ]
+    assert len(succeeded_events) == 1
+    assert succeeded_events[0][1].provider_policy_id == "fallback_policy_v1"
+
+
+def test_gateway_fallback_failure_event_context_uses_resolved_provider_policy_id() -> None:
+    repository = RecordingProviderCallRepository()
+    emitter = RecordingEventEmitter()
+    gateway = ProviderGateway(
+        {"primary": AlwaysFailAdapter(), "fallback": PlatformFailureAdapter()},
+        build_policy_resolver_with_fallback(),
+        provider_call_repository=repository,
+        event_emitter=emitter,
+    )
+    scenario_session = make_scenario_session()
+    job = make_job(scenario_session.id)
+    action_run = make_action_run(scenario_session.id, job.id)
+
+    with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+        asyncio.run(
+            gateway.request(
+                build_request(
+                    scenario_session,
+                    job,
+                    action_run,
+                    provider_policy_id="primary_policy_v1",
+                )
+            )
+        )
+
+    assert exc_info.value.provider_policy_id == "fallback_policy_v1"
+    assert repository.updated[0].provider_policy_id == "fallback_policy_v1"
+    failed_events = [event for event in emitter.emitted if event[0] == "provider.request_failed"]
+    assert len(failed_events) == 1
+    assert failed_events[0][1].provider_policy_id == "fallback_policy_v1"
 
 
 def test_gateway_request_cancellation_cleans_up_running_provider_call(
