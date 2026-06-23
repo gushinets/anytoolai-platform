@@ -199,10 +199,32 @@ class ConfigLoader:
                 ref_value=ref_value or path.name,
             ) from exc
 
+    def _require_product_mapping_file(
+        self,
+        path: Path,
+        *,
+        product_id: str,
+        ref_type: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        return self._require_mapping_file(
+            path,
+            config_id=product_id,
+            ref_type=ref_type,
+            ref_value=path.name,
+            reason=reason,
+        )
+
     def _load_tenants(self) -> None:
         path = self.config_root / "default_tenant.yaml"
         try:
-            data = load_yaml_file(path)
+            data = self._require_mapping_file(
+                path,
+                config_id="kernel",
+                ref_type="default_tenant_file",
+                ref_value=path.name,
+                reason="default_tenant.yaml is required because it owns the default tenant definition",
+            )
             tenant_id = data.get("tenant_id")
             display_name = data.get("display_name")
 
@@ -224,7 +246,13 @@ class ConfigLoader:
     def _load_regions(self) -> None:
         path = self.config_root / "regions.yaml"
         try:
-            data = load_yaml_file(path)
+            data = self._require_mapping_file(
+                path,
+                config_id="kernel",
+                ref_type="regions_file",
+                ref_value=path.name,
+                reason="regions.yaml is required because it owns region definitions",
+            )
             for region_data in data.get("regions", []):
                 region = region_data.get("region")
                 display_name = region_data.get("display_name")
@@ -255,7 +283,13 @@ class ConfigLoader:
     def _load_provider_policies(self) -> None:
         path = self.config_root / "provider_policies.yaml"
         try:
-            data = load_yaml_file(path)
+            data = self._require_mapping_file(
+                path,
+                config_id="kernel",
+                ref_type="provider_policies_file",
+                ref_value=path.name,
+                reason="provider_policies.yaml is required because it owns provider policy definitions",
+            )
             for policy_data in data.get("provider_policies", []):
                 policy_id = policy_data.get("provider_policy_id")
                 provider = policy_data.get("provider")
@@ -399,7 +433,13 @@ class ConfigLoader:
     def _load_product(self, product_dir: Path) -> None:
         product_file = product_dir / "product.yaml"
         try:
-            product_data = load_yaml_file(product_file)
+            product_data = self._require_mapping_file(
+                product_file,
+                config_id=product_dir.name,
+                ref_type="product_file",
+                ref_value=product_file.name,
+                reason="product.yaml is required because it owns the product definition",
+            )
             product_id = product_data.get("product_id")
             product_platform = product_data.get("product_platform")
             display_name = product_data.get("display_name")
@@ -437,9 +477,9 @@ class ConfigLoader:
                     ref_value="product.yaml.analytics",
                 )
 
-            self._load_action_configs(product_dir / "action_configs.yaml")
-            self._load_workflows(product_dir / "workflows.yaml")
-            self._load_scenarios(product_dir / "scenarios.yaml")
+            self._load_action_configs(product_dir / "action_configs.yaml", product_id)
+            self._load_workflows(product_dir / "workflows.yaml", product_id)
+            self._load_scenarios(product_dir / "scenarios.yaml", product_id)
 
             quota_refs = self._load_quotas(product_dir / "quotas.yaml")
             self._load_handoffs(product_dir / "handoffs.yaml")
@@ -526,9 +566,14 @@ class ConfigLoader:
             return load_yaml_file(path)
         return {}
 
-    def _load_action_configs(self, path: Path) -> None:
+    def _load_action_configs(self, path: Path, product_id: str) -> None:
         try:
-            data = load_yaml_file(path)
+            data = self._require_product_mapping_file(
+                path,
+                product_id=product_id,
+                ref_type="action_configs_file",
+                reason="action_configs.yaml is required because it owns action configuration definitions",
+            )
             for config_data in data.get("action_configs", []):
                 config_id = config_data.get("action_config_id")
                 action_type = config_data.get("action_type")
@@ -560,9 +605,14 @@ class ConfigLoader:
         except ConfigError as error:
             self._append_error(error)
 
-    def _load_workflows(self, path: Path) -> None:
+    def _load_workflows(self, path: Path, product_id: str) -> None:
         try:
-            data = load_yaml_file(path)
+            data = self._require_product_mapping_file(
+                path,
+                product_id=product_id,
+                ref_type="workflows_file",
+                reason="workflows.yaml is required because it owns workflow definitions",
+            )
             for workflow_data in data.get("workflows", []):
                 workflow_id = workflow_data.get("workflow_id")
                 version = workflow_data.get("version")
@@ -624,9 +674,14 @@ class ConfigLoader:
         except ConfigError as error:
             self._append_error(error)
 
-    def _load_scenarios(self, path: Path) -> None:
+    def _load_scenarios(self, path: Path, product_id: str) -> None:
         try:
-            data = load_yaml_file(path)
+            data = self._require_product_mapping_file(
+                path,
+                product_id=product_id,
+                ref_type="scenarios_file",
+                reason="scenarios.yaml is required because it owns scenario definitions",
+            )
             for scenario_data in data.get("scenarios", []):
                 scenario_id = scenario_data.get("scenario_id")
                 version = scenario_data.get("version")

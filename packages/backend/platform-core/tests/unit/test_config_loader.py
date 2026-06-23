@@ -195,6 +195,40 @@ def test_loader_rejects_embedded_analytics_in_product_yaml(tmp_path: Path) -> No
     )
 
 
+def test_loader_fails_on_missing_provider_policies_file(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "provider_policies.yaml"
+    path.unlink()
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_missing_file(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel",
+        ref_type="provider_policies_file",
+        ref_value="provider_policies.yaml",
+    )
+
+
+def test_loader_fails_on_missing_action_configs_file(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "action_configs.yaml"
+    path.unlink()
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_missing_file(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="action_configs_file",
+        ref_value="action_configs.yaml",
+    )
+
+
 def test_loader_fails_on_duplicate_ids(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "products" / "kernel_demo" / "action_configs.yaml"
