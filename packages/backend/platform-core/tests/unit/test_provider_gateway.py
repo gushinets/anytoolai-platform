@@ -229,6 +229,31 @@ class ResponseErrorCodeAdapter:
         )
 
 
+class ResponseStatusAdapter:
+    def __init__(
+        self,
+        *,
+        status: ProviderCallStatus,
+        error_code: str | None = None,
+        error_message_safe: str | None = None,
+    ) -> None:
+        self._status = status
+        self._error_code = error_code
+        self._error_message_safe = error_message_safe
+
+    async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
+        return ProviderResponse(
+            provider_policy_id=request.provider_policy_id,
+            provider=request.provider,
+            model=request.model,
+            output_text=json.dumps({"ok": False}, sort_keys=True),
+            status=self._status,
+            usage=ProviderUsage(input_tokens=3, output_tokens=1),
+            error_code=self._error_code,
+            error_message_safe=self._error_message_safe,
+        )
+
+
 class CancelledAdapter:
     async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
         del request
@@ -621,6 +646,66 @@ def test_gateway_request_emits_provider_events_when_event_emitter_configured(
         )
 
     assert {"provider.request_started", "provider.request_succeeded"} <= set(event_types)
+
+
+def test_gateway_failed_provider_response_emits_failed_event_without_raising(
+    config_registry: Any,
+) -> None:
+    repository = RecordingProviderCallRepository()
+    emitter = RecordingEventEmitter()
+    gateway = ProviderGateway(
+        {
+            "fake": ResponseStatusAdapter(
+                status=ProviderCallStatus.failed,
+                error_code="provider_response_failed",
+                error_message_safe="safe failure",
+            )
+        },
+        ProviderPolicyResolver(config_registry),
+        provider_call_repository=repository,
+        event_emitter=emitter,
+    )
+    scenario_session = make_scenario_session()
+    job = make_job(scenario_session.id)
+    action_run = make_action_run(scenario_session.id, job.id)
+
+    response = asyncio.run(gateway.request(build_request(scenario_session, job, action_run)))
+
+    assert response.status is ProviderCallStatus.failed
+    assert repository.updated[0].status is ProviderCallStatus.failed
+    succeeded_events = [event for event in emitter.emitted if event[0] == "provider.request_succeeded"]
+    failed_events = [event for event in emitter.emitted if event[0] == "provider.request_failed"]
+    assert succeeded_events == []
+    assert len(failed_events) == 1
+    assert failed_events[0][2]["result_status"] == ProviderCallStatus.failed.value
+    assert failed_events[0][2]["properties"]["error_code"] == "provider_response_failed"
+
+
+def test_gateway_timed_out_provider_response_emits_failed_event_without_raising(
+    config_registry: Any,
+) -> None:
+    repository = RecordingProviderCallRepository()
+    emitter = RecordingEventEmitter()
+    gateway = ProviderGateway(
+        {"fake": ResponseStatusAdapter(status=ProviderCallStatus.timed_out)},
+        ProviderPolicyResolver(config_registry),
+        provider_call_repository=repository,
+        event_emitter=emitter,
+    )
+    scenario_session = make_scenario_session()
+    job = make_job(scenario_session.id)
+    action_run = make_action_run(scenario_session.id, job.id)
+
+    response = asyncio.run(gateway.request(build_request(scenario_session, job, action_run)))
+
+    assert response.status is ProviderCallStatus.timed_out
+    assert repository.updated[0].status is ProviderCallStatus.timed_out
+    succeeded_events = [event for event in emitter.emitted if event[0] == "provider.request_succeeded"]
+    failed_events = [event for event in emitter.emitted if event[0] == "provider.request_failed"]
+    assert succeeded_events == []
+    assert len(failed_events) == 1
+    assert failed_events[0][2]["result_status"] == ProviderCallStatus.timed_out.value
+    assert failed_events[0][2]["properties"]["error_code"] == "provider_request_timed_out"
 
 
 def test_gateway_request_failure_emits_failed_event_with_safe_platform_error_code(

@@ -210,6 +210,28 @@ class PlatformFailureAdapter:
         raise PlatformError("provider_unavailable", "safe provider failure")
 
 
+class FailedResponseAdapter:
+    def __init__(
+        self,
+        *,
+        status: ProviderCallStatus,
+        error_code: str | None = None,
+    ) -> None:
+        self._status = status
+        self._error_code = error_code
+
+    async def complete(self, request: Any) -> ProviderResponse:
+        return ProviderResponse(
+            provider_policy_id=request.provider_policy_id,
+            output_text="not-ok",
+            provider=request.provider,
+            model=request.model,
+            status=self._status,
+            error_code=self._error_code,
+            error_message_safe="safe provider response failure",
+        )
+
+
 def build_provider_request(action: ActionRunRecord, job: JobRecord, **overrides: Any) -> ProviderRequest:
     values = {
         "provider_policy_id": "default_fake_provider_v1",
@@ -545,6 +567,56 @@ def test_provider_gateway_failure_uses_safe_platform_error_code(
 
     assert exc_info.value.error_code == "provider_unavailable"
     assert failed_event["error_code"] == "provider_unavailable"
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_error_code"),
+    [
+        (ProviderCallStatus.failed, "provider_request_failed"),
+        (ProviderCallStatus.timed_out, "provider_request_timed_out"),
+    ],
+)
+def test_provider_gateway_failed_provider_response_emits_failed_event_and_persists_status(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
+    status: ProviderCallStatus,
+    expected_error_code: str,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        emitter = _build_emitter(session)
+        gateway = ProviderGateway(
+            {"fake": FailedResponseAdapter(status=status)},
+            policy_resolver=ProviderPolicyResolver(config_registry),
+            provider_call_repository=ProviderCallRepository(session),
+            event_emitter=emitter,
+        )
+
+        action = make_action_run("scenario_session_demo", "job_demo")
+        job = make_job(action.scenario_session_id, id=action.job_id)
+
+        response = asyncio.run(gateway.request(build_provider_request(action, job), session=session))
+
+        event_types = _event_types(session)
+        failed_event = session.execute(
+            sa.select(event_log_table)
+            .where(event_log_table.c.event_type == "provider.request_failed")
+            .order_by(event_log_table.c.timestamp.desc(), event_log_table.c.event_id.desc())
+        ).mappings().first()
+        provider_call = session.execute(
+            sa.select(provider_calls_table).order_by(
+                provider_calls_table.c.created_at.desc(),
+                provider_calls_table.c.id.desc(),
+            )
+        ).mappings().first()
+
+    assert response.status is status
+    assert "provider.request_succeeded" not in event_types
+    assert "provider.request_failed" in event_types
+    assert failed_event is not None
+    assert failed_event["result_status"] == status.value
+    assert failed_event["error_code"] == expected_error_code
+    assert provider_call is not None
+    assert provider_call["status"] == status
 
 
 @pytest.mark.parametrize(("field_name", "value"), [("tenant_id", ""), ("region", "")])

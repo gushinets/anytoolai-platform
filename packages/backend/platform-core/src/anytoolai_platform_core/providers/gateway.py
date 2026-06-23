@@ -229,10 +229,17 @@ class ProviderGateway:
                     ),
                 )
             )
-        self._emit_provider_succeeded(
-            success_context,
-            result_status=stored_response.status.value,
-        )
+        if self._is_success_status(stored_response.status):
+            self._emit_provider_succeeded(
+                success_context,
+                result_status=stored_response.status.value,
+            )
+        else:
+            self._emit_provider_failed(
+                success_context,
+                error_code=self._response_error_code(stored_response),
+                result_status=stored_response.status.value,
+            )
         return stored_response
 
     async def _execute_policy_chain(
@@ -446,6 +453,16 @@ class ProviderGateway:
         if any(secret_key in lowered for secret_key in _SECRET_KEYS):
             return "[redacted provider error]"
         return raw[:_MAX_STRING_LENGTH]
+
+    def _is_success_status(self, status: ProviderCallStatus) -> bool:
+        return status is ProviderCallStatus.succeeded
+
+    def _response_error_code(self, response: ProviderResponse) -> str:
+        if response.error_code:
+            return response.error_code
+        if response.status is ProviderCallStatus.timed_out:
+            return "provider_request_timed_out"
+        return "provider_request_failed"
 
     def _event_context_from_request(
         self,
