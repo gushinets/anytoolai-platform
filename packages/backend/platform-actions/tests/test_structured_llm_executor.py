@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import tomllib
 from pathlib import Path
 
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
@@ -12,6 +13,7 @@ from anytoolai_platform_actions.structured_llm.executor import (
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
+PACKAGE_ROOT = REPO_ROOT / "packages" / "backend" / "platform-actions"
 
 
 class SpyGateway:
@@ -29,6 +31,20 @@ class SpyGateway:
             output_text='{"ok": true}',
             status=ProviderCallStatus.succeeded,
         )
+
+
+def test_platform_actions_package_declares_runtime_dependencies() -> None:
+    pyproject = tomllib.loads((PACKAGE_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+
+    dependencies = pyproject["project"]["dependencies"]
+    sources = pyproject["tool"]["uv"]["sources"]
+
+    assert "anytoolai-platform-core" in dependencies
+    assert "sqlalchemy>=2.0" in dependencies
+    assert sources["anytoolai-platform-core"] == {
+        "path": "../platform-core",
+        "editable": True,
+    }
 
 
 def test_structured_llm_executor_routes_calls_through_provider_gateway() -> None:

@@ -5,7 +5,7 @@
 - State: active
 - Owner: agent
 - Created: 2026-06-22
-- Last updated: 2026-06-22
+- Last updated: 2026-06-23
 
 ## Goal
 
@@ -90,6 +90,7 @@ provider-adapter boundary for real routed provider transport.
 |---|---|---|
 | 2026-06-22 | Reviewed required architecture docs, provider docs, config loader, runtime storage, current adapters/gateway, and the existing provider architecture test. | Implement the async provider contract and gateway persistence path, then wire tests and docs. |
 | 2026-06-23 | Added LiteLLM behind the adapter boundary, switched real provider-policy routing to `provider: litellm`, removed the public sync gateway bypass, and updated provider/event/config/architecture tests. | Run targeted validation plus `quick_check`, then capture any remaining validation gaps in the summary. |
+| 2026-06-23 | Declared `platform-actions` runtime dependencies on `anytoolai-platform-core` and `sqlalchemy`, and added a package metadata test so executor imports do not rely on the root monorepo install order. | Validate package tests plus an isolated package import path. |
 
 ## Open questions
 
