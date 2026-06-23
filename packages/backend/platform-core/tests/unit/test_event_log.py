@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,19 +17,21 @@ from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.artifacts.models import ArtifactRecord
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
+from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter, EventValidationError
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.events.taxonomy import PLATFORM_EVENT_GROUPS, PLATFORM_EVENTS
-from anytoolai_platform_core.providers.gateway import (
-    ProviderAdapter,
-    ProviderGateway,
+from anytoolai_platform_core.providers.gateway import ProviderGateway, ProviderGatewayExecutionError
+from anytoolai_platform_core.providers.models import (
+    ProviderCallStatus,
     ProviderRequest,
     ProviderResponse,
+    ProviderUsage,
 )
-from anytoolai_platform_core.providers.models import ProviderCallStatus
+from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionRecord,
@@ -49,6 +52,9 @@ from sqlalchemy import event
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[5]
+
+
+CONFIG_ROOT = _repo_root() / "configs" / "kernel"
 
 
 def _sqlite_url(database_path: Path) -> str:
@@ -96,6 +102,11 @@ def runtime_engine(tmp_path: Path) -> sa.Engine:
 @pytest.fixture
 def session_factory(runtime_engine: sa.Engine) -> sa.orm.sessionmaker[sa.orm.Session]:
     return build_session_factory(runtime_engine)
+
+
+@pytest.fixture
+def config_registry() -> Any:
+    return build_config_registry(CONFIG_ROOT)
 
 
 def make_execution_context(**overrides: Any) -> ExecutionContext:
@@ -175,28 +186,49 @@ def make_artifact(scenario_session_id: str, **overrides: Any) -> ArtifactRecord:
 
 
 class SuccessfulAdapter:
-    def complete(self, request: ProviderRequest) -> ProviderResponse:
+    async def complete(self, request: Any) -> ProviderResponse:
         return ProviderResponse(
-            content="ok",
-            provider="openai",
+            provider_policy_id=request.provider_policy_id,
+            output_text="ok",
+            provider=request.provider,
             model=request.model,
-            input_tokens=128,
-            output_tokens=64,
+            usage=ProviderUsage(input_tokens=128, output_tokens=64),
             latency_ms=950,
             estimated_cost=0.42,
         )
 
 
 class TimeoutAdapter:
-    def complete(self, request: ProviderRequest) -> ProviderResponse:
+    async def complete(self, request: Any) -> ProviderResponse:
         del request
         raise TimeoutError("provider timed out")
 
 
 class PlatformFailureAdapter:
-    def complete(self, request: ProviderRequest) -> ProviderResponse:
+    async def complete(self, request: Any) -> ProviderResponse:
         del request
         raise PlatformError("provider_unavailable", "safe provider failure")
+
+
+def build_provider_request(action: ActionRunRecord, job: JobRecord, **overrides: Any) -> ProviderRequest:
+    values = {
+        "provider_policy_id": "default_fake_provider_v1",
+        "tenant_id": action.tenant_id,
+        "region": action.region,
+        "product_id": action.product_id,
+        "frontend_id": action.frontend_id,
+        "scenario_session_id": action.scenario_session_id,
+        "job_id": job.id,
+        "workflow_id": action.workflow_id,
+        "step_id": action.step_id,
+        "action_run_id": action.id,
+        "action_type": action.action_type,
+        "action_config_id": action.action_config_id,
+        "prompt": "hello",
+        "prompt_ref": "kernel_demo.extract_structured_fields.v1",
+    }
+    values.update(overrides)
+    return ProviderRequest(**values)
 
 
 def _build_emitter(session: sa.orm.Session) -> EventEmitter:
@@ -375,6 +407,7 @@ def test_platform_taxonomy_covers_required_groups_and_events() -> None:
 
 def test_runtime_services_emit_required_success_events(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
 ) -> None:
     with transaction_boundary(session_factory) as session:
         emitter = _build_emitter(session)
@@ -386,7 +419,8 @@ def test_runtime_services_emit_required_success_events(
         action_service = ActionRunService(ActionRunRepository(session), emitter)
         artifact_service = ArtifactService(ArtifactRepository(session), emitter)
         gateway = ProviderGateway(
-            {"openai": SuccessfulAdapter()},
+            {"fake": SuccessfulAdapter()},
+            policy_resolver=ProviderPolicyResolver(config_registry),
             provider_call_repository=ProviderCallRepository(session),
             event_emitter=emitter,
         )
@@ -401,25 +435,7 @@ def test_runtime_services_emit_required_success_events(
                 action_run_id=action.id,
             )
         )
-        gateway.execute(
-            "openai",
-            ProviderRequest(prompt="hello", model="gpt-5-mini"),
-            ExecutionContext(
-                tenant_id=action.tenant_id,
-                region=action.region,
-                product_id=action.product_id,
-                frontend_id=action.frontend_id,
-                scenario_session_id=action.scenario_session_id,
-                job_id=action.job_id,
-                workflow_id=action.workflow_id,
-                workflow_version=job.workflow_version,
-                step_id=action.step_id,
-                action_type=action.action_type,
-                action_config_id=action.action_config_id,
-            ),
-            provider_policy_id="policy_primary",
-            action_run_id=action.id,
-        )
+        asyncio.run(gateway.request(build_provider_request(action, job), session=session))
         action_service.mark_succeeded(
             replace(
                 action,
@@ -459,6 +475,7 @@ def test_runtime_services_emit_required_success_events(
 
 def test_runtime_services_emit_required_failure_events(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
 ) -> None:
     with transaction_boundary(session_factory) as session:
         emitter = _build_emitter(session)
@@ -469,7 +486,8 @@ def test_runtime_services_emit_required_failure_events(
         workflow_service = WorkflowJobService(JobRepository(session), emitter)
         action_service = ActionRunService(ActionRunRepository(session), emitter)
         gateway = ProviderGateway(
-            {"openai": TimeoutAdapter()},
+            {"fake": TimeoutAdapter()},
+            policy_resolver=ProviderPolicyResolver(config_registry),
             provider_call_repository=ProviderCallRepository(session),
             event_emitter=emitter,
         )
@@ -478,26 +496,8 @@ def test_runtime_services_emit_required_failure_events(
         job = workflow_service.start(make_job(scenario.id))
         action = action_service.start(make_action_run(scenario.id, job.id))
 
-        with pytest.raises(TimeoutError):
-            gateway.execute(
-                "openai",
-                ProviderRequest(prompt="hello", model="gpt-5-mini"),
-                ExecutionContext(
-                    tenant_id=action.tenant_id,
-                    region=action.region,
-                    product_id=action.product_id,
-                    frontend_id=action.frontend_id,
-                    scenario_session_id=action.scenario_session_id,
-                    job_id=action.job_id,
-                    workflow_id=action.workflow_id,
-                    workflow_version=job.workflow_version,
-                    step_id=action.step_id,
-                    action_type=action.action_type,
-                    action_config_id=action.action_config_id,
-                ),
-                provider_policy_id="policy_primary",
-                action_run_id=action.id,
-            )
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+            asyncio.run(gateway.request(build_provider_request(action, job), session=session))
 
         action_service.mark_failed(action, error_code="timeout")
         workflow_service.mark_failed(job, error_code="timeout")
@@ -508,6 +508,7 @@ def test_runtime_services_emit_required_failure_events(
             session.execute(sa.select(provider_calls_table.c.status)).scalars()
         )
 
+    assert exc_info.value.error_code == "provider_request_timed_out"
     assert {
         "provider.request_failed",
         "action.failed",
@@ -519,26 +520,22 @@ def test_runtime_services_emit_required_failure_events(
 
 def test_provider_gateway_failure_uses_safe_platform_error_code(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
 ) -> None:
     with transaction_boundary(session_factory) as session:
         emitter = _build_emitter(session)
         gateway = ProviderGateway(
-            {"openai": PlatformFailureAdapter()},
+            {"fake": PlatformFailureAdapter()},
+            policy_resolver=ProviderPolicyResolver(config_registry),
             provider_call_repository=ProviderCallRepository(session),
             event_emitter=emitter,
         )
 
-        with pytest.raises(PlatformError):
-            gateway.execute(
-                "openai",
-                ProviderRequest(prompt="hello", model="gpt-5-mini"),
-                make_execution_context(
-                    provider="openai",
-                    model="gpt-5-mini",
-                ),
-                provider_policy_id="policy_primary",
-                action_run_id="action_run_demo",
-            )
+        action = make_action_run("scenario_session_demo", "job_demo")
+        job = make_job(action.scenario_session_id, id=action.job_id)
+
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+            asyncio.run(gateway.request(build_provider_request(action, job), session=session))
 
         failed_event = session.execute(
             sa.select(event_log_table).where(
@@ -546,32 +543,34 @@ def test_provider_gateway_failure_uses_safe_platform_error_code(
             )
         ).mappings().one()
 
+    assert exc_info.value.error_code == "provider_unavailable"
     assert failed_event["error_code"] == "provider_unavailable"
 
 
 @pytest.mark.parametrize(("field_name", "value"), [("tenant_id", ""), ("region", "")])
 def test_provider_gateway_does_not_persist_provider_call_when_event_dimensions_are_invalid(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
     field_name: str,
     value: str,
 ) -> None:
     with transaction_boundary(session_factory) as session:
         emitter = _build_emitter(session)
         gateway = ProviderGateway(
-            {"openai": SuccessfulAdapter()},
+            {"fake": SuccessfulAdapter()},
+            policy_resolver=ProviderPolicyResolver(config_registry),
             provider_call_repository=ProviderCallRepository(session),
             event_emitter=emitter,
         )
-        context = make_execution_context()
-        invalid_context = replace(context, **{field_name: value})
+        action = make_action_run("scenario_session_demo", "job_demo", **{field_name: value})
+        job = make_job(action.scenario_session_id, id=action.job_id, **{field_name: value})
 
         with pytest.raises(EventValidationError, match=field_name):
-            gateway.execute(
-                "openai",
-                ProviderRequest(prompt="hello", model="gpt-5-mini"),
-                invalid_context,
-                provider_policy_id="policy_primary",
-                action_run_id="action_run_demo",
+            asyncio.run(
+                gateway.request(
+                    build_provider_request(action, job, **{field_name: value}),
+                    session=session,
+                )
             )
 
         provider_call_count = session.execute(

@@ -277,7 +277,10 @@ class ConfigLoader:
                         file_path=path,
                         config_id=policy_id,
                     ),
-                    metadata={"_file_path": str(path)},
+                    metadata={
+                        **dict(policy_data.get("metadata", {})),
+                        "_file_path": str(path),
+                    },
                 )
                 self._remember_source("provider_policy", policy_id, path)
         except ConfigError as error:

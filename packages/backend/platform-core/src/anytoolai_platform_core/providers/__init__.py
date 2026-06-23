@@ -10,8 +10,8 @@ _EXPORTS = {
         "anytoolai_platform_core.providers.gateway",
         "ProviderGatewayExecutionError",
     ),
-    "ProviderRequest": ("anytoolai_platform_core.providers.gateway", "ProviderRequest"),
-    "ProviderResponse": ("anytoolai_platform_core.providers.gateway", "ProviderResponse"),
+    "ProviderRequest": ("anytoolai_platform_core.providers.models", "ProviderRequest"),
+    "ProviderResponse": ("anytoolai_platform_core.providers.models", "ProviderResponse"),
     "InternalProviderRequest": (
         "anytoolai_platform_core.providers.models",
         "ProviderRequest",

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import replace
 import inspect
 from time import perf_counter
 from typing import Any
@@ -18,9 +18,8 @@ from anytoolai_platform_core.providers.models import (
     ProviderCallRecord,
     ProviderCallStatus,
     ProviderPolicy,
-    ProviderRequest as InternalProviderRequest,
-    ProviderResponse as InternalProviderResponse,
-    ProviderUsage,
+    ProviderRequest,
+    ProviderResponse,
     ResolvedProviderRequest,
 )
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
@@ -40,24 +39,6 @@ _MAX_COLLECTION_ITEMS = 20
 _MAX_NESTING_DEPTH = 4
 
 
-@dataclass(frozen=True)
-class ProviderRequest:
-    prompt: str
-    model: str
-    response_schema: Mapping[str, Any] | None = None
-
-
-@dataclass(frozen=True)
-class ProviderResponse:
-    content: str
-    provider: str
-    model: str
-    input_tokens: int = 0
-    output_tokens: int = 0
-    latency_ms: int = 0
-    estimated_cost: float = 0.0
-
-
 class ProviderGatewayExecutionError(RuntimeError):
     def __init__(
         self,
@@ -68,6 +49,7 @@ class ProviderGatewayExecutionError(RuntimeError):
         error_code: str,
         error_type: str,
         message: str,
+        resolved_request: ResolvedProviderRequest | None = None,
     ) -> None:
         super().__init__(message)
         self.provider_policy_id = provider_policy_id
@@ -76,6 +58,7 @@ class ProviderGatewayExecutionError(RuntimeError):
         self.error_code = error_code
         self.error_type = error_type
         self.message = message
+        self.resolved_request = resolved_request
 
 
 class ProviderGateway:
@@ -93,32 +76,171 @@ class ProviderGateway:
 
     async def request(
         self,
-        request: InternalProviderRequest,
+        request: ProviderRequest,
         *,
         session: Session | None = None,
-    ) -> InternalProviderResponse:
+    ) -> ProviderResponse:
         if self._policy_resolver is None:
             raise TypeError(
                 "ProviderGateway.request() requires a policy_resolver configured on the gateway"
             )
-        policy = self._policy_resolver.resolve(request.provider_policy_id)
-        return await self._execute_policy_chain(
-            request=request,
-            policy=policy,
-            fallback_from_policy_id=None,
-            session=session,
-            visited_policy_ids=set(),
+
+        initial_policy = self._policy_resolver.resolve(request.provider_policy_id)
+        initial_context = self._event_context_from_request(
+            request,
+            provider=initial_policy.provider,
+            model=initial_policy.model,
         )
+        self._emit_provider_started(initial_context)
+
+        repository = self._resolve_provider_call_repository(session)
+        should_persist = self._should_persist_provider_call(request)
+        stored = None
+        if repository is not None and should_persist:
+            initial_resolved_request = self._resolved_request_from_policy(
+                request=request,
+                policy=initial_policy,
+                fallback_from_policy_id=None,
+            )
+            stored = repository.create(
+                ProviderCallRecord(
+                    tenant_id=request.tenant_id,
+                    region=request.region,
+                    product_id=request.product_id,
+                    frontend_id=request.frontend_id,
+                    scenario_session_id=request.scenario_session_id,
+                    job_id=request.job_id,
+                    action_run_id=request.action_run_id,
+                    workflow_id=request.workflow_id,
+                    step_id=request.step_id,
+                    action_type=request.action_type,
+                    action_config_id=request.action_config_id,
+                    provider_policy_id=initial_policy.provider_policy_id,
+                    provider=initial_policy.provider,
+                    model=initial_policy.model,
+                    status=ProviderCallStatus.running,
+                    started_at=utc_now(),
+                    metadata=self._build_provider_call_metadata(initial_resolved_request),
+                )
+            )
+
+        started = perf_counter()
+        try:
+            resolved_request, response = await self._execute_policy_chain(
+                request=request,
+                policy=initial_policy,
+                fallback_from_policy_id=None,
+                visited_policy_ids=set(),
+            )
+        except asyncio.CancelledError:
+            latency_ms = self._latency_ms(started)
+            safe_message = "provider request cancelled"
+            if repository is not None and stored is not None:
+                repository.update(
+                    replace(
+                        stored,
+                        status=ProviderCallStatus.failed,
+                        latency_ms=latency_ms,
+                        error_code="provider_request_cancelled",
+                        error_message_safe=safe_message,
+                        completed_at=utc_now(),
+                    )
+                )
+            self._emit_provider_failed(
+                initial_context,
+                error_code="provider_request_cancelled",
+                result_status=ProviderCallStatus.failed.value,
+            )
+            raise
+        except ProviderGatewayExecutionError as exc:
+            latency_ms = self._latency_ms(started)
+            failure_request = exc.resolved_request or self._resolved_request_from_policy(
+                request=request,
+                policy=initial_policy,
+                fallback_from_policy_id=None,
+            )
+            failure_context = replace(
+                initial_context,
+                provider=failure_request.provider,
+                model=failure_request.model,
+            )
+            if repository is not None and stored is not None:
+                repository.update(
+                    replace(
+                        stored,
+                        provider_policy_id=failure_request.provider_policy_id,
+                        provider=failure_request.provider,
+                        model=failure_request.model,
+                        status=(
+                            ProviderCallStatus.timed_out
+                            if exc.error_code == "provider_request_timed_out"
+                            else ProviderCallStatus.failed
+                        ),
+                        latency_ms=latency_ms,
+                        error_code=exc.error_code,
+                        error_message_safe=exc.message,
+                        completed_at=utc_now(),
+                        metadata=self._build_provider_call_metadata(
+                            failure_request,
+                            error_type=exc.error_type,
+                            error_code=exc.error_code,
+                            error_message_safe=exc.message,
+                        ),
+                    )
+                )
+            self._emit_provider_failed(
+                failure_context,
+                error_code=exc.error_code,
+                result_status=(
+                    ProviderCallStatus.timed_out.value
+                    if exc.error_code == "provider_request_timed_out"
+                    else ProviderCallStatus.failed.value
+                ),
+            )
+            raise
+
+        latency_ms = response.latency_ms or self._latency_ms(started)
+        stored_response = replace(response, latency_ms=latency_ms)
+        success_context = replace(
+            initial_context,
+            provider=stored_response.provider,
+            model=stored_response.model,
+        )
+        if repository is not None and stored is not None:
+            repository.update(
+                replace(
+                    stored,
+                    provider_policy_id=resolved_request.provider_policy_id,
+                    provider=stored_response.provider,
+                    model=stored_response.model,
+                    status=stored_response.status,
+                    input_tokens=stored_response.usage.input_tokens,
+                    output_tokens=stored_response.usage.output_tokens,
+                    latency_ms=stored_response.latency_ms,
+                    estimated_cost=stored_response.estimated_cost,
+                    error_code=stored_response.error_code,
+                    error_message_safe=stored_response.error_message_safe,
+                    completed_at=utc_now(),
+                    metadata=self._build_provider_call_metadata(
+                        resolved_request,
+                        response=stored_response,
+                    ),
+                )
+            )
+        self._emit_provider_succeeded(
+            success_context,
+            result_status=stored_response.status.value,
+        )
+        return stored_response
 
     async def _execute_policy_chain(
         self,
         *,
-        request: InternalProviderRequest,
+        request: ProviderRequest,
         policy: ProviderPolicy,
         fallback_from_policy_id: str | None,
-        session: Session | None,
         visited_policy_ids: set[str],
-    ) -> InternalProviderResponse:
+    ) -> tuple[ResolvedProviderRequest, ProviderResponse]:
         if policy.provider_policy_id in visited_policy_ids:
             raise ProviderGatewayExecutionError(
                 provider_policy_id=policy.provider_policy_id,
@@ -132,372 +254,101 @@ class ProviderGateway:
                 ),
             )
 
-        visited_policy_ids = set(visited_policy_ids)
-        visited_policy_ids.add(policy.provider_policy_id)
-
-        response, final_error = await self._execute_policy_attempts(
+        resolved_request = self._resolved_request_from_policy(
             request=request,
             policy=policy,
             fallback_from_policy_id=fallback_from_policy_id,
-            session=session,
-        )
-        if response is not None:
-            return response
-
-        if policy.fallback_policy is None:
-            assert final_error is not None
-            raise final_error
-
-        fallback_policy = self._policy_resolver.resolve(policy.fallback_policy)
-        return await self._execute_policy_chain(
-            request=request,
-            policy=fallback_policy,
-            fallback_from_policy_id=policy.provider_policy_id,
-            session=session,
-            visited_policy_ids=visited_policy_ids,
         )
 
-    async def _execute_policy_attempts(
-        self,
-        *,
-        request: InternalProviderRequest,
-        policy: ProviderPolicy,
-        fallback_from_policy_id: str | None,
-        session: Session | None,
-    ) -> tuple[InternalProviderResponse | None, ProviderGatewayExecutionError | None]:
-        repository = self._resolve_provider_call_repository(session)
-        event_context = self._event_context_from_request(
-            request,
-            provider=policy.provider,
-            model=policy.model,
-        )
-        self._emit_provider_started(event_context)
-        should_persist = self._should_persist_provider_call(request)
-        max_attempts = policy.max_retries + 1
-        last_error: ProviderGatewayExecutionError | None = None
-
-        for attempt_number in range(1, max_attempts + 1):
-            resolved_request = ResolvedProviderRequest(
+        root_exception: Exception | None = None
+        try:
+            adapter = self._adapters[policy.provider]
+            raw_response = await asyncio.wait_for(
+                self._invoke_adapter(adapter, resolved_request),
+                timeout=policy.timeout_seconds,
+            )
+            response = self._normalize_internal_response(raw_response)
+            return resolved_request, response
+        except TimeoutError as exc:
+            root_exception = exc
+            error = ProviderGatewayExecutionError(
                 provider_policy_id=policy.provider_policy_id,
                 provider=policy.provider,
                 model=policy.model,
-                temperature=policy.temperature,
-                timeout_seconds=policy.timeout_seconds,
-                max_retries=policy.max_retries,
-                structured_output_mode=policy.structured_output_mode,
-                tenant_id=request.tenant_id,
-                region=request.region,
-                product_id=request.product_id,
-                frontend_id=request.frontend_id,
-                scenario_session_id=request.scenario_session_id,
-                job_id=request.job_id,
-                workflow_id=request.workflow_id,
-                step_id=request.step_id,
-                action_run_id=request.action_run_id,
-                action_type=request.action_type,
-                action_config_id=request.action_config_id,
-                prompt=request.prompt,
-                prompt_ref=request.prompt_ref,
-                response_schema=request.response_schema,
-                messages=request.messages,
-                metadata=request.metadata,
-                fixture_key=request.fixture_key,
-                request_id=request.request_id,
-                correlation_id=request.correlation_id,
-                attempt_number=attempt_number,
-                fallback_from_policy_id=fallback_from_policy_id,
-            )
-            started_at = utc_now()
-            stored = None
-            if repository is not None and should_persist:
-                stored = repository.create(
-                    ProviderCallRecord(
-                        tenant_id=request.tenant_id,
-                        region=request.region,
-                        product_id=request.product_id,
-                        frontend_id=request.frontend_id,
-                        scenario_session_id=request.scenario_session_id,
-                        job_id=request.job_id,
-                        action_run_id=request.action_run_id,
-                        workflow_id=request.workflow_id,
-                        step_id=request.step_id,
-                        action_type=request.action_type,
-                        action_config_id=request.action_config_id,
-                        provider_policy_id=policy.provider_policy_id,
-                        provider=policy.provider,
-                        model=policy.model,
-                        status=ProviderCallStatus.running,
-                        started_at=started_at,
-                        metadata=self._build_provider_call_metadata(resolved_request),
-                    )
-                )
-            attempt_started = perf_counter()
-
-            try:
-                adapter = self._adapters[policy.provider]
-                raw_response = await asyncio.wait_for(
-                    self._invoke_adapter(adapter, resolved_request),
-                    timeout=policy.timeout_seconds,
-                )
-                response = self._normalize_internal_response(
-                    raw_response,
-                    provider_policy_id=policy.provider_policy_id,
-                    provider=policy.provider,
-                    model=policy.model,
-                )
-            except TimeoutError as exc:
-                latency_ms = self._latency_ms(attempt_started)
-                safe_message = (
-                    f"provider request exceeded configured timeout of "
+                error_code="provider_request_timed_out",
+                error_type="TimeoutError",
+                message=(
+                    "provider request exceeded configured timeout of "
                     f"{policy.timeout_seconds} second(s)"
-                )
-                last_error = ProviderGatewayExecutionError(
-                    provider_policy_id=policy.provider_policy_id,
-                    provider=policy.provider,
-                    model=policy.model,
-                    error_code="provider_request_timed_out",
-                    error_type="TimeoutError",
-                    message=safe_message,
-                )
-                if repository is not None and stored is not None:
-                    repository.update(
-                        replace(
-                            stored,
-                            status=ProviderCallStatus.timed_out,
-                            latency_ms=latency_ms,
-                            error_code=last_error.error_code,
-                            error_message_safe=safe_message,
-                            completed_at=utc_now(),
-                            metadata=self._build_provider_call_metadata(
-                                resolved_request,
-                                error_type=last_error.error_type,
-                                error_code=last_error.error_code,
-                                error_message_safe=safe_message,
-                            ),
-                        )
-                    )
-                self._emit_provider_failed(
-                    event_context,
-                    error_code=last_error.error_code,
-                    result_status=ProviderCallStatus.timed_out.value,
-                )
-                if attempt_number == max_attempts:
-                    break
-                continue
-            except asyncio.CancelledError:
-                latency_ms = self._latency_ms(attempt_started)
-                safe_message = "provider request cancelled"
-                last_error = ProviderGatewayExecutionError(
-                    provider_policy_id=policy.provider_policy_id,
-                    provider=policy.provider,
-                    model=policy.model,
-                    error_code="provider_request_cancelled",
-                    error_type="CancelledError",
-                    message=safe_message,
-                )
-                if repository is not None and stored is not None:
-                    repository.update(
-                        replace(
-                            stored,
-                            status=ProviderCallStatus.failed,
-                            latency_ms=latency_ms,
-                            error_code=last_error.error_code,
-                            error_message_safe=safe_message,
-                            completed_at=utc_now(),
-                            metadata=self._build_provider_call_metadata(
-                                resolved_request,
-                                error_type=last_error.error_type,
-                                error_code=last_error.error_code,
-                                error_message_safe=safe_message,
-                            ),
-                        )
-                    )
-                self._emit_provider_failed(
-                    event_context,
-                    error_code=last_error.error_code,
-                    result_status=ProviderCallStatus.failed.value,
-                )
-                raise
-            except Exception as exc:  # pragma: no cover - exercised by tests via fake adapter.
-                latency_ms = self._latency_ms(attempt_started)
-                safe_message = self._safe_error_message(exc)
-                safe_error_code = self._safe_error_code(exc)
-                last_error = ProviderGatewayExecutionError(
-                    provider_policy_id=policy.provider_policy_id,
-                    provider=policy.provider,
-                    model=policy.model,
-                    error_code=safe_error_code,
-                    error_type=type(exc).__name__,
-                    message=safe_message,
-                )
-                if repository is not None and stored is not None:
-                    repository.update(
-                        replace(
-                            stored,
-                            status=ProviderCallStatus.failed,
-                            latency_ms=latency_ms,
-                            error_code=last_error.error_code,
-                            error_message_safe=safe_message,
-                            completed_at=utc_now(),
-                            metadata=self._build_provider_call_metadata(
-                                resolved_request,
-                                error_type=last_error.error_type,
-                                error_code=last_error.error_code,
-                                error_message_safe=safe_message,
-                            ),
-                        )
-                    )
-                self._emit_provider_failed(
-                    event_context,
-                    error_code=last_error.error_code,
-                    result_status=ProviderCallStatus.failed.value,
-                )
-                if attempt_number == max_attempts:
-                    break
-                continue
-
-            latency_ms = response.latency_ms or self._latency_ms(attempt_started)
-            stored_response = replace(
-                response,
-                latency_ms=latency_ms,
+                ),
+                resolved_request=resolved_request,
             )
-            if repository is not None and stored is not None:
-                repository.update(
-                    replace(
-                        stored,
-                        status=stored_response.status,
-                        input_tokens=stored_response.usage.input_tokens,
-                        output_tokens=stored_response.usage.output_tokens,
-                        latency_ms=stored_response.latency_ms,
-                        estimated_cost=stored_response.estimated_cost,
-                        error_code=stored_response.error_code,
-                        error_message_safe=stored_response.error_message_safe,
-                        completed_at=utc_now(),
-                        metadata=self._build_provider_call_metadata(
-                            resolved_request,
-                            response=stored_response,
-                        ),
-                    )
-                )
-            self._emit_provider_succeeded(
-                event_context,
-                result_status=stored_response.status.value,
-            )
-            return stored_response, None
-
-        return None, last_error
-
-    def execute(
-        self,
-        provider: str,
-        request: ProviderRequest,
-        context: ExecutionContext,
-        *,
-        provider_policy_id: str,
-        action_run_id: str,
-    ) -> ProviderResponse:
-        adapter = self._adapters[provider]
-        repository = self._resolve_provider_call_repository(None)
-        event_context = replace(
-            context,
-            provider=provider,
-            model=request.model,
-            action_run_id=action_run_id,
-            provider_policy_id=provider_policy_id,
-        )
-        self._emit_provider_started(event_context)
-        should_persist = self._should_persist_context(event_context)
-        stored = None
-        if repository is not None and should_persist:
-            stored = repository.create(
-                ProviderCallRecord(
-                    tenant_id=event_context.tenant_id,
-                    region=event_context.region,
-                    product_id=event_context.product_id,
-                    frontend_id=event_context.frontend_id,
-                    scenario_session_id=event_context.scenario_session_id or "",
-                    job_id=event_context.job_id or "",
-                    action_run_id=action_run_id,
-                    workflow_id=event_context.workflow_id or "",
-                    step_id=event_context.step_id or "",
-                    action_type=event_context.action_type or "",
-                    action_config_id=event_context.action_config_id or "",
-                    provider_policy_id=provider_policy_id,
-                    provider=provider,
-                    model=request.model,
-                    status=ProviderCallStatus.running,
-                    started_at=utc_now(),
-                    metadata={
-                        "response_schema_present": request.response_schema is not None,
-                        "provider_policy_id": provider_policy_id,
-                    },
-                )
-            )
-
-        started = perf_counter()
-        try:
-            raw_response = self._invoke_adapter_sync(adapter, request)
-            response = self._normalize_compat_response(
-                raw_response,
-                provider=provider,
-                model=request.model,
-            )
-        except Exception as exc:
-            safe_error_code = self._safe_error_code(exc)
-            safe_message = self._safe_error_message(exc)
-            status = (
-                ProviderCallStatus.timed_out if isinstance(exc, TimeoutError) else ProviderCallStatus.failed
-            )
-            if repository is not None and stored is not None:
-                repository.update(
-                    replace(
-                        stored,
-                        status=status,
-                        latency_ms=self._latency_ms(started),
-                        error_code=safe_error_code,
-                        error_message_safe=safe_message,
-                        completed_at=utc_now(),
-                        metadata={
-                            **stored.metadata,
-                            "error": {
-                                "code": safe_error_code,
-                                "type": type(exc).__name__,
-                                "message_safe": safe_message,
-                            },
-                        },
-                    )
-                )
-            self._emit_provider_failed(
-                event_context,
-                error_code=safe_error_code,
-                result_status=status.value,
-            )
+        except asyncio.CancelledError:
             raise
-
-        latency_ms = response.latency_ms or self._latency_ms(started)
-        normalized_response = replace(response, latency_ms=latency_ms)
-        if repository is not None and stored is not None:
-            repository.update(
-                replace(
-                    stored,
-                    status=ProviderCallStatus.succeeded,
-                    input_tokens=normalized_response.input_tokens,
-                    output_tokens=normalized_response.output_tokens,
-                    latency_ms=normalized_response.latency_ms,
-                    estimated_cost=normalized_response.estimated_cost,
-                    completed_at=utc_now(),
-                    metadata={
-                        **stored.metadata,
-                        "provider": provider,
-                        "model": request.model,
-                    },
-                )
+        except Exception as exc:  # pragma: no cover - exercised by tests via adapters.
+            root_exception = exc
+            error = ProviderGatewayExecutionError(
+                provider_policy_id=policy.provider_policy_id,
+                provider=policy.provider,
+                model=policy.model,
+                error_code=self._safe_error_code(exc),
+                error_type=type(exc).__name__,
+                message=self._safe_error_message(exc),
+                resolved_request=resolved_request,
             )
-        self._emit_provider_succeeded(
-            event_context,
-            result_status=ProviderCallStatus.succeeded.value,
+
+        if policy.fallback_policy is not None:
+            fallback_policy = self._policy_resolver.resolve(policy.fallback_policy)
+            next_visited = set(visited_policy_ids)
+            next_visited.add(policy.provider_policy_id)
+            return await self._execute_policy_chain(
+                request=request,
+                policy=fallback_policy,
+                fallback_from_policy_id=policy.provider_policy_id,
+                visited_policy_ids=next_visited,
+            )
+
+        if root_exception is None:
+            raise error
+        raise error from root_exception
+
+    def _resolved_request_from_policy(
+        self,
+        *,
+        request: ProviderRequest,
+        policy: ProviderPolicy,
+        fallback_from_policy_id: str | None,
+    ) -> ResolvedProviderRequest:
+        return ResolvedProviderRequest(
+            provider_policy_id=policy.provider_policy_id,
+            provider=policy.provider,
+            model=policy.model,
+            temperature=policy.temperature,
+            timeout_seconds=policy.timeout_seconds,
+            max_retries=policy.max_retries,
+            structured_output_mode=policy.structured_output_mode,
+            tenant_id=request.tenant_id,
+            region=request.region,
+            product_id=request.product_id,
+            frontend_id=request.frontend_id,
+            scenario_session_id=request.scenario_session_id,
+            job_id=request.job_id,
+            workflow_id=request.workflow_id,
+            step_id=request.step_id,
+            action_run_id=request.action_run_id,
+            action_type=request.action_type,
+            action_config_id=request.action_config_id,
+            prompt=request.prompt,
+            prompt_ref=request.prompt_ref,
+            response_schema=request.response_schema,
+            messages=request.messages,
+            metadata=request.metadata,
+            fixture_key=request.fixture_key,
+            request_id=request.request_id,
+            correlation_id=request.correlation_id,
+            attempt_number=1,
+            fallback_from_policy_id=fallback_from_policy_id,
         )
-        return normalized_response
 
     def _build_provider_call_metadata(
         self,
@@ -517,7 +368,7 @@ class ProviderGateway:
             "temperature": request.temperature,
             "timeout": {"configured_seconds": request.timeout_seconds},
             "retry": {
-                "attempt_number": request.attempt_number,
+                "owned_by": "litellm" if request.provider == "litellm" else "adapter",
                 "max_retries": request.max_retries,
             },
             "fallback_from_policy_id": request.fallback_from_policy_id,
@@ -528,8 +379,16 @@ class ProviderGateway:
             },
             "request_metadata": self._sanitize_metadata(request.metadata),
         }
+        if request.provider == "litellm":
+            metadata["litellm"] = {"model_group": request.model}
         if response is not None:
             metadata["response_metadata"] = self._sanitize_metadata(response.metadata)
+            litellm_metadata = response.metadata.get("litellm")
+            if request.provider == "litellm" and isinstance(litellm_metadata, Mapping):
+                metadata["litellm"] = {
+                    **metadata.get("litellm", {}),
+                    **self._sanitize_metadata(litellm_metadata),
+                }
         if error_type is not None or error_message_safe is not None:
             metadata["error"] = {
                 "type": error_type,
@@ -548,16 +407,6 @@ class ProviderGateway:
             return await result
         return result
 
-    def _invoke_adapter_sync(
-        self,
-        adapter: ProviderAdapter,
-        request: ProviderRequest,
-    ) -> Any:
-        result = adapter.complete(request)
-        if inspect.isawaitable(result):
-            return asyncio.run(result)
-        return result
-
     def _resolve_provider_call_repository(
         self,
         session: Session | None,
@@ -574,11 +423,6 @@ class ProviderGateway:
     def _should_persist_provider_call(self, request: ProviderRequest) -> bool:
         return self._has_required_dimension(request.tenant_id) and self._has_required_dimension(
             request.region
-        )
-
-    def _should_persist_context(self, context: ExecutionContext) -> bool:
-        return self._has_required_dimension(context.tenant_id) and self._has_required_dimension(
-            context.region
         )
 
     def _has_required_dimension(self, value: str | None) -> bool:
@@ -603,7 +447,7 @@ class ProviderGateway:
 
     def _event_context_from_request(
         self,
-        request: InternalProviderRequest,
+        request: ProviderRequest,
         *,
         provider: str,
         model: str,
@@ -663,50 +507,9 @@ class ProviderGateway:
     def _normalize_internal_response(
         self,
         response: Any,
-        *,
-        provider_policy_id: str,
-        provider: str,
-        model: str,
-    ) -> InternalProviderResponse:
-        if isinstance(response, InternalProviderResponse):
-            return response
-        normalized = self._normalize_compat_response(
-            response,
-            provider=provider,
-            model=model,
-        )
-        return InternalProviderResponse(
-            provider_policy_id=provider_policy_id,
-            provider=normalized.provider,
-            model=normalized.model,
-            output_text=normalized.content,
-            usage=ProviderUsage(
-                input_tokens=normalized.input_tokens,
-                output_tokens=normalized.output_tokens,
-            ),
-            latency_ms=normalized.latency_ms,
-            estimated_cost=normalized.estimated_cost,
-        )
-
-    def _normalize_compat_response(
-        self,
-        response: Any,
-        *,
-        provider: str,
-        model: str,
     ) -> ProviderResponse:
         if isinstance(response, ProviderResponse):
             return response
-        if isinstance(response, InternalProviderResponse):
-            return ProviderResponse(
-                content=response.output_text,
-                provider=response.provider,
-                model=response.model,
-                input_tokens=response.usage.input_tokens,
-                output_tokens=response.usage.output_tokens,
-                latency_ms=response.latency_ms,
-                estimated_cost=response.estimated_cost,
-            )
         raise TypeError(
             "provider adapter returned an unsupported response type: "
             f"{type(response).__name__}"

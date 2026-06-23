@@ -1,0 +1,9 @@
+model_list:
+  - model_name: anytoolai.default_text
+    litellm_params:
+      model: openai/gpt-4.1-mini
+      api_key: env/OPENAI_API_KEY
+
+router_settings:
+  routing_strategy: simple-shuffle
+  enable_pre_call_checks: true

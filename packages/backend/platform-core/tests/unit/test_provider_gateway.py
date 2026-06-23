@@ -174,7 +174,7 @@ class AlwaysFailAdapter:
         raise RuntimeError(f"provider exploded for {request.model} with secret_token=abc123")
 
 
-class FlakyAdapter:
+class SingleAttemptFailureAdapter:
     def __init__(self) -> None:
         self.seen_attempts: list[tuple[int, int, int]] = []
 
@@ -182,15 +182,7 @@ class FlakyAdapter:
         self.seen_attempts.append(
             (request.attempt_number, request.timeout_seconds, request.max_retries)
         )
-        if request.attempt_number == 1:
-            raise RuntimeError("retry me once")
-        return ProviderResponse(
-            provider_policy_id=request.provider_policy_id,
-            provider=request.provider,
-            model=request.model,
-            output_text=json.dumps({"ok": True}, sort_keys=True),
-            usage=ProviderUsage(input_tokens=21, output_tokens=8),
-        )
+        raise RuntimeError("do not retry in gateway")
 
 
 class RecordingProviderCallRepository:
@@ -238,8 +230,9 @@ def test_provider_policy_resolution_uses_config_registry(config_registry: Any) -
 
     policy = resolver.resolve("default_text_generation_v1")
 
-    assert policy.provider == "openai"
-    assert policy.model == "gpt-4.1-mini"
+    assert policy.provider == "litellm"
+    assert policy.model == "anytoolai.default_text"
+    assert policy.metadata["model_group"] == "anytoolai.default_text"
 
 
 def test_gateway_success_persists_provider_call(
@@ -276,7 +269,7 @@ def test_gateway_success_persists_provider_call(
     assert row["error_code"] is None
     assert row["error_message_safe"] is None
     assert row["metadata"]["timeout"]["configured_seconds"] == 30
-    assert row["metadata"]["retry"] == {"attempt_number": 1, "max_retries": 1}
+    assert row["metadata"]["retry"] == {"owned_by": "adapter", "max_retries": 1}
     assert row["metadata"]["request_id"] == "req-123"
     assert row["metadata"]["correlation_id"] == "corr-456"
     assert row["metadata"]["request_metadata"]["api_key"] == "[redacted]"
@@ -315,11 +308,10 @@ def test_gateway_failure_persists_failed_provider_call(
 
     assert exc_info.value.error_type == "RuntimeError"
     assert exc_info.value.error_code == "provider_request_failed"
-    assert len(rows) == 2
+    assert len(rows) == 1
     assert rows[0]["status"] == ProviderCallStatus.failed
-    assert rows[1]["status"] == ProviderCallStatus.failed
-    assert rows[1]["error_code"] == "provider_request_failed"
-    assert rows[1]["error_message_safe"] == "[redacted provider error]"
+    assert rows[0]["error_code"] == "provider_request_failed"
+    assert rows[0]["error_message_safe"] == "[redacted provider error]"
 
 
 def test_fake_provider_selects_fixtures_by_metadata_not_prompt_text() -> None:
@@ -446,11 +438,11 @@ def test_fake_provider_missing_fixture_uses_normal_not_found_behavior() -> None:
         )
 
 
-def test_gateway_captures_retry_metadata_and_retries_once(
+def test_gateway_records_router_owned_retry_metadata_without_gateway_retries(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
     config_registry: Any,
 ) -> None:
-    flaky_adapter = FlakyAdapter()
+    flaky_adapter = SingleAttemptFailureAdapter()
     gateway = ProviderGateway(
         {"fake": flaky_adapter},
         ProviderPolicyResolver(config_registry),
@@ -458,9 +450,10 @@ def test_gateway_captures_retry_metadata_and_retries_once(
 
     with transaction_boundary(session_factory) as session:
         scenario_session, job, action_run = seed_runtime_chain(session)
-        response = asyncio.run(
-            gateway.request(build_request(scenario_session, job, action_run), session=session)
-        )
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+            asyncio.run(
+                gateway.request(build_request(scenario_session, job, action_run), session=session)
+            )
         rows = (
             session.execute(
                 sa.select(provider_calls_table).order_by(provider_calls_table.c.created_at)
@@ -469,14 +462,11 @@ def test_gateway_captures_retry_metadata_and_retries_once(
             .all()
         )
 
-    assert json.loads(response.output_text)["ok"] is True
-    assert flaky_adapter.seen_attempts == [(1, 30, 1), (2, 30, 1)]
-    assert [row["status"] for row in rows] == [
-        ProviderCallStatus.failed,
-        ProviderCallStatus.succeeded,
-    ]
-    assert rows[0]["metadata"]["retry"] == {"attempt_number": 1, "max_retries": 1}
-    assert rows[1]["metadata"]["retry"] == {"attempt_number": 2, "max_retries": 1}
+    assert exc_info.value.error_code == "provider_request_failed"
+    assert flaky_adapter.seen_attempts == [(1, 30, 1)]
+    assert len(rows) == 1
+    assert rows[0]["status"] == ProviderCallStatus.failed
+    assert rows[0]["metadata"]["retry"] == {"owned_by": "adapter", "max_retries": 1}
 
 
 def test_gateway_supports_explicit_provider_call_repository_dependency(

@@ -4,7 +4,14 @@ import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SKIP_PATH_PARTS = {".venv", ".quick-check-venv", "scripts"}
+SKIP_PATH_PARTS = {
+    ".venv",
+    ".quick-check-tmp",
+    ".quick-check-venv",
+    ".uv-cache",
+    "node_modules",
+    "scripts",
+}
 ALLOWED_ADAPTER_MODULE_ROOT = (
     ROOT
     / "packages"
@@ -88,5 +95,21 @@ def test_no_direct_openai_imports_outside_provider_adapter() -> None:
             offenders.append(path)
 
     assert offenders == [], "direct openai imports found outside provider adapters: " + ", ".join(
+        str(path.relative_to(ROOT)) for path in offenders
+    )
+
+
+def test_no_direct_litellm_imports_outside_provider_adapter() -> None:
+    offenders: list[Path] = []
+    for path in _python_files():
+        if path.is_relative_to(ALLOWED_ADAPTER_MODULE_ROOT):
+            continue
+        if "tests" in path.parts:
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if "import litellm" in text or "from litellm" in text:
+            offenders.append(path)
+
+    assert offenders == [], "direct litellm imports found outside provider adapters: " + ", ".join(
         str(path.relative_to(ROOT)) for path in offenders
     )

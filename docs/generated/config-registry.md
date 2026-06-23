@@ -17,6 +17,10 @@ The current loader reads definitions in this order:
 7. schemas
 8. cross-reference validation
 
+LiteLLM router deployment config is separate from the ConfigRegistry load order. It lives in
+`configs/kernel/litellm_router.yaml` and is consumed by provider-adapter bootstrap, not by the
+registry loader.
+
 ## Required Definition Types
 
 - product definition
@@ -37,6 +41,7 @@ The current loader reads definitions in this order:
 configs/kernel/default_tenant.yaml
 configs/kernel/regions.yaml
 configs/kernel/provider_policies.yaml
+configs/kernel/litellm_router.yaml
 configs/kernel/action_definitions/
 configs/kernel/products/kernel_demo/product.yaml
 configs/kernel/products/kernel_demo/frontends.yaml
@@ -52,6 +57,9 @@ configs/kernel/products/kernel_demo/quotas.yaml
 ## Ownership And Fallbacks
 
 - `default_tenant.yaml`, `regions.yaml`, and `provider_policies.yaml` are top-level single sources for their definition types.
+- `litellm_router.yaml` is a top-level provider deployment/routing config file and is intentionally
+  separate from provider policies. Provider policies describe platform intent; LiteLLM router config
+  describes deployment/model-group routing.
 - Each product directory is loaded from `product.yaml` first, with dedicated child files then loaded for action configs, workflows, scenarios, quotas, handoffs, prompts, and schemas.
 - `frontends.yaml` is used when present; otherwise the loader falls back to the `frontends` field in `product.yaml`.
 - `analytics.yaml` is used when present; otherwise the loader falls back to the `analytics` field in `product.yaml`.

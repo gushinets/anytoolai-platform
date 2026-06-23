@@ -83,7 +83,10 @@ def test_loader_builds_registry_from_current_tree() -> None:
     assert registry.get_product("kernel_demo") is not None
     assert registry.get_scenario("kernel_demo.single_action_smoke_v1") is not None
     assert registry.get_workflow("kernel_demo.extract_detect_report_v1") is not None
-    assert registry.get_action_config("kernel_demo.extract_structured_fields_v1") is not None
+    assert (
+        registry.get_action_configuration("kernel_demo.extract_structured_fields_v1")
+        is not None
+    )
     assert registry.get_prompt("kernel_demo.extract_structured_fields.v1") is not None
     assert registry.get_provider_policy("default_fake_provider_v1") is not None
     assert registry.get_schema("kernel.schemas.extract_input_v1") is not None
@@ -95,6 +98,19 @@ def test_loader_builds_registry_from_current_tree() -> None:
 
     with pytest.raises(TypeError):
         registry.products["another"] = product
+
+
+def test_loader_preserves_provider_policy_yaml_metadata() -> None:
+    registry = ConfigLoader(CONFIG_ROOT).load()
+
+    policy = registry.get_provider_policy("default_text_generation_v1")
+
+    assert policy is not None
+    assert policy.provider == "litellm"
+    assert policy.model == "anytoolai.default_text"
+    assert policy.metadata["model_group"] == "anytoolai.default_text"
+    assert policy.metadata["routing_profile"] == "default_text"
+    assert policy.metadata["_file_path"].endswith("provider_policies.yaml")
 
 
 def test_loader_fails_on_duplicate_ids(tmp_path: Path) -> None:

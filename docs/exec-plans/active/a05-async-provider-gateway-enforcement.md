@@ -10,8 +10,9 @@
 ## Goal
 
 Implement an async `ProviderGateway` as the only allowed runtime path for model/provider calls, with
-provider policy resolution, deterministic fake-provider fixture selection, and durable
-`platform.provider_calls` persistence for both success and failure outcomes.
+provider policy resolution, deterministic fake-provider fixture selection, durable
+`platform.provider_calls` persistence for both success and failure outcomes, and LiteLLM behind the
+provider-adapter boundary for real routed provider transport.
 
 ## Scope
 
@@ -19,9 +20,10 @@ provider policy resolution, deterministic fake-provider fixture selection, and d
 
 - Async provider request/response DTOs and adapter protocol under `platform-core/providers`.
 - Gateway-owned provider policy resolution from the config registry / `configs/kernel/provider_policies.yaml`.
-- Gateway-owned timeout/retry metadata handling and latency measurement.
+- Gateway-owned timeout handling, safe retry metadata, and latency measurement.
 - Provider call persistence to `platform.provider_calls` for success and failure paths.
 - Deterministic fake-provider fixture selection based on request metadata instead of prompt text.
+- LiteLLM router-backed adapter and separate `configs/kernel/litellm_router.yaml` deployment config.
 - Action/runtime wiring so provider calls flow through `ProviderGateway`.
 - Architecture tests that prohibit direct adapter imports outside the provider adapter boundary.
 - Provider docs and fixture docs aligned with the new gateway contract.
@@ -56,14 +58,15 @@ provider policy resolution, deterministic fake-provider fixture selection, and d
 
 ## Implementation steps
 
-- [ ] Add async provider DTOs and an async adapter protocol.
-- [ ] Implement policy resolution helpers that read `ProviderPolicy` from the config registry.
-- [ ] Rework `ProviderGateway` into an async orchestration service with persistence and safe failure handling.
-- [ ] Make the fake provider deterministic via request metadata and fixture files.
-- [ ] Route action/runtime provider execution through the gateway only.
-- [ ] Strengthen architecture tests to block adapter imports and direct provider bypasses outside the boundary.
-- [ ] Add focused unit tests for success, failure, deterministic fixtures, metadata capture, and policy resolution.
-- [ ] Update provider documentation and fixture docs.
+- [x] Add async provider DTOs and an async adapter protocol.
+- [x] Implement policy resolution helpers that read `ProviderPolicy` from the config registry.
+- [x] Rework `ProviderGateway` into an async orchestration service with persistence and safe failure handling.
+- [x] Make the fake provider deterministic via request metadata and fixture files.
+- [x] Add a LiteLLM adapter and separate router config, while keeping the gateway as the only platform boundary.
+- [x] Route action/runtime provider execution through the gateway only.
+- [x] Strengthen architecture tests to block adapter imports, direct provider bypasses, and direct LiteLLM usage outside the boundary.
+- [x] Add focused unit tests for success, failure, deterministic fixtures, metadata capture, policy resolution, and LiteLLM request/response normalization.
+- [x] Update provider documentation and fixture docs.
 
 ## Validation
 
@@ -86,6 +89,7 @@ provider policy resolution, deterministic fake-provider fixture selection, and d
 | Date | Progress | Next |
 |---|---|---|
 | 2026-06-22 | Reviewed required architecture docs, provider docs, config loader, runtime storage, current adapters/gateway, and the existing provider architecture test. | Implement the async provider contract and gateway persistence path, then wire tests and docs. |
+| 2026-06-23 | Added LiteLLM behind the adapter boundary, switched real provider-policy routing to `provider: litellm`, removed the public sync gateway bypass, and updated provider/event/config/architecture tests. | Run targeted validation plus `quick_check`, then capture any remaining validation gaps in the summary. |
 
 ## Open questions
 

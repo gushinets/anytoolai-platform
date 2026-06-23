@@ -6,8 +6,7 @@ Provider Gateway responsibilities:
 
 - provider policy resolution;
 - async request orchestration;
-- timeout handling;
-- retries;
+- timeout enforcement and timeout settings propagation to adapters;
 - fallback policy when configured;
 - structured output mode;
 - provider call logging;
@@ -50,6 +49,15 @@ The runtime provider path uses async DTOs:
 Concrete adapters implement one shared async interface and remain implementation details behind the
 gateway.
 
+For real provider transport, the current default adapter path is:
+
+```text
+ProviderGateway -> LiteLLMProviderAdapter -> litellm.Router.acompletion(...)
+```
+
+LiteLLM stays behind the AnytoolAI gateway boundary. Actions, workflows, products, and frontends do
+not call LiteLLM directly.
+
 ## Dependency shape
 
 `ProviderGateway` supports two persistence wiring modes:
@@ -65,11 +73,9 @@ provider-specific event path.
 This preserves the explicit transaction-boundary pattern from runtime storage. The gateway does not
 own commits and does not introduce hidden commit behavior.
 
-The gateway currently exposes:
-
-- async `request(...)` for the current provider-runtime path
-- sync `execute(...)` as a compatibility seam for event-log/runtime service tests that still use the
-  earlier provider execution shape
+The gateway exposes async `request(...)` for the provider-runtime path. The older public sync
+compatibility seam was removed so callers cannot bypass provider-policy-owned routing with direct
+provider/model arguments.
 
 Minimum provider policy fields:
 
@@ -106,14 +112,23 @@ Persisted data includes:
 - token counts when available
 - latency and estimated cost when available
 - safe error type/message for failures
-- safe metadata for timeout, retry, request id, correlation id, fixture selection, and response
-  annotations
+- safe metadata for timeout, request id, correlation id, fixture selection, router-owned retry
+  configuration, and response annotations
 
 The gateway must not persist secrets, raw credentials, or large unsafe payloads such as raw prompt
 bodies.
 
 Required event dimensions gate persistence for provider calls. If required dimensions such as
 `tenant_id` or `region` are missing or blank, the gateway must not write a `provider_calls` row.
+
+When the resolved provider is `litellm`, the gateway writes one logical `provider_calls` row per
+request and delegates retry/load-balancing behavior to LiteLLM Router. Safe row metadata may
+include:
+
+- LiteLLM model group alias from `ProviderPolicy.model`
+- actual provider/model identifiers returned by LiteLLM when available
+- router/deployment `model_id` when available
+- estimated response cost when LiteLLM exposes it
 
 When the shared event emitter is configured, the gateway should emit:
 
@@ -149,3 +164,20 @@ Current behavior:
 
 The gateway may still keep the underlying exception type for internal metadata, but persisted
 failure rows and surfaced safe errors should use the safe platform error code.
+
+## Config split
+
+Provider policy intent remains in `configs/kernel/provider_policies.yaml`:
+
+- logical provider boundary (`fake`, `litellm`, ...)
+- logical model group alias
+- temperature
+- timeout
+- max retries
+- structured output mode
+
+LiteLLM deployment/routing config lives separately in `configs/kernel/litellm_router.yaml`:
+
+- `model_list`
+- deployment credentials via `env/VAR_NAME` sentinels
+- router strategy / pre-call checks / other router settings
