@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 TEXT_EXTS = {".py", ".ts", ".tsx", ".md", ".yaml", ".yml", ".json"}
+PY_EXTS = {".py"}
 
 FORBIDDEN_PLATFORM_TERMS = [
     "FreelancerProfile",
@@ -26,11 +28,67 @@ FORBIDDEN_PLATFORM_TERMS = [
     "proposal_ai",
 ]
 
+LLM_PROVIDER_IMPORTS = {
+    "litellm",
+    "pydantic_ai",
+    "openai",
+    "anthropic",
+    "google.genai",
+    "cohere",
+    "mistralai",
+}
+
 
 def iter_text_files(root: Path):
+    if not root.exists():
+        return
     for path in root.rglob("*"):
         if path.is_file() and path.suffix in TEXT_EXTS and ".git" not in path.parts:
             yield path
+
+
+def iter_python_files(root: Path):
+    if not root.exists():
+        return
+    for path in root.rglob("*"):
+        if path.is_file() and path.suffix in PY_EXTS and ".git" not in path.parts:
+            yield path
+
+
+def imported_modules(path: Path) -> set[str]:
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8", errors="ignore"))
+    except SyntaxError:
+        return set()
+
+    imports: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                imports.add(alias.name)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imports.add(node.module)
+    return imports
+
+
+def imports_module(imports: set[str], module: str) -> bool:
+    return any(imported == module or imported.startswith(f"{module}.") for imported in imports)
+
+
+def is_provider_boundary(path: Path) -> bool:
+    relative = path.relative_to(ROOT)
+    return (
+        relative.parts[:3] == ("packages", "backend", "platform-core")
+        and "providers" in relative.parts
+    )
+
+
+def is_structured_llm_executor_boundary(path: Path) -> bool:
+    relative = path.relative_to(ROOT)
+    return (
+        relative.parts[:3] == ("packages", "backend", "platform-actions")
+        and "structured_llm_executor" in relative.parts
+    )
 
 
 def main() -> int:
@@ -47,14 +105,30 @@ def main() -> int:
         for term in FORBIDDEN_PLATFORM_TERMS:
             if term in text:
                 errors.append(f"ATAI002 {path}: forbidden product term in platform-core: {term}")
-        if "from openai" in text or "import openai" in text:
-            if "providers/adapters/openai.py" not in str(path):
-                errors.append(f"ATAI003 {path}: direct OpenAI import outside provider adapter")
 
     for path in iter_text_files(platform_actions):
         text = path.read_text(encoding="utf-8", errors="ignore")
         if "product-platforms" in text or "anytoolai_freelancer" in text:
             errors.append(f"ATAI004 {path}: platform-actions must not import product-platforms")
+
+    for root in [ROOT / "apps", ROOT / "packages", ROOT / "extensions"]:
+        for path in iter_python_files(root):
+            imports = imported_modules(path)
+            for module in LLM_PROVIDER_IMPORTS:
+                if not imports_module(imports, module):
+                    continue
+
+                if module == "litellm" and is_provider_boundary(path):
+                    continue
+                if module == "pydantic_ai" and is_structured_llm_executor_boundary(path):
+                    continue
+                if module in {"openai", "anthropic", "google.genai", "cohere", "mistralai"} and is_provider_boundary(path):
+                    continue
+
+                errors.append(
+                    "ATAI006 "
+                    f"{path}: forbidden direct LLM/provider import `{module}` outside approved gateway/executor boundary"
+                )
 
     for path in iter_text_files(extensions):
         if path.name in {"AGENTS.md", "README.md"}:
