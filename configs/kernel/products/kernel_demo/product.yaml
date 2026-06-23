@@ -1,10 +1,6 @@
 product_id: kernel_demo
 product_platform: platform_kernel
 display_name: Kernel Demo
-frontends:
-  - frontend_id: kernel_demo_ce
-    type: chrome_extension
-    enabled: true
 scenarios:
   - kernel_demo.single_action_smoke_v1
   - kernel_demo.multi_step_workflow_smoke_v1
@@ -12,5 +8,3 @@ scenarios:
   - kernel_demo.handoff_smoke_source_v1
   - kernel_demo.handoff_smoke_target_v1
 quota_policy_ref: kernel_demo.guest_quota_v1
-analytics:
-  aha_event: kernel_demo.result_viewed

@@ -13,8 +13,8 @@ class ProviderPolicy(ContractModel):
     provider_policy_id: str
     provider: str
     model: str
-    temperature: float = 0.3
-    timeout_seconds: int = 60
-    max_retries: int = 2
+    temperature: float
+    timeout_seconds: int
+    max_retries: int
     fallback_policy: str | None = None
-    structured_output_mode: StructuredOutputMode = StructuredOutputMode.json_schema
+    structured_output_mode: StructuredOutputMode

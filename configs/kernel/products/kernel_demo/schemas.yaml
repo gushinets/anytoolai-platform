@@ -1,0 +1,16 @@
+schemas:
+  - schema_ref: kernel_demo.extract_input_v1
+    version: 1
+    file_path: schemas/extract_input.schema.json
+  - schema_ref: kernel_demo.extract_output_v1
+    version: 1
+    file_path: schemas/extract_output.schema.json
+  - schema_ref: kernel_demo.generic_text_input_v1
+    version: 1
+    file_path: schemas/generic_text_input.schema.json
+  - schema_ref: kernel_demo.issues_output_v1
+    version: 1
+    file_path: schemas/issues_output.schema.json
+  - schema_ref: kernel_demo.report_output_v1
+    version: 1
+    file_path: schemas/report_output.schema.json

@@ -5,7 +5,7 @@
 - State: active
 - Owner: agent
 - Created: 2026-06-16
-- Last updated: 2026-06-19
+- Last updated: 2026-06-23
 
 ## Goal
 
@@ -66,6 +66,10 @@ and is reused by both API startup and `validate_configs.py`.
 - [ ] Normalize `configs/kernel` ownership rules so each definition type has one owning file or
   manifest and no silent merge behavior.
 - [ ] Add explicit prompt and schema manifests instead of inferring ids from filenames.
+- [ ] Remove loader fallback from `product.yaml` for `frontends` and `analytics`; dedicated child
+  files own those definitions.
+- [ ] Require explicit `quota_policy_ref` whenever `quotas.yaml` defines quota policies.
+- [ ] Require explicit provider-policy tuning fields in repo config instead of loader defaults.
 - [ ] Replace the ad hoc `scripts/agent/validate_configs.py` logic with the shared loader or the
   same validation layer.
 - [ ] Wire API/bootstrap startup to build the registry before the app can serve requests.
@@ -89,6 +93,10 @@ and is reused by both API startup and `validate_configs.py`.
 | 2026-06-16 | Treat product child files as the owners of their definition types and avoid field-level merge magic. | The repo favors explicit, searchable contracts over clever implicit rules. |
 | 2026-06-16 | Fail on any duplicate id or broken reference during bootstrap, before FastAPI serves traffic. | This is a source-of-truth registry, not a best-effort loader. |
 | 2026-06-16 | Keep the registry read-only with no DB fallback and no runtime mutation hooks. | Matches MVP-A scope and protects the platform boundary for MVP-B. |
+| 2026-06-23 | `frontends.yaml` is required for every product, and `product.yaml` must not embed frontend definitions. | Frontend ownership must be explicit and read from one file only. |
+| 2026-06-23 | `analytics.yaml` is optional, but when analytics are configured it is the exclusive owner; `product.yaml` must not embed analytics. | This preserves optional analytics without hidden fallback from unrelated product fields. |
+| 2026-06-23 | `quota_policy_ref` is explicit whenever quota policies exist; the loader must not infer a single available quota policy. | The registry should not silently pick config-owned references. |
+| 2026-06-23 | Provider-policy tuning fields are explicit config-owned values, not loader defaults. | Removes hidden runtime behavior and makes the source of truth traceable in repo config. |
 
 ## Progress log
 
@@ -97,6 +105,7 @@ and is reused by both API startup and `validate_configs.py`.
 | 2026-06-16 | Reviewed architecture docs, MVP scope docs, current loader placeholders, startup wiring, and config layout. | Draft implementation and rollout sequence. |
 | 2026-06-16 | Ran repo checks with the documented Python fallback; config and architecture validation passed from `.venv`. | Implement loader, tests, and startup failure wiring in small reviewable slices. |
 | 2026-06-19 | Confirmed invalid enum values now enter `RegistryLoadError.errors`, but still lack `ref_type` and `ref_value` on the nested `InvalidConfigShapeError`. | Add structured enum diagnostics and focused regression tests for every enum conversion path called out in review. |
+| 2026-06-23 | Confirmed current loader still falls back from `product.yaml` for frontends/analytics, infers single quota refs, defaults provider policy fields, and infers prompt/schema ids from asset filenames. Also confirmed `scripts/agent/validate_configs.py` is the shared validation entrypoint and local validation must use `uv` with a workspace-owned `UV_CACHE_DIR` because `just` is unavailable here and the default `uv` cache path is access-blocked. | Tighten loader ownership rules, add manifests, update repo config/docs, and rerun focused config validation. |
 
 ## Open questions
 

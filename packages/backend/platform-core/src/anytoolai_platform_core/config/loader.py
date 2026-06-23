@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any
 
@@ -45,9 +44,6 @@ from anytoolai_platform_core.workflows.models import (
     WorkflowDefinition,
     WorkflowStepDefinition,
 )
-
-VERSION_SUFFIX_PATTERN = re.compile(r"(?P<separator>[._])v(?P<version>\d+)$")
-
 
 def load_yaml_file(path: Path) -> dict[str, Any]:
     """Load and parse a YAML file."""
@@ -183,6 +179,26 @@ class ConfigLoader:
     def _append_error(self, error: ConfigError) -> None:
         self.errors.append(error)
 
+    def _require_mapping_file(
+        self,
+        path: Path,
+        *,
+        config_id: str,
+        ref_type: str,
+        reason: str,
+        ref_value: str | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return load_yaml_file(path)
+        except MissingConfigFileError as exc:
+            raise MissingConfigFileError(
+                exc.file_path or path,
+                reason,
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value or path.name,
+            ) from exc
+
     def _load_tenants(self) -> None:
         path = self.config_root / "default_tenant.yaml"
         try:
@@ -244,11 +260,31 @@ class ConfigLoader:
                 policy_id = policy_data.get("provider_policy_id")
                 provider = policy_data.get("provider")
                 model = policy_data.get("model")
+                required_fields = (
+                    "provider_policy_id",
+                    "provider",
+                    "model",
+                    "temperature",
+                    "timeout_seconds",
+                    "max_retries",
+                    "structured_output_mode",
+                )
+                missing_fields = [
+                    field_name
+                    for field_name in required_fields
+                    if field_name not in policy_data
+                ]
 
-                if not all([policy_id, provider, model]):
+                if not all([policy_id, provider, model]) or missing_fields:
                     raise InvalidConfigShapeError(
                         path,
-                        f"Provider policy missing required fields: {policy_data}",
+                        (
+                            "Provider policy missing required fields: "
+                            f"{', '.join(missing_fields) or policy_data}"
+                        ),
+                        config_id=policy_id,
+                        ref_type=missing_fields[0] if missing_fields else None,
+                        ref_value="<missing>" if missing_fields else None,
                     )
 
                 if policy_id in self.provider_policies:
@@ -263,16 +299,13 @@ class ConfigLoader:
                     provider_policy_id=policy_id,
                     provider=provider,
                     model=model,
-                    temperature=policy_data.get("temperature", 0.3),
-                    timeout_seconds=policy_data.get("timeout_seconds", 60),
-                    max_retries=policy_data.get("max_retries", 2),
+                    temperature=policy_data["temperature"],
+                    timeout_seconds=policy_data["timeout_seconds"],
+                    max_retries=policy_data["max_retries"],
                     fallback_policy=policy_data.get("fallback_policy"),
                     structured_output_mode=parse_enum_value(
                         StructuredOutputMode,
-                        policy_data.get(
-                            "structured_output_mode",
-                            StructuredOutputMode.json_schema,
-                        ),
+                        policy_data["structured_output_mode"],
                         field_name="structured_output_mode",
                         file_path=path,
                         config_id=policy_id,
@@ -387,6 +420,23 @@ class ConfigLoader:
 
             self.product_dirs[product_id] = product_dir
 
+            if "frontends" in product_data:
+                raise InvalidConfigShapeError(
+                    product_file,
+                    "Frontend definitions must be declared in frontends.yaml; product.yaml must not embed frontends",
+                    config_id=product_id,
+                    ref_type="frontends",
+                    ref_value="product.yaml.frontends",
+                )
+            if "analytics" in product_data:
+                raise InvalidConfigShapeError(
+                    product_file,
+                    "Analytics definitions must be declared in analytics.yaml; product.yaml must not embed analytics",
+                    config_id=product_id,
+                    ref_type="analytics",
+                    ref_value="product.yaml.analytics",
+                )
+
             self._load_action_configs(product_dir / "action_configs.yaml")
             self._load_workflows(product_dir / "workflows.yaml")
             self._load_scenarios(product_dir / "scenarios.yaml")
@@ -394,23 +444,17 @@ class ConfigLoader:
             quota_refs = self._load_quotas(product_dir / "quotas.yaml")
             self._load_handoffs(product_dir / "handoffs.yaml")
 
-            frontends = self._load_frontends(
-                product_dir / "frontends.yaml",
-                fallback_frontends=product_data.get("frontends", []),
-            )
-            analytics = self._load_analytics(
-                product_dir / "analytics.yaml",
-                fallback_analytics=product_data.get("analytics", {}),
-            )
+            frontends = self._load_frontends(product_dir / "frontends.yaml", product_id)
+            analytics = self._load_analytics(product_dir / "analytics.yaml")
 
             quota_policy_ref = product_data.get("quota_policy_ref")
-            if quota_policy_ref is None and len(quota_refs) == 1:
-                quota_policy_ref = quota_refs[0]
-            if quota_policy_ref is None and len(quota_refs) > 1:
+            if quota_policy_ref is None and quota_refs:
                 raise InvalidConfigShapeError(
                     product_file,
-                    "Multiple quota policies found; product.yaml must set quota_policy_ref",
+                    "quota_policy_ref is required when quotas.yaml defines quota policies",
                     config_id=product_id,
+                    ref_type="quota_policy_ref",
+                    ref_value="<missing>",
                 )
 
             scenarios = product_data.get("scenarios", [])
@@ -438,16 +482,16 @@ class ConfigLoader:
     def _load_frontends(
         self,
         path: Path,
-        fallback_frontends: list[dict[str, Any]],
+        product_id: str,
     ) -> list[FrontendDefinition]:
-        frontends_data = fallback_frontends
-        source_path = path
-
-        if path.exists():
-            data = load_yaml_file(path)
-            frontends_data = data.get("frontends", [])
-        else:
-            source_path = path.parent / "product.yaml"
+        data = self._require_mapping_file(
+            path,
+            config_id=product_id,
+            ref_type="frontends_file",
+            ref_value=path.name,
+            reason="frontends.yaml is required because it is the exclusive source of frontend definitions",
+        )
+        frontends_data = data.get("frontends", [])
 
         frontends: list[FrontendDefinition] = []
         for frontend_data in frontends_data:
@@ -455,8 +499,9 @@ class ConfigLoader:
             frontend_type = frontend_data.get("type")
             if not frontend_id or not frontend_type:
                 raise InvalidConfigShapeError(
-                    source_path,
+                    path,
                     f"Frontend missing required fields: {frontend_data}",
+                    config_id=product_id,
                 )
 
             frontends.append(
@@ -466,24 +511,20 @@ class ConfigLoader:
                         FrontendType,
                         frontend_type,
                         field_name="frontend type",
-                        file_path=source_path,
+                        file_path=path,
                         config_id=frontend_id,
                         ref_type="type",
                     ),
                     enabled=frontend_data.get("enabled", True),
-                    metadata={"_file_path": str(source_path)},
+                    metadata={"_file_path": str(path)},
                 )
             )
         return frontends
 
-    def _load_analytics(
-        self,
-        path: Path,
-        fallback_analytics: dict[str, Any],
-    ) -> dict[str, Any]:
+    def _load_analytics(self, path: Path) -> dict[str, Any]:
         if path.exists():
             return load_yaml_file(path)
-        return fallback_analytics
+        return {}
 
     def _load_action_configs(self, path: Path) -> None:
         try:
@@ -625,11 +666,11 @@ class ConfigLoader:
             data = load_yaml_file(path)
             for quota_data in data.get("quota_policies", []):
                 quota_id = quota_data.get("quota_policy_id")
-                unit = quota_data.get("unit", "scenario_run")
+                unit = quota_data.get("unit")
                 limit_count = quota_data.get("limit_count")
-                period = quota_data.get("period", "lifetime")
+                period = quota_data.get("period")
 
-                if not all([quota_id, limit_count is not None]):
+                if not all([quota_id, limit_count is not None, unit, period]):
                     raise InvalidConfigShapeError(
                         path,
                         f"Quota policy missing required fields: {quota_data}",
@@ -722,118 +763,146 @@ class ConfigLoader:
 
     def _load_prompts(self) -> None:
         for product_id, product_dir in sorted(self.product_dirs.items()):
-            prompt_dir = product_dir / "prompts"
-            if not prompt_dir.exists():
-                continue
+            manifest_path = product_dir / "prompts.yaml"
+            try:
+                data = self._require_mapping_file(
+                    manifest_path,
+                    config_id=product_id,
+                    ref_type="prompt_manifest",
+                    ref_value=manifest_path.name,
+                    reason="prompts.yaml is required because it owns prompt definitions",
+                )
+                for prompt_data in data.get("prompts", []):
+                    prompt_ref = prompt_data.get("prompt_ref")
+                    template_path = prompt_data.get("template_path")
+                    version = prompt_data.get("version")
+                    output_schema_ref = prompt_data.get("output_schema_ref")
+                    input_variables = prompt_data.get("input_variables")
 
-            for path in sorted(prompt_dir.glob("*.md")):
-                if path.name.lower() == "readme.md":
-                    continue
-
-                try:
-                    prompt_ref = self._prompt_ref_from_path(product_id, path)
-                    version = self._parse_version_from_name(path.stem)
+                    if not all(
+                        [
+                            prompt_ref,
+                            template_path,
+                            version is not None,
+                            output_schema_ref,
+                            input_variables is not None,
+                        ]
+                    ):
+                        raise InvalidConfigShapeError(
+                            manifest_path,
+                            f"Prompt manifest entry missing required fields: {prompt_data}",
+                            config_id=prompt_ref or product_id,
+                        )
 
                     if prompt_ref in self.prompts:
                         raise DuplicateConfigIdError(
                             "prompt_ref",
                             prompt_ref,
-                            self._source_for("prompt", prompt_ref, path),
-                            path,
+                            self._source_for("prompt", prompt_ref, manifest_path),
+                            manifest_path,
                         )
 
-                    with path.open("r", encoding="utf-8") as handle:
+                    asset_path = product_dir / template_path
+                    if not asset_path.exists():
+                        raise MissingConfigFileError(
+                            asset_path,
+                            f"Prompt asset referenced from {manifest_path} was not found",
+                            config_id=prompt_ref,
+                            ref_type="prompt_asset",
+                            ref_value=template_path,
+                        )
+
+                    with asset_path.open("r", encoding="utf-8") as handle:
                         content = handle.read()
 
                     self.prompts[prompt_ref] = PromptDefinition(
                         prompt_ref=prompt_ref,
                         version=version,
                         content=content,
-                        input_variables=[],
-                        output_schema_ref=self._infer_prompt_output_schema_ref(
-                            prompt_ref
-                        ),
-                        metadata={"_file_path": str(path)},
+                        input_variables=input_variables,
+                        output_schema_ref=output_schema_ref,
+                        metadata={
+                            "_file_path": str(asset_path),
+                            "_manifest_path": str(manifest_path),
+                            "template_path": template_path,
+                        },
                     )
-                    self._remember_source("prompt", prompt_ref, path)
-                except ConfigError as error:
-                    self._append_error(error)
+                    self._remember_source("prompt", prompt_ref, asset_path)
+            except ConfigError as error:
+                self._append_error(error)
 
     def _load_schemas(self) -> None:
-        self._load_schema_directory(
-            scope="kernel",
-            schema_dir=self.config_root / "schemas",
+        self._load_schema_manifest(
+            owner_id="kernel",
+            manifest_path=self.config_root / "schemas.yaml",
+            base_dir=self.config_root,
         )
 
         for product_id, product_dir in sorted(self.product_dirs.items()):
-            self._load_schema_directory(
-                scope=product_id,
-                schema_dir=product_dir / "schemas",
+            self._load_schema_manifest(
+                owner_id=product_id,
+                manifest_path=product_dir / "schemas.yaml",
+                base_dir=product_dir,
             )
 
-    def _load_schema_directory(self, scope: str, schema_dir: Path) -> None:
-        if not schema_dir.exists():
-            return
+    def _load_schema_manifest(
+        self,
+        *,
+        owner_id: str,
+        manifest_path: Path,
+        base_dir: Path,
+    ) -> None:
+        try:
+            data = self._require_mapping_file(
+                manifest_path,
+                config_id=owner_id,
+                ref_type="schema_manifest",
+                ref_value=manifest_path.name,
+                reason="schemas.yaml is required because it owns schema definitions",
+            )
+            for schema_data in data.get("schemas", []):
+                schema_ref = schema_data.get("schema_ref")
+                version = schema_data.get("version")
+                file_path_value = schema_data.get("file_path")
 
-        for path in sorted(schema_dir.glob("*.json")):
-            try:
-                schema_ref, version = self._schema_ref_from_path(scope, path)
+                if not all([schema_ref, version is not None, file_path_value]):
+                    raise InvalidConfigShapeError(
+                        manifest_path,
+                        f"Schema manifest entry missing required fields: {schema_data}",
+                        config_id=schema_ref or owner_id,
+                    )
 
                 if schema_ref in self.schemas:
                     raise DuplicateConfigIdError(
                         "schema_ref",
                         schema_ref,
-                        self._source_for("schema", schema_ref, path),
-                        path,
+                        self._source_for("schema", schema_ref, manifest_path),
+                        manifest_path,
+                    )
+
+                asset_path = base_dir / file_path_value
+                if not asset_path.exists():
+                    raise MissingConfigFileError(
+                        asset_path,
+                        f"Schema asset referenced from {manifest_path} was not found",
+                        config_id=schema_ref,
+                        ref_type="schema_asset",
+                        ref_value=file_path_value,
                     )
 
                 self.schemas[schema_ref] = SchemaDefinition(
                     schema_ref=schema_ref,
                     version=version,
-                    schema=load_json_file(path),
-                    metadata={"_file_path": str(path)},
+                    schema=load_json_file(asset_path),
+                    metadata={
+                        "_file_path": str(asset_path),
+                        "_manifest_path": str(manifest_path),
+                        "file_path": file_path_value,
+                    },
                 )
-                self._remember_source("schema", schema_ref, path)
-            except ConfigError as error:
-                self._append_error(error)
-
-    def _prompt_ref_from_path(self, product_id: str, path: Path) -> str:
-        return f"{product_id}.{path.stem}"
-
-    def _schema_ref_from_path(self, scope: str, path: Path) -> tuple[str, int]:
-        base_name = path.name
-        if base_name.endswith(".schema.json"):
-            base_name = base_name[: -len(".schema.json")]
-        elif base_name.endswith(".json"):
-            base_name = base_name[:-len(".json")]
-
-        version = self._parse_version_from_name(base_name)
-        stem = self._strip_version_suffix(base_name)
-        if scope == "kernel":
-            return (f"kernel.schemas.{stem}_v{version}", version)
-        return (f"{scope}.{stem}_v{version}", version)
-
-    def _parse_version_from_name(self, name: str) -> int:
-        match = VERSION_SUFFIX_PATTERN.search(name)
-        if not match:
-            return 1
-        return int(match.group("version"))
-
-    def _strip_version_suffix(self, name: str) -> str:
-        match = VERSION_SUFFIX_PATTERN.search(name)
-        if not match:
-            return name
-        return name[: match.start()]
-
-    def _infer_prompt_output_schema_ref(self, prompt_ref: str) -> str | None:
-        for action_config in self.action_configurations.values():
-            if action_config.prompt_ref != prompt_ref:
-                continue
-
-            action_definition = self.action_definitions.get(action_config.action_type)
-            if action_definition is not None:
-                return action_definition.output_schema_ref
-        return None
+                self._remember_source("schema", schema_ref, asset_path)
+        except ConfigError as error:
+            self._append_error(error)
 
     def _validate_cross_references(self) -> None:
         for action_type, action_def in self.action_definitions.items():
@@ -995,8 +1064,6 @@ class ConfigLoader:
             )
 
         for prompt_ref, prompt in self.prompts.items():
-            if prompt.output_schema_ref is None:
-                continue
             source_path = self._source_for("prompt", prompt_ref, self.config_root)
             self._validate_schema_ref(
                 config_id=prompt_ref,

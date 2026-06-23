@@ -77,6 +77,25 @@ def test_missing_required_fields_fail_validation() -> None:
     with pytest.raises(ValidationError):
         ActionDefinition.model_validate({"action_type": "text.extract_structured_fields"})
 
+    with pytest.raises(ValidationError):
+        ProviderPolicy.model_validate(
+            {
+                "provider_policy_id": "default_fake_provider_v1",
+                "provider": "fake",
+                "model": "fake-json-v1",
+            }
+        )
+
+    with pytest.raises(ValidationError):
+        PromptRef.model_validate(
+            {
+                "prompt_ref": "kernel_demo.extract_structured_fields.v1",
+                "version": 1,
+                "template_path": "prompts/extract_structured_fields.v1.md",
+                "input_variables": [],
+            }
+        )
+
 
 def test_invalid_enum_values_fail_validation() -> None:
     with pytest.raises(ValidationError):
