@@ -10,7 +10,6 @@ SKIP_PATH_PARTS = {
     ".quick-check-venv",
     ".uv-cache",
     "node_modules",
-    "scripts",
 }
 ALLOWED_ADAPTER_MODULE_ROOT = (
     ROOT
@@ -66,6 +65,21 @@ def _imports_provider_adapter(path: Path) -> bool:
     return False
 
 
+def _imports_module(path: Path, module_name: str) -> bool:
+    tree = ast.parse(path.read_text(encoding="utf-8", errors="ignore"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(
+                alias.name == module_name or alias.name.startswith(f"{module_name}.")
+                for alias in node.names
+            ):
+                return True
+        if isinstance(node, ast.ImportFrom) and node.module is not None:
+            if node.module == module_name or node.module.startswith(f"{module_name}."):
+                return True
+    return False
+
+
 def test_no_direct_provider_adapter_imports_outside_provider_boundary() -> None:
     offenders: list[Path] = []
     for path in _python_files():
@@ -90,8 +104,7 @@ def test_no_direct_openai_imports_outside_provider_adapter() -> None:
             continue
         if "tests" in path.parts:
             continue
-        text = path.read_text(encoding="utf-8", errors="ignore")
-        if "import openai" in text or "from openai" in text:
+        if _imports_module(path, "openai"):
             offenders.append(path)
 
     assert offenders == [], "direct openai imports found outside provider adapters: " + ", ".join(
@@ -106,8 +119,7 @@ def test_no_direct_litellm_imports_outside_provider_adapter() -> None:
             continue
         if "tests" in path.parts:
             continue
-        text = path.read_text(encoding="utf-8", errors="ignore")
-        if "import litellm" in text or "from litellm" in text:
+        if _imports_module(path, "litellm"):
             offenders.append(path)
 
     assert offenders == [], "direct litellm imports found outside provider adapters: " + ", ".join(
