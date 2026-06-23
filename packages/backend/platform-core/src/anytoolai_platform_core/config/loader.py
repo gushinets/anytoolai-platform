@@ -179,6 +179,23 @@ class ConfigLoader:
     def _append_error(self, error: ConfigError) -> None:
         self.errors.append(error)
 
+    def _missing_required_file_error(
+        self,
+        path: Path,
+        *,
+        config_id: str,
+        ref_type: str,
+        reason: str,
+        ref_value: str | None = None,
+    ) -> MissingConfigFileError:
+        return MissingConfigFileError(
+            path,
+            reason,
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=ref_value or path.name,
+        )
+
     def _require_mapping_file(
         self,
         path: Path,
@@ -191,9 +208,9 @@ class ConfigLoader:
         try:
             return load_yaml_file(path)
         except MissingConfigFileError as exc:
-            raise MissingConfigFileError(
+            raise self._missing_required_file_error(
                 exc.file_path or path,
-                reason,
+                reason=reason,
                 config_id=config_id,
                 ref_type=ref_type,
                 ref_value=ref_value or path.name,
@@ -354,9 +371,12 @@ class ConfigLoader:
         action_dir = self.config_root / "action_definitions"
         if not action_dir.exists():
             self._append_error(
-                MissingConfigFileError(
+                self._missing_required_file_error(
                     action_dir,
-                    "Expected action_definitions directory",
+                    config_id="kernel",
+                    ref_type="action_definitions_dir",
+                    ref_value=action_dir.name,
+                    reason="action_definitions directory is required because it owns action definitions",
                 )
             )
             return
@@ -419,9 +439,12 @@ class ConfigLoader:
         products_dir = self.config_root / "products"
         if not products_dir.exists():
             self._append_error(
-                MissingConfigFileError(
+                self._missing_required_file_error(
                     products_dir,
-                    "Expected products directory",
+                    config_id="kernel",
+                    ref_type="products_dir",
+                    ref_value=products_dir.name,
+                    reason="products directory is required because it owns product definition directories",
                 )
             )
             return
@@ -859,9 +882,9 @@ class ConfigLoader:
 
                     asset_path = product_dir / template_path
                     if not asset_path.exists():
-                        raise MissingConfigFileError(
+                        raise self._missing_required_file_error(
                             asset_path,
-                            f"Prompt asset referenced from {manifest_path} was not found",
+                            reason=f"Prompt asset referenced from {manifest_path} was not found",
                             config_id=prompt_ref,
                             ref_type="prompt_asset",
                             ref_value=template_path,
@@ -937,9 +960,9 @@ class ConfigLoader:
 
                 asset_path = base_dir / file_path_value
                 if not asset_path.exists():
-                    raise MissingConfigFileError(
+                    raise self._missing_required_file_error(
                         asset_path,
-                        f"Schema asset referenced from {manifest_path} was not found",
+                        reason=f"Schema asset referenced from {manifest_path} was not found",
                         config_id=schema_ref,
                         ref_type="schema_asset",
                         ref_value=file_path_value,
