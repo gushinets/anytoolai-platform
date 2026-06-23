@@ -56,7 +56,7 @@ class LiteLLMProviderAdapter:
 
 
 def default_litellm_router_config_path(config_root: Path | None = None) -> Path:
-    root = config_root or Path(__file__).resolve().parents[6] / "configs" / "kernel"
+    root = config_root or Path(__file__).resolve().parents[7] / "configs" / "kernel"
     return root / "litellm_router.yaml"
 
 

@@ -9,6 +9,8 @@ import pytest
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.providers.adapters.litellm import (
     LiteLLMProviderAdapter,
+    build_litellm_router,
+    default_litellm_router_config_path,
     load_litellm_router_config,
 )
 from anytoolai_platform_core.providers.models import (
@@ -217,3 +219,17 @@ def test_load_litellm_router_config_rejects_missing_env_sentinel(
         load_litellm_router_config(config_path)
 
     assert exc_info.value.code == "provider_router_env_missing"
+
+
+def test_build_litellm_router_uses_repo_default_config_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected_path = Path(__file__).resolve().parents[5] / "configs" / "kernel" / "litellm_router.yaml"
+
+    monkeypatch.setenv("OPENAI_API_KEY", "secret-value")
+
+    assert default_litellm_router_config_path() == expected_path
+
+    router = build_litellm_router()
+
+    assert router is not None
