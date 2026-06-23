@@ -232,6 +232,25 @@ class ConfigLoader:
             reason=reason,
         )
 
+    def _require_mapping_entry(
+        self,
+        entry: Any,
+        *,
+        file_path: Path,
+        config_id: str,
+        entry_type: str,
+        ref_type: str,
+    ) -> dict[str, Any]:
+        if isinstance(entry, dict):
+            return entry
+        raise InvalidConfigShapeError(
+            file_path,
+            f"Expected each {entry_type} entry to be a mapping, got: {entry!r}",
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=type(entry).__name__,
+        )
+
     def _load_tenants(self) -> None:
         path = self.config_root / "default_tenant.yaml"
         try:
@@ -323,7 +342,7 @@ class ConfigLoader:
                 missing_fields = [
                     field_name
                     for field_name in required_fields
-                    if field_name not in policy_data
+                    if field_name not in policy_data or policy_data[field_name] is None
                 ]
 
                 if not all([policy_id, provider, model]) or missing_fields:
@@ -558,6 +577,13 @@ class ConfigLoader:
 
         frontends: list[FrontendDefinition] = []
         for frontend_data in frontends_data:
+            frontend_data = self._require_mapping_entry(
+                frontend_data,
+                file_path=path,
+                config_id=product_id,
+                entry_type="frontend",
+                ref_type="frontends_entry",
+            )
             frontend_id = frontend_data.get("frontend_id")
             frontend_type = frontend_data.get("type")
             if not frontend_id or not frontend_type:
@@ -851,6 +877,13 @@ class ConfigLoader:
                     reason="prompts.yaml is required because it owns prompt definitions",
                 )
                 for prompt_data in data.get("prompts", []):
+                    prompt_data = self._require_mapping_entry(
+                        prompt_data,
+                        file_path=manifest_path,
+                        config_id=product_id,
+                        entry_type="prompt manifest",
+                        ref_type="prompt_manifest_entry",
+                    )
                     prompt_ref = prompt_data.get("prompt_ref")
                     template_path = prompt_data.get("template_path")
                     version = prompt_data.get("version")
@@ -939,6 +972,13 @@ class ConfigLoader:
                 reason="schemas.yaml is required because it owns schema definitions",
             )
             for schema_data in data.get("schemas", []):
+                schema_data = self._require_mapping_entry(
+                    schema_data,
+                    file_path=manifest_path,
+                    config_id=owner_id,
+                    entry_type="schema manifest",
+                    ref_type="schema_manifest_entry",
+                )
                 schema_ref = schema_data.get("schema_ref")
                 version = schema_data.get("version")
                 file_path_value = schema_data.get("file_path")

@@ -376,6 +376,26 @@ def test_loader_fails_on_missing_provider_policy_tuning_field(tmp_path: Path) ->
     )
 
 
+def test_loader_fails_on_null_provider_policy_tuning_field(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "provider_policies.yaml"
+    data = _load_yaml(path)
+    data["provider_policies"][0]["timeout_seconds"] = None
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="default_fake_provider_v1",
+        ref_type="timeout_seconds",
+        ref_value="<missing>",
+        message_part="timeout_seconds",
+    )
+
+
 def test_loader_fails_on_invalid_structured_output_mode(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "provider_policies.yaml"
@@ -433,6 +453,26 @@ def test_loader_fails_on_invalid_frontend_type(tmp_path: Path) -> None:
         ref_type="type",
         ref_value="desktop_app",
         message_part="frontend type",
+    )
+
+
+def test_loader_fails_on_non_mapping_frontend_entry(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "frontends.yaml"
+    data = _load_yaml(path)
+    data["frontends"] = ["kernel_demo_ce"]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="frontends_entry",
+        ref_value="str",
+        message_part="mapping",
     )
 
 
@@ -512,6 +552,26 @@ def test_loader_fails_on_missing_prompt_asset(tmp_path: Path) -> None:
     )
 
 
+def test_loader_fails_on_non_mapping_prompt_manifest_entry(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "prompts.yaml"
+    data = _load_yaml(path)
+    data["prompts"] = ["kernel_demo.extract_structured_fields.v1"]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="prompt_manifest_entry",
+        ref_value="str",
+        message_part="mapping",
+    )
+
+
 def test_loader_fails_on_missing_schema_manifest(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "schemas.yaml"
@@ -545,4 +605,24 @@ def test_loader_fails_on_missing_schema_asset(tmp_path: Path) -> None:
         config_id="kernel_demo.extract_input_v1",
         ref_type="schema_asset",
         ref_value="schemas/missing_extract_input.schema.json",
+    )
+
+
+def test_loader_fails_on_non_mapping_schema_manifest_entry(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "schemas.yaml"
+    data = _load_yaml(path)
+    data["schemas"] = ["kernel_demo.extract_input_v1"]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="schema_manifest_entry",
+        ref_value="str",
+        message_part="mapping",
     )
