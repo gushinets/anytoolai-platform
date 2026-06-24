@@ -13,7 +13,7 @@ platform-core
 platform-actions
   -> platform-core public contracts
   -> no product-platforms
-  -> structured_llm_executor may import pydantic_ai only under that executor boundary
+  -> structured_llm or structured_llm_executor may import pydantic_ai only under that executor boundary
 
 product-platforms/*
   -> platform-sdk only
@@ -43,8 +43,12 @@ packages/backend/platform-core/**/providers/**
   openai
   anthropic
   google.genai
+  @google/genai
   cohere
   mistralai
+
+packages/backend/platform-actions/**/structured_llm/**
+  pydantic_ai
 
 packages/backend/platform-actions/**/structured_llm_executor/**
   pydantic_ai
