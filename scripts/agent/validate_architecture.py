@@ -6,6 +6,24 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 TEXT_EXTS = {".py", ".ts", ".tsx", ".md", ".yaml", ".yml", ".json"}
+SKIP_PATH_PARTS = {
+    ".git",
+    ".venv",
+    ".quick-check-venv",
+    ".quick-check-tmp",
+    ".uv-cache",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "__pycache__",
+    "site-packages",
+    "node_modules",
+    ".pnpm-store",
+    ".next",
+    "dist",
+    "build",
+    "coverage",
+}
 
 FORBIDDEN_PLATFORM_TERMS = [
     "FreelancerProfile",
@@ -29,7 +47,9 @@ FORBIDDEN_PLATFORM_TERMS = [
 
 def iter_text_files(root: Path):
     for path in root.rglob("*"):
-        if path.is_file() and path.suffix in TEXT_EXTS and ".git" not in path.parts:
+        if any(part in SKIP_PATH_PARTS for part in path.parts):
+            continue
+        if path.is_file() and path.suffix in TEXT_EXTS:
             yield path
 
 

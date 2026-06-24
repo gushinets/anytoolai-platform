@@ -53,7 +53,7 @@ For any non-trivial work:
 `just` is the preferred local command interface. If `just` is unavailable or a shell integration fails,
 use the shell-independent fallback command that matches the task:
 
-- baseline backend checks: `python3 scripts/agent/quick_check.py`
+- canonical baseline backend checks: `python scripts/agent/quick_check.py`
 - repo checks in the managed environment: `uv run python scripts/agent/runner.py <command>`
 
 Python package management uses `uv`, not `pip`.
@@ -63,8 +63,8 @@ Python package management uses `uv`, not `pip`.
 - Use `uv run python scripts/agent/runner.py <command>` for repo checks through the managed environment.
 - Do not hand-edit `uv.lock`.
 
-Windows fallback for baseline backend checks: `python scripts/agent/quick_check.py`
-Secondary Windows fallback when the Python launcher is configured: `py -3 scripts/agent/quick_check.py`
+Linux alias when Python 3 is exposed as `python3`: `python3 scripts/agent/quick_check.py`
+Windows PowerShell fallback when the Python launcher is configured: `py -3 scripts/agent/quick_check.py`
 
 ## Validation commands
 
@@ -78,6 +78,8 @@ Baseline quick-check includes config validation, architecture validation, and a 
 It does not provision a test DB and does not include frontend checks, `tests/e2e`, or `kernel-smoke`.
 The Python entrypoint self-manages `.quick-check-venv` instead of installing into a system interpreter.
 It must re-exec into that environment even if the caller already has another virtualenv active.
+It strips caller-provided `PYTHONPATH`, so no manual `PYTHONPATH` setup is required.
+GitHub Actions runs this same command on Linux CI and Windows PowerShell, and the backend workflow is required on pull requests and pushes to `main`.
 
 Full check:
 
@@ -110,13 +112,13 @@ just kernel-smoke
 Fallback form:
 
 ```bash
-python3 scripts/agent/quick_check.py
+python scripts/agent/quick_check.py
 ```
 
-Windows fallback:
+Linux alias:
 
-```powershell
-python scripts/agent/quick_check.py
+```bash
+python3 scripts/agent/quick_check.py
 ```
 
 ## If stuck

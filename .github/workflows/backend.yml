@@ -1,5 +1,9 @@
 name: baseline-backend
-on: [pull_request]
+on:
+  pull_request:
+  push:
+    branches:
+      - main
 jobs:
   baseline:
     strategy:
@@ -15,8 +19,7 @@ jobs:
         with:
           python-version: '3.12'
       - uses: astral-sh/setup-uv@v4
-      - run: uv sync --frozen --group dev
-      - run: uv run python scripts/agent/runner.py quick-check
+      - run: python scripts/agent/quick_check.py
   full-check:
     runs-on: ubuntu-latest
     steps:
@@ -27,5 +30,4 @@ jobs:
         with:
           python-version: '3.12'
       - uses: astral-sh/setup-uv@v4
-      - run: uv sync --frozen --group dev
-      - run: uv run python scripts/agent/runner.py full-check
+      - run: python scripts/agent/runner.py full-check
