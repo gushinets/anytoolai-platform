@@ -127,7 +127,12 @@ def imported_modules(path: Path) -> set[str]:
 
 def imports_module(imports: set[str], module: str) -> bool:
     """Return whether any captured import references a forbidden module."""
-    return any(imported == module or imported.startswith(f"{module}.") for imported in imports)
+    return any(
+        imported == module
+        or imported.startswith(f"{module}.")
+        or imported.startswith(f"{module}/")
+        for imported in imports
+    )
 
 
 def is_provider_boundary(path: Path) -> bool:
