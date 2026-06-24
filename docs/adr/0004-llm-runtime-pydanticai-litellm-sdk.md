@@ -125,6 +125,9 @@ Allowed:
 packages/backend/platform-core/**/providers/**
   may import litellm and provider SDKs.
 
+packages/backend/platform-actions/**/structured_llm/**
+  may import pydantic_ai.
+
 packages/backend/platform-actions/**/structured_llm_executor/**
   may import pydantic_ai.
 ```
@@ -137,6 +140,7 @@ litellm
 openai
 anthropic
 google.genai
+@google/genai
 cohere
 mistralai
 ```
