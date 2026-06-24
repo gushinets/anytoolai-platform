@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterator
 from pathlib import Path
 import sys
 
@@ -39,7 +40,8 @@ LLM_PROVIDER_IMPORTS = {
 }
 
 
-def iter_text_files(root: Path):
+def iter_text_files(root: Path) -> Iterator[Path]:
+    """Yield repo text files that architecture validation should scan."""
     if not root.exists():
         return
     for path in root.rglob("*"):
@@ -47,7 +49,8 @@ def iter_text_files(root: Path):
             yield path
 
 
-def iter_python_files(root: Path):
+def iter_python_files(root: Path) -> Iterator[Path]:
+    """Yield Python files that import-boundary validation should scan."""
     if not root.exists():
         return
     for path in root.rglob("*"):
@@ -56,6 +59,7 @@ def iter_python_files(root: Path):
 
 
 def imported_modules(path: Path) -> set[str]:
+    """Return direct module imports and from-imported submodule candidates."""
     try:
         tree = ast.parse(path.read_text(encoding="utf-8", errors="ignore"))
     except SyntaxError:
@@ -68,14 +72,20 @@ def imported_modules(path: Path) -> set[str]:
                 imports.add(alias.name)
         elif isinstance(node, ast.ImportFrom) and node.module:
             imports.add(node.module)
+            if node.level == 0:
+                for alias in node.names:
+                    if alias.name != "*":
+                        imports.add(f"{node.module}.{alias.name}")
     return imports
 
 
 def imports_module(imports: set[str], module: str) -> bool:
+    """Return whether any captured import references a forbidden module."""
     return any(imported == module or imported.startswith(f"{module}.") for imported in imports)
 
 
 def is_provider_boundary(path: Path) -> bool:
+    """Return whether a path is inside the AnytoolAI provider boundary."""
     relative = path.relative_to(ROOT)
     return (
         relative.parts[:3] == ("packages", "backend", "platform-core")
@@ -84,6 +94,7 @@ def is_provider_boundary(path: Path) -> bool:
 
 
 def is_structured_llm_executor_boundary(path: Path) -> bool:
+    """Return whether a path is inside the structured LLM executor boundary."""
     relative = path.relative_to(ROOT)
     return (
         relative.parts[:3] == ("packages", "backend", "platform-actions")
@@ -92,6 +103,7 @@ def is_structured_llm_executor_boundary(path: Path) -> bool:
 
 
 def main() -> int:
+    """Validate product-domain and LLM/provider import architecture boundaries."""
     errors: list[str] = []
 
     platform_core = ROOT / "packages" / "backend" / "platform-core"
