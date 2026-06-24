@@ -50,7 +50,7 @@ Deep rules live in `docs/architecture/llm-runtime.md`.
 - Provider calls must go through `platform-core/providers/gateway.py` and provider adapters.
 - `litellm` imports are allowed only in the Provider Gateway/provider adapter layer.
 - `pydantic_ai` imports are allowed only in `platform-actions` structured LLM executor code.
-- Direct `openai`, `anthropic`, `google.genai`, `cohere`, and `mistralai` imports outside approved provider boundaries are forbidden.
+- Direct `openai`, `anthropic`, `google.genai`, `@google/genai`, `cohere`, and `mistralai` imports outside approved provider boundaries are forbidden.
 - Every scenario start must create `scenario_session_id`.
 - Events must include required dimensions where applicable.
 - Definitions live in YAML/Markdown; runtime state lives in PostgreSQL.
