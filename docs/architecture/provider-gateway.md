@@ -106,6 +106,7 @@ litellm
 openai
 anthropic
 google.genai
+@google/genai
 cohere
 mistralai
 ```
