@@ -1,4 +1,4 @@
-# ADR 0004: LLM Runtime With PydanticAI And In-Process LiteLLM SDK
+# ADR 0007: LLM Runtime With PydanticAI And In-Process LiteLLM SDK
 
 ## Status
 

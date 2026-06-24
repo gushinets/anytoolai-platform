@@ -30,8 +30,12 @@ This directory is the system of record for agents. Keep it current. If a decisio
 ## Architecture decisions
 
 - `adr/0001-monorepo.md`
+- `adr/0002-config-first-registry.md`
 - `adr/0003-short-agents-md.md`
-- `adr/0004-llm-runtime-pydanticai-litellm-sdk.md`
+- `adr/0004-generic-structured-llm-executor.md`
+- `adr/0005-separate-product-chrome-extensions.md`
+- `adr/0006-event-log-as-core.md`
+- `adr/0007-llm-runtime-pydanticai-litellm-sdk.md`
 
 ## Product specs
 

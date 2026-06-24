@@ -40,7 +40,7 @@ Promote the PydanticAI + LiteLLM SDK runtime decisions from planning conversatio
 - `docs/architecture/structured-output.md`
 - `docs/architecture/action-model.md`
 - `docs/architecture/package-layering.md`
-- `docs/adr/0004-llm-runtime-pydanticai-litellm-sdk.md`
+- `docs/adr/0007-llm-runtime-pydanticai-litellm-sdk.md`
 - `docs/agent/harness-engineering-map.md`
 
 ## Contracts touched
@@ -56,7 +56,7 @@ Promote the PydanticAI + LiteLLM SDK runtime decisions from planning conversatio
 - [x] Create branch `docs/llm-runtime-decisions`.
 - [x] Update `AGENTS.md` first with the accepted LLM runtime decision and deep-doc pointer.
 - [x] Add `docs/architecture/llm-runtime.md` as the detailed source of truth.
-- [x] Add ADR 0004 for the library and SDK/proxy decision.
+- [x] Add ADR 0007 for the library and SDK/proxy decision.
 - [x] Update architecture docs that own related boundaries.
 - [x] Encode the import boundary in `scripts/agent/validate_architecture.py`.
 - [x] Create this execution plan.
@@ -66,10 +66,11 @@ Promote the PydanticAI + LiteLLM SDK runtime decisions from planning conversatio
 
 - [ ] `just quick-check`
 - [ ] `just validate-configs`
+- [x] `python scripts/agent/validate_architecture.py`
 - [ ] `just validate-architecture`
 - [ ] `just kernel-smoke`
 
-Local validation was not run in this environment because the repo could not be cloned from GitHub through the container network. The PR is documentation plus a Python architecture-validator update; reviewers should run `just validate-architecture` and `just quick-check` in the normal repo environment.
+Local validation: `python scripts/agent/validate_architecture.py` passed. `just doctor` and `just validate-architecture` could not start because the local `just.exe` WinGet shim returned Access denied; reviewers should run `just validate-architecture` and `just quick-check` in a normal repo environment.
 
 ## Decision log
 

@@ -49,7 +49,7 @@ Repo asset:
 - `docs/product-specs/*`
 - `docs/references/*`
 - `docs/architecture/llm-runtime.md`
-- `docs/adr/0004-llm-runtime-pydanticai-litellm-sdk.md`
+- `docs/adr/0007-llm-runtime-pydanticai-litellm-sdk.md`
 
 Reason: knowledge outside the repo does not exist for future agent runs. LLM runtime decisions from planning conversations must be promoted into searchable repo docs before implementation.
 
