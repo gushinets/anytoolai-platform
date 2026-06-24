@@ -48,8 +48,10 @@ Repo asset:
 - `docs/architecture/*`
 - `docs/product-specs/*`
 - `docs/references/*`
+- `docs/architecture/llm-runtime.md`
+- `docs/adr/0007-llm-runtime-pydanticai-litellm-sdk.md`
 
-Reason: knowledge outside the repo does not exist for future agent runs.
+Reason: knowledge outside the repo does not exist for future agent runs. LLM runtime decisions from planning conversations must be promoted into searchable repo docs before implementation.
 
 ## 5. AGENTS.md is a map, not a manual
 
@@ -78,7 +80,7 @@ Repo asset:
 - `scripts/agent/validate-architecture.py`
 - `.github/workflows/architecture.yml`
 
-Reason: documentation alone cannot stop drift in an agent-generated codebase.
+Reason: documentation alone cannot stop drift in an agent-generated codebase. LLM/provider import boundaries are enforced here so actions, products, and extensions cannot bypass Provider Gateway.
 
 ## 8. Use strict boundaries and predictable structure
 
@@ -95,10 +97,11 @@ Reason: agents move faster when the allowed dependency graph is explicit.
 Repo asset:
 
 - `docs/architecture/structured-output.md`
+- `docs/architecture/llm-runtime.md`
 - config schemas and validation tests
 - action definitions with input/output schemas
 
-Reason: no guessed JSON shapes; typed boundaries are mandatory.
+Reason: no guessed JSON shapes; typed boundaries are mandatory. PydanticAI may help structured-output execution, but AnytoolAI still final-validates before artifacts and downstream workflow mapping.
 
 ## 10. Throughput changes merge philosophy
 
