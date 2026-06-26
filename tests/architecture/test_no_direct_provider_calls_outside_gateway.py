@@ -28,9 +28,13 @@ def _imports_openai(text: str) -> bool:
         return False
 
     for node in ast.walk(module):
-        if isinstance(node, ast.Import) and any(alias.name == "openai" for alias in node.names):
+        if isinstance(node, ast.Import) and any(
+            alias.name == "openai" or alias.name.startswith("openai.") for alias in node.names
+        ):
             return True
-        if isinstance(node, ast.ImportFrom) and node.module == "openai":
+        if isinstance(node, ast.ImportFrom) and node.module and (
+            node.module == "openai" or node.module.startswith("openai.")
+        ):
             return True
     return False
 
