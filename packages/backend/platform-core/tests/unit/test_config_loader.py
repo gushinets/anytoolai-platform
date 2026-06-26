@@ -317,6 +317,86 @@ def test_loader_requires_max_physical_provider_calls_per_action(tmp_path: Path) 
     )
 
 
+def test_loader_rejects_unexpected_retry_policy_top_level_key(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "provider_policies.yaml"
+    data = _load_yaml(path)
+    data["provider_policies"][0]["retry_policy"]["unexpected_section"] = {"enabled": True}
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="default_fake_provider_v1",
+        ref_type="unexpected_section",
+        ref_value='{"enabled": true}',
+        message_part="unsupported field",
+    )
+
+
+def test_loader_rejects_unexpected_transport_retry_key(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "provider_policies.yaml"
+    data = _load_yaml(path)
+    data["provider_policies"][0]["retry_policy"]["transport"]["jitter_seconds"] = 5
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="default_fake_provider_v1",
+        ref_type="jitter_seconds",
+        ref_value="5",
+        message_part="unsupported field",
+    )
+
+
+def test_loader_rejects_unexpected_validation_retry_key(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "provider_policies.yaml"
+    data = _load_yaml(path)
+    data["provider_policies"][0]["retry_policy"]["validation"]["reflect"] = True
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="default_fake_provider_v1",
+        ref_type="reflect",
+        ref_value="True",
+        message_part="unsupported field",
+    )
+
+
+def test_loader_rejects_unexpected_hard_limits_key(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "provider_policies.yaml"
+    data = _load_yaml(path)
+    data["provider_policies"][0]["retry_policy"]["hard_limits"]["burst_limit"] = 3
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="default_fake_provider_v1",
+        ref_type="burst_limit",
+        ref_value="3",
+        message_part="unsupported field",
+    )
+
+
 def test_loader_fails_on_invalid_action_executor(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "action_definitions" / "text.extract_structured_fields.yaml"

@@ -100,6 +100,14 @@ LEGACY_PROVIDER_POLICY_RETRY_FIELDS = frozenset(
         "validation_owner",
     }
 )
+PROVIDER_RETRY_POLICY_FIELDS = frozenset({"transport", "validation", "hard_limits"})
+PROVIDER_TRANSPORT_RETRY_POLICY_FIELDS = frozenset(
+    {"owner", "max_attempts", "litellm_num_retries_per_attempt"}
+)
+PROVIDER_VALIDATION_RETRY_POLICY_FIELDS = frozenset({"owner", "max_attempts"})
+PROVIDER_RETRY_HARD_LIMIT_FIELDS = frozenset(
+    {"max_physical_provider_calls_per_action"}
+)
 
 
 def load_yaml_file(path: Path) -> dict[str, Any]:
@@ -246,8 +254,30 @@ def _parse_positive_int_field(
             config_id=config_id,
             ref_type=ref_type,
             ref_value=_stringify_config_value(raw_value),
-        )
+    )
     return raw_value
+
+
+def _reject_unexpected_mapping_keys(
+    mapping: dict[str, Any],
+    *,
+    allowed_keys: set[str],
+    field_name: str,
+    file_path: Path,
+    config_id: str,
+) -> None:
+    unexpected_keys = sorted(set(mapping) - allowed_keys)
+    if not unexpected_keys:
+        return
+
+    unexpected_key = unexpected_keys[0]
+    raise InvalidConfigShapeError(
+        file_path,
+        f"{field_name} contains unsupported field '{unexpected_key}'",
+        config_id=config_id,
+        ref_type=unexpected_key,
+        ref_value=_stringify_config_value(mapping[unexpected_key]),
+    )
 
 
 class ConfigLoader:
@@ -397,6 +427,14 @@ class ConfigLoader:
                     ref_value=_stringify_config_value(retry_policy.get(legacy_field)),
                 )
 
+        _reject_unexpected_mapping_keys(
+            retry_policy,
+            allowed_keys=PROVIDER_RETRY_POLICY_FIELDS,
+            field_name="Provider policy retry_policy",
+            file_path=file_path,
+            config_id=policy_id,
+        )
+
         transport = retry_policy.get("transport")
         if not isinstance(transport, dict):
             raise InvalidConfigShapeError(
@@ -406,6 +444,14 @@ class ConfigLoader:
                 ref_type="transport",
                 ref_value=_stringify_config_value(transport),
             )
+
+        _reject_unexpected_mapping_keys(
+            transport,
+            allowed_keys=PROVIDER_TRANSPORT_RETRY_POLICY_FIELDS,
+            field_name="Provider policy retry_policy.transport",
+            file_path=file_path,
+            config_id=policy_id,
+        )
 
         validation = retry_policy.get("validation")
         if not isinstance(validation, dict):
@@ -417,6 +463,14 @@ class ConfigLoader:
                 ref_value=_stringify_config_value(validation),
             )
 
+        _reject_unexpected_mapping_keys(
+            validation,
+            allowed_keys=PROVIDER_VALIDATION_RETRY_POLICY_FIELDS,
+            field_name="Provider policy retry_policy.validation",
+            file_path=file_path,
+            config_id=policy_id,
+        )
+
         hard_limits = retry_policy.get("hard_limits")
         if not isinstance(hard_limits, dict):
             raise InvalidConfigShapeError(
@@ -426,6 +480,14 @@ class ConfigLoader:
                 ref_type="hard_limits",
                 ref_value=_stringify_config_value(hard_limits),
             )
+
+        _reject_unexpected_mapping_keys(
+            hard_limits,
+            allowed_keys=PROVIDER_RETRY_HARD_LIMIT_FIELDS,
+            field_name="Provider policy retry_policy.hard_limits",
+            file_path=file_path,
+            config_id=policy_id,
+        )
 
         transport_owner = transport.get("owner")
         if transport_owner is None:
