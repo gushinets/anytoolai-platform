@@ -12,6 +12,7 @@ from anytoolai_platform_sdk.contracts import (
     ProductDefinition,
     PromptRef,
     ProviderPolicy,
+    ProviderTransportRetryPolicy,
     QuotaPolicy,
     ScenarioDefinition,
     WorkflowDefinition,
@@ -134,6 +135,15 @@ def test_provider_policy_split_retry_shape_is_validatable() -> None:
 
     assert policy.retry_policy.transport.owner == "provider_gateway_litellm_sdk"
     assert policy.retry_policy.hard_limits.max_physical_provider_calls_per_action == 2
+
+    with pytest.raises(ValidationError):
+        ProviderTransportRetryPolicy.model_validate(
+            {
+                "owner": "provider_gateway_litellm_sdk",
+                "max_attempts": 1,
+                "litellm_num_retries_per_attempt": 1,
+            }
+        )
 
 
 def test_optional_metadata_allows_unknown_nested_values() -> None:
