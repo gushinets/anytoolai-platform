@@ -544,6 +544,31 @@ def test_loader_rejects_raw_model_field_in_prompt_front_matter(tmp_path: Path) -
     )
 
 
+def test_loader_rejects_invalid_yaml_in_prompt_front_matter(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = (
+        config_root
+        / "products"
+        / "kernel_demo"
+        / "prompts"
+        / "extract_structured_fields.v1.md"
+    )
+    path.write_text(
+        "---\nmodel: [unterminated\n---\nPrompt body\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, InvalidConfigShapeError)
+        and error.file_path == path
+        and error.message.endswith("Prompt front matter contains invalid YAML")
+        for error in exc_info.value.errors
+    )
+
+
 def test_loader_fails_on_invalid_frontend_type(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "products" / "kernel_demo" / "frontends.yaml"

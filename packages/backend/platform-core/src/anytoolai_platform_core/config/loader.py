@@ -229,7 +229,13 @@ def _split_prompt_front_matter(path: Path, content: str) -> tuple[dict[str, Any]
             )
         return {}, content
 
-    front_matter = yaml.safe_load(match.group("front_matter")) or {}
+    try:
+        front_matter = yaml.safe_load(match.group("front_matter")) or {}
+    except yaml.YAMLError as exc:
+        raise InvalidConfigShapeError(
+            path,
+            "Prompt front matter contains invalid YAML",
+        ) from exc
     if not isinstance(front_matter, dict):
         raise InvalidConfigShapeError(
             path,

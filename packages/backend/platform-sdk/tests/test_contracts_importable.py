@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Pathtest_contracts_importable
+from pathlib import Path
 
 import pytest
 import yaml
