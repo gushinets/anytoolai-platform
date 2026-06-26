@@ -48,8 +48,8 @@ GitHub Actions runs this same baseline command on both Linux and Windows, and th
 Other Python-owned commands still route through the runner:
 
 ```bash
-python scripts/agent/runner.py doctor
-python scripts/agent/runner.py full-check
+uv run python scripts/agent/runner.py doctor
+uv run python scripts/agent/runner.py full-check
 ```
 
 Python dependency management uses `uv`, not `pip`. Use `uv add <package>` for runtime dependencies,
