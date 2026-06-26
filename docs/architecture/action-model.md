@@ -6,6 +6,30 @@ Action Configuration = product/scenario-specific behavior for an action type.
 
 MVP-A implements all 11 Wave 1 action types using one generic `StructuredLlmActionExecutor` where possible.
 
+## Structured LLM executor decision
+
+`StructuredLlmActionExecutor` is the only MVP-A place where PydanticAI may be used.
+
+It owns:
+
+- resolving prompt and schema references for an action config;
+- invoking PydanticAI for typed structured-output execution;
+- letting PydanticAI perform validation retries;
+- calling Provider Gateway for every physical model attempt;
+- returning an AnytoolAI `ActionResult` for downstream workflow mapping.
+
+It does not own:
+
+- provider/model selection outside `provider_policy_ref`;
+- direct LiteLLM SDK calls;
+- direct provider SDK calls;
+- workflow orchestration;
+- scenario/session/job persistence;
+- artifact persistence as a hidden side effect;
+- product-specific Freelancer semantics.
+
+All physical provider attempts go through Provider Gateway so retry accounting and `platform.provider_calls` remain deterministic.
+
 ## Required action definition fields
 
 - `action_type`

@@ -14,8 +14,9 @@ Read these first:
 4. `docs/core-beliefs.md`
 5. `docs/architecture/platform-boundaries.md`
 6. `docs/architecture/package-layering.md`
-7. `docs/product-specs/mvp-a-platform-kernel.md`
-8. `docs/agent/harness-engineering-map.md`
+7. `docs/architecture/llm-runtime.md`
+8. `docs/product-specs/mvp-a-platform-kernel.md`
+9. `docs/agent/harness-engineering-map.md`
 
 ## Current MVP
 
@@ -26,6 +27,19 @@ MVP-A builds the platform execution kernel. MVP-B validates it with thin product
 
 The controlling concept source for MVP-A/MVP-B scope is mirrored in `docs/product-specs/mvp-scope-source-of-truth.md`. Keep repo-local docs and scaffold aligned with that file.
 
+## LLM runtime decision
+
+MVP-A uses both PydanticAI and LiteLLM:
+
+- PydanticAI is only for structured LLM action execution and validation retries inside `StructuredLlmActionExecutor`.
+- LiteLLM is used as an in-process SDK behind Provider Gateway for provider/model access.
+- LiteLLM Proxy is not part of MVP-A, but remains the scale path.
+- Transport retries belong to AnytoolAI ProviderGateway around LiteLLM SDK calls.
+- Validation retries belong to PydanticAI.
+- LiteLLM SDK hidden retries stay disabled in MVP-A; each physical ProviderGateway attempt must create a provider-call ledger row.
+
+Deep rules live in `docs/architecture/llm-runtime.md`.
+
 ## Non-negotiable architecture boundaries
 
 - `packages/backend/platform-core` must not import `product-platforms`.
@@ -34,6 +48,9 @@ The controlling concept source for MVP-A/MVP-B scope is mirrored in `docs/produc
 - Extensions must not contain system prompts.
 - Frontend must not choose provider/model.
 - Provider calls must go through `platform-core/providers/gateway.py` and provider adapters.
+- `litellm` imports are allowed only in the Provider Gateway/provider adapter layer.
+- `pydantic_ai` imports are allowed only in `platform-actions` structured LLM executor code.
+- Direct `openai`, `anthropic`, `google.genai`, `@google/genai`, `cohere`, and `mistralai` imports outside approved provider boundaries are forbidden.
 - Every scenario start must create `scenario_session_id`.
 - Events must include required dimensions where applicable.
 - Definitions live in YAML/Markdown; runtime state lives in PostgreSQL.
