@@ -5,6 +5,11 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
+# Keep the code-extension aliases defined so merge refs that preserve the
+# older iter_code_files path still have a consistent symbol to use.
+PY_EXTS = {".py"}
+JS_TS_EXTS = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
+CODE_EXTS = PY_EXTS | JS_TS_EXTS
 TEXT_EXTS = {".py", ".ts", ".tsx", ".md", ".yaml", ".yml", ".json"}
 SKIP_PATH_PARTS = {
     ".git",
