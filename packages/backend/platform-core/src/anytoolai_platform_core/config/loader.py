@@ -369,15 +369,13 @@ class ConfigLoader:
         file_path: Path,
         config_kind: str,
         config_id: str | None = None,
+        recursive: bool = False,
     ) -> None:
-        found = _find_forbidden_raw_llm_field(payload)
+        found = _find_forbidden_raw_llm_field(payload, recursive=recursive)
         if found is None:
             return
 
         field_path, field_value = found
-        field_name = field_path.split(".")[-1]
-        if "[" in field_name:
-            field_name = field_name.split("[", maxsplit=1)[0]
         raise InvalidConfigShapeError(
             file_path,
             (
@@ -387,7 +385,7 @@ class ConfigLoader:
                 "`provider_policy_ref` instead"
             ),
             config_id=config_id,
-            ref_type=field_name,
+            ref_type=field_path,
             ref_value=_stringify_config_value(field_value),
         )
 
@@ -796,6 +794,7 @@ class ConfigLoader:
                     file_path=path,
                     config_kind="Action definition",
                     config_id=action_type,
+                    recursive=True,
                 )
 
                 self.action_definitions[action_type] = ActionDefinition(
@@ -860,6 +859,7 @@ class ConfigLoader:
                 file_path=product_file,
                 config_kind="Product",
                 config_id=product_id,
+                recursive=True,
             )
 
             self.product_dirs[product_id] = product_dir
@@ -941,6 +941,7 @@ class ConfigLoader:
                 file_path=source_path,
                 config_kind="Frontend",
                 config_id=frontend_id,
+                recursive=True,
             )
 
             frontends.append(
@@ -997,6 +998,7 @@ class ConfigLoader:
                     file_path=path,
                     config_kind="Action",
                     config_id=config_id,
+                    recursive=True,
                 )
 
                 self.action_configurations[config_id] = ActionConfiguration(
@@ -1045,6 +1047,7 @@ class ConfigLoader:
                     file_path=path,
                     config_kind="Workflow",
                     config_id=workflow_id,
+                    recursive=True,
                 )
 
                 steps: list[WorkflowStepDefinition] = []
@@ -1063,6 +1066,7 @@ class ConfigLoader:
                         file_path=path,
                         config_kind="Workflow",
                         config_id=workflow_id,
+                        recursive=True,
                     )
 
                     steps.append(
@@ -1115,6 +1119,7 @@ class ConfigLoader:
                     file_path=path,
                     config_kind="Scenario",
                     config_id=scenario_id,
+                    recursive=True,
                 )
 
                 self.scenarios[scenario_id] = ScenarioDefinition(
@@ -1266,6 +1271,7 @@ class ConfigLoader:
                         file_path=path,
                         config_kind="Prompt",
                         config_id=prompt_ref,
+                        recursive=True,
                     )
 
                     self.prompts[prompt_ref] = PromptDefinition(

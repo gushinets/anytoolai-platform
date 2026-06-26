@@ -437,6 +437,26 @@ def test_loader_rejects_raw_provider_field_in_product_config(tmp_path: Path) -> 
     )
 
 
+def test_loader_rejects_nested_raw_model_field_in_product_config(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "product.yaml"
+    data = _load_yaml(path)
+    data["metadata"] = {"model": "gpt-4.1-mini"}
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="metadata.model",
+        ref_value="gpt-4.1-mini",
+        message_part="metadata.model",
+    )
+
+
 def test_loader_rejects_raw_model_field_in_scenario_config(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "products" / "kernel_demo" / "scenarios.yaml"
@@ -497,6 +517,26 @@ def test_loader_rejects_raw_temperature_in_action_config(tmp_path: Path) -> None
     )
 
 
+def test_loader_rejects_nested_raw_temperature_in_action_config(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "action_configs.yaml"
+    data = _load_yaml(path)
+    data["action_configs"][0]["llm"] = {"temperature": 0.2}
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo.extract_structured_fields_v1",
+        ref_type="llm.temperature",
+        ref_value="0.2",
+        message_part="llm.temperature",
+    )
+
+
 def test_loader_rejects_raw_litellm_field_in_frontend_config(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "products" / "kernel_demo" / "frontends.yaml"
@@ -514,6 +554,46 @@ def test_loader_rejects_raw_litellm_field_in_frontend_config(tmp_path: Path) -> 
         ref_type="litellm_cache",
         ref_value="True",
         message_part="Frontend configs must not define",
+    )
+
+
+def test_loader_rejects_nested_litellm_field_in_frontend_config(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "frontends.yaml"
+    data = _load_yaml(path)
+    data["frontends"][0]["settings"] = {"litellm_cache": True}
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo_ce",
+        ref_type="settings.litellm_cache",
+        ref_value="True",
+        message_part="settings.litellm_cache",
+    )
+
+
+def test_loader_rejects_nested_raw_response_schema_in_workflow_config(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "workflows.yaml"
+    data = _load_yaml(path)
+    data["workflows"][0]["llm"] = {"response_schema": {"type": "object"}}
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo.single_action_extract_v1",
+        ref_type="llm.response_schema",
+        ref_value='{"type": "object"}',
+        message_part="llm.response_schema",
     )
 
 
@@ -542,6 +622,16 @@ def test_loader_rejects_raw_model_field_in_prompt_front_matter(tmp_path: Path) -
         ref_value="gpt-5-mini",
         message_part="Prompt configs must not define",
     )
+
+
+def test_loader_still_allows_provider_policy_ref_in_action_config(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+
+    registry = ConfigLoader(config_root).load()
+
+    action_config = registry.get_action_config("kernel_demo.extract_structured_fields_v1")
+    assert action_config is not None
+    assert action_config.provider_policy_ref == "default_fake_provider_v1"
 
 
 def test_loader_rejects_invalid_yaml_in_prompt_front_matter(tmp_path: Path) -> None:
