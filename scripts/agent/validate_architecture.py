@@ -8,10 +8,30 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-TEXT_EXTS = {".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".md", ".yaml", ".yml", ".json"}
+# Keep the code-extension aliases defined so merge refs that preserve the
+# older iter_code_files path still have a consistent symbol to use.
 PY_EXTS = {".py"}
 JS_TS_EXTS = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
 CODE_EXTS = PY_EXTS | JS_TS_EXTS
+TEXT_EXTS = {".py", ".ts", ".tsx", ".md", ".yaml", ".yml", ".json"}
+SKIP_PATH_PARTS = {
+    ".git",
+    ".venv",
+    ".quick-check-venv",
+    ".quick-check-tmp",
+    ".uv-cache",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "__pycache__",
+    "site-packages",
+    "node_modules",
+    ".pnpm-store",
+    ".next",
+    "dist",
+    "build",
+    "coverage",
+}
 
 FORBIDDEN_PLATFORM_TERMS = [
     "FreelancerProfile",
@@ -67,7 +87,9 @@ def iter_text_files(root: Path) -> Iterator[Path]:
     if not root.exists():
         return
     for path in root.rglob("*"):
-        if path.is_file() and path.suffix in TEXT_EXTS and ".git" not in path.parts:
+        if any(part in SKIP_PATH_PARTS for part in path.parts):
+            continue
+        if path.is_file() and path.suffix in TEXT_EXTS:
             yield path
 
 
