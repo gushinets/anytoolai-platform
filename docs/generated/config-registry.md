@@ -65,6 +65,35 @@ configs/kernel/products/kernel_demo/quotas.yaml
 - The loader does not silently merge `analytics.yaml` with `product.yaml` analytics. If `analytics.yaml` exists, it replaces the fallback from `product.yaml`.
 - Cross-reference validation happens only after all configured definitions, prompts, and schemas have been loaded.
 
+## Provider Policy Contract
+
+Provider policies are the config-owned source of truth for provider/model routing and retry
+ownership in MVP-A.
+
+Current required retry shape:
+
+```yaml
+retry_policy:
+  transport:
+    owner: provider_gateway_litellm_sdk
+    max_attempts: <int >= 1>
+    litellm_num_retries_per_attempt: 0
+  validation:
+    owner: pydantic_ai
+    max_attempts: <int >= 1>
+  hard_limits:
+    max_physical_provider_calls_per_action: <int >= 1>
+```
+
+Rules:
+
+- `litellm_num_retries_per_attempt` must be exactly `0` in MVP-A.
+- Flat retry fields such as `max_retries` are invalid.
+- Missing `retry_policy.transport.owner`, `retry_policy.validation.owner`, or
+  `retry_policy.hard_limits.max_physical_provider_calls_per_action` fails startup.
+- Product/scenario/workflow/action/frontend/prompt-owned configs may reference
+  `provider_policy_ref`, but they must not define raw provider/model/LiteLLM request fields.
+
 ## Validation Rules
 
 - All YAML configs validate before runtime startup.
@@ -74,4 +103,6 @@ configs/kernel/products/kernel_demo/quotas.yaml
 - Workflow steps must reference existing action configs.
 - Action configs must reference known action types.
 - Action configs must include `prompt_ref` and `provider_policy_ref`.
+- Provider policies must use the ADR 0007 split retry shape with explicit transport and validation owners.
+- Product, frontend, scenario, workflow, action, and prompt-owned configs must reject raw provider/model/LiteLLM fields such as `provider`, `model`, `temperature`, `timeout_seconds`, `max_retries`, `response_format`, `response_schema`, and `litellm_*`.
 - Frontends must not choose prompt/provider/model.

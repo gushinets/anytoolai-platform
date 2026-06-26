@@ -37,7 +37,13 @@ from anytoolai_platform_core.products.models import (
 )
 from anytoolai_platform_core.providers.models import (
     ProviderPolicy,
+    ProviderRetryHardLimits,
+    ProviderRetryPolicy,
+    ProviderTransportRetryPolicy,
+    ProviderValidationRetryPolicy,
     StructuredOutputMode,
+    TransportRetryOwner,
+    ValidationRetryOwner,
 )
 from anytoolai_platform_core.quotas.models import QuotaPeriod, QuotaPolicy, QuotaUnit
 from anytoolai_platform_core.scenarios.models import ScenarioDefinition
@@ -47,6 +53,53 @@ from anytoolai_platform_core.workflows.models import (
 )
 
 VERSION_SUFFIX_PATTERN = re.compile(r"(?P<separator>[._])v(?P<version>\d+)$")
+PROMPT_FRONT_MATTER_PATTERN = re.compile(
+    r"\A---\r?\n(?P<front_matter>.*?)\r?\n---\r?\n(?P<body>.*)\Z",
+    re.DOTALL,
+)
+
+FORBIDDEN_RAW_LLM_FIELDS = frozenset(
+    {
+        "api_base",
+        "base_url",
+        "fallback_policy",
+        "gateway_backend",
+        "gateway_model",
+        "max_retries",
+        "max_tokens",
+        "model",
+        "model_ref",
+        "num_retries",
+        "presence_penalty",
+        "provider",
+        "reasoning_effort",
+        "response_format",
+        "response_schema",
+        "retry_policy",
+        "seed",
+        "stop",
+        "stream",
+        "structured_output",
+        "structured_output_mode",
+        "temperature",
+        "timeout_seconds",
+        "tool_choice",
+        "tools",
+        "top_p",
+    }
+)
+FORBIDDEN_RAW_LLM_PREFIXES = ("litellm_",)
+LEGACY_PROVIDER_POLICY_RETRY_FIELDS = frozenset(
+    {
+        "litellm_num_retries_per_attempt",
+        "max_physical_provider_calls_per_action",
+        "max_retries",
+        "transport_max_attempts",
+        "transport_owner",
+        "validation_max_attempts",
+        "validation_owner",
+    }
+)
 
 
 def load_yaml_file(path: Path) -> dict[str, Any]:
@@ -105,6 +158,96 @@ def parse_enum_value(
             ref_type=ref_type or field_name,
             ref_value=str(raw_value),
         ) from exc
+
+
+def _stringify_config_value(value: Any) -> str:
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return str(value)
+    try:
+        return json.dumps(value, sort_keys=True)
+    except TypeError:
+        return repr(value)
+
+
+def _is_forbidden_raw_llm_field(field_name: str) -> bool:
+    if field_name in FORBIDDEN_RAW_LLM_FIELDS:
+        return True
+    return any(field_name.startswith(prefix) for prefix in FORBIDDEN_RAW_LLM_PREFIXES)
+
+
+def _find_forbidden_raw_llm_field(
+    payload: Any,
+    *,
+    current_path: str = "",
+    recursive: bool = False,
+) -> tuple[str, Any] | None:
+    if isinstance(payload, dict):
+        for field_name, value in payload.items():
+            field_path = f"{current_path}.{field_name}" if current_path else field_name
+            if _is_forbidden_raw_llm_field(field_name):
+                return field_path, value
+            if recursive:
+                found = _find_forbidden_raw_llm_field(
+                    value,
+                    current_path=field_path,
+                    recursive=True,
+                )
+                if found is not None:
+                    return found
+        return None
+
+    if recursive and isinstance(payload, list):
+        for index, item in enumerate(payload):
+            item_path = f"{current_path}[{index}]"
+            found = _find_forbidden_raw_llm_field(
+                item,
+                current_path=item_path,
+                recursive=True,
+            )
+            if found is not None:
+                return found
+        return None
+
+    return None
+
+
+def _split_prompt_front_matter(path: Path, content: str) -> tuple[dict[str, Any], str]:
+    match = PROMPT_FRONT_MATTER_PATTERN.match(content)
+    if match is None:
+        if content.startswith("---"):
+            raise InvalidConfigShapeError(
+                path,
+                "Prompt front matter started with '---' but closing '---' was not found",
+            )
+        return {}, content
+
+    front_matter = yaml.safe_load(match.group("front_matter")) or {}
+    if not isinstance(front_matter, dict):
+        raise InvalidConfigShapeError(
+            path,
+            "Prompt front matter must be a YAML mapping",
+        )
+
+    return front_matter, match.group("body")
+
+
+def _parse_positive_int_field(
+    raw_value: Any,
+    *,
+    field_name: str,
+    file_path: Path,
+    config_id: str,
+    ref_type: str,
+) -> int:
+    if not isinstance(raw_value, int) or isinstance(raw_value, bool) or raw_value < 1:
+        raise InvalidConfigShapeError(
+            file_path,
+            f"{field_name} must be an integer greater than or equal to 1",
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=_stringify_config_value(raw_value),
+        )
+    return raw_value
 
 
 class ConfigLoader:
@@ -182,6 +325,254 @@ class ConfigLoader:
 
     def _append_error(self, error: ConfigError) -> None:
         self.errors.append(error)
+
+    def _reject_forbidden_raw_llm_fields(
+        self,
+        *,
+        payload: Any,
+        file_path: Path,
+        config_kind: str,
+        config_id: str | None = None,
+    ) -> None:
+        found = _find_forbidden_raw_llm_field(payload)
+        if found is None:
+            return
+
+        field_path, field_value = found
+        field_name = field_path.split(".")[-1]
+        if "[" in field_name:
+            field_name = field_name.split("[", maxsplit=1)[0]
+        raise InvalidConfigShapeError(
+            file_path,
+            (
+                f"{config_kind} configs must not define raw provider/model/LiteLLM "
+                f"field '{field_path}'; keep provider/model routing and request "
+                "settings in provider policy/model registry files and use "
+                "`provider_policy_ref` instead"
+            ),
+            config_id=config_id,
+            ref_type=field_name,
+            ref_value=_stringify_config_value(field_value),
+        )
+
+    def _parse_provider_retry_policy(
+        self,
+        *,
+        policy_data: dict[str, Any],
+        file_path: Path,
+        policy_id: str,
+    ) -> ProviderRetryPolicy:
+        retry_policy = policy_data.get("retry_policy")
+        if not isinstance(retry_policy, dict):
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy must define retry_policy as a mapping",
+                config_id=policy_id,
+                ref_type="retry_policy",
+                ref_value=_stringify_config_value(retry_policy),
+            )
+
+        for legacy_field in LEGACY_PROVIDER_POLICY_RETRY_FIELDS:
+            if legacy_field in policy_data:
+                raise InvalidConfigShapeError(
+                    file_path,
+                    (
+                        f"Provider policy uses legacy retry field '{legacy_field}'; "
+                        "use the ADR 0007 split retry_policy contract"
+                    ),
+                    config_id=policy_id,
+                    ref_type=legacy_field,
+                    ref_value=_stringify_config_value(policy_data.get(legacy_field)),
+                )
+            if legacy_field in retry_policy:
+                raise InvalidConfigShapeError(
+                    file_path,
+                    (
+                        f"Provider policy uses legacy retry field "
+                        f"'retry_policy.{legacy_field}'; use transport, validation, "
+                        "and hard_limits sections instead"
+                    ),
+                    config_id=policy_id,
+                    ref_type=legacy_field,
+                    ref_value=_stringify_config_value(retry_policy.get(legacy_field)),
+                )
+
+        transport = retry_policy.get("transport")
+        if not isinstance(transport, dict):
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy retry_policy.transport must be a mapping",
+                config_id=policy_id,
+                ref_type="transport",
+                ref_value=_stringify_config_value(transport),
+            )
+
+        validation = retry_policy.get("validation")
+        if not isinstance(validation, dict):
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy retry_policy.validation must be a mapping",
+                config_id=policy_id,
+                ref_type="validation",
+                ref_value=_stringify_config_value(validation),
+            )
+
+        hard_limits = retry_policy.get("hard_limits")
+        if not isinstance(hard_limits, dict):
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy retry_policy.hard_limits must be a mapping",
+                config_id=policy_id,
+                ref_type="hard_limits",
+                ref_value=_stringify_config_value(hard_limits),
+            )
+
+        transport_owner = transport.get("owner")
+        if transport_owner is None:
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy retry_policy.transport.owner is required",
+                config_id=policy_id,
+                ref_type="owner",
+                ref_value=_stringify_config_value(transport_owner),
+            )
+
+        transport_attempts_raw = transport.get("max_attempts")
+        if transport_attempts_raw is None:
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy retry_policy.transport.max_attempts is required",
+                config_id=policy_id,
+                ref_type="max_attempts",
+                ref_value=_stringify_config_value(transport_attempts_raw),
+            )
+        transport_attempts = _parse_positive_int_field(
+            transport_attempts_raw,
+            field_name="retry_policy.transport.max_attempts",
+            file_path=file_path,
+            config_id=policy_id,
+            ref_type="max_attempts",
+        )
+
+        litellm_num_retries = transport.get("litellm_num_retries_per_attempt")
+        if litellm_num_retries is None:
+            raise InvalidConfigShapeError(
+                file_path,
+                (
+                    "Provider policy "
+                    "retry_policy.transport.litellm_num_retries_per_attempt is required"
+                ),
+                config_id=policy_id,
+                ref_type="litellm_num_retries_per_attempt",
+            )
+        if not isinstance(litellm_num_retries, int) or isinstance(
+            litellm_num_retries,
+            bool,
+        ):
+            raise InvalidConfigShapeError(
+                file_path,
+                (
+                    "retry_policy.transport.litellm_num_retries_per_attempt must be "
+                    "an integer"
+                ),
+                config_id=policy_id,
+                ref_type="litellm_num_retries_per_attempt",
+                ref_value=_stringify_config_value(litellm_num_retries),
+            )
+        if litellm_num_retries != 0:
+            raise InvalidConfigShapeError(
+                file_path,
+                (
+                    "MVP-A requires "
+                    "retry_policy.transport.litellm_num_retries_per_attempt to be 0"
+                ),
+                config_id=policy_id,
+                ref_type="litellm_num_retries_per_attempt",
+                ref_value=_stringify_config_value(litellm_num_retries),
+            )
+
+        validation_owner = validation.get("owner")
+        if validation_owner is None:
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy retry_policy.validation.owner is required",
+                config_id=policy_id,
+                ref_type="owner",
+                ref_value=_stringify_config_value(validation_owner),
+            )
+
+        validation_attempts_raw = validation.get("max_attempts")
+        if validation_attempts_raw is None:
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy retry_policy.validation.max_attempts is required",
+                config_id=policy_id,
+                ref_type="max_attempts",
+                ref_value=_stringify_config_value(validation_attempts_raw),
+            )
+        validation_attempts = _parse_positive_int_field(
+            validation_attempts_raw,
+            field_name="retry_policy.validation.max_attempts",
+            file_path=file_path,
+            config_id=policy_id,
+            ref_type="max_attempts",
+        )
+
+        max_physical_provider_calls_raw = hard_limits.get(
+            "max_physical_provider_calls_per_action"
+        )
+        if max_physical_provider_calls_raw is None:
+            raise InvalidConfigShapeError(
+                file_path,
+                (
+                    "Provider policy "
+                    "retry_policy.hard_limits.max_physical_provider_calls_per_action "
+                    "is required"
+                ),
+                config_id=policy_id,
+                ref_type="max_physical_provider_calls_per_action",
+                ref_value=_stringify_config_value(max_physical_provider_calls_raw),
+            )
+        max_physical_provider_calls = _parse_positive_int_field(
+            max_physical_provider_calls_raw,
+            field_name="retry_policy.hard_limits.max_physical_provider_calls_per_action",
+            file_path=file_path,
+            config_id=policy_id,
+            ref_type="max_physical_provider_calls_per_action",
+        )
+
+        return ProviderRetryPolicy(
+            transport=ProviderTransportRetryPolicy(
+                owner=parse_enum_value(
+                    TransportRetryOwner,
+                    transport_owner,
+                    field_name="transport retry owner",
+                    file_path=file_path,
+                    config_id=policy_id,
+                    ref_type="owner",
+                ),
+                max_attempts=transport_attempts,
+                litellm_num_retries_per_attempt=litellm_num_retries,
+                metadata={"_file_path": str(file_path)},
+            ),
+            validation=ProviderValidationRetryPolicy(
+                owner=parse_enum_value(
+                    ValidationRetryOwner,
+                    validation_owner,
+                    field_name="validation retry owner",
+                    file_path=file_path,
+                    config_id=policy_id,
+                    ref_type="owner",
+                ),
+                max_attempts=validation_attempts,
+                metadata={"_file_path": str(file_path)},
+            ),
+            hard_limits=ProviderRetryHardLimits(
+                max_physical_provider_calls_per_action=max_physical_provider_calls,
+                metadata={"_file_path": str(file_path)},
+            ),
+            metadata={"_file_path": str(file_path)},
+        )
 
     def _load_tenants(self) -> None:
         path = self.config_root / "default_tenant.yaml"
@@ -265,7 +656,11 @@ class ConfigLoader:
                     model=model,
                     temperature=policy_data.get("temperature", 0.3),
                     timeout_seconds=policy_data.get("timeout_seconds", 60),
-                    max_retries=policy_data.get("max_retries", 2),
+                    retry_policy=self._parse_provider_retry_policy(
+                        policy_data=policy_data,
+                        file_path=path,
+                        policy_id=policy_id,
+                    ),
                     fallback_policy=policy_data.get("fallback_policy"),
                     structured_output_mode=parse_enum_value(
                         StructuredOutputMode,
@@ -328,6 +723,13 @@ class ConfigLoader:
                         path,
                     )
 
+                self._reject_forbidden_raw_llm_fields(
+                    payload=data,
+                    file_path=path,
+                    config_kind="Action definition",
+                    config_id=action_type,
+                )
+
                 self.action_definitions[action_type] = ActionDefinition(
                     action_type=action_type,
                     version=version,
@@ -384,6 +786,13 @@ class ConfigLoader:
                     self._source_for("product", product_id, product_file),
                     product_file,
                 )
+
+            self._reject_forbidden_raw_llm_fields(
+                payload=product_data,
+                file_path=product_file,
+                config_kind="Product",
+                config_id=product_id,
+            )
 
             self.product_dirs[product_id] = product_dir
 
@@ -459,6 +868,13 @@ class ConfigLoader:
                     f"Frontend missing required fields: {frontend_data}",
                 )
 
+            self._reject_forbidden_raw_llm_fields(
+                payload=frontend_data,
+                file_path=source_path,
+                config_kind="Frontend",
+                config_id=frontend_id,
+            )
+
             frontends.append(
                 FrontendDefinition(
                     frontend_id=frontend_id,
@@ -508,6 +924,13 @@ class ConfigLoader:
                         path,
                     )
 
+                self._reject_forbidden_raw_llm_fields(
+                    payload=config_data,
+                    file_path=path,
+                    config_kind="Action",
+                    config_id=config_id,
+                )
+
                 self.action_configurations[config_id] = ActionConfiguration(
                     action_config_id=config_id,
                     action_type=action_type,
@@ -549,6 +972,13 @@ class ConfigLoader:
                         path,
                     )
 
+                self._reject_forbidden_raw_llm_fields(
+                    payload=workflow_data,
+                    file_path=path,
+                    config_kind="Workflow",
+                    config_id=workflow_id,
+                )
+
                 steps: list[WorkflowStepDefinition] = []
                 for step_data in workflow_data.get("steps", []):
                     step_id = step_data.get("step_id")
@@ -559,6 +989,13 @@ class ConfigLoader:
                             f"Workflow step missing required fields: {step_data}",
                             config_id=workflow_id,
                         )
+
+                    self._reject_forbidden_raw_llm_fields(
+                        payload=step_data,
+                        file_path=path,
+                        config_kind="Workflow",
+                        config_id=workflow_id,
+                    )
 
                     steps.append(
                         WorkflowStepDefinition(
@@ -604,6 +1041,13 @@ class ConfigLoader:
                         self._source_for("scenario", scenario_id, path),
                         path,
                     )
+
+                self._reject_forbidden_raw_llm_fields(
+                    payload=scenario_data,
+                    file_path=path,
+                    config_kind="Scenario",
+                    config_id=scenario_id,
+                )
 
                 self.scenarios[scenario_id] = ScenarioDefinition(
                     scenario_id=scenario_id,
@@ -743,7 +1187,18 @@ class ConfigLoader:
                         )
 
                     with path.open("r", encoding="utf-8") as handle:
-                        content = handle.read()
+                        raw_content = handle.read()
+
+                    prompt_metadata, content = _split_prompt_front_matter(
+                        path,
+                        raw_content,
+                    )
+                    self._reject_forbidden_raw_llm_fields(
+                        payload=prompt_metadata,
+                        file_path=path,
+                        config_kind="Prompt",
+                        config_id=prompt_ref,
+                    )
 
                     self.prompts[prompt_ref] = PromptDefinition(
                         prompt_ref=prompt_ref,

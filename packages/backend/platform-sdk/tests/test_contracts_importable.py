@@ -90,9 +90,50 @@ def test_unknown_top_level_fields_fail_validation() -> None:
                 "provider_policy_id": "default_fake_provider_v1",
                 "provider": "fake",
                 "model": "fake-json-v1",
+                "retry_policy": {
+                    "transport": {
+                        "owner": "provider_gateway_litellm_sdk",
+                        "max_attempts": 1,
+                        "litellm_num_retries_per_attempt": 0,
+                    },
+                    "validation": {
+                        "owner": "pydantic_ai",
+                        "max_attempts": 1,
+                    },
+                    "hard_limits": {
+                        "max_physical_provider_calls_per_action": 2,
+                    },
+                },
                 "unexpected_field": True,
             }
         )
+
+
+def test_provider_policy_split_retry_shape_is_validatable() -> None:
+    policy = ProviderPolicy.model_validate(
+        {
+            "provider_policy_id": "default_fake_provider_v1",
+            "provider": "fake",
+            "model": "fake-json-v1",
+            "retry_policy": {
+                "transport": {
+                    "owner": "provider_gateway_litellm_sdk",
+                    "max_attempts": 1,
+                    "litellm_num_retries_per_attempt": 0,
+                },
+                "validation": {
+                    "owner": "pydantic_ai",
+                    "max_attempts": 1,
+                },
+                "hard_limits": {
+                    "max_physical_provider_calls_per_action": 2,
+                },
+            },
+        }
+    )
+
+    assert policy.retry_policy.transport.owner == "provider_gateway_litellm_sdk"
+    assert policy.retry_policy.hard_limits.max_physical_provider_calls_per_action == 2
 
 
 def test_optional_metadata_allows_unknown_nested_values() -> None:
