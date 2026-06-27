@@ -5,7 +5,7 @@ doctor:
     {{python_cmd}} scripts/agent/runner.py doctor
 
 quick-check:
-    {{python_cmd}} scripts/agent/runner.py quick-check
+    {{python_cmd}} scripts/agent/quick_check.py
 
 full-check:
     {{python_cmd}} scripts/agent/runner.py full-check

@@ -13,6 +13,14 @@ class StructuredOutputMode(StrEnum):
     json_schema = "json_schema"
 
 
+class TransportRetryOwner(StrEnum):
+    provider_gateway_litellm_sdk = "provider_gateway_litellm_sdk"
+
+
+class ValidationRetryOwner(StrEnum):
+    pydantic_ai = "pydantic_ai"
+
+
 class ProviderCallStatus(StrEnum):
     created = "created"
     running = "running"
@@ -22,14 +30,46 @@ class ProviderCallStatus(StrEnum):
 
 
 @dataclass(frozen=True)
+class ProviderTransportRetryPolicy:
+    owner: TransportRetryOwner
+    max_attempts: int
+    litellm_num_retries_per_attempt: int = 0
+    schema_version: int = 1
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ProviderValidationRetryPolicy:
+    owner: ValidationRetryOwner
+    max_attempts: int
+    schema_version: int = 1
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ProviderRetryHardLimits:
+    max_physical_provider_calls_per_action: int
+    schema_version: int = 1
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ProviderRetryPolicy:
+    transport: ProviderTransportRetryPolicy
+    validation: ProviderValidationRetryPolicy
+    hard_limits: ProviderRetryHardLimits
+    schema_version: int = 1
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class ProviderPolicy:
     provider_policy_id: str
     provider: str
     model: str
-    temperature: float
-    timeout_seconds: int
-    max_retries: int
-    structured_output_mode: StructuredOutputMode
+    retry_policy: ProviderRetryPolicy
+    temperature: float = 0.3
+    timeout_seconds: int = 60
     fallback_policy: str | None = None
     schema_version: int = 1
     metadata: dict[str, Any] = field(default_factory=dict)

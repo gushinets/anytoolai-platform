@@ -24,9 +24,13 @@ class ProductDefinition:
     product_id: str
     product_platform: str
     display_name: str
-    frontends: list[FrontendDefinition] = field(default_factory=list)
-    scenarios: list[str] = field(default_factory=list)
+    frontends: tuple[FrontendDefinition, ...] = field(default_factory=tuple)
+    scenarios: tuple[str, ...] = field(default_factory=tuple)
     quota_policy_ref: str | None = None
     analytics: dict[str, Any] = field(default_factory=dict)
     schema_version: int = 1
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "frontends", tuple(self.frontends))
+        object.__setattr__(self, "scenarios", tuple(self.scenarios))
