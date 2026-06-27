@@ -36,30 +36,32 @@ Provider Gateway does not own semantic structured-output validation. That belong
 ## Minimum provider policy fields
 
 ```text
-provider_policy_ref
-model_ref
-gateway_backend
-provider optional
-gateway_model
+provider_policy_id
+provider
+model
 temperature
 timeout_seconds
+retry_policy.transport.owner
 retry_policy.transport.max_attempts
 retry_policy.transport.litellm_num_retries_per_attempt
+retry_policy.validation.owner
 retry_policy.validation.max_attempts
 retry_policy.hard_limits.max_physical_provider_calls_per_action
 fallback_policy optional
-structured_output.mode
+structured_output_mode
 ```
 
-`gateway_model` may use LiteLLM-format model strings, but only inside provider policy/model registry files. Product and action configs reference `provider_policy_ref`; they do not carry provider/model strings.
+Current MVP-A kernel config keeps provider/model routing in provider policy entries. Product and action
+configs reference `provider_policy_ref`; they do not carry provider/model strings or LiteLLM request
+settings.
 
 ## Retry ownership
 
 Do not pass a single `max_retries` value into multiple layers.
 
 ```text
-Transport retry owner: AnytoolAI ProviderGateway around LiteLLM SDK
-Validation retry owner: PydanticAI inside StructuredLlmActionExecutor
+Transport retry owner: provider_gateway_litellm_sdk
+Validation retry owner: pydantic_ai
 Hard cap owner: AnytoolAI ProviderGateway
 ```
 
@@ -70,6 +72,13 @@ num_retries=0
 ```
 
 Each physical ProviderGateway attempt creates one `platform.provider_calls` row. Hidden LiteLLM SDK retries are disabled so the ledger stays deterministic.
+
+Config validation must reject old retry shapes such as flat `max_retries` and must fail startup if
+`retry_policy.hard_limits.max_physical_provider_calls_per_action` is missing.
+
+Outside provider policy/model registry ownership, config validation must reject raw provider/model
+and LiteLLM request fields such as `provider`, `model`, `temperature`, `timeout_seconds`,
+`max_retries`, `response_format`, `response_schema`, and `litellm_*`.
 
 ## Provider call logging
 

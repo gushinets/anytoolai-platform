@@ -8,12 +8,10 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-# Keep the code-extension aliases defined so merge refs that preserve the
-# older iter_code_files path still have a consistent symbol to use.
+TEXT_EXTS = {".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".md", ".yaml", ".yml", ".json"}
 PY_EXTS = {".py"}
 JS_TS_EXTS = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
 CODE_EXTS = PY_EXTS | JS_TS_EXTS
-TEXT_EXTS = {".py", ".ts", ".tsx", ".md", ".yaml", ".yml", ".json"}
 SKIP_PATH_PARTS = {
     ".git",
     ".venv",
@@ -98,7 +96,9 @@ def iter_code_files(root: Path) -> Iterator[Path]:
     if not root.exists():
         return
     for path in root.rglob("*"):
-        if path.is_file() and path.suffix in CODE_EXTS and ".git" not in path.parts:
+        if any(part in SKIP_PATH_PARTS for part in path.parts):
+            continue
+        if path.is_file() and path.suffix in CODE_EXTS:
             yield path
 
 

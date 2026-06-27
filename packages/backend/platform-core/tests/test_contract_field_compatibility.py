@@ -35,7 +35,25 @@ from anytoolai_platform_core.providers.models import (
     ProviderPolicy as CoreProviderPolicy,
 )
 from anytoolai_platform_core.providers.models import (
+    ProviderRetryHardLimits as CoreProviderRetryHardLimits,
+)
+from anytoolai_platform_core.providers.models import (
+    ProviderRetryPolicy as CoreProviderRetryPolicy,
+)
+from anytoolai_platform_core.providers.models import (
+    ProviderTransportRetryPolicy as CoreProviderTransportRetryPolicy,
+)
+from anytoolai_platform_core.providers.models import (
+    ProviderValidationRetryPolicy as CoreProviderValidationRetryPolicy,
+)
+from anytoolai_platform_core.providers.models import (
     StructuredOutputMode as CoreStructuredOutputMode,
+)
+from anytoolai_platform_core.providers.models import (
+    TransportRetryOwner as CoreTransportRetryOwner,
+)
+from anytoolai_platform_core.providers.models import (
+    ValidationRetryOwner as CoreValidationRetryOwner,
 )
 from anytoolai_platform_core.quotas.models import (
     QuotaPeriod as CoreQuotaPeriod,
@@ -74,12 +92,18 @@ from anytoolai_platform_sdk.contracts import (
     ProductDefinition,
     PromptRef,
     ProviderPolicy,
+    ProviderRetryHardLimits,
+    ProviderRetryPolicy,
+    ProviderTransportRetryPolicy,
+    ProviderValidationRetryPolicy,
     QuotaPeriod,
     QuotaPolicy,
     QuotaUnit,
     ScenarioDefinition,
     ScenarioSessionStatus,
     StructuredOutputMode,
+    TransportRetryOwner,
+    ValidationRetryOwner,
     WorkflowDefinition,
     WorkflowStepDefinition,
 )
@@ -105,6 +129,10 @@ def core_dataclass_fields(model: type[Any]) -> set[str]:
         (ProductDefinition, CoreProductDefinition),
         (PromptRef, CorePromptRef),
         (ProviderPolicy, CoreProviderPolicy),
+        (ProviderRetryHardLimits, CoreProviderRetryHardLimits),
+        (ProviderRetryPolicy, CoreProviderRetryPolicy),
+        (ProviderTransportRetryPolicy, CoreProviderTransportRetryPolicy),
+        (ProviderValidationRetryPolicy, CoreProviderValidationRetryPolicy),
         (QuotaPolicy, CoreQuotaPolicy),
         (ScenarioDefinition, CoreScenarioDefinition),
         (WorkflowDefinition, CoreWorkflowDefinition),
@@ -132,6 +160,8 @@ def enum_values(enum_type: type[StrEnum]) -> set[str]:
         (QuotaUnit, CoreQuotaUnit),
         (ScenarioSessionStatus, CoreScenarioSessionStatus),
         (StructuredOutputMode, CoreStructuredOutputMode),
+        (TransportRetryOwner, CoreTransportRetryOwner),
+        (ValidationRetryOwner, CoreValidationRetryOwner),
     ],
 )
 def test_core_enums_mirror_sdk_contract_values(
