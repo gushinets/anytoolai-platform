@@ -1,0 +1,16 @@
+prompts:
+  - prompt_ref: kernel_demo.extract_structured_fields.v1
+    version: 1
+    template_path: prompts/extract_structured_fields.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.extract_output_v1
+  - prompt_ref: kernel_demo.detect_issues.v1
+    version: 1
+    template_path: prompts/detect_issues.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.issue_detection_output_v1
+  - prompt_ref: kernel_demo.generate_report.v1
+    version: 1
+    template_path: prompts/generate_report.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.generate_document_output_v1

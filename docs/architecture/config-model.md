@@ -22,17 +22,40 @@ Product / Scenario / Workflow / Action Config / Prompt = repo config.
 Runtime state / Events / Artifacts / Sessions = database.
 ```
 
-Prompt registry entries live in repo Markdown/config and must expose:
+Registry ownership is explicit and read-only:
+
+- `product.yaml` owns product identity, platform, scenario list, and explicit `quota_policy_ref`.
+- `frontends.yaml` is required for every product and is the only allowed source of frontend definitions.
+- `analytics.yaml` is optional; when analytics are configured it is the only allowed source of analytics definitions.
+- `prompts.yaml` owns prompt ids and prompt asset paths for each product.
+- `schemas.yaml` owns schema ids and schema asset paths for kernel and product-local schemas.
+- Loader-level silent fallback, hidden merge, and hidden default behavior are not allowed for registry-owned definitions.
+
+Prompt registry entries live in repo manifests plus Markdown assets and must expose:
 
 - `prompt_ref`
 - version
-- template
+- `template_path`
 - input variables
 - `output_schema_ref`
+
+Schema registry entries live in repo manifests plus JSON assets and must expose:
+
+- `schema_ref`
+- version
+- `file_path`
+
+Provider policy entries must explicitly declare:
+
+- `temperature`
+- `timeout_seconds`
+- `max_retries`
+- `structured_output_mode`
 
 Frontend must not see system prompts or choose prompt versions.
 
 Config validation must run in CI and before runtime startup. Broken references must fail startup.
+Missing owned files and missing explicit fields must fail validation with structured diagnostics.
 
 ## Provider policy ownership
 
