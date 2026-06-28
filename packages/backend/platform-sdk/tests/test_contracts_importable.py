@@ -135,6 +135,7 @@ def test_provider_policy_split_retry_shape_is_validatable() -> None:
             "provider_policy_id": "default_fake_provider_v1",
             "provider": "fake",
             "model": "fake-json-v1",
+            "structured_output_mode": "json_schema",
             "retry_policy": {
                 "transport": {
                     "owner": "provider_gateway_litellm_sdk",
