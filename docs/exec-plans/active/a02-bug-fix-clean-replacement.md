@@ -49,14 +49,20 @@ Create a clean replacement branch for PR #16 from its current base, carrying onl
 
 ## Implementation steps
 
-- [ ] Confirm PR #16 base and isolate the final net diff from `feature/a02-bug-fix`.
-- [ ] Create `feature/a02-bug-fix-clean` from the PR base and apply only the final required file changes.
-- [ ] Validate with `uv run python scripts/agent/runner.py doctor` and `uv run python scripts/agent/runner.py full-check`, then push the clean branch.
+- [x] Confirm PR #16 base and isolate the final net diff from `feature/a02-bug-fix`.
+- [x] Create `feature/a02-bug-fix-clean` from the PR base and apply only the final required file changes.
+- [x] Validate with `uv run python scripts/agent/runner.py doctor` and `uv run python scripts/agent/runner.py full-check`, then push the clean branch.
+- [x] Harden missing-file diagnostics so `MissingConfigFileError` carries structured context and escaped config errors are preserved in `RegistryLoadError.errors`.
 
 ## Validation
 
-- [ ] `uv run python scripts/agent/runner.py doctor`
-- [ ] `uv run python scripts/agent/runner.py full-check`
+- [x] `uv run python scripts/agent/runner.py doctor`
+- [x] `uv run python scripts/agent/runner.py full-check`
+- [x] `.venv\Scripts\python.exe -m pytest packages/backend/platform-core/tests/unit/test_config_loader.py -q`
+- [x] `.venv\Scripts\python.exe -m pytest packages/backend/platform-core/tests/unit -k config`
+- [x] `.venv\Scripts\python.exe scripts/agent/validate_configs.py`
+- [x] `python scripts/agent/quick_check.py`
+- [x] `python scripts/agent/runner.py quick-check`
 
 ## Decision log
 
@@ -70,6 +76,8 @@ Create a clean replacement branch for PR #16 from its current base, carrying onl
 |---|---|---|
 | 2026-06-28 | Read required repo orientation docs, inspected local git graph, and confirmed `pr-16-merge` merges `feature/a02-bug-fix` into `origin/main` commit `d3af7e0`. | Create the clean branch from `d3af7e0` and replay only the final file state. |
 | 2026-06-28 | `just doctor` unavailable in this shell; `uv run ... quick-check` also hit a local `uv` cache permission error under `C:\\Users\\jackd\\AppData\\Local\\uv\\cache`. | Retry validation with escalation and a workspace-owned `UV_CACHE_DIR` if needed. |
+| 2026-06-28 | User reported quick-check failures around missing-file diagnostics and constructor compatibility; focused loader tests currently pass under the repo virtualenv. | Patch the implementation to make the structured diagnostic behavior explicit and rerun the requested validation ladder. |
+| 2026-06-28 | Added shared required-file helpers and hardened top-level registry error preservation; focused config tests, config validation, `quick_check.py`, and `runner.py quick-check` pass. | Commit and push the follow-up fix to the clean branch. |
 
 ## Open questions
 

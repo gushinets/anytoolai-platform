@@ -339,7 +339,14 @@ class ConfigLoader:
                 quotas=dict(self.quotas),
                 handoffs=dict(self.handoffs),
             )
-        except RegistryLoadError:
+        except RegistryLoadError as error:
+            if not error.errors:
+                preserved_errors = self._preserved_config_errors_from_exception(error)
+                if preserved_errors:
+                    raise RegistryLoadError(
+                        error.message,
+                        errors=preserved_errors,
+                    ) from error
             raise
         except ConfigError as error:
             raise RegistryLoadError(
@@ -347,10 +354,7 @@ class ConfigLoader:
                 errors=[error],
             ) from error
         except Exception as exc:  # pragma: no cover - defensive wrapper
-            preserved_errors = list(self.errors)
-            cause = exc.__cause__
-            if isinstance(cause, ConfigError):
-                preserved_errors.append(cause)
+            preserved_errors = self._preserved_config_errors_from_exception(exc)
             raise RegistryLoadError(
                 "Unexpected error during config load",
                 context=str(exc),
@@ -371,6 +375,31 @@ class ConfigLoader:
     def _append_error(self, error: ConfigError) -> None:
         self.errors.append(error)
 
+    def _preserved_config_errors_from_exception(
+        self,
+        exc: BaseException,
+    ) -> list[ConfigError]:
+        preserved_errors: list[ConfigError] = []
+        seen: set[int] = set()
+
+        def add_error(error: ConfigError) -> None:
+            if id(error) in seen:
+                return
+            preserved_errors.append(error)
+            seen.add(id(error))
+
+        for error in self.errors:
+            add_error(error)
+
+        for candidate in (exc.__cause__, exc.__context__):
+            if isinstance(candidate, RegistryLoadError):
+                for nested_error in candidate.errors:
+                    add_error(nested_error)
+            elif isinstance(candidate, ConfigError):
+                add_error(candidate)
+
+        return preserved_errors
+
     def _missing_required_file_error(
         self,
         path: Path,
@@ -388,6 +417,25 @@ class ConfigLoader:
             ref_value=ref_value or path.name,
         )
 
+    def _require_file(
+        self,
+        path: Path,
+        *,
+        config_id: str,
+        ref_type: str,
+        reason: str,
+        ref_value: str | None = None,
+    ) -> Path:
+        if path.exists():
+            return path
+        raise self._missing_required_file_error(
+            path,
+            reason=reason,
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=ref_value or path.name,
+        )
+
     def _require_mapping_file(
         self,
         path: Path,
@@ -397,8 +445,42 @@ class ConfigLoader:
         reason: str,
         ref_value: str | None = None,
     ) -> dict[str, Any]:
+        self._require_file(
+            path,
+            config_id=config_id,
+            ref_type=ref_type,
+            reason=reason,
+            ref_value=ref_value or path.name,
+        )
         try:
             return load_yaml_file(path)
+        except MissingConfigFileError as exc:
+            raise self._missing_required_file_error(
+                exc.file_path or path,
+                reason=reason,
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value or path.name,
+            ) from exc
+
+    def _require_json_file(
+        self,
+        path: Path,
+        *,
+        config_id: str,
+        ref_type: str,
+        reason: str,
+        ref_value: str | None = None,
+    ) -> dict[str, Any]:
+        self._require_file(
+            path,
+            config_id=config_id,
+            ref_type=ref_type,
+            reason=reason,
+            ref_value=ref_value or path.name,
+        )
+        try:
+            return load_json_file(path)
         except MissingConfigFileError as exc:
             raise self._missing_required_file_error(
                 exc.file_path or path,
@@ -1443,14 +1525,13 @@ class ConfigLoader:
                         )
 
                     asset_path = product_dir / template_path
-                    if not asset_path.exists():
-                        raise self._missing_required_file_error(
-                            asset_path,
-                            reason=f"Prompt asset referenced from {manifest_path} was not found",
-                            config_id=prompt_ref,
-                            ref_type="prompt_asset",
-                            ref_value=template_path,
-                        )
+                    self._require_file(
+                        asset_path,
+                        reason=f"Prompt asset referenced from {manifest_path} was not found",
+                        config_id=prompt_ref,
+                        ref_type="prompt_asset",
+                        ref_value=template_path,
+                    )
 
                     with asset_path.open("r", encoding="utf-8") as handle:
                         raw_content = handle.read()
@@ -1540,19 +1621,16 @@ class ConfigLoader:
                     )
 
                 asset_path = base_dir / file_path_value
-                if not asset_path.exists():
-                    raise self._missing_required_file_error(
+                self.schemas[schema_ref] = SchemaDefinition(
+                    schema_ref=schema_ref,
+                    version=version,
+                    schema=self._require_json_file(
                         asset_path,
                         reason=f"Schema asset referenced from {manifest_path} was not found",
                         config_id=schema_ref,
                         ref_type="schema_asset",
                         ref_value=file_path_value,
-                    )
-
-                self.schemas[schema_ref] = SchemaDefinition(
-                    schema_ref=schema_ref,
-                    version=version,
-                    schema=load_json_file(asset_path),
+                    ),
                     metadata={
                         "_file_path": str(asset_path),
                         "_manifest_path": str(manifest_path),
