@@ -525,6 +525,36 @@ class ConfigLoader:
             ref_value=type(entry).__name__,
         )
 
+    def _require_string_list_field(
+        self,
+        value: Any,
+        *,
+        file_path: Path,
+        config_id: str,
+        field_name: str,
+    ) -> list[str]:
+        if not isinstance(value, list):
+            raise InvalidConfigShapeError(
+                file_path,
+                f"{field_name} must be a list of strings",
+                config_id=config_id,
+                ref_type=field_name,
+                ref_value=type(value).__name__,
+            )
+
+        for item in value:
+            if isinstance(item, str):
+                continue
+            raise InvalidConfigShapeError(
+                file_path,
+                f"{field_name} must contain only strings",
+                config_id=config_id,
+                ref_type=field_name,
+                ref_value=_stringify_config_value(item),
+            )
+
+        return value
+
     def _reject_forbidden_raw_llm_fields(
         self,
         *,
@@ -1530,6 +1560,13 @@ class ConfigLoader:
                             self._source_for("prompt", prompt_ref, manifest_path),
                             manifest_path,
                         )
+
+                    input_variables = self._require_string_list_field(
+                        input_variables,
+                        file_path=manifest_path,
+                        config_id=prompt_ref,
+                        field_name="input_variables",
+                    )
 
                     asset_path = product_dir / template_path
                     self._require_file(

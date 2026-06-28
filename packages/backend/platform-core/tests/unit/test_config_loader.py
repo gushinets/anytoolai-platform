@@ -1027,6 +1027,60 @@ def test_loader_fails_on_non_mapping_prompt_manifest_entry(tmp_path: Path) -> No
     )
 
 
+def test_loader_fails_on_scalar_prompt_input_variables(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "prompts.yaml"
+    data = _load_yaml(path)
+    data["prompts"][0]["input_variables"] = "source_text"
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo.extract_structured_fields.v1",
+        ref_type="input_variables",
+        ref_value="str",
+        message_part="list of strings",
+    )
+
+
+def test_loader_fails_on_non_string_prompt_input_variable_item(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "prompts.yaml"
+    data = _load_yaml(path)
+    data["prompts"][0]["input_variables"] = ["source_text", 123]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo.extract_structured_fields.v1",
+        ref_type="input_variables",
+        ref_value="123",
+        message_part="contain only strings",
+    )
+
+
+def test_loader_preserves_prompt_input_variable_names_as_strings(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "prompts.yaml"
+    data = _load_yaml(path)
+    data["prompts"][0]["input_variables"] = ["source_text"]
+    _write_yaml(path, data)
+
+    registry = ConfigLoader(config_root).load()
+
+    prompt = registry.get_prompt("kernel_demo.extract_structured_fields.v1")
+    assert prompt is not None
+    assert prompt.input_variables == ["source_text"]
+
+
 def test_loader_fails_on_missing_schema_manifest(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "schemas.yaml"
