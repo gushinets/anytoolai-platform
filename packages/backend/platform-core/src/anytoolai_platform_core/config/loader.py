@@ -879,6 +879,13 @@ class ConfigLoader:
                 reason="provider_policies.yaml is required because it owns provider policy definitions",
             )
             for policy_data in data.get("provider_policies", []):
+                policy_data = self._require_mapping_entry(
+                    policy_data,
+                    file_path=path,
+                    config_id="kernel",
+                    entry_type="provider policy",
+                    ref_type="provider_policies_entry",
+                )
                 policy_id = policy_data.get("provider_policy_id")
                 provider = policy_data.get("provider")
                 model = policy_data.get("model")

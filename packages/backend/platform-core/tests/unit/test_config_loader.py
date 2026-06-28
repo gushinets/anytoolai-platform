@@ -425,6 +425,26 @@ def test_loader_fails_on_null_provider_policy_tuning_field(tmp_path: Path) -> No
     )
 
 
+def test_loader_fails_on_non_mapping_provider_policy_entry(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "provider_policies.yaml"
+    data = _load_yaml(path)
+    data["provider_policies"] = ["default_fake_provider_v1"]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel",
+        ref_type="provider_policies_entry",
+        ref_value="str",
+        message_part="mapping",
+    )
+
+
 def test_loader_fails_on_invalid_structured_output_mode(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "provider_policies.yaml"
