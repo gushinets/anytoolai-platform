@@ -145,6 +145,32 @@ def test_core_models_mirror_sdk_contract_field_names(
     assert core_dataclass_fields(core_model) == sdk_model_fields(sdk_model)
 
 
+def test_core_provider_policy_requires_structured_output_mode_like_sdk() -> None:
+    assert ProviderPolicy.model_fields["structured_output_mode"].is_required()
+
+    retry_policy = CoreProviderRetryPolicy(
+        transport=CoreProviderTransportRetryPolicy(
+            owner=CoreTransportRetryOwner.provider_gateway_litellm_sdk,
+            max_attempts=1,
+        ),
+        validation=CoreProviderValidationRetryPolicy(
+            owner=CoreValidationRetryOwner.pydantic_ai,
+            max_attempts=1,
+        ),
+        hard_limits=CoreProviderRetryHardLimits(
+            max_physical_provider_calls_per_action=2,
+        ),
+    )
+
+    with pytest.raises(TypeError, match="structured_output_mode"):
+        CoreProviderPolicy(
+            provider_policy_id="default_fake_provider_v1",
+            provider="fake",
+            model="fake-json-v1",
+            retry_policy=retry_policy,
+        )
+
+
 def enum_values(enum_type: type[StrEnum]) -> set[str]:
     return {member.value for member in enum_type}
 
