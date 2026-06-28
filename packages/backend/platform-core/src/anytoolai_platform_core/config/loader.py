@@ -339,12 +339,22 @@ class ConfigLoader:
                 quotas=dict(self.quotas),
                 handoffs=dict(self.handoffs),
             )
-        except ConfigError:
+        except RegistryLoadError:
             raise
+        except ConfigError as error:
+            raise RegistryLoadError(
+                "Config registry load failed with 1 error(s)",
+                errors=[error],
+            ) from error
         except Exception as exc:  # pragma: no cover - defensive wrapper
+            preserved_errors = list(self.errors)
+            cause = exc.__cause__
+            if isinstance(cause, ConfigError):
+                preserved_errors.append(cause)
             raise RegistryLoadError(
                 "Unexpected error during config load",
                 context=str(exc),
+                errors=preserved_errors,
             ) from exc
 
     def _remember_source(self, config_type: str, config_id: str, file_path: Path) -> None:

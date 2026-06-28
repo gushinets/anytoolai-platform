@@ -1041,3 +1041,49 @@ def test_loader_fails_on_non_mapping_schema_manifest_entry(tmp_path: Path) -> No
         ref_value="str",
         message_part="mapping",
     )
+
+
+def test_loader_wraps_escaped_missing_config_error_into_registry_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loader = ConfigLoader(CONFIG_ROOT)
+    expected_error = MissingConfigFileError(
+        CONFIG_ROOT / "provider_policies.yaml",
+        "provider_policies.yaml is required because it owns provider policy definitions",
+        config_id="kernel",
+        ref_type="provider_policies_file",
+        ref_value="provider_policies.yaml",
+    )
+
+    def _boom() -> None:
+        raise expected_error
+
+    monkeypatch.setattr(loader, "_load_tenants", _boom)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        loader.load()
+
+    assert exc_info.value.errors == (expected_error,)
+
+
+def test_loader_preserves_config_error_cause_in_unexpected_registry_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loader = ConfigLoader(CONFIG_ROOT)
+    expected_error = MissingConfigFileError(
+        CONFIG_ROOT / "provider_policies.yaml",
+        "provider_policies.yaml is required because it owns provider policy definitions",
+        config_id="kernel",
+        ref_type="provider_policies_file",
+        ref_value="provider_policies.yaml",
+    )
+
+    def _boom() -> None:
+        raise RuntimeError("unexpected wrapper") from expected_error
+
+    monkeypatch.setattr(loader, "_load_tenants", _boom)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        loader.load()
+
+    assert exc_info.value.errors == (expected_error,)
