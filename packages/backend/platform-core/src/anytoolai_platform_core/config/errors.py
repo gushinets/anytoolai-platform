@@ -78,7 +78,17 @@ class DuplicateConfigIdError(ConfigError):
 class MissingConfigFileError(ConfigError):
     """Raised when a required config file is missing."""
 
-    def __init__(self, file_path: Path, reason: str = "") -> None:
+    reason: str = ""
+
+    def __init__(
+        self,
+        file_path: Path,
+        reason: str = "",
+        *,
+        config_id: str | None = None,
+        ref_type: str | None = None,
+        ref_value: str | None = None,
+    ) -> None:
         message = f"Config file not found: {file_path}"
         if reason:
             message += f". {reason}"
@@ -86,7 +96,11 @@ class MissingConfigFileError(ConfigError):
             code="config_missing_file",
             message=message,
             file_path=file_path,
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=ref_value,
         )
+        object.__setattr__(self, "reason", reason)
 
 
 @dataclass(frozen=True)
