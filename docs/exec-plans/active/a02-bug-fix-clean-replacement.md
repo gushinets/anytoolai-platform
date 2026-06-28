@@ -53,6 +53,8 @@ Create a clean replacement branch for PR #16 from its current base, carrying onl
 - [x] Create `feature/a02-bug-fix-clean` from the PR base and apply only the final required file changes.
 - [x] Validate with `uv run python scripts/agent/runner.py doctor` and `uv run python scripts/agent/runner.py full-check`, then push the clean branch.
 - [x] Harden missing-file diagnostics so `MissingConfigFileError` carries structured context and escaped config errors are preserved in `RegistryLoadError.errors`.
+- [x] Reproduce PR #19's GitHub merge ref and verify the actual PR head branch at `b3a411c0b51b1d7515df47f4bd651828875a512d`.
+- [x] Run `uv run python scripts/agent/runner.py full-check` on the PR #19 merge ref and patch the PR source branch if the merge ref fails.
 
 ## Validation
 
@@ -78,6 +80,8 @@ Create a clean replacement branch for PR #16 from its current base, carrying onl
 | 2026-06-28 | `just doctor` unavailable in this shell; `uv run ... quick-check` also hit a local `uv` cache permission error under `C:\\Users\\jackd\\AppData\\Local\\uv\\cache`. | Retry validation with escalation and a workspace-owned `UV_CACHE_DIR` if needed. |
 | 2026-06-28 | User reported quick-check failures around missing-file diagnostics and constructor compatibility; focused loader tests currently pass under the repo virtualenv. | Patch the implementation to make the structured diagnostic behavior explicit and rerun the requested validation ladder. |
 | 2026-06-28 | Added shared required-file helpers and hardened top-level registry error preservation; focused config tests, config validation, `quick_check.py`, and `runner.py quick-check` pass. | Commit and push the follow-up fix to the clean branch. |
+| 2026-06-28 | User reported PR #19 CI still checks merge commit `75d9a76` from PR head `b3a411c`, not old `origin/feature/a02-bug-fix`. | Fetch and validate the PR #19 merge ref directly, then patch the actual PR source branch if needed. |
+| 2026-06-28 | Fetched `pull/19/merge` as `pr-19-merge`, confirmed it resolves to `75d9a76ba935934ccf5806ef29c5982f1f7527b4`, and confirmed `origin/feature/a02-bug-fix-clean` points to `b3a411c0b51b1d7515df47f4bd651828875a512d`. | No source patch needed; `uv run python scripts/agent/runner.py full-check` passes on the PR #19 merge ref. |
 
 ## Open questions
 

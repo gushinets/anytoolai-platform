@@ -365,6 +365,26 @@ def test_loader_fails_on_missing_quota_policy_ref_when_quotas_exist(tmp_path: Pa
     )
 
 
+def test_loader_fails_on_empty_quota_policy_ref_when_quotas_exist(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "product.yaml"
+    data = _load_yaml(path)
+    data["quota_policy_ref"] = ""
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="quota_policy_ref",
+        ref_value="<missing>",
+        message_part="quota_policy_ref",
+    )
+
+
 def test_loader_fails_on_missing_provider_policy_tuning_field(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "provider_policies.yaml"

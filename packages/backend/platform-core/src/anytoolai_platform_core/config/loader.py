@@ -1101,7 +1101,7 @@ class ConfigLoader:
             analytics = self._load_analytics(product_dir / "analytics.yaml")
 
             quota_policy_ref = product_data.get("quota_policy_ref")
-            if quota_policy_ref is None and quota_refs:
+            if not quota_policy_ref and quota_refs:
                 raise InvalidConfigShapeError(
                     product_file,
                     "quota_policy_ref is required when quotas.yaml defines quota policies",
