@@ -154,7 +154,7 @@ def _freeze_handoff(definition: HandoffDefinition) -> HandoffDefinition:
 def _freeze_prompt(definition: PromptDefinition) -> PromptDefinition:
     return replace(
         definition,
-        input_variables=tuple(definition.input_variables),
+        input_variables=list(definition.input_variables),
         metadata=_freeze_value(definition.metadata),
     )
 
