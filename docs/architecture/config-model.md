@@ -49,8 +49,13 @@ Provider policy entries must explicitly declare:
 
 - `temperature`
 - `timeout_seconds`
-- `max_retries`
+- `retry_policy`
 - `structured_output_mode`
+
+See the provider policy section below and
+`packages/backend/platform-sdk/src/anytoolai_platform_sdk/contracts/provider.py`:
+retry configuration belongs under `retry_policy`, and old flat retry fields such
+as `max_retries` are invalid.
 
 Frontend must not see system prompts or choose prompt versions.
 
