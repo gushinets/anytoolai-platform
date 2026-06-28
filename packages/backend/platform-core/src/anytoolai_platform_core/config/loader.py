@@ -361,6 +361,78 @@ class ConfigLoader:
     def _append_error(self, error: ConfigError) -> None:
         self.errors.append(error)
 
+    def _missing_required_file_error(
+        self,
+        path: Path,
+        *,
+        config_id: str,
+        ref_type: str,
+        reason: str,
+        ref_value: str | None = None,
+    ) -> MissingConfigFileError:
+        return MissingConfigFileError(
+            path,
+            reason,
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=ref_value or path.name,
+        )
+
+    def _require_mapping_file(
+        self,
+        path: Path,
+        *,
+        config_id: str,
+        ref_type: str,
+        reason: str,
+        ref_value: str | None = None,
+    ) -> dict[str, Any]:
+        try:
+            return load_yaml_file(path)
+        except MissingConfigFileError as exc:
+            raise self._missing_required_file_error(
+                exc.file_path or path,
+                reason=reason,
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value or path.name,
+            ) from exc
+
+    def _require_product_mapping_file(
+        self,
+        path: Path,
+        *,
+        product_id: str,
+        ref_type: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        return self._require_mapping_file(
+            path,
+            config_id=product_id,
+            ref_type=ref_type,
+            ref_value=path.name,
+            reason=reason,
+        )
+
+    def _require_mapping_entry(
+        self,
+        entry: Any,
+        *,
+        file_path: Path,
+        config_id: str,
+        entry_type: str,
+        ref_type: str,
+    ) -> dict[str, Any]:
+        if isinstance(entry, dict):
+            return entry
+        raise InvalidConfigShapeError(
+            file_path,
+            f"Expected each {entry_type} entry to be a mapping, got: {entry!r}",
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=type(entry).__name__,
+        )
+
     def _reject_forbidden_raw_llm_fields(
         self,
         *,
@@ -724,7 +796,6 @@ class ConfigLoader:
                     "model",
                     "temperature",
                     "timeout_seconds",
-                    "max_retries",
                     "structured_output_mode",
                 )
                 missing_fields = [
@@ -1003,7 +1074,7 @@ class ConfigLoader:
 
             self._reject_forbidden_raw_llm_fields(
                 payload=frontend_data,
-                file_path=source_path,
+                file_path=path,
                 config_kind="Frontend",
                 config_id=frontend_id,
                 recursive=True,
@@ -1371,16 +1442,16 @@ class ConfigLoader:
                             ref_value=template_path,
                         )
 
-                    with path.open("r", encoding="utf-8") as handle:
+                    with asset_path.open("r", encoding="utf-8") as handle:
                         raw_content = handle.read()
 
                     prompt_metadata, content = _split_prompt_front_matter(
-                        path,
+                        asset_path,
                         raw_content,
                     )
                     self._reject_forbidden_raw_llm_fields(
                         payload=prompt_metadata,
-                        file_path=path,
+                        file_path=asset_path,
                         config_kind="Prompt",
                         config_id=prompt_ref,
                         recursive=True,

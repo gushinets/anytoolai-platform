@@ -5,7 +5,7 @@
 - State: active
 - Owner: agent
 - Created: 2026-06-16
-- Last updated: 2026-06-23
+- Last updated: 2026-06-28
 
 ## Goal
 
@@ -106,6 +106,7 @@ and is reused by both API startup and `validate_configs.py`.
 | 2026-06-16 | Ran repo checks with the documented Python fallback; config and architecture validation passed from `.venv`. | Implement loader, tests, and startup failure wiring in small reviewable slices. |
 | 2026-06-19 | Confirmed invalid enum values now enter `RegistryLoadError.errors`, but still lack `ref_type` and `ref_value` on the nested `InvalidConfigShapeError`. | Add structured enum diagnostics and focused regression tests for every enum conversion path called out in review. |
 | 2026-06-23 | Completed the loader tightening slice: `product.yaml` fallback for frontends/analytics is rejected, `quota_policy_ref` is explicit when quotas exist, provider-policy tuning fields are explicit, and prompt/schema ids now come from manifests instead of asset filenames. Also confirmed `scripts/agent/validate_configs.py` is the shared validation entrypoint and local validation must use `uv` with a workspace-owned `UV_CACHE_DIR` because `just` is unavailable here and the default `uv` cache path is access-blocked. | Keep the docs, focused tests, and shared validation path aligned with the tightened loader contract. |
+| 2026-06-28 | Traced a CI regression to merge commit `27a102b`, which dropped helper definitions still used by `ConfigLoader`. Restoring the missing mapping/file helper block in `loader.py` to recover the current contract expected by tests and call sites. | Run focused validation for the loader path and confirm there are no remaining unresolved helper references. |
 
 ## Open questions
 

@@ -71,6 +71,7 @@ class ProviderPolicy:
     temperature: float = 0.3
     timeout_seconds: int = 60
     fallback_policy: str | None = None
+    structured_output_mode: StructuredOutputMode = StructuredOutputMode.json_schema
     schema_version: int = 1
     metadata: dict[str, Any] = field(default_factory=dict)
 
