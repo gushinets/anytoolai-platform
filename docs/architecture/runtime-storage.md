@@ -288,13 +288,24 @@ Key columns:
 
 - all common dimensions through action-run granularity
 - `provider_policy_id`
+- `workflow_version`
+- `gateway_backend`
+- `gateway_model`
 - `provider`
 - `model`
+- `semantic_attempt_index`
+- `transport_attempt_index`
+- `physical_call_index`
 - `status`
 - `input_tokens`
 - `output_tokens`
+- `total_tokens`
 - `latency_ms`
 - `estimated_cost`
+- `failure_kind`
+- `http_status`
+- `pydantic_run_id`
+- `litellm_response_id`
 - `error_code`
 - timestamps
 
@@ -307,7 +318,9 @@ Provider call status values:
 - `timed_out`
 
 These fields were chosen to match the provider-gateway contract: even before billing, provider
-calls must log provider, model, tokens, latency, cost when known, and success/failure state.
+calls must log the resolved provider policy ID, gateway/model routing, attempt indexes, provider,
+model, tokens, latency, cost when known, and success/failure state. One row always means one
+physical `ProviderGateway` attempt.
 
 ### `platform.artifacts`
 

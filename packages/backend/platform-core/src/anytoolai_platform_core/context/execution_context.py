@@ -24,3 +24,7 @@ class ExecutionContext:
     acquisition_source: str | None = None
     action_run_id: str | None = None
     provider_policy_id: str | None = None
+    provider_call_id: str | None = None
+    physical_call_index: int | None = None
+    pydantic_run_id: str | None = None
+    litellm_response_id: str | None = None

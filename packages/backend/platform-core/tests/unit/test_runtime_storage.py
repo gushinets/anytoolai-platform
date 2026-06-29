@@ -38,6 +38,7 @@ from sqlalchemy.exc import IntegrityError
 
 PROVIDER_INPUT_TOKENS = 128
 PROVIDER_OUTPUT_TOKENS = 64
+PROVIDER_TOTAL_TOKENS = PROVIDER_INPUT_TOKENS + PROVIDER_OUTPUT_TOKENS
 PROVIDER_LATENCY_MS = 950
 
 
@@ -146,12 +147,18 @@ def make_provider_call(
         "job_id": job_id,
         "action_run_id": action_run_id,
         "workflow_id": "wf_smoke",
+        "workflow_version": 1,
         "step_id": "step_1",
         "action_type": "text.extract_structured_fields",
         "action_config_id": "cfg_extract",
         "provider_policy_id": "policy_primary",
+        "gateway_backend": "litellm_sdk",
+        "gateway_model": "gpt-5-mini",
         "provider": "openai",
         "model": "gpt-5-mini",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
     }
     values.update(overrides)
     return ProviderCallRecord(**values)
@@ -251,7 +258,7 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         columns = {
             column["name"]: column
             for column in sa.inspect(connection).get_columns(
-                "scenario_sessions",
+                "provider_calls",
                 schema="platform",
             )
         }
@@ -263,8 +270,23 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "provider_calls",
         "artifacts",
     }.issubset(table_names)
-    assert "created_at" in columns
-    assert columns["created_at"]["nullable"] is False
+    assert {
+        "workflow_version",
+        "gateway_backend",
+        "gateway_model",
+        "semantic_attempt_index",
+        "transport_attempt_index",
+        "physical_call_index",
+        "total_tokens",
+        "failure_kind",
+        "http_status",
+        "pydantic_run_id",
+        "litellm_response_id",
+    } <= set(columns)
+    assert columns["workflow_version"]["nullable"] is False
+    assert columns["gateway_backend"]["nullable"] is False
+    assert columns["physical_call_index"]["nullable"] is False
+    assert columns["total_tokens"]["nullable"] is False
     assert {
         "ix_scenario_sessions_created_at",
         "ix_jobs_scenario_session_id",
@@ -584,15 +606,27 @@ def test_provider_call_repository_create_read_update(
                 completed_at=utc_now(),
                 input_tokens=PROVIDER_INPUT_TOKENS,
                 output_tokens=PROVIDER_OUTPUT_TOKENS,
+                total_tokens=PROVIDER_TOTAL_TOKENS,
                 latency_ms=PROVIDER_LATENCY_MS,
                 estimated_cost=0.014,
+                http_status=200,
+                litellm_response_id="resp_demo",
             )
         )
 
         assert updated.status is ProviderCallStatus.succeeded
+        assert updated.workflow_version == 1
+        assert updated.gateway_backend == "litellm_sdk"
+        assert updated.gateway_model == "gpt-5-mini"
+        assert updated.semantic_attempt_index == 1
+        assert updated.transport_attempt_index == 1
+        assert updated.physical_call_index == 1
         assert updated.input_tokens == PROVIDER_INPUT_TOKENS
         assert updated.output_tokens == PROVIDER_OUTPUT_TOKENS
+        assert updated.total_tokens == PROVIDER_TOTAL_TOKENS
         assert updated.latency_ms == PROVIDER_LATENCY_MS
+        assert updated.http_status == 200
+        assert updated.litellm_response_id == "resp_demo"
 
 
 def test_provider_call_repository_required_fields(

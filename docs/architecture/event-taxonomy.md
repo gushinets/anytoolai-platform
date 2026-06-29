@@ -22,10 +22,16 @@ changes that produced them.
 - `job_id`
 - `workflow_id`
 - `workflow_version`
+- `action_run_id`
 - `action_type`
 - `action_config_id`
+- `provider_policy_id`
+- `provider_call_id`
 - `provider`
 - `model`
+- `physical_call_index`
+- `pydantic_run_id`
+- `litellm_response_id`
 - `artifact_id`
 - `handoff_id`
 - `result_status`
@@ -63,6 +69,12 @@ Current MVP-A runtime-owned emission points:
 
 Other taxonomy groups remain part of the platform contract even when their concrete runtime service
 slice lands later.
+
+For provider events, the event log must persist deterministic correlation to
+`platform.provider_calls` through `provider_call_id`, `action_run_id`, `provider_policy_id`,
+`physical_call_index`, and auxiliary `pydantic_run_id` / `litellm_response_id` when present.
+These domain events are emitted by runtime-owned execution flow and do not depend on LiteLLM
+callbacks or PydanticAI tracing.
 
 ## Taxonomy source
 
