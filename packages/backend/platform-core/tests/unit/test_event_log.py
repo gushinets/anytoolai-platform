@@ -601,12 +601,12 @@ def test_provider_gateway_success_events_include_deterministic_correlation_field
         "provider.request_started",
         "provider.request_succeeded",
     ]
-    for event in events:
-        assert event["provider_call_id"] == provider_call.id
-        assert event["action_run_id"] == "action_run_demo"
-        assert event["provider_policy_id"] == "policy_primary"
-        assert event["physical_call_index"] == 2
-        assert event["pydantic_run_id"] == "pydantic_run_success"
+    for event_row in events:
+        assert event_row["provider_call_id"] == provider_call.id
+        assert event_row["action_run_id"] == "action_run_demo"
+        assert event_row["provider_policy_id"] == "policy_primary"
+        assert event_row["physical_call_index"] == 2
+        assert event_row["pydantic_run_id"] == "pydantic_run_success"
     assert events[0]["litellm_response_id"] is None
     assert events[1]["litellm_response_id"] == "litellm_resp_123"
 
@@ -646,11 +646,11 @@ def test_provider_gateway_failure_events_include_deterministic_correlation_field
         "provider.request_started",
         "provider.request_failed",
     ]
-    for event in events:
-        assert event["action_run_id"] == "action_run_demo"
-        assert event["provider_policy_id"] == "policy_primary"
-        assert event["physical_call_index"] == 5
-        assert event["pydantic_run_id"] == "pydantic_run_failure"
+    for event_row in events:
+        assert event_row["action_run_id"] == "action_run_demo"
+        assert event_row["provider_policy_id"] == "policy_primary"
+        assert event_row["physical_call_index"] == 5
+        assert event_row["pydantic_run_id"] == "pydantic_run_failure"
     assert events[0]["provider_call_id"] is not None
     assert events[1]["provider_call_id"] == events[0]["provider_call_id"]
     assert events[1]["litellm_response_id"] is None
