@@ -103,7 +103,7 @@ action_run_id
 workflow_id
 workflow_version
 step_id
-provider_policy_ref
+provider_policy_id
 gateway_backend = litellm_sdk
 gateway_model
 provider
@@ -240,7 +240,7 @@ job_id
 action_run_id
 workflow_id
 step_id
-provider_policy_ref
+provider_policy_id
 physical_call_index
 pydantic_run_id
 litellm_response_id

@@ -86,19 +86,30 @@ class ProviderCallRecord:
     job_id: str
     action_run_id: str
     workflow_id: str
+    workflow_version: int
     step_id: str
     action_type: str
     action_config_id: str
     provider_policy_id: str
+    gateway_backend: str
+    gateway_model: str
     provider: str
     model: str
+    semantic_attempt_index: int
+    transport_attempt_index: int
+    physical_call_index: int
     id: str = field(default_factory=lambda: new_id("provider_call"))
     status: ProviderCallStatus = ProviderCallStatus.created
     input_tokens: int = 0
     output_tokens: int = 0
+    total_tokens: int = 0
     latency_ms: int = 0
     estimated_cost: float = 0.0
+    failure_kind: str | None = None
     error_code: str | None = None
+    http_status: int | None = None
+    pydantic_run_id: str | None = None
+    litellm_response_id: str | None = None
     created_at: datetime = field(default_factory=utc_now)
     started_at: datetime | None = None
     completed_at: datetime | None = None

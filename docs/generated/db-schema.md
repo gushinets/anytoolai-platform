@@ -120,18 +120,29 @@ scenario_session_id
 job_id
 action_run_id
 workflow_id
+workflow_version
 step_id
 action_type
 action_config_id
 provider_policy_id
+gateway_backend
+gateway_model
 provider
 model
+semantic_attempt_index
+transport_attempt_index
+physical_call_index
 status
 input_tokens
 output_tokens
+total_tokens
 latency_ms
 estimated_cost
+failure_kind nullable
 error_code nullable
+http_status nullable
+pydantic_run_id nullable
+litellm_response_id nullable
 created_at
 started_at nullable
 completed_at nullable
@@ -180,10 +191,16 @@ scenario_chain_id nullable
 job_id nullable
 workflow_id nullable
 workflow_version nullable
+action_run_id nullable
 action_type nullable
 action_config_id nullable
+provider_policy_id nullable
+provider_call_id nullable
 provider nullable
 model nullable
+physical_call_index nullable
+pydantic_run_id nullable
+litellm_response_id nullable
 artifact_id nullable
 handoff_id nullable
 result_status nullable

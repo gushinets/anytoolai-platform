@@ -13,10 +13,16 @@ required_dimensions:
   - job_id
   - workflow_id
   - workflow_version
+  - action_run_id
   - action_type
   - action_config_id
+  - provider_policy_id
+  - provider_call_id
   - provider
   - model
+  - physical_call_index
+  - pydantic_run_id
+  - litellm_response_id
   - artifact_id
   - handoff_id
   - result_status

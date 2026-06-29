@@ -87,8 +87,9 @@ Even before billing, each physical provider attempt must log:
 - tenant and region dimensions;
 - product and frontend dimensions;
 - scenario, job, workflow, step, and action-run dimensions where available;
-- provider policy reference;
+- resolved `provider_policy_id` from the action config's `provider_policy_ref`;
 - gateway backend;
+- gateway model;
 - provider;
 - model;
 - input tokens;
@@ -98,11 +99,15 @@ Even before billing, each physical provider attempt must log:
 - estimated cost when available;
 - success/failure;
 - failure kind and safe error code when failed;
+- HTTP status when known;
 - semantic validation attempt index;
 - transport attempt index;
 - physical call index.
 
 PydanticAI usage summaries can be stored on action-run metadata, but they do not replace `platform.provider_calls` rows.
+Provider request/success/failure events must correlate with those rows through `provider_call_id`,
+`action_run_id`, `provider_policy_id`, `physical_call_index`, and optional `pydantic_run_id` /
+`litellm_response_id`. LiteLLM callbacks and PydanticAI tracing remain auxiliary telemetry only.
 
 ## Import boundary
 

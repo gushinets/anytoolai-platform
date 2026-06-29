@@ -109,8 +109,10 @@ def make_execution_context(**overrides: Any) -> ExecutionContext:
         "workflow_id": "wf_smoke",
         "workflow_version": 1,
         "step_id": "step_1",
+        "action_run_id": "action_run_demo",
         "action_type": "text.extract_structured_fields",
         "action_config_id": "cfg_extract",
+        "provider_policy_id": "policy_primary",
         "artifact_id": "artifact_demo",
     }
     values.update(overrides)
@@ -182,8 +184,11 @@ class SuccessfulAdapter:
             model=request.model,
             input_tokens=128,
             output_tokens=64,
+            total_tokens=192,
             latency_ms=950,
             estimated_cost=0.42,
+            http_status=200,
+            litellm_response_id="litellm_resp_123",
         )
 
 
@@ -241,6 +246,8 @@ def test_event_log_migration_creates_table_at_0002(tmp_path: Path) -> None:
             "ix_event_log_product_id",
             "ix_event_log_scenario_session_id",
             "ix_event_log_job_id",
+            "ix_event_log_action_run_id",
+            "ix_event_log_provider_call_id",
             "ix_event_log_handoff_id",
         }.issubset(index_names)
     finally:
@@ -265,6 +272,11 @@ def test_event_emitter_persists_round_trip_and_maps_dimensions(
                 scenario_chain_id="chain_demo",
                 provider="openai",
                 model="gpt-5-mini",
+                provider_policy_id="policy_primary",
+                provider_call_id="provider_call_demo",
+                physical_call_index=1,
+                pydantic_run_id="pydantic_run_demo",
+                litellm_response_id="litellm_resp_demo",
                 acquisition_source="kernel_demo_ce",
             ),
             properties={"scenario_id": "smoke_start"},
@@ -281,8 +293,14 @@ def test_event_emitter_persists_round_trip_and_maps_dimensions(
     assert stored.guest_id == "guest_demo"
     assert stored.user_id == "user_demo"
     assert stored.scenario_chain_id == "chain_demo"
+    assert stored.action_run_id == "action_run_demo"
+    assert stored.provider_policy_id == "policy_primary"
+    assert stored.provider_call_id == "provider_call_demo"
     assert stored.provider == "openai"
     assert stored.model == "gpt-5-mini"
+    assert stored.physical_call_index == 1
+    assert stored.pydantic_run_id == "pydantic_run_demo"
+    assert stored.litellm_response_id == "litellm_resp_demo"
     assert stored.properties["scenario_id"] == "smoke_start"
 
 
@@ -547,6 +565,95 @@ def test_provider_gateway_failure_uses_safe_platform_error_code(
         ).mappings().one()
 
     assert failed_event["error_code"] == "provider_unavailable"
+
+
+def test_provider_gateway_success_events_include_deterministic_correlation_fields(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        emitter = _build_emitter(session)
+        gateway = ProviderGateway(
+            {"openai": SuccessfulAdapter()},
+            provider_call_repository=ProviderCallRepository(session),
+            event_emitter=emitter,
+        )
+
+        provider_call, _response = gateway.execute(
+            "openai",
+            ProviderRequest(prompt="hello", model="gpt-5-mini"),
+            make_execution_context(),
+            provider_policy_id="policy_primary",
+            action_run_id="action_run_demo",
+            physical_call_index=2,
+            pydantic_run_id="pydantic_run_success",
+        )
+
+        events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.event_type.like("provider.request_%"))
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert len(events) == 2
+    assert [event["event_type"] for event in events] == [
+        "provider.request_started",
+        "provider.request_succeeded",
+    ]
+    for event_row in events:
+        assert event_row["provider_call_id"] == provider_call.id
+        assert event_row["action_run_id"] == "action_run_demo"
+        assert event_row["provider_policy_id"] == "policy_primary"
+        assert event_row["physical_call_index"] == 2
+        assert event_row["pydantic_run_id"] == "pydantic_run_success"
+    assert events[0]["litellm_response_id"] is None
+    assert events[1]["litellm_response_id"] == "litellm_resp_123"
+
+
+def test_provider_gateway_failure_events_include_deterministic_correlation_fields(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        emitter = _build_emitter(session)
+        gateway = ProviderGateway(
+            {"openai": TimeoutAdapter()},
+            provider_call_repository=ProviderCallRepository(session),
+            event_emitter=emitter,
+        )
+
+        with pytest.raises(TimeoutError):
+            gateway.execute(
+                "openai",
+                ProviderRequest(prompt="hello", model="gpt-5-mini"),
+                make_execution_context(),
+                provider_policy_id="policy_primary",
+                action_run_id="action_run_demo",
+                physical_call_index=5,
+                pydantic_run_id="pydantic_run_failure",
+            )
+
+        events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.event_type.like("provider.request_%"))
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert len(events) == 2
+    assert [event["event_type"] for event in events] == [
+        "provider.request_started",
+        "provider.request_failed",
+    ]
+    for event_row in events:
+        assert event_row["action_run_id"] == "action_run_demo"
+        assert event_row["provider_policy_id"] == "policy_primary"
+        assert event_row["physical_call_index"] == 5
+        assert event_row["pydantic_run_id"] == "pydantic_run_failure"
+    assert events[0]["provider_call_id"] is not None
+    assert events[1]["provider_call_id"] == events[0]["provider_call_id"]
+    assert events[1]["litellm_response_id"] is None
 
 
 @pytest.mark.parametrize(("field_name", "value"), [("tenant_id", ""), ("region", "")])
