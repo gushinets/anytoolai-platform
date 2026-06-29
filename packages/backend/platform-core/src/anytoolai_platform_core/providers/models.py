@@ -68,10 +68,10 @@ class ProviderPolicy:
     provider: str
     model: str
     retry_policy: ProviderRetryPolicy
+    structured_output_mode: StructuredOutputMode
     temperature: float = 0.3
     timeout_seconds: int = 60
     fallback_policy: str | None = None
-    structured_output_mode: StructuredOutputMode = StructuredOutputMode.json_schema
     schema_version: int = 1
     metadata: dict[str, Any] = field(default_factory=dict)
 

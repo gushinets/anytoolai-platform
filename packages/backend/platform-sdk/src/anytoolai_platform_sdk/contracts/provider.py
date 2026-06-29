@@ -49,4 +49,4 @@ class ProviderPolicy(ContractModel):
     timeout_seconds: int = 60
     retry_policy: ProviderRetryPolicy
     fallback_policy: str | None = None
-    structured_output_mode: StructuredOutputMode = StructuredOutputMode.json_schema
+    structured_output_mode: StructuredOutputMode
