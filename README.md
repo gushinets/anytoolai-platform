@@ -15,7 +15,25 @@ just validate-architecture
 
 `just` is the preferred human-facing command interface.
 
-`just quick-check` is the baseline backend gate. It includes:
+The canonical baseline backend command is:
+
+```bash
+python scripts/agent/quick_check.py
+```
+
+On shells where Python 3 is exposed as `python3`, use:
+
+```bash
+python3 scripts/agent/quick_check.py
+```
+
+Windows PowerShell fallback when the Python launcher is configured:
+
+```powershell
+py -3 scripts/agent/quick_check.py
+```
+
+`just quick-check` is a thin wrapper around the same entrypoint. The baseline gate includes:
 
 - config validation
 - architecture validation
@@ -24,24 +42,8 @@ just validate-architecture
 It intentionally excludes frontend checks, `tests/e2e`, `kernel-smoke`, and any test DB provisioning.
 The script self-manages `.quick-check-venv` so it does not need to install packages into a system Python.
 It always re-execs into `.quick-check-venv`, even if you started from another active virtualenv.
-
-On systems where `just` or shell integration is unavailable, run the Python baseline entrypoint directly:
-
-```bash
-python3 scripts/agent/quick_check.py
-```
-
-Windows fallback:
-
-```powershell
-python scripts/agent/quick_check.py
-```
-
-Secondary Windows fallback when the Python launcher is configured:
-
-```powershell
-py -3 scripts/agent/quick_check.py
-```
+It strips caller-provided `PYTHONPATH`, so no manual `PYTHONPATH` setup is required.
+GitHub Actions runs this same baseline command on both Linux and Windows, and the backend workflow is required on pull requests plus pushes to `main`.
 
 Other Python-owned commands still route through the runner:
 

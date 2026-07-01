@@ -39,10 +39,16 @@ def upgrade() -> None:
         sa.Column("job_id", sa.String(length=128)),
         sa.Column("workflow_id", sa.String(length=128)),
         sa.Column("workflow_version", sa.Integer()),
+        sa.Column("action_run_id", sa.String(length=128)),
         sa.Column("action_type", sa.String(length=128)),
         sa.Column("action_config_id", sa.String(length=128)),
+        sa.Column("provider_policy_id", sa.String(length=128)),
+        sa.Column("provider_call_id", sa.String(length=128)),
         sa.Column("provider", sa.String(length=128)),
         sa.Column("model", sa.String(length=256)),
+        sa.Column("physical_call_index", sa.Integer()),
+        sa.Column("pydantic_run_id", sa.String(length=128)),
+        sa.Column("litellm_response_id", sa.String(length=256)),
         sa.Column("artifact_id", sa.String(length=128)),
         sa.Column("handoff_id", sa.String(length=128)),
         sa.Column("result_status", sa.String(length=64)),
@@ -84,6 +90,18 @@ def upgrade() -> None:
         "ix_event_log_job_id",
         "event_log",
         ["job_id"],
+        schema=PLATFORM_SCHEMA,
+    )
+    op.create_index(
+        "ix_event_log_action_run_id",
+        "event_log",
+        ["action_run_id"],
+        schema=PLATFORM_SCHEMA,
+    )
+    op.create_index(
+        "ix_event_log_provider_call_id",
+        "event_log",
+        ["provider_call_id"],
         schema=PLATFORM_SCHEMA,
     )
     op.create_index(

@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
 from anytoolai_platform_core.actions.models import (
     ActionConfiguration,
     ActionDefinition,
@@ -51,6 +50,61 @@ from anytoolai_platform_core.workflows.models import (
 )
 
 VERSION_SUFFIX_PATTERN = re.compile(r"(?P<separator>[._])v(?P<version>\d+)$")
+PROMPT_FRONT_MATTER_PATTERN = re.compile(
+    r"\A---\r?\n(?P<front_matter>.*?)\r?\n---\r?\n(?P<body>.*)\Z",
+    re.DOTALL,
+)
+
+FORBIDDEN_RAW_LLM_FIELDS = frozenset(
+    {
+        "api_base",
+        "base_url",
+        "fallback_policy",
+        "gateway_backend",
+        "gateway_model",
+        "max_retries",
+        "max_tokens",
+        "model",
+        "model_ref",
+        "num_retries",
+        "presence_penalty",
+        "provider",
+        "reasoning_effort",
+        "response_format",
+        "response_schema",
+        "retry_policy",
+        "seed",
+        "stop",
+        "stream",
+        "structured_output",
+        "structured_output_mode",
+        "temperature",
+        "timeout_seconds",
+        "tool_choice",
+        "tools",
+        "top_p",
+    }
+)
+FORBIDDEN_RAW_LLM_PREFIXES = ("litellm_",)
+LEGACY_PROVIDER_POLICY_RETRY_FIELDS = frozenset(
+    {
+        "litellm_num_retries_per_attempt",
+        "max_physical_provider_calls_per_action",
+        "max_retries",
+        "transport_max_attempts",
+        "transport_owner",
+        "validation_max_attempts",
+        "validation_owner",
+    }
+)
+PROVIDER_RETRY_POLICY_FIELDS = frozenset({"transport", "validation", "hard_limits"})
+PROVIDER_TRANSPORT_RETRY_POLICY_FIELDS = frozenset(
+    {"owner", "max_attempts", "litellm_num_retries_per_attempt"}
+)
+PROVIDER_VALIDATION_RETRY_POLICY_FIELDS = frozenset({"owner", "max_attempts"})
+PROVIDER_RETRY_HARD_LIMIT_FIELDS = frozenset(
+    {"max_physical_provider_calls_per_action"}
+)
 
 
 def load_yaml_file(path: Path) -> dict[str, Any]:
@@ -111,6 +165,124 @@ def parse_enum_value(
         ) from exc
 
 
+def _stringify_config_value(value: Any) -> str:
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return str(value)
+    try:
+        return json.dumps(value, sort_keys=True)
+    except TypeError:
+        return repr(value)
+
+
+def _is_forbidden_raw_llm_field(field_name: str) -> bool:
+    if field_name in FORBIDDEN_RAW_LLM_FIELDS:
+        return True
+    return any(field_name.startswith(prefix) for prefix in FORBIDDEN_RAW_LLM_PREFIXES)
+
+
+def _find_forbidden_raw_llm_field(
+    payload: Any,
+    *,
+    current_path: str = "",
+    recursive: bool = False,
+) -> tuple[str, Any] | None:
+    if isinstance(payload, dict):
+        for field_name, value in payload.items():
+            field_path = f"{current_path}.{field_name}" if current_path else field_name
+            if _is_forbidden_raw_llm_field(field_name):
+                return field_path, value
+            if recursive:
+                found = _find_forbidden_raw_llm_field(
+                    value,
+                    current_path=field_path,
+                    recursive=True,
+                )
+                if found is not None:
+                    return found
+        return None
+
+    if recursive and isinstance(payload, list):
+        for index, item in enumerate(payload):
+            item_path = f"{current_path}[{index}]"
+            found = _find_forbidden_raw_llm_field(
+                item,
+                current_path=item_path,
+                recursive=True,
+            )
+            if found is not None:
+                return found
+        return None
+
+    return None
+
+
+def _split_prompt_front_matter(path: Path, content: str) -> tuple[dict[str, Any], str]:
+    match = PROMPT_FRONT_MATTER_PATTERN.match(content)
+    if match is None:
+        if content.startswith("---"):
+            raise InvalidConfigShapeError(
+                path,
+                "Prompt front matter started with '---' but closing '---' was not found",
+            )
+        return {}, content
+
+    try:
+        front_matter = yaml.safe_load(match.group("front_matter")) or {}
+    except yaml.YAMLError as exc:
+        raise InvalidConfigShapeError(
+            path,
+            "Prompt front matter contains invalid YAML",
+        ) from exc
+    if not isinstance(front_matter, dict):
+        raise InvalidConfigShapeError(
+            path,
+            "Prompt front matter must be a YAML mapping",
+        )
+
+    return front_matter, match.group("body")
+
+
+def _parse_positive_int_field(
+    raw_value: Any,
+    *,
+    field_name: str,
+    file_path: Path,
+    config_id: str,
+    ref_type: str,
+) -> int:
+    if not isinstance(raw_value, int) or isinstance(raw_value, bool) or raw_value < 1:
+        raise InvalidConfigShapeError(
+            file_path,
+            f"{field_name} must be an integer greater than or equal to 1",
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=_stringify_config_value(raw_value),
+    )
+    return raw_value
+
+
+def _reject_unexpected_mapping_keys(
+    mapping: dict[str, Any],
+    *,
+    allowed_keys: set[str],
+    field_name: str,
+    file_path: Path,
+    config_id: str,
+) -> None:
+    unexpected_keys = sorted(set(mapping) - allowed_keys)
+    if not unexpected_keys:
+        return
+
+    unexpected_key = unexpected_keys[0]
+    raise InvalidConfigShapeError(
+        file_path,
+        f"{field_name} contains unsupported field '{unexpected_key}'",
+        config_id=config_id,
+        ref_type=unexpected_key,
+        ref_value=_stringify_config_value(mapping[unexpected_key]),
+    )
+
+
 class ConfigLoader:
     """Build an immutable ``ConfigRegistry`` from the repo config tree."""
 
@@ -165,12 +337,26 @@ class ConfigLoader:
                 quotas=dict(self.quotas),
                 handoffs=dict(self.handoffs),
             )
-        except ConfigError:
+        except RegistryLoadError as error:
+            if not error.errors:
+                preserved_errors = self._preserved_config_errors_from_exception(error)
+                if preserved_errors:
+                    raise RegistryLoadError(
+                        error.message,
+                        errors=preserved_errors,
+                    ) from error
             raise
+        except ConfigError as error:
+            raise RegistryLoadError(
+                "Config registry load failed with 1 error(s)",
+                errors=[error],
+            ) from error
         except Exception as exc:  # pragma: no cover - defensive wrapper
+            preserved_errors = self._preserved_config_errors_from_exception(exc)
             raise RegistryLoadError(
                 "Unexpected error during config load",
                 context=str(exc),
+                errors=preserved_errors,
             ) from exc
 
     def _remember_source(self, config_type: str, config_id: str, file_path: Path) -> None:
@@ -187,10 +373,456 @@ class ConfigLoader:
     def _append_error(self, error: ConfigError) -> None:
         self.errors.append(error)
 
+    def _preserved_config_errors_from_exception(
+        self,
+        exc: BaseException,
+    ) -> list[ConfigError]:
+        preserved_errors: list[ConfigError] = []
+        seen: set[int] = set()
+
+        def add_error(error: ConfigError) -> None:
+            if id(error) in seen:
+                return
+            preserved_errors.append(error)
+            seen.add(id(error))
+
+        for error in self.errors:
+            add_error(error)
+
+        for candidate in (exc.__cause__, exc.__context__):
+            if isinstance(candidate, RegistryLoadError):
+                for nested_error in candidate.errors:
+                    add_error(nested_error)
+            elif isinstance(candidate, ConfigError):
+                add_error(candidate)
+
+        return preserved_errors
+
+    def _missing_required_file_error(
+        self,
+        path: Path,
+        *,
+        config_id: str,
+        ref_type: str,
+        reason: str,
+        ref_value: str | None = None,
+    ) -> MissingConfigFileError:
+        return MissingConfigFileError(
+            path,
+            reason,
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=ref_value or path.name,
+        )
+
+    def _require_file(
+        self,
+        path: Path,
+        *,
+        config_id: str,
+        ref_type: str,
+        reason: str,
+        ref_value: str | None = None,
+    ) -> Path:
+        if path.exists():
+            return path
+        raise self._missing_required_file_error(
+            path,
+            reason=reason,
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=ref_value or path.name,
+        )
+
+    def _require_mapping_file(
+        self,
+        path: Path,
+        *,
+        config_id: str,
+        ref_type: str,
+        reason: str,
+        ref_value: str | None = None,
+    ) -> dict[str, Any]:
+        self._require_file(
+            path,
+            config_id=config_id,
+            ref_type=ref_type,
+            reason=reason,
+            ref_value=ref_value or path.name,
+        )
+        try:
+            return load_yaml_file(path)
+        except MissingConfigFileError as exc:
+            raise self._missing_required_file_error(
+                exc.file_path or path,
+                reason=reason,
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value or path.name,
+            ) from exc
+
+    def _require_json_file(
+        self,
+        path: Path,
+        *,
+        config_id: str,
+        ref_type: str,
+        reason: str,
+        ref_value: str | None = None,
+    ) -> dict[str, Any]:
+        self._require_file(
+            path,
+            config_id=config_id,
+            ref_type=ref_type,
+            reason=reason,
+            ref_value=ref_value or path.name,
+        )
+        try:
+            return load_json_file(path)
+        except MissingConfigFileError as exc:
+            raise self._missing_required_file_error(
+                exc.file_path or path,
+                reason=reason,
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value or path.name,
+            ) from exc
+
+    def _require_product_mapping_file(
+        self,
+        path: Path,
+        *,
+        product_id: str,
+        ref_type: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        return self._require_mapping_file(
+            path,
+            config_id=product_id,
+            ref_type=ref_type,
+            ref_value=path.name,
+            reason=reason,
+        )
+
+    def _require_mapping_entry(
+        self,
+        entry: Any,
+        *,
+        file_path: Path,
+        config_id: str,
+        entry_type: str,
+        ref_type: str,
+    ) -> dict[str, Any]:
+        if isinstance(entry, dict):
+            return entry
+        raise InvalidConfigShapeError(
+            file_path,
+            f"Expected each {entry_type} entry to be a mapping, got: {entry!r}",
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=type(entry).__name__,
+        )
+
+    def _require_string_list_field(
+        self,
+        value: Any,
+        *,
+        file_path: Path,
+        config_id: str,
+        field_name: str,
+    ) -> list[str]:
+        if not isinstance(value, list):
+            raise InvalidConfigShapeError(
+                file_path,
+                f"{field_name} must be a list of strings",
+                config_id=config_id,
+                ref_type=field_name,
+                ref_value=type(value).__name__,
+            )
+
+        for item in value:
+            if isinstance(item, str):
+                continue
+            raise InvalidConfigShapeError(
+                file_path,
+                f"{field_name} must contain only strings",
+                config_id=config_id,
+                ref_type=field_name,
+                ref_value=_stringify_config_value(item),
+            )
+
+        return value
+
+    def _reject_forbidden_raw_llm_fields(
+        self,
+        *,
+        payload: Any,
+        file_path: Path,
+        config_kind: str,
+        config_id: str | None = None,
+        recursive: bool = False,
+    ) -> None:
+        found = _find_forbidden_raw_llm_field(payload, recursive=recursive)
+        if found is None:
+            return
+
+        field_path, field_value = found
+        raise InvalidConfigShapeError(
+            file_path,
+            (
+                f"{config_kind} configs must not define raw provider/model/LiteLLM "
+                f"field '{field_path}'; keep provider/model routing and request "
+                "settings in provider policy/model registry files and use "
+                "`provider_policy_ref` instead"
+            ),
+            config_id=config_id,
+            ref_type=field_path,
+            ref_value=_stringify_config_value(field_value),
+        )
+
+    def _parse_provider_retry_policy(
+        self,
+        *,
+        policy_data: dict[str, Any],
+        file_path: Path,
+        policy_id: str,
+    ) -> ProviderRetryPolicy:
+        retry_policy = policy_data.get("retry_policy")
+        if not isinstance(retry_policy, dict):
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy must define retry_policy as a mapping",
+                config_id=policy_id,
+                ref_type="retry_policy",
+                ref_value=_stringify_config_value(retry_policy),
+            )
+
+        for legacy_field in LEGACY_PROVIDER_POLICY_RETRY_FIELDS:
+            if legacy_field in policy_data:
+                raise InvalidConfigShapeError(
+                    file_path,
+                    (
+                        f"Provider policy uses legacy retry field '{legacy_field}'; "
+                        "use the ADR 0007 split retry_policy contract"
+                    ),
+                    config_id=policy_id,
+                    ref_type=legacy_field,
+                    ref_value=_stringify_config_value(policy_data.get(legacy_field)),
+                )
+            if legacy_field in retry_policy:
+                raise InvalidConfigShapeError(
+                    file_path,
+                    (
+                        f"Provider policy uses legacy retry field "
+                        f"'retry_policy.{legacy_field}'; use transport, validation, "
+                        "and hard_limits sections instead"
+                    ),
+                    config_id=policy_id,
+                    ref_type=legacy_field,
+                    ref_value=_stringify_config_value(retry_policy.get(legacy_field)),
+                )
+
+        _reject_unexpected_mapping_keys(
+            retry_policy,
+            allowed_keys=PROVIDER_RETRY_POLICY_FIELDS,
+            field_name="Provider policy retry_policy",
+            file_path=file_path,
+            config_id=policy_id,
+        )
+
+        transport = retry_policy.get("transport")
+        if not isinstance(transport, dict):
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy retry_policy.transport must be a mapping",
+                config_id=policy_id,
+                ref_type="transport",
+                ref_value=_stringify_config_value(transport),
+            )
+
+        _reject_unexpected_mapping_keys(
+            transport,
+            allowed_keys=PROVIDER_TRANSPORT_RETRY_POLICY_FIELDS,
+            field_name="Provider policy retry_policy.transport",
+            file_path=file_path,
+            config_id=policy_id,
+        )
+
+        validation = retry_policy.get("validation")
+        if not isinstance(validation, dict):
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy retry_policy.validation must be a mapping",
+                config_id=policy_id,
+                ref_type="validation",
+                ref_value=_stringify_config_value(validation),
+            )
+
+        _reject_unexpected_mapping_keys(
+            validation,
+            allowed_keys=PROVIDER_VALIDATION_RETRY_POLICY_FIELDS,
+            field_name="Provider policy retry_policy.validation",
+            file_path=file_path,
+            config_id=policy_id,
+        )
+
+        hard_limits = retry_policy.get("hard_limits")
+        if not isinstance(hard_limits, dict):
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy retry_policy.hard_limits must be a mapping",
+                config_id=policy_id,
+                ref_type="hard_limits",
+                ref_value=_stringify_config_value(hard_limits),
+            )
+
+        _reject_unexpected_mapping_keys(
+            hard_limits,
+            allowed_keys=PROVIDER_RETRY_HARD_LIMIT_FIELDS,
+            field_name="Provider policy retry_policy.hard_limits",
+            file_path=file_path,
+            config_id=policy_id,
+        )
+
+        transport_owner = transport.get("owner")
+        if transport_owner is None:
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy retry_policy.transport.owner is required",
+                config_id=policy_id,
+                ref_type="owner",
+                ref_value=_stringify_config_value(transport_owner),
+            )
+
+        transport_attempts_raw = transport.get("max_attempts")
+        if transport_attempts_raw is None:
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy retry_policy.transport.max_attempts is required",
+                config_id=policy_id,
+                ref_type="max_attempts",
+                ref_value=_stringify_config_value(transport_attempts_raw),
+            )
+        transport_attempts = _parse_positive_int_field(
+            transport_attempts_raw,
+            field_name="retry_policy.transport.max_attempts",
+            file_path=file_path,
+            config_id=policy_id,
+            ref_type="max_attempts",
+        )
+
+        litellm_num_retries = transport.get("litellm_num_retries_per_attempt")
+        if litellm_num_retries is None:
+            raise InvalidConfigShapeError(
+                file_path,
+                (
+                    "Provider policy "
+                    "retry_policy.transport.litellm_num_retries_per_attempt is required"
+                ),
+                config_id=policy_id,
+                ref_type="litellm_num_retries_per_attempt",
+            )
+        if not isinstance(litellm_num_retries, int) or isinstance(
+            litellm_num_retries,
+            bool,
+        ):
+            raise InvalidConfigShapeError(
+                file_path,
+                (
+                    "retry_policy.transport.litellm_num_retries_per_attempt must be "
+                    "an integer"
+                ),
+                config_id=policy_id,
+                ref_type="litellm_num_retries_per_attempt",
+                ref_value=_stringify_config_value(litellm_num_retries),
+            )
+        if litellm_num_retries != 0:
+            raise InvalidConfigShapeError(
+                file_path,
+                (
+                    "MVP-A requires "
+                    "retry_policy.transport.litellm_num_retries_per_attempt to be 0"
+                ),
+                config_id=policy_id,
+                ref_type="litellm_num_retries_per_attempt",
+                ref_value=_stringify_config_value(litellm_num_retries),
+            )
+
+        validation_owner = validation.get("owner")
+        if validation_owner is None:
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy retry_policy.validation.owner is required",
+                config_id=policy_id,
+                ref_type="owner",
+                ref_value=_stringify_config_value(validation_owner),
+            )
+
+        validation_attempts_raw = validation.get("max_attempts")
+        if validation_attempts_raw is None:
+            raise InvalidConfigShapeError(
+                file_path,
+                "Provider policy retry_policy.validation.max_attempts is required",
+                config_id=policy_id,
+                ref_type="max_attempts",
+                ref_value=_stringify_config_value(validation_attempts_raw),
+            )
+        validation_attempts = _parse_positive_int_field(
+            validation_attempts_raw,
+            field_name="retry_policy.validation.max_attempts",
+            file_path=file_path,
+            config_id=policy_id,
+            ref_type="max_attempts",
+        )
+
+        max_physical_provider_calls_raw = hard_limits.get(
+            "max_physical_provider_calls_per_action"
+        )
+        if max_physical_provider_calls_raw is None:
+            raise InvalidConfigShapeError(
+                file_path,
+                (
+                    "Provider policy "
+                    "retry_policy.hard_limits.max_physical_provider_calls_per_action "
+                    "is required"
+                ),
+                config_id=policy_id,
+                ref_type="max_physical_provider_calls_per_action",
+                ref_value=_stringify_config_value(max_physical_provider_calls_raw),
+            )
+        max_physical_provider_calls = _parse_positive_int_field(
+            max_physical_provider_calls_raw,
+            field_name="retry_policy.hard_limits.max_physical_provider_calls_per_action",
+            file_path=file_path,
+            config_id=policy_id,
+            ref_type="max_physical_provider_calls_per_action",
+        )
+
+        return ProviderRetryPolicy(
+            transport=ProviderTransportRetryPolicy(
+                owner=str(transport_owner),
+                max_attempts=transport_attempts,
+                litellm_num_retries_per_attempt=litellm_num_retries,
+            ),
+            validation=ProviderValidationRetryPolicy(
+                owner=str(validation_owner),
+                max_attempts=validation_attempts,
+            ),
+            hard_limits=ProviderRetryHardLimits(
+                max_physical_provider_calls_per_action=max_physical_provider_calls,
+            ),
+        )
+
     def _load_tenants(self) -> None:
         path = self.config_root / "default_tenant.yaml"
         try:
-            data = load_yaml_file(path)
+            data = self._require_mapping_file(
+                path,
+                config_id="kernel",
+                ref_type="default_tenant_file",
+                ref_value=path.name,
+                reason="default_tenant.yaml is required because it owns the default tenant definition",
+            )
             tenant_id = data.get("tenant_id")
             display_name = data.get("display_name")
 
@@ -212,7 +844,13 @@ class ConfigLoader:
     def _load_regions(self) -> None:
         path = self.config_root / "regions.yaml"
         try:
-            data = load_yaml_file(path)
+            data = self._require_mapping_file(
+                path,
+                config_id="kernel",
+                ref_type="regions_file",
+                ref_value=path.name,
+                reason="regions.yaml is required because it owns region definitions",
+            )
             for region_data in data.get("regions", []):
                 region = region_data.get("region")
                 display_name = region_data.get("display_name")
@@ -243,16 +881,48 @@ class ConfigLoader:
     def _load_provider_policies(self) -> None:
         path = self.config_root / "provider_policies.yaml"
         try:
-            data = load_yaml_file(path)
+            data = self._require_mapping_file(
+                path,
+                config_id="kernel",
+                ref_type="provider_policies_file",
+                ref_value=path.name,
+                reason="provider_policies.yaml is required because it owns provider policy definitions",
+            )
             for policy_data in data.get("provider_policies", []):
+                policy_data = self._require_mapping_entry(
+                    policy_data,
+                    file_path=path,
+                    config_id="kernel",
+                    entry_type="provider policy",
+                    ref_type="provider_policies_entry",
+                )
                 policy_id = policy_data.get("provider_policy_ref")
                 provider = policy_data.get("provider")
                 model = policy_data.get("model")
+                required_fields = (
+                    "provider_policy_ref",
+                    "provider",
+                    "model",
+                    "temperature",
+                    "timeout_seconds",
+                    "structured_output_mode",
+                )
+                missing_fields = [
+                    field_name
+                    for field_name in required_fields
+                    if field_name not in policy_data or policy_data[field_name] is None
+                ]
 
-                if not all([policy_id, provider, model]):
+                if not all([policy_id, provider, model]) or missing_fields:
                     raise InvalidConfigShapeError(
                         path,
-                        f"Provider policy missing required fields: {policy_data}",
+                        (
+                            "Provider policy missing required fields: "
+                            f"{', '.join(missing_fields) or policy_data}"
+                        ),
+                        config_id=policy_id,
+                        ref_type=missing_fields[0] if missing_fields else None,
+                        ref_value="<missing>" if missing_fields else None,
                     )
 
                 if policy_id in self.provider_policies:
@@ -296,10 +966,7 @@ class ConfigLoader:
                     fallback_policy=policy_data.get("fallback_policy"),
                     structured_output_mode=parse_enum_value(
                         StructuredOutputMode,
-                        policy_data.get(
-                            "structured_output_mode",
-                            StructuredOutputMode.json_schema,
-                        ),
+                        policy_data["structured_output_mode"],
                         field_name="structured_output_mode",
                         file_path=path,
                         config_id=policy_id,
@@ -374,9 +1041,12 @@ class ConfigLoader:
         action_dir = self.config_root / "action_definitions"
         if not action_dir.exists():
             self._append_error(
-                MissingConfigFileError(
+                self._missing_required_file_error(
                     action_dir,
-                    "Expected action_definitions directory",
+                    config_id="kernel",
+                    ref_type="action_definitions_dir",
+                    ref_value=action_dir.name,
+                    reason="action_definitions directory is required because it owns action definitions",
                 )
             )
             return
@@ -415,6 +1085,14 @@ class ConfigLoader:
                         path,
                     )
 
+                self._reject_forbidden_raw_llm_fields(
+                    payload=data,
+                    file_path=path,
+                    config_kind="Action definition",
+                    config_id=action_type,
+                    recursive=True,
+                )
+
                 self.action_definitions[action_type] = ActionDefinition(
                     action_type=action_type,
                     version=version,
@@ -439,9 +1117,12 @@ class ConfigLoader:
         products_dir = self.config_root / "products"
         if not products_dir.exists():
             self._append_error(
-                MissingConfigFileError(
+                self._missing_required_file_error(
                     products_dir,
-                    "Expected products directory",
+                    config_id="kernel",
+                    ref_type="products_dir",
+                    ref_value=products_dir.name,
+                    reason="products directory is required because it owns product definition directories",
                 )
             )
             return
@@ -453,7 +1134,13 @@ class ConfigLoader:
     def _load_product(self, product_dir: Path) -> None:
         product_file = product_dir / "product.yaml"
         try:
-            product_data = load_yaml_file(product_file)
+            product_data = self._require_mapping_file(
+                product_file,
+                config_id=product_dir.name,
+                ref_type="product_file",
+                ref_value=product_file.name,
+                reason="product.yaml is required because it owns the product definition",
+            )
             product_id = product_data.get("product_id")
             product_platform = product_data.get("product_platform")
             display_name = product_data.get("display_name")
@@ -472,32 +1159,51 @@ class ConfigLoader:
                     product_file,
                 )
 
+            self._reject_forbidden_raw_llm_fields(
+                payload=product_data,
+                file_path=product_file,
+                config_kind="Product",
+                config_id=product_id,
+                recursive=True,
+            )
+
             self.product_dirs[product_id] = product_dir
 
-            self._load_action_configs(product_dir / "action_configs.yaml")
-            self._load_workflows(product_dir / "workflows.yaml")
-            self._load_scenarios(product_dir / "scenarios.yaml")
+            if "frontends" in product_data:
+                raise InvalidConfigShapeError(
+                    product_file,
+                    "Frontend definitions must be declared in frontends.yaml; product.yaml must not embed frontends",
+                    config_id=product_id,
+                    ref_type="frontends",
+                    ref_value="product.yaml.frontends",
+                )
+            if "analytics" in product_data:
+                raise InvalidConfigShapeError(
+                    product_file,
+                    "Analytics definitions must be declared in analytics.yaml; product.yaml must not embed analytics",
+                    config_id=product_id,
+                    ref_type="analytics",
+                    ref_value="product.yaml.analytics",
+                )
+
+            self._load_action_configs(product_dir / "action_configs.yaml", product_id)
+            self._load_workflows(product_dir / "workflows.yaml", product_id)
+            self._load_scenarios(product_dir / "scenarios.yaml", product_id)
 
             quota_refs = self._load_quotas(product_dir / "quotas.yaml")
             self._load_handoffs(product_dir / "handoffs.yaml")
 
-            frontends = self._load_frontends(
-                product_dir / "frontends.yaml",
-                fallback_frontends=product_data.get("frontends", []),
-            )
-            analytics = self._load_analytics(
-                product_dir / "analytics.yaml",
-                fallback_analytics=product_data.get("analytics", {}),
-            )
+            frontends = self._load_frontends(product_dir / "frontends.yaml", product_id)
+            analytics = self._load_analytics(product_dir / "analytics.yaml")
 
             quota_policy_ref = product_data.get("quota_policy_ref")
-            if quota_policy_ref is None and len(quota_refs) == 1:
-                quota_policy_ref = quota_refs[0]
-            if quota_policy_ref is None and len(quota_refs) > 1:
+            if not quota_policy_ref and quota_refs:
                 raise InvalidConfigShapeError(
                     product_file,
-                    "Multiple quota policies found; product.yaml must set quota_policy_ref",
+                    "quota_policy_ref is required when quotas.yaml defines quota policies",
                     config_id=product_id,
+                    ref_type="quota_policy_ref",
+                    ref_value="<missing>",
                 )
 
             scenarios = product_data.get("scenarios", [])
@@ -525,26 +1231,42 @@ class ConfigLoader:
     def _load_frontends(
         self,
         path: Path,
-        fallback_frontends: list[dict[str, Any]],
+        product_id: str,
     ) -> list[FrontendDefinition]:
-        frontends_data = fallback_frontends
-        source_path = path
-
-        if path.exists():
-            data = load_yaml_file(path)
-            frontends_data = data.get("frontends", [])
-        else:
-            source_path = path.parent / "product.yaml"
+        data = self._require_mapping_file(
+            path,
+            config_id=product_id,
+            ref_type="frontends_file",
+            ref_value=path.name,
+            reason="frontends.yaml is required because it is the exclusive source of frontend definitions",
+        )
+        frontends_data = data.get("frontends", [])
 
         frontends: list[FrontendDefinition] = []
         for frontend_data in frontends_data:
+            frontend_data = self._require_mapping_entry(
+                frontend_data,
+                file_path=path,
+                config_id=product_id,
+                entry_type="frontend",
+                ref_type="frontends_entry",
+            )
             frontend_id = frontend_data.get("frontend_id")
             frontend_type = frontend_data.get("type")
             if not frontend_id or not frontend_type:
                 raise InvalidConfigShapeError(
-                    source_path,
+                    path,
                     f"Frontend missing required fields: {frontend_data}",
+                    config_id=product_id,
                 )
+
+            self._reject_forbidden_raw_llm_fields(
+                payload=frontend_data,
+                file_path=path,
+                config_kind="Frontend",
+                config_id=frontend_id,
+                recursive=True,
+            )
 
             frontends.append(
                 FrontendDefinition(
@@ -553,28 +1275,29 @@ class ConfigLoader:
                         FrontendType,
                         frontend_type,
                         field_name="frontend type",
-                        file_path=source_path,
+                        file_path=path,
                         config_id=frontend_id,
                         ref_type="type",
                     ),
                     enabled=frontend_data.get("enabled", True),
-                    metadata={"_file_path": str(source_path)},
+                    metadata={"_file_path": str(path)},
                 )
             )
         return frontends
 
-    def _load_analytics(
-        self,
-        path: Path,
-        fallback_analytics: dict[str, Any],
-    ) -> dict[str, Any]:
+    def _load_analytics(self, path: Path) -> dict[str, Any]:
         if path.exists():
             return load_yaml_file(path)
-        return fallback_analytics
+        return {}
 
-    def _load_action_configs(self, path: Path) -> None:
+    def _load_action_configs(self, path: Path, product_id: str) -> None:
         try:
-            data = load_yaml_file(path)
+            data = self._require_product_mapping_file(
+                path,
+                product_id=product_id,
+                ref_type="action_configs_file",
+                reason="action_configs.yaml is required because it owns action configuration definitions",
+            )
             for config_data in data.get("action_configs", []):
                 config_id = config_data.get("action_config_id")
                 action_type = config_data.get("action_type")
@@ -595,6 +1318,14 @@ class ConfigLoader:
                         path,
                     )
 
+                self._reject_forbidden_raw_llm_fields(
+                    payload=config_data,
+                    file_path=path,
+                    config_kind="Action",
+                    config_id=config_id,
+                    recursive=True,
+                )
+
                 self.action_configurations[config_id] = ActionConfiguration(
                     action_config_id=config_id,
                     action_type=action_type,
@@ -606,9 +1337,14 @@ class ConfigLoader:
         except ConfigError as error:
             self._append_error(error)
 
-    def _load_workflows(self, path: Path) -> None:
+    def _load_workflows(self, path: Path, product_id: str) -> None:
         try:
-            data = load_yaml_file(path)
+            data = self._require_product_mapping_file(
+                path,
+                product_id=product_id,
+                ref_type="workflows_file",
+                reason="workflows.yaml is required because it owns workflow definitions",
+            )
             for workflow_data in data.get("workflows", []):
                 workflow_id = workflow_data.get("workflow_id")
                 version = workflow_data.get("version")
@@ -636,6 +1372,14 @@ class ConfigLoader:
                         path,
                     )
 
+                self._reject_forbidden_raw_llm_fields(
+                    payload=workflow_data,
+                    file_path=path,
+                    config_kind="Workflow",
+                    config_id=workflow_id,
+                    recursive=True,
+                )
+
                 steps: list[WorkflowStepDefinition] = []
                 for step_data in workflow_data.get("steps", []):
                     step_id = step_data.get("step_id")
@@ -646,6 +1390,14 @@ class ConfigLoader:
                             f"Workflow step missing required fields: {step_data}",
                             config_id=workflow_id,
                         )
+
+                    self._reject_forbidden_raw_llm_fields(
+                        payload=step_data,
+                        file_path=path,
+                        config_kind="Workflow",
+                        config_id=workflow_id,
+                        recursive=True,
+                    )
 
                     steps.append(
                         WorkflowStepDefinition(
@@ -670,9 +1422,14 @@ class ConfigLoader:
         except ConfigError as error:
             self._append_error(error)
 
-    def _load_scenarios(self, path: Path) -> None:
+    def _load_scenarios(self, path: Path, product_id: str) -> None:
         try:
-            data = load_yaml_file(path)
+            data = self._require_product_mapping_file(
+                path,
+                product_id=product_id,
+                ref_type="scenarios_file",
+                reason="scenarios.yaml is required because it owns scenario definitions",
+            )
             for scenario_data in data.get("scenarios", []):
                 scenario_id = scenario_data.get("scenario_id")
                 version = scenario_data.get("version")
@@ -691,6 +1448,14 @@ class ConfigLoader:
                         self._source_for("scenario", scenario_id, path),
                         path,
                     )
+
+                self._reject_forbidden_raw_llm_fields(
+                    payload=scenario_data,
+                    file_path=path,
+                    config_kind="Scenario",
+                    config_id=scenario_id,
+                    recursive=True,
+                )
 
                 self.scenarios[scenario_id] = ScenarioDefinition(
                     scenario_id=scenario_id,
@@ -712,11 +1477,11 @@ class ConfigLoader:
             data = load_yaml_file(path)
             for quota_data in data.get("quota_policies", []):
                 quota_id = quota_data.get("quota_policy_id")
-                unit = quota_data.get("unit", "scenario_run")
+                unit = quota_data.get("unit")
                 limit_count = quota_data.get("limit_count")
-                period = quota_data.get("period", "lifetime")
+                period = quota_data.get("period")
 
-                if not all([quota_id, limit_count is not None]):
+                if not all([quota_id, limit_count is not None, unit, period]):
                     raise InvalidConfigShapeError(
                         path,
                         f"Quota policy missing required fields: {quota_data}",
@@ -809,118 +1574,175 @@ class ConfigLoader:
 
     def _load_prompts(self) -> None:
         for product_id, product_dir in sorted(self.product_dirs.items()):
-            prompt_dir = product_dir / "prompts"
-            if not prompt_dir.exists():
-                continue
+            manifest_path = product_dir / "prompts.yaml"
+            try:
+                data = self._require_mapping_file(
+                    manifest_path,
+                    config_id=product_id,
+                    ref_type="prompt_manifest",
+                    ref_value=manifest_path.name,
+                    reason="prompts.yaml is required because it owns prompt definitions",
+                )
+                for prompt_data in data.get("prompts", []):
+                    prompt_data = self._require_mapping_entry(
+                        prompt_data,
+                        file_path=manifest_path,
+                        config_id=product_id,
+                        entry_type="prompt manifest",
+                        ref_type="prompt_manifest_entry",
+                    )
+                    prompt_ref = prompt_data.get("prompt_ref")
+                    template_path = prompt_data.get("template_path")
+                    version = prompt_data.get("version")
+                    output_schema_ref = prompt_data.get("output_schema_ref")
+                    input_variables = prompt_data.get("input_variables")
 
-            for path in sorted(prompt_dir.glob("*.md")):
-                if path.name.lower() == "readme.md":
-                    continue
-
-                try:
-                    prompt_ref = self._prompt_ref_from_path(product_id, path)
-                    version = self._parse_version_from_name(path.stem)
+                    if not all(
+                        [
+                            prompt_ref,
+                            template_path,
+                            version is not None,
+                            output_schema_ref,
+                            input_variables is not None,
+                        ]
+                    ):
+                        raise InvalidConfigShapeError(
+                            manifest_path,
+                            f"Prompt manifest entry missing required fields: {prompt_data}",
+                            config_id=prompt_ref or product_id,
+                        )
 
                     if prompt_ref in self.prompts:
                         raise DuplicateConfigIdError(
                             "prompt_ref",
                             prompt_ref,
-                            self._source_for("prompt", prompt_ref, path),
-                            path,
+                            self._source_for("prompt", prompt_ref, manifest_path),
+                            manifest_path,
                         )
 
-                    with path.open("r", encoding="utf-8") as handle:
-                        content = handle.read()
+                    input_variables = self._require_string_list_field(
+                        input_variables,
+                        file_path=manifest_path,
+                        config_id=prompt_ref,
+                        field_name="input_variables",
+                    )
+
+                    asset_path = product_dir / template_path
+                    self._require_file(
+                        asset_path,
+                        reason=f"Prompt asset referenced from {manifest_path} was not found",
+                        config_id=prompt_ref,
+                        ref_type="prompt_asset",
+                        ref_value=template_path,
+                    )
+
+                    with asset_path.open("r", encoding="utf-8") as handle:
+                        raw_content = handle.read()
+
+                    prompt_metadata, content = _split_prompt_front_matter(
+                        asset_path,
+                        raw_content,
+                    )
+                    self._reject_forbidden_raw_llm_fields(
+                        payload=prompt_metadata,
+                        file_path=asset_path,
+                        config_kind="Prompt",
+                        config_id=prompt_ref,
+                        recursive=True,
+                    )
 
                     self.prompts[prompt_ref] = PromptDefinition(
                         prompt_ref=prompt_ref,
                         version=version,
                         content=content,
-                        input_variables=[],
-                        output_schema_ref=self._infer_prompt_output_schema_ref(
-                            prompt_ref
-                        ),
-                        metadata={"_file_path": str(path)},
+                        input_variables=input_variables,
+                        output_schema_ref=output_schema_ref,
+                        metadata={
+                            "_file_path": str(asset_path),
+                            "_manifest_path": str(manifest_path),
+                            "template_path": template_path,
+                        },
                     )
-                    self._remember_source("prompt", prompt_ref, path)
-                except ConfigError as error:
-                    self._append_error(error)
+                    self._remember_source("prompt", prompt_ref, asset_path)
+            except ConfigError as error:
+                self._append_error(error)
 
     def _load_schemas(self) -> None:
-        self._load_schema_directory(
-            scope="kernel",
-            schema_dir=self.config_root / "schemas",
+        self._load_schema_manifest(
+            owner_id="kernel",
+            manifest_path=self.config_root / "schemas.yaml",
+            base_dir=self.config_root,
         )
 
         for product_id, product_dir in sorted(self.product_dirs.items()):
-            self._load_schema_directory(
-                scope=product_id,
-                schema_dir=product_dir / "schemas",
+            self._load_schema_manifest(
+                owner_id=product_id,
+                manifest_path=product_dir / "schemas.yaml",
+                base_dir=product_dir,
             )
 
-    def _load_schema_directory(self, scope: str, schema_dir: Path) -> None:
-        if not schema_dir.exists():
-            return
+    def _load_schema_manifest(
+        self,
+        *,
+        owner_id: str,
+        manifest_path: Path,
+        base_dir: Path,
+    ) -> None:
+        try:
+            data = self._require_mapping_file(
+                manifest_path,
+                config_id=owner_id,
+                ref_type="schema_manifest",
+                ref_value=manifest_path.name,
+                reason="schemas.yaml is required because it owns schema definitions",
+            )
+            for schema_data in data.get("schemas", []):
+                schema_data = self._require_mapping_entry(
+                    schema_data,
+                    file_path=manifest_path,
+                    config_id=owner_id,
+                    entry_type="schema manifest",
+                    ref_type="schema_manifest_entry",
+                )
+                schema_ref = schema_data.get("schema_ref")
+                version = schema_data.get("version")
+                file_path_value = schema_data.get("file_path")
 
-        for path in sorted(schema_dir.glob("*.json")):
-            try:
-                schema_ref, version = self._schema_ref_from_path(scope, path)
+                if not all([schema_ref, version is not None, file_path_value]):
+                    raise InvalidConfigShapeError(
+                        manifest_path,
+                        f"Schema manifest entry missing required fields: {schema_data}",
+                        config_id=schema_ref or owner_id,
+                    )
 
                 if schema_ref in self.schemas:
                     raise DuplicateConfigIdError(
                         "schema_ref",
                         schema_ref,
-                        self._source_for("schema", schema_ref, path),
-                        path,
+                        self._source_for("schema", schema_ref, manifest_path),
+                        manifest_path,
                     )
 
+                asset_path = base_dir / file_path_value
                 self.schemas[schema_ref] = SchemaDefinition(
                     schema_ref=schema_ref,
                     version=version,
-                    schema=load_json_file(path),
-                    metadata={"_file_path": str(path)},
+                    schema=self._require_json_file(
+                        asset_path,
+                        reason=f"Schema asset referenced from {manifest_path} was not found",
+                        config_id=schema_ref,
+                        ref_type="schema_asset",
+                        ref_value=file_path_value,
+                    ),
+                    metadata={
+                        "_file_path": str(asset_path),
+                        "_manifest_path": str(manifest_path),
+                        "file_path": file_path_value,
+                    },
                 )
-                self._remember_source("schema", schema_ref, path)
-            except ConfigError as error:
-                self._append_error(error)
-
-    def _prompt_ref_from_path(self, product_id: str, path: Path) -> str:
-        return f"{product_id}.{path.stem}"
-
-    def _schema_ref_from_path(self, scope: str, path: Path) -> tuple[str, int]:
-        base_name = path.name
-        if base_name.endswith(".schema.json"):
-            base_name = base_name[: -len(".schema.json")]
-        elif base_name.endswith(".json"):
-            base_name = base_name[:-len(".json")]
-
-        version = self._parse_version_from_name(base_name)
-        stem = self._strip_version_suffix(base_name)
-        if scope == "kernel":
-            return (f"kernel.schemas.{stem}_v{version}", version)
-        return (f"{scope}.{stem}_v{version}", version)
-
-    def _parse_version_from_name(self, name: str) -> int:
-        match = VERSION_SUFFIX_PATTERN.search(name)
-        if not match:
-            return 1
-        return int(match.group("version"))
-
-    def _strip_version_suffix(self, name: str) -> str:
-        match = VERSION_SUFFIX_PATTERN.search(name)
-        if not match:
-            return name
-        return name[: match.start()]
-
-    def _infer_prompt_output_schema_ref(self, prompt_ref: str) -> str | None:
-        for action_config in self.action_configurations.values():
-            if action_config.prompt_ref != prompt_ref:
-                continue
-
-            action_definition = self.action_definitions.get(action_config.action_type)
-            if action_definition is not None:
-                return action_definition.output_schema_ref
-        return None
+                self._remember_source("schema", schema_ref, asset_path)
+        except ConfigError as error:
+            self._append_error(error)
 
     def _validate_cross_references(self) -> None:
         for action_type, action_def in self.action_definitions.items():
@@ -1082,8 +1904,6 @@ class ConfigLoader:
             )
 
         for prompt_ref, prompt in self.prompts.items():
-            if prompt.output_schema_ref is None:
-                continue
             source_path = self._source_for("prompt", prompt_ref, self.config_root)
             self._validate_schema_ref(
                 config_id=prompt_ref,

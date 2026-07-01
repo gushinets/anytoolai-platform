@@ -2,7 +2,23 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PLATFORM_CORE = ROOT / "packages" / "backend" / "platform-core"
-SKIP_PATH_PARTS = {".venv", ".quick-check-tmp", ".quick-check-venv", ".uv-cache", "node_modules"}
+SKIP_PATH_PARTS = {
+    ".venv",
+    ".quick-check-venv",
+    ".quick-check-tmp",
+    ".uv-cache",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "__pycache__",
+    "site-packages",
+    "node_modules",
+    ".pnpm-store",
+    ".next",
+    "dist",
+    "build",
+    "coverage",
+}
 FORBIDDEN = [
     "FreelancerProfile",
     "ExternalTask",

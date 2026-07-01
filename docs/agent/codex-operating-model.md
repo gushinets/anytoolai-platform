@@ -26,12 +26,14 @@ This repo uses `uv` for Python dependency management. Agents should treat `uv` a
 - Use `uv add <package>` for runtime dependencies.
 - Use `uv add --dev <package>` for dev dependencies.
 - Use `uv run python scripts/agent/runner.py <command>` for repo-managed Python commands when working outside `just`.
-- Keep `python3 scripts/agent/quick_check.py` as the narrow shell-independent baseline fallback when `just` integration is unavailable.
+- Keep `python scripts/agent/quick_check.py` as the canonical shell-independent baseline command; `python3` on Linux and `py -3` on Windows are interpreter aliases, not different baseline entrypoints.
 - Do not hand-edit `uv.lock`; update it only through `uv` commands.
 
 ## CI rule
 
-GitHub workflows that need repo Python dependencies should install `uv`, sync from `uv.lock`, and run checks through `uv run` instead of invoking `pip`.
+GitHub workflows that need repo Python dependencies should install `uv` instead of invoking `pip` directly.
+The backend baseline workflow should run `python scripts/agent/quick_check.py` directly so CI uses the same canonical command humans are told to run.
+Optional non-baseline workflows may still call `python scripts/agent/runner.py <command>` when that wrapper is the documented command surface.
 
 ## Escalation
 

@@ -1,5 +1,11 @@
 name: baseline-backend
-on: [pull_request]
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+permissions:
+  contents: read
 jobs:
   baseline:
     strategy:

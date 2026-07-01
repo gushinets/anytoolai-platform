@@ -1,0 +1,67 @@
+schemas:
+  - schema_ref: kernel.schemas.extract_input_v1
+    version: 1
+    file_path: schemas/extract_input.schema.json
+  - schema_ref: kernel.schemas.compose_reply_output_v1
+    version: 1
+    file_path: schemas/compose_reply_output.schema.json
+  - schema_ref: kernel.schemas.compose_reply_input_v1
+    version: 1
+    file_path: schemas/compose_reply_input.schema.json
+  - schema_ref: kernel.schemas.compose_persuasive_text_output_v1
+    version: 1
+    file_path: schemas/compose_persuasive_text_output.schema.json
+  - schema_ref: kernel.schemas.compose_persuasive_text_input_v1
+    version: 1
+    file_path: schemas/compose_persuasive_text_input.schema.json
+  - schema_ref: kernel.schemas.compare_classify_output_v1
+    version: 1
+    file_path: schemas/compare_classify_output.schema.json
+  - schema_ref: kernel.schemas.compare_classify_input_v1
+    version: 1
+    file_path: schemas/compare_classify_input.schema.json
+  - schema_ref: kernel.schemas.generate_document_output_v1
+    version: 1
+    file_path: schemas/generate_document_output.schema.json
+  - schema_ref: kernel.schemas.generate_document_input_v1
+    version: 1
+    file_path: schemas/generate_document_input.schema.json
+  - schema_ref: kernel.schemas.extract_output_v1
+    version: 1
+    file_path: schemas/extract_output.schema.json
+  - schema_ref: kernel.schemas.generate_gap_rewrites_output_v1
+    version: 1
+    file_path: schemas/generate_gap_rewrites_output.schema.json
+  - schema_ref: kernel.schemas.generate_gap_rewrites_input_v1
+    version: 1
+    file_path: schemas/generate_gap_rewrites_input.schema.json
+  - schema_ref: kernel.schemas.generate_questions_input_v1
+    version: 1
+    file_path: schemas/generate_questions_input.schema.json
+  - schema_ref: kernel.schemas.generate_questions_output_v1
+    version: 1
+    file_path: schemas/generate_questions_output.schema.json
+  - schema_ref: kernel.schemas.synthesize_angle_output_v1
+    version: 1
+    file_path: schemas/synthesize_angle_output.schema.json
+  - schema_ref: kernel.schemas.synthesize_angle_input_v1
+    version: 1
+    file_path: schemas/synthesize_angle_input.schema.json
+  - schema_ref: kernel.schemas.score_multidim_output_v1
+    version: 1
+    file_path: schemas/score_multidim_output.schema.json
+  - schema_ref: kernel.schemas.score_multidim_input_v1
+    version: 1
+    file_path: schemas/score_multidim_input.schema.json
+  - schema_ref: kernel.schemas.score_match_output_v1
+    version: 1
+    file_path: schemas/score_match_output.schema.json
+  - schema_ref: kernel.schemas.score_match_input_v1
+    version: 1
+    file_path: schemas/score_match_input.schema.json
+  - schema_ref: kernel.schemas.issue_detection_output_v1
+    version: 1
+    file_path: schemas/issue_detection_output.schema.json
+  - schema_ref: kernel.schemas.issue_detection_input_v1
+    version: 1
+    file_path: schemas/issue_detection_input.schema.json

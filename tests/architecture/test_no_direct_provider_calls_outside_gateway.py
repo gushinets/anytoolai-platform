@@ -6,10 +6,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SKIP_PATH_PARTS = {
     ".venv",
-    ".quick-check-tmp",
     ".quick-check-venv",
+    ".quick-check-tmp",
     ".uv-cache",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "__pycache__",
+    "site-packages",
     "node_modules",
+    ".pnpm-store",
+    ".next",
+    "dist",
+    "build",
+    "coverage",
 }
 ALLOWED_ADAPTER_MODULE_ROOT = (
     ROOT
