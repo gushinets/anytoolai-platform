@@ -288,14 +288,25 @@ def test_event_log_migration_creates_table_at_0002(tmp_path: Path) -> None:
                     sa.text("SELECT name FROM platform.sqlite_master WHERE type = 'index'")
                 ).scalars()
             )
+            event_log_columns = {
+                column["name"]
+                for column in sa.inspect(connection).get_columns(
+                    "event_log",
+                    schema="platform",
+                )
+            }
 
         assert "event_log" in table_names
+        assert "provider_policy_ref" in event_log_columns
+        assert "provider_policy_id" not in event_log_columns
         assert {
             "ix_event_log_timestamp",
             "ix_event_log_event_type",
             "ix_event_log_product_id",
             "ix_event_log_scenario_session_id",
             "ix_event_log_job_id",
+            "ix_event_log_action_run_id",
+            "ix_event_log_provider_call_id",
             "ix_event_log_handoff_id",
         }.issubset(index_names)
     finally:
@@ -304,7 +315,40 @@ def test_event_log_migration_creates_table_at_0002(tmp_path: Path) -> None:
 
 def test_platform_migration_chain_is_single_head() -> None:
     script = ScriptDirectory.from_config(_build_alembic_config("sqlite+pysqlite://"))
-    assert script.get_heads() == ["0005"]
+    assert script.get_heads() == ["0006"]
+
+
+def test_event_log_upgrade_from_0005_renames_provider_policy_column(tmp_path: Path) -> None:
+    main_db = tmp_path / "migration-upgrade-main.sqlite3"
+    platform_db = tmp_path / "migration-upgrade-platform.sqlite3"
+    engine = _build_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    try:
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "0005")
+            connection.execute(
+                sa.text(
+                    "ALTER TABLE platform.event_log "
+                    "RENAME COLUMN provider_policy_ref TO provider_policy_id"
+                )
+            )
+
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "head")
+            event_log_columns = {
+                column["name"]
+                for column in sa.inspect(connection).get_columns(
+                    "event_log",
+                    schema="platform",
+                )
+            }
+
+        assert "provider_policy_ref" in event_log_columns
+        assert "provider_policy_id" not in event_log_columns
+    finally:
+        engine.dispose()
 
 
 def test_event_emitter_persists_round_trip_and_maps_dimensions(
@@ -318,8 +362,14 @@ def test_event_emitter_persists_round_trip_and_maps_dimensions(
                 guest_id="guest_demo",
                 user_id="user_demo",
                 scenario_chain_id="chain_demo",
+                action_run_id="action_run_demo",
+                provider_policy_ref="policy_demo",
+                provider_call_id="provider_call_demo",
                 provider="openai",
                 model="gpt-5-mini",
+                physical_call_index=2,
+                pydantic_run_id="pydantic-run-demo",
+                litellm_response_id="litellm-response-demo",
                 acquisition_source="kernel_demo_ce",
             ),
             properties={"scenario_id": "smoke_start"},
@@ -336,8 +386,14 @@ def test_event_emitter_persists_round_trip_and_maps_dimensions(
     assert stored.guest_id == "guest_demo"
     assert stored.user_id == "user_demo"
     assert stored.scenario_chain_id == "chain_demo"
+    assert stored.action_run_id == "action_run_demo"
+    assert stored.provider_policy_ref == "policy_demo"
+    assert stored.provider_call_id == "provider_call_demo"
     assert stored.provider == "openai"
     assert stored.model == "gpt-5-mini"
+    assert stored.physical_call_index == 2
+    assert stored.pydantic_run_id == "pydantic-run-demo"
+    assert stored.litellm_response_id == "litellm-response-demo"
     assert stored.properties["scenario_id"] == "smoke_start"
 
 
@@ -529,12 +585,22 @@ def test_provider_events_include_adr_0007_correlation_properties(
     started_event, succeeded_event = provider_events
     assert started_event["event_type"] == "provider.request_started"
     assert succeeded_event["event_type"] == "provider.request_succeeded"
+    assert started_event["action_run_id"] == provider_call["action_run_id"]
+    assert succeeded_event["action_run_id"] == provider_call["action_run_id"]
+    assert started_event["provider_policy_ref"] == "default_fake_provider_v1"
+    assert succeeded_event["provider_policy_ref"] == "default_fake_provider_v1"
+    assert started_event["provider_call_id"] == provider_call["id"]
+    assert succeeded_event["provider_call_id"] == provider_call["id"]
+    assert started_event["physical_call_index"] == 1
+    assert succeeded_event["physical_call_index"] == 1
     assert started_event["properties"]["provider_call_id"] == provider_call["id"]
     assert succeeded_event["properties"]["provider_call_id"] == provider_call["id"]
     assert started_event["properties"]["provider_policy_ref"] == "default_fake_provider_v1"
     assert succeeded_event["properties"]["provider_policy_ref"] == "default_fake_provider_v1"
     assert started_event["properties"]["physical_call_index"] == 1
     assert succeeded_event["properties"]["physical_call_index"] == 1
+    assert succeeded_event["pydantic_run_id"]
+    assert succeeded_event["litellm_response_id"] is None
     assert succeeded_event["properties"]["semantic_attempt_index"] == 1
     assert succeeded_event["properties"]["transport_attempt_index"] == 1
     assert succeeded_event["properties"]["pydantic_run_id"]

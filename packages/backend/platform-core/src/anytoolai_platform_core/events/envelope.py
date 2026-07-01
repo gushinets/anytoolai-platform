@@ -19,10 +19,16 @@ class EventEnvelope:
     job_id: str | None = None
     workflow_id: str | None = None
     workflow_version: int | None = None
+    action_run_id: str | None = None
     action_type: str | None = None
     action_config_id: str | None = None
+    provider_policy_ref: str | None = None
+    provider_call_id: str | None = None
     provider: str | None = None
     model: str | None = None
+    physical_call_index: int | None = None
+    pydantic_run_id: str | None = None
+    litellm_response_id: str | None = None
     artifact_id: str | None = None
     handoff_id: str | None = None
     result_status: str | None = None

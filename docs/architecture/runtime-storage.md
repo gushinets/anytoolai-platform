@@ -46,11 +46,15 @@ For the Provider Gateway ADR-0007 realignment:
 
 - `0001_runtime_tables.py` was realigned in place so fresh `upgrade head` creates the
   ADR-0007-compatible `platform.provider_calls` ledger directly
-- `0002_event_log.py` remains the event-log migration
-- `0005_provider_calls_error_message_safe.py` remains the migration head and acts as a compatibility
-  revision for older upgrade paths
+- `0002_event_log.py` now creates `platform.event_log` with the canonical
+  `provider_policy_ref` correlation column for fresh installs
+- `0005_provider_calls_error_message_safe.py` preserves the provider-call error-message
+  compatibility change
+- `0006_event_log_provider_policy_ref_compat.py` renames the old
+  `platform.event_log.provider_policy_id` column to `provider_policy_ref` for databases already
+  upgraded through the previous chain
 
-No new Alembic revision was introduced for this realignment.
+This keeps fresh installs and already-upgraded databases on the same final schema.
 
 ## SQLAlchemy Choice
 

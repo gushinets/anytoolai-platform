@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.context.execution_context import ExecutionContext
-from anytoolai_platform_core.events.emitter import EventEmitter
+from anytoolai_platform_core.events.emitter import EventEmitter, enrich_event_context
 from anytoolai_platform_core.providers.adapters.base import ProviderAdapter
 from anytoolai_platform_core.providers.models import (
     ProviderCallRecord,
@@ -644,7 +644,11 @@ class ProviderGateway:
             return
         self._event_emitter.emit(
             "provider.request_started",
-            context,
+            self._provider_event_context(
+                context,
+                provider_call=provider_call,
+                pydantic_run_id=provider_call.pydantic_run_id,
+            ),
             properties=self._provider_event_properties(provider_call=provider_call),
         )
 
@@ -659,7 +663,12 @@ class ProviderGateway:
             return
         self._event_emitter.emit(
             "provider.request_succeeded",
-            context,
+            self._provider_event_context(
+                context,
+                provider_call=provider_call,
+                pydantic_run_id=response.pydantic_run_id,
+                litellm_response_id=response.litellm_response_id,
+            ),
             result_status=response.status.value,
             properties=self._provider_event_properties(
                 provider_call=provider_call,
@@ -681,7 +690,11 @@ class ProviderGateway:
             return
         self._event_emitter.emit(
             "provider.request_failed",
-            context,
+            self._provider_event_context(
+                context,
+                provider_call=provider_call,
+                pydantic_run_id=provider_call.pydantic_run_id,
+            ),
             result_status=(
                 ProviderCallStatus.timed_out.value
                 if error.error_code == "provider_request_timed_out"
@@ -693,6 +706,24 @@ class ProviderGateway:
                 error_code=error.error_code,
                 failure_kind=error.failure_kind,
             ),
+        )
+
+    def _provider_event_context(
+        self,
+        context: ExecutionContext,
+        *,
+        provider_call: ProviderCallRecord,
+        pydantic_run_id: str | None = None,
+        litellm_response_id: str | None = None,
+    ) -> ExecutionContext:
+        return enrich_event_context(
+            context,
+            action_run_id=provider_call.action_run_id,
+            provider_policy_ref=provider_call.provider_policy_ref,
+            provider_call_id=provider_call.id,
+            physical_call_index=provider_call.physical_call_index,
+            pydantic_run_id=pydantic_run_id,
+            litellm_response_id=litellm_response_id,
         )
 
     def _provider_event_properties(

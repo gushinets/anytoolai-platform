@@ -149,7 +149,8 @@ metadata jsonb
 Contract note:
 
 - one row equals one physical ProviderGateway attempt
-- event correlation details stay in `platform.event_log.properties`, not new event-log columns
+- event correlation details are persisted in both `platform.event_log` columns and
+  `platform.event_log.properties`
 
 ## `platform.artifacts`
 
@@ -188,10 +189,16 @@ scenario_chain_id nullable
 job_id nullable
 workflow_id nullable
 workflow_version nullable
+action_run_id nullable
 action_type nullable
 action_config_id nullable
+provider_policy_ref nullable
+provider_call_id nullable
 provider nullable
 model nullable
+physical_call_index nullable
+pydantic_run_id nullable
+litellm_response_id nullable
 artifact_id nullable
 handoff_id nullable
 result_status nullable

@@ -101,7 +101,7 @@ The lifecycle is:
 2. create one `platform.provider_calls` row for one physical attempt
 3. invoke exactly one physical adapter call
 4. update the same row with success or failure data
-5. emit provider events with deterministic correlation properties
+5. emit provider events with deterministic correlation columns/properties
 
 Invariant:
 
@@ -148,7 +148,8 @@ When the shared event emitter is configured, the gateway emits:
 The event log remains the domain source of truth. LiteLLM callbacks and PydanticAI tracing are
 auxiliary only.
 
-Provider-event correlation data lives in `event_log.properties` and includes:
+Provider-event correlation data is persisted both in top-level `event_log` columns and in
+`event_log.properties`. It includes:
 
 - `provider_call_id`
 - `action_run_id`

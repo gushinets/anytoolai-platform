@@ -88,7 +88,7 @@ without relying on LiteLLM callbacks or PydanticAI tracing.
 
 | Date | Decision | Why |
 |---|---|---|
-| 2026-06-29 | Keep `provider_policy_id` as the canonical runtime/storage/event field name. | Configs already use `provider_policy_ref`, but the persisted runtime contract and current code use `provider_policy_id`; backfill should clarify, not fork, the naming. |
+| 2026-06-29 | Keep `provider_policy_ref` as the canonical runtime/storage/event field name. | Configs, provider-call storage, and the final event-log contract should converge on the same provider-policy identifier instead of keeping a split runtime name. |
 | 2026-06-29 | Update `0001` and `0002` in place instead of adding a new migration. | The repo is still in pre-deployment baseline-folding mode with one clean head and explicit cleanup guidance to keep the baseline chain clean. |
 | 2026-06-29 | Persist provider correlation as first-class `event_log` columns, not only JSON properties. | The event log is the domain source of truth and should support deterministic joins without auxiliary callback/tracing systems. |
 

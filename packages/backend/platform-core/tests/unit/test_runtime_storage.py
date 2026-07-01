@@ -268,6 +268,13 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
                 schema="platform",
             )
         }
+        event_log_columns = {
+            column["name"]: column
+            for column in sa.inspect(connection).get_columns(
+                "event_log",
+                schema="platform",
+            )
+        }
 
     assert {
         "scenario_sessions",
@@ -293,6 +300,13 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
     assert "http_status" in provider_call_columns
     assert "pydantic_run_id" in provider_call_columns
     assert "litellm_response_id" in provider_call_columns
+    assert "action_run_id" in event_log_columns
+    assert "provider_policy_ref" in event_log_columns
+    assert "provider_policy_id" not in event_log_columns
+    assert "provider_call_id" in event_log_columns
+    assert "physical_call_index" in event_log_columns
+    assert "pydantic_run_id" in event_log_columns
+    assert "litellm_response_id" in event_log_columns
     assert {
         "ix_scenario_sessions_created_at",
         "ix_jobs_scenario_session_id",
@@ -300,6 +314,8 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "ix_provider_calls_job_id",
         "ix_artifacts_job_id",
         "ix_jobs_status",
+        "ix_event_log_action_run_id",
+        "ix_event_log_provider_call_id",
     }.issubset(index_names)
 
 
