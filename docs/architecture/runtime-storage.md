@@ -56,6 +56,34 @@ For the Provider Gateway ADR-0007 realignment:
 
 This keeps fresh installs and already-upgraded databases on the same final schema.
 
+### Provider Policy Ref Compatibility
+
+The provider-policy migration fix matters because the runtime contract had drifted across two
+surfaces:
+
+- config, provider-call storage, and Provider Gateway runtime code already used
+  `provider_policy_ref`
+- the historical `0002_event_log.py` migration still created `platform.event_log.provider_policy_id`
+
+The canonical runtime field name is now `provider_policy_ref` everywhere that the platform stores
+or emits provider-policy identity.
+
+Final upgrade behavior:
+
+- fresh databases get `platform.event_log.provider_policy_ref` directly from
+  `0002_event_log.py`
+- databases that were already upgraded through the older chain reach the same schema through
+  `0006_event_log_provider_policy_ref_compat.py`, which renames
+  `platform.event_log.provider_policy_id` to `provider_policy_ref`
+
+This means the durable storage contract no longer depends on whether a database was created after
+the baseline migration cleanup or upgraded from an older local/dev chain.
+
+The provider-event correlation contract also became explicit at the event-log table level. Provider
+request events now persist correlation both as top-level `platform.event_log` columns and inside
+`event_log.properties`, so joins remain deterministic while the JSON properties still preserve the
+full provider-attempt context.
+
 ## SQLAlchemy Choice
 
 The implementation uses SQLAlchemy Core tables plus small repository classes.
@@ -373,7 +401,8 @@ When the shared event emitter is configured on `ProviderGateway`, provider reque
 should be emitted through that emitter before or alongside persistence work, so invalid required
 event dimensions fail fast and do not leave behind unsafe provider-call rows.
 
-Provider-event correlation data continues to live in `event_log.properties`, including:
+Provider-event correlation data is persisted in both top-level `platform.event_log` columns and
+`event_log.properties`, including:
 
 - `provider_call_id`
 - `action_run_id`

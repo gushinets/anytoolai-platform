@@ -5,7 +5,7 @@
 - State: completed
 - Owner: agent
 - Created: 2026-07-01
-- Last updated: 2026-07-01
+- Last updated: 2026-07-02
 
 ## Goal
 
@@ -85,6 +85,7 @@ column to `provider_policy_ref` while keeping fresh installs on the same final s
 |---|---|---|
 | 2026-07-01 | Reviewed AGENTS/docs, current migrations, storage metadata, provider gateway flow, and event-log persistence. Confirmed fresh `0002` still creates `provider_policy_id` on `event_log`, while runtime/provider code expects `provider_policy_ref` semantics. | Patch migrations and event persistence together, then run focused tests for both fresh and upgraded schemas. |
 | 2026-07-01 | Updated `0002` for fresh installs, added `0006` compatibility rename for already-upgraded databases, aligned event-log columns/envelopes/emitter/gateway correlation fields, refreshed docs, and passed targeted tests plus `quick_check`. | Deliver summary with the final upgrade-path behavior and note the local `doctor` fallback/module constraint. |
+| 2026-07-02 | Added a repo-doc follow-up in `docs/architecture/runtime-storage.md` so the migration-compatibility story is documented outside the execution plan. | Keep any future migration/storage docs aligned with the canonical `provider_policy_ref` contract and the top-level `event_log` correlation columns. |
 
 ## Open questions
 
