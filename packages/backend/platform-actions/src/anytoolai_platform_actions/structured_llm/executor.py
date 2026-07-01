@@ -4,11 +4,19 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
+from pydantic_ai import UnexpectedModelBehavior
 from sqlalchemy.orm import Session
 
 from anytoolai_platform_core.config.registry import ConfigRegistry
-from anytoolai_platform_core.providers.gateway import ProviderGateway
+from anytoolai_platform_core.providers.gateway import (
+    ProviderGateway,
+    ProviderGatewayExecutionError,
+)
 from anytoolai_platform_core.providers.models import ProviderRequest, ProviderResponse
+
+from anytoolai_platform_actions.structured_llm.pydanticai_runner import (
+    PydanticAIStructuredRunner,
+)
 
 
 @dataclass(frozen=True)
@@ -44,6 +52,7 @@ class StructuredLlmActionExecutor:
     ) -> None:
         self._config_registry = config_registry
         self._provider_gateway = provider_gateway
+        self._structured_runner = PydanticAIStructuredRunner()
 
     async def execute(
         self,
@@ -79,7 +88,27 @@ class StructuredLlmActionExecutor:
             request_id=request.request_id,
             correlation_id=request.correlation_id,
         )
-        return await self._provider_gateway.request(provider_request, session=session)
+        provider_policy = self._require_provider_policy(action_config.provider_policy_ref)
+        try:
+            result = await self._structured_runner.run(
+                provider_request,
+                request_executor=lambda retry_request: self._provider_gateway.request(
+                    retry_request,
+                    session=session,
+                ),
+                validation_max_attempts=provider_policy.retry_policy.validation.max_attempts,
+            )
+        except UnexpectedModelBehavior as exc:
+            raise ProviderGatewayExecutionError(
+                provider_policy_ref=provider_policy.provider_policy_ref,
+                provider=provider_policy.provider,
+                model=provider_policy.model,
+                error_code="structured_output_validation_failed",
+                error_type=type(exc).__name__,
+                message=str(exc),
+                failure_kind="validation",
+            ) from exc
+        return result.last_response
 
     def _require_action_config(self, action_config_id: str) -> Any:
         action_config = self._config_registry.get_action_configuration(action_config_id)
@@ -98,6 +127,12 @@ class StructuredLlmActionExecutor:
         if prompt is None:
             raise LookupError(f"prompt not found: {prompt_ref}")
         return prompt
+
+    def _require_provider_policy(self, provider_policy_ref: str) -> Any:
+        provider_policy = self._config_registry.get_provider_policy(provider_policy_ref)
+        if provider_policy is None:
+            raise LookupError(f"provider policy not found: {provider_policy_ref}")
+        return provider_policy
 
     def _render_prompt(self, template: str, input_payload: Mapping[str, Any]) -> str:
         if not input_payload:

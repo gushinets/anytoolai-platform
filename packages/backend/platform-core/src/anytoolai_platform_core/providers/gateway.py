@@ -7,7 +7,6 @@ import inspect
 from time import perf_counter
 from typing import Any
 
-from pydantic_ai import UnexpectedModelBehavior
 from sqlalchemy.orm import Session
 
 from anytoolai_platform_core.common.errors import PlatformError
@@ -24,7 +23,6 @@ from anytoolai_platform_core.providers.models import (
     ResolvedProviderRequest,
 )
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
-from anytoolai_platform_core.providers.pydanticai_runner import PydanticAIStructuredRunner
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 
 _SECRET_KEYS = {
@@ -84,7 +82,6 @@ class ProviderGateway:
         self._policy_resolver = policy_resolver
         self._provider_call_repository = provider_call_repository
         self._event_emitter = event_emitter
-        self._structured_runner = PydanticAIStructuredRunner()
 
     async def request(
         self,
@@ -140,24 +137,9 @@ class ProviderGateway:
             fallback_from_policy_ref=fallback_from_policy_ref,
         )
         try:
-            result = await self._structured_runner.run(
+            return await self._execute_transport_attempts(
                 resolved_request,
-                transport_executor=lambda semantic_request: self._execute_transport_attempts(
-                    semantic_request,
-                    gateway_state=gateway_state,
-                ),
-            )
-            return result.last_response
-        except UnexpectedModelBehavior as exc:
-            error = ProviderGatewayExecutionError(
-                provider_policy_ref=policy.provider_policy_ref,
-                provider=policy.provider,
-                model=policy.model,
-                error_code="structured_output_validation_failed",
-                error_type=type(exc).__name__,
-                message=self._safe_error_message(exc),
-                resolved_request=resolved_request,
-                failure_kind="validation",
+                gateway_state=gateway_state,
             )
         except ProviderGatewayExecutionError as exc:
             error = exc
@@ -477,6 +459,8 @@ class ProviderGateway:
             fixture_key=request.fixture_key,
             request_id=request.request_id,
             correlation_id=request.correlation_id,
+            semantic_attempt_index=request.semantic_attempt_index,
+            pydantic_run_id=request.pydantic_run_id,
             fallback_from_policy_ref=fallback_from_policy_ref,
         )
 

@@ -6,23 +6,33 @@ from typing import Any, Awaitable, Callable, Mapping
 from jsonschema import ValidationError as JsonSchemaValidationError
 from jsonschema import validate as validate_json_schema
 from pydantic_ai import Agent, ModelRetry
-from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, RetryPromptPart, TextPart, UserPromptPart
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    RetryPromptPart,
+    TextPart,
+    UserPromptPart,
+)
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RequestUsage
 
 from anytoolai_platform_core.providers.models import (
     ProviderMessage,
+    ProviderRequest,
     ProviderResponse,
-    ResolvedProviderRequest,
 )
-from anytoolai_platform_core.structured_output.validator import StructuredOutputError, parse_json_object
+from anytoolai_platform_core.structured_output.validator import (
+    StructuredOutputError,
+    parse_json_object,
+)
 
 
 @dataclass
 class PydanticAIValidationState:
-    request: ResolvedProviderRequest
-    transport_executor: Callable[[ResolvedProviderRequest], Awaitable[ProviderResponse]]
+    request: ProviderRequest
+    request_executor: Callable[[ProviderRequest], Awaitable[ProviderResponse]]
     parsed_output: Mapping[str, Any] | None = None
     last_response: ProviderResponse | None = None
     semantic_attempt_index: int = 0
@@ -40,15 +50,20 @@ class PydanticAIValidationResult:
 class PydanticAIStructuredRunner:
     async def run(
         self,
-        request: ResolvedProviderRequest,
+        request: ProviderRequest,
         *,
-        transport_executor: Callable[[ResolvedProviderRequest], Awaitable[ProviderResponse]],
+        request_executor: Callable[[ProviderRequest], Awaitable[ProviderResponse]],
+        validation_max_attempts: int,
     ) -> PydanticAIValidationResult:
         state = PydanticAIValidationState(
             request=request,
-            transport_executor=transport_executor,
+            request_executor=request_executor,
         )
-        async def model_request(messages: list[ModelMessage], _agent_info: Any) -> ModelResponse:
+
+        async def model_request(
+            messages: list[ModelMessage],
+            _agent_info: Any,
+        ) -> ModelResponse:
             state.semantic_attempt_index += 1
             pydantic_run_id = _extract_run_id(messages)
             if pydantic_run_id is not None:
@@ -60,14 +75,14 @@ class PydanticAIStructuredRunner:
                 semantic_attempt_index=state.semantic_attempt_index,
                 pydantic_run_id=state.pydantic_run_id,
             )
-            response = await state.transport_executor(attempt_request)
+            response = await state.request_executor(attempt_request)
             state.last_response = response
 
             provider_details = (
                 dict(response.metadata) if isinstance(response.metadata, Mapping) else {}
             )
-            provider_details["gateway_backend"] = attempt_request.provider
-            provider_details["gateway_model"] = attempt_request.model
+            provider_details["gateway_backend"] = response.provider
+            provider_details["gateway_model"] = response.model
 
             return ModelResponse(
                 parts=[TextPart(response.output_text)],
@@ -87,13 +102,16 @@ class PydanticAIStructuredRunner:
                 model_name="function:anytoolai_provider_gateway",
             ),
             output_type=str,
-            retries={"output": max(request.retry_policy.validation.max_attempts - 1, 0)},
+            retries={"output": max(validation_max_attempts - 1, 0)},
             deps_type=PydanticAIValidationState,
-            name="provider_gateway_validation",
+            name="structured_llm_validation",
         )
 
         @agent.output_validator
-        def _validate_output(ctx: RunContext[PydanticAIValidationState], data: str) -> str:
+        def _validate_output(
+            ctx: RunContext[PydanticAIValidationState],
+            data: str,
+        ) -> str:
             ctx.deps.pydantic_run_id = ctx.run_id
             if ctx.deps.request.response_schema is None:
                 return data
@@ -114,7 +132,9 @@ class PydanticAIStructuredRunner:
             infer_name=False,
         )
         if state.last_response is None:
-            raise RuntimeError("PydanticAI validation run completed without a provider response")
+            raise RuntimeError(
+                "PydanticAI validation run completed without a provider response"
+            )
         return PydanticAIValidationResult(
             output_text=result.output,
             structured_output=state.parsed_output,

@@ -166,6 +166,15 @@ def is_provider_boundary(path: Path) -> bool:
     )
 
 
+def is_pydantic_ai_boundary(path: Path) -> bool:
+    """Return whether a path is inside the structured LLM execution boundary."""
+    relative = path.relative_to(ROOT)
+    return (
+        relative.parts[:3] == ("packages", "backend", "platform-actions")
+        and "structured_llm" in relative.parts
+    )
+
+
 def main() -> int:
     """Validate product-domain and LLM/provider import architecture boundaries."""
     errors: list[str] = []
@@ -194,7 +203,10 @@ def main() -> int:
                 if not imports_module(imports, module):
                     continue
 
-                if module in {"litellm", "pydantic_ai", "openai", "anthropic", "google.genai", "@google/genai", "cohere", "mistralai"} and is_provider_boundary(path):
+                if module == "pydantic_ai" and is_pydantic_ai_boundary(path):
+                    continue
+
+                if module in {"litellm", "openai", "anthropic", "google.genai", "@google/genai", "cohere", "mistralai"} and is_provider_boundary(path):
                     continue
 
                 errors.append(

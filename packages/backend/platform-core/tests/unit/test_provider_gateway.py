@@ -195,6 +195,8 @@ def build_request(
         "metadata": {"trace": "trace-123", "api_key": "do-not-persist"},
         "request_id": "req-123",
         "correlation_id": "corr-456",
+        "semantic_attempt_index": 1,
+        "pydantic_run_id": "pydantic-run-demo",
     }
     values.update(overrides)
     return ProviderRequest(**values)
@@ -256,29 +258,6 @@ def build_resolved_request(**overrides: Any) -> ResolvedProviderRequest:
     }
     values.update(overrides)
     return ResolvedProviderRequest(**values)
-
-
-class InvalidThenValidAdapter:
-    def __init__(self) -> None:
-        self.call_count = 0
-
-    async def complete(self, request: Any) -> ProviderResponse:
-        self.call_count += 1
-        if self.call_count == 1:
-            return ProviderResponse(
-                provider_policy_ref=request.provider_policy_ref,
-                provider=request.provider,
-                model=request.model,
-                output_text="not-json",
-                usage=ProviderUsage(input_tokens=10, output_tokens=2),
-            )
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider=request.provider,
-            model=request.model,
-            output_text='{"ok": true}',
-            usage=ProviderUsage(input_tokens=12, output_tokens=3),
-        )
 
 
 class TransportRetryAdapter:
@@ -362,7 +341,7 @@ def test_gateway_success_persists_adr_0007_provider_call_ledger(
         rows = _provider_rows(session)
 
     assert json.loads(response.output_text)["title"] == "Kernel Demo Source Summary"
-    assert response.structured_output is not None
+    assert response.structured_output is None
     assert len(rows) == 1
     row = rows[0]
     assert row["provider_policy_ref"] == "default_fake_provider_v1"
@@ -374,31 +353,17 @@ def test_gateway_success_persists_adr_0007_provider_call_ledger(
     assert row["physical_call_index"] == 1
     assert row["status"] == ProviderCallStatus.succeeded
     assert row["total_tokens"] == row["input_tokens"] + row["output_tokens"]
-    assert row["pydantic_run_id"] is not None
+    assert row["pydantic_run_id"] == "pydantic-run-demo"
     assert row["litellm_response_id"] is None
 
 
-def test_gateway_validation_retry_creates_one_row_per_physical_attempt(
+def test_gateway_uses_caller_supplied_semantic_attempt_index_and_pydantic_run_id(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: ConfigRegistry,
 ) -> None:
-    adapter = InvalidThenValidAdapter()
-    policy = ProviderPolicy(
-        provider_policy_ref="validation_retry_policy_v1",
-        provider="fake",
-        model="fake-json-v1",
-        retry_policy=ProviderRetryPolicy(
-            transport=ProviderTransportRetryPolicy(
-                owner="fake_adapter",
-                max_attempts=1,
-                litellm_num_retries_per_attempt=0,
-            ),
-            validation=ProviderValidationRetryPolicy(owner="pydanticai", max_attempts=2),
-            hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=2),
-        ),
-    )
     gateway = ProviderGateway(
-        {"fake": adapter},
-        build_policy_resolver(policy),
+        {"fake": FakeProviderAdapter(FIXTURE_ROOT)},
+        ProviderPolicyResolver(config_registry),
     )
 
     with transaction_boundary(session_factory) as session:
@@ -409,23 +374,20 @@ def test_gateway_validation_retry_creates_one_row_per_physical_attempt(
                     scenario_session,
                     job,
                     action_run,
-                    provider_policy_ref="validation_retry_policy_v1",
-                    response_schema=DEFAULT_SCHEMA,
+                    semantic_attempt_index=2,
+                    pydantic_run_id="pydantic-run-attempt-2",
                 ),
                 session=session,
             )
         )
         rows = _provider_rows(session)
 
-    assert adapter.call_count == 2
-    assert response.structured_output == {"ok": True}
-    assert [row["semantic_attempt_index"] for row in rows] == [1, 2]
-    assert [row["transport_attempt_index"] for row in rows] == [1, 1]
-    assert [row["physical_call_index"] for row in rows] == [1, 2]
-    assert [row["status"] for row in rows] == [
-        ProviderCallStatus.succeeded,
-        ProviderCallStatus.succeeded,
-    ]
+    assert json.loads(response.output_text)["title"] == "Kernel Demo Source Summary"
+    assert len(rows) == 1
+    assert rows[0]["semantic_attempt_index"] == 2
+    assert rows[0]["transport_attempt_index"] == 1
+    assert rows[0]["physical_call_index"] == 1
+    assert rows[0]["pydantic_run_id"] == "pydantic-run-attempt-2"
 
 
 def test_gateway_transport_retry_creates_multiple_rows_with_transport_indexes(
@@ -468,7 +430,7 @@ def test_gateway_transport_retry_creates_multiple_rows_with_transport_indexes(
         rows = _provider_rows(session)
 
     assert adapter.call_count == 2
-    assert response.structured_output == {"ok": True}
+    assert response.structured_output is None
     assert [row["semantic_attempt_index"] for row in rows] == [1, 1]
     assert [row["transport_attempt_index"] for row in rows] == [1, 2]
     assert [row["physical_call_index"] for row in rows] == [1, 2]

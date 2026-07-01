@@ -249,6 +249,8 @@ def build_provider_request(action: ActionRunRecord, job: JobRecord, **overrides:
         "action_config_id": action.action_config_id,
         "prompt": "hello",
         "prompt_ref": "kernel_demo.extract_structured_fields.v1",
+        "semantic_attempt_index": 1,
+        "pydantic_run_id": "pydantic-run-demo",
     }
     values.update(overrides)
     return ProviderRequest(**values)

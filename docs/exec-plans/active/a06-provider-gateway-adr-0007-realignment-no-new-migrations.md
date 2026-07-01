@@ -18,7 +18,8 @@ PydanticAI for structured validation/retry, and the existing migration chain onl
 
 - Replace flat provider retry fields with the ADR-0007 nested retry-policy contract.
 - Update provider runtime DTOs, gateway flow, and persistence to track physical transport attempts.
-- Integrate PydanticAI inside the provider boundary for structured validation retries.
+- Integrate PydanticAI inside the `platform-actions` structured LLM execution layer for
+  structured validation retries.
 - Realign existing runtime migrations in place so `upgrade head` produces the new provider-call
   ledger without adding `0006`.
 - Update provider/event/config/docs/tests to match the new contract.
@@ -85,4 +86,4 @@ PydanticAI for structured validation/retry, and the existing migration chain onl
 - Event correlation keys beyond the standard event-log columns continue to live in
   `event_log.properties`.
 - LiteLLM remains the only transport/router layer; PydanticAI owns structured validation and
-  validation retry only.
+  validation retry only from `platform-actions`, not from `platform-core`.

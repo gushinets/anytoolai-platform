@@ -41,7 +41,8 @@ action/runtime code -> ProviderGateway -> provider adapter protocol -> concrete 
 ```
 
 Direct `litellm` imports are allowed only inside provider adapters. Direct `pydantic_ai` imports are
-allowed only inside the provider boundary under `platform-core/providers`.
+allowed only inside the structured LLM execution layer under
+`packages/backend/platform-actions/**/structured_llm*`.
 
 Actions, workflows, products, scenarios, and executors must not call LiteLLM directly.
 
@@ -85,7 +86,8 @@ retry_policy.hard_limits.max_physical_provider_calls_per_action
 
 Ownership is split deliberately:
 
-- LiteLLM owns transport retries inside one semantic validation attempt.
+- `ProviderGateway` owns transport retries around LiteLLM SDK calls inside one semantic
+  validation attempt.
 - PydanticAI owns structured-output validation retries.
 - `ProviderGateway` enforces the hard cap on total physical provider calls for one action run.
 
@@ -182,7 +184,7 @@ LiteLLM does not own:
 
 ## PydanticAI Responsibilities
 
-PydanticAI stays inside the provider boundary.
+PydanticAI stays inside the structured LLM execution layer in `platform-actions`.
 
 It owns:
 
@@ -191,7 +193,8 @@ It owns:
 - validation retry loops
 - propagation of `pydantic_run_id` when available
 
-It does not replace the gateway persistence boundary. Each actual model call still flows through
+It does not replace the gateway persistence boundary. Structured executors call `ProviderGateway`
+through AnytoolAI request/response DTOs, and each actual model call still flows through
 gateway-managed row creation, row update, and event emission.
 
 ## Fake Provider

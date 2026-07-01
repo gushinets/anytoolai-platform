@@ -10,7 +10,6 @@ dependencies = [
     "jsonschema>=4.26.0",
     "litellm>=1.89.3",
     "pydantic==2.13.4",
-    "pydantic-ai-slim>=2.2.0",
     "pyyaml",
     "sqlalchemy>=2.0",
 ]

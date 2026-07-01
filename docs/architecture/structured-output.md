@@ -1,6 +1,6 @@
 # Structured Output
 
-Structured output is enforced at the provider boundary.
+Structured output is enforced in the structured LLM execution layer around `ProviderGateway`.
 
 MVP-A supports:
 
@@ -12,12 +12,12 @@ MVP-A supports:
 
 ## Ownership
 
-`ProviderGateway` remains the runtime boundary.
+`ProviderGateway` remains the transport, persistence, and event boundary.
 
 Responsibility split:
 
 - LiteLLM: transport/router only
-- PydanticAI: structured validation and validation retry
+- PydanticAI: structured validation and validation retry inside `platform-actions`
 - `ProviderGateway`: persistence, event emission, policy resolution, safe errors, hard call limits
 
 ## Validation Flow
@@ -29,7 +29,9 @@ action input
   ->
 action/request validation
   ->
-ProviderGateway
+StructuredLlmActionExecutor
+  ->
+ProviderGateway transport attempt
   ->
 physical provider call
   ->

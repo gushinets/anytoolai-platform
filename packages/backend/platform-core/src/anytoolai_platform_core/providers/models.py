@@ -91,6 +91,8 @@ class ProviderRequest:
     fixture_key: str | None = None
     request_id: str | None = None
     correlation_id: str | None = None
+    semantic_attempt_index: int = 1
+    pydantic_run_id: str | None = None
 
 
 @dataclass(frozen=True)
