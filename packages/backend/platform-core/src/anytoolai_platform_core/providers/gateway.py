@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import dataclass, replace
 import inspect
 from time import perf_counter
 from typing import Any
 
+from pydantic_ai import UnexpectedModelBehavior
 from sqlalchemy.orm import Session
 
 from anytoolai_platform_core.common.errors import PlatformError
@@ -23,6 +24,7 @@ from anytoolai_platform_core.providers.models import (
     ResolvedProviderRequest,
 )
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
+from anytoolai_platform_core.providers.pydanticai_runner import PydanticAIStructuredRunner
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 
 _SECRET_KEYS = {
@@ -39,26 +41,35 @@ _MAX_COLLECTION_ITEMS = 20
 _MAX_NESTING_DEPTH = 4
 
 
+@dataclass
+class _GatewayAttemptState:
+    repository: Any
+    should_persist: bool
+    physical_call_count: int = 0
+
+
 class ProviderGatewayExecutionError(RuntimeError):
     def __init__(
         self,
         *,
-        provider_policy_id: str,
+        provider_policy_ref: str,
         provider: str,
         model: str,
         error_code: str,
         error_type: str,
         message: str,
         resolved_request: ResolvedProviderRequest | None = None,
+        failure_kind: str | None = None,
     ) -> None:
         super().__init__(message)
-        self.provider_policy_id = provider_policy_id
+        self.provider_policy_ref = provider_policy_ref
         self.provider = provider
         self.model = model
         self.error_code = error_code
         self.error_type = error_type
         self.message = message
         self.resolved_request = resolved_request
+        self.failure_kind = failure_kind
 
 
 class ProviderGateway:
@@ -73,6 +84,7 @@ class ProviderGateway:
         self._policy_resolver = policy_resolver
         self._provider_call_repository = provider_call_repository
         self._event_emitter = event_emitter
+        self._structured_runner = PydanticAIStructuredRunner()
 
     async def request(
         self,
@@ -85,256 +97,365 @@ class ProviderGateway:
                 "ProviderGateway.request() requires a policy_resolver configured on the gateway"
             )
 
-        initial_policy = self._policy_resolver.resolve(request.provider_policy_id)
-        initial_context = self._event_context_from_request(
-            request,
-            provider=initial_policy.provider,
-            model=initial_policy.model,
-        )
-        self._emit_provider_started(initial_context)
-
         repository = self._resolve_provider_call_repository(session)
-        should_persist = self._should_persist_provider_call(request)
-        stored = None
-        if repository is not None and should_persist:
-            initial_resolved_request = self._resolved_request_from_policy(
-                request=request,
-                policy=initial_policy,
-                fallback_from_policy_id=None,
-            )
-            stored = repository.create(
-                ProviderCallRecord(
-                    tenant_id=request.tenant_id,
-                    region=request.region,
-                    product_id=request.product_id,
-                    frontend_id=request.frontend_id,
-                    scenario_session_id=request.scenario_session_id,
-                    job_id=request.job_id,
-                    action_run_id=request.action_run_id,
-                    workflow_id=request.workflow_id,
-                    step_id=request.step_id,
-                    action_type=request.action_type,
-                    action_config_id=request.action_config_id,
-                    provider_policy_id=initial_policy.provider_policy_id,
-                    provider=initial_policy.provider,
-                    model=initial_policy.model,
-                    status=ProviderCallStatus.running,
-                    started_at=utc_now(),
-                    metadata=self._build_provider_call_metadata(initial_resolved_request),
-                )
-            )
-
-        started = perf_counter()
-        try:
-            resolved_request, response = await self._execute_policy_chain(
-                request=request,
-                policy=initial_policy,
-                fallback_from_policy_id=None,
-                visited_policy_ids=set(),
-            )
-        except asyncio.CancelledError:
-            latency_ms = self._latency_ms(started)
-            safe_message = "provider request cancelled"
-            if repository is not None and stored is not None:
-                repository.update(
-                    replace(
-                        stored,
-                        status=ProviderCallStatus.failed,
-                        latency_ms=latency_ms,
-                        error_code="provider_request_cancelled",
-                        error_message_safe=safe_message,
-                        completed_at=utc_now(),
-                    )
-                )
-            self._emit_provider_failed(
-                initial_context,
-                error_code="provider_request_cancelled",
-                result_status=ProviderCallStatus.failed.value,
-            )
-            raise
-        except ProviderGatewayExecutionError as exc:
-            latency_ms = self._latency_ms(started)
-            failure_request = exc.resolved_request or self._resolved_request_from_policy(
-                request=request,
-                policy=initial_policy,
-                fallback_from_policy_id=None,
-            )
-            failure_context = replace(
-                initial_context,
-                provider_policy_id=failure_request.provider_policy_id,
-                provider=failure_request.provider,
-                model=failure_request.model,
-            )
-            if repository is not None and stored is not None:
-                repository.update(
-                    replace(
-                        stored,
-                        provider_policy_id=failure_request.provider_policy_id,
-                        provider=failure_request.provider,
-                        model=failure_request.model,
-                        status=(
-                            ProviderCallStatus.timed_out
-                            if exc.error_code == "provider_request_timed_out"
-                            else ProviderCallStatus.failed
-                        ),
-                        latency_ms=latency_ms,
-                        error_code=exc.error_code,
-                        error_message_safe=exc.message,
-                        completed_at=utc_now(),
-                        metadata=self._build_provider_call_metadata(
-                            failure_request,
-                            error_type=exc.error_type,
-                            error_code=exc.error_code,
-                            error_message_safe=exc.message,
-                        ),
-                    )
-                )
-            self._emit_provider_failed(
-                failure_context,
-                error_code=exc.error_code,
-                result_status=(
-                    ProviderCallStatus.timed_out.value
-                    if exc.error_code == "provider_request_timed_out"
-                    else ProviderCallStatus.failed.value
-                ),
-            )
-            raise
-
-        latency_ms = response.latency_ms or self._latency_ms(started)
-        stored_response = replace(response, latency_ms=latency_ms)
-        success_context = replace(
-            initial_context,
-            provider_policy_id=resolved_request.provider_policy_id,
-            provider=stored_response.provider,
-            model=stored_response.model,
+        gateway_state = _GatewayAttemptState(
+            repository=repository,
+            should_persist=self._should_persist_provider_call(request),
         )
-        if repository is not None and stored is not None:
-            repository.update(
-                replace(
-                    stored,
-                    provider_policy_id=resolved_request.provider_policy_id,
-                    provider=stored_response.provider,
-                    model=stored_response.model,
-                    status=stored_response.status,
-                    input_tokens=stored_response.usage.input_tokens,
-                    output_tokens=stored_response.usage.output_tokens,
-                    latency_ms=stored_response.latency_ms,
-                    estimated_cost=stored_response.estimated_cost,
-                    error_code=stored_response.error_code,
-                    error_message_safe=stored_response.error_message_safe,
-                    completed_at=utc_now(),
-                    metadata=self._build_provider_call_metadata(
-                        resolved_request,
-                        response=stored_response,
-                    ),
-                )
-            )
-        if self._is_success_status(stored_response.status):
-            self._emit_provider_succeeded(
-                success_context,
-                result_status=stored_response.status.value,
-            )
-        else:
-            self._emit_provider_failed(
-                success_context,
-                error_code=self._response_error_code(stored_response),
-                result_status=stored_response.status.value,
-            )
-        return stored_response
+        initial_policy = self._policy_resolver.resolve(request.provider_policy_ref)
+        return await self._execute_policy_chain(
+            request=request,
+            policy=initial_policy,
+            fallback_from_policy_ref=None,
+            visited_policy_refs=set(),
+            gateway_state=gateway_state,
+        )
 
     async def _execute_policy_chain(
         self,
         *,
         request: ProviderRequest,
         policy: ProviderPolicy,
-        fallback_from_policy_id: str | None,
-        visited_policy_ids: set[str],
-    ) -> tuple[ResolvedProviderRequest, ProviderResponse]:
-        if policy.provider_policy_id in visited_policy_ids:
+        fallback_from_policy_ref: str | None,
+        visited_policy_refs: set[str],
+        gateway_state: _GatewayAttemptState,
+    ) -> ProviderResponse:
+        if policy.provider_policy_ref in visited_policy_refs:
             raise ProviderGatewayExecutionError(
-                provider_policy_id=policy.provider_policy_id,
+                provider_policy_ref=policy.provider_policy_ref,
                 provider=policy.provider,
                 model=policy.model,
                 error_code="provider_policy_cycle",
                 error_type="ProviderPolicyCycleError",
                 message=(
                     "provider policy fallback cycle detected for "
-                    f"{policy.provider_policy_id}"
+                    f"{policy.provider_policy_ref}"
                 ),
+                failure_kind="policy_cycle",
             )
 
         resolved_request = self._resolved_request_from_policy(
             request=request,
             policy=policy,
-            fallback_from_policy_id=fallback_from_policy_id,
+            fallback_from_policy_ref=fallback_from_policy_ref,
         )
-
-        root_exception: Exception | None = None
         try:
-            adapter = self._adapters[policy.provider]
-            raw_response = await asyncio.wait_for(
-                self._invoke_adapter(adapter, resolved_request),
-                timeout=policy.timeout_seconds,
+            result = await self._structured_runner.run(
+                resolved_request,
+                transport_executor=lambda semantic_request: self._execute_transport_attempts(
+                    semantic_request,
+                    gateway_state=gateway_state,
+                ),
             )
-            response = self._normalize_internal_response(raw_response)
-            return resolved_request, response
-        except TimeoutError as exc:
-            root_exception = exc
+            return result.last_response
+        except UnexpectedModelBehavior as exc:
             error = ProviderGatewayExecutionError(
-                provider_policy_id=policy.provider_policy_id,
+                provider_policy_ref=policy.provider_policy_ref,
                 provider=policy.provider,
                 model=policy.model,
-                error_code="provider_request_timed_out",
-                error_type="TimeoutError",
-                message=(
-                    "provider request exceeded configured timeout of "
-                    f"{policy.timeout_seconds} second(s)"
-                ),
+                error_code="structured_output_validation_failed",
+                error_type=type(exc).__name__,
+                message=self._safe_error_message(exc),
                 resolved_request=resolved_request,
+                failure_kind="validation",
             )
+        except ProviderGatewayExecutionError as exc:
+            error = exc
         except asyncio.CancelledError:
             raise
-        except Exception as exc:  # pragma: no cover - exercised by tests via adapters.
-            root_exception = exc
+        except Exception as exc:  # pragma: no cover - defensive wrapper
             error = ProviderGatewayExecutionError(
-                provider_policy_id=policy.provider_policy_id,
+                provider_policy_ref=policy.provider_policy_ref,
                 provider=policy.provider,
                 model=policy.model,
                 error_code=self._safe_error_code(exc),
                 error_type=type(exc).__name__,
                 message=self._safe_error_message(exc),
                 resolved_request=resolved_request,
+                failure_kind="gateway",
             )
 
         if policy.fallback_policy is not None:
             fallback_policy = self._policy_resolver.resolve(policy.fallback_policy)
-            next_visited = set(visited_policy_ids)
-            next_visited.add(policy.provider_policy_id)
+            next_visited = set(visited_policy_refs)
+            next_visited.add(policy.provider_policy_ref)
             return await self._execute_policy_chain(
                 request=request,
                 policy=fallback_policy,
-                fallback_from_policy_id=policy.provider_policy_id,
-                visited_policy_ids=next_visited,
+                fallback_from_policy_ref=policy.provider_policy_ref,
+                visited_policy_refs=next_visited,
+                gateway_state=gateway_state,
             )
 
-        if root_exception is None:
-            raise error
-        raise error from root_exception
+        raise error
+
+    async def _execute_transport_attempts(
+        self,
+        request: ResolvedProviderRequest,
+        *,
+        gateway_state: _GatewayAttemptState,
+    ) -> ProviderResponse:
+        last_error: ProviderGatewayExecutionError | None = None
+        max_attempts = max(request.retry_policy.transport.max_attempts, 1)
+        for transport_attempt_index in range(1, max_attempts + 1):
+            if (
+                gateway_state.physical_call_count
+                >= request.retry_policy.hard_limits.max_physical_provider_calls_per_action
+            ):
+                raise ProviderGatewayExecutionError(
+                    provider_policy_ref=request.provider_policy_ref,
+                    provider=request.provider,
+                    model=request.model,
+                    error_code="provider_physical_call_limit_exceeded",
+                    error_type="ProviderPhysicalCallLimitExceeded",
+                    message="provider physical call limit exceeded",
+                    resolved_request=request,
+                    failure_kind="hard_limit",
+                )
+
+            physical_call_index = gateway_state.physical_call_count + 1
+            gateway_state.physical_call_count = physical_call_index
+            attempt_request = replace(
+                request,
+                transport_attempt_index=transport_attempt_index,
+                physical_call_index=physical_call_index,
+            )
+            provider_call = ProviderCallRecord(
+                tenant_id=attempt_request.tenant_id,
+                region=attempt_request.region,
+                product_id=attempt_request.product_id,
+                frontend_id=attempt_request.frontend_id,
+                scenario_session_id=attempt_request.scenario_session_id,
+                job_id=attempt_request.job_id,
+                action_run_id=attempt_request.action_run_id,
+                workflow_id=attempt_request.workflow_id,
+                workflow_version=attempt_request.workflow_version,
+                step_id=attempt_request.step_id,
+                action_type=attempt_request.action_type,
+                action_config_id=attempt_request.action_config_id,
+                provider_policy_ref=attempt_request.provider_policy_ref,
+                provider=attempt_request.provider,
+                model=attempt_request.model,
+                gateway_backend=attempt_request.provider,
+                gateway_model=attempt_request.model,
+                semantic_attempt_index=attempt_request.semantic_attempt_index,
+                transport_attempt_index=attempt_request.transport_attempt_index,
+                physical_call_index=attempt_request.physical_call_index,
+                status=ProviderCallStatus.running,
+                started_at=utc_now(),
+                pydantic_run_id=attempt_request.pydantic_run_id,
+                metadata=self._build_provider_call_metadata(attempt_request),
+            )
+            context = self._event_context_from_resolved_request(attempt_request)
+            self._emit_provider_started(
+                context,
+                provider_call=provider_call,
+            )
+
+            stored = None
+            if gateway_state.should_persist:
+                stored = gateway_state.repository.create(provider_call)
+
+            started = perf_counter()
+            try:
+                adapter = self._adapters[attempt_request.provider]
+                raw_response = await asyncio.wait_for(
+                    self._invoke_adapter(adapter, attempt_request),
+                    timeout=attempt_request.timeout_seconds,
+                )
+                response = self._normalize_internal_response(raw_response)
+                response = replace(
+                    response,
+                    latency_ms=response.latency_ms or self._latency_ms(started),
+                    pydantic_run_id=attempt_request.pydantic_run_id
+                    or response.pydantic_run_id,
+                )
+                if self._is_success_status(response.status):
+                    self._update_provider_call_success(
+                        stored=stored,
+                        provider_call=provider_call,
+                        request=attempt_request,
+                        response=response,
+                        gateway_state=gateway_state,
+                    )
+                    self._emit_provider_succeeded(
+                        context,
+                        provider_call=provider_call,
+                        response=response,
+                    )
+                    return response
+
+                error = ProviderGatewayExecutionError(
+                    provider_policy_ref=attempt_request.provider_policy_ref,
+                    provider=response.provider,
+                    model=response.model,
+                    error_code=self._response_error_code(response),
+                    error_type=response.error_type or type(response).__name__,
+                    message=response.error_message_safe or "provider response failed",
+                    resolved_request=attempt_request,
+                    failure_kind=response.failure_kind
+                    or self._failure_kind_for_status(response.status),
+                )
+            except asyncio.CancelledError:
+                latency_ms = self._latency_ms(started)
+                error = ProviderGatewayExecutionError(
+                    provider_policy_ref=attempt_request.provider_policy_ref,
+                    provider=attempt_request.provider,
+                    model=attempt_request.model,
+                    error_code="provider_request_cancelled",
+                    error_type="CancelledError",
+                    message="provider request cancelled",
+                    resolved_request=attempt_request,
+                    failure_kind="cancelled",
+                )
+                self._update_provider_call_failure(
+                    stored=stored,
+                    provider_call=provider_call,
+                    request=attempt_request,
+                    gateway_state=gateway_state,
+                    error=error,
+                    latency_ms=latency_ms,
+                )
+                self._emit_provider_failed(
+                    context,
+                    provider_call=provider_call,
+                    error=error,
+                )
+                raise
+            except TimeoutError as exc:
+                error = ProviderGatewayExecutionError(
+                    provider_policy_ref=attempt_request.provider_policy_ref,
+                    provider=attempt_request.provider,
+                    model=attempt_request.model,
+                    error_code="provider_request_timed_out",
+                    error_type="TimeoutError",
+                    message=(
+                        "provider request exceeded configured timeout of "
+                        f"{attempt_request.timeout_seconds} second(s)"
+                    ),
+                    resolved_request=attempt_request,
+                    failure_kind="timeout",
+                )
+            except ProviderGatewayExecutionError as exc:  # pragma: no cover - defensive seam
+                error = exc
+            except Exception as exc:  # pragma: no cover - exercised by tests via adapters
+                error = ProviderGatewayExecutionError(
+                    provider_policy_ref=attempt_request.provider_policy_ref,
+                    provider=attempt_request.provider,
+                    model=attempt_request.model,
+                    error_code=self._safe_error_code(exc),
+                    error_type=type(exc).__name__,
+                    message=self._safe_error_message(exc),
+                    resolved_request=attempt_request,
+                    failure_kind="transport",
+                )
+
+            latency_ms = self._latency_ms(started)
+            self._update_provider_call_failure(
+                stored=stored,
+                provider_call=provider_call,
+                request=attempt_request,
+                gateway_state=gateway_state,
+                error=error,
+                latency_ms=latency_ms,
+            )
+            self._emit_provider_failed(
+                context,
+                provider_call=provider_call,
+                error=error,
+            )
+            last_error = error
+            if transport_attempt_index == max_attempts:
+                raise error
+
+        if last_error is None:  # pragma: no cover - defensive
+            raise RuntimeError("transport loop exhausted without a provider error")
+        raise last_error
+
+    def _update_provider_call_success(
+        self,
+        *,
+        stored: ProviderCallRecord | None,
+        provider_call: ProviderCallRecord,
+        request: ResolvedProviderRequest,
+        response: ProviderResponse,
+        gateway_state: _GatewayAttemptState,
+    ) -> None:
+        if not gateway_state.should_persist or stored is None:
+            return
+        gateway_state.repository.update(
+            replace(
+                stored,
+                provider=response.provider,
+                model=response.model,
+                status=response.status,
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+                total_tokens=response.usage.total_tokens,
+                latency_ms=response.latency_ms,
+                estimated_cost=response.estimated_cost,
+                failure_kind=response.failure_kind,
+                http_status=response.http_status,
+                pydantic_run_id=response.pydantic_run_id,
+                litellm_response_id=response.litellm_response_id,
+                completed_at=utc_now(),
+                metadata=self._build_provider_call_metadata(
+                    request,
+                    response=response,
+                ),
+            )
+        )
+
+    def _update_provider_call_failure(
+        self,
+        *,
+        stored: ProviderCallRecord | None,
+        provider_call: ProviderCallRecord,
+        request: ResolvedProviderRequest,
+        gateway_state: _GatewayAttemptState,
+        error: ProviderGatewayExecutionError,
+        latency_ms: int,
+    ) -> None:
+        if not gateway_state.should_persist or stored is None:
+            return
+        gateway_state.repository.update(
+            replace(
+                stored,
+                status=(
+                    ProviderCallStatus.timed_out
+                    if error.error_code == "provider_request_timed_out"
+                    else ProviderCallStatus.failed
+                ),
+                latency_ms=latency_ms,
+                error_code=error.error_code,
+                error_message_safe=error.message,
+                failure_kind=error.failure_kind,
+                pydantic_run_id=request.pydantic_run_id,
+                completed_at=utc_now(),
+                metadata=self._build_provider_call_metadata(
+                    request,
+                    error_type=error.error_type,
+                    error_code=error.error_code,
+                    error_message_safe=error.message,
+                    failure_kind=error.failure_kind,
+                ),
+            )
+        )
 
     def _resolved_request_from_policy(
         self,
         *,
         request: ProviderRequest,
         policy: ProviderPolicy,
-        fallback_from_policy_id: str | None,
+        fallback_from_policy_ref: str | None,
     ) -> ResolvedProviderRequest:
         return ResolvedProviderRequest(
-            provider_policy_id=policy.provider_policy_id,
+            provider_policy_ref=policy.provider_policy_ref,
             provider=policy.provider,
             model=policy.model,
             temperature=policy.temperature,
             timeout_seconds=policy.timeout_seconds,
-            max_retries=policy.max_retries,
+            retry_policy=policy.retry_policy,
             structured_output_mode=policy.structured_output_mode,
             tenant_id=request.tenant_id,
             region=request.region,
@@ -343,6 +464,7 @@ class ProviderGateway:
             scenario_session_id=request.scenario_session_id,
             job_id=request.job_id,
             workflow_id=request.workflow_id,
+            workflow_version=request.workflow_version,
             step_id=request.step_id,
             action_run_id=request.action_run_id,
             action_type=request.action_type,
@@ -355,8 +477,7 @@ class ProviderGateway:
             fixture_key=request.fixture_key,
             request_id=request.request_id,
             correlation_id=request.correlation_id,
-            attempt_number=1,
-            fallback_from_policy_id=fallback_from_policy_id,
+            fallback_from_policy_ref=fallback_from_policy_ref,
         )
 
     def _build_provider_call_metadata(
@@ -367,6 +488,7 @@ class ProviderGateway:
         error_type: str | None = None,
         error_code: str | None = None,
         error_message_safe: str | None = None,
+        failure_kind: str | None = None,
     ) -> dict[str, Any]:
         metadata: dict[str, Any] = {
             "prompt_ref": request.prompt_ref,
@@ -376,11 +498,27 @@ class ProviderGateway:
             "structured_output_mode": request.structured_output_mode.value,
             "temperature": request.temperature,
             "timeout": {"configured_seconds": request.timeout_seconds},
-            "retry": {
-                "owned_by": "litellm" if request.provider == "litellm" else "adapter",
-                "max_retries": request.max_retries,
+            "retry_policy": {
+                "transport": {
+                    "owner": request.retry_policy.transport.owner,
+                    "max_attempts": request.retry_policy.transport.max_attempts,
+                    "litellm_num_retries_per_attempt": request.retry_policy.transport.litellm_num_retries_per_attempt,
+                },
+                "validation": {
+                    "owner": request.retry_policy.validation.owner,
+                    "max_attempts": request.retry_policy.validation.max_attempts,
+                },
+                "hard_limits": {
+                    "max_physical_provider_calls_per_action": request.retry_policy.hard_limits.max_physical_provider_calls_per_action,
+                },
             },
-            "fallback_from_policy_id": request.fallback_from_policy_id,
+            "attempts": {
+                "semantic_attempt_index": request.semantic_attempt_index,
+                "transport_attempt_index": request.transport_attempt_index,
+                "physical_call_index": request.physical_call_index,
+                "pydantic_run_id": request.pydantic_run_id,
+            },
+            "fallback_from_policy_ref": request.fallback_from_policy_ref,
             "request_payload": {
                 "prompt_chars": len(request.prompt),
                 "message_count": len(request.messages),
@@ -392,6 +530,11 @@ class ProviderGateway:
             metadata["litellm"] = {"model_group": request.model}
         if response is not None:
             metadata["response_metadata"] = self._sanitize_metadata(response.metadata)
+            metadata["response"] = {
+                "http_status": response.http_status,
+                "litellm_response_id": response.litellm_response_id,
+                "total_tokens": response.usage.total_tokens,
+            }
             litellm_metadata = response.metadata.get("litellm")
             if request.provider == "litellm" and isinstance(litellm_metadata, Mapping):
                 metadata["litellm"] = {
@@ -403,6 +546,7 @@ class ProviderGateway:
                 "type": error_type,
                 "code": error_code,
                 "message_safe": error_message_safe,
+                "failure_kind": failure_kind,
             }
         return metadata
 
@@ -419,7 +563,7 @@ class ProviderGateway:
     def _resolve_provider_call_repository(
         self,
         session: Session | None,
-    ) -> Any | None:
+    ) -> Any:
         if self._provider_call_repository is not None:
             return self._provider_call_repository
         if session is None:
@@ -464,12 +608,14 @@ class ProviderGateway:
             return "provider_request_timed_out"
         return "provider_request_failed"
 
-    def _event_context_from_request(
+    def _failure_kind_for_status(self, status: ProviderCallStatus) -> str:
+        if status is ProviderCallStatus.timed_out:
+            return "timeout"
+        return "response_failure"
+
+    def _event_context_from_resolved_request(
         self,
-        request: ProviderRequest,
-        *,
-        provider: str,
-        model: str,
+        request: ResolvedProviderRequest,
     ) -> ExecutionContext:
         return ExecutionContext(
             tenant_id=request.tenant_id,
@@ -479,49 +625,101 @@ class ProviderGateway:
             scenario_session_id=request.scenario_session_id,
             job_id=request.job_id,
             workflow_id=request.workflow_id,
-            step_id=request.step_id,
+            workflow_version=request.workflow_version,
             action_type=request.action_type,
             action_config_id=request.action_config_id,
-            provider=provider,
-            model=model,
+            provider=request.provider,
+            model=request.model,
             action_run_id=request.action_run_id,
-            provider_policy_id=request.provider_policy_id,
+            provider_policy_ref=request.provider_policy_ref,
         )
 
-    def _emit_provider_started(self, context: ExecutionContext) -> None:
+    def _emit_provider_started(
+        self,
+        context: ExecutionContext,
+        *,
+        provider_call: ProviderCallRecord,
+    ) -> None:
         if self._event_emitter is None:
             return
-        self._event_emitter.emit("provider.request_started", context)
+        self._event_emitter.emit(
+            "provider.request_started",
+            context,
+            properties=self._provider_event_properties(provider_call=provider_call),
+        )
 
     def _emit_provider_succeeded(
         self,
         context: ExecutionContext,
         *,
-        result_status: str,
+        provider_call: ProviderCallRecord,
+        response: ProviderResponse,
     ) -> None:
         if self._event_emitter is None:
             return
         self._event_emitter.emit(
             "provider.request_succeeded",
             context,
-            result_status=result_status,
+            result_status=response.status.value,
+            properties=self._provider_event_properties(
+                provider_call=provider_call,
+                pydantic_run_id=response.pydantic_run_id,
+                litellm_response_id=response.litellm_response_id,
+                total_tokens=response.usage.total_tokens,
+                http_status=response.http_status,
+            ),
         )
 
     def _emit_provider_failed(
         self,
         context: ExecutionContext,
         *,
-        error_code: str,
-        result_status: str,
+        provider_call: ProviderCallRecord,
+        error: ProviderGatewayExecutionError,
     ) -> None:
         if self._event_emitter is None:
             return
         self._event_emitter.emit(
             "provider.request_failed",
             context,
-            result_status=result_status,
-            properties={"error_code": error_code},
+            result_status=(
+                ProviderCallStatus.timed_out.value
+                if error.error_code == "provider_request_timed_out"
+                else ProviderCallStatus.failed.value
+            ),
+            properties=self._provider_event_properties(
+                provider_call=provider_call,
+                pydantic_run_id=provider_call.pydantic_run_id,
+                error_code=error.error_code,
+                failure_kind=error.failure_kind,
+            ),
         )
+
+    def _provider_event_properties(
+        self,
+        *,
+        provider_call: ProviderCallRecord,
+        pydantic_run_id: str | None = None,
+        litellm_response_id: str | None = None,
+        total_tokens: int | None = None,
+        http_status: int | None = None,
+        error_code: str | None = None,
+        failure_kind: str | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "provider_call_id": provider_call.id,
+            "action_run_id": provider_call.action_run_id,
+            "provider_policy_ref": provider_call.provider_policy_ref,
+            "physical_call_index": provider_call.physical_call_index,
+            "semantic_attempt_index": provider_call.semantic_attempt_index,
+            "transport_attempt_index": provider_call.transport_attempt_index,
+            "pydantic_run_id": pydantic_run_id,
+            "litellm_response_id": litellm_response_id,
+            "total_tokens": total_tokens,
+            "http_status": http_status,
+            "failure_kind": failure_kind,
+            "error_code": error_code,
+        }
 
     def _normalize_internal_response(
         self,

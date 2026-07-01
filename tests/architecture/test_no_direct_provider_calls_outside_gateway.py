@@ -21,6 +21,15 @@ ALLOWED_ADAPTER_MODULE_ROOT = (
     / "providers"
     / "adapters"
 )
+ALLOWED_PROVIDER_MODULE_ROOT = (
+    ROOT
+    / "packages"
+    / "backend"
+    / "platform-core"
+    / "src"
+    / "anytoolai_platform_core"
+    / "providers"
+)
 FORBIDDEN_ADAPTER_IMPORT_PREFIX = "anytoolai_platform_core.providers.adapters"
 FORBIDDEN_PROVIDER_IMPORT_PARENT = "anytoolai_platform_core.providers"
 ALLOWED_GATEWAY_MODULE = (
@@ -123,5 +132,20 @@ def test_no_direct_litellm_imports_outside_provider_adapter() -> None:
             offenders.append(path)
 
     assert offenders == [], "direct litellm imports found outside provider adapters: " + ", ".join(
+        str(path.relative_to(ROOT)) for path in offenders
+    )
+
+
+def test_no_direct_pydantic_ai_imports_outside_provider_boundary() -> None:
+    offenders: list[Path] = []
+    for path in _python_files():
+        if path.is_relative_to(ALLOWED_PROVIDER_MODULE_ROOT):
+            continue
+        if "tests" in path.parts:
+            continue
+        if _imports_module(path, "pydantic_ai"):
+            offenders.append(path)
+
+    assert offenders == [], "direct pydantic_ai imports found outside provider boundary: " + ", ".join(
         str(path.relative_to(ROOT)) for path in offenders
     )

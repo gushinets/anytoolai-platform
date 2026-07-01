@@ -15,6 +15,10 @@ from anytoolai_platform_core.providers.adapters.litellm import (
 )
 from anytoolai_platform_core.providers.models import (
     ProviderMessage,
+    ProviderRetryHardLimits,
+    ProviderRetryPolicy,
+    ProviderTransportRetryPolicy,
+    ProviderValidationRetryPolicy,
     ResolvedProviderRequest,
     StructuredOutputMode,
 )
@@ -32,12 +36,20 @@ class RecordingRouter:
 
 def make_request(**overrides: object) -> ResolvedProviderRequest:
     values: dict[str, object] = {
-        "provider_policy_id": "default_text_generation_v1",
+        "provider_policy_ref": "default_text_generation_v1",
         "provider": "litellm",
         "model": "anytoolai.default_text",
         "temperature": 0.3,
         "timeout_seconds": 60,
-        "max_retries": 2,
+        "retry_policy": ProviderRetryPolicy(
+            transport=ProviderTransportRetryPolicy(
+                owner="litellm",
+                max_attempts=2,
+                litellm_num_retries_per_attempt=1,
+            ),
+            validation=ProviderValidationRetryPolicy(owner="pydanticai", max_attempts=2),
+            hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=4),
+        ),
         "structured_output_mode": StructuredOutputMode.json_schema,
         "tenant_id": "tenant_demo",
         "region": "eu-central",
@@ -46,6 +58,7 @@ def make_request(**overrides: object) -> ResolvedProviderRequest:
         "scenario_session_id": "scenario_session_demo",
         "job_id": "job_demo",
         "workflow_id": "workflow_demo",
+        "workflow_version": 1,
         "step_id": "step_1",
         "action_run_id": "action_run_demo",
         "action_type": "text.extract_structured_fields",
@@ -75,6 +88,8 @@ def make_router_response(**overrides: object) -> object:
         ],
         "usage": usage,
         "model": "openai/gpt-4.1-mini",
+        "id": "litellm-response-123",
+        "status_code": 200,
         "_hidden_params": hidden_params,
     }
     values.update(overrides)
@@ -101,7 +116,7 @@ def test_litellm_adapter_maps_messages_to_router_acompletion() -> None:
             ],
             "temperature": 0.3,
             "timeout": 60.0,
-            "num_retries": 2,
+            "num_retries": 1,
         }
     ]
 
@@ -170,6 +185,8 @@ def test_litellm_adapter_handles_response_content_lists() -> None:
     assert response.output_text == '{"ok":true}'
     assert response.metadata["usage"]["total_tokens"] == 16
     assert response.metadata["litellm"]["model_id"] == "router-deployment-1"
+    assert response.litellm_response_id == "litellm-response-123"
+    assert response.http_status == 200
 
 
 def test_load_litellm_router_config_resolves_env_sentinels(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

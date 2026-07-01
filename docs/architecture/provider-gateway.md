@@ -1,20 +1,38 @@
 # Provider Gateway
 
-All model/provider calls go through Provider Gateway.
+All provider/model calls go through `ProviderGateway`.
 
-Provider Gateway responsibilities:
+The runtime boundary remains:
 
-- provider policy resolution;
-- async request orchestration;
-- timeout enforcement and timeout settings propagation to adapters;
-- fallback policy when configured;
-- structured output mode;
-- provider call logging;
-- token/cost metadata;
-- latency metadata;
-- user-safe provider errors.
+```text
+Structured LLM Action
+        ->
+ProviderGateway
+        ->
+Resolve ProviderPolicy
+        ->
+Create provider_calls row
+        ->
+LiteLLM / fake adapter
+        ->
+Normalize response
+        ->
+Update provider_calls row
+        ->
+Emit provider events
+```
 
-## Allowed runtime path
+`ProviderGateway` is not replaced by LiteLLM or PydanticAI. It owns:
+
+- provider-policy resolution
+- runtime dimensions
+- provider-call persistence
+- provider event emission
+- safe platform errors
+- hard physical-call limits
+- deterministic fake-provider behavior
+
+## Boundaries
 
 Runtime code must use:
 
@@ -22,126 +40,162 @@ Runtime code must use:
 action/runtime code -> ProviderGateway -> provider adapter protocol -> concrete adapter
 ```
 
-Direct provider adapter imports outside `platform-core/providers` are forbidden. Actions, workflow
-runtime, and other execution code must not bypass the gateway to call provider adapters directly.
+Direct `litellm` imports are allowed only inside provider adapters. Direct `pydantic_ai` imports are
+allowed only inside the provider boundary under `platform-core/providers`.
 
-## Async provider contract
+Actions, workflows, products, scenarios, and executors must not call LiteLLM directly.
 
-The runtime provider path uses async DTOs:
+## Runtime DTOs
 
-- `ProviderRequest`
-  - runtime dimensions such as `scenario_session_id`, `job_id`, `action_run_id`,
-    `action_config_id`, and `provider_policy_id`
-  - input payload as `prompt` plus optional `messages`
-  - safe request metadata, `fixture_key`, and optional correlation/request ids
-- `ResolvedProviderRequest`
-  - the adapter-facing request after `ProviderPolicy` resolution
-  - includes resolved `provider`, `model`, `temperature`, `timeout_seconds`, `max_retries`, and
-    `structured_output_mode`
-- `ProviderResponse`
-  - `output_text`
-  - success/failure status
-  - token usage
-  - latency
-  - estimated cost when known
-  - safe response/error metadata
+`ProviderRequest`
 
-Concrete adapters implement one shared async interface and remain implementation details behind the
-gateway.
+- carries runtime dimensions through `action_run_id`
+- carries `provider_policy_ref`, `workflow_version`, prompt/messages, response schema, and safe
+  metadata
 
-For real provider transport, the current default adapter path is:
+`ResolvedProviderRequest`
 
-```text
-ProviderGateway -> LiteLLMProviderAdapter -> litellm.Router.acompletion(...)
-```
+- is the adapter-facing request after policy resolution
+- carries resolved provider/model settings plus ADR-0007 attempt fields:
+  `semantic_attempt_index`, `transport_attempt_index`, `physical_call_index`
+- carries nested `retry_policy`
 
-LiteLLM stays behind the AnytoolAI gateway boundary. Actions, workflows, products, and frontends do
-not call LiteLLM directly.
+`ProviderResponse`
 
-## Dependency shape
+- carries normalized provider/model/output
+- carries usage, latency, estimated cost, safe failure data, `http_status`,
+  `pydantic_run_id`, and `litellm_response_id` when available
 
-`ProviderGateway` supports two persistence wiring modes:
+## Retry Ownership
 
-- explicit `provider_call_repository` injection
-- caller-owned SQLAlchemy `session` passed to `request(...)`, with the gateway constructing
-  `ProviderCallRepository(session)`
+Provider policy is the only owner of retry intent.
 
-For runtime event emission, `ProviderGateway` may also receive the shared `event_emitter`
-dependency. Provider request events must go through that shared emitter, not through an ad-hoc
-provider-specific event path.
-
-This preserves the explicit transaction-boundary pattern from runtime storage. The gateway does not
-own commits and does not introduce hidden commit behavior.
-
-The gateway exposes async `request(...)` for the provider-runtime path. The older public sync
-compatibility seam was removed so callers cannot bypass provider-policy-owned routing with direct
-provider/model arguments.
-
-Minimum provider policy fields:
+The runtime contract is:
 
 ```text
-provider
-model
-temperature
-timeout_seconds
-max_retries
-fallback_policy optional
-structured_output_mode
+retry_policy.transport.owner
+retry_policy.transport.max_attempts
+retry_policy.transport.litellm_num_retries_per_attempt
+
+retry_policy.validation.owner
+retry_policy.validation.max_attempts
+
+retry_policy.hard_limits.max_physical_provider_calls_per_action
 ```
 
-Even before billing, provider calls must log:
+Ownership is split deliberately:
 
-- provider;
-- model;
-- input tokens;
-- output tokens;
-- latency in milliseconds;
-- estimated cost;
-- success/failure.
+- LiteLLM owns transport retries inside one semantic validation attempt.
+- PydanticAI owns structured-output validation retries.
+- `ProviderGateway` enforces the hard cap on total physical provider calls for one action run.
 
-## Provider call persistence
+Legacy flat fields such as `max_retries` are not part of the contract anymore.
 
-The gateway persists `platform.provider_calls` rows for both success and failure paths while keeping
-transaction ownership with the caller.
+## Provider-Call Lifecycle
 
-Persisted data includes:
+Provider-call persistence is gateway-owned and caller-transactional.
 
-- resolved provider policy id, provider, and model
-- runtime dimensions through `action_run_id`
-- result status
-- token counts when available
-- latency and estimated cost when available
-- safe error type/message for failures
-- safe metadata for timeout, request id, correlation id, fixture selection, router-owned retry
-  configuration, and response annotations
+The lifecycle is:
 
-The gateway must not persist secrets, raw credentials, or large unsafe payloads such as raw prompt
-bodies.
+1. resolve `ProviderPolicy`
+2. create one `platform.provider_calls` row for one physical attempt
+3. invoke exactly one physical adapter call
+4. update the same row with success or failure data
+5. emit provider events with deterministic correlation properties
 
-Required event dimensions gate persistence for provider calls. If required dimensions such as
-`tenant_id` or `region` are missing or blank, the gateway must not write a `provider_calls` row.
+Invariant:
 
-When the resolved provider is `litellm`, the gateway writes one logical `provider_calls` row per
-request and delegates retry/load-balancing behavior to LiteLLM Router. Safe row metadata may
-include:
+```text
+one provider_calls row == one physical ProviderGateway attempt
+```
 
-- LiteLLM model group alias from `ProviderPolicy.model`
-- actual provider/model identifiers returned by LiteLLM when available
-- router/deployment `model_id` when available
-- estimated response cost when LiteLLM exposes it
+The gateway must not:
 
-When the shared event emitter is configured, the gateway should emit:
+- collapse multiple transport attempts into one row
+- create synthetic rows from LiteLLM callbacks
+- create synthetic rows for validation retries
+
+## Persistence Contract
+
+`platform.provider_calls` rows persist both success and failure paths.
+
+Key ledger fields:
+
+- `workflow_version`
+- `provider_policy_ref`
+- `gateway_backend`
+- `gateway_model`
+- `semantic_attempt_index`
+- `transport_attempt_index`
+- `physical_call_index`
+- `failure_kind`
+- `http_status`
+- `total_tokens`
+- `pydantic_run_id` nullable
+- `litellm_response_id` nullable
+
+Required execution dimensions gate persistence. If required dimensions such as `tenant_id` or
+`region` are invalid, the gateway must not persist a provider-call row.
+
+## Event Emission
+
+When the shared event emitter is configured, the gateway emits:
 
 - `provider.request_started`
 - `provider.request_succeeded`
 - `provider.request_failed`
 
-If required event dimensions are invalid, event emission should fail fast and provider-call
-persistence should not proceed.
+The event log remains the domain source of truth. LiteLLM callbacks and PydanticAI tracing are
+auxiliary only.
 
-## Fake provider behavior
+Provider-event correlation data lives in `event_log.properties` and includes:
 
-The fake provider is deterministic and selects fixtures by request metadata, not prompt text.
+- `provider_call_id`
+- `action_run_id`
+- `provider_policy_ref`
+- `physical_call_index`
+- `semantic_attempt_index`
+- `transport_attempt_index`
+- `pydantic_run_id` when present
+- `litellm_response_id` when present
+
+## LiteLLM Responsibilities
+
+LiteLLM stays inside `providers/adapters/litellm.py`.
+
+It owns:
+
+- provider transport
+- router/deployment selection from `configs/kernel/litellm_router.yaml`
+- provider response normalization inputs such as usage, model ids, and response ids
+- per-attempt transport retry count through
+  `retry_policy.transport.litellm_num_retries_per_attempt`
+
+LiteLLM does not own:
+
+- provider-policy resolution
+- runtime persistence
+- event emission
+- structured-output validation
+- hard physical-call limits
+
+## PydanticAI Responsibilities
+
+PydanticAI stays inside the provider boundary.
+
+It owns:
+
+- structured-output validation
+- JSON Schema enforcement
+- validation retry loops
+- propagation of `pydantic_run_id` when available
+
+It does not replace the gateway persistence boundary. Each actual model call still flows through
+gateway-managed row creation, row update, and event emission.
+
+## Fake Provider
+
+The fake provider remains deterministic and does not inspect prompt text for fixture selection.
 
 Selection order:
 
@@ -152,32 +206,23 @@ Selection order:
 
 Fixture files live in `tests/fixtures/provider/fake_provider_outputs/`.
 
-## Failure safety
+## Config Split
 
-Gateway failures must use safe platform-facing error codes.
+Provider policy intent lives in `configs/kernel/provider_policies.yaml`.
 
-Current behavior:
+It owns:
 
-- use `PlatformError.code` when the underlying exception is a platform error
-- use `provider_request_timed_out` for timeout failures
-- use `provider_request_failed` for other provider failures
+- provider selection
+- model-group selection
+- timeout policy
+- retry policy
+- structured-output mode
 
-The gateway may still keep the underlying exception type for internal metadata, but persisted
-failure rows and surfaced safe errors should use the safe platform error code.
+LiteLLM router config lives separately in `configs/kernel/litellm_router.yaml`.
 
-## Config split
+It owns:
 
-Provider policy intent remains in `configs/kernel/provider_policies.yaml`:
-
-- logical provider boundary (`fake`, `litellm`, ...)
-- logical model group alias
-- temperature
-- timeout
-- max retries
-- structured output mode
-
-LiteLLM deployment/routing config lives separately in `configs/kernel/litellm_router.yaml`:
-
-- `model_list`
-- deployment credentials via `env/VAR_NAME` sentinels
-- router strategy / pre-call checks / other router settings
+- deployments
+- routing strategy
+- credentials
+- provider-specific transport settings

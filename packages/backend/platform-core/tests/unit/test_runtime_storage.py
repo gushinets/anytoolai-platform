@@ -146,12 +146,18 @@ def make_provider_call(
         "job_id": job_id,
         "action_run_id": action_run_id,
         "workflow_id": "wf_smoke",
+        "workflow_version": 1,
         "step_id": "step_1",
         "action_type": "text.extract_structured_fields",
         "action_config_id": "cfg_extract",
-        "provider_policy_id": "policy_primary",
+        "provider_policy_ref": "policy_primary",
         "provider": "openai",
         "model": "gpt-5-mini",
+        "gateway_backend": "litellm",
+        "gateway_model": "anytoolai.default_text",
+        "semantic_attempt_index": 1,
+        "transport_attempt_index": 1,
+        "physical_call_index": 1,
     }
     values.update(overrides)
     return ProviderCallRecord(**values)
@@ -274,6 +280,19 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
     assert scenario_session_columns["created_at"]["nullable"] is False
     assert "error_message_safe" in provider_call_columns
     assert provider_call_columns["error_message_safe"]["nullable"] is True
+    assert "provider_policy_ref" in provider_call_columns
+    assert "provider_policy_id" not in provider_call_columns
+    assert "workflow_version" in provider_call_columns
+    assert "gateway_backend" in provider_call_columns
+    assert "gateway_model" in provider_call_columns
+    assert "semantic_attempt_index" in provider_call_columns
+    assert "transport_attempt_index" in provider_call_columns
+    assert "physical_call_index" in provider_call_columns
+    assert "total_tokens" in provider_call_columns
+    assert "failure_kind" in provider_call_columns
+    assert "http_status" in provider_call_columns
+    assert "pydantic_run_id" in provider_call_columns
+    assert "litellm_response_id" in provider_call_columns
     assert {
         "ix_scenario_sessions_created_at",
         "ix_jobs_scenario_session_id",

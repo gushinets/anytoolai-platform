@@ -20,6 +20,7 @@ class StructuredLlmActionRequest:
     scenario_session_id: str
     job_id: str
     workflow_id: str
+    workflow_version: int
     step_id: str
     action_run_id: str
     action_config_id: str
@@ -57,7 +58,7 @@ class StructuredLlmActionExecutor:
             action_definition.output_schema_ref
         )
         provider_request = ProviderRequest(
-            provider_policy_id=action_config.provider_policy_ref,
+            provider_policy_ref=action_config.provider_policy_ref,
             tenant_id=request.tenant_id,
             region=request.region,
             product_id=request.product_id,
@@ -65,6 +66,7 @@ class StructuredLlmActionExecutor:
             scenario_session_id=request.scenario_session_id,
             job_id=request.job_id,
             workflow_id=request.workflow_id,
+            workflow_version=request.workflow_version,
             step_id=request.step_id,
             action_run_id=request.action_run_id,
             action_type=action_config.action_type,

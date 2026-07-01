@@ -23,7 +23,7 @@ class FakeProviderAdapter:
         output_text = self._response_text(fixture)
 
         return ProviderResponse(
-            provider_policy_id=request.provider_policy_id,
+            provider_policy_ref=request.provider_policy_ref,
             provider=request.provider,
             model=request.model,
             output_text=output_text,

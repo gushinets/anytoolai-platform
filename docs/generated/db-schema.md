@@ -1,8 +1,22 @@
 # DB Schema
 
-Generated-doc mirror of the MVP-A runtime schema from `docs/product-specs/mvp-scope-source-of-truth.md`.
+Generated-doc mirror of the MVP-A runtime schema from the current repository state.
 
 Definitions stay in YAML/Markdown. PostgreSQL stores runtime state only.
+
+## Migration Rule
+
+The canonical migration chain remains:
+
+- `0001_runtime_tables.py`
+- `0002_event_log.py`
+- `0003_guest_quota.py`
+- `0004_handoffs.py`
+- `0005_provider_calls_error_message_safe.py`
+
+The Provider Gateway ADR-0007 realignment did not add a new revision. Existing migration files were
+edited in place so fresh `upgrade head` produces the current schema directly, and `0005` remains
+the head.
 
 ## Runtime Tables
 
@@ -17,18 +31,6 @@ Definitions stay in YAML/Markdown. PostgreSQL stores runtime state only.
 - `platform.email_captures`
 - `platform.paywall_intents`
 - `platform.product_handoffs`
-
-## Tables Not Needed In MVP-A
-
-- `platform.products`
-- `platform.workflow_definitions`
-- `platform.action_definitions`
-- `platform.action_configurations`
-- `platform.prompt_versions`
-- `platform.subscriptions`
-- `platform.wallets`
-- `platform.ledger_entries`
-- `platform.admin_users`
 
 ## `platform.scenario_sessions`
 
@@ -56,8 +58,6 @@ completed_at nullable
 expires_at nullable
 ```
 
-Initial statuses: `started`, `waiting_for_user`, `running`, `completed`, `failed`, `expired`.
-
 ## `platform.jobs`
 
 ```text
@@ -79,8 +79,6 @@ completed_at nullable
 created_at
 metadata jsonb
 ```
-
-Initial statuses: `created`, `running`, `succeeded`, `failed`, `canceled`.
 
 ## `platform.action_runs`
 
@@ -106,8 +104,6 @@ completed_at nullable
 metadata jsonb
 ```
 
-Initial statuses: `created`, `running`, `succeeded`, `failed`, `canceled`, `skipped`.
-
 ## `platform.provider_calls`
 
 ```text
@@ -120,25 +116,40 @@ scenario_session_id
 job_id
 action_run_id
 workflow_id
+workflow_version
 step_id
 action_type
 action_config_id
-provider_policy_id
+provider_policy_ref
 provider
 model
+gateway_backend
+gateway_model
+semantic_attempt_index
+transport_attempt_index
+physical_call_index
 status
 input_tokens
 output_tokens
+total_tokens
 latency_ms
 estimated_cost
 error_code nullable
+error_message_safe nullable
+failure_kind nullable
+http_status nullable
+pydantic_run_id nullable
+litellm_response_id nullable
 created_at
 started_at nullable
 completed_at nullable
 metadata jsonb
 ```
 
-Initial statuses: `created`, `running`, `succeeded`, `failed`, `timed_out`.
+Contract note:
+
+- one row equals one physical ProviderGateway attempt
+- event correlation details stay in `platform.event_log.properties`, not new event-log columns
 
 ## `platform.artifacts`
 
@@ -159,9 +170,6 @@ object_storage_key nullable
 metadata jsonb
 created_at
 ```
-
-MVP-A may store text and JSON directly in PostgreSQL. Keep object storage as an interface.
-Initial statuses: `created`, `stored`, `failed`.
 
 ## `platform.event_log`
 
@@ -192,8 +200,6 @@ acquisition_source nullable
 properties jsonb
 ```
 
-Event log is required for analytics, debugging, future billing, and later consumers.
-
 ## `platform.product_handoffs`
 
 ```text
@@ -218,5 +224,3 @@ context_payload jsonb
 created_at
 expires_at
 ```
-
-Statuses: `created`, `viewed`, `accepted`, `declined`, `consumed`, `expired`, `failed`.

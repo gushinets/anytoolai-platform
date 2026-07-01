@@ -1,19 +1,37 @@
 provider_policies:
-  - provider_policy_id: default_fake_provider_v1
+  - provider_policy_ref: default_fake_provider_v1
     provider: fake
     model: fake-json-v1
     temperature: 0.0
     timeout_seconds: 30
-    max_retries: 1
+    retry_policy:
+      transport:
+        owner: fake_adapter
+        max_attempts: 1
+        litellm_num_retries_per_attempt: 0
+      validation:
+        owner: pydanticai
+        max_attempts: 1
+      hard_limits:
+        max_physical_provider_calls_per_action: 1
     structured_output_mode: json_schema
     metadata:
       fixture_strategy: deterministic_metadata_key
-  - provider_policy_id: default_text_generation_v1
+  - provider_policy_ref: default_text_generation_v1
     provider: litellm
     model: anytoolai.default_text
     temperature: 0.3
     timeout_seconds: 60
-    max_retries: 2
+    retry_policy:
+      transport:
+        owner: litellm
+        max_attempts: 2
+        litellm_num_retries_per_attempt: 1
+      validation:
+        owner: pydanticai
+        max_attempts: 2
+      hard_limits:
+        max_physical_provider_calls_per_action: 4
     structured_output_mode: json_schema
     metadata:
       model_group: anytoolai.default_text

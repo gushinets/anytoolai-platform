@@ -25,7 +25,7 @@ class SpyGateway:
         self.requests.append(request)
         self.sessions.append(session)
         return ProviderResponse(
-            provider_policy_id=request.provider_policy_id,
+            provider_policy_ref=request.provider_policy_ref,
             provider="fake",
             model="fake-json-v1",
             output_text='{"ok": true}',
@@ -62,6 +62,7 @@ def test_structured_llm_executor_routes_calls_through_provider_gateway() -> None
         scenario_session_id="scenario_session_demo",
         job_id="job_demo",
         workflow_id="kernel_demo.single_action_extract_v1",
+        workflow_version=1,
         step_id="extract",
         action_run_id="action_run_demo",
         action_config_id="kernel_demo.extract_structured_fields_v1",
@@ -79,7 +80,8 @@ def test_structured_llm_executor_routes_calls_through_provider_gateway() -> None
     assert spy_gateway.sessions == [session]
     assert len(spy_gateway.requests) == 1
     provider_request = spy_gateway.requests[0]
-    assert provider_request.provider_policy_id == "default_fake_provider_v1"
+    assert provider_request.provider_policy_ref == "default_fake_provider_v1"
+    assert provider_request.workflow_version == 1
     assert provider_request.action_type == "text.extract_structured_fields"
     assert provider_request.prompt_ref == "kernel_demo.extract_structured_fields.v1"
     assert provider_request.fixture_key == "fixture_alpha"

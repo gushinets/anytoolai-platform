@@ -188,7 +188,7 @@ def make_artifact(scenario_session_id: str, **overrides: Any) -> ArtifactRecord:
 class SuccessfulAdapter:
     async def complete(self, request: Any) -> ProviderResponse:
         return ProviderResponse(
-            provider_policy_id=request.provider_policy_id,
+            provider_policy_ref=request.provider_policy_ref,
             output_text="ok",
             provider=request.provider,
             model=request.model,
@@ -222,7 +222,7 @@ class FailedResponseAdapter:
 
     async def complete(self, request: Any) -> ProviderResponse:
         return ProviderResponse(
-            provider_policy_id=request.provider_policy_id,
+            provider_policy_ref=request.provider_policy_ref,
             output_text="not-ok",
             provider=request.provider,
             model=request.model,
@@ -234,7 +234,7 @@ class FailedResponseAdapter:
 
 def build_provider_request(action: ActionRunRecord, job: JobRecord, **overrides: Any) -> ProviderRequest:
     values = {
-        "provider_policy_id": "default_fake_provider_v1",
+        "provider_policy_ref": "default_fake_provider_v1",
         "tenant_id": action.tenant_id,
         "region": action.region,
         "product_id": action.product_id,
@@ -242,6 +242,7 @@ def build_provider_request(action: ActionRunRecord, job: JobRecord, **overrides:
         "scenario_session_id": action.scenario_session_id,
         "job_id": job.id,
         "workflow_id": action.workflow_id,
+        "workflow_version": job.workflow_version,
         "step_id": action.step_id,
         "action_run_id": action.id,
         "action_type": action.action_type,
@@ -495,6 +496,52 @@ def test_runtime_services_emit_required_success_events(
     } <= set(event_types)
 
 
+def test_provider_events_include_adr_0007_correlation_properties(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        emitter = _build_emitter(session)
+        gateway = ProviderGateway(
+            {"fake": SuccessfulAdapter()},
+            policy_resolver=ProviderPolicyResolver(config_registry),
+            provider_call_repository=ProviderCallRepository(session),
+            event_emitter=emitter,
+        )
+
+        action = make_action_run("scenario_session_demo", "job_demo")
+        job = make_job(action.scenario_session_id, id=action.job_id)
+
+        asyncio.run(gateway.request(build_provider_request(action, job), session=session))
+
+        provider_call = session.execute(
+            sa.select(provider_calls_table)
+            .order_by(provider_calls_table.c.created_at.desc(), provider_calls_table.c.id.desc())
+        ).mappings().one()
+        provider_events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.event_type.like("provider.request_%"))
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    started_event, succeeded_event = provider_events
+    assert started_event["event_type"] == "provider.request_started"
+    assert succeeded_event["event_type"] == "provider.request_succeeded"
+    assert started_event["properties"]["provider_call_id"] == provider_call["id"]
+    assert succeeded_event["properties"]["provider_call_id"] == provider_call["id"]
+    assert started_event["properties"]["provider_policy_ref"] == "default_fake_provider_v1"
+    assert succeeded_event["properties"]["provider_policy_ref"] == "default_fake_provider_v1"
+    assert started_event["properties"]["physical_call_index"] == 1
+    assert succeeded_event["properties"]["physical_call_index"] == 1
+    assert succeeded_event["properties"]["semantic_attempt_index"] == 1
+    assert succeeded_event["properties"]["transport_attempt_index"] == 1
+    assert succeeded_event["properties"]["pydantic_run_id"]
+    assert succeeded_event["properties"]["total_tokens"] == "[REDACTED]"
+    assert provider_call["total_tokens"] == 192
+
+
 def test_runtime_services_emit_required_failure_events(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
     config_registry: Any,
@@ -594,7 +641,8 @@ def test_provider_gateway_failed_provider_response_emits_failed_event_and_persis
         action = make_action_run("scenario_session_demo", "job_demo")
         job = make_job(action.scenario_session_id, id=action.job_id)
 
-        response = asyncio.run(gateway.request(build_provider_request(action, job), session=session))
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+            asyncio.run(gateway.request(build_provider_request(action, job), session=session))
 
         event_types = _event_types(session)
         failed_event = session.execute(
@@ -609,7 +657,7 @@ def test_provider_gateway_failed_provider_response_emits_failed_event_and_persis
             )
         ).mappings().first()
 
-    assert response.status is status
+    assert exc_info.value.error_code == expected_error_code
     assert "provider.request_succeeded" not in event_types
     assert "provider.request_failed" in event_types
     assert failed_event is not None
@@ -637,7 +685,7 @@ def test_provider_gateway_does_not_persist_provider_call_when_event_dimensions_a
         action = make_action_run("scenario_session_demo", "job_demo", **{field_name: value})
         job = make_job(action.scenario_session_id, id=action.job_id, **{field_name: value})
 
-        with pytest.raises(EventValidationError, match=field_name):
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
             asyncio.run(
                 gateway.request(
                     build_provider_request(action, job, **{field_name: value}),
@@ -649,4 +697,6 @@ def test_provider_gateway_does_not_persist_provider_call_when_event_dimensions_a
             sa.select(sa.func.count()).select_from(provider_calls_table)
         ).scalar_one()
 
+    assert exc_info.value.error_code == "provider_request_failed"
+    assert field_name in exc_info.value.message
     assert provider_call_count == 0

@@ -87,7 +87,7 @@ def test_unknown_top_level_fields_fail_validation() -> None:
     with pytest.raises(ValidationError):
         ProviderPolicy.model_validate(
             {
-                "provider_policy_id": "default_fake_provider_v1",
+                "provider_policy_ref": "default_fake_provider_v1",
                 "provider": "fake",
                 "model": "fake-json-v1",
                 "unexpected_field": True,

@@ -1,6 +1,6 @@
 # Runtime Storage
 
-This document describes the first SQLAlchemy-backed runtime storage slice for MVP-A.
+This document describes the SQLAlchemy-backed runtime storage slice for MVP-A.
 
 It covers the design that was implemented for:
 
@@ -18,6 +18,7 @@ The runtime storage slice lives in these files:
 
 - `migrations/platform/env.py`
 - `migrations/platform/versions/0001_runtime_tables.py`
+- `migrations/platform/versions/0005_provider_calls_error_message_safe.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/db.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/transactions.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/scenarios/repository.py`
@@ -36,6 +37,20 @@ The runtime storage slice does not cover:
 - product definition tables
 - billing tables
 - admin editing flows
+
+## Migration Chain
+
+The canonical runtime migration chain remains the existing files only.
+
+For the Provider Gateway ADR-0007 realignment:
+
+- `0001_runtime_tables.py` was realigned in place so fresh `upgrade head` creates the
+  ADR-0007-compatible `platform.provider_calls` ledger directly
+- `0002_event_log.py` remains the event-log migration
+- `0005_provider_calls_error_message_safe.py` remains the migration head and acts as a compatibility
+  revision for older upgrade paths
+
+No new Alembic revision was introduced for this realignment.
 
 ## SQLAlchemy Choice
 
@@ -282,21 +297,32 @@ Action run status values:
 
 Purpose:
 
-- persist provider gateway calls and their safe operational metadata
+- persist provider gateway physical attempts and their safe operational metadata
 
 Key columns:
 
 - all common dimensions through action-run granularity
-- `provider_policy_id`
+- `workflow_version`
+- `provider_policy_ref`
 - `provider`
 - `model`
+- `gateway_backend`
+- `gateway_model`
+- `semantic_attempt_index`
+- `transport_attempt_index`
+- `physical_call_index`
 - `status`
 - `input_tokens`
 - `output_tokens`
+- `total_tokens`
 - `latency_ms`
 - `estimated_cost`
 - `error_code`
 - `error_message_safe`
+- `failure_kind`
+- `http_status`
+- `pydantic_run_id`
+- `litellm_response_id`
 - timestamps
 
 Provider call status values:
@@ -307,8 +333,15 @@ Provider call status values:
 - `failed`
 - `timed_out`
 
-These fields were chosen to match the provider-gateway contract: even before billing, provider
-calls must log provider, model, tokens, latency, cost when known, and success/failure state.
+These fields were chosen to match the ADR-0007 provider-gateway contract. The row is a runtime
+ledger entry for one physical ProviderGateway attempt, not one logical high-level request.
+
+Invariants:
+
+- one `provider_calls` row == one physical transport attempt
+- validation retries create additional rows
+- transport retries create additional rows
+- rows are created by the gateway, not by LiteLLM callbacks or synthetic bookkeeping
 
 Additional safe operational details such as timeout metadata, retry metadata, request/correlation
 ids, fixture selection, and response annotations may be stored in the row `metadata` JSON. Raw
@@ -317,6 +350,13 @@ prompt bodies, secrets, and unsafe payloads should not be persisted there.
 Provider-call persistence is gateway-owned. The gateway may receive an explicit
 `provider_call_repository` dependency or may construct `ProviderCallRepository(session)` from a
 caller-owned session, but it must not own commits.
+
+Retry ownership stays split across runtime layers:
+
+- LiteLLM transport uses `retry_policy.transport`
+- PydanticAI validation uses `retry_policy.validation`
+- the gateway enforces
+  `retry_policy.hard_limits.max_physical_provider_calls_per_action`
 
 Provider-call rows should be written only when required execution dimensions are valid. If required
 dimensions such as `tenant_id` or `region` are missing or blank, the gateway should skip
@@ -328,6 +368,17 @@ still keeping safe operational metadata for debugging.
 When the shared event emitter is configured on `ProviderGateway`, provider request lifecycle events
 should be emitted through that emitter before or alongside persistence work, so invalid required
 event dimensions fail fast and do not leave behind unsafe provider-call rows.
+
+Provider-event correlation data continues to live in `event_log.properties`, including:
+
+- `provider_call_id`
+- `action_run_id`
+- `provider_policy_ref`
+- `physical_call_index`
+- `semantic_attempt_index`
+- `transport_attempt_index`
+- `pydantic_run_id` when present
+- `litellm_response_id` when present
 
 ### `platform.artifacts`
 
@@ -446,7 +497,7 @@ The storage slice is covered in:
 
 The test approach is important:
 
-- it runs the real Alembic `0001` migration
+- it runs the real Alembic migration chain through `head`
 - it verifies CRUD against the migrated schema
 - it uses SQLite for lightweight CI compatibility
 - it attaches a second SQLite database as the `platform` schema so schema-qualified table names are

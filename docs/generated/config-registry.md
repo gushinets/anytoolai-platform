@@ -21,6 +21,17 @@ LiteLLM router deployment config is separate from the ConfigRegistry load order.
 `configs/kernel/litellm_router.yaml` and is consumed by provider-adapter bootstrap, not by the
 registry loader.
 
+Provider policies remain the owner of platform intent, including:
+
+- provider selection
+- model-group selection
+- timeout policy
+- structured-output mode
+- nested retry policy
+
+LiteLLM router config remains the owner of deployments, routing, credentials, and provider-specific
+transport settings.
+
 ## Required Definition Types
 
 - product definition
@@ -83,3 +94,22 @@ configs/kernel/products/kernel_demo/quotas.yaml
 - Action configs must reference known action types.
 - Action configs must include `prompt_ref` and `provider_policy_ref`.
 - Frontends must not choose prompt/provider/model.
+
+## Provider Policy Contract
+
+Provider policies use `provider_policy_ref` and the ADR-0007 nested retry contract.
+
+Current retry shape:
+
+```text
+retry_policy.transport.owner
+retry_policy.transport.max_attempts
+retry_policy.transport.litellm_num_retries_per_attempt
+
+retry_policy.validation.owner
+retry_policy.validation.max_attempts
+
+retry_policy.hard_limits.max_physical_provider_calls_per_action
+```
+
+Legacy flat fields such as `max_retries` are rejected by the loader.

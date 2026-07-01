@@ -7,9 +7,9 @@ from anytoolai_platform_core.providers.models import ProviderPolicy
 
 
 class ProviderPolicyNotFoundError(LookupError):
-    def __init__(self, provider_policy_id: str) -> None:
-        super().__init__(f"provider policy not found: {provider_policy_id}")
-        self.provider_policy_id = provider_policy_id
+    def __init__(self, provider_policy_ref: str) -> None:
+        super().__init__(f"provider policy not found: {provider_policy_ref}")
+        self.provider_policy_ref = provider_policy_ref
 
 
 class ProviderPolicyResolver:
@@ -22,8 +22,8 @@ class ProviderPolicyResolver:
 
         return cls(build_config_registry(config_root))
 
-    def resolve(self, provider_policy_id: str) -> ProviderPolicy:
-        policy = self._registry.get_provider_policy(provider_policy_id)
+    def resolve(self, provider_policy_ref: str) -> ProviderPolicy:
+        policy = self._registry.get_provider_policy(provider_policy_ref)
         if policy is None:
-            raise ProviderPolicyNotFoundError(provider_policy_id)
+            raise ProviderPolicyNotFoundError(provider_policy_ref)
         return policy

@@ -37,6 +37,10 @@ from anytoolai_platform_core.products.models import (
 )
 from anytoolai_platform_core.providers.models import (
     ProviderPolicy,
+    ProviderRetryHardLimits,
+    ProviderRetryPolicy,
+    ProviderTransportRetryPolicy,
+    ProviderValidationRetryPolicy,
     StructuredOutputMode,
 )
 from anytoolai_platform_core.quotas.models import QuotaPeriod, QuotaPolicy, QuotaUnit
@@ -241,7 +245,7 @@ class ConfigLoader:
         try:
             data = load_yaml_file(path)
             for policy_data in data.get("provider_policies", []):
-                policy_id = policy_data.get("provider_policy_id")
+                policy_id = policy_data.get("provider_policy_ref")
                 provider = policy_data.get("provider")
                 model = policy_data.get("model")
 
@@ -253,7 +257,7 @@ class ConfigLoader:
 
                 if policy_id in self.provider_policies:
                     raise DuplicateConfigIdError(
-                        "provider_policy_id",
+                        "provider_policy_ref",
                         policy_id,
                         self._source_for("provider_policy", policy_id, path),
                         path,
@@ -269,13 +273,26 @@ class ConfigLoader:
                         ref_value=str(metadata),
                     )
 
+                if "max_retries" in policy_data:
+                    raise InvalidConfigShapeError(
+                        path,
+                        "Provider policy must use nested retry_policy; legacy max_retries is not allowed",
+                        config_id=policy_id,
+                        ref_type="max_retries",
+                        ref_value=str(policy_data["max_retries"]),
+                    )
+
                 self.provider_policies[policy_id] = ProviderPolicy(
-                    provider_policy_id=policy_id,
+                    provider_policy_ref=policy_id,
                     provider=provider,
                     model=model,
                     temperature=policy_data.get("temperature", 0.3),
                     timeout_seconds=policy_data.get("timeout_seconds", 60),
-                    max_retries=policy_data.get("max_retries", 2),
+                    retry_policy=self._parse_provider_retry_policy(
+                        path=path,
+                        policy_id=policy_id,
+                        retry_policy=policy_data.get("retry_policy"),
+                    ),
                     fallback_policy=policy_data.get("fallback_policy"),
                     structured_output_mode=parse_enum_value(
                         StructuredOutputMode,
@@ -295,6 +312,63 @@ class ConfigLoader:
                 self._remember_source("provider_policy", policy_id, path)
         except ConfigError as error:
             self._append_error(error)
+
+    def _parse_provider_retry_policy(
+        self,
+        *,
+        path: Path,
+        policy_id: str,
+        retry_policy: Any,
+    ) -> ProviderRetryPolicy:
+        if retry_policy is None:
+            transport = {}
+            validation = {}
+            hard_limits = {}
+        else:
+            if not isinstance(retry_policy, dict):
+                raise InvalidConfigShapeError(
+                    path,
+                    "retry_policy must be a mapping object",
+                    config_id=policy_id,
+                    ref_type="retry_policy",
+                    ref_value=str(retry_policy),
+                )
+            transport = retry_policy.get("transport", {})
+            validation = retry_policy.get("validation", {})
+            hard_limits = retry_policy.get("hard_limits", {})
+
+        for ref_type, section in (
+            ("retry_policy.transport", transport),
+            ("retry_policy.validation", validation),
+            ("retry_policy.hard_limits", hard_limits),
+        ):
+            if not isinstance(section, dict):
+                raise InvalidConfigShapeError(
+                    path,
+                    f"{ref_type} must be a mapping object",
+                    config_id=policy_id,
+                    ref_type=ref_type,
+                    ref_value=str(section),
+                )
+
+        return ProviderRetryPolicy(
+            transport=ProviderTransportRetryPolicy(
+                owner=str(transport.get("owner", "litellm")),
+                max_attempts=int(transport.get("max_attempts", 1)),
+                litellm_num_retries_per_attempt=int(
+                    transport.get("litellm_num_retries_per_attempt", 0)
+                ),
+            ),
+            validation=ProviderValidationRetryPolicy(
+                owner=str(validation.get("owner", "pydanticai")),
+                max_attempts=int(validation.get("max_attempts", 1)),
+            ),
+            hard_limits=ProviderRetryHardLimits(
+                max_physical_provider_calls_per_action=int(
+                    hard_limits.get("max_physical_provider_calls_per_action", 1)
+                )
+            ),
+        )
 
     def _load_action_definitions(self) -> None:
         action_dir = self.config_root / "action_definitions"

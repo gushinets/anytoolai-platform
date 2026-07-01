@@ -24,6 +24,22 @@ _EXPORTS = {
     "ProviderCallStatus": ("anytoolai_platform_core.providers.models", "ProviderCallStatus"),
     "ProviderMessage": ("anytoolai_platform_core.providers.models", "ProviderMessage"),
     "ProviderPolicy": ("anytoolai_platform_core.providers.models", "ProviderPolicy"),
+    "ProviderRetryHardLimits": (
+        "anytoolai_platform_core.providers.models",
+        "ProviderRetryHardLimits",
+    ),
+    "ProviderRetryPolicy": (
+        "anytoolai_platform_core.providers.models",
+        "ProviderRetryPolicy",
+    ),
+    "ProviderTransportRetryPolicy": (
+        "anytoolai_platform_core.providers.models",
+        "ProviderTransportRetryPolicy",
+    ),
+    "ProviderValidationRetryPolicy": (
+        "anytoolai_platform_core.providers.models",
+        "ProviderValidationRetryPolicy",
+    ),
     "ProviderUsage": ("anytoolai_platform_core.providers.models", "ProviderUsage"),
     "ResolvedProviderRequest": (
         "anytoolai_platform_core.providers.models",

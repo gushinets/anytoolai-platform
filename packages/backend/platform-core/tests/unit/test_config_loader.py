@@ -108,6 +108,9 @@ def test_loader_preserves_provider_policy_yaml_metadata() -> None:
     assert policy is not None
     assert policy.provider == "litellm"
     assert policy.model == "anytoolai.default_text"
+    assert policy.retry_policy.transport.max_attempts == 2
+    assert policy.retry_policy.transport.litellm_num_retries_per_attempt == 1
+    assert policy.retry_policy.validation.max_attempts == 2
     assert policy.metadata["model_group"] == "anytoolai.default_text"
     assert policy.metadata["routing_profile"] == "default_text"
     assert policy.metadata["_file_path"].endswith("provider_policies.yaml")
@@ -261,6 +264,26 @@ def test_loader_fails_on_invalid_structured_output_mode(tmp_path: Path) -> None:
         ref_type="structured_output_mode",
         ref_value="xml_schema",
         message_part="structured_output_mode",
+    )
+
+
+def test_loader_rejects_legacy_max_retries_provider_policy_field(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "provider_policies.yaml"
+    data = _load_yaml(path)
+    data["provider_policies"][0]["max_retries"] = 9
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="default_fake_provider_v1",
+        ref_type="max_retries",
+        ref_value="9",
+        message_part="legacy max_retries",
     )
 
 

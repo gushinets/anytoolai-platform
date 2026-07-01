@@ -204,7 +204,7 @@ class ConfigRegistry:
         loaded_from: Path to the config root that was loaded (for logging/debugging)
         tenants: Immutable mapping of tenant_id -> TenantDefinition
         regions: Immutable mapping of region -> RegionDefinition
-        provider_policies: Immutable mapping of provider_policy_id -> ProviderPolicy
+        provider_policies: Immutable mapping of provider_policy_ref -> ProviderPolicy
         action_definitions: Immutable mapping of action_type -> ActionDefinition
         action_configurations: Immutable mapping of action_config_id -> ActionConfiguration
         workflows: Immutable mapping of workflow_id -> WorkflowDefinition
@@ -304,9 +304,9 @@ class ConfigRegistry:
         """Look up product definition by ID."""
         return self.products.get(product_id)
 
-    def get_provider_policy(self, provider_policy_id: str) -> ProviderPolicy | None:
+    def get_provider_policy(self, provider_policy_ref: str) -> ProviderPolicy | None:
         """Look up provider policy by ID."""
-        return self.provider_policies.get(provider_policy_id)
+        return self.provider_policies.get(provider_policy_ref)
 
     def get_prompt(self, prompt_ref: str) -> PromptDefinition | None:
         """Look up prompt definition by ref."""

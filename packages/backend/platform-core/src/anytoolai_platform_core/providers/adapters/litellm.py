@@ -31,7 +31,7 @@ class LiteLLMProviderAdapter:
             "messages": self._messages_for(request),
             "temperature": request.temperature,
             "timeout": float(request.timeout_seconds),
-            "num_retries": request.max_retries,
+            "num_retries": request.retry_policy.transport.litellm_num_retries_per_attempt,
         }
         if (
             request.response_schema is not None
@@ -131,10 +131,18 @@ def _normalize_litellm_response(
     )
     actual_provider = _string_like(hidden_params.get("custom_llm_provider"))
     model_id = _string_like(hidden_params.get("model_id"))
+    response_id = _string_like(
+        _value_from(response, "id") or hidden_params.get("response_id")
+    )
+    http_status = _int_like(
+        hidden_params.get("status_code")
+        or hidden_params.get("http_status")
+        or _value_from(response, "status_code")
+    )
     content = _choice_content(response)
 
     return ProviderResponse(
-        provider_policy_id=request.provider_policy_id,
+        provider_policy_ref=request.provider_policy_ref,
         provider=actual_provider or request.provider,
         model=actual_model or request.model,
         output_text=content,
@@ -149,12 +157,16 @@ def _normalize_litellm_response(
             ),
         ),
         estimated_cost=estimated_cost,
+        http_status=http_status or None,
+        litellm_response_id=response_id,
         metadata={
             "litellm": {
                 "model_group": request.model,
                 "actual_model": actual_model,
                 "actual_provider": actual_provider,
                 "model_id": model_id,
+                "response_id": response_id,
+                "http_status": http_status or None,
                 "response_cost": estimated_cost if estimated_cost > 0 else None,
             },
             "usage": {"total_tokens": total_tokens},
