@@ -439,6 +439,9 @@ def test_event_emitter_sanitizes_properties_and_keeps_persistence_safe(
             properties={
                 "password": "super-secret",
                 "token_value": "should-hide",
+                "total_tokens": 192,
+                "input_tokens": 128,
+                "output_tokens": 64,
                 "error_code": "provider_unavailable",
                 "when": datetime(2026, 6, 19, tzinfo=UTC),
                 "tags": {"beta", "alpha"},
@@ -454,6 +457,9 @@ def test_event_emitter_sanitizes_properties_and_keeps_persistence_safe(
     assert stored.error_code == "provider_unavailable"
     assert stored.properties["password"] == "[REDACTED]"
     assert stored.properties["token_value"] == "[REDACTED]"
+    assert stored.properties["total_tokens"] == 192
+    assert stored.properties["input_tokens"] == 128
+    assert stored.properties["output_tokens"] == 64
     assert stored.properties["when"] == "2026-06-19 00:00:00+00:00"
     assert sorted(stored.properties["tags"]) == ["alpha", "beta"]
     assert stored.properties["payload"] == "[UNSUPPORTED]"
@@ -606,7 +612,7 @@ def test_provider_events_include_adr_0007_correlation_properties(
     assert succeeded_event["properties"]["semantic_attempt_index"] == 1
     assert succeeded_event["properties"]["transport_attempt_index"] == 1
     assert succeeded_event["properties"]["pydantic_run_id"]
-    assert succeeded_event["properties"]["total_tokens"] == "[REDACTED]"
+    assert succeeded_event["properties"]["total_tokens"] == 192
     assert provider_call["total_tokens"] == 192
 
 

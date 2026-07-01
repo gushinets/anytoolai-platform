@@ -33,6 +33,13 @@ SENSITIVE_KEY_PARTS = (
     "private_key",
     "credential",
 )
+SAFE_NUMERIC_USAGE_COUNTER_KEYS = frozenset(
+    {
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+    }
+)
 
 
 class EventValidationError(ValueError):
@@ -142,6 +149,9 @@ def _sanitize_mapping(value: Mapping[Any, Any], *, depth: int) -> dict[str, Any]
     sanitized: dict[str, Any] = {}
     for raw_key, raw_value in items[:MAX_PROPERTY_ITEMS]:
         key = _sanitize_string(str(raw_key))
+        if _is_safe_numeric_usage_counter(key, raw_value):
+            sanitized[key] = raw_value
+            continue
         if _is_sensitive_key(key):
             sanitized[key] = REDACTED
             continue
@@ -169,6 +179,19 @@ def _sanitize_string(value: str) -> str:
 def _is_sensitive_key(key: str) -> bool:
     normalized = key.casefold()
     return any(part in normalized for part in SENSITIVE_KEY_PARTS)
+
+
+def _is_safe_numeric_usage_counter(key: str, value: Any) -> bool:
+    normalized = key.casefold()
+    if normalized not in SAFE_NUMERIC_USAGE_COUNTER_KEYS:
+        return False
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return True
+    if isinstance(value, float):
+        return math.isfinite(value)
+    return False
 
 
 def _extract_error_code(properties: dict[str, Any]) -> str | None:
