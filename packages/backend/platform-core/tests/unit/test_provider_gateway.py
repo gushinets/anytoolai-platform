@@ -333,7 +333,7 @@ def test_provider_policy_resolution_uses_nested_retry_policy(
 
     assert policy.provider == "litellm"
     assert policy.retry_policy.transport.max_attempts == 2
-    assert policy.retry_policy.transport.litellm_num_retries_per_attempt == 1
+    assert policy.retry_policy.transport.litellm_num_retries_per_attempt == 0
     assert policy.retry_policy.validation.max_attempts == 2
 
 

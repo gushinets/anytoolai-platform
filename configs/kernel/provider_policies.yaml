@@ -26,7 +26,7 @@ provider_policies:
       transport:
         owner: litellm
         max_attempts: 2
-        litellm_num_retries_per_attempt: 1
+        litellm_num_retries_per_attempt: 0
       validation:
         owner: pydanticai
         max_attempts: 2

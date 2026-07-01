@@ -45,7 +45,7 @@ def make_request(**overrides: object) -> ResolvedProviderRequest:
             transport=ProviderTransportRetryPolicy(
                 owner="litellm",
                 max_attempts=2,
-                litellm_num_retries_per_attempt=1,
+                litellm_num_retries_per_attempt=0,
             ),
             validation=ProviderValidationRetryPolicy(owner="pydanticai", max_attempts=2),
             hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=4),
@@ -116,7 +116,7 @@ def test_litellm_adapter_maps_messages_to_router_acompletion() -> None:
             ],
             "temperature": 0.3,
             "timeout": 60.0,
-            "num_retries": 1,
+            "num_retries": 0,
         }
     ]
 

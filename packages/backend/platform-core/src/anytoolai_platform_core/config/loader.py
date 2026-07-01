@@ -112,8 +112,15 @@ def load_yaml_file(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise MissingConfigFileError(path)
 
-    with path.open("r", encoding="utf-8") as handle:
-        data = yaml.safe_load(handle) or {}
+    loader_class = _build_unique_key_yaml_loader(path)
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            data = yaml.load(handle, Loader=loader_class) or {}
+    except yaml.YAMLError as exc:
+        raise InvalidConfigShapeError(
+            path,
+            "YAML parsing failed",
+        ) from exc
 
     if not isinstance(data, dict):
         raise InvalidConfigShapeError(
@@ -227,7 +234,10 @@ def _split_prompt_front_matter(path: Path, content: str) -> tuple[dict[str, Any]
         return {}, content
 
     try:
-        front_matter = yaml.safe_load(match.group("front_matter")) or {}
+        front_matter = yaml.load(
+            match.group("front_matter"),
+            Loader=_build_unique_key_yaml_loader(path),
+        ) or {}
     except yaml.YAMLError as exc:
         raise InvalidConfigShapeError(
             path,
@@ -281,6 +291,37 @@ def _reject_unexpected_mapping_keys(
         ref_type=unexpected_key,
         ref_value=_stringify_config_value(mapping[unexpected_key]),
     )
+
+
+def _build_unique_key_yaml_loader(
+    file_path: Path,
+) -> type[yaml.SafeLoader]:
+    class _UniqueKeySafeLoader(yaml.SafeLoader):
+        pass
+
+    def _construct_mapping(
+        loader: yaml.SafeLoader,
+        node: yaml.nodes.MappingNode,
+        deep: bool = False,
+    ) -> dict[str, Any]:
+        mapping: dict[str, Any] = {}
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node, deep=deep)
+            if key in mapping:
+                raise InvalidConfigShapeError(
+                    file_path,
+                    f"Duplicate YAML key '{key}' is not allowed",
+                    ref_type="duplicate_key",
+                    ref_value=_stringify_config_value(key),
+                )
+            mapping[key] = loader.construct_object(value_node, deep=deep)
+        return mapping
+
+    _UniqueKeySafeLoader.add_constructor(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+        _construct_mapping,
+    )
+    return _UniqueKeySafeLoader
 
 
 class ConfigLoader:
@@ -959,9 +1000,9 @@ class ConfigLoader:
                     temperature=policy_data.get("temperature", 0.3),
                     timeout_seconds=policy_data.get("timeout_seconds", 60),
                     retry_policy=self._parse_provider_retry_policy(
-                        path=path,
+                        policy_data=policy_data,
+                        file_path=path,
                         policy_id=policy_id,
-                        retry_policy=policy_data.get("retry_policy"),
                     ),
                     fallback_policy=policy_data.get("fallback_policy"),
                     structured_output_mode=parse_enum_value(
@@ -979,63 +1020,6 @@ class ConfigLoader:
                 self._remember_source("provider_policy", policy_id, path)
         except ConfigError as error:
             self._append_error(error)
-
-    def _parse_provider_retry_policy(
-        self,
-        *,
-        path: Path,
-        policy_id: str,
-        retry_policy: Any,
-    ) -> ProviderRetryPolicy:
-        if retry_policy is None:
-            transport = {}
-            validation = {}
-            hard_limits = {}
-        else:
-            if not isinstance(retry_policy, dict):
-                raise InvalidConfigShapeError(
-                    path,
-                    "retry_policy must be a mapping object",
-                    config_id=policy_id,
-                    ref_type="retry_policy",
-                    ref_value=str(retry_policy),
-                )
-            transport = retry_policy.get("transport", {})
-            validation = retry_policy.get("validation", {})
-            hard_limits = retry_policy.get("hard_limits", {})
-
-        for ref_type, section in (
-            ("retry_policy.transport", transport),
-            ("retry_policy.validation", validation),
-            ("retry_policy.hard_limits", hard_limits),
-        ):
-            if not isinstance(section, dict):
-                raise InvalidConfigShapeError(
-                    path,
-                    f"{ref_type} must be a mapping object",
-                    config_id=policy_id,
-                    ref_type=ref_type,
-                    ref_value=str(section),
-                )
-
-        return ProviderRetryPolicy(
-            transport=ProviderTransportRetryPolicy(
-                owner=str(transport.get("owner", "litellm")),
-                max_attempts=int(transport.get("max_attempts", 1)),
-                litellm_num_retries_per_attempt=int(
-                    transport.get("litellm_num_retries_per_attempt", 0)
-                ),
-            ),
-            validation=ProviderValidationRetryPolicy(
-                owner=str(validation.get("owner", "pydanticai")),
-                max_attempts=int(validation.get("max_attempts", 1)),
-            ),
-            hard_limits=ProviderRetryHardLimits(
-                max_physical_provider_calls_per_action=int(
-                    hard_limits.get("max_physical_provider_calls_per_action", 1)
-                )
-            ),
-        )
 
     def _load_action_definitions(self) -> None:
         action_dir = self.config_root / "action_definitions"
