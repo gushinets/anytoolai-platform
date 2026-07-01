@@ -35,25 +35,7 @@ from anytoolai_platform_core.providers.models import (
     ProviderPolicy as CoreProviderPolicy,
 )
 from anytoolai_platform_core.providers.models import (
-    ProviderRetryHardLimits as CoreProviderRetryHardLimits,
-)
-from anytoolai_platform_core.providers.models import (
-    ProviderRetryPolicy as CoreProviderRetryPolicy,
-)
-from anytoolai_platform_core.providers.models import (
-    ProviderTransportRetryPolicy as CoreProviderTransportRetryPolicy,
-)
-from anytoolai_platform_core.providers.models import (
-    ProviderValidationRetryPolicy as CoreProviderValidationRetryPolicy,
-)
-from anytoolai_platform_core.providers.models import (
     StructuredOutputMode as CoreStructuredOutputMode,
-)
-from anytoolai_platform_core.providers.models import (
-    TransportRetryOwner as CoreTransportRetryOwner,
-)
-from anytoolai_platform_core.providers.models import (
-    ValidationRetryOwner as CoreValidationRetryOwner,
 )
 from anytoolai_platform_core.quotas.models import (
     QuotaPeriod as CoreQuotaPeriod,
@@ -92,18 +74,12 @@ from anytoolai_platform_sdk.contracts import (
     ProductDefinition,
     PromptRef,
     ProviderPolicy,
-    ProviderRetryHardLimits,
-    ProviderRetryPolicy,
-    ProviderTransportRetryPolicy,
-    ProviderValidationRetryPolicy,
     QuotaPeriod,
     QuotaPolicy,
     QuotaUnit,
     ScenarioDefinition,
     ScenarioSessionStatus,
     StructuredOutputMode,
-    TransportRetryOwner,
-    ValidationRetryOwner,
     WorkflowDefinition,
     WorkflowStepDefinition,
 )
@@ -129,10 +105,6 @@ def core_dataclass_fields(model: type[Any]) -> set[str]:
         (ProductDefinition, CoreProductDefinition),
         (PromptRef, CorePromptRef),
         (ProviderPolicy, CoreProviderPolicy),
-        (ProviderRetryHardLimits, CoreProviderRetryHardLimits),
-        (ProviderRetryPolicy, CoreProviderRetryPolicy),
-        (ProviderTransportRetryPolicy, CoreProviderTransportRetryPolicy),
-        (ProviderValidationRetryPolicy, CoreProviderValidationRetryPolicy),
         (QuotaPolicy, CoreQuotaPolicy),
         (ScenarioDefinition, CoreScenarioDefinition),
         (WorkflowDefinition, CoreWorkflowDefinition),
@@ -143,32 +115,6 @@ def test_core_models_mirror_sdk_contract_field_names(
     sdk_model: type[Any], core_model: type[Any]
 ) -> None:
     assert core_dataclass_fields(core_model) == sdk_model_fields(sdk_model)
-
-
-def test_core_provider_policy_requires_structured_output_mode_like_sdk() -> None:
-    assert ProviderPolicy.model_fields["structured_output_mode"].is_required()
-
-    retry_policy = CoreProviderRetryPolicy(
-        transport=CoreProviderTransportRetryPolicy(
-            owner=CoreTransportRetryOwner.provider_gateway_litellm_sdk,
-            max_attempts=1,
-        ),
-        validation=CoreProviderValidationRetryPolicy(
-            owner=CoreValidationRetryOwner.pydantic_ai,
-            max_attempts=1,
-        ),
-        hard_limits=CoreProviderRetryHardLimits(
-            max_physical_provider_calls_per_action=2,
-        ),
-    )
-
-    with pytest.raises(TypeError, match="structured_output_mode"):
-        CoreProviderPolicy(
-            provider_policy_id="default_fake_provider_v1",
-            provider="fake",
-            model="fake-json-v1",
-            retry_policy=retry_policy,
-        )
 
 
 def enum_values(enum_type: type[StrEnum]) -> set[str]:
@@ -186,8 +132,6 @@ def enum_values(enum_type: type[StrEnum]) -> set[str]:
         (QuotaUnit, CoreQuotaUnit),
         (ScenarioSessionStatus, CoreScenarioSessionStatus),
         (StructuredOutputMode, CoreStructuredOutputMode),
-        (TransportRetryOwner, CoreTransportRetryOwner),
-        (ValidationRetryOwner, CoreValidationRetryOwner),
     ],
 )
 def test_core_enums_mirror_sdk_contract_values(

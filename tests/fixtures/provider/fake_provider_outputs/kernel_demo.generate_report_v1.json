@@ -1,0 +1,10 @@
+{
+  "output_text": "# Report\n\n- Scope needs clarification.\n- Budget assumptions should be confirmed.",
+  "input_tokens": 180,
+  "output_tokens": 72,
+  "latency_ms": 18,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "kernel_demo.generate_report_v1"
+  }
+}

@@ -42,7 +42,7 @@ def upgrade() -> None:
         sa.Column("action_run_id", sa.String(length=128)),
         sa.Column("action_type", sa.String(length=128)),
         sa.Column("action_config_id", sa.String(length=128)),
-        sa.Column("provider_policy_id", sa.String(length=128)),
+        sa.Column("provider_policy_ref", sa.String(length=128)),
         sa.Column("provider_call_id", sa.String(length=128)),
         sa.Column("provider", sa.String(length=128)),
         sa.Column("model", sa.String(length=256)),

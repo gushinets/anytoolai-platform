@@ -69,7 +69,7 @@ only.
 
 Current MVP-A provider policies expose:
 
-- `provider_policy_id`
+- `provider_policy_ref`
 - `provider`
 - `model`
 - `temperature`

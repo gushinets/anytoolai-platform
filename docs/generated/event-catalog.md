@@ -81,7 +81,7 @@ Generated-doc mirror of the MVP-A platform event taxonomy from `configs/kernel/p
 - `action_run_id`
 - `action_type`
 - `action_config_id`
-- `provider_policy_id`
+- `provider_policy_ref`
 - `provider_call_id`
 - `provider`
 - `model`

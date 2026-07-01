@@ -1,63 +1,88 @@
 # Structured Output
 
-Actions validate input and output at the boundary.
+Structured output is enforced in the structured LLM execution layer around `ProviderGateway`.
 
-MVP-A must support:
+MVP-A supports:
 
-- input schema validation;
-- output schema validation;
-- retry on invalid JSON;
-- raw provider output artifact;
-- normalized final output artifact;
-- standardized validation errors.
+- input schema validation at the action boundary
+- structured provider output validation against JSON Schema
+- validation retry on invalid JSON or schema mismatch
+- raw normalized provider output handling
+- standardized safe failures
 
-No YOLO JSON probing.
+## Ownership
 
-## Library ownership
+`ProviderGateway` remains the transport, persistence, and event boundary.
 
-Structured-output semantics are owned by the structured action executor, not by Provider Gateway.
+Responsibility split:
 
-MVP-A uses PydanticAI inside `StructuredLlmActionExecutor` for:
+- LiteLLM: transport/router only
+- PydanticAI: structured validation and validation retry inside `platform-actions`
+- `ProviderGateway`: persistence, event emission, policy resolution, safe errors, hard call limits
 
-- typed output binding;
-- output validators;
-- validation retry/reflection;
-- structured-output mode selection where supported.
+## Validation Flow
 
-Provider Gateway uses LiteLLM SDK for provider/model access. LiteLLM must not independently enforce a second conflicting JSON schema for the same action.
-
-Allowed pass-through:
+For structured actions, the runtime flow is:
 
 ```text
-PydanticAI chooses provider-native/tool/prompted structured-output transport
-  -> ProviderGateway passes the resulting request shape through LiteLLM SDK
+action input
+  ->
+action/request validation
+  ->
+StructuredLlmActionExecutor
+  ->
+ProviderGateway transport attempt
+  ->
+physical provider call
+  ->
+PydanticAI output validation
+  ->
+success or validation retry
 ```
 
-Forbidden:
+If the provider output is invalid:
+
+- PydanticAI owns the validation retry loop
+- each retry still produces a new physical provider call through the gateway
+- each physical call gets its own `provider_calls` row
+
+## Retry Contract
+
+Structured-output validation uses provider-policy-owned nested retry config:
 
 ```text
-StructuredLlmActionExecutor configures one schema
-ProviderGateway independently configures another LiteLLM response_format/schema
+retry_policy.validation.owner
+retry_policy.validation.max_attempts
 ```
 
-That creates ambiguous failures and retry loops where the wrong layer owns the error.
+Transport retries are separate:
 
-## Validation retry vs transport retry
+```text
+retry_policy.transport.owner
+retry_policy.transport.max_attempts
+retry_policy.transport.litellm_num_retries_per_attempt
+```
 
-Validation retries belong to PydanticAI.
+`ProviderGateway` also enforces:
 
-Transport retries belong to AnytoolAI ProviderGateway around LiteLLM SDK calls.
+```text
+retry_policy.hard_limits.max_physical_provider_calls_per_action
+```
 
-Each validation retry may produce another physical ProviderGateway attempt. The ProviderGateway hard cap must stop unbounded multiplication before a new provider call is made.
+## Persistence And Events
 
-## Final validation and artifacts
+Validation retries are not synthetic bookkeeping. They are part of runtime history.
 
-AnytoolAI still final-validates output before downstream use.
+That means:
 
-For every structured LLM action, preserve:
+- one physical call creates one `provider_calls` row
+- semantic validation retries increment `semantic_attempt_index`
+- transport retries increment `transport_attempt_index`
+- every provider event correlates back to the physical row through `provider_call_id`
 
-- raw provider output artifact for debugging;
-- normalized final output artifact for workflow mapping and frontend rendering;
-- standardized safe validation error when output cannot be normalized.
+## Safety
 
-PydanticAI usage summaries can help action-run metadata, but final contract validation and artifact persistence are platform responsibilities.
+The platform must not rely on prompt-text parsing heuristics or loose JSON probing.
+
+Raw secrets, credentials, and unsafe payloads must not be persisted in provider-call metadata or
+provider events.

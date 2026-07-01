@@ -12,7 +12,6 @@ from anytoolai_platform_sdk.contracts import (
     ProductDefinition,
     PromptRef,
     ProviderPolicy,
-    ProviderTransportRetryPolicy,
     QuotaPolicy,
     ScenarioDefinition,
     WorkflowDefinition,
@@ -78,25 +77,6 @@ def test_missing_required_fields_fail_validation() -> None:
     with pytest.raises(ValidationError):
         ActionDefinition.model_validate({"action_type": "text.extract_structured_fields"})
 
-    with pytest.raises(ValidationError):
-        ProviderPolicy.model_validate(
-            {
-                "provider_policy_id": "default_fake_provider_v1",
-                "provider": "fake",
-                "model": "fake-json-v1",
-            }
-        )
-
-    with pytest.raises(ValidationError):
-        PromptRef.model_validate(
-            {
-                "prompt_ref": "kernel_demo.extract_structured_fields.v1",
-                "version": 1,
-                "template_path": "prompts/extract_structured_fields.v1.md",
-                "input_variables": [],
-            }
-        )
-
 
 def test_invalid_enum_values_fail_validation() -> None:
     with pytest.raises(ValidationError):
@@ -107,61 +87,10 @@ def test_unknown_top_level_fields_fail_validation() -> None:
     with pytest.raises(ValidationError):
         ProviderPolicy.model_validate(
             {
-                "provider_policy_id": "default_fake_provider_v1",
+                "provider_policy_ref": "default_fake_provider_v1",
                 "provider": "fake",
                 "model": "fake-json-v1",
-                "retry_policy": {
-                    "transport": {
-                        "owner": "provider_gateway_litellm_sdk",
-                        "max_attempts": 1,
-                        "litellm_num_retries_per_attempt": 0,
-                    },
-                    "validation": {
-                        "owner": "pydantic_ai",
-                        "max_attempts": 1,
-                    },
-                    "hard_limits": {
-                        "max_physical_provider_calls_per_action": 2,
-                    },
-                },
                 "unexpected_field": True,
-            }
-        )
-
-
-def test_provider_policy_split_retry_shape_is_validatable() -> None:
-    policy = ProviderPolicy.model_validate(
-        {
-            "provider_policy_id": "default_fake_provider_v1",
-            "provider": "fake",
-            "model": "fake-json-v1",
-            "structured_output_mode": "json_schema",
-            "retry_policy": {
-                "transport": {
-                    "owner": "provider_gateway_litellm_sdk",
-                    "max_attempts": 1,
-                    "litellm_num_retries_per_attempt": 0,
-                },
-                "validation": {
-                    "owner": "pydantic_ai",
-                    "max_attempts": 1,
-                },
-                "hard_limits": {
-                    "max_physical_provider_calls_per_action": 2,
-                },
-            },
-        }
-    )
-
-    assert policy.retry_policy.transport.owner == "provider_gateway_litellm_sdk"
-    assert policy.retry_policy.hard_limits.max_physical_provider_calls_per_action == 2
-
-    with pytest.raises(ValidationError):
-        ProviderTransportRetryPolicy.model_validate(
-            {
-                "owner": "provider_gateway_litellm_sdk",
-                "max_attempts": 1,
-                "litellm_num_retries_per_attempt": 1,
             }
         )
 

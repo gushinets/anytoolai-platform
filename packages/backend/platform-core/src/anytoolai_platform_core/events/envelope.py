@@ -22,7 +22,7 @@ class EventEnvelope:
     action_run_id: str | None = None
     action_type: str | None = None
     action_config_id: str | None = None
-    provider_policy_id: str | None = None
+    provider_policy_ref: str | None = None
     provider_call_id: str | None = None
     provider: str | None = None
     model: str | None = None

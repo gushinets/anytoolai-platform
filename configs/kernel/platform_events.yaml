@@ -16,7 +16,7 @@ required_dimensions:
   - action_run_id
   - action_type
   - action_config_id
-  - provider_policy_id
+  - provider_policy_ref
   - provider_call_id
   - provider
   - model

@@ -166,15 +166,12 @@ def is_provider_boundary(path: Path) -> bool:
     )
 
 
-def is_structured_llm_executor_boundary(path: Path) -> bool:
-    """Return whether a path is inside a structured LLM executor boundary."""
+def is_pydantic_ai_boundary(path: Path) -> bool:
+    """Return whether a path is inside the structured LLM execution boundary."""
     relative = path.relative_to(ROOT)
     return (
         relative.parts[:3] == ("packages", "backend", "platform-actions")
-        and (
-            "structured_llm" in relative.parts
-            or "structured_llm_executor" in relative.parts
-        )
+        and "structured_llm" in relative.parts
     )
 
 
@@ -206,16 +203,15 @@ def main() -> int:
                 if not imports_module(imports, module):
                     continue
 
-                if module == "litellm" and is_provider_boundary(path):
+                if module == "pydantic_ai" and is_pydantic_ai_boundary(path):
                     continue
-                if module == "pydantic_ai" and is_structured_llm_executor_boundary(path):
-                    continue
-                if module in {"openai", "anthropic", "google.genai", "@google/genai", "cohere", "mistralai"} and is_provider_boundary(path):
+
+                if module in {"litellm", "openai", "anthropic", "google.genai", "@google/genai", "cohere", "mistralai"} and is_provider_boundary(path):
                     continue
 
                 errors.append(
                     "ATAI006 "
-                    f"{path}: forbidden direct LLM/provider import `{module}` outside approved gateway/executor boundary"
+                    f"{path}: forbidden direct LLM/provider import `{module}` outside approved provider boundary"
                 )
 
     for path in iter_text_files(extensions):

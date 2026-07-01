@@ -41,8 +41,6 @@ from anytoolai_platform_core.providers.models import (
     ProviderTransportRetryPolicy,
     ProviderValidationRetryPolicy,
     StructuredOutputMode,
-    TransportRetryOwner,
-    ValidationRetryOwner,
 )
 from anytoolai_platform_core.quotas.models import QuotaPeriod, QuotaPolicy, QuotaUnit
 from anytoolai_platform_core.scenarios.models import ScenarioDefinition
@@ -114,8 +112,15 @@ def load_yaml_file(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise MissingConfigFileError(path)
 
-    with path.open("r", encoding="utf-8") as handle:
-        data = yaml.safe_load(handle) or {}
+    loader_class = _build_unique_key_yaml_loader(path)
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            data = yaml.load(handle, Loader=loader_class) or {}
+    except yaml.YAMLError as exc:
+        raise InvalidConfigShapeError(
+            path,
+            "YAML parsing failed",
+        ) from exc
 
     if not isinstance(data, dict):
         raise InvalidConfigShapeError(
@@ -229,7 +234,10 @@ def _split_prompt_front_matter(path: Path, content: str) -> tuple[dict[str, Any]
         return {}, content
 
     try:
-        front_matter = yaml.safe_load(match.group("front_matter")) or {}
+        front_matter = yaml.load(
+            match.group("front_matter"),
+            Loader=_build_unique_key_yaml_loader(path),
+        ) or {}
     except yaml.YAMLError as exc:
         raise InvalidConfigShapeError(
             path,
@@ -283,6 +291,37 @@ def _reject_unexpected_mapping_keys(
         ref_type=unexpected_key,
         ref_value=_stringify_config_value(mapping[unexpected_key]),
     )
+
+
+def _build_unique_key_yaml_loader(
+    file_path: Path,
+) -> type[yaml.SafeLoader]:
+    class _UniqueKeySafeLoader(yaml.SafeLoader):
+        pass
+
+    def _construct_mapping(
+        loader: yaml.SafeLoader,
+        node: yaml.nodes.MappingNode,
+        deep: bool = False,
+    ) -> dict[str, Any]:
+        mapping: dict[str, Any] = {}
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node, deep=deep)
+            if key in mapping:
+                raise InvalidConfigShapeError(
+                    file_path,
+                    f"Duplicate YAML key '{key}' is not allowed",
+                    ref_type="duplicate_key",
+                    ref_value=_stringify_config_value(key),
+                )
+            mapping[key] = loader.construct_object(value_node, deep=deep)
+        return mapping
+
+    _UniqueKeySafeLoader.add_constructor(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+        _construct_mapping,
+    )
+    return _UniqueKeySafeLoader
 
 
 class ConfigLoader:
@@ -802,35 +841,17 @@ class ConfigLoader:
 
         return ProviderRetryPolicy(
             transport=ProviderTransportRetryPolicy(
-                owner=parse_enum_value(
-                    TransportRetryOwner,
-                    transport_owner,
-                    field_name="transport retry owner",
-                    file_path=file_path,
-                    config_id=policy_id,
-                    ref_type="owner",
-                ),
+                owner=str(transport_owner),
                 max_attempts=transport_attempts,
                 litellm_num_retries_per_attempt=litellm_num_retries,
-                metadata={"_file_path": str(file_path)},
             ),
             validation=ProviderValidationRetryPolicy(
-                owner=parse_enum_value(
-                    ValidationRetryOwner,
-                    validation_owner,
-                    field_name="validation retry owner",
-                    file_path=file_path,
-                    config_id=policy_id,
-                    ref_type="owner",
-                ),
+                owner=str(validation_owner),
                 max_attempts=validation_attempts,
-                metadata={"_file_path": str(file_path)},
             ),
             hard_limits=ProviderRetryHardLimits(
                 max_physical_provider_calls_per_action=max_physical_provider_calls,
-                metadata={"_file_path": str(file_path)},
             ),
-            metadata={"_file_path": str(file_path)},
         )
 
     def _load_tenants(self) -> None:
@@ -916,11 +937,11 @@ class ConfigLoader:
                     entry_type="provider policy",
                     ref_type="provider_policies_entry",
                 )
-                policy_id = policy_data.get("provider_policy_id")
+                policy_id = policy_data.get("provider_policy_ref")
                 provider = policy_data.get("provider")
                 model = policy_data.get("model")
                 required_fields = (
-                    "provider_policy_id",
+                    "provider_policy_ref",
                     "provider",
                     "model",
                     "temperature",
@@ -947,14 +968,33 @@ class ConfigLoader:
 
                 if policy_id in self.provider_policies:
                     raise DuplicateConfigIdError(
-                        "provider_policy_id",
+                        "provider_policy_ref",
                         policy_id,
                         self._source_for("provider_policy", policy_id, path),
                         path,
                     )
 
+                metadata = policy_data.get("metadata", {})
+                if not isinstance(metadata, dict):
+                    raise InvalidConfigShapeError(
+                        path,
+                        "Provider policy metadata must be a dictionary object",
+                        config_id=policy_id,
+                        ref_type="metadata",
+                        ref_value=str(metadata),
+                    )
+
+                if "max_retries" in policy_data:
+                    raise InvalidConfigShapeError(
+                        path,
+                        "Provider policy must use nested retry_policy; legacy max_retries is not allowed",
+                        config_id=policy_id,
+                        ref_type="max_retries",
+                        ref_value=str(policy_data["max_retries"]),
+                    )
+
                 self.provider_policies[policy_id] = ProviderPolicy(
-                    provider_policy_id=policy_id,
+                    provider_policy_ref=policy_id,
                     provider=provider,
                     model=model,
                     temperature=policy_data.get("temperature", 0.3),
@@ -972,7 +1012,10 @@ class ConfigLoader:
                         file_path=path,
                         config_id=policy_id,
                     ),
-                    metadata={"_file_path": str(path)},
+                    metadata={
+                        **metadata,
+                        "_file_path": str(path),
+                    },
                 )
                 self._remember_source("provider_policy", policy_id, path)
         except ConfigError as error:
