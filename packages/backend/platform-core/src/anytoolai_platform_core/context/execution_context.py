@@ -23,7 +23,7 @@ class ExecutionContext:
     model: str | None = None
     acquisition_source: str | None = None
     action_run_id: str | None = None
-    provider_policy_id: str | None = None
+    provider_policy_ref: str | None = None
     provider_call_id: str | None = None
     physical_call_index: int | None = None
     pydantic_run_id: str | None = None

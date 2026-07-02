@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,19 +17,21 @@ from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.artifacts.models import ArtifactRecord
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
+from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter, EventValidationError
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.events.taxonomy import PLATFORM_EVENT_GROUPS, PLATFORM_EVENTS
-from anytoolai_platform_core.providers.gateway import (
-    ProviderAdapter,
-    ProviderGateway,
+from anytoolai_platform_core.providers.gateway import ProviderGateway, ProviderGatewayExecutionError
+from anytoolai_platform_core.providers.models import (
+    ProviderCallStatus,
     ProviderRequest,
     ProviderResponse,
+    ProviderUsage,
 )
-from anytoolai_platform_core.providers.models import ProviderCallStatus
+from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionRecord,
@@ -49,6 +52,9 @@ from sqlalchemy import event
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[5]
+
+
+CONFIG_ROOT = _repo_root() / "configs" / "kernel"
 
 
 def _sqlite_url(database_path: Path) -> str:
@@ -98,6 +104,11 @@ def session_factory(runtime_engine: sa.Engine) -> sa.orm.sessionmaker[sa.orm.Ses
     return build_session_factory(runtime_engine)
 
 
+@pytest.fixture
+def config_registry() -> Any:
+    return build_config_registry(CONFIG_ROOT)
+
+
 def make_execution_context(**overrides: Any) -> ExecutionContext:
     values = {
         "tenant_id": "tenant_demo",
@@ -109,10 +120,8 @@ def make_execution_context(**overrides: Any) -> ExecutionContext:
         "workflow_id": "wf_smoke",
         "workflow_version": 1,
         "step_id": "step_1",
-        "action_run_id": "action_run_demo",
         "action_type": "text.extract_structured_fields",
         "action_config_id": "cfg_extract",
-        "provider_policy_id": "policy_primary",
         "artifact_id": "artifact_demo",
     }
     values.update(overrides)
@@ -177,31 +186,74 @@ def make_artifact(scenario_session_id: str, **overrides: Any) -> ArtifactRecord:
 
 
 class SuccessfulAdapter:
-    def complete(self, request: ProviderRequest) -> ProviderResponse:
+    async def complete(self, request: Any) -> ProviderResponse:
         return ProviderResponse(
-            content="ok",
-            provider="openai",
+            provider_policy_ref=request.provider_policy_ref,
+            output_text="ok",
+            provider=request.provider,
             model=request.model,
-            input_tokens=128,
-            output_tokens=64,
-            total_tokens=192,
+            usage=ProviderUsage(input_tokens=128, output_tokens=64),
             latency_ms=950,
             estimated_cost=0.42,
-            http_status=200,
-            litellm_response_id="litellm_resp_123",
         )
 
 
 class TimeoutAdapter:
-    def complete(self, request: ProviderRequest) -> ProviderResponse:
+    async def complete(self, request: Any) -> ProviderResponse:
         del request
         raise TimeoutError("provider timed out")
 
 
 class PlatformFailureAdapter:
-    def complete(self, request: ProviderRequest) -> ProviderResponse:
+    async def complete(self, request: Any) -> ProviderResponse:
         del request
         raise PlatformError("provider_unavailable", "safe provider failure")
+
+
+class FailedResponseAdapter:
+    def __init__(
+        self,
+        *,
+        status: ProviderCallStatus,
+        error_code: str | None = None,
+    ) -> None:
+        self._status = status
+        self._error_code = error_code
+
+    async def complete(self, request: Any) -> ProviderResponse:
+        return ProviderResponse(
+            provider_policy_ref=request.provider_policy_ref,
+            output_text="not-ok",
+            provider=request.provider,
+            model=request.model,
+            status=self._status,
+            error_code=self._error_code,
+            error_message_safe="safe provider response failure",
+        )
+
+
+def build_provider_request(action: ActionRunRecord, job: JobRecord, **overrides: Any) -> ProviderRequest:
+    values = {
+        "provider_policy_ref": "default_fake_provider_v1",
+        "tenant_id": action.tenant_id,
+        "region": action.region,
+        "product_id": action.product_id,
+        "frontend_id": action.frontend_id,
+        "scenario_session_id": action.scenario_session_id,
+        "job_id": job.id,
+        "workflow_id": action.workflow_id,
+        "workflow_version": job.workflow_version,
+        "step_id": action.step_id,
+        "action_run_id": action.id,
+        "action_type": action.action_type,
+        "action_config_id": action.action_config_id,
+        "prompt": "hello",
+        "prompt_ref": "kernel_demo.extract_structured_fields.v1",
+        "semantic_attempt_index": 1,
+        "pydantic_run_id": "pydantic-run-demo",
+    }
+    values.update(overrides)
+    return ProviderRequest(**values)
 
 
 def _build_emitter(session: sa.orm.Session) -> EventEmitter:
@@ -238,8 +290,17 @@ def test_event_log_migration_creates_table_at_0002(tmp_path: Path) -> None:
                     sa.text("SELECT name FROM platform.sqlite_master WHERE type = 'index'")
                 ).scalars()
             )
+            event_log_columns = {
+                column["name"]
+                for column in sa.inspect(connection).get_columns(
+                    "event_log",
+                    schema="platform",
+                )
+            }
 
         assert "event_log" in table_names
+        assert "provider_policy_ref" in event_log_columns
+        assert "provider_policy_id" not in event_log_columns
         assert {
             "ix_event_log_timestamp",
             "ix_event_log_event_type",
@@ -256,7 +317,40 @@ def test_event_log_migration_creates_table_at_0002(tmp_path: Path) -> None:
 
 def test_platform_migration_chain_is_single_head() -> None:
     script = ScriptDirectory.from_config(_build_alembic_config("sqlite+pysqlite://"))
-    assert script.get_heads() == ["0004"]
+    assert script.get_heads() == ["0006"]
+
+
+def test_event_log_upgrade_from_0005_renames_provider_policy_column(tmp_path: Path) -> None:
+    main_db = tmp_path / "migration-upgrade-main.sqlite3"
+    platform_db = tmp_path / "migration-upgrade-platform.sqlite3"
+    engine = _build_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    try:
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "0005")
+            connection.execute(
+                sa.text(
+                    "ALTER TABLE platform.event_log "
+                    "RENAME COLUMN provider_policy_ref TO provider_policy_id"
+                )
+            )
+
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "head")
+            event_log_columns = {
+                column["name"]
+                for column in sa.inspect(connection).get_columns(
+                    "event_log",
+                    schema="platform",
+                )
+            }
+
+        assert "provider_policy_ref" in event_log_columns
+        assert "provider_policy_id" not in event_log_columns
+    finally:
+        engine.dispose()
 
 
 def test_event_emitter_persists_round_trip_and_maps_dimensions(
@@ -270,13 +364,14 @@ def test_event_emitter_persists_round_trip_and_maps_dimensions(
                 guest_id="guest_demo",
                 user_id="user_demo",
                 scenario_chain_id="chain_demo",
+                action_run_id="action_run_demo",
+                provider_policy_ref="policy_demo",
+                provider_call_id="provider_call_demo",
                 provider="openai",
                 model="gpt-5-mini",
-                provider_policy_id="policy_primary",
-                provider_call_id="provider_call_demo",
-                physical_call_index=1,
-                pydantic_run_id="pydantic_run_demo",
-                litellm_response_id="litellm_resp_demo",
+                physical_call_index=2,
+                pydantic_run_id="pydantic-run-demo",
+                litellm_response_id="litellm-response-demo",
                 acquisition_source="kernel_demo_ce",
             ),
             properties={"scenario_id": "smoke_start"},
@@ -294,13 +389,13 @@ def test_event_emitter_persists_round_trip_and_maps_dimensions(
     assert stored.user_id == "user_demo"
     assert stored.scenario_chain_id == "chain_demo"
     assert stored.action_run_id == "action_run_demo"
-    assert stored.provider_policy_id == "policy_primary"
+    assert stored.provider_policy_ref == "policy_demo"
     assert stored.provider_call_id == "provider_call_demo"
     assert stored.provider == "openai"
     assert stored.model == "gpt-5-mini"
-    assert stored.physical_call_index == 1
-    assert stored.pydantic_run_id == "pydantic_run_demo"
-    assert stored.litellm_response_id == "litellm_resp_demo"
+    assert stored.physical_call_index == 2
+    assert stored.pydantic_run_id == "pydantic-run-demo"
+    assert stored.litellm_response_id == "litellm-response-demo"
     assert stored.properties["scenario_id"] == "smoke_start"
 
 
@@ -344,6 +439,9 @@ def test_event_emitter_sanitizes_properties_and_keeps_persistence_safe(
             properties={
                 "password": "super-secret",
                 "token_value": "should-hide",
+                "total_tokens": 192,
+                "input_tokens": 128,
+                "output_tokens": 64,
                 "error_code": "provider_unavailable",
                 "when": datetime(2026, 6, 19, tzinfo=UTC),
                 "tags": {"beta", "alpha"},
@@ -359,6 +457,9 @@ def test_event_emitter_sanitizes_properties_and_keeps_persistence_safe(
     assert stored.error_code == "provider_unavailable"
     assert stored.properties["password"] == "[REDACTED]"
     assert stored.properties["token_value"] == "[REDACTED]"
+    assert stored.properties["total_tokens"] == 192
+    assert stored.properties["input_tokens"] == 128
+    assert stored.properties["output_tokens"] == 64
     assert stored.properties["when"] == "2026-06-19 00:00:00+00:00"
     assert sorted(stored.properties["tags"]) == ["alpha", "beta"]
     assert stored.properties["payload"] == "[UNSUPPORTED]"
@@ -393,6 +494,7 @@ def test_platform_taxonomy_covers_required_groups_and_events() -> None:
 
 def test_runtime_services_emit_required_success_events(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
 ) -> None:
     with transaction_boundary(session_factory) as session:
         emitter = _build_emitter(session)
@@ -404,7 +506,8 @@ def test_runtime_services_emit_required_success_events(
         action_service = ActionRunService(ActionRunRepository(session), emitter)
         artifact_service = ArtifactService(ArtifactRepository(session), emitter)
         gateway = ProviderGateway(
-            {"openai": SuccessfulAdapter()},
+            {"fake": SuccessfulAdapter()},
+            policy_resolver=ProviderPolicyResolver(config_registry),
             provider_call_repository=ProviderCallRepository(session),
             event_emitter=emitter,
         )
@@ -419,25 +522,7 @@ def test_runtime_services_emit_required_success_events(
                 action_run_id=action.id,
             )
         )
-        gateway.execute(
-            "openai",
-            ProviderRequest(prompt="hello", model="gpt-5-mini"),
-            ExecutionContext(
-                tenant_id=action.tenant_id,
-                region=action.region,
-                product_id=action.product_id,
-                frontend_id=action.frontend_id,
-                scenario_session_id=action.scenario_session_id,
-                job_id=action.job_id,
-                workflow_id=action.workflow_id,
-                workflow_version=job.workflow_version,
-                step_id=action.step_id,
-                action_type=action.action_type,
-                action_config_id=action.action_config_id,
-            ),
-            provider_policy_id="policy_primary",
-            action_run_id=action.id,
-        )
+        asyncio.run(gateway.request(build_provider_request(action, job), session=session))
         action_service.mark_succeeded(
             replace(
                 action,
@@ -475,8 +560,65 @@ def test_runtime_services_emit_required_success_events(
     } <= set(event_types)
 
 
+def test_provider_events_include_adr_0007_correlation_properties(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        emitter = _build_emitter(session)
+        gateway = ProviderGateway(
+            {"fake": SuccessfulAdapter()},
+            policy_resolver=ProviderPolicyResolver(config_registry),
+            provider_call_repository=ProviderCallRepository(session),
+            event_emitter=emitter,
+        )
+
+        action = make_action_run("scenario_session_demo", "job_demo")
+        job = make_job(action.scenario_session_id, id=action.job_id)
+
+        asyncio.run(gateway.request(build_provider_request(action, job), session=session))
+
+        provider_call = session.execute(
+            sa.select(provider_calls_table)
+            .order_by(provider_calls_table.c.created_at.desc(), provider_calls_table.c.id.desc())
+        ).mappings().one()
+        provider_events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.event_type.like("provider.request_%"))
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    started_event, succeeded_event = provider_events
+    assert started_event["event_type"] == "provider.request_started"
+    assert succeeded_event["event_type"] == "provider.request_succeeded"
+    assert started_event["action_run_id"] == provider_call["action_run_id"]
+    assert succeeded_event["action_run_id"] == provider_call["action_run_id"]
+    assert started_event["provider_policy_ref"] == "default_fake_provider_v1"
+    assert succeeded_event["provider_policy_ref"] == "default_fake_provider_v1"
+    assert started_event["provider_call_id"] == provider_call["id"]
+    assert succeeded_event["provider_call_id"] == provider_call["id"]
+    assert started_event["physical_call_index"] == 1
+    assert succeeded_event["physical_call_index"] == 1
+    assert started_event["properties"]["provider_call_id"] == provider_call["id"]
+    assert succeeded_event["properties"]["provider_call_id"] == provider_call["id"]
+    assert started_event["properties"]["provider_policy_ref"] == "default_fake_provider_v1"
+    assert succeeded_event["properties"]["provider_policy_ref"] == "default_fake_provider_v1"
+    assert started_event["properties"]["physical_call_index"] == 1
+    assert succeeded_event["properties"]["physical_call_index"] == 1
+    assert succeeded_event["pydantic_run_id"]
+    assert succeeded_event["litellm_response_id"] is None
+    assert succeeded_event["properties"]["semantic_attempt_index"] == 1
+    assert succeeded_event["properties"]["transport_attempt_index"] == 1
+    assert succeeded_event["properties"]["pydantic_run_id"]
+    assert succeeded_event["properties"]["total_tokens"] == 192
+    assert provider_call["total_tokens"] == 192
+
+
 def test_runtime_services_emit_required_failure_events(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
 ) -> None:
     with transaction_boundary(session_factory) as session:
         emitter = _build_emitter(session)
@@ -487,7 +629,8 @@ def test_runtime_services_emit_required_failure_events(
         workflow_service = WorkflowJobService(JobRepository(session), emitter)
         action_service = ActionRunService(ActionRunRepository(session), emitter)
         gateway = ProviderGateway(
-            {"openai": TimeoutAdapter()},
+            {"fake": TimeoutAdapter()},
+            policy_resolver=ProviderPolicyResolver(config_registry),
             provider_call_repository=ProviderCallRepository(session),
             event_emitter=emitter,
         )
@@ -496,26 +639,8 @@ def test_runtime_services_emit_required_failure_events(
         job = workflow_service.start(make_job(scenario.id))
         action = action_service.start(make_action_run(scenario.id, job.id))
 
-        with pytest.raises(TimeoutError):
-            gateway.execute(
-                "openai",
-                ProviderRequest(prompt="hello", model="gpt-5-mini"),
-                ExecutionContext(
-                    tenant_id=action.tenant_id,
-                    region=action.region,
-                    product_id=action.product_id,
-                    frontend_id=action.frontend_id,
-                    scenario_session_id=action.scenario_session_id,
-                    job_id=action.job_id,
-                    workflow_id=action.workflow_id,
-                    workflow_version=job.workflow_version,
-                    step_id=action.step_id,
-                    action_type=action.action_type,
-                    action_config_id=action.action_config_id,
-                ),
-                provider_policy_id="policy_primary",
-                action_run_id=action.id,
-            )
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+            asyncio.run(gateway.request(build_provider_request(action, job), session=session))
 
         action_service.mark_failed(action, error_code="timeout")
         workflow_service.mark_failed(job, error_code="timeout")
@@ -526,6 +651,7 @@ def test_runtime_services_emit_required_failure_events(
             session.execute(sa.select(provider_calls_table.c.status)).scalars()
         )
 
+    assert exc_info.value.error_code == "provider_request_timed_out"
     assert {
         "provider.request_failed",
         "action.failed",
@@ -537,26 +663,22 @@ def test_runtime_services_emit_required_failure_events(
 
 def test_provider_gateway_failure_uses_safe_platform_error_code(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
 ) -> None:
     with transaction_boundary(session_factory) as session:
         emitter = _build_emitter(session)
         gateway = ProviderGateway(
-            {"openai": PlatformFailureAdapter()},
+            {"fake": PlatformFailureAdapter()},
+            policy_resolver=ProviderPolicyResolver(config_registry),
             provider_call_repository=ProviderCallRepository(session),
             event_emitter=emitter,
         )
 
-        with pytest.raises(PlatformError):
-            gateway.execute(
-                "openai",
-                ProviderRequest(prompt="hello", model="gpt-5-mini"),
-                make_execution_context(
-                    provider="openai",
-                    model="gpt-5-mini",
-                ),
-                provider_policy_id="policy_primary",
-                action_run_id="action_run_demo",
-            )
+        action = make_action_run("scenario_session_demo", "job_demo")
+        job = make_job(action.scenario_session_id, id=action.job_id)
+
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+            asyncio.run(gateway.request(build_provider_request(action, job), session=session))
 
         failed_event = session.execute(
             sa.select(event_log_table).where(
@@ -564,125 +686,91 @@ def test_provider_gateway_failure_uses_safe_platform_error_code(
             )
         ).mappings().one()
 
+    assert exc_info.value.error_code == "provider_unavailable"
     assert failed_event["error_code"] == "provider_unavailable"
 
 
-def test_provider_gateway_success_events_include_deterministic_correlation_fields(
+@pytest.mark.parametrize(
+    ("status", "expected_error_code"),
+    [
+        (ProviderCallStatus.failed, "provider_request_failed"),
+        (ProviderCallStatus.timed_out, "provider_request_timed_out"),
+    ],
+)
+def test_provider_gateway_failed_provider_response_emits_failed_event_and_persists_status(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
+    status: ProviderCallStatus,
+    expected_error_code: str,
 ) -> None:
     with transaction_boundary(session_factory) as session:
         emitter = _build_emitter(session)
         gateway = ProviderGateway(
-            {"openai": SuccessfulAdapter()},
+            {"fake": FailedResponseAdapter(status=status)},
+            policy_resolver=ProviderPolicyResolver(config_registry),
             provider_call_repository=ProviderCallRepository(session),
             event_emitter=emitter,
         )
 
-        provider_call, _response = gateway.execute(
-            "openai",
-            ProviderRequest(prompt="hello", model="gpt-5-mini"),
-            make_execution_context(),
-            provider_policy_id="policy_primary",
-            action_run_id="action_run_demo",
-            physical_call_index=2,
-            pydantic_run_id="pydantic_run_success",
-        )
+        action = make_action_run("scenario_session_demo", "job_demo")
+        job = make_job(action.scenario_session_id, id=action.job_id)
 
-        events = list(
-            session.execute(
-                sa.select(event_log_table)
-                .where(event_log_table.c.event_type.like("provider.request_%"))
-                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
-            ).mappings()
-        )
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+            asyncio.run(gateway.request(build_provider_request(action, job), session=session))
 
-    assert len(events) == 2
-    assert [event["event_type"] for event in events] == [
-        "provider.request_started",
-        "provider.request_succeeded",
-    ]
-    for event_row in events:
-        assert event_row["provider_call_id"] == provider_call.id
-        assert event_row["action_run_id"] == "action_run_demo"
-        assert event_row["provider_policy_id"] == "policy_primary"
-        assert event_row["physical_call_index"] == 2
-        assert event_row["pydantic_run_id"] == "pydantic_run_success"
-    assert events[0]["litellm_response_id"] is None
-    assert events[1]["litellm_response_id"] == "litellm_resp_123"
-
-
-def test_provider_gateway_failure_events_include_deterministic_correlation_fields(
-    session_factory: sa.orm.sessionmaker[sa.orm.Session],
-) -> None:
-    with transaction_boundary(session_factory) as session:
-        emitter = _build_emitter(session)
-        gateway = ProviderGateway(
-            {"openai": TimeoutAdapter()},
-            provider_call_repository=ProviderCallRepository(session),
-            event_emitter=emitter,
-        )
-
-        with pytest.raises(TimeoutError):
-            gateway.execute(
-                "openai",
-                ProviderRequest(prompt="hello", model="gpt-5-mini"),
-                make_execution_context(),
-                provider_policy_id="policy_primary",
-                action_run_id="action_run_demo",
-                physical_call_index=5,
-                pydantic_run_id="pydantic_run_failure",
+        event_types = _event_types(session)
+        failed_event = session.execute(
+            sa.select(event_log_table)
+            .where(event_log_table.c.event_type == "provider.request_failed")
+            .order_by(event_log_table.c.timestamp.desc(), event_log_table.c.event_id.desc())
+        ).mappings().first()
+        provider_call = session.execute(
+            sa.select(provider_calls_table).order_by(
+                provider_calls_table.c.created_at.desc(),
+                provider_calls_table.c.id.desc(),
             )
+        ).mappings().first()
 
-        events = list(
-            session.execute(
-                sa.select(event_log_table)
-                .where(event_log_table.c.event_type.like("provider.request_%"))
-                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
-            ).mappings()
-        )
-
-    assert len(events) == 2
-    assert [event["event_type"] for event in events] == [
-        "provider.request_started",
-        "provider.request_failed",
-    ]
-    for event_row in events:
-        assert event_row["action_run_id"] == "action_run_demo"
-        assert event_row["provider_policy_id"] == "policy_primary"
-        assert event_row["physical_call_index"] == 5
-        assert event_row["pydantic_run_id"] == "pydantic_run_failure"
-    assert events[0]["provider_call_id"] is not None
-    assert events[1]["provider_call_id"] == events[0]["provider_call_id"]
-    assert events[1]["litellm_response_id"] is None
+    assert exc_info.value.error_code == expected_error_code
+    assert "provider.request_succeeded" not in event_types
+    assert "provider.request_failed" in event_types
+    assert failed_event is not None
+    assert failed_event["result_status"] == status.value
+    assert failed_event["error_code"] == expected_error_code
+    assert provider_call is not None
+    assert provider_call["status"] == status
 
 
 @pytest.mark.parametrize(("field_name", "value"), [("tenant_id", ""), ("region", "")])
 def test_provider_gateway_does_not_persist_provider_call_when_event_dimensions_are_invalid(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry: Any,
     field_name: str,
     value: str,
 ) -> None:
     with transaction_boundary(session_factory) as session:
         emitter = _build_emitter(session)
         gateway = ProviderGateway(
-            {"openai": SuccessfulAdapter()},
+            {"fake": SuccessfulAdapter()},
+            policy_resolver=ProviderPolicyResolver(config_registry),
             provider_call_repository=ProviderCallRepository(session),
             event_emitter=emitter,
         )
-        context = make_execution_context()
-        invalid_context = replace(context, **{field_name: value})
+        action = make_action_run("scenario_session_demo", "job_demo", **{field_name: value})
+        job = make_job(action.scenario_session_id, id=action.job_id, **{field_name: value})
 
-        with pytest.raises(EventValidationError, match=field_name):
-            gateway.execute(
-                "openai",
-                ProviderRequest(prompt="hello", model="gpt-5-mini"),
-                invalid_context,
-                provider_policy_id="policy_primary",
-                action_run_id="action_run_demo",
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+            asyncio.run(
+                gateway.request(
+                    build_provider_request(action, job, **{field_name: value}),
+                    session=session,
+                )
             )
 
         provider_call_count = session.execute(
             sa.select(sa.func.count()).select_from(provider_calls_table)
         ).scalar_one()
 
+    assert exc_info.value.error_code == "provider_request_failed"
+    assert field_name in exc_info.value.message
     assert provider_call_count == 0

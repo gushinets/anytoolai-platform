@@ -1,0 +1,17 @@
+{
+  "response_json": {
+    "title": "Kernel Demo Source Summary",
+    "fields": [
+      "deadline",
+      "budget",
+      "deliverables"
+    ]
+  },
+  "input_tokens": 120,
+  "output_tokens": 48,
+  "latency_ms": 12,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "kernel_demo.extract_structured_fields_v1"
+  }
+}

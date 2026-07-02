@@ -1,0 +1,17 @@
+{
+  "response_json": {
+    "issues": [
+      {
+        "severity": "high",
+        "issue": "Timeline is underspecified"
+      }
+    ]
+  },
+  "input_tokens": 140,
+  "output_tokens": 60,
+  "latency_ms": 14,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "kernel_demo.detect_issues_v1"
+  }
+}
