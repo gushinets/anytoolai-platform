@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -18,7 +17,6 @@ from anytoolai_platform_core.providers.models import (
 )
 
 _ENV_SENTINEL_PREFIX = "env/"
-_MIN_JSON_SCHEMA_RESPONSE_FORMAT_VERSION = (1, 80, 0)
 
 
 class LiteLLMProviderAdapter:
@@ -33,18 +31,6 @@ class LiteLLMProviderAdapter:
             "timeout": float(request.timeout_seconds),
             "num_retries": request.retry_policy.transport.litellm_num_retries_per_attempt,
         }
-        if (
-            request.response_schema is not None
-            and _supports_json_schema_response_format()
-        ):
-            kwargs["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": request.action_config_id.replace(".", "_"),
-                    "schema": dict(request.response_schema),
-                    "strict": True,
-                },
-            }
 
         response = await self._router.acompletion(**kwargs)
         return _normalize_litellm_response(request, response)
@@ -226,21 +212,3 @@ def _float_like(value: Any) -> float:
 def _string_like(value: Any) -> str | None:
     return value if isinstance(value, str) and value.strip() else None
 
-
-def _supports_json_schema_response_format() -> bool:
-    current_version = _parse_version(version("litellm"))
-    return current_version >= _MIN_JSON_SCHEMA_RESPONSE_FORMAT_VERSION
-
-
-def _parse_version(raw_version: str) -> tuple[int, int, int]:
-    numeric_parts: list[int] = []
-    for part in raw_version.split("."):
-        digits = "".join(character for character in part if character.isdigit())
-        if digits == "":
-            break
-        numeric_parts.append(int(digits))
-        if len(numeric_parts) == 3:
-            break
-    while len(numeric_parts) < 3:
-        numeric_parts.append(0)
-    return tuple(numeric_parts[:3])

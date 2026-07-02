@@ -3,9 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Any, Awaitable, Callable, Mapping
 
-from jsonschema import ValidationError as JsonSchemaValidationError
-from jsonschema import validate as validate_json_schema
-from pydantic_ai import Agent, ModelRetry
+from pydantic_ai import Agent, ModelRetry, UnexpectedModelBehavior
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -23,9 +21,10 @@ from anytoolai_platform_core.providers.models import (
     ProviderRequest,
     ProviderResponse,
 )
+from anytoolai_platform_core.structured_output.errors import StructuredOutputError
 from anytoolai_platform_core.structured_output.validator import (
-    StructuredOutputError,
     parse_json_object,
+    validate_structured_output,
 )
 
 
@@ -45,6 +44,20 @@ class PydanticAIValidationResult:
     structured_output: Mapping[str, Any] | None
     last_response: ProviderResponse
     pydantic_run_id: str
+
+
+class PydanticAIValidationExhaustedError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        last_response: ProviderResponse,
+        pydantic_run_id: str | None,
+        cause: UnexpectedModelBehavior,
+    ) -> None:
+        super().__init__(str(cause))
+        self.last_response = last_response
+        self.pydantic_run_id = pydantic_run_id
+        self.cause = cause
 
 
 class PydanticAIStructuredRunner:
@@ -117,20 +130,32 @@ class PydanticAIStructuredRunner:
                 return data
             try:
                 parsed = parse_json_object(data)
-                validate_json_schema(
-                    instance=parsed,
+                validation_result = validate_structured_output(
+                    data,
                     schema=dict(ctx.deps.request.response_schema),
                 )
-            except (StructuredOutputError, JsonSchemaValidationError) as exc:
+            except StructuredOutputError as exc:
                 raise ModelRetry(str(exc)) from exc
-            ctx.deps.parsed_output = parsed
+            ctx.deps.parsed_output = validation_result.normalized_output or parsed
             return data
 
-        result = await agent.run(
-            request.prompt,
-            deps=state,
-            infer_name=False,
-        )
+        try:
+            result = await agent.run(
+                request.prompt,
+                deps=state,
+                infer_name=False,
+            )
+        except UnexpectedModelBehavior as exc:
+            if state.last_response is None:
+                raise
+            raise PydanticAIValidationExhaustedError(
+                last_response=replace(
+                    state.last_response,
+                    pydantic_run_id=state.pydantic_run_id or state.last_response.pydantic_run_id,
+                ),
+                pydantic_run_id=state.pydantic_run_id,
+                cause=exc,
+            ) from exc
         if state.last_response is None:
             raise RuntimeError(
                 "PydanticAI validation run completed without a provider response"

@@ -130,7 +130,7 @@ def test_litellm_adapter_falls_back_to_prompt_as_user_message() -> None:
     assert router.calls[0]["messages"] == [{"role": "user", "content": "hello world"}]
 
 
-def test_litellm_adapter_maps_json_schema_to_response_format() -> None:
+def test_litellm_adapter_does_not_inject_conflicting_response_format() -> None:
     router = RecordingRouter(make_router_response())
     adapter = LiteLLMProviderAdapter(router)
 
@@ -147,20 +147,7 @@ def test_litellm_adapter_maps_json_schema_to_response_format() -> None:
         )
     )
 
-    response_format = router.calls[0]["response_format"]
-    assert response_format == {
-        "type": "json_schema",
-        "json_schema": {
-            "name": "kernel_demo_extract_structured_fields_v1",
-            "schema": {
-                "type": "object",
-                "properties": {"ok": {"type": "boolean"}},
-                "required": ["ok"],
-                "additionalProperties": False,
-            },
-            "strict": True,
-        },
-    }
+    assert "response_format" not in router.calls[0]
 
 
 def test_litellm_adapter_handles_response_content_lists() -> None:
