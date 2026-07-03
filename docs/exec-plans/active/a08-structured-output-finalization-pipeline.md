@@ -75,6 +75,7 @@ one safe standardized validation error without introducing a second retry loop.
 | Date | Progress | Next |
 |---|---|---|
 | 2026-07-03 | Read required docs, traced structured LLM execution, artifact persistence, provider ledger behavior, event emission, and LiteLLM schema handling. Confirmed PydanticAI already owns retry and that LiteLLM currently injects `response_format`, which conflicts with the target boundary. | Add the implementation and verification updates described above. |
+| 2026-07-03 | Verified the current structured-output validator still duplicated mapping/value normalization from `schemas.py`. Replaced the duplicate with shared public helpers so schema and runtime payload normalization now share one source of truth. | Run focused structured-output tests plus doctor/quick-check fallbacks and record results. |
 
 ## Open questions
 

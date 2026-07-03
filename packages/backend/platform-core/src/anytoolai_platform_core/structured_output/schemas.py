@@ -7,23 +7,23 @@ from typing import Any, Mapping
 def normalize_schema_mapping(schema: Mapping[str, Any] | None) -> dict[str, Any] | None:
     if schema is None:
         return None
-    return _normalize_mapping(schema)
+    return normalize_mapping(schema)
 
 
-def _normalize_mapping(value: Mapping[str, Any]) -> dict[str, Any]:
+def normalize_mapping(value: Mapping[str, Any]) -> dict[str, Any]:
     return {
-        str(key): _normalize_value(item)
+        str(key): normalize_value(item)
         for key, item in value.items()
     }
 
 
-def _normalize_value(value: Any) -> Any:
+def normalize_value(value: Any) -> Any:
     if isinstance(value, Mapping):
-        return _normalize_mapping(value)
+        return normalize_mapping(value)
     if isinstance(value, tuple):
-        return [_normalize_value(item) for item in value]
+        return [normalize_value(item) for item in value]
     if isinstance(value, list):
-        return [_normalize_value(item) for item in value]
+        return [normalize_value(item) for item in value]
     return value
 
 

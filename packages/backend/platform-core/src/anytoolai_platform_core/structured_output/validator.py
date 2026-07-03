@@ -14,6 +14,7 @@ from anytoolai_platform_core.structured_output.errors import (
 )
 from anytoolai_platform_core.structured_output.schemas import (
     StructuredOutputContract,
+    normalize_mapping,
     normalize_schema_mapping,
 )
 
@@ -36,7 +37,7 @@ def parse_json_object(raw: str) -> dict[str, Any]:
     value = parse_json_value(raw)
     if not isinstance(value, dict):
         raise StructuredOutputNonObjectJsonError("Expected JSON object")
-    return _normalize_mapping(value)
+    return normalize_mapping(value)
 
 
 def validate_structured_output(
@@ -56,7 +57,7 @@ def validate_structured_output(
     parsed = parse_json_value(raw_text)
     if requires_object and not isinstance(parsed, dict):
         raise StructuredOutputNonObjectJsonError("Expected JSON object")
-    normalized_output = _normalize_mapping(parsed) if isinstance(parsed, dict) else parsed
+    normalized_output = normalize_mapping(parsed) if isinstance(parsed, dict) else parsed
     if not isinstance(normalized_output, dict):
         raise StructuredOutputNonObjectJsonError("Expected JSON object")
     if contract.schema is not None:
@@ -69,20 +70,3 @@ def validate_structured_output(
         normalized_output=normalized_output,
         contract=contract,
     )
-
-
-def _normalize_mapping(value: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        str(key): _normalize_value(item)
-        for key, item in value.items()
-    }
-
-
-def _normalize_value(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return _normalize_mapping(value)
-    if isinstance(value, tuple):
-        return [_normalize_value(item) for item in value]
-    if isinstance(value, list):
-        return [_normalize_value(item) for item in value]
-    return value
