@@ -36,10 +36,10 @@ from anytoolai_platform_actions.structured_llm.executor import (
     StructuredLlmActionExecutor,
     StructuredLlmActionRequest,
 )
+from anytoolai_platform_actions.structured_llm import pydanticai_runner
 from anytoolai_platform_actions.structured_llm.pydanticai_runner import (
     PydanticAIStructuredRunner,
 )
-from pydantic_ai import UnexpectedModelBehavior
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
@@ -488,7 +488,9 @@ def test_pydanticai_runner_reraises_non_validation_unexpected_model_behavior(
                 output_text="transient-failure",
                 status=ProviderCallStatus.succeeded,
             )
-            raise UnexpectedModelBehavior("transport-independent model failure")
+            raise pydanticai_runner.UnexpectedModelBehavior(
+                "transport-independent model failure"
+            )
 
     monkeypatch.setattr(
         "anytoolai_platform_actions.structured_llm.pydanticai_runner.Agent",
@@ -516,7 +518,10 @@ def test_pydanticai_runner_reraises_non_validation_unexpected_model_behavior(
         prompt="Prompt text",
     )
 
-    with pytest.raises(UnexpectedModelBehavior, match="transport-independent model failure"):
+    with pytest.raises(
+        pydanticai_runner.UnexpectedModelBehavior,
+        match="transport-independent model failure",
+    ):
         asyncio.run(
             runner.run(
                 request,
