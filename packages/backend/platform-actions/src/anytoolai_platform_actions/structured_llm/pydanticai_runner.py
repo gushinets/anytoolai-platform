@@ -146,7 +146,7 @@ class PydanticAIStructuredRunner:
                 infer_name=False,
             )
         except UnexpectedModelBehavior as exc:
-            if state.last_response is None:
+            if state.last_response is None or state.pydantic_run_id is None:
                 raise
             raise PydanticAIValidationExhaustedError(
                 last_response=replace(

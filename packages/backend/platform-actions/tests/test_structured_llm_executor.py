@@ -19,6 +19,7 @@ from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.models import ProviderCallRecord
 from anytoolai_platform_core.providers.models import ProviderCallStatus, ProviderResponse
+from anytoolai_platform_core.providers.models import ProviderRequest
 from anytoolai_platform_core.providers.models import ProviderValidationRetryPolicy
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.storage.db import artifacts_table
@@ -35,6 +36,10 @@ from anytoolai_platform_actions.structured_llm.executor import (
     StructuredLlmActionExecutor,
     StructuredLlmActionRequest,
 )
+from anytoolai_platform_actions.structured_llm.pydanticai_runner import (
+    PydanticAIStructuredRunner,
+)
+from pydantic_ai import UnexpectedModelBehavior
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
@@ -413,3 +418,63 @@ def test_structured_llm_executor_raises_safe_error_and_persists_debug_artifact_a
     assert artifact_rows[0]["artifact_type"] == "structured_output_debug_raw"
     assert artifact_rows[0]["content_text"] == "not-json"
     assert artifact_rows[0]["metadata"]["error_code"] == STRUCTURED_OUTPUT_VALIDATION_ERROR_CODE
+
+
+def test_pydanticai_runner_reraises_non_validation_unexpected_model_behavior(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class StubAgent:
+        def __class_getitem__(cls, _item: Any) -> type["StubAgent"]:
+            return cls
+
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            del args, kwargs
+
+        def output_validator(self, fn: Any) -> Any:
+            return fn
+
+        async def run(self, *args: Any, **kwargs: Any) -> Any:
+            deps = kwargs["deps"]
+            deps.last_response = ProviderResponse(
+                provider_policy_ref=deps.request.provider_policy_ref,
+                provider="fake",
+                model="fake-json-v1",
+                output_text="transient-failure",
+                status=ProviderCallStatus.succeeded,
+            )
+            raise UnexpectedModelBehavior("transport-independent model failure")
+
+    monkeypatch.setattr(
+        "anytoolai_platform_actions.structured_llm.pydanticai_runner.Agent",
+        StubAgent,
+    )
+
+    async def request_executor(_request: Any) -> Any:
+        raise AssertionError("request_executor should not be called when Agent is stubbed")
+
+    runner = PydanticAIStructuredRunner()
+    request = ProviderRequest(
+        provider_policy_ref="default_fake_provider_v1",
+        tenant_id="tenant_demo",
+        region="eu-central",
+        product_id="kernel_demo",
+        frontend_id="kernel_demo_ce",
+        scenario_session_id="scenario_session_demo",
+        job_id="job_demo",
+        workflow_id="wf_demo",
+        workflow_version=1,
+        step_id="step_1",
+        action_run_id="action_run_demo",
+        action_type="text.extract_structured_fields",
+        action_config_id="kernel_demo.extract_structured_fields_v1",
+        prompt="Prompt text",
+    )
+
+    with pytest.raises(UnexpectedModelBehavior, match="transport-independent model failure"):
+        asyncio.run(
+            runner.run(
+                request,
+                request_executor=request_executor,
+                validation_max_attempts=2,
+            )
+        )
