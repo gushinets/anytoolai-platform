@@ -4,8 +4,8 @@
 
 - State: active
 - Owner: agent
-- Created: 2026-07-03
-- Last updated: 2026-07-03
+- Created: 2026-07-04
+- Last updated: 2026-07-04
 
 ## Goal
 
@@ -67,15 +67,15 @@ one safe standardized validation error without introducing a second retry loop.
 
 | Date | Decision | Why |
 |---|---|---|
-| 2026-07-03 | Final validation and artifact persistence will be injected into the structured executor boundary. | There is no higher-level runtime orchestrator wired yet, and this keeps PydanticAI retry ownership in `platform-actions` while using platform-core services for finalization. |
-| 2026-07-03 | One safe public error code will cover malformed JSON, non-object JSON, and schema mismatch. | The task requires a standardized safe error shape and explicitly forbids leaking raw output or verbose schema internals. |
+| 2026-07-04 | Final validation and artifact persistence will be injected into the structured executor boundary. | There is no higher-level runtime orchestrator wired yet, and this keeps PydanticAI retry ownership in `platform-actions` while using platform-core services for finalization. |
+| 2026-07-04 | One safe public error code will cover malformed JSON, non-object JSON, and schema mismatch. | The task requires a standardized safe error shape and explicitly forbids leaking raw output or verbose schema internals. |
 
 ## Progress log
 
 | Date | Progress | Next |
 |---|---|---|
-| 2026-07-03 | Read required docs, traced structured LLM execution, artifact persistence, provider ledger behavior, event emission, and LiteLLM schema handling. Confirmed PydanticAI already owns retry and that LiteLLM currently injects `response_format`, which conflicts with the target boundary. | Add the implementation and verification updates described above. |
-| 2026-07-03 | Verified the current structured-output validator still duplicated mapping/value normalization from `schemas.py`. Replaced the duplicate with shared public helpers so schema and runtime payload normalization now share one source of truth. | Run focused structured-output tests plus doctor/quick-check fallbacks and record results. |
+| 2026-07-04 | Read required docs, traced structured LLM execution, artifact persistence, provider ledger behavior, event emission, and LiteLLM schema handling. Confirmed PydanticAI already owns retry and that LiteLLM currently injects `response_format`, which conflicts with the target boundary. | Add the implementation and verification updates described above. |
+| 2026-07-04 | Verified the current structured-output validator still duplicated mapping/value normalization from `schemas.py`. Replaced the duplicate with shared public helpers so schema and runtime payload normalization now share one source of truth. | Run focused structured-output tests plus doctor/quick-check fallbacks and record results. |
 
 ## Open questions
 
