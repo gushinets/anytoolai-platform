@@ -160,6 +160,16 @@ def test_validate_structured_output_normalizes_frozen_schema_to_plain_dict() -> 
     assert isinstance(result.contract.schema, dict)
 
 
+def test_validate_structured_output_allows_non_object_json_when_not_required() -> None:
+    result = validate_structured_output(
+        '["a","b"]',
+        schema={"type": "array", "items": {"type": "string"}},
+        requires_object=False,
+    )
+
+    assert result.normalized_output == ["a", "b"]
+
+
 def test_structured_output_finalizer_persists_success_artifact(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

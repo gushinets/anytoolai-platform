@@ -22,7 +22,7 @@ from anytoolai_platform_core.structured_output.schemas import (
 @dataclass(frozen=True)
 class StructuredOutputValidationResult:
     raw_text: str
-    normalized_output: dict[str, Any]
+    normalized_output: Any
     contract: StructuredOutputContract
 
 
@@ -58,7 +58,7 @@ def validate_structured_output(
     if requires_object and not isinstance(parsed, dict):
         raise StructuredOutputNonObjectJsonError("Expected JSON object")
     normalized_output = normalize_mapping(parsed) if isinstance(parsed, dict) else parsed
-    if not isinstance(normalized_output, dict):
+    if requires_object and not isinstance(normalized_output, dict):
         raise StructuredOutputNonObjectJsonError("Expected JSON object")
     if contract.schema is not None:
         try:
