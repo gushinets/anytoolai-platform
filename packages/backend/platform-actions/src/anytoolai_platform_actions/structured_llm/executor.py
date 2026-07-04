@@ -166,6 +166,8 @@ class StructuredLlmActionExecutor:
         session: Session,
     ) -> ProviderResponse:
         schema_mapping = None if response_schema is None else dict(response_schema.schema)
+        if schema_mapping is None:
+            return response
         if self._artifact_service is None:
             validation_result = None
             try:

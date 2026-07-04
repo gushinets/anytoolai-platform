@@ -334,6 +334,52 @@ def test_structured_llm_executor_finalizes_and_persists_structured_artifact(
     }
 
 
+def test_structured_llm_executor_skips_schema_less_finalization_with_artifact_service(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    registry = build_config_registry(CONFIG_ROOT)
+    spy_gateway = SpyGateway()
+    with transaction_boundary(session_factory) as session:
+        artifact_service = ArtifactService(
+            ArtifactRepository(session),
+            EventEmitter(EventLogRepository(session)),
+        )
+        executor = StructuredLlmActionExecutor(
+            config_registry=registry,
+            provider_gateway=spy_gateway,
+            artifact_service=artifact_service,
+        )
+        action_definition = executor._require_action_definition("text.extract_structured_fields")
+        executor._require_action_definition = lambda _action_type: replace(
+            action_definition,
+            output_schema_ref="kernel.schemas.missing_output_v1",
+        )
+        request = StructuredLlmActionRequest(
+            tenant_id="tenant_demo",
+            region="eu-central",
+            product_id="kernel_demo",
+            frontend_id="kernel_demo_ce",
+            scenario_session_id="scenario_session_demo",
+            job_id="job_demo",
+            workflow_id="kernel_demo.single_action_extract_v1",
+            workflow_version=1,
+            step_id="extract",
+            action_run_id="action_run_demo",
+            action_config_id="kernel_demo.extract_structured_fields_v1",
+            input_payload={"source_text": "Budget and timeline details"},
+        )
+
+        response = asyncio.run(executor.execute(request, session=session))
+        artifact_rows = list(
+            session.execute(sa.select(artifacts_table)).mappings()
+        )
+
+    assert response.output_text == '{"title": "Summary", "fields": ["budget", "timeline"]}'
+    assert response.structured_output is None
+    assert "structured_output_artifact_id" not in response.metadata
+    assert artifact_rows == []
+
+
 def test_structured_llm_executor_raises_safe_error_and_persists_debug_artifact_after_retry_exhaustion(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
