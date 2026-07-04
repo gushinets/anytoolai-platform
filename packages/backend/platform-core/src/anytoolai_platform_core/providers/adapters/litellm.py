@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Any, Mapping
@@ -36,9 +37,14 @@ class LiteLLMProviderAdapter:
         return _normalize_litellm_response(request, response)
 
     def _messages_for(self, request: ResolvedProviderRequest) -> list[dict[str, Any]]:
-        if request.messages:
-            return [_serialize_message(message) for message in request.messages]
-        return [{"role": "user", "content": request.prompt}]
+        messages = (
+            [_serialize_message(message) for message in request.messages]
+            if request.messages
+            else [{"role": "user", "content": request.prompt}]
+        )
+        if request.response_schema is None:
+            return messages
+        return [_schema_guidance_message(request.response_schema), *messages]
 
 
 def default_litellm_router_config_path(config_root: Path | None = None) -> Path:
@@ -95,6 +101,18 @@ def _resolve_env_sentinels(value: Any) -> Any:
 
 def _serialize_message(message: ProviderMessage) -> dict[str, Any]:
     return {"role": message.role, "content": message.content}
+
+
+def _schema_guidance_message(schema: Mapping[str, Any]) -> dict[str, str]:
+    schema_json = json.dumps(dict(schema), sort_keys=True, separators=(",", ":"))
+    return {
+        "role": "system",
+        "content": (
+            "Return JSON that matches this schema exactly. "
+            "Do not wrap the JSON in markdown fences.\n"
+            f"JSON Schema: {schema_json}"
+        ),
+    }
 
 
 def _normalize_litellm_response(
@@ -211,4 +229,3 @@ def _float_like(value: Any) -> float:
 
 def _string_like(value: Any) -> str | None:
     return value if isinstance(value, str) and value.strip() else None
-

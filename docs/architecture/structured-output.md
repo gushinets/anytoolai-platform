@@ -108,5 +108,6 @@ the debug artifact path for platform debugging.
 PydanticAI owns the structured-output schema/retry path for structured actions.
 
 LiteLLM / `ProviderGateway` must not independently enforce a second conflicting schema transport for
-the same action. `response_schema` stays on AnytoolAI DTOs for platform validation context, but the
-provider adapter does not inject an additional `response_format` by default in MVP-A.
+the same action. `response_schema` stays on AnytoolAI DTOs for platform validation context, and the
+LiteLLM adapter may pass that schema forward as model-facing message guidance, but it does not
+inject an additional `response_format` validation path in MVP-A.

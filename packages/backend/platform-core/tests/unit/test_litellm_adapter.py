@@ -133,21 +133,63 @@ def test_litellm_adapter_falls_back_to_prompt_as_user_message() -> None:
 def test_litellm_adapter_does_not_inject_conflicting_response_format() -> None:
     router = RecordingRouter(make_router_response())
     adapter = LiteLLMProviderAdapter(router)
+    schema = {
+        "type": "object",
+        "properties": {"ok": {"type": "boolean"}},
+        "required": ["ok"],
+        "additionalProperties": False,
+    }
 
     asyncio.run(
         adapter.complete(
             make_request(
-                response_schema={
-                    "type": "object",
-                    "properties": {"ok": {"type": "boolean"}},
-                    "required": ["ok"],
-                    "additionalProperties": False,
-                }
+                response_schema=schema,
             )
         )
     )
 
     assert "response_format" not in router.calls[0]
+    assert router.calls[0]["messages"][0] == {
+        "role": "system",
+        "content": (
+            "Return JSON that matches this schema exactly. "
+            'Do not wrap the JSON in markdown fences.\nJSON Schema: {"additionalProperties":false,"properties":{"ok":{"type":"boolean"}},"required":["ok"],"type":"object"}'
+        ),
+    }
+    assert router.calls[0]["messages"][1:] == [
+        {"role": "system", "content": "You are structured"},
+        {"role": "user", "content": "Return JSON"},
+    ]
+
+
+def test_litellm_adapter_includes_schema_guidance_with_prompt_fallback() -> None:
+    router = RecordingRouter(make_router_response())
+    adapter = LiteLLMProviderAdapter(router)
+
+    asyncio.run(
+        adapter.complete(
+            make_request(
+                messages=(),
+                response_schema={
+                    "type": "object",
+                    "properties": {"summary": {"type": "string"}},
+                    "required": ["summary"],
+                    "additionalProperties": False,
+                },
+            )
+        )
+    )
+
+    assert router.calls[0]["messages"] == [
+        {
+            "role": "system",
+            "content": (
+                "Return JSON that matches this schema exactly. "
+                'Do not wrap the JSON in markdown fences.\nJSON Schema: {"additionalProperties":false,"properties":{"summary":{"type":"string"}},"required":["summary"],"type":"object"}'
+            ),
+        },
+        {"role": "user", "content": "hello world"},
+    ]
 
 
 def test_litellm_adapter_handles_response_content_lists() -> None:
