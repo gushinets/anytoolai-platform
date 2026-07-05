@@ -260,6 +260,35 @@ def test_litellm_adapter_serializes_real_registry_schema_before_dispatch() -> No
     }
 
 
+def test_litellm_adapter_fails_loudly_if_schema_guidance_normalization_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    router = RecordingRouter(make_router_response())
+    adapter = LiteLLMProviderAdapter(router)
+
+    monkeypatch.setattr(
+        "anytoolai_platform_core.providers.adapters.litellm.normalize_schema_mapping",
+        lambda _schema: None,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="LiteLLM schema guidance requires a non-null response schema after normalization",
+    ):
+        asyncio.run(
+            adapter.complete(
+                make_request(
+                    response_schema={
+                        "type": "object",
+                        "properties": {"ok": {"type": "boolean"}},
+                    }
+                )
+            )
+        )
+
+    assert router.calls == []
+
+
 def test_litellm_adapter_handles_response_content_lists() -> None:
     router = RecordingRouter(
         make_router_response(

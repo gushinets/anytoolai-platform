@@ -107,7 +107,9 @@ def _serialize_message(message: ProviderMessage) -> dict[str, Any]:
 def _schema_guidance_message(schema: Mapping[str, Any]) -> dict[str, str]:
     normalized_schema = normalize_schema_mapping(schema)
     if normalized_schema is None:  # pragma: no cover - defensive
-        normalized_schema = {}
+        raise RuntimeError(
+            "LiteLLM schema guidance requires a non-null response schema after normalization"
+        )
     schema_json = json.dumps(normalized_schema, sort_keys=True, separators=(",", ":"))
     return {
         "role": "system",
