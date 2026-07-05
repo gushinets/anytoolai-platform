@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import json
 import os
-from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -16,9 +16,9 @@ from anytoolai_platform_core.providers.models import (
     ProviderUsage,
     ResolvedProviderRequest,
 )
+from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
 
 _ENV_SENTINEL_PREFIX = "env/"
-_MIN_JSON_SCHEMA_RESPONSE_FORMAT_VERSION = (1, 80, 0)
 
 
 class LiteLLMProviderAdapter:
@@ -33,26 +33,19 @@ class LiteLLMProviderAdapter:
             "timeout": float(request.timeout_seconds),
             "num_retries": request.retry_policy.transport.litellm_num_retries_per_attempt,
         }
-        if (
-            request.response_schema is not None
-            and _supports_json_schema_response_format()
-        ):
-            kwargs["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": request.action_config_id.replace(".", "_"),
-                    "schema": dict(request.response_schema),
-                    "strict": True,
-                },
-            }
 
         response = await self._router.acompletion(**kwargs)
         return _normalize_litellm_response(request, response)
 
     def _messages_for(self, request: ResolvedProviderRequest) -> list[dict[str, Any]]:
-        if request.messages:
-            return [_serialize_message(message) for message in request.messages]
-        return [{"role": "user", "content": request.prompt}]
+        messages = (
+            [_serialize_message(message) for message in request.messages]
+            if request.messages
+            else [{"role": "user", "content": request.prompt}]
+        )
+        if request.response_schema is None:
+            return messages
+        return [_schema_guidance_message(request.response_schema), *messages]
 
 
 def default_litellm_router_config_path(config_root: Path | None = None) -> Path:
@@ -109,6 +102,23 @@ def _resolve_env_sentinels(value: Any) -> Any:
 
 def _serialize_message(message: ProviderMessage) -> dict[str, Any]:
     return {"role": message.role, "content": message.content}
+
+
+def _schema_guidance_message(schema: Mapping[str, Any]) -> dict[str, str]:
+    normalized_schema = normalize_schema_mapping(schema)
+    if normalized_schema is None:  # pragma: no cover - defensive
+        raise RuntimeError(
+            "LiteLLM schema guidance requires a non-null response schema after normalization"
+        )
+    schema_json = json.dumps(normalized_schema, sort_keys=True, separators=(",", ":"))
+    return {
+        "role": "system",
+        "content": (
+            "Return JSON that matches this schema exactly. "
+            "Do not wrap the JSON in markdown fences.\n"
+            f"JSON Schema: {schema_json}"
+        ),
+    }
 
 
 def _normalize_litellm_response(
@@ -225,22 +235,3 @@ def _float_like(value: Any) -> float:
 
 def _string_like(value: Any) -> str | None:
     return value if isinstance(value, str) and value.strip() else None
-
-
-def _supports_json_schema_response_format() -> bool:
-    current_version = _parse_version(version("litellm"))
-    return current_version >= _MIN_JSON_SCHEMA_RESPONSE_FORMAT_VERSION
-
-
-def _parse_version(raw_version: str) -> tuple[int, int, int]:
-    numeric_parts: list[int] = []
-    for part in raw_version.split("."):
-        digits = "".join(character for character in part if character.isdigit())
-        if digits == "":
-            break
-        numeric_parts.append(int(digits))
-        if len(numeric_parts) == 3:
-            break
-    while len(numeric_parts) < 3:
-        numeric_parts.append(0)
-    return tuple(numeric_parts[:3])

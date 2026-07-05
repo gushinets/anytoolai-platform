@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from anytoolai_platform_core.artifacts.models import ArtifactRecord
+from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
@@ -20,6 +20,64 @@ class ArtifactService:
             properties={"artifact_type": stored.artifact_type},
         )
         return stored
+
+    def create_structured_output_artifact(
+        self,
+        *,
+        tenant_id: str,
+        region: str,
+        product_id: str,
+        frontend_id: str,
+        scenario_session_id: str,
+        job_id: str | None,
+        action_run_id: str | None,
+        content_json: dict[str, object],
+        metadata: dict[str, object] | None = None,
+    ) -> ArtifactRecord:
+        return self.create(
+            ArtifactRecord(
+                tenant_id=tenant_id,
+                region=region,
+                product_id=product_id,
+                frontend_id=frontend_id,
+                scenario_session_id=scenario_session_id,
+                job_id=job_id,
+                action_run_id=action_run_id,
+                artifact_type="structured_output",
+                status=ArtifactStatus.stored,
+                content_json=content_json,
+                metadata={} if metadata is None else dict(metadata),
+            )
+        )
+
+    def create_structured_output_debug_artifact(
+        self,
+        *,
+        tenant_id: str,
+        region: str,
+        product_id: str,
+        frontend_id: str,
+        scenario_session_id: str,
+        job_id: str | None,
+        action_run_id: str | None,
+        raw_output_text: str,
+        metadata: dict[str, object] | None = None,
+    ) -> ArtifactRecord:
+        return self.create(
+            ArtifactRecord(
+                tenant_id=tenant_id,
+                region=region,
+                product_id=product_id,
+                frontend_id=frontend_id,
+                scenario_session_id=scenario_session_id,
+                job_id=job_id,
+                action_run_id=action_run_id,
+                artifact_type="structured_output_debug_raw",
+                status=ArtifactStatus.failed,
+                content_text=raw_output_text,
+                metadata={} if metadata is None else dict(metadata),
+            )
+        )
 
 
 def _context_from_record(record: ArtifactRecord) -> ExecutionContext:

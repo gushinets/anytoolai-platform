@@ -1,20 +1,33 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Mapping
 
-from pydantic_ai import UnexpectedModelBehavior
 from sqlalchemy.orm import Session
 
+from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.providers.gateway import (
     ProviderGateway,
     ProviderGatewayExecutionError,
 )
 from anytoolai_platform_core.providers.models import ProviderRequest, ProviderResponse
+from anytoolai_platform_core.providers.repository import ProviderCallRepository
+from anytoolai_platform_core.structured_output.service import (
+    StructuredOutputFinalizer,
+    StructuredOutputPersistenceContext,
+)
+from anytoolai_platform_core.structured_output.errors import (
+    StructuredOutputError,
+    to_safe_validation_error,
+)
+from anytoolai_platform_core.structured_output.validator import (
+    validate_structured_output,
+)
 
 from anytoolai_platform_actions.structured_llm.pydanticai_runner import (
+    PydanticAIValidationExhaustedError,
     PydanticAIStructuredRunner,
 )
 
@@ -49,10 +62,12 @@ class StructuredLlmActionExecutor:
         *,
         config_registry: ConfigRegistry,
         provider_gateway: ProviderGateway,
+        artifact_service: ArtifactService | None = None,
     ) -> None:
         self._config_registry = config_registry
         self._provider_gateway = provider_gateway
         self._structured_runner = PydanticAIStructuredRunner()
+        self._artifact_service = artifact_service
 
     async def execute(
         self,
@@ -98,17 +113,19 @@ class StructuredLlmActionExecutor:
                 ),
                 validation_max_attempts=provider_policy.retry_policy.validation.max_attempts,
             )
-        except UnexpectedModelBehavior as exc:
-            raise ProviderGatewayExecutionError(
-                provider_policy_ref=provider_policy.provider_policy_ref,
-                provider=provider_policy.provider,
-                model=provider_policy.model,
-                error_code="structured_output_validation_failed",
-                error_type=type(exc).__name__,
-                message=str(exc),
-                failure_kind="validation",
-            ) from exc
-        return result.last_response
+        except PydanticAIValidationExhaustedError as exc:
+            return self._finalize_response(
+                response=exc.last_response,
+                request=request,
+                response_schema=response_schema,
+                session=session,
+            )
+        return self._finalize_response(
+            response=result.last_response,
+            request=request,
+            response_schema=response_schema,
+            session=session,
+        )
 
     def _require_action_config(self, action_config_id: str) -> Any:
         action_config = self._config_registry.get_action_configuration(action_config_id)
@@ -139,3 +156,63 @@ class StructuredLlmActionExecutor:
             return template
         serialized_payload = json.dumps(dict(input_payload), sort_keys=True)
         return f"{template}\n\nInput payload:\n{serialized_payload}"
+
+    def _finalize_response(
+        self,
+        *,
+        response: ProviderResponse,
+        request: StructuredLlmActionRequest,
+        response_schema: Any,
+        session: Session,
+    ) -> ProviderResponse:
+        schema_mapping = None if response_schema is None else dict(response_schema.schema)
+        if schema_mapping is None:
+            return response
+        if self._artifact_service is None:
+            validation_result = None
+            try:
+                if schema_mapping is not None:
+                    validation_result = validate_structured_output(
+                        response.output_text,
+                        schema=schema_mapping,
+                        schema_ref=response_schema.schema_ref,
+                        schema_version=response_schema.version,
+                    )
+            except StructuredOutputError as exc:
+                raise to_safe_validation_error(exc) from exc
+            return replace(
+                response,
+                structured_output=(
+                    response.structured_output
+                    if validation_result is None
+                    else validation_result.normalized_output
+                ),
+            )
+
+        finalizer = StructuredOutputFinalizer(
+            artifact_service=self._artifact_service,
+            provider_call_repository=ProviderCallRepository(session),
+        )
+        finalized = finalizer.finalize(
+            response.output_text,
+            persistence_context=StructuredOutputPersistenceContext(
+                tenant_id=request.tenant_id,
+                region=request.region,
+                product_id=request.product_id,
+                frontend_id=request.frontend_id,
+                scenario_session_id=request.scenario_session_id,
+                job_id=request.job_id,
+                action_run_id=request.action_run_id,
+            ),
+            schema=schema_mapping,
+            schema_ref=None if response_schema is None else response_schema.schema_ref,
+            schema_version=None if response_schema is None else response_schema.version,
+        )
+        return replace(
+            response,
+            structured_output=finalized.validation_result.normalized_output,
+            metadata={
+                **dict(response.metadata),
+                "structured_output_artifact_id": finalized.artifact.id,
+            },
+        )
