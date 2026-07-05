@@ -16,6 +16,7 @@ from anytoolai_platform_core.providers.models import (
     ProviderUsage,
     ResolvedProviderRequest,
 )
+from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
 
 _ENV_SENTINEL_PREFIX = "env/"
 
@@ -104,7 +105,10 @@ def _serialize_message(message: ProviderMessage) -> dict[str, Any]:
 
 
 def _schema_guidance_message(schema: Mapping[str, Any]) -> dict[str, str]:
-    schema_json = json.dumps(dict(schema), sort_keys=True, separators=(",", ":"))
+    normalized_schema = normalize_schema_mapping(schema)
+    if normalized_schema is None:  # pragma: no cover - defensive
+        normalized_schema = {}
+    schema_json = json.dumps(normalized_schema, sort_keys=True, separators=(",", ":"))
     return {
         "role": "system",
         "content": (

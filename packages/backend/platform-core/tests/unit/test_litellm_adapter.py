@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 from types import SimpleNamespace
+from types import MappingProxyType
 
 import pytest
 
+from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.providers.adapters.litellm import (
     LiteLLMProviderAdapter,
@@ -22,6 +24,9 @@ from anytoolai_platform_core.providers.models import (
     ResolvedProviderRequest,
     StructuredOutputMode,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[5]
+CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 
 
 class RecordingRouter:
@@ -190,6 +195,69 @@ def test_litellm_adapter_includes_schema_guidance_with_prompt_fallback() -> None
         },
         {"role": "user", "content": "hello world"},
     ]
+
+
+def test_litellm_adapter_serializes_nested_frozen_schema_values() -> None:
+    router = RecordingRouter(make_router_response())
+    adapter = LiteLLMProviderAdapter(router)
+    frozen_schema = MappingProxyType(
+        {
+            "type": "object",
+            "properties": MappingProxyType(
+                {
+                    "outer": MappingProxyType(
+                        {
+                            "type": "object",
+                            "properties": MappingProxyType(
+                                {
+                                    "value": MappingProxyType({"type": "string"}),
+                                    "items": MappingProxyType(
+                                        {
+                                            "type": "array",
+                                            "items": MappingProxyType({"type": "integer"}),
+                                        }
+                                    ),
+                                }
+                            ),
+                            "required": ("value", "items"),
+                            "additionalProperties": False,
+                        }
+                    )
+                }
+            ),
+            "required": ("outer",),
+            "additionalProperties": False,
+        }
+    )
+
+    asyncio.run(adapter.complete(make_request(response_schema=frozen_schema)))
+
+    assert router.calls[0]["messages"][0] == {
+        "role": "system",
+        "content": (
+            "Return JSON that matches this schema exactly. "
+            'Do not wrap the JSON in markdown fences.\nJSON Schema: {"additionalProperties":false,"properties":{"outer":{"additionalProperties":false,"properties":{"items":{"items":{"type":"integer"},"type":"array"},"value":{"type":"string"}},"required":["value","items"],"type":"object"}},"required":["outer"],"type":"object"}'
+        ),
+    }
+
+
+def test_litellm_adapter_serializes_real_registry_schema_before_dispatch() -> None:
+    router = RecordingRouter(make_router_response())
+    adapter = LiteLLMProviderAdapter(router)
+    registry = build_config_registry(CONFIG_ROOT)
+    schema_definition = registry.get_schema("kernel.schemas.extract_output_v1")
+
+    assert schema_definition is not None
+
+    asyncio.run(adapter.complete(make_request(response_schema=schema_definition.schema)))
+
+    assert router.calls[0]["messages"][0] == {
+        "role": "system",
+        "content": (
+            "Return JSON that matches this schema exactly. "
+            'Do not wrap the JSON in markdown fences.\nJSON Schema: {"additionalProperties":true,"type":"object"}'
+        ),
+    }
 
 
 def test_litellm_adapter_handles_response_content_lists() -> None:
