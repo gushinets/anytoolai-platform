@@ -1,4 +1,21 @@
 {
   "type": "object",
-  "additionalProperties": true
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "title",
+    "fields"
+  ],
+  "additionalProperties": false
 }

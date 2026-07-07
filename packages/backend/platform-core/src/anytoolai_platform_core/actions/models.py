@@ -66,3 +66,17 @@ class ActionRunRecord:
     started_at: datetime | None = None
     completed_at: datetime | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ActionResult:
+    action_run_id: str
+    action_type: str
+    action_config_id: str
+    status: ActionRunStatus
+    output_payload: dict[str, Any] | list[Any] | None = None
+    output_artifact_id: str | None = None
+    provider_policy_ref: str | None = None
+    provider: str | None = None
+    model: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)

@@ -7,6 +7,7 @@ from typing import Any, Mapping
 from sqlalchemy.orm import Session
 
 from anytoolai_platform_core.artifacts.service import ArtifactService
+from anytoolai_platform_core.actions.executor import ActionExecutorRequest
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.providers.gateway import (
     ProviderGateway,
@@ -33,20 +34,7 @@ from anytoolai_platform_actions.structured_llm.pydanticai_runner import (
 
 
 @dataclass(frozen=True)
-class StructuredLlmActionRequest:
-    tenant_id: str
-    region: str
-    product_id: str
-    frontend_id: str
-    scenario_session_id: str
-    job_id: str
-    workflow_id: str
-    workflow_version: int
-    step_id: str
-    action_run_id: str
-    action_config_id: str
-    input_payload: Mapping[str, Any] = field(default_factory=dict)
-    metadata: Mapping[str, Any] = field(default_factory=dict)
+class StructuredLlmActionRequest(ActionExecutorRequest):
     fixture_key: str | None = None
     request_id: str | None = None
     correlation_id: str | None = None
