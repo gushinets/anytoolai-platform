@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from typing import Any, Mapping
 
 from sqlalchemy.orm import Session
 
 from anytoolai_platform_core.artifacts.service import ArtifactService
-from anytoolai_platform_core.actions.executor import ActionExecutorRequest
-from anytoolai_platform_core.config.registry import ConfigRegistry
-from anytoolai_platform_core.providers.gateway import (
-    ProviderGateway,
-    ProviderGatewayExecutionError,
+from anytoolai_platform_core.actions.executor import (
+    ActionExecutorRequest,
+    ActionExecutorResponse,
+    ProviderCallInfo,
 )
+from anytoolai_platform_core.config.registry import ConfigRegistry
+from anytoolai_platform_core.providers.gateway import ProviderGateway
 from anytoolai_platform_core.providers.models import ProviderRequest, ProviderResponse
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.structured_output.service import (
@@ -59,10 +60,10 @@ class StructuredLlmActionExecutor:
 
     async def execute(
         self,
-        request: StructuredLlmActionRequest,
+        request: ActionExecutorRequest,
         *,
         session: Session,
-    ) -> ProviderResponse:
+    ) -> ActionExecutorResponse:
         action_config = self._require_action_config(request.action_config_id)
         action_definition = self._require_action_definition(action_config.action_type)
         prompt = self._require_prompt(action_config.prompt_ref)
@@ -102,17 +103,21 @@ class StructuredLlmActionExecutor:
                 validation_max_attempts=provider_policy.retry_policy.validation.max_attempts,
             )
         except PydanticAIValidationExhaustedError as exc:
-            return self._finalize_response(
-                response=exc.last_response,
+            return self._to_executor_response(
+                self._finalize_response(
+                    response=exc.last_response,
+                    request=request,
+                    response_schema=response_schema,
+                    session=session,
+                )
+            )
+        return self._to_executor_response(
+            self._finalize_response(
+                response=result.last_response,
                 request=request,
                 response_schema=response_schema,
                 session=session,
             )
-        return self._finalize_response(
-            response=result.last_response,
-            request=request,
-            response_schema=response_schema,
-            session=session,
         )
 
     def _require_action_config(self, action_config_id: str) -> Any:
@@ -149,7 +154,7 @@ class StructuredLlmActionExecutor:
         self,
         *,
         response: ProviderResponse,
-        request: StructuredLlmActionRequest,
+        request: ActionExecutorRequest,
         response_schema: Any,
         session: Session,
     ) -> ProviderResponse:
@@ -203,4 +208,23 @@ class StructuredLlmActionExecutor:
                 **dict(response.metadata),
                 "structured_output_artifact_id": finalized.artifact.id,
             },
+        )
+
+    def _to_executor_response(
+        self,
+        response: ProviderResponse,
+    ) -> ActionExecutorResponse:
+        return ActionExecutorResponse(
+            structured_output=response.structured_output,
+            metadata=dict(response.metadata),
+            provider_call=ProviderCallInfo(
+                provider_policy_ref=response.provider_policy_ref,
+                provider=response.provider,
+                model=response.model,
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+                latency_ms=response.latency_ms,
+                estimated_cost=response.estimated_cost,
+                metadata=dict(response.metadata),
+            ),
         )

@@ -27,7 +27,31 @@ class ActionExecutorRequest:
     correlation_id: str | None = None
 
 
+@dataclass(frozen=True)
+class ProviderCallInfo:
+    provider_policy_ref: str
+    provider: str
+    model: str
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    latency_ms: int | None = None
+    estimated_cost: float | None = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ActionExecutorResponse:
+    structured_output: Mapping[str, Any] | None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+    provider_call: ProviderCallInfo | None = None
+
+
 class ActionExecutor(Protocol):
     executor_id: str
 
-    async def execute(self, request: ActionExecutorRequest, *, session: Any) -> Any: ...
+    async def execute(
+        self,
+        request: ActionExecutorRequest,
+        *,
+        session: Any,
+    ) -> ActionExecutorResponse: ...

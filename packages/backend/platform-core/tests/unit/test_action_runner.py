@@ -11,6 +11,7 @@ from alembic.config import Config
 from sqlalchemy import event
 
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
+from anytoolai_platform_core.actions.executor import ActionExecutorResponse
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.actions.runner import (
     ActionInputValidationError,
@@ -101,6 +102,17 @@ class AlwaysFailFakeAdapter:
     async def complete(self, request: Any) -> Any:
         del request
         raise RuntimeError("provider exploded with secret_token=abc123")
+
+
+class GenericExecutor:
+    executor_id = "structured_llm"
+
+    async def execute(self, request: Any, *, session: Any) -> ActionExecutorResponse:
+        del request, session
+        return ActionExecutorResponse(
+            structured_output={"title": "Generic Summary", "fields": ["budget"]},
+            metadata={"structured_output_artifact_id": "artifact_generic"},
+        )
 
 
 def _event_rows(session: sa.orm.Session) -> list[dict[str, Any]]:
@@ -297,3 +309,47 @@ def test_action_runner_marks_failed_on_input_validation_error(
         "action.started",
         "action.failed",
     ]
+
+
+def test_action_runner_allows_executor_responses_without_provider_call(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        registry = build_config_registry(CONFIG_ROOT)
+        emitter = EventEmitter(EventLogRepository(session))
+        runner = ActionRunner(
+            session=session,
+            config_registry=registry,
+            action_run_service=ActionRunService(ActionRunRepository(session), emitter),
+            executors={GenericExecutor.executor_id: GenericExecutor()},
+            artifact_repository=ArtifactRepository(session),
+        )
+
+        result = asyncio.run(
+            runner.run(
+                "text.extract_structured_fields",
+                "kernel_demo.extract_structured_fields_v1",
+                {"source_text": "deadline budget deliverables"},
+                _context(
+                    step_id="extract",
+                    action_type="text.extract_structured_fields",
+                    action_config_id="kernel_demo.extract_structured_fields_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {
+        "title": "Generic Summary",
+        "fields": ["budget"],
+    }
+    assert result.output_artifact_id == "artifact_generic"
+    assert result.provider_policy_ref is None
+    assert result.provider is None
+    assert result.model is None
+    assert action_run["metadata"]["llm_response_metadata"] == {
+        "structured_output_artifact_id": "artifact_generic"
+    }
+    assert "provider" not in action_run["metadata"]
+    assert "model" not in action_run["metadata"]

@@ -7,7 +7,11 @@ from jsonschema import ValidationError as JsonSchemaValidationError
 from jsonschema import validate as validate_json_schema
 from sqlalchemy.orm import Session
 
-from anytoolai_platform_core.actions.executor import ActionExecutor, ActionExecutorRequest
+from anytoolai_platform_core.actions.executor import (
+    ActionExecutor,
+    ActionExecutorRequest,
+    ActionExecutorResponse,
+)
 from anytoolai_platform_core.actions.models import ActionResult, ActionRunRecord, ActionRunStatus
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
@@ -17,7 +21,6 @@ from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
-from anytoolai_platform_core.providers.models import ProviderResponse
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
 from anytoolai_platform_core.structured_output.schemas import normalize_mapping, normalize_schema_mapping
 
@@ -131,6 +134,7 @@ class ActionRunner:
             raise
 
         output_artifact_id = self._artifact_id_from_response(response)
+        provider_call = response.provider_call
         succeeded = self._action_run_service.mark_succeeded(
             replace(
                 action_run,
@@ -139,11 +143,17 @@ class ActionRunner:
                 completed_at=utc_now(),
                 metadata={
                     **dict(action_run.metadata),
-                    "provider_policy_ref": response.provider_policy_ref,
-                    "provider": response.provider,
-                    "model": response.model,
                     "structured_output_artifact_id": output_artifact_id,
                     "llm_response_metadata": dict(response.metadata),
+                    **(
+                        {}
+                        if provider_call is None
+                        else {
+                            "provider_policy_ref": provider_call.provider_policy_ref,
+                            "provider": provider_call.provider,
+                            "model": provider_call.model,
+                        }
+                    ),
                 },
             )
         )
@@ -158,9 +168,11 @@ class ActionRunner:
                 else response.structured_output
             ),
             output_artifact_id=output_artifact_id,
-            provider_policy_ref=response.provider_policy_ref,
-            provider=response.provider,
-            model=response.model,
+            provider_policy_ref=(
+                None if provider_call is None else provider_call.provider_policy_ref
+            ),
+            provider=None if provider_call is None else provider_call.provider,
+            model=None if provider_call is None else provider_call.model,
             metadata={
                 "prompt_ref": prompt.prompt_ref,
                 "input_schema_ref": input_schema.schema_ref,
@@ -223,7 +235,7 @@ class ActionRunner:
                 f"Action input validation failed for {schema_ref}."
             ) from exc
 
-    def _artifact_id_from_response(self, response: ProviderResponse) -> str | None:
+    def _artifact_id_from_response(self, response: ActionExecutorResponse) -> str | None:
         artifact_id = response.metadata.get("structured_output_artifact_id")
         return artifact_id if isinstance(artifact_id, str) and artifact_id else None
 

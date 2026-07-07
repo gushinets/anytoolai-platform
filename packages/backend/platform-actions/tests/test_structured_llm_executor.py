@@ -193,7 +193,14 @@ def test_structured_llm_executor_routes_calls_through_provider_gateway() -> None
 
     response = asyncio.run(executor.execute(request, session=session))
 
-    assert response.output_text == '{"title": "Summary", "fields": ["budget", "timeline"]}'
+    assert response.structured_output == {
+        "title": "Summary",
+        "fields": ["budget", "timeline"],
+    }
+    assert response.provider_call is not None
+    assert response.provider_call.provider == "fake"
+    assert response.provider_call.model == "fake-json-v1"
+    assert response.provider_call.provider_policy_ref == "default_fake_provider_v1"
     assert spy_gateway.sessions == [session]
     assert len(spy_gateway.requests) == 1
     provider_request = spy_gateway.requests[0]
@@ -248,12 +255,11 @@ def test_structured_llm_executor_owns_validation_retries_through_gateway_dtos() 
 
     response = asyncio.run(executor.execute(request, session=session))
 
-    assert response.output_text == '{"title": "Summary", "fields": ["budget", "timeline"]}'
     assert response.structured_output == {
         "title": "Summary",
         "fields": ["budget", "timeline"],
     }
-    assert response.pydantic_run_id is not None
+    assert response.provider_call is not None
     assert spy_gateway.sessions == [session, session]
     assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
         1,
@@ -325,6 +331,7 @@ def test_structured_llm_executor_finalizes_and_persists_structured_artifact(
         "title": "Summary",
         "fields": ["budget", "timeline"],
     }
+    assert response.provider_call is not None
     assert response.metadata["structured_output_artifact_id"].startswith("artifact_")
     assert len(artifact_rows) == 1
     assert artifact_rows[0]["artifact_type"] == "structured_output"
@@ -374,8 +381,8 @@ def test_structured_llm_executor_skips_schema_less_finalization_with_artifact_se
             session.execute(sa.select(artifacts_table)).mappings()
         )
 
-    assert response.output_text == '{"title": "Summary", "fields": ["budget", "timeline"]}'
     assert response.structured_output is None
+    assert response.provider_call is not None
     assert "structured_output_artifact_id" not in response.metadata
     assert artifact_rows == []
 
