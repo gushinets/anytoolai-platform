@@ -64,6 +64,13 @@ For these atoms the repo now includes:
 - `platform.artifacts` through the structured-output finalizer path
 - `platform.event_log` action lifecycle rows
 
+When an executor or input-validation error is raised and the exception escapes the caller's
+`transaction_boundary()`, `ActionRunner` still preserves durable failed action state by replaying
+`platform.action_runs` failed persistence and the `action.failed` event in an independent recovery
+transaction. The original exception is still re-raised to the caller. If the caller catches the
+exception inside the active transaction boundary, the normal in-transaction failed update/event
+path is committed instead.
+
 Provider-attempt correlation remains gateway-owned through:
 
 - `platform.provider_calls`

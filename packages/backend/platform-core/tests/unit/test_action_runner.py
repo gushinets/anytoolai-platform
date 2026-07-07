@@ -306,6 +306,41 @@ def test_action_runner_marks_failed_on_provider_failure(
     assert _event_by_type(events, "action.failed")["action_run_id"] == action_run["id"]
 
 
+def test_action_runner_persists_failed_state_when_exception_escapes_transaction_boundary(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+        with transaction_boundary(session_factory) as session:
+            runner = _build_runner(session, fake_adapter=AlwaysFailFakeAdapter())
+            asyncio.run(
+                runner.run(
+                    "text.extract_structured_fields",
+                    "kernel_demo.extract_structured_fields_v1",
+                    {"source_text": "deadline budget deliverables"},
+                    _context(
+                        step_id="extract",
+                        action_type="text.extract_structured_fields",
+                        action_config_id="kernel_demo.extract_structured_fields_v1",
+                    ),
+                )
+            )
+
+    with transaction_boundary(session_factory) as session:
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        provider_call_count = session.execute(
+            sa.select(sa.func.count()).select_from(provider_calls_table)
+        ).scalar_one()
+        events = _event_rows(session)
+
+    assert exc_info.value.error_code == "provider_request_failed"
+    assert action_run["status"].value == "failed"
+    assert action_run["error_code"] == "provider_request_failed"
+    assert provider_call_count == 0
+    assert _event_counts(events) == Counter({"action.failed": 1})
+    assert _event_by_type(events, "action.failed")["action_run_id"] == action_run["id"]
+    assert _event_by_type(events, "action.failed")["workflow_version"] == 1
+
+
 def test_action_runner_marks_failed_on_input_validation_error(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

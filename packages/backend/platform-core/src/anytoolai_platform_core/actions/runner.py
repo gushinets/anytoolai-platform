@@ -20,7 +20,12 @@ from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
+from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
+from anytoolai_platform_core.storage.transactions import (
+    register_rollback_recovery_callback,
+    transaction_boundary,
+)
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
 from anytoolai_platform_core.structured_output.schemas import normalize_mapping, normalize_schema_mapping
 
@@ -123,14 +128,23 @@ class ActionRunner:
             )
             response = await executor.execute(request, session=self._session)
         except Exception as exc:
+            error_code = self._error_code_for_exception(exc)
+            metadata_updates = {
+                "error_type": type(exc).__name__,
+                "provider_policy_ref": provider_policy.provider_policy_ref,
+            }
+            output_artifact_id = self._latest_artifact_id(action_run.id)
+            self._register_failure_recovery(
+                action_run,
+                error_code=error_code,
+                metadata_updates=metadata_updates,
+                output_artifact_id=output_artifact_id,
+            )
             self._action_run_service.mark_failed(
                 action_run,
-                error_code=self._error_code_for_exception(exc),
-                metadata_updates={
-                    "error_type": type(exc).__name__,
-                    "provider_policy_ref": provider_policy.provider_policy_ref,
-                },
-                output_artifact_id=self._latest_artifact_id(action_run.id),
+                error_code=error_code,
+                metadata_updates=metadata_updates,
+                output_artifact_id=output_artifact_id,
             )
             raise
 
@@ -263,6 +277,25 @@ class ActionRunner:
             raise ValueError("missing required action context: workflow_version")
         return value
 
+    def _register_failure_recovery(
+        self,
+        action_run: ActionRunRecord,
+        *,
+        error_code: str,
+        metadata_updates: Mapping[str, Any],
+        output_artifact_id: str | None,
+    ) -> None:
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _persist_failed_action_run_after_rollback(
+                recovery_session_factory,
+                action_run,
+                error_code=error_code,
+                metadata_updates=metadata_updates,
+                output_artifact_id=output_artifact_id,
+            ),
+        )
+
 
 class ActionRunService:
     def __init__(self, repository: ActionRunRepository, event_emitter: EventEmitter) -> None:
@@ -291,16 +324,11 @@ class ActionRunService:
         metadata_updates: Mapping[str, Any] | None = None,
         output_artifact_id: str | None = None,
     ) -> ActionRunRecord:
-        failed_record = replace(
+        failed_record = _build_failed_action_run_record(
             record,
-            status=ActionRunStatus.failed,
             error_code=error_code,
-            output_artifact_id=output_artifact_id or record.output_artifact_id,
-            completed_at=utc_now(),
-            metadata={
-                **dict(record.metadata),
-                **({} if metadata_updates is None else dict(metadata_updates)),
-            },
+            metadata_updates=metadata_updates,
+            output_artifact_id=output_artifact_id,
         )
         updated = self._repository.update(failed_record)
         self._event_emitter.emit(
@@ -340,3 +368,65 @@ def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
 def _metadata_int(metadata: Mapping[str, Any], key: str) -> int | None:
     value = metadata.get(key)
     return value if isinstance(value, int) else None
+
+
+def _build_failed_action_run_record(
+    record: ActionRunRecord,
+    *,
+    error_code: str,
+    metadata_updates: Mapping[str, Any] | None = None,
+    output_artifact_id: str | None = None,
+) -> ActionRunRecord:
+    return replace(
+        record,
+        status=ActionRunStatus.failed,
+        error_code=error_code,
+        output_artifact_id=output_artifact_id or record.output_artifact_id,
+        completed_at=utc_now(),
+        metadata={
+            **dict(record.metadata),
+            **({} if metadata_updates is None else dict(metadata_updates)),
+        },
+    )
+
+
+def _persist_failed_action_run_after_rollback(
+    recovery_session_factory: Any,
+    record: ActionRunRecord,
+    *,
+    error_code: str,
+    metadata_updates: Mapping[str, Any],
+    output_artifact_id: str | None,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        action_run_repository = ActionRunRepository(recovery_session)
+        artifact_repository = ArtifactRepository(recovery_session)
+        event_emitter = EventEmitter(EventLogRepository(recovery_session))
+
+        persisted_artifact_id = output_artifact_id
+        if persisted_artifact_id is not None and artifact_repository.get(persisted_artifact_id) is None:
+            persisted_artifact_id = None
+
+        existing = action_run_repository.get(record.id)
+        if existing is None:
+            failed_record = _build_failed_action_run_record(
+                record,
+                error_code=error_code,
+                metadata_updates=metadata_updates,
+                output_artifact_id=persisted_artifact_id,
+            )
+            stored = action_run_repository.create(failed_record)
+            event_emitter.emit(
+                "action.failed",
+                _context_from_record(stored),
+                result_status=stored.status.value,
+                properties={"error_code": error_code},
+            )
+            return
+
+        ActionRunService(action_run_repository, event_emitter).mark_failed(
+            existing,
+            error_code=error_code,
+            metadata_updates=metadata_updates,
+            output_artifact_id=persisted_artifact_id,
+        )
