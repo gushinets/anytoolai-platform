@@ -80,7 +80,13 @@ def session_factory(tmp_path: Path) -> sa.orm.sessionmaker[sa.orm.Session]:
         engine.dispose()
 
 
-def _context(*, step_id: str, action_type: str, action_config_id: str) -> ExecutionContext:
+def _context(
+    *,
+    step_id: str,
+    action_type: str,
+    action_config_id: str,
+    workflow_version: int | None = 1,
+) -> ExecutionContext:
     return ExecutionContext(
         tenant_id="tenant_demo",
         region="eu-central",
@@ -89,7 +95,7 @@ def _context(*, step_id: str, action_type: str, action_config_id: str) -> Execut
         scenario_session_id="scenario_session_demo",
         job_id="job_demo",
         workflow_id="kernel_demo.extract_detect_report_v1",
-        workflow_version=1,
+        workflow_version=workflow_version,
         step_id=step_id,
         guest_id="guest_demo",
         user_id="user_demo",
@@ -309,6 +315,8 @@ def test_action_runner_marks_failed_on_input_validation_error(
         "action.started",
         "action.failed",
     ]
+    assert events[0]["workflow_version"] == 1
+    assert events[1]["workflow_version"] == 1
 
 
 def test_action_runner_allows_executor_responses_without_provider_call(
@@ -353,3 +361,34 @@ def test_action_runner_allows_executor_responses_without_provider_call(
     }
     assert "provider" not in action_run["metadata"]
     assert "model" not in action_run["metadata"]
+
+
+def test_action_runner_rejects_missing_workflow_version_before_creating_action_run(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session)
+
+        with pytest.raises(ValueError, match="workflow_version"):
+            asyncio.run(
+                runner.run(
+                    "text.extract_structured_fields",
+                    "kernel_demo.extract_structured_fields_v1",
+                    {"source_text": "deadline budget deliverables"},
+                    _context(
+                        step_id="extract",
+                        action_type="text.extract_structured_fields",
+                        action_config_id="kernel_demo.extract_structured_fields_v1",
+                        workflow_version=None,
+                    ),
+                )
+            )
+        action_run_count = session.execute(
+            sa.select(sa.func.count()).select_from(action_runs_table)
+        ).scalar_one()
+        event_count = session.execute(
+            sa.select(sa.func.count()).select_from(event_log_table)
+        ).scalar_one()
+
+    assert action_run_count == 0
+    assert event_count == 0

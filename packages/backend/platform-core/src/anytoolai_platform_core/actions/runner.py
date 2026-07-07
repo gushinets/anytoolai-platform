@@ -64,6 +64,7 @@ class ActionRunner:
         prompt = self._require_prompt(action_config.prompt_ref)
         input_schema = self._require_schema(action_definition.input_schema_ref)
         output_schema = self._require_schema(action_definition.output_schema_ref)
+        workflow_version = self._require_workflow_version(context.workflow_version)
 
         now = utc_now()
         action_run = self._action_run_service.start(
@@ -81,7 +82,7 @@ class ActionRunner:
                 status=ActionRunStatus.running,
                 started_at=now,
                 metadata={
-                    "workflow_version": context.workflow_version,
+                    "workflow_version": workflow_version,
                     "guest_id": context.guest_id,
                     "user_id": context.user_id,
                     "provider_policy_ref": provider_policy.provider_policy_ref,
@@ -107,7 +108,7 @@ class ActionRunner:
                 scenario_session_id=action_run.scenario_session_id,
                 job_id=action_run.job_id,
                 workflow_id=action_run.workflow_id,
-                workflow_version=self._require_workflow_version(context.workflow_version),
+                workflow_version=workflow_version,
                 step_id=action_run.step_id,
                 action_run_id=action_run.id,
                 action_type=action_type,
