@@ -36,3 +36,5 @@ Thumbs.db
 logs/
 tmp/
 temp/
+.tmp/
+.pytest-tmp
