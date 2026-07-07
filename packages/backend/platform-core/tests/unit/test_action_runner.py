@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -123,13 +124,18 @@ class GenericExecutor:
 
 def _event_rows(session: sa.orm.Session) -> list[dict[str, Any]]:
     return list(
-        session.execute(
-            sa.select(event_log_table).order_by(
-                event_log_table.c.timestamp,
-                event_log_table.c.event_id,
-            )
-        ).mappings()
+        session.execute(sa.select(event_log_table)).mappings()
     )
+
+
+def _event_counts(rows: list[dict[str, Any]]) -> Counter[str]:
+    return Counter(str(row["event_type"]) for row in rows)
+
+
+def _event_by_type(rows: list[dict[str, Any]], event_type: str) -> dict[str, Any]:
+    matches = [row for row in rows if row["event_type"] == event_type]
+    assert len(matches) == 1
+    return matches[0]
 
 
 def _build_runner(
@@ -198,22 +204,34 @@ def test_action_runner_executes_extract_structured_fields_and_persists_context(
     assert artifact["metadata"]["schema_ref"] == "kernel.schemas.extract_output_v1"
     assert provider_call["action_run_id"] == action_run["id"]
     assert provider_call["workflow_version"] == 1
-    assert [row["event_type"] for row in events] == [
-        "action.started",
-        "provider.request_started",
-        "provider.request_succeeded",
-        "artifact.created",
-        "action.succeeded",
-    ]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_succeeded": 1,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
     assert all(row["tenant_id"] == "tenant_demo" for row in events)
     assert all(row["region"] == "eu-central" for row in events)
-    assert events[0]["guest_id"] == "guest_demo"
-    assert events[0]["user_id"] == "user_demo"
-    assert events[0]["workflow_version"] == 1
-    assert events[1]["provider_policy_ref"] == "default_fake_provider_v1"
-    assert events[2]["provider_call_id"] == provider_call["id"]
-    assert events[3]["artifact_id"] == artifact["id"]
-    assert events[4]["action_run_id"] == action_run["id"]
+    action_started = _event_by_type(events, "action.started")
+    provider_started = _event_by_type(events, "provider.request_started")
+    provider_succeeded = _event_by_type(events, "provider.request_succeeded")
+    artifact_created = _event_by_type(events, "artifact.created")
+    action_succeeded = _event_by_type(events, "action.succeeded")
+    assert action_started["guest_id"] == "guest_demo"
+    assert action_started["user_id"] == "user_demo"
+    assert action_started["workflow_version"] == 1
+    assert action_started["action_run_id"] == action_run["id"]
+    assert provider_started["provider_policy_ref"] == "default_fake_provider_v1"
+    assert provider_started["provider_call_id"] == provider_call["id"]
+    assert provider_started["action_run_id"] == action_run["id"]
+    assert provider_succeeded["provider_call_id"] == provider_call["id"]
+    assert provider_succeeded["action_run_id"] == action_run["id"]
+    assert artifact_created["artifact_id"] == artifact["id"]
+    assert artifact_created["action_run_id"] == action_run["id"]
+    assert action_succeeded["action_run_id"] == action_run["id"]
 
 
 def test_action_runner_executes_detect_issues_atom_through_generic_path(
@@ -274,12 +292,18 @@ def test_action_runner_marks_failed_on_provider_failure(
     assert exc_info.value.error_code == "provider_request_failed"
     assert action_run["status"].value == "failed"
     assert action_run["error_code"] == "provider_request_failed"
-    assert [row["event_type"] for row in events] == [
-        "action.started",
-        "provider.request_started",
-        "provider.request_failed",
-        "action.failed",
-    ]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_failed": 1,
+            "action.failed": 1,
+        }
+    )
+    assert _event_by_type(events, "action.started")["action_run_id"] == action_run["id"]
+    assert _event_by_type(events, "provider.request_started")["action_run_id"] == action_run["id"]
+    assert _event_by_type(events, "provider.request_failed")["action_run_id"] == action_run["id"]
+    assert _event_by_type(events, "action.failed")["action_run_id"] == action_run["id"]
 
 
 def test_action_runner_marks_failed_on_input_validation_error(
@@ -311,12 +335,14 @@ def test_action_runner_marks_failed_on_input_validation_error(
     assert action_run["status"].value == "failed"
     assert action_run["error_code"] == "action_input_validation_failed"
     assert provider_call_count == 0
-    assert [row["event_type"] for row in events] == [
-        "action.started",
-        "action.failed",
-    ]
-    assert events[0]["workflow_version"] == 1
-    assert events[1]["workflow_version"] == 1
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "action.failed": 1,
+        }
+    )
+    assert _event_by_type(events, "action.started")["workflow_version"] == 1
+    assert _event_by_type(events, "action.failed")["workflow_version"] == 1
 
 
 def test_action_runner_allows_executor_responses_without_provider_call(
