@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SKIP_PATH_PARTS = {
+    ".git",
     ".venv",
     ".quick-check-venv",
     ".quick-check-tmp",
@@ -20,6 +21,7 @@ SKIP_PATH_PARTS = {
     "dist",
     "build",
     "coverage",
+    "tmp",
 }
 ALLOWED_ADAPTER_MODULE_ROOT = (
     ROOT
