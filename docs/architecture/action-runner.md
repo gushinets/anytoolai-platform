@@ -71,6 +71,10 @@ transaction. The original exception is still re-raised to the caller. If the cal
 exception inside the active transaction boundary, the normal in-transaction failed update/event
 path is committed instead.
 
+Canonical artifact linkage is also runner-owned: `output_artifact_id` may reference only an
+existing `structured_output` artifact for the same `action_run`. Arbitrary executor metadata values
+and raw debug artifacts must not become the canonical output pointer.
+
 Provider-attempt correlation remains gateway-owned through:
 
 - `platform.provider_calls`

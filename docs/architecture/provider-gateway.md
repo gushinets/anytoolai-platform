@@ -121,6 +121,11 @@ The gateway must not:
 
 `platform.provider_calls` rows persist both success and failure paths.
 
+If a later action-layer exception escapes the caller's `transaction_boundary()` and rolls back the
+main unit of work, `ProviderGateway` still preserves each already-executed physical attempt by
+replaying the final `platform.provider_calls` row snapshot in an independent recovery transaction.
+This keeps the ledger contract intact without swallowing the original exception.
+
 Key ledger fields:
 
 - `workflow_version`

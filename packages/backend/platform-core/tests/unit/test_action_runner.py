@@ -30,6 +30,7 @@ from anytoolai_platform_core.providers.gateway import (
     ProviderGateway,
     ProviderGatewayExecutionError,
 )
+from anytoolai_platform_core.providers.models import ProviderCallStatus, ProviderResponse
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.storage.db import (
@@ -42,6 +43,7 @@ from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
 )
+from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
@@ -114,11 +116,25 @@ class AlwaysFailFakeAdapter:
 class GenericExecutor:
     executor_id = "structured_llm"
 
+    def __init__(self, artifact_id: str = "artifact_generic") -> None:
+        self._artifact_id = artifact_id
+
     async def execute(self, request: Any, *, session: Any) -> ActionExecutorResponse:
         del request, session
         return ActionExecutorResponse(
             structured_output={"title": "Generic Summary", "fields": ["budget"]},
-            metadata={"structured_output_artifact_id": "artifact_generic"},
+            metadata={"structured_output_artifact_id": self._artifact_id},
+        )
+
+
+class InvalidStructuredOutputAdapter:
+    async def complete(self, request: Any) -> ProviderResponse:
+        return ProviderResponse(
+            provider_policy_ref=request.provider_policy_ref,
+            provider=request.provider,
+            model=request.model,
+            output_text="not-json",
+            status=ProviderCallStatus.succeeded,
         )
 
 
@@ -327,15 +343,15 @@ def test_action_runner_persists_failed_state_when_exception_escapes_transaction_
 
     with transaction_boundary(session_factory) as session:
         action_run = session.execute(sa.select(action_runs_table)).mappings().one()
-        provider_call_count = session.execute(
-            sa.select(sa.func.count()).select_from(provider_calls_table)
-        ).scalar_one()
+        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
         events = _event_rows(session)
 
     assert exc_info.value.error_code == "provider_request_failed"
     assert action_run["status"].value == "failed"
     assert action_run["error_code"] == "provider_request_failed"
-    assert provider_call_count == 0
+    assert provider_call["action_run_id"] == action_run["id"]
+    assert provider_call["status"] == ProviderCallStatus.failed
+    assert provider_call["error_code"] == "provider_request_failed"
     assert _event_counts(events) == Counter({"action.failed": 1})
     assert _event_by_type(events, "action.failed")["action_run_id"] == action_run["id"]
     assert _event_by_type(events, "action.failed")["workflow_version"] == 1
@@ -407,21 +423,102 @@ def test_action_runner_allows_executor_responses_without_provider_call(
             )
         )
         action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact_count = session.execute(
+            sa.select(sa.func.count()).select_from(artifacts_table)
+        ).scalar_one()
 
     assert result.status.value == "succeeded"
     assert result.output_payload == {
         "title": "Generic Summary",
         "fields": ["budget"],
     }
-    assert result.output_artifact_id == "artifact_generic"
+    assert result.output_artifact_id is None
     assert result.provider_policy_ref is None
     assert result.provider is None
     assert result.model is None
+    assert action_run["output_artifact_id"] is None
+    assert artifact_count == 0
     assert action_run["metadata"]["llm_response_metadata"] == {
         "structured_output_artifact_id": "artifact_generic"
     }
+    assert "structured_output_artifact_id" not in action_run["metadata"]
     assert "provider" not in action_run["metadata"]
     assert "model" not in action_run["metadata"]
+
+
+def test_action_runner_ignores_non_structured_output_artifact_id_from_executor_metadata(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        registry = build_config_registry(CONFIG_ROOT)
+        emitter = EventEmitter(EventLogRepository(session))
+        artifact_service = ArtifactService(ArtifactRepository(session), emitter)
+        debug_artifact = artifact_service.create_structured_output_debug_artifact(
+            tenant_id="tenant_demo",
+            region="eu-central",
+            product_id="kernel_demo",
+            frontend_id="kernel_demo_ce",
+            scenario_session_id="scenario_session_demo",
+            job_id="job_demo",
+            action_run_id="action_run_debug",
+            raw_output_text="not-json",
+        )
+        runner = ActionRunner(
+            session=session,
+            config_registry=registry,
+            action_run_service=ActionRunService(ActionRunRepository(session), emitter),
+            executors={GenericExecutor.executor_id: GenericExecutor(debug_artifact.id)},
+            artifact_repository=ArtifactRepository(session),
+        )
+
+        result = asyncio.run(
+            runner.run(
+                "text.extract_structured_fields",
+                "kernel_demo.extract_structured_fields_v1",
+                {"source_text": "deadline budget deliverables"},
+                _context(
+                    step_id="extract",
+                    action_type="text.extract_structured_fields",
+                    action_config_id="kernel_demo.extract_structured_fields_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+
+    assert debug_artifact.artifact_type == "structured_output_debug_raw"
+    assert result.output_artifact_id is None
+    assert action_run["output_artifact_id"] is None
+    assert "structured_output_artifact_id" not in action_run["metadata"]
+
+
+def test_action_runner_does_not_link_failed_action_to_debug_raw_artifact(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session, fake_adapter=InvalidStructuredOutputAdapter())
+
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            asyncio.run(
+                runner.run(
+                    "text.extract_structured_fields",
+                    "kernel_demo.extract_structured_fields_v1",
+                    {"source_text": "deadline budget deliverables"},
+                    _context(
+                        step_id="extract",
+                        action_type="text.extract_structured_fields",
+                        action_config_id="kernel_demo.extract_structured_fields_v1",
+                    ),
+                )
+            )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifacts = session.execute(sa.select(artifacts_table)).mappings().all()
+
+    assert exc_info.value.code == "structured_output_validation_failed"
+    assert action_run["status"].value == "failed"
+    assert action_run["output_artifact_id"] is None
+    assert len(artifacts) == 1
+    assert artifacts[0]["artifact_type"] == "structured_output_debug_raw"
+    assert artifacts[0]["action_run_id"] == action_run["id"]
 
 
 def test_action_runner_rejects_missing_workflow_version_before_creating_action_run(

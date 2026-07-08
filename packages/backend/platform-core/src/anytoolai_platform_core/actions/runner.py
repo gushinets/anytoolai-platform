@@ -133,7 +133,7 @@ class ActionRunner:
                 "error_type": type(exc).__name__,
                 "provider_policy_ref": provider_policy.provider_policy_ref,
             }
-            output_artifact_id = self._latest_artifact_id(action_run.id)
+            output_artifact_id = self._latest_structured_output_artifact_id(action_run.id)
             self._register_failure_recovery(
                 action_run,
                 error_code=error_code,
@@ -148,7 +148,10 @@ class ActionRunner:
             )
             raise
 
-        output_artifact_id = self._artifact_id_from_response(response)
+        output_artifact_id = self._validated_structured_output_artifact_id(
+            response,
+            action_run_id=action_run.id,
+        )
         provider_call = response.provider_call
         succeeded = self._action_run_service.mark_succeeded(
             replace(
@@ -158,8 +161,12 @@ class ActionRunner:
                 completed_at=utc_now(),
                 metadata={
                     **dict(action_run.metadata),
-                    "structured_output_artifact_id": output_artifact_id,
                     "llm_response_metadata": dict(response.metadata),
+                    **(
+                        {}
+                        if output_artifact_id is None
+                        else {"structured_output_artifact_id": output_artifact_id}
+                    ),
                     **(
                         {}
                         if provider_call is None
@@ -250,12 +257,28 @@ class ActionRunner:
                 f"Action input validation failed for {schema_ref}."
             ) from exc
 
-    def _artifact_id_from_response(self, response: ActionExecutorResponse) -> str | None:
+    def _validated_structured_output_artifact_id(
+        self,
+        response: ActionExecutorResponse,
+        *,
+        action_run_id: str,
+    ) -> str | None:
         artifact_id = response.metadata.get("structured_output_artifact_id")
-        return artifact_id if isinstance(artifact_id, str) and artifact_id else None
+        if not isinstance(artifact_id, str) or not artifact_id:
+            return None
+        artifact = self._artifact_repository.get(artifact_id)
+        if artifact is None:
+            return None
+        if artifact.action_run_id != action_run_id:
+            return None
+        if artifact.artifact_type != "structured_output":
+            return None
+        return artifact.id
 
-    def _latest_artifact_id(self, action_run_id: str) -> str | None:
-        artifact = self._artifact_repository.get_latest_for_action_run(action_run_id)
+    def _latest_structured_output_artifact_id(self, action_run_id: str) -> str | None:
+        artifact = self._artifact_repository.get_latest_structured_output_for_action_run(
+            action_run_id
+        )
         return None if artifact is None else artifact.id
 
     def _error_code_for_exception(self, exc: Exception) -> str:
