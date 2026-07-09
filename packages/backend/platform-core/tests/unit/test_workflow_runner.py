@@ -286,6 +286,12 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
             "workflow.succeeded": 1,
         }
     )
+    workflow_started = _event_by_type(events, "workflow.started")[0]
+    workflow_succeeded = _event_by_type(events, "workflow.succeeded")[0]
+    assert workflow_started["guest_id"] == "guest_demo"
+    assert workflow_started["user_id"] == "user_demo"
+    assert workflow_succeeded["guest_id"] == "guest_demo"
+    assert workflow_succeeded["user_id"] == "user_demo"
 
 
 def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mappings(
@@ -461,9 +467,12 @@ def test_workflow_runner_stops_after_failed_step(
     assert job["completed_at"] is not None
     assert job["result_artifact_id"] is None
     assert [row["step_id"] for row in action_runs] == ["extract"]
-    assert _event_by_type(events, "workflow.step_failed")[0]["properties"]["step_id"] == "extract"
+    workflow_step_failed = _event_by_type(events, "workflow.step_failed")[0]
+    workflow_failed = _event_by_type(events, "workflow.failed")[0]
+    assert workflow_step_failed["properties"]["step_id"] == "extract"
     assert not _event_by_type(events, "workflow.step_succeeded")
-    assert _event_by_type(events, "workflow.failed")
+    assert workflow_failed["guest_id"] == "guest_demo"
+    assert workflow_failed["user_id"] == "user_demo"
 
 
 def test_workflow_runner_latest_action_run_id_uses_ordered_timestamp_columns(
@@ -569,4 +578,7 @@ def test_workflow_runner_persists_failed_state_when_exception_escapes_transactio
     assert job["error_message_safe"] == "Workflow execution failed."
     assert job["completed_at"] is not None
     assert _event_counts(events) == Counter({"workflow.failed": 1})
-    assert _event_by_type(events, "workflow.failed")[0]["job_id"] == job["id"]
+    workflow_failed = _event_by_type(events, "workflow.failed")[0]
+    assert workflow_failed["job_id"] == job["id"]
+    assert workflow_failed["guest_id"] == "guest_demo"
+    assert workflow_failed["user_id"] == "user_demo"

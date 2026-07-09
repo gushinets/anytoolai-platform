@@ -662,6 +662,8 @@ def _context_from_record(record: JobRecord) -> ExecutionContext:
         job_id=record.id,
         workflow_id=record.workflow_id,
         workflow_version=record.workflow_version,
+        guest_id=_metadata_str(record.metadata, "guest_id"),
+        user_id=_metadata_str(record.metadata, "user_id"),
     )
 
 
@@ -703,6 +705,11 @@ def _persist_failed_workflow_job_after_rollback(
                 "workflow_version": stored.workflow_version,
             },
         )
+
+
+def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
+    value = metadata.get(key)
+    return value if isinstance(value, str) and value else None
 
 
 class _WorkflowExecutionState:
