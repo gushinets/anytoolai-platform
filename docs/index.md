@@ -14,6 +14,7 @@ This directory is the system of record for agents. Keep it current. If a decisio
 
 - `architecture/platform-boundaries.md`
 - `architecture/package-layering.md`
+- `architecture/action-runner.md`
 - `architecture/action-model.md`
 - `architecture/workflow-model.md`
 - `architecture/scenario-session-model.md`

@@ -37,6 +37,40 @@ class ArtifactRepository:
         )
         return None if row is None else ArtifactRecord(**dict(row))
 
+    def get_latest_for_action_run(self, action_run_id: str) -> ArtifactRecord | None:
+        row = (
+            self._session.execute(
+                sa.select(artifacts_table)
+                .where(artifacts_table.c.action_run_id == action_run_id)
+                .order_by(
+                    artifacts_table.c.created_at.desc(),
+                    artifacts_table.c.id.desc(),
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return None if row is None else ArtifactRecord(**dict(row))
+
+    def get_latest_structured_output_for_action_run(
+        self,
+        action_run_id: str,
+    ) -> ArtifactRecord | None:
+        row = (
+            self._session.execute(
+                sa.select(artifacts_table)
+                .where(artifacts_table.c.action_run_id == action_run_id)
+                .where(artifacts_table.c.artifact_type == "structured_output")
+                .order_by(
+                    artifacts_table.c.created_at.desc(),
+                    artifacts_table.c.id.desc(),
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return None if row is None else ArtifactRecord(**dict(row))
+
     def update(self, record: ArtifactRecord) -> ArtifactRecord:
         values = asdict(record)
         values.pop("id")

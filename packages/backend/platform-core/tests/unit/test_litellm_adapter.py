@@ -255,7 +255,9 @@ def test_litellm_adapter_serializes_real_registry_schema_before_dispatch() -> No
         "role": "system",
         "content": (
             "Return JSON that matches this schema exactly. "
-            'Do not wrap the JSON in markdown fences.\nJSON Schema: {"additionalProperties":true,"type":"object"}'
+            "Do not wrap the JSON in markdown fences.\n"
+            "JSON Schema: "
+            '{"additionalProperties":false,"properties":{"fields":{"items":{"minLength":1,"type":"string"},"type":"array"},"title":{"minLength":1,"type":"string"}},"required":["title","fields"],"type":"object"}'
         ),
     }
 

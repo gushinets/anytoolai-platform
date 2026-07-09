@@ -24,6 +24,10 @@ from anytoolai_platform_core.providers.models import (
 )
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
+from anytoolai_platform_core.storage.transactions import (
+    register_rollback_recovery_callback,
+    transaction_boundary,
+)
 
 _SECRET_KEYS = {
     "api_key",
@@ -43,6 +47,7 @@ _MAX_NESTING_DEPTH = 4
 class _GatewayAttemptState:
     repository: Any
     should_persist: bool
+    recovery_session: Session | None
     physical_call_count: int = 0
 
 
@@ -98,6 +103,7 @@ class ProviderGateway:
         gateway_state = _GatewayAttemptState(
             repository=repository,
             should_persist=self._should_persist_provider_call(request),
+            recovery_session=session,
         )
         initial_policy = self._policy_resolver.resolve(request.provider_policy_ref)
         return await self._execute_policy_chain(
@@ -235,8 +241,14 @@ class ProviderGateway:
             )
 
             stored = None
+            recovery_state: dict[str, ProviderCallRecord] | None = None
             if gateway_state.should_persist:
                 stored = gateway_state.repository.create(provider_call)
+                recovery_state = {"record": stored}
+                self._register_provider_call_recovery(
+                    session=gateway_state.recovery_session,
+                    recovery_state=recovery_state,
+                )
 
             started = perf_counter()
             try:
@@ -253,12 +265,16 @@ class ProviderGateway:
                     or response.pydantic_run_id,
                 )
                 if self._is_success_status(response.status):
-                    self._update_provider_call_success(
+                    updated = self._update_provider_call_success(
                         stored=stored,
                         provider_call=provider_call,
                         request=attempt_request,
                         response=response,
                         gateway_state=gateway_state,
+                    )
+                    self._update_recovery_state(
+                        recovery_state,
+                        updated,
                     )
                     self._emit_provider_succeeded(
                         context,
@@ -290,13 +306,17 @@ class ProviderGateway:
                     resolved_request=attempt_request,
                     failure_kind="cancelled",
                 )
-                self._update_provider_call_failure(
+                updated = self._update_provider_call_failure(
                     stored=stored,
                     provider_call=provider_call,
                     request=attempt_request,
                     gateway_state=gateway_state,
                     error=error,
                     latency_ms=latency_ms,
+                )
+                self._update_recovery_state(
+                    recovery_state,
+                    updated,
                 )
                 self._emit_provider_failed(
                     context,
@@ -333,13 +353,17 @@ class ProviderGateway:
                 )
 
             latency_ms = self._latency_ms(started)
-            self._update_provider_call_failure(
+            updated = self._update_provider_call_failure(
                 stored=stored,
                 provider_call=provider_call,
                 request=attempt_request,
                 gateway_state=gateway_state,
                 error=error,
                 latency_ms=latency_ms,
+            )
+            self._update_recovery_state(
+                recovery_state,
+                updated,
             )
             self._emit_provider_failed(
                 context,
@@ -362,10 +386,10 @@ class ProviderGateway:
         request: ResolvedProviderRequest,
         response: ProviderResponse,
         gateway_state: _GatewayAttemptState,
-    ) -> None:
+    ) -> ProviderCallRecord | None:
         if not gateway_state.should_persist or stored is None:
-            return
-        gateway_state.repository.update(
+            return None
+        return gateway_state.repository.update(
             replace(
                 stored,
                 provider=response.provider,
@@ -397,10 +421,10 @@ class ProviderGateway:
         gateway_state: _GatewayAttemptState,
         error: ProviderGatewayExecutionError,
         latency_ms: int,
-    ) -> None:
+    ) -> ProviderCallRecord | None:
         if not gateway_state.should_persist or stored is None:
-            return
-        gateway_state.repository.update(
+            return None
+        return gateway_state.repository.update(
             replace(
                 stored,
                 status=(
@@ -556,6 +580,31 @@ class ProviderGateway:
                 "provider_call_repository is not injected"
             )
         return ProviderCallRepository(session)
+
+    def _register_provider_call_recovery(
+        self,
+        *,
+        session: Session | None,
+        recovery_state: dict[str, ProviderCallRecord],
+    ) -> None:
+        if session is None:
+            return
+        register_rollback_recovery_callback(
+            session,
+            lambda recovery_session_factory: _persist_provider_call_after_rollback(
+                recovery_session_factory,
+                recovery_state["record"],
+            ),
+        )
+
+    @staticmethod
+    def _update_recovery_state(
+        recovery_state: dict[str, ProviderCallRecord] | None,
+        updated_record: ProviderCallRecord | None,
+    ) -> None:
+        if recovery_state is None or updated_record is None:
+            return
+        recovery_state["record"] = updated_record
 
     def _should_persist_provider_call(self, request: ProviderRequest) -> bool:
         return self._has_required_dimension(request.tenant_id) and self._has_required_dimension(
@@ -785,3 +834,16 @@ class ProviderGateway:
                 for item in items
             ]
         return str(value)[:_MAX_STRING_LENGTH]
+
+
+def _persist_provider_call_after_rollback(
+    recovery_session_factory: Any,
+    record: ProviderCallRecord,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        repository = ProviderCallRepository(recovery_session)
+        existing = repository.get(record.id)
+        if existing is None:
+            repository.create(record)
+            return
+        repository.update(record)

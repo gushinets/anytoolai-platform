@@ -92,6 +92,8 @@ That means:
 - every provider event correlates back to the physical row through `provider_call_id`
 - successful final validation creates a `structured_output` artifact
 - final validation failure creates a `structured_output_debug_raw` artifact
+- canonical `action_runs.output_artifact_id` may point only to a real `structured_output` artifact;
+  debug raw artifacts stay debug-only and must not become the canonical result pointer
 
 ## Safety
 

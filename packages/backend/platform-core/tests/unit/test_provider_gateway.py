@@ -518,6 +518,44 @@ def test_gateway_uses_safe_platform_error_codes_on_failure(
     assert rows[0]["failure_kind"] == "transport"
 
 
+def test_gateway_persists_provider_call_row_when_exception_escapes_transaction_boundary(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    policy = ProviderPolicy(
+        provider_policy_ref="escaped_failure_policy_v1",
+        provider="fake",
+        model="fake-json-v1",
+    )
+    gateway = ProviderGateway(
+        {"fake": AlwaysFailAdapter()},
+        build_policy_resolver(policy),
+    )
+
+    with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+        with transaction_boundary(session_factory) as session:
+            scenario_session, job, action_run = seed_runtime_chain(session)
+            asyncio.run(
+                gateway.request(
+                    build_request(
+                        scenario_session,
+                        job,
+                        action_run,
+                        provider_policy_ref="escaped_failure_policy_v1",
+                    ),
+                    session=session,
+                )
+            )
+
+    with transaction_boundary(session_factory) as session:
+        rows = _provider_rows(session)
+
+    assert exc_info.value.error_code == "provider_request_failed"
+    assert len(rows) == 1
+    assert rows[0]["status"] == ProviderCallStatus.failed
+    assert rows[0]["error_code"] == "provider_request_failed"
+    assert rows[0]["failure_kind"] == "transport"
+
+
 def test_gateway_request_cancellation_persists_failed_provider_call(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

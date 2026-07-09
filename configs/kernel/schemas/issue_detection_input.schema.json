@@ -1,4 +1,22 @@
 {
   "type": "object",
-  "additionalProperties": true
+  "properties": {
+    "source_text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "taxonomy": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "source_text",
+    "taxonomy"
+  ],
+  "additionalProperties": false
 }
