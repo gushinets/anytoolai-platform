@@ -85,6 +85,7 @@ preserving MVP-A architecture boundaries and existing simple YAML compatibility.
 |---|---|---|
 | 2026-07-09 | Read the required architecture and runtime docs, inspected workflow/action/runtime/event/artifact/config code, and confirmed the current workflow runner is still a skeleton | Patch contracts and loader validation first so runtime code has an explicit contract to implement |
 | 2026-07-09 | Implemented the sequential runner, contract validation, workflow-step events, workflow docs/examples, and focused/full backend tests | Capture final validation results and document the environment-specific quick-check blocker |
+| 2026-07-09 | Added rollback-recovery persistence for failed workflow jobs and workflow.failed events when exceptions escape the transaction boundary | Re-run focused/full backend validation and confirm the quick-check blocker is still environment-specific |
 
 ## Open questions
 

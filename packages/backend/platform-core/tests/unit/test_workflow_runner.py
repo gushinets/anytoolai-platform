@@ -447,6 +447,9 @@ def test_workflow_runner_stops_after_failed_step(
         events = _event_rows(session)
 
     assert job["status"].value == "failed"
+    assert job["error_code"] == "workflow_execution_failed"
+    assert job["error_message_safe"] == "Workflow execution failed."
+    assert job["completed_at"] is not None
     assert job["result_artifact_id"] is None
     assert [row["step_id"] for row in action_runs] == ["extract"]
     assert _event_by_type(events, "workflow.step_failed")[0]["properties"]["step_id"] == "extract"
@@ -477,3 +480,32 @@ def test_workflow_runner_persists_generic_safe_message_for_unknown_exceptions(
     assert job["error_code"] == "workflow_execution_failed"
     assert job["error_message_safe"] == "Workflow execution failed."
     assert "secret_token" not in job["error_message_safe"]
+
+
+def test_workflow_runner_persists_failed_state_when_exception_escapes_transaction_boundary(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with pytest.raises(RuntimeError):
+        with transaction_boundary(session_factory) as session:
+            runner = _build_workflow_runner_with_action_runner(
+                session,
+                action_runner=ExplodingActionRunner(),
+            )
+            asyncio.run(
+                runner.run(
+                    "kernel_demo.single_action_extract_v1",
+                    {"source_text": "deadline budget deliverables"},
+                    _base_context(),
+                )
+            )
+
+    with transaction_boundary(session_factory) as session:
+        job = session.execute(sa.select(jobs_table)).mappings().one()
+        events = _event_rows(session)
+
+    assert job["status"].value == "failed"
+    assert job["error_code"] == "workflow_execution_failed"
+    assert job["error_message_safe"] == "Workflow execution failed."
+    assert job["completed_at"] is not None
+    assert _event_counts(events) == Counter({"workflow.failed": 1})
+    assert _event_by_type(events, "workflow.failed")[0]["job_id"] == job["id"]

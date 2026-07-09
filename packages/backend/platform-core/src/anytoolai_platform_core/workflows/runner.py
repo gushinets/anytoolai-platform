@@ -18,7 +18,12 @@ from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter, enrich_event_context
+from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.storage.db import action_runs_table
+from anytoolai_platform_core.storage.transactions import (
+    register_rollback_recovery_callback,
+    transaction_boundary,
+)
 from anytoolai_platform_core.structured_output.schemas import normalize_mapping, normalize_schema_mapping
 from anytoolai_platform_core.workflows.errors import (
     WorkflowExecutionError,
@@ -199,17 +204,14 @@ class SequentialWorkflowRunner:
             )
         except Exception as exc:
             error_code = self._error_code_for_exception(exc)
-            job = self._persist_job_state(
-                replace(
-                    job,
-                    status=JobStatus.failed,
-                    error_code=error_code,
-                    error_message_safe=self._safe_error_message_for_exception(exc),
-                    completed_at=utc_now(),
-                ),
+            failed_job = self._build_failed_job_record(
+                job,
                 state,
+                error_code=error_code,
+                error_message_safe=self._safe_error_message_for_exception(exc),
             )
-            self._job_service.mark_failed(job, error_code=error_code)
+            self._register_failure_recovery(failed_job, error_code=error_code)
+            job = self._job_service.mark_failed(failed_job, error_code=error_code)
             raise
 
     async def _run_step(
@@ -484,6 +486,27 @@ class SequentialWorkflowRunner:
         }
         return self._job_repository.update(replace(job, metadata=metadata))
 
+    def _build_failed_job_record(
+        self,
+        job: JobRecord,
+        state: "_WorkflowExecutionState",
+        *,
+        error_code: str,
+        error_message_safe: str,
+    ) -> JobRecord:
+        metadata = {
+            **dict(job.metadata),
+            "workflow_state": self._workflow_state_metadata(state),
+        }
+        return replace(
+            job,
+            status=JobStatus.failed,
+            error_code=error_code,
+            error_message_safe=error_message_safe,
+            completed_at=utc_now(),
+            metadata=metadata,
+        )
+
     def _workflow_state_metadata(
         self,
         state: "_WorkflowExecutionState",
@@ -577,6 +600,21 @@ class SequentialWorkflowRunner:
             return "[redacted workflow error]"
         return message[:_MAX_SAFE_ERROR_MESSAGE_LENGTH]
 
+    def _register_failure_recovery(
+        self,
+        job: JobRecord,
+        *,
+        error_code: str,
+    ) -> None:
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _persist_failed_workflow_job_after_rollback(
+                recovery_session_factory,
+                job,
+                error_code=error_code,
+            ),
+        )
+
     def _latest_action_run_id(self, job_id: str, step_id: str) -> str | None:
         return self._session.execute(
             sa.select(action_runs_table.c.id)
@@ -634,6 +672,33 @@ _SECRET_KEYS = frozenset(
         "token",
     }
 )
+
+
+def _persist_failed_workflow_job_after_rollback(
+    recovery_session_factory: Any,
+    record: JobRecord,
+    *,
+    error_code: str,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        repository = JobRepository(recovery_session)
+        event_emitter = EventEmitter(EventLogRepository(recovery_session))
+
+        existing = repository.get(record.id)
+        if existing is None:
+            stored = repository.create(record)
+        else:
+            stored = repository.update(record)
+
+        event_emitter.emit(
+            "workflow.failed",
+            _context_from_record(stored),
+            result_status=stored.status.value,
+            properties={
+                "error_code": error_code,
+                "workflow_version": stored.workflow_version,
+            },
+        )
 
 
 class _WorkflowExecutionState:
