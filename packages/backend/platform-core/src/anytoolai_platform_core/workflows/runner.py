@@ -620,7 +620,11 @@ class SequentialWorkflowRunner:
             sa.select(action_runs_table.c.id)
             .where(action_runs_table.c.job_id == job_id)
             .where(action_runs_table.c.step_id == step_id)
-            .order_by(action_runs_table.c.created_at.desc(), action_runs_table.c.id.desc())
+            .order_by(
+                action_runs_table.c.created_at.desc(),
+                action_runs_table.c.started_at.desc().nullslast(),
+                action_runs_table.c.completed_at.desc().nullslast(),
+            )
         ).scalars().first()
 
     def _emit_step_failed(

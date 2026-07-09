@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import Counter
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -11,17 +12,22 @@ from alembic import command
 from alembic.config import Config
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.executor import ActionExecutorResponse
+from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.actions.runner import ActionRunService, ActionRunner
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
+from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
-from anytoolai_platform_core.providers.gateway import ProviderGateway
+from anytoolai_platform_core.providers.gateway import (
+    ProviderGateway,
+    ProviderGatewayExecutionError,
+)
 from anytoolai_platform_core.providers.models import ProviderResponse, ProviderUsage
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
@@ -431,7 +437,10 @@ def test_workflow_runner_stops_after_failed_step(
     with transaction_boundary(session_factory) as session:
         runner = _build_structured_workflow_runner(session, adapter=AlwaysFailAdapter())
 
-        with pytest.raises(Exception):
+        with pytest.raises(
+            ProviderGatewayExecutionError,
+            match="\\[redacted provider error\\]",
+        ):
             asyncio.run(
                 runner.run(
                     "kernel_demo.extract_detect_report_v1",
@@ -455,6 +464,58 @@ def test_workflow_runner_stops_after_failed_step(
     assert _event_by_type(events, "workflow.step_failed")[0]["properties"]["step_id"] == "extract"
     assert not _event_by_type(events, "workflow.step_succeeded")
     assert _event_by_type(events, "workflow.failed")
+
+
+def test_workflow_runner_latest_action_run_id_uses_ordered_timestamp_columns(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        runner = _build_recording_workflow_runner(
+            session,
+            executor=RecordingExecutor({"extract": {"title": "Extracted"}}),
+        )
+        repository = ActionRunRepository(session)
+        created_at = utc_now()
+
+        earlier = repository.create(
+            ActionRunRecord(
+                tenant_id="tenant_demo",
+                region="eu-central",
+                product_id="kernel_demo",
+                frontend_id="kernel_demo_ce",
+                scenario_session_id="scenario_session_demo",
+                job_id="job_demo",
+                workflow_id="kernel_demo.single_action_extract_v1",
+                step_id="extract",
+                action_type="text.extract_structured_fields",
+                action_config_id="kernel_demo.extract_structured_fields_v1",
+                status=ActionRunStatus.failed,
+                created_at=created_at,
+                started_at=created_at,
+            )
+        )
+        later = repository.create(
+            ActionRunRecord(
+                tenant_id="tenant_demo",
+                region="eu-central",
+                product_id="kernel_demo",
+                frontend_id="kernel_demo_ce",
+                scenario_session_id="scenario_session_demo",
+                job_id="job_demo",
+                workflow_id="kernel_demo.single_action_extract_v1",
+                step_id="extract",
+                action_type="text.extract_structured_fields",
+                action_config_id="kernel_demo.extract_structured_fields_v1",
+                status=ActionRunStatus.failed,
+                created_at=created_at,
+                started_at=created_at + timedelta(microseconds=1),
+            )
+        )
+
+        latest_id = runner._latest_action_run_id("job_demo", "extract")
+
+    assert latest_id == later.id
+    assert latest_id != earlier.id
 
 
 def test_workflow_runner_persists_generic_safe_message_for_unknown_exceptions(
