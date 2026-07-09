@@ -485,6 +485,8 @@ def test_platform_taxonomy_covers_required_groups_and_events() -> None:
     assert "quota.checked" in PLATFORM_EVENTS
     assert "scenario.started" in PLATFORM_EVENTS
     assert "workflow.started" in PLATFORM_EVENTS
+    assert "workflow.step_started" in PLATFORM_EVENTS
+    assert "workflow.step_failed" in PLATFORM_EVENTS
     assert "action.started" in PLATFORM_EVENTS
     assert "provider.request_started" in PLATFORM_EVENTS
     assert "artifact.created" in PLATFORM_EVENTS

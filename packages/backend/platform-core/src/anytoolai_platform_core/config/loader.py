@@ -48,6 +48,8 @@ from anytoolai_platform_core.workflows.models import (
     WorkflowDefinition,
     WorkflowStepDefinition,
 )
+from anytoolai_platform_core.workflows.errors import WorkflowStepContractValidationError
+from anytoolai_platform_core.workflows.mappings import validate_step_contract
 
 VERSION_SUFFIX_PATTERN = re.compile(r"(?P<separator>[._])v(?P<version>\d+)$")
 PROMPT_FRONT_MATTER_PATTERN = re.compile(
@@ -1383,6 +1385,34 @@ class ConfigLoader:
                         recursive=True,
                     )
 
+                    if any(existing.step_id == step_id for existing in steps):
+                        raise InvalidConfigShapeError(
+                            path,
+                            f"Workflow step_id must be unique within a workflow: {step_id}",
+                            config_id=workflow_id,
+                            ref_type="step_id",
+                            ref_value=step_id,
+                        )
+
+                    retry_count = step_data.get("retry_count", 0)
+                    try:
+                        validate_step_contract(
+                            step_id=step_id,
+                            prior_step_ids=tuple(existing.step_id for existing in steps),
+                            input_mapping=step_data.get("input_mapping", {}),
+                            output_mapping=step_data.get("output_mapping", {}),
+                            when=step_data.get("when"),
+                            retry_count=retry_count,
+                        )
+                    except WorkflowStepContractValidationError as exc:
+                        raise InvalidConfigShapeError(
+                            path,
+                            str(exc),
+                            config_id=workflow_id,
+                            ref_type="step_id",
+                            ref_value=step_id,
+                        ) from exc
+
                     steps.append(
                         WorkflowStepDefinition(
                             step_id=step_id,
@@ -1390,6 +1420,7 @@ class ConfigLoader:
                             input_mapping=step_data.get("input_mapping", {}),
                             output_mapping=step_data.get("output_mapping", {}),
                             when=step_data.get("when"),
+                            retry_count=retry_count,
                             metadata={"_file_path": str(path)},
                         )
                     )

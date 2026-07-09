@@ -24,6 +24,10 @@ Generated-doc mirror of the MVP-A platform event taxonomy from `configs/kernel/p
 ### workflow
 
 - `workflow.started`
+- `workflow.step_started`
+- `workflow.step_skipped`
+- `workflow.step_succeeded`
+- `workflow.step_failed`
 - `workflow.succeeded`
 - `workflow.failed`
 

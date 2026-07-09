@@ -21,9 +21,10 @@ class JobStatus(StrEnum):
 class WorkflowStepDefinition:
     step_id: str
     action_config_id: str
-    input_mapping: dict[str, Any] = field(default_factory=dict)
-    output_mapping: dict[str, Any] = field(default_factory=dict)
+    input_mapping: dict[str, str] = field(default_factory=dict)
+    output_mapping: dict[str, str] = field(default_factory=dict)
     when: str | None = None
+    retry_count: int = 0
     schema_version: int = 1
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -57,4 +58,15 @@ class JobRecord:
     started_at: datetime | None = None
     completed_at: datetime | None = None
     created_at: datetime = field(default_factory=utc_now)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class WorkflowRunResult:
+    job_id: str
+    workflow_id: str
+    workflow_version: int
+    status: JobStatus
+    output_payload: dict[str, Any] | list[Any] | None = None
+    result_artifact_id: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
