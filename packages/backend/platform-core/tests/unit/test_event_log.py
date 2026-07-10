@@ -518,7 +518,13 @@ def test_runtime_services_emit_required_success_events(
         job = workflow_service.start(
             make_job(
                 scenario.id,
-                metadata={"guest_id": "guest_demo", "user_id": "user_demo"},
+                metadata={
+                    "guest_id": "guest_demo",
+                    "user_id": "user_demo",
+                    "scenario_chain_id": "scenario_chain_demo",
+                    "handoff_id": "handoff_demo",
+                    "acquisition_source": "kernel_demo_ce",
+                },
             )
         )
         action = action_service.start(make_action_run(scenario.id, job.id))
@@ -575,8 +581,14 @@ def test_runtime_services_emit_required_success_events(
     } <= set(event_types)
     assert workflow_started["guest_id"] == "guest_demo"
     assert workflow_started["user_id"] == "user_demo"
+    assert workflow_started["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_started["handoff_id"] == "handoff_demo"
+    assert workflow_started["acquisition_source"] == "kernel_demo_ce"
     assert workflow_succeeded["guest_id"] == "guest_demo"
     assert workflow_succeeded["user_id"] == "user_demo"
+    assert workflow_succeeded["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_succeeded["handoff_id"] == "handoff_demo"
+    assert workflow_succeeded["acquisition_source"] == "kernel_demo_ce"
 
 
 def test_provider_events_include_adr_0007_correlation_properties(
@@ -658,7 +670,13 @@ def test_runtime_services_emit_required_failure_events(
         job = workflow_service.start(
             make_job(
                 scenario.id,
-                metadata={"guest_id": "guest_demo", "user_id": "user_demo"},
+                metadata={
+                    "guest_id": "guest_demo",
+                    "user_id": "user_demo",
+                    "scenario_chain_id": "scenario_chain_demo",
+                    "handoff_id": "handoff_demo",
+                    "acquisition_source": "kernel_demo_ce",
+                },
             )
         )
         action = action_service.start(make_action_run(scenario.id, job.id))
@@ -689,6 +707,9 @@ def test_runtime_services_emit_required_failure_events(
     assert ProviderCallStatus.timed_out in provider_call_statuses
     assert workflow_failed["guest_id"] == "guest_demo"
     assert workflow_failed["user_id"] == "user_demo"
+    assert workflow_failed["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_failed["handoff_id"] == "handoff_demo"
+    assert workflow_failed["acquisition_source"] == "kernel_demo_ce"
 
 
 def test_provider_gateway_failure_uses_safe_platform_error_code(

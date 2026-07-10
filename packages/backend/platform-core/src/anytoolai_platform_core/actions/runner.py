@@ -90,6 +90,9 @@ class ActionRunner:
                     "workflow_version": workflow_version,
                     "guest_id": context.guest_id,
                     "user_id": context.user_id,
+                    "scenario_chain_id": context.scenario_chain_id,
+                    "handoff_id": context.handoff_id,
+                    "acquisition_source": context.acquisition_source,
                     "provider_policy_ref": provider_policy.provider_policy_ref,
                     "prompt_ref": prompt.prompt_ref,
                     "input_schema_ref": input_schema.schema_ref,
@@ -122,6 +125,9 @@ class ActionRunner:
                 metadata={
                     "guest_id": context.guest_id,
                     "user_id": context.user_id,
+                    "scenario_chain_id": context.scenario_chain_id,
+                    "handoff_id": context.handoff_id,
+                    "acquisition_source": context.acquisition_source,
                 },
                 guest_id=context.guest_id,
                 user_id=context.user_id,
@@ -376,10 +382,13 @@ def _context_from_record(record: ActionRunRecord) -> ExecutionContext:
         step_id=record.step_id,
         guest_id=_metadata_str(record.metadata, "guest_id"),
         user_id=_metadata_str(record.metadata, "user_id"),
+        scenario_chain_id=_metadata_str(record.metadata, "scenario_chain_id"),
         action_type=record.action_type,
         action_config_id=record.action_config_id,
         action_run_id=record.id,
         provider_policy_ref=_metadata_str(record.metadata, "provider_policy_ref"),
+        handoff_id=_metadata_str(record.metadata, "handoff_id"),
+        acquisition_source=_metadata_str(record.metadata, "acquisition_source"),
     )
 
 

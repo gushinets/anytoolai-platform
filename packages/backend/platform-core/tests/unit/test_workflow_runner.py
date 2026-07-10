@@ -104,6 +104,9 @@ def _base_context() -> ExecutionContext:
         scenario_session_id="scenario_session_demo",
         guest_id="guest_demo",
         user_id="user_demo",
+        scenario_chain_id="scenario_chain_demo",
+        handoff_id="handoff_demo",
+        acquisition_source="kernel_demo_ce",
     )
 
 
@@ -150,6 +153,18 @@ class AlwaysFailAdapter:
     async def complete(self, request: Any) -> ProviderResponse:
         del request
         raise RuntimeError("provider exploded with secret_token=abc123")
+
+
+class FailOnSecondCallAdapter:
+    def __init__(self) -> None:
+        self.call_count = 0
+        self._delegate = FakeProviderAdapter(FIXTURE_ROOT)
+
+    async def complete(self, request: Any) -> ProviderResponse:
+        self.call_count += 1
+        if self.call_count == 2:
+            raise RuntimeError("provider exploded with secret_token=abc123")
+        return await self._delegate.complete(request)
 
 
 class ExplodingActionRunner:
@@ -287,11 +302,33 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
         }
     )
     workflow_started = _event_by_type(events, "workflow.started")[0]
+    workflow_step_started = _event_by_type(events, "workflow.step_started")[0]
+    action_started = _event_by_type(events, "action.started")[0]
+    provider_started = _event_by_type(events, "provider.request_started")[0]
+    workflow_step_succeeded = _event_by_type(events, "workflow.step_succeeded")[0]
     workflow_succeeded = _event_by_type(events, "workflow.succeeded")[0]
     assert workflow_started["guest_id"] == "guest_demo"
     assert workflow_started["user_id"] == "user_demo"
+    assert workflow_started["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_started["handoff_id"] == "handoff_demo"
+    assert workflow_started["acquisition_source"] == "kernel_demo_ce"
+    assert workflow_step_started["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_step_started["handoff_id"] == "handoff_demo"
+    assert workflow_step_started["acquisition_source"] == "kernel_demo_ce"
+    assert workflow_step_succeeded["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_step_succeeded["handoff_id"] == "handoff_demo"
+    assert workflow_step_succeeded["acquisition_source"] == "kernel_demo_ce"
+    assert action_started["scenario_chain_id"] == "scenario_chain_demo"
+    assert action_started["handoff_id"] == "handoff_demo"
+    assert action_started["acquisition_source"] == "kernel_demo_ce"
+    assert provider_started["scenario_chain_id"] == "scenario_chain_demo"
+    assert provider_started["handoff_id"] == "handoff_demo"
+    assert provider_started["acquisition_source"] == "kernel_demo_ce"
     assert workflow_succeeded["guest_id"] == "guest_demo"
     assert workflow_succeeded["user_id"] == "user_demo"
+    assert workflow_succeeded["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_succeeded["handoff_id"] == "handoff_demo"
+    assert workflow_succeeded["acquisition_source"] == "kernel_demo_ce"
 
 
 def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mappings(
@@ -470,9 +507,15 @@ def test_workflow_runner_stops_after_failed_step(
     workflow_step_failed = _event_by_type(events, "workflow.step_failed")[0]
     workflow_failed = _event_by_type(events, "workflow.failed")[0]
     assert workflow_step_failed["properties"]["step_id"] == "extract"
+    assert workflow_step_failed["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_step_failed["handoff_id"] == "handoff_demo"
+    assert workflow_step_failed["acquisition_source"] == "kernel_demo_ce"
     assert not _event_by_type(events, "workflow.step_succeeded")
     assert workflow_failed["guest_id"] == "guest_demo"
     assert workflow_failed["user_id"] == "user_demo"
+    assert workflow_failed["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_failed["handoff_id"] == "handoff_demo"
+    assert workflow_failed["acquisition_source"] == "kernel_demo_ce"
 
 
 def test_workflow_runner_latest_action_run_id_uses_ordered_timestamp_columns(
@@ -577,8 +620,100 @@ def test_workflow_runner_persists_failed_state_when_exception_escapes_transactio
     assert job["error_code"] == "workflow_execution_failed"
     assert job["error_message_safe"] == "Workflow execution failed."
     assert job["completed_at"] is not None
-    assert _event_counts(events) == Counter({"workflow.failed": 1})
+    assert _event_counts(events) == Counter(
+        {
+            "workflow.started": 1,
+            "workflow.step_started": 1,
+            "workflow.step_failed": 1,
+            "workflow.failed": 1,
+        }
+    )
     workflow_failed = _event_by_type(events, "workflow.failed")[0]
     assert workflow_failed["job_id"] == job["id"]
     assert workflow_failed["guest_id"] == "guest_demo"
     assert workflow_failed["user_id"] == "user_demo"
+    assert workflow_failed["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_failed["handoff_id"] == "handoff_demo"
+    assert workflow_failed["acquisition_source"] == "kernel_demo_ce"
+
+
+def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollback(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    adapter = FailOnSecondCallAdapter()
+
+    with pytest.raises(ProviderGatewayExecutionError):
+        with transaction_boundary(session_factory) as session:
+            runner = _build_structured_workflow_runner(session, adapter=adapter)
+            asyncio.run(
+                runner.run(
+                    "kernel_demo.extract_detect_report_v1",
+                    {
+                        "source_text": "deadline budget deliverables",
+                        "taxonomy": ["timeline", "scope"],
+                    },
+                    _base_context(),
+                )
+            )
+
+    with transaction_boundary(session_factory) as session:
+        job = session.execute(sa.select(jobs_table)).mappings().one()
+        action_runs = list(
+            session.execute(
+                sa.select(action_runs_table).order_by(action_runs_table.c.created_at, action_runs_table.c.id)
+            ).mappings()
+        )
+        artifacts = list(session.execute(sa.select(artifacts_table)).mappings())
+        events = _event_rows(session)
+
+    assert adapter.call_count == 2
+    assert job["status"].value == "failed"
+    assert job["error_code"] == "workflow_execution_failed"
+    assert job["error_message_safe"] == "Workflow execution failed."
+    assert len(action_runs) == 1
+    assert action_runs[0]["step_id"] == "detect_issues"
+    assert action_runs[0]["status"].value == "failed"
+    assert artifacts == []
+    assert job["result_artifact_id"] is None
+    assert job["metadata"]["workflow_state"] == {
+        "steps": {
+            "detect_issues": {
+                "status": "failed",
+                "attempt_count": 1,
+                "last_action_run_id": action_runs[0]["id"],
+                "output_artifact_id": None,
+                "skip_reason": None,
+                "error_code": "workflow_execution_failed",
+            }
+        },
+        "context": {},
+        "last_successful_step_id": None,
+        "last_successful_output_artifact_id": None,
+        "final_output_source": None,
+        "result_artifact_id": None,
+    }
+    assert _event_counts(events) == Counter(
+        {
+            "action.failed": 1,
+            "workflow.started": 1,
+            "workflow.step_started": 1,
+            "workflow.step_failed": 1,
+            "workflow.failed": 1,
+        }
+    )
+    workflow_started = _event_by_type(events, "workflow.started")[0]
+    workflow_step_failed = _event_by_type(events, "workflow.step_failed")[0]
+    workflow_failed = _event_by_type(events, "workflow.failed")[0]
+    assert workflow_started["job_id"] == job["id"]
+    assert workflow_started["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_started["handoff_id"] == "handoff_demo"
+    assert workflow_started["acquisition_source"] == "kernel_demo_ce"
+    assert workflow_step_failed["action_run_id"] == action_runs[0]["id"]
+    assert workflow_step_failed["properties"]["step_id"] == "detect_issues"
+    assert workflow_step_failed["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_step_failed["handoff_id"] == "handoff_demo"
+    assert workflow_step_failed["acquisition_source"] == "kernel_demo_ce"
+    assert workflow_failed["job_id"] == job["id"]
+    assert workflow_failed["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_failed["handoff_id"] == "handoff_demo"
+    assert workflow_failed["acquisition_source"] == "kernel_demo_ce"
