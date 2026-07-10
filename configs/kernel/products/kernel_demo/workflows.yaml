@@ -6,6 +6,8 @@ workflows:
     steps:
       - step_id: extract
         action_config_id: kernel_demo.extract_structured_fields_v1
+        input_mapping:
+          source_text: scenario.input.source_text
 
   - workflow_id: kernel_demo.extract_detect_report_v1
     version: 1
@@ -14,7 +16,50 @@ workflows:
     steps:
       - step_id: extract
         action_config_id: kernel_demo.extract_structured_fields_v1
+        input_mapping:
+          source_text: scenario.input.source_text
+        output_mapping:
+          context.extracted: steps.extract.output
       - step_id: detect_issues
         action_config_id: kernel_demo.detect_issues_v1
+        input_mapping:
+          source_text: scenario.input.source_text
+          taxonomy: scenario.input.taxonomy
+        output_mapping:
+          context.detected_issues: steps.detect_issues.output.issues
       - step_id: generate_report
         action_config_id: kernel_demo.generate_report_v1
+        input_mapping:
+          source_text: scenario.input.source_text
+          extracted: steps.extract.output
+          issues: steps.detect_issues.output
+        output_mapping:
+          context.workflow_output: steps.generate_report.output
+
+  - workflow_id: kernel_demo.conditional_skip_extract_v1
+    version: 1
+    input_schema_ref: kernel_demo.generic_text_input_v1
+    output_schema_ref: kernel_demo.extract_output_v1
+    steps:
+      - step_id: extract
+        action_config_id: kernel_demo.extract_structured_fields_v1
+        input_mapping:
+          source_text: scenario.input.source_text
+        output_mapping:
+          context.workflow_output: steps.extract.output
+      - step_id: optional_extract
+        action_config_id: kernel_demo.extract_structured_fields_v1
+        input_mapping:
+          source_text: scenario.input.source_text
+        when: scenario.input.run_optional_step
+
+  - workflow_id: kernel_demo.retry_extract_v1
+    version: 1
+    input_schema_ref: kernel_demo.generic_text_input_v1
+    output_schema_ref: kernel_demo.extract_output_v1
+    steps:
+      - step_id: extract
+        action_config_id: kernel_demo.extract_structured_fields_v1
+        input_mapping:
+          source_text: scenario.input.source_text
+        retry_count: 1

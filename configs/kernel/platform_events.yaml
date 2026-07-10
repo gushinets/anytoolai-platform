@@ -42,6 +42,10 @@ groups:
     - scenario.failed
   workflow:
     - workflow.started
+    - workflow.step_started
+    - workflow.step_skipped
+    - workflow.step_succeeded
+    - workflow.step_failed
     - workflow.succeeded
     - workflow.failed
   action:

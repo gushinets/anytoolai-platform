@@ -19,9 +19,10 @@ class JobStatus(StrEnum):
 class WorkflowStepDefinition(ContractModel):
     step_id: str
     action_config_id: str
-    input_mapping: dict[str, Any] = Field(default_factory=dict)
-    output_mapping: dict[str, Any] = Field(default_factory=dict)
+    input_mapping: dict[str, str] = Field(default_factory=dict)
+    output_mapping: dict[str, str] = Field(default_factory=dict)
     when: str | None = None
+    retry_count: int = Field(default=0, ge=0)
 
 
 class WorkflowDefinition(ContractModel):

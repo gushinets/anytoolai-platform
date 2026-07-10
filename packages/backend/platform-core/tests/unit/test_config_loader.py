@@ -2,16 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 import shutil
-import sys
 
 import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-PLATFORM_CORE_SRC = REPO_ROOT / "packages" / "backend" / "platform-core" / "src"
-
-if str(PLATFORM_CORE_SRC) not in sys.path:
-    sys.path.insert(0, str(PLATFORM_CORE_SRC))
 
 from anytoolai_platform_core.config.errors import (
     BrokenReferenceError,
@@ -95,6 +90,19 @@ def test_loader_builds_registry_from_current_tree() -> None:
     product = registry.get_product("kernel_demo")
     assert product is not None
     assert isinstance(product.scenarios, tuple)
+
+    multi_step = registry.get_workflow("kernel_demo.extract_detect_report_v1")
+    assert multi_step is not None
+    assert multi_step.steps[0].input_mapping == {
+        "source_text": "scenario.input.source_text",
+    }
+    assert multi_step.steps[2].output_mapping == {
+        "context.workflow_output": "steps.generate_report.output",
+    }
+
+    retry_workflow = registry.get_workflow("kernel_demo.retry_extract_v1")
+    assert retry_workflow is not None
+    assert retry_workflow.steps[0].retry_count == 1
 
     with pytest.raises(TypeError):
         registry.products["another"] = product
@@ -444,4 +452,84 @@ def test_loader_fails_on_invalid_quota_period(tmp_path: Path) -> None:
         ref_type="period",
         ref_value="daily",
         message_part="quota period",
+    )
+
+
+def test_loader_rejects_negative_workflow_step_retry_count(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "workflows.yaml"
+    data = _load_yaml(path)
+    data["workflows"][-1]["steps"][0]["retry_count"] = -1
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo.retry_extract_v1",
+        ref_type="step_id",
+        ref_value="extract",
+        message_part="retry_count",
+    )
+
+
+def test_loader_rejects_forward_step_reference_in_workflow_input_mapping(
+    tmp_path: Path,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "workflows.yaml"
+    data = _load_yaml(path)
+    data["workflows"][1]["steps"][0]["input_mapping"] = {
+        "source_text": "steps.detect_issues.output.issues"
+    }
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo.extract_detect_report_v1",
+        ref_type="step_id",
+        ref_value="extract",
+        message_part="previous step output",
+    )
+
+
+def test_loader_allows_missing_workflow_step_input_mapping_for_backward_compatibility(
+    tmp_path: Path,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "workflows.yaml"
+    data = _load_yaml(path)
+    del data["workflows"][0]["steps"][0]["input_mapping"]
+    _write_yaml(path, data)
+
+    registry = ConfigLoader(config_root).load()
+    workflow = registry.get_workflow("kernel_demo.single_action_extract_v1")
+
+    assert workflow is not None
+    assert workflow.steps[0].input_mapping == {}
+
+
+def test_loader_rejects_duplicate_workflow_step_ids(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "workflows.yaml"
+    data = _load_yaml(path)
+    data["workflows"][1]["steps"][1]["step_id"] = "extract"
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo.extract_detect_report_v1",
+        ref_type="step_id",
+        ref_value="extract",
+        message_part="must be unique within a workflow",
     )

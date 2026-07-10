@@ -485,6 +485,8 @@ def test_platform_taxonomy_covers_required_groups_and_events() -> None:
     assert "quota.checked" in PLATFORM_EVENTS
     assert "scenario.started" in PLATFORM_EVENTS
     assert "workflow.started" in PLATFORM_EVENTS
+    assert "workflow.step_started" in PLATFORM_EVENTS
+    assert "workflow.step_failed" in PLATFORM_EVENTS
     assert "action.started" in PLATFORM_EVENTS
     assert "provider.request_started" in PLATFORM_EVENTS
     assert "artifact.created" in PLATFORM_EVENTS
@@ -513,7 +515,18 @@ def test_runtime_services_emit_required_success_events(
         )
 
         scenario = scenario_service.start(make_scenario_session())
-        job = workflow_service.start(make_job(scenario.id))
+        job = workflow_service.start(
+            make_job(
+                scenario.id,
+                metadata={
+                    "guest_id": "guest_demo",
+                    "user_id": "user_demo",
+                    "scenario_chain_id": "scenario_chain_demo",
+                    "handoff_id": "handoff_demo",
+                    "acquisition_source": "kernel_demo_ce",
+                },
+            )
+        )
         action = action_service.start(make_action_run(scenario.id, job.id))
         artifact_service.create(
             make_artifact(
@@ -546,6 +559,14 @@ def test_runtime_services_emit_required_success_events(
         )
 
         event_types = _event_types(session)
+        workflow_started = session.execute(
+            sa.select(event_log_table)
+            .where(event_log_table.c.event_type == "workflow.started")
+        ).mappings().one()
+        workflow_succeeded = session.execute(
+            sa.select(event_log_table)
+            .where(event_log_table.c.event_type == "workflow.succeeded")
+        ).mappings().one()
 
     assert {
         "scenario.started",
@@ -558,6 +579,16 @@ def test_runtime_services_emit_required_success_events(
         "workflow.succeeded",
         "scenario.completed",
     } <= set(event_types)
+    assert workflow_started["guest_id"] == "guest_demo"
+    assert workflow_started["user_id"] == "user_demo"
+    assert workflow_started["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_started["handoff_id"] == "handoff_demo"
+    assert workflow_started["acquisition_source"] == "kernel_demo_ce"
+    assert workflow_succeeded["guest_id"] == "guest_demo"
+    assert workflow_succeeded["user_id"] == "user_demo"
+    assert workflow_succeeded["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_succeeded["handoff_id"] == "handoff_demo"
+    assert workflow_succeeded["acquisition_source"] == "kernel_demo_ce"
 
 
 def test_provider_events_include_adr_0007_correlation_properties(
@@ -636,7 +667,18 @@ def test_runtime_services_emit_required_failure_events(
         )
 
         scenario = scenario_service.start(make_scenario_session())
-        job = workflow_service.start(make_job(scenario.id))
+        job = workflow_service.start(
+            make_job(
+                scenario.id,
+                metadata={
+                    "guest_id": "guest_demo",
+                    "user_id": "user_demo",
+                    "scenario_chain_id": "scenario_chain_demo",
+                    "handoff_id": "handoff_demo",
+                    "acquisition_source": "kernel_demo_ce",
+                },
+            )
+        )
         action = action_service.start(make_action_run(scenario.id, job.id))
 
         with pytest.raises(ProviderGatewayExecutionError) as exc_info:
@@ -647,6 +689,10 @@ def test_runtime_services_emit_required_failure_events(
         scenario_service.mark_failed(scenario, error_code="timeout")
 
         event_types = _event_types(session)
+        workflow_failed = session.execute(
+            sa.select(event_log_table)
+            .where(event_log_table.c.event_type == "workflow.failed")
+        ).mappings().one()
         provider_call_statuses = list(
             session.execute(sa.select(provider_calls_table.c.status)).scalars()
         )
@@ -659,6 +705,11 @@ def test_runtime_services_emit_required_failure_events(
         "scenario.failed",
     } <= set(event_types)
     assert ProviderCallStatus.timed_out in provider_call_statuses
+    assert workflow_failed["guest_id"] == "guest_demo"
+    assert workflow_failed["user_id"] == "user_demo"
+    assert workflow_failed["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_failed["handoff_id"] == "handoff_demo"
+    assert workflow_failed["acquisition_source"] == "kernel_demo_ce"
 
 
 def test_provider_gateway_failure_uses_safe_platform_error_code(

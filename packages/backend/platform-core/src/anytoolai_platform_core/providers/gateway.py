@@ -659,10 +659,13 @@ class ProviderGateway:
             job_id=request.job_id,
             workflow_id=request.workflow_id,
             workflow_version=request.workflow_version,
+            scenario_chain_id=_metadata_str(request.metadata, "scenario_chain_id"),
             action_type=request.action_type,
             action_config_id=request.action_config_id,
+            handoff_id=_metadata_str(request.metadata, "handoff_id"),
             provider=request.provider,
             model=request.model,
+            acquisition_source=_metadata_str(request.metadata, "acquisition_source"),
             action_run_id=request.action_run_id,
             provider_policy_ref=request.provider_policy_ref,
         )
@@ -847,3 +850,8 @@ def _persist_provider_call_after_rollback(
             repository.create(record)
             return
         repository.update(record)
+
+
+def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
+    value = metadata.get(key)
+    return value if isinstance(value, str) and value else None
