@@ -705,6 +705,8 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
     workflow_step_failed = _event_by_type(events, "workflow.step_failed")[0]
     workflow_failed = _event_by_type(events, "workflow.failed")[0]
     assert workflow_started["job_id"] == job["id"]
+    assert workflow_started["guest_id"] == "guest_demo"
+    assert workflow_started["user_id"] == "user_demo"
     assert workflow_started["scenario_chain_id"] == "scenario_chain_demo"
     assert workflow_started["handoff_id"] == "handoff_demo"
     assert workflow_started["acquisition_source"] == "kernel_demo_ce"
@@ -714,6 +716,8 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
     assert workflow_step_failed["handoff_id"] == "handoff_demo"
     assert workflow_step_failed["acquisition_source"] == "kernel_demo_ce"
     assert workflow_failed["job_id"] == job["id"]
+    assert workflow_failed["guest_id"] == "guest_demo"
+    assert workflow_failed["user_id"] == "user_demo"
     assert workflow_failed["scenario_chain_id"] == "scenario_chain_demo"
     assert workflow_failed["handoff_id"] == "handoff_demo"
     assert workflow_failed["acquisition_source"] == "kernel_demo_ce"
