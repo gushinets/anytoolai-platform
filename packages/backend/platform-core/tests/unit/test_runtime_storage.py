@@ -580,6 +580,58 @@ def test_job_repository_create_read_update(
         assert updated.completed_at is not None
 
 
+def test_job_repository_claims_created_jobs_once_and_supports_preclaim_cancel(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        scenario_session = ScenarioSessionRepository(session).create(make_scenario_session())
+        repository = JobRepository(session)
+        created = repository.create(make_job(scenario_session.id))
+
+        claimed = repository.claim_created(created.id)
+        assert claimed is not None
+        assert claimed.status is JobStatus.running
+        assert claimed.started_at is not None
+        assert repository.claim_created(created.id) is None
+
+        succeeded = repository.mark_succeeded(
+            replace(
+                claimed,
+                status=JobStatus.succeeded,
+                result_artifact_id="artifact_result",
+                completed_at=utc_now(),
+            )
+        )
+        assert succeeded.status is JobStatus.succeeded
+        assert repository.claim_created(created.id) is None
+
+        cancelable = repository.create(make_job(scenario_session.id))
+        canceled = repository.cancel_created(cancelable.id)
+        assert canceled is not None
+        assert canceled.status is JobStatus.canceled
+        assert canceled.completed_at is not None
+        assert repository.claim_created(cancelable.id) is None
+
+
+def test_job_repository_failed_transition_completes_safe_terminal_contract(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        scenario_session = ScenarioSessionRepository(session).create(make_scenario_session())
+        repository = JobRepository(session)
+        claimed = repository.claim_created(
+            repository.create(make_job(scenario_session.id)).id
+        )
+        assert claimed is not None
+
+        failed = repository.mark_failed(replace(claimed, status=JobStatus.failed))
+
+    assert failed.status is JobStatus.failed
+    assert failed.completed_at is not None
+    assert failed.error_code == "workflow_execution_failed"
+    assert failed.error_message_safe == "Workflow execution failed."
+
+
 def test_job_repository_required_fields(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

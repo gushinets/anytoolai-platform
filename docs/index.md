@@ -17,6 +17,7 @@ This directory is the system of record for agents. Keep it current. If a decisio
 - `architecture/action-runner.md`
 - `architecture/action-model.md`
 - `architecture/workflow-model.md`
+- `architecture/job-lifecycle.md`
 - `architecture/scenario-session-model.md`
 - `architecture/event-taxonomy.md`
 - `architecture/handoff-model.md`
@@ -61,6 +62,11 @@ This directory is the system of record for agents. Keep it current. If a decisio
 - `exec-plans/template.md`
 - `exec-plans/active/`
 - `exec-plans/completed/`
+
+## Task handoffs
+
+- `tasks/a11-job-lifecycle-and-worker-integration.md`
+- `handoffs/a11-job-lifecycle-worker-review-remediation.md`
 
 ## Generated docs
 

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
-import inspect
+from pathlib import Path
 from time import perf_counter
 from typing import Any
 
@@ -14,6 +15,11 @@ from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter, enrich_event_context
 from anytoolai_platform_core.providers.adapters.base import ProviderAdapter
+from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
+from anytoolai_platform_core.providers.adapters.litellm import (
+    LiteLLMProviderAdapter,
+    build_litellm_router,
+)
 from anytoolai_platform_core.providers.models import (
     ProviderCallRecord,
     ProviderCallStatus,
@@ -73,6 +79,30 @@ class ProviderGatewayExecutionError(RuntimeError):
         self.message = message
         self.resolved_request = resolved_request
         self.failure_kind = failure_kind
+
+
+class LazyLiteLLMProviderAdapter:
+    """Delay router/env resolution until a LiteLLM-backed job actually runs."""
+
+    def __init__(self, config_root: Path | None = None) -> None:
+        self._config_root = config_root
+        self._adapter: LiteLLMProviderAdapter | None = None
+
+    async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
+        if self._adapter is None:
+            self._adapter = LiteLLMProviderAdapter(build_litellm_router(self._config_root))
+        return await self._adapter.complete(request)
+
+
+def build_default_provider_adapters(
+    config_root: Path | None = None,
+) -> dict[str, ProviderAdapter]:
+    """Build production adapters without exposing concrete adapters to composition roots."""
+
+    return {
+        "fake": FakeProviderAdapter(),
+        "litellm": LazyLiteLLMProviderAdapter(config_root),
+    }
 
 
 class ProviderGateway:
@@ -324,7 +354,7 @@ class ProviderGateway:
                     error=error,
                 )
                 raise
-            except TimeoutError as exc:
+            except TimeoutError:
                 error = ProviderGatewayExecutionError(
                     provider_policy_ref=attempt_request.provider_policy_ref,
                     provider=attempt_request.provider,

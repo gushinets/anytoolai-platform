@@ -20,12 +20,16 @@ from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter, enrich_event_context
 from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
 from anytoolai_platform_core.storage.db import action_runs_table
 from anytoolai_platform_core.storage.transactions import (
     register_rollback_recovery_callback,
     transaction_boundary,
 )
-from anytoolai_platform_core.structured_output.schemas import normalize_mapping, normalize_schema_mapping
+from anytoolai_platform_core.structured_output.schemas import (
+    normalize_mapping,
+    normalize_schema_mapping,
+)
 from anytoolai_platform_core.workflows.errors import (
     WorkflowExecutionError,
     WorkflowInputValidationError,
@@ -52,6 +56,12 @@ class WorkflowJobService:
         self._event_emitter = event_emitter
 
     def start(self, record: JobRecord) -> JobRecord:
+        if record.status is JobStatus.created:
+            record = replace(
+                record,
+                status=JobStatus.running,
+                started_at=record.started_at or utc_now(),
+            )
         stored = self._repository.create(record)
         self._event_emitter.emit(
             "workflow.started",
@@ -60,8 +70,35 @@ class WorkflowJobService:
         )
         return stored
 
+    def claim_created(self, job_id: str) -> JobRecord | None:
+        """Claim and emit the start event inside the caller's transaction."""
+
+        stored = self._repository.claim_created(job_id)
+        if stored is None:
+            return None
+        self._event_emitter.emit(
+            "workflow.started",
+            _context_from_record(stored),
+            properties={"workflow_version": stored.workflow_version},
+        )
+        return stored
+
+    def cancel_created(self, job_id: str) -> JobRecord | None:
+        """Cancel and emit the terminal event inside the caller's transaction."""
+
+        stored = self._repository.cancel_created(job_id)
+        if stored is None:
+            return None
+        self._event_emitter.emit(
+            "workflow.canceled",
+            _context_from_record(stored),
+            result_status=stored.status.value,
+            properties={"workflow_version": stored.workflow_version},
+        )
+        return stored
+
     def mark_succeeded(self, record: JobRecord) -> JobRecord:
-        updated = self._repository.update(record)
+        updated = self._repository.mark_succeeded(record)
         self._event_emitter.emit(
             "workflow.succeeded",
             _context_from_record(updated),
@@ -71,8 +108,16 @@ class WorkflowJobService:
         return updated
 
     def mark_failed(self, record: JobRecord, *, error_code: str) -> JobRecord:
-        failed_record = replace(record, status=JobStatus.failed, error_code=error_code)
-        updated = self._repository.update(failed_record)
+        failed_record = replace(
+            record,
+            status=JobStatus.failed,
+            error_code=error_code,
+            error_message_safe=(
+                record.error_message_safe or "Workflow execution failed."
+            ),
+            completed_at=record.completed_at or utc_now(),
+        )
+        updated = self._repository.mark_failed(failed_record)
         self._event_emitter.emit(
             "workflow.failed",
             _context_from_record(updated),
@@ -145,12 +190,6 @@ class SequentialWorkflowRunner:
             )
         )
 
-        state = _WorkflowExecutionState(
-            scenario_input=normalized_input,
-            step_outputs={},
-            context={},
-            step_state={},
-        )
         job_context = ExecutionContext(
             tenant_id=context.tenant_id,
             region=context.region,
@@ -167,6 +206,79 @@ class SequentialWorkflowRunner:
             acquisition_source=context.acquisition_source,
         )
 
+        return await self._run_started_job(
+            workflow=workflow,
+            normalized_input=normalized_input,
+            job=job,
+            job_context=job_context,
+        )
+
+    async def run_claimed_job(
+        self,
+        job: JobRecord,
+        input_payload: Mapping[str, Any],
+        context: ExecutionContext,
+    ) -> WorkflowRunResult:
+        """Execute an already-claimed job without creating a second job row."""
+
+        if job.status is not JobStatus.running:
+            raise ValueError(f"job {job.id} is not running")
+        if context.scenario_session_id != job.scenario_session_id:
+            raise ValueError("job and execution context scenario_session_id do not match")
+        if context.job_id not in (None, job.id):
+            raise ValueError("job and execution context job_id do not match")
+        if context.workflow_id not in (None, job.workflow_id):
+            raise ValueError("job and execution context workflow_id do not match")
+        if context.workflow_version not in (None, job.workflow_version):
+            raise ValueError("job and execution context workflow_version do not match")
+
+        workflow = self._require_workflow(job.workflow_id)
+        if workflow.version != job.workflow_version:
+            raise ValueError("job workflow version does not match the loaded workflow")
+
+        metadata = {
+            **dict(job.metadata),
+            "guest_id": context.guest_id,
+            "user_id": context.user_id,
+            "scenario_chain_id": context.scenario_chain_id,
+            "handoff_id": context.handoff_id,
+            "acquisition_source": context.acquisition_source,
+            "input_schema_ref": workflow.input_schema_ref,
+            "output_schema_ref": workflow.output_schema_ref,
+            "workflow_state": {
+                "steps": {},
+                "context": {},
+            },
+        }
+        job = self._job_repository.update(replace(job, metadata=metadata))
+        job_context = replace(
+            context,
+            scenario_session_id=job.scenario_session_id,
+            job_id=job.id,
+            workflow_id=workflow.workflow_id,
+            workflow_version=workflow.version,
+        )
+        return await self._run_started_job(
+            workflow=workflow,
+            normalized_input=normalize_mapping(dict(input_payload)),
+            job=job,
+            job_context=job_context,
+        )
+
+    async def _run_started_job(
+        self,
+        *,
+        workflow: WorkflowDefinition,
+        normalized_input: dict[str, Any],
+        job: JobRecord,
+        job_context: ExecutionContext,
+    ) -> WorkflowRunResult:
+        state = _WorkflowExecutionState(
+            scenario_input=normalized_input,
+            step_outputs={},
+            context={},
+            step_state={},
+        )
         try:
             self._validate_workflow_input(
                 workflow,
@@ -193,13 +305,19 @@ class SequentialWorkflowRunner:
             job = self._persist_job_state(
                 replace(
                     job,
-                    status=JobStatus.succeeded,
                     result_artifact_id=final_artifact.id,
                     completed_at=utc_now(),
                 ),
                 state,
             )
-            job = self._job_service.mark_succeeded(job)
+            job = self._job_service.mark_succeeded(
+                replace(
+                    job,
+                    status=JobStatus.succeeded,
+                    result_artifact_id=final_artifact.id,
+                    completed_at=job.completed_at or utc_now(),
+                )
+            )
             return WorkflowRunResult(
                 job_id=job.id,
                 workflow_id=job.workflow_id,
@@ -222,7 +340,7 @@ class SequentialWorkflowRunner:
                 error_code=error_code,
                 failed_step=state.failed_step,
             )
-            job = self._job_service.mark_failed(failed_job, error_code=error_code)
+            self._job_service.mark_failed(failed_job, error_code=error_code)
             raise
 
     async def _run_step(
@@ -627,11 +745,15 @@ class SequentialWorkflowRunner:
         return value
 
     def _error_code_for_exception(self, exc: Exception) -> str:
+        if isinstance(exc, ProviderGatewayExecutionError):
+            return exc.error_code
         if isinstance(exc, WorkflowExecutionError):
             return exc.code
         return getattr(exc, "code", "workflow_execution_failed")
 
     def _safe_error_message_for_exception(self, exc: Exception) -> str:
+        if isinstance(exc, ProviderGatewayExecutionError):
+            return self._redact_sensitive_error_message(exc.message)
         if isinstance(exc, PlatformError):
             raw = str(exc).strip() or type(exc).__name__
             return self._redact_sensitive_error_message(raw)

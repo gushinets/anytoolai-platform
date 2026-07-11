@@ -14,7 +14,7 @@ from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActi
 from anytoolai_platform_core.actions.executor import ActionExecutorResponse
 from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
 from anytoolai_platform_core.actions.repository import ActionRunRepository
-from anytoolai_platform_core.actions.runner import ActionRunService, ActionRunner
+from anytoolai_platform_core.actions.runner import ActionRunner, ActionRunService
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
@@ -28,7 +28,7 @@ from anytoolai_platform_core.providers.gateway import (
     ProviderGateway,
     ProviderGatewayExecutionError,
 )
-from anytoolai_platform_core.providers.models import ProviderResponse, ProviderUsage
+from anytoolai_platform_core.providers.models import ProviderResponse
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.storage.db import (
@@ -42,6 +42,8 @@ from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
 )
+from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
+from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import (
     SequentialWorkflowRunner,
@@ -177,6 +179,21 @@ class ExplodingActionRunner:
     ) -> Any:
         del action_type, action_config_id, input_payload, context
         raise RuntimeError("workflow exploded with secret_token=abc123")
+
+
+class ValidationFailingActionRunner:
+    async def run(
+        self,
+        action_type: str,
+        action_config_id: str,
+        input_payload: dict[str, Any],
+        context: ExecutionContext,
+    ) -> Any:
+        del action_type, action_config_id, input_payload, context
+        raise StructuredOutputValidationError(
+            reason="schema_mismatch",
+            error_type="StructuredOutputSchemaMismatchError",
+        )
 
 
 def _build_recording_workflow_runner(
@@ -329,6 +346,52 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
     assert workflow_succeeded["scenario_chain_id"] == "scenario_chain_demo"
     assert workflow_succeeded["handoff_id"] == "handoff_demo"
     assert workflow_succeeded["acquisition_source"] == "kernel_demo_ce"
+
+
+def test_workflow_runner_executes_an_existing_claimed_job_without_duplicate_job(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        runner = _build_structured_workflow_runner(session)
+        repository = JobRepository(session)
+        claimed = WorkflowJobService(
+            repository,
+            EventEmitter(EventLogRepository(session)),
+        ).claim_created(
+            repository.create(
+                JobRecord(
+                    tenant_id="tenant_demo",
+                    region="eu-central",
+                    product_id="kernel_demo",
+                    frontend_id="kernel_demo_ce",
+                    scenario_session_id="scenario_session_demo",
+                    workflow_id="kernel_demo.single_action_extract_v1",
+                    workflow_version=1,
+                )
+            ).id
+        )
+        assert claimed is not None
+
+        result = asyncio.run(
+            runner.run_claimed_job(
+                claimed,
+                {"source_text": "deadline budget deliverables"},
+                _base_context(),
+            )
+        )
+        jobs = list(session.execute(sa.select(jobs_table)).mappings())
+        action_runs = list(session.execute(sa.select(action_runs_table)).mappings())
+        provider_calls = list(session.execute(sa.select(provider_calls_table)).mappings())
+        artifacts = list(session.execute(sa.select(artifacts_table)).mappings())
+
+    assert result.status is JobStatus.succeeded
+    assert len(jobs) == 1
+    assert jobs[0]["id"] == claimed.id
+    assert jobs[0]["status"] is JobStatus.succeeded
+    assert jobs[0]["result_artifact_id"] == result.result_artifact_id
+    assert action_runs[0]["job_id"] == claimed.id
+    assert provider_calls[0]["job_id"] == claimed.id
+    assert all(artifact["job_id"] == claimed.id for artifact in artifacts)
 
 
 def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mappings(
@@ -499,8 +562,8 @@ def test_workflow_runner_stops_after_failed_step(
         events = _event_rows(session)
 
     assert job["status"].value == "failed"
-    assert job["error_code"] == "workflow_execution_failed"
-    assert job["error_message_safe"] == "Workflow execution failed."
+    assert job["error_code"] == "provider_request_failed"
+    assert job["error_message_safe"] == "[redacted provider error]"
     assert job["completed_at"] is not None
     assert job["result_artifact_id"] is None
     assert [row["step_id"] for row in action_runs] == ["extract"]
@@ -595,6 +658,30 @@ def test_workflow_runner_persists_generic_safe_message_for_unknown_exceptions(
     assert "secret_token" not in job["error_message_safe"]
 
 
+def test_workflow_runner_preserves_safe_validation_failure_category(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        runner = _build_workflow_runner_with_action_runner(
+            session,
+            action_runner=ValidationFailingActionRunner(),
+        )
+
+        with pytest.raises(StructuredOutputValidationError):
+            asyncio.run(
+                runner.run(
+                    "kernel_demo.single_action_extract_v1",
+                    {"source_text": "invalid output"},
+                    _base_context(),
+                )
+            )
+        job = session.execute(sa.select(jobs_table)).mappings().one()
+
+    assert job["status"].value == "failed"
+    assert job["error_code"] == "structured_output_validation_failed"
+    assert job["error_message_safe"] == "Structured output validation failed."
+
+
 def test_workflow_runner_persists_failed_state_when_exception_escapes_transaction_boundary(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
@@ -668,8 +755,8 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
 
     assert adapter.call_count == 2
     assert job["status"].value == "failed"
-    assert job["error_code"] == "workflow_execution_failed"
-    assert job["error_message_safe"] == "Workflow execution failed."
+    assert job["error_code"] == "provider_request_failed"
+    assert job["error_message_safe"] == "[redacted provider error]"
     assert len(action_runs) == 1
     assert action_runs[0]["step_id"] == "detect_issues"
     assert action_runs[0]["status"].value == "failed"
@@ -683,7 +770,7 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
                 "last_action_run_id": action_runs[0]["id"],
                 "output_artifact_id": None,
                 "skip_reason": None,
-                "error_code": "workflow_execution_failed",
+                "error_code": "provider_request_failed",
             }
         },
         "context": {},

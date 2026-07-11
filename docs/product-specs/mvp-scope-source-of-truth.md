@@ -228,6 +228,7 @@ MVP-A platform events:
 - `scenario.completed`
 - `scenario.failed`
 - `workflow.started`
+- `workflow.canceled`
 - `workflow.succeeded`
 - `workflow.failed`
 - `action.started`
