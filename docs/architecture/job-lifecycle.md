@@ -45,7 +45,7 @@ The runner's claimed-job entrypoint never creates another job row.
 - Workflow failure writes `failed`, `completed_at`, `error_code`, and `error_message_safe`, and
   emits `workflow.failed`.
 - A user cancellation is limited to `created -> canceled`. A canceled job is not claimable; running
-  work is not interrupted by that API path. If the worker task itself is cancelled after claim, the
+  work is not interrupted by that API path. If the worker task itself is canceled after claim, the
   handler persists `running -> canceled` and `workflow.canceled` in a recovery transaction, then
   re-raises `asyncio.CancelledError` so cooperative shutdown behavior is preserved.
 
