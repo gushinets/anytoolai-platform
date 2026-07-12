@@ -17,6 +17,7 @@ psycopg2 DBAPI.
 
 - Declared `psycopg[binary]>=3.2` as an `apps/platform-worker` runtime dependency.
 - Regenerated `apps/platform-worker/uv.lock` with `uv add`.
+- Added the same explicit Psycopg dependency to the root managed test environment and lockfile.
 - Changed only the worker compose URL to `postgresql+psycopg://...`, explicitly matching Psycopg 3.
 - Added a regression test that constructs the real production worker graph with that URL.
 - Added the execution plan and task record for repository continuity.
@@ -35,6 +36,8 @@ is outside this fix and materially larger.
   `build_worker(...)` returned `Worker` without a DBAPI import failure.
 - `uv run --project apps/platform-worker --with pytest --with alembic python -m pytest apps/platform-worker/tests -q`:
   passed, 6 tests.
+- `uv run python -m pytest apps/platform-worker/tests/test_worker_boot.py -q`: passed, 6 tests;
+  the root managed environment imports `psycopg 3.3.4`.
 - `docker compose -f infra/compose/docker-compose.yml config`: passed and rendered the worker's
   `postgresql+psycopg://` URL.
 - Config validation and architecture validation inside quick-check: passed.
