@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from math import isfinite
 
 PROJECT_DATABASE_URL_ENV = "ANYTOOLAI_DATABASE_URL"
 GENERIC_DATABASE_URL_ENV = "DATABASE_URL"
@@ -21,7 +22,7 @@ class WorkerSettings:
                 f"set {PROJECT_DATABASE_URL_ENV} or {GENERIC_DATABASE_URL_ENV}"
             )
         poll_interval_seconds = float(os.getenv(POLL_INTERVAL_ENV, "1.0"))
-        if poll_interval_seconds <= 0:
+        if not isfinite(poll_interval_seconds) or poll_interval_seconds <= 0:
             raise ValueError(f"{POLL_INTERVAL_ENV} must be greater than zero")
         return cls(
             database_url=database_url,
