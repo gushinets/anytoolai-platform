@@ -281,11 +281,14 @@ def test_worker_started_and_failed_events_keep_scenario_identity_for_invalid_inp
             ).mappings()
         )
 
-    assert [event["event_type"] for event in events] == ["workflow.started", "workflow.failed"]
-    for event in events:
-        assert event["guest_id"] == "guest_demo"
-        assert event["user_id"] == "user_demo"
-        assert event["scenario_chain_id"] == "scenario_chain_demo"
+    assert [event_row["event_type"] for event_row in events] == [
+        "workflow.started",
+        "workflow.failed",
+    ]
+    for event_row in events:
+        assert event_row["guest_id"] == "guest_demo"
+        assert event_row["user_id"] == "user_demo"
+        assert event_row["scenario_chain_id"] == "scenario_chain_demo"
 
 
 def test_claim_and_workflow_started_roll_back_together_when_event_persistence_fails(
@@ -409,7 +412,7 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
             ).mappings()
         )
 
-    event_types = [event["event_type"] for event in events]
+    event_types = [event_row["event_type"] for event_row in events]
 
     assert stored_job["result_artifact_id"] == result.result_artifact_id
     assert action_run["scenario_session_id"] == job.scenario_session_id
@@ -427,14 +430,14 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
         "workflow.succeeded",
     }.issubset(event_types)
     assert event_types.count("workflow.started") == 1
-    for event in events:
-        if event["event_type"] in {
+    for event_row in events:
+        if event_row["event_type"] in {
             "workflow.started",
             "action.started",
             "provider.request_started",
             "provider.request_succeeded",
             "workflow.succeeded",
         }:
-            assert event["guest_id"] == "guest_demo", event["event_type"]
-            assert event["user_id"] == "user_demo", event["event_type"]
-            assert event["scenario_chain_id"] == "scenario_chain_demo", event["event_type"]
+            assert event_row["guest_id"] == "guest_demo", event_row["event_type"]
+            assert event_row["user_id"] == "user_demo", event_row["event_type"]
+            assert event_row["scenario_chain_id"] == "scenario_chain_demo", event_row["event_type"]
