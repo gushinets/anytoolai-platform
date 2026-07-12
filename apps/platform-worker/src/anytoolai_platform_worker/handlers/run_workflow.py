@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from typing import Any
@@ -67,6 +69,9 @@ class RunWorkflowHandler:
                 context = self._execution_context(job, scenario)
                 runner = self._runner_factory(session)
                 await runner.run_claimed_job(job, input_payload, context)
+        except asyncio.CancelledError:
+            self._persist_handler_cancellation(job_id)
+            raise
         except Exception as exc:
             self._persist_handler_failure(job_id, exc)
 
@@ -165,6 +170,15 @@ class RunWorkflowHandler:
                 ),
                 error_code=error_code,
             )
+
+    def _persist_handler_cancellation(self, job_id: str) -> None:
+        with transaction_boundary(self._session_factory) as session:
+            repository = JobRepository(session)
+            job = repository.get(job_id)
+            if job is None or job.status is not JobStatus.running:
+                return
+            emitter = EventEmitter(EventLogRepository(session))
+            WorkflowJobService(repository, emitter).mark_canceled(job)
 
 
 def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:

@@ -134,6 +134,16 @@ class WorkflowJobService:
         )
         return updated
 
+    def mark_canceled(self, record: JobRecord) -> JobRecord:
+        updated = self._repository.mark_canceled(record)
+        self._event_emitter.emit(
+            "workflow.canceled",
+            _context_from_record(updated),
+            result_status=updated.status.value,
+            properties={"workflow_version": updated.workflow_version},
+        )
+        return updated
+
 
 class SequentialWorkflowRunner:
     def __init__(

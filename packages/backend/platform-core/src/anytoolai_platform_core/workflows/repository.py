@@ -105,6 +105,16 @@ class JobRepository:
             expected_status=JobStatus.failed,
         )
 
+    def mark_canceled(self, record: JobRecord) -> JobRecord:
+        return self._transition_from_running(
+            replace(
+                record,
+                status=JobStatus.canceled,
+                completed_at=record.completed_at or utc_now(),
+            ),
+            expected_status=JobStatus.canceled,
+        )
+
     def _transition_from_running(
         self,
         record: JobRecord,

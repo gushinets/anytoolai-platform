@@ -135,6 +135,20 @@ class RecordingRunner:
         )
 
 
+class CancelledRunner:
+    def __init__(self, session: sa.orm.Session) -> None:
+        del session
+
+    async def run_claimed_job(
+        self,
+        job: JobRecord,
+        input_payload: dict[str, Any],
+        context: ExecutionContext,
+    ) -> None:
+        del job, input_payload, context
+        raise asyncio.CancelledError()
+
+
 def _seed_job(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
     *,
@@ -208,6 +222,36 @@ def test_worker_failure_is_safe_and_emits_correlated_workflow_failed_event(
     assert event_row["job_id"] == job.id
     assert event_row["scenario_session_id"] == job.scenario_session_id
     assert event_row["error_code"] == "workflow_execution_failed"
+
+
+def test_worker_cancellation_marks_claimed_job_canceled_and_reraises(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_job(session_factory, input_payload={"source_text": "cancel"})
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=CancelledRunner,
+        )
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(worker.process_job(job.id))
+
+    with transaction_boundary(session_factory) as session:
+        stored = JobRepository(session).get(job.id)
+        event_types = list(
+            session.execute(
+                sa.select(event_log_table.c.event_type)
+                .where(event_log_table.c.job_id == job.id)
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).scalars()
+        )
+
+    assert stored is not None
+    assert stored.status is JobStatus.canceled
+    assert stored.completed_at is not None
+    assert event_types == ["workflow.started", "workflow.canceled"]
 
 
 def test_worker_started_and_failed_events_keep_scenario_identity_for_invalid_input(
