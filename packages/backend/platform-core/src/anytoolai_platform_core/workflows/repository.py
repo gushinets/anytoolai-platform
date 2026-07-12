@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, replace
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -34,7 +36,12 @@ class JobRepository:
         )
         return None if row is None else JobRecord(**dict(row))
 
-    def claim_created(self, job_id: str) -> JobRecord | None:
+    def claim_created(
+        self,
+        job_id: str,
+        *,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> JobRecord | None:
         """Claim a created job exactly once within the caller's transaction.
 
         The conditional update is the coordination primitive for the MVP worker.  A caller must
@@ -42,16 +49,20 @@ class JobRepository:
         make the job visible as ``created`` again.
         """
 
+        values: dict[str, Any] = {
+            "status": JobStatus.running,
+            "started_at": utc_now(),
+        }
+        if metadata is not None:
+            values["metadata"] = dict(metadata)
+
         result = self._session.execute(
             sa.update(jobs_table)
             .where(
                 jobs_table.c.id == job_id,
                 jobs_table.c.status == JobStatus.created,
             )
-            .values(
-                status=JobStatus.running,
-                started_at=utc_now(),
-            )
+            .values(values)
         )
         if result.rowcount == 0:
             return None

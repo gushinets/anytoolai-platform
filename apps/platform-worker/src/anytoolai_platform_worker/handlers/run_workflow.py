@@ -85,7 +85,21 @@ class RunWorkflowHandler:
         with transaction_boundary(self._session_factory) as session:
             repository = JobRepository(session)
             emitter = EventEmitter(EventLogRepository(session))
-            return WorkflowJobService(repository, emitter).claim_created(job_id)
+            job = repository.get(job_id)
+            if job is None or job.status is not JobStatus.created:
+                return None
+
+            scenario = self._load_scenario(session, job)
+            metadata = {
+                **job.metadata,
+                "guest_id": scenario.guest_id,
+                "user_id": scenario.user_id,
+                "scenario_chain_id": scenario.scenario_chain_id,
+            }
+            return WorkflowJobService(repository, emitter).claim_created(
+                job_id,
+                metadata=metadata,
+            )
 
     def _get(self, job_id: str) -> JobRecord | None:
         with transaction_boundary(self._session_factory) as session:

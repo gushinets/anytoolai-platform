@@ -689,6 +689,8 @@ class ProviderGateway:
             job_id=request.job_id,
             workflow_id=request.workflow_id,
             workflow_version=request.workflow_version,
+            guest_id=_metadata_str(request.metadata, "guest_id"),
+            user_id=_metadata_str(request.metadata, "user_id"),
             scenario_chain_id=_metadata_str(request.metadata, "scenario_chain_id"),
             action_type=request.action_type,
             action_config_id=request.action_config_id,

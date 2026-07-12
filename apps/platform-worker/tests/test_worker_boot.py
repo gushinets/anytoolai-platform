@@ -80,6 +80,7 @@ def _scenario(**metadata: Any) -> ScenarioSessionRecord:
         scenario_id="kernel_demo.single_action_smoke_v1",
         scenario_version=1,
         guest_id="guest_demo",
+        user_id="user_demo",
         scenario_chain_id="scenario_chain_demo",
         metadata=metadata,
     )
@@ -209,6 +210,40 @@ def test_worker_failure_is_safe_and_emits_correlated_workflow_failed_event(
     assert event_row["error_code"] == "workflow_execution_failed"
 
 
+def test_worker_started_and_failed_events_keep_scenario_identity_for_invalid_input(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_job(session_factory, input_payload=None)
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=RecordingRunner,
+        )
+    )
+
+    result = asyncio.run(worker.process_job(job.id))
+
+    assert result is not None
+    assert result.status is JobStatus.failed
+    with transaction_boundary(session_factory) as session:
+        events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(
+                    event_log_table.c.job_id == job.id,
+                    event_log_table.c.event_type.in_(("workflow.started", "workflow.failed")),
+                )
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert [event["event_type"] for event in events] == ["workflow.started", "workflow.failed"]
+    for event in events:
+        assert event["guest_id"] == "guest_demo"
+        assert event["user_id"] == "user_demo"
+        assert event["scenario_chain_id"] == "scenario_chain_demo"
+
+
 def test_claim_and_workflow_started_roll_back_together_when_event_persistence_fails(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
     monkeypatch: pytest.MonkeyPatch,
@@ -322,13 +357,15 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
                 sa.select(artifacts_table).where(artifacts_table.c.job_id == job.id)
             ).mappings()
         )
-        event_types = list(
+        events = list(
             session.execute(
-                sa.select(event_log_table.c.event_type).where(
-                    event_log_table.c.job_id == job.id
-                )
-            ).scalars()
+                sa.select(event_log_table)
+                .where(event_log_table.c.job_id == job.id)
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
         )
+
+    event_types = [event["event_type"] for event in events]
 
     assert stored_job["result_artifact_id"] == result.result_artifact_id
     assert action_run["scenario_session_id"] == job.scenario_session_id
@@ -346,3 +383,14 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
         "workflow.succeeded",
     }.issubset(event_types)
     assert event_types.count("workflow.started") == 1
+    for event in events:
+        if event["event_type"] in {
+            "workflow.started",
+            "action.started",
+            "provider.request_started",
+            "provider.request_succeeded",
+            "workflow.succeeded",
+        }:
+            assert event["guest_id"] == "guest_demo", event["event_type"]
+            assert event["user_id"] == "user_demo", event["event_type"]
+            assert event["scenario_chain_id"] == "scenario_chain_demo", event["event_type"]

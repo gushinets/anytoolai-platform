@@ -70,10 +70,15 @@ class WorkflowJobService:
         )
         return stored
 
-    def claim_created(self, job_id: str) -> JobRecord | None:
+    def claim_created(
+        self,
+        job_id: str,
+        *,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> JobRecord | None:
         """Claim and emit the start event inside the caller's transaction."""
 
-        stored = self._repository.claim_created(job_id)
+        stored = self._repository.claim_created(job_id, metadata=metadata)
         if stored is None:
             return None
         self._event_emitter.emit(
