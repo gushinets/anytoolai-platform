@@ -97,6 +97,16 @@ def _job(scenario_session_id: str) -> JobRecord:
     )
 
 
+def test_production_composition_accepts_configured_psycopg_database_url() -> None:
+    worker = build_worker(
+        database_url="postgresql+psycopg://anytoolai:anytoolai@postgres:5432/anytoolai",
+        config_root=CONFIG_ROOT,
+        provider_adapters={"fake": FakeProviderAdapter(FIXTURE_ROOT)},
+    )
+
+    assert isinstance(worker, Worker)
+
+
 class RecordingRunner:
     def __init__(self, session: sa.orm.Session, *, fail: bool = False) -> None:
         self._session = session
