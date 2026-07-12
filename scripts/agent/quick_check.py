@@ -13,7 +13,7 @@ VENV_DIR = ROOT / ".quick-check-venv"
 LEGACY_VENV_DIR = ROOT / ".venv" / "quick-check"
 TMP_ROOT = ROOT / ".quick-check-tmp"
 MINIMUM_PYTHON = (3, 12)
-ROOT_BUILD_REQUIREMENTS = ["setuptools>=82", "wheel"]
+ROOT_BUILD_REQUIREMENTS = ["setuptools>=82", "wheel", "maturin>=1.7,<2"]
 EDITABLE_PROJECTS = [
     ROOT / "packages" / "backend" / "platform-sdk",
     ROOT / "packages" / "backend" / "platform-core",

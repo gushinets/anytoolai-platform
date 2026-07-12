@@ -160,6 +160,7 @@ def test_bootstrap_uses_uv_for_all_install_steps(monkeypatch, tmp_path) -> None:
             "--upgrade",
             "setuptools>=82",
             "wheel",
+            "maturin>=1.7,<2",
         ],
         [
             "/usr/local/bin/uv",
