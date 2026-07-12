@@ -134,6 +134,28 @@ class WorkflowJobService:
         )
         return updated
 
+    def mark_failed_from_created(self, record: JobRecord, *, error_code: str) -> JobRecord:
+        failed_record = replace(
+            record,
+            status=JobStatus.failed,
+            error_code=error_code,
+            error_message_safe=(
+                record.error_message_safe or "Workflow execution failed."
+            ),
+            completed_at=record.completed_at or utc_now(),
+        )
+        updated = self._repository.mark_failed_from_created(failed_record)
+        self._event_emitter.emit(
+            "workflow.failed",
+            _context_from_record(updated),
+            result_status=updated.status.value,
+            properties={
+                "error_code": error_code,
+                "workflow_version": updated.workflow_version,
+            },
+        )
+        return updated
+
     def mark_canceled(self, record: JobRecord) -> JobRecord:
         updated = self._repository.mark_canceled(record)
         self._event_emitter.emit(

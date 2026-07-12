@@ -529,7 +529,7 @@ def test_runtime_services_emit_required_success_events(
             )
         )
         action = action_service.start(make_action_run(scenario.id, job.id))
-        artifact_service.create(
+        result_artifact = artifact_service.create(
             make_artifact(
                 scenario.id,
                 job_id=job.id,
@@ -548,6 +548,7 @@ def test_runtime_services_emit_required_success_events(
             replace(
                 job,
                 status=JobStatus.succeeded,
+                result_artifact_id=result_artifact.id,
                 completed_at=utc_now(),
             )
         )

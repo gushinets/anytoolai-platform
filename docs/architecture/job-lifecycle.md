@@ -39,11 +39,17 @@ duplicate execution. For each discovered id, the worker handler:
 
 The runner's claimed-job entrypoint never creates another job row.
 
+If a pre-claim job already has an invalid `scenario_session_id` link or mismatched runtime
+dimensions, the worker terminalizes that poison job as `failed` with a safe integrity error instead
+of leaving it `created`. This prevents one broken row from blocking the queue forever.
+
 ## Terminal behavior
 
 - Success writes `succeeded`, `completed_at`, and `result_artifact_id`.
 - Workflow failure writes `failed`, `completed_at`, `error_code`, and `error_message_safe`, and
   emits `workflow.failed`.
+- Poison pre-claim integrity failures may write `created -> failed` with a safe integrity error when
+  the worker proves the job cannot be executed because its scenario-session linkage is invalid.
 - A user cancellation is limited to `created -> canceled`. A canceled job is not claimable; running
   work is not interrupted by that API path. If the worker task itself is canceled after claim, the
   handler persists `running -> canceled` and `workflow.canceled` in a recovery transaction, then
@@ -62,3 +68,6 @@ provider-call ledger rows, and artifacts. The final workflow artifact points bac
 action/provider artifacts retain their action-run linkage. Existing rollback-recovery callbacks
 preserve failed workflow, action, and provider state when an execution exception escapes its
 transaction boundary.
+
+`JobRepository` also enforces the critical success contract directly: a `succeeded` transition must
+carry `completed_at` plus a real final artifact linked back to the same job.

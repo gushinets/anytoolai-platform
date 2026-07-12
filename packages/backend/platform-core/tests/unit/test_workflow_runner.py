@@ -31,6 +31,8 @@ from anytoolai_platform_core.providers.gateway import (
 from anytoolai_platform_core.providers.models import ProviderResponse
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
+from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
+from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.storage.db import (
     action_runs_table,
     artifacts_table,
@@ -109,6 +111,27 @@ def _base_context() -> ExecutionContext:
         scenario_chain_id="scenario_chain_demo",
         handoff_id="handoff_demo",
         acquisition_source="kernel_demo_ce",
+    )
+
+
+def _seed_context_scenario(
+    session: sa.orm.Session,
+    context: ExecutionContext | None = None,
+) -> None:
+    seeded = context or _base_context()
+    ScenarioSessionRepository(session).create(
+        ScenarioSessionRecord(
+            id=seeded.scenario_session_id or "scenario_session_demo",
+            tenant_id=seeded.tenant_id,
+            region=seeded.region,
+            product_id=seeded.product_id,
+            frontend_id=seeded.frontend_id,
+            scenario_id="smoke_start",
+            scenario_version=1,
+            guest_id=seeded.guest_id,
+            user_id=seeded.user_id,
+            scenario_chain_id=seeded.scenario_chain_id,
+        )
     )
 
 
@@ -284,13 +307,15 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_structured_workflow_runner(session)
 
         result = asyncio.run(
             runner.run(
                 "kernel_demo.single_action_extract_v1",
                 {"source_text": "deadline budget deliverables"},
-                _base_context(),
+                context,
             )
         )
         job = session.execute(sa.select(jobs_table)).mappings().one()
@@ -360,6 +385,8 @@ def test_workflow_runner_executes_an_existing_claimed_job_without_duplicate_job(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_structured_workflow_runner(session)
         repository = JobRepository(session)
         claimed = WorkflowJobService(
@@ -384,7 +411,7 @@ def test_workflow_runner_executes_an_existing_claimed_job_without_duplicate_job(
             runner.run_claimed_job(
                 claimed,
                 {"source_text": "deadline budget deliverables"},
-                _base_context(),
+                context,
             )
         )
         jobs = list(session.execute(sa.select(jobs_table)).mappings())
@@ -416,6 +443,8 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
         }
     )
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_recording_workflow_runner(session, executor=executor)
 
         result = asyncio.run(
@@ -425,7 +454,7 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
                     "source_text": "deadline budget deliverables",
                     "taxonomy": ["timeline", "scope"],
                 },
-                _base_context(),
+                context,
             )
         )
         job = session.execute(sa.select(jobs_table)).mappings().one()
@@ -476,6 +505,8 @@ def test_workflow_runner_skips_step_and_records_reason(
         }
     )
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_recording_workflow_runner(session, executor=executor)
 
         result = asyncio.run(
@@ -485,7 +516,7 @@ def test_workflow_runner_skips_step_and_records_reason(
                     "source_text": "deadline budget deliverables",
                     "run_optional_step": False,
                 },
-                _base_context(),
+                context,
             )
         )
         action_runs = list(
@@ -513,13 +544,15 @@ def test_workflow_runner_retries_step_without_mixing_provider_retry_layers(
 ) -> None:
     adapter = FailOnceThenSucceedAdapter()
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_structured_workflow_runner(session, adapter=adapter)
 
         result = asyncio.run(
             runner.run(
                 "kernel_demo.retry_extract_v1",
                 {"source_text": "deadline budget deliverables"},
-                _base_context(),
+                context,
             )
         )
         action_runs = list(
@@ -549,6 +582,8 @@ def test_workflow_runner_stops_after_failed_step(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_structured_workflow_runner(session, adapter=AlwaysFailAdapter())
 
         with pytest.raises(
@@ -562,7 +597,7 @@ def test_workflow_runner_stops_after_failed_step(
                         "source_text": "deadline budget deliverables",
                         "taxonomy": ["timeline", "scope"],
                     },
-                    _base_context(),
+                    context,
                 )
             )
         job = session.execute(sa.select(jobs_table)).mappings().one()
@@ -645,6 +680,8 @@ def test_workflow_runner_persists_generic_safe_message_for_unknown_exceptions(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_workflow_runner_with_action_runner(
             session,
             action_runner=ExplodingActionRunner(),
@@ -655,7 +692,7 @@ def test_workflow_runner_persists_generic_safe_message_for_unknown_exceptions(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
                     {"source_text": "deadline budget deliverables"},
-                    _base_context(),
+                    context,
                 )
             )
         job = session.execute(sa.select(jobs_table)).mappings().one()
@@ -670,6 +707,8 @@ def test_workflow_runner_preserves_safe_validation_failure_category(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_workflow_runner_with_action_runner(
             session,
             action_runner=ValidationFailingActionRunner(),
@@ -680,7 +719,7 @@ def test_workflow_runner_preserves_safe_validation_failure_category(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
                     {"source_text": "invalid output"},
-                    _base_context(),
+                    context,
                 )
             )
         job = session.execute(sa.select(jobs_table)).mappings().one()
@@ -693,6 +732,10 @@ def test_workflow_runner_preserves_safe_validation_failure_category(
 def test_workflow_runner_persists_failed_state_when_exception_escapes_transaction_boundary(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
+    context = _base_context()
+    with transaction_boundary(session_factory) as session:
+        _seed_context_scenario(session, context)
+
     with pytest.raises(RuntimeError):
         with transaction_boundary(session_factory) as session:
             runner = _build_workflow_runner_with_action_runner(
@@ -703,7 +746,7 @@ def test_workflow_runner_persists_failed_state_when_exception_escapes_transactio
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
                     {"source_text": "deadline budget deliverables"},
-                    _base_context(),
+                    context,
                 )
             )
 
@@ -736,6 +779,9 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     adapter = FailOnSecondCallAdapter()
+    context = _base_context()
+    with transaction_boundary(session_factory) as session:
+        _seed_context_scenario(session, context)
 
     with pytest.raises(ProviderGatewayExecutionError):
         with transaction_boundary(session_factory) as session:
@@ -747,7 +793,7 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
                         "source_text": "deadline budget deliverables",
                         "taxonomy": ["timeline", "scope"],
                     },
-                    _base_context(),
+                    context,
                 )
             )
 
@@ -842,6 +888,8 @@ def test_workflow_runner_uses_generic_safe_provider_message_for_unknown_adapter_
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_structured_workflow_runner(
             session,
             adapter=UnsafeRawTextProviderAdapter(),
@@ -852,7 +900,7 @@ def test_workflow_runner_uses_generic_safe_provider_message_for_unknown_adapter_
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
                     {"source_text": "deadline budget deliverables"},
-                    _base_context(),
+                    context,
                 )
             )
         job = session.execute(sa.select(jobs_table)).mappings().one()

@@ -36,6 +36,14 @@ class ScenarioInputInvalidError(PlatformError):
         super().__init__("scenario_input_invalid", "Scenario input must be an object.")
 
 
+class JobScenarioSessionInvalidError(PlatformError):
+    def __init__(self) -> None:
+        super().__init__(
+            "job_scenario_session_invalid",
+            "Job scenario session linkage is invalid.",
+        )
+
+
 RunnerFactory = Callable[[Session], SequentialWorkflowRunner]
 
 
@@ -52,7 +60,13 @@ class RunWorkflowHandler:
         self._runner_factory = runner_factory
 
     async def handle(self, job_id: str) -> JobRecord | None:
-        claimed = self._claim(job_id)
+        try:
+            claimed = self._claim(job_id)
+        except asyncio.CancelledError:
+            raise
+        except JobScenarioSessionInvalidError as exc:
+            self._persist_created_job_failure(job_id, exc)
+            return self._get(job_id)
         if claimed is None:
             return self._get(job_id)
 
@@ -119,7 +133,7 @@ class RunWorkflowHandler:
             frontend_id=job.frontend_id,
         )
         if scenario is None:
-            raise LookupError(f"scenario session not found: {job.scenario_session_id}")
+            raise JobScenarioSessionInvalidError()
         return scenario
 
     def _scenario_input(self, scenario: ScenarioSessionRecord) -> dict[str, Any]:
@@ -161,6 +175,26 @@ class RunWorkflowHandler:
                 return
             emitter = EventEmitter(EventLogRepository(session))
             WorkflowJobService(repository, emitter).mark_failed(
+                replace(
+                    job,
+                    status=JobStatus.failed,
+                    error_code=error_code,
+                    error_message_safe=error_message_safe,
+                    completed_at=job.completed_at or utc_now(),
+                ),
+                error_code=error_code,
+            )
+
+    def _persist_created_job_failure(self, job_id: str, exc: Exception) -> None:
+        error_code = _safe_error_code(exc)
+        error_message_safe = _safe_error_message(exc)
+        with transaction_boundary(self._session_factory) as session:
+            repository = JobRepository(session)
+            job = repository.get(job_id)
+            if job is None or job.status is not JobStatus.created:
+                return
+            emitter = EventEmitter(EventLogRepository(session))
+            WorkflowJobService(repository, emitter).mark_failed_from_created(
                 replace(
                     job,
                     status=JobStatus.failed,

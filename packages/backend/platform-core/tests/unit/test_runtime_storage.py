@@ -204,7 +204,7 @@ ROUND_TRIP_REPOSITORY_CASES = [
     pytest.param(
         JobRepository,
         lambda: make_job("scenario_session_demo"),
-        lambda record: replace(record, status=JobStatus.running),
+        lambda record: replace(record, metadata={"round_trip": True}),
         id="job",
     ),
     pytest.param(
@@ -226,6 +226,22 @@ ROUND_TRIP_REPOSITORY_CASES = [
         id="artifact",
     ),
 ]
+
+
+def _create_round_trip_record(
+    session: sa.orm.Session,
+    repository: Any,
+    record_factory: Any,
+) -> Any:
+    if isinstance(repository, JobRepository):
+        scenario_session = ScenarioSessionRepository(session).create(make_scenario_session())
+        return repository.create(
+            replace(
+                record_factory(),
+                scenario_session_id=scenario_session.id,
+            )
+        )
+    return repository.create(record_factory())
 
 
 def test_runtime_table_enums_create_check_constraints() -> None:
@@ -414,7 +430,18 @@ def test_repositories_raise_explicit_error_when_round_trip_read_missing_on_creat
         monkeypatch.setattr(repository, "get", lambda *_args, **_kwargs: None)
 
         with pytest.raises(RuntimeError, match="round-trip failed after create"):
-            repository.create(record_factory())
+            if isinstance(repository, JobRepository):
+                scenario_session = ScenarioSessionRepository(session).create(
+                    make_scenario_session()
+                )
+                repository.create(
+                    replace(
+                        record_factory(),
+                        scenario_session_id=scenario_session.id,
+                    )
+                )
+            else:
+                repository.create(record_factory())
     finally:
         session.rollback()
         session.close()
@@ -440,7 +467,7 @@ def test_repositories_raise_explicit_error_when_round_trip_read_missing_on_updat
     session = session_factory()
     try:
         repository = repository_type(session)
-        created = repository.create(record_factory())
+        created = _create_round_trip_record(session, repository, record_factory)
 
         with pytest.raises(RuntimeError, match="round-trip failed after update"):
             if isinstance(repository, ScenarioSessionRepository):
@@ -454,6 +481,14 @@ def test_repositories_raise_explicit_error_when_round_trip_read_missing_on_updat
                     update_factory(created),
                     **scenario_session_scope(created),
                 )
+            elif isinstance(repository, JobRepository):
+                get_results = iter([created, None])
+                monkeypatch.setattr(
+                    repository,
+                    "get",
+                    lambda *_args, **_kwargs: next(get_results),
+                )
+                repository.update(update_factory(created))
             else:
                 monkeypatch.setattr(repository, "get", lambda *_args, **_kwargs: None)
                 repository.update(update_factory(created))
@@ -568,16 +603,31 @@ def test_job_repository_create_read_update(
         updated = repository.update(
             replace(
                 created,
-                status=JobStatus.succeeded,
-                started_at=utc_now(),
-                completed_at=utc_now(),
-                result_artifact_id="artifact_result",
+                metadata={"note": "still created"},
             )
         )
 
-        assert updated.status is JobStatus.succeeded
-        assert updated.result_artifact_id == "artifact_result"
-        assert updated.completed_at is not None
+        assert updated.status is JobStatus.created
+        assert updated.metadata == {"note": "still created"}
+
+
+def test_job_repository_create_rejects_orphaned_or_mismatched_scenario_session_link(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        scenario_session = ScenarioSessionRepository(session).create(make_scenario_session())
+        repository = JobRepository(session)
+
+        with pytest.raises(LookupError, match="job scenario session link is invalid"):
+            repository.create(make_job("scenario_session_missing"))
+
+        with pytest.raises(LookupError, match="job scenario session link is invalid"):
+            repository.create(
+                make_job(
+                    scenario_session.id,
+                    product_id="kernel_demo_other",
+                )
+            )
 
 
 def test_job_repository_claims_created_jobs_once_and_supports_preclaim_cancel(
@@ -587,6 +637,13 @@ def test_job_repository_claims_created_jobs_once_and_supports_preclaim_cancel(
         scenario_session = ScenarioSessionRepository(session).create(make_scenario_session())
         repository = JobRepository(session)
         created = repository.create(make_job(scenario_session.id))
+        final_artifact = ArtifactRepository(session).create(
+            make_artifact(
+                scenario_session.id,
+                job_id=created.id,
+                metadata={"artifact_role": "workflow_result"},
+            )
+        )
 
         claimed = repository.claim_created(created.id)
         assert claimed is not None
@@ -598,11 +655,12 @@ def test_job_repository_claims_created_jobs_once_and_supports_preclaim_cancel(
             replace(
                 claimed,
                 status=JobStatus.succeeded,
-                result_artifact_id="artifact_result",
+                result_artifact_id=final_artifact.id,
                 completed_at=utc_now(),
             )
         )
         assert succeeded.status is JobStatus.succeeded
+        assert succeeded.result_artifact_id == final_artifact.id
         assert repository.claim_created(created.id) is None
 
         cancelable = repository.create(make_job(scenario_session.id))
@@ -632,13 +690,80 @@ def test_job_repository_failed_transition_completes_safe_terminal_contract(
     assert failed.error_message_safe == "Workflow execution failed."
 
 
+def test_job_repository_mark_succeeded_requires_valid_result_artifact(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        scenario_session = ScenarioSessionRepository(session).create(make_scenario_session())
+        repository = JobRepository(session)
+        claimed = repository.claim_created(
+            repository.create(make_job(scenario_session.id)).id
+        )
+        assert claimed is not None
+
+        with pytest.raises(ValueError, match="requires result_artifact_id"):
+            repository.mark_succeeded(
+                replace(
+                    claimed,
+                    status=JobStatus.succeeded,
+                    completed_at=utc_now(),
+                )
+            )
+
+        with pytest.raises(LookupError, match="result artifact not found"):
+            repository.mark_succeeded(
+                replace(
+                    claimed,
+                    status=JobStatus.succeeded,
+                    result_artifact_id="artifact_missing",
+                    completed_at=utc_now(),
+                )
+            )
+
+        wrong_job_artifact = ArtifactRepository(session).create(
+            make_artifact(
+                scenario_session.id,
+                job_id="job_other",
+            )
+        )
+        with pytest.raises(ValueError, match="must belong to the same job"):
+            repository.mark_succeeded(
+                replace(
+                    claimed,
+                    status=JobStatus.succeeded,
+                    result_artifact_id=wrong_job_artifact.id,
+                    completed_at=utc_now(),
+                )
+            )
+
+
+def test_job_repository_update_rejects_status_and_identity_changes(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        scenario_session = ScenarioSessionRepository(session).create(make_scenario_session())
+        repository = JobRepository(session)
+        created = repository.create(make_job(scenario_session.id))
+
+        with pytest.raises(ValueError, match="status changes must use repository lifecycle methods"):
+            repository.update(replace(created, status=JobStatus.running))
+
+        with pytest.raises(ValueError, match="immutable field scenario_session_id"):
+            repository.update(
+                replace(
+                    created,
+                    scenario_session_id="scenario_session_other",
+                )
+            )
+
+
 def test_job_repository_required_fields(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     broken = make_job(scenario_session_id=None)  # type: ignore[arg-type]
     session = session_factory()
     try:
-        with pytest.raises(IntegrityError):
+        with pytest.raises(ValueError, match="scenario_session_id"):
             JobRepository(session).create(broken)
     finally:
         session.rollback()

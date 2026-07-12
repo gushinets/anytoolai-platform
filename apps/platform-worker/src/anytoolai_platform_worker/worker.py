@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from anytoolai_platform_core.workflows.models import JobRecord
 
 from anytoolai_platform_worker.handlers.run_workflow import RunWorkflowHandler
 from anytoolai_platform_worker.queues import DatabaseJobQueue
+
+logger = logging.getLogger(__name__)
 
 
 class Worker:
@@ -40,6 +43,13 @@ class Worker:
         if self._job_queue is None:
             raise RuntimeError("worker has no DB job queue configured")
         while True:
-            result = await self.process_next_job()
+            try:
+                result = await self.process_next_job()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("worker loop iteration failed")
+                await asyncio.sleep(self._poll_interval_seconds)
+                continue
             if result is None:
                 await asyncio.sleep(self._poll_interval_seconds)

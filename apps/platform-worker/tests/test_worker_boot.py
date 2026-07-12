@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import replace
+from dataclasses import asdict, replace
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,8 @@ import pytest
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
+from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
+from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
@@ -32,6 +35,7 @@ from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import WorkflowJobService
 from anytoolai_platform_worker.composition import build_worker
 from anytoolai_platform_worker.handlers.run_workflow import RunWorkflowHandler
+from anytoolai_platform_worker.queues import DatabaseJobQueue, WorkflowJobMessage
 from anytoolai_platform_worker.worker import Worker
 from sqlalchemy import event
 
@@ -123,13 +127,27 @@ class RecordingRunner:
         self.calls.append((job, input_payload, context))
         if self._fail:
             raise RuntimeError("raw provider output secret_token=should-not-leak")
+        artifact = ArtifactRepository(self._session).create(
+            ArtifactRecord(
+                id="artifact_result",
+                tenant_id=job.tenant_id,
+                region=job.region,
+                product_id=job.product_id,
+                frontend_id=job.frontend_id,
+                scenario_session_id=job.scenario_session_id,
+                job_id=job.id,
+                artifact_type="structured_output",
+                status=ArtifactStatus.stored,
+                content_json={"ok": True},
+            )
+        )
         repository = JobRepository(self._session)
         emitter = EventEmitter(EventLogRepository(self._session))
         WorkflowJobService(repository, emitter).mark_succeeded(
             replace(
                 job,
                 status=JobStatus.succeeded,
-                result_artifact_id="artifact_result",
+                result_artifact_id=artifact.id,
                 completed_at=utc_now(),
             )
         )
@@ -161,11 +179,25 @@ def _seed_job(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
     *,
     input_payload: Any = None,
+    created_at: Any = None,
 ) -> JobRecord:
     metadata = {} if input_payload is None else {"input": input_payload}
     with transaction_boundary(session_factory) as session:
         scenario = ScenarioSessionRepository(session).create(_scenario(**metadata))
-        return JobRepository(session).create(_job(scenario.id))
+        job = _job(scenario.id)
+        if created_at is not None:
+            job = replace(job, created_at=created_at)
+        return JobRepository(session).create(job)
+
+
+def _seed_raw_job(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    record: JobRecord,
+) -> JobRecord:
+    with transaction_boundary(session_factory) as session:
+        session.execute(sa.insert(jobs_table).values(asdict(record)))
+        session.flush()
+    return record
 
 
 def test_worker_boot_processes_a_claimed_job_from_scenario_session_input(
@@ -374,6 +406,121 @@ def test_worker_claim_is_idempotent_and_cancel_is_preclaim_only(
     assert canceled_event["job_id"] == cancelable.id
     assert canceled_event["scenario_session_id"] == cancelable.scenario_session_id
     assert canceled_event["result_status"] == JobStatus.canceled.value
+
+
+@pytest.mark.parametrize("poison_case", ["missing", "mismatched"])
+def test_worker_terminalizes_poison_created_job_and_advances_queue(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    poison_case: str,
+) -> None:
+    now = utc_now()
+    if poison_case == "missing":
+        poison_job = _seed_raw_job(
+            session_factory,
+            replace(
+                _job("scenario_session_missing"),
+                created_at=now,
+            ),
+        )
+    else:
+        with transaction_boundary(session_factory) as session:
+            scenario = ScenarioSessionRepository(session).create(_scenario())
+        poison_job = _seed_raw_job(
+            session_factory,
+            replace(
+                _job(scenario.id),
+                product_id="kernel_demo_other",
+                created_at=now,
+            ),
+        )
+    valid_job = _seed_job(
+        session_factory,
+        input_payload={"source_text": "deadline budget deliverables"},
+        created_at=now + timedelta(microseconds=1),
+    )
+
+    runners: list[RecordingRunner] = []
+
+    def runner_factory(session: sa.orm.Session) -> RecordingRunner:
+        runner = RecordingRunner(session)
+        runners.append(runner)
+        return runner
+
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=runner_factory,
+        ),
+        job_queue=DatabaseJobQueue(session_factory),
+    )
+
+    first = asyncio.run(worker.process_next_job())
+    second = asyncio.run(worker.process_next_job())
+
+    assert first is not None
+    assert first.id == poison_job.id
+    assert first.status is JobStatus.failed
+    assert first.error_code == "job_scenario_session_invalid"
+    assert first.error_message_safe == "Job scenario session linkage is invalid."
+    assert second is not None
+    assert second.id == valid_job.id
+    assert second.status is JobStatus.succeeded
+    assert len(runners) == 1
+
+    with transaction_boundary(session_factory) as session:
+        poison_events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.job_id == poison_job.id)
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert [event_row["event_type"] for event_row in poison_events] == ["workflow.failed"]
+    assert poison_events[0]["error_code"] == "job_scenario_session_invalid"
+
+
+def test_worker_run_forever_continues_after_unexpected_iteration_exception(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class StubHandler:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def handle(self, job_id: str) -> Any:
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError(f"boom for {job_id}")
+            raise asyncio.CancelledError()
+
+        def cancel(self, job_id: str) -> None:
+            del job_id
+            return None
+
+    class StubQueue:
+        def __init__(self) -> None:
+            self.messages = [
+                WorkflowJobMessage(job_id="job_boom"),
+                WorkflowJobMessage(job_id="job_stop"),
+            ]
+
+        def next_message(self) -> WorkflowJobMessage | None:
+            if not self.messages:
+                return None
+            return self.messages.pop(0)
+
+    handler = StubHandler()
+    worker = Worker(
+        handler,  # type: ignore[arg-type]
+        job_queue=StubQueue(),  # type: ignore[arg-type]
+        poll_interval_seconds=0,
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(worker.run_forever())
+
+    assert handler.calls == 2
+    assert "worker loop iteration failed" in caplog.text
 
 
 def test_production_composed_worker_processes_real_runtime_path_end_to_end(
