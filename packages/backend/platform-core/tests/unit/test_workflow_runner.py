@@ -157,6 +157,14 @@ class AlwaysFailAdapter:
         raise RuntimeError("provider exploded with secret_token=abc123")
 
 
+class UnsafeRawTextProviderAdapter:
+    async def complete(self, request: Any) -> ProviderResponse:
+        raise RuntimeError(
+            "provider returned raw prompt="
+            f"{request.prompt}; customer_text=deadline budget deliverables"
+        )
+
+
 class FailOnSecondCallAdapter:
     def __init__(self) -> None:
         self.call_count = 0
@@ -545,7 +553,7 @@ def test_workflow_runner_stops_after_failed_step(
 
         with pytest.raises(
             ProviderGatewayExecutionError,
-            match="\\[redacted provider error\\]",
+            match="Provider request failed\\.",
         ):
             asyncio.run(
                 runner.run(
@@ -563,7 +571,7 @@ def test_workflow_runner_stops_after_failed_step(
 
     assert job["status"].value == "failed"
     assert job["error_code"] == "provider_request_failed"
-    assert job["error_message_safe"] == "[redacted provider error]"
+    assert job["error_message_safe"] == "Provider request failed."
     assert job["completed_at"] is not None
     assert job["result_artifact_id"] is None
     assert [row["step_id"] for row in action_runs] == ["extract"]
@@ -750,45 +758,62 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
                 sa.select(action_runs_table).order_by(action_runs_table.c.created_at, action_runs_table.c.id)
             ).mappings()
         )
+        provider_calls = list(
+            session.execute(
+                sa.select(provider_calls_table).order_by(
+                    provider_calls_table.c.created_at,
+                    provider_calls_table.c.id,
+                )
+            ).mappings()
+        )
         artifacts = list(session.execute(sa.select(artifacts_table)).mappings())
         events = _event_rows(session)
 
     assert adapter.call_count == 2
     assert job["status"].value == "failed"
     assert job["error_code"] == "provider_request_failed"
-    assert job["error_message_safe"] == "[redacted provider error]"
-    assert len(action_runs) == 1
-    assert action_runs[0]["step_id"] == "detect_issues"
-    assert action_runs[0]["status"].value == "failed"
-    assert artifacts == []
+    assert job["error_message_safe"] == "Provider request failed."
+    assert [row["step_id"] for row in action_runs] == ["extract", "detect_issues"]
+    assert [row["status"].value for row in action_runs] == ["succeeded", "failed"]
+    assert len(artifacts) == 1
     assert job["result_artifact_id"] is None
-    assert job["metadata"]["workflow_state"] == {
-        "steps": {
-            "detect_issues": {
-                "status": "failed",
-                "attempt_count": 1,
-                "last_action_run_id": action_runs[0]["id"],
-                "output_artifact_id": None,
-                "skip_reason": None,
-                "error_code": "provider_request_failed",
-            }
-        },
-        "context": {},
-        "last_successful_step_id": None,
-        "last_successful_output_artifact_id": None,
-        "final_output_source": None,
-        "result_artifact_id": None,
+    workflow_state = job["metadata"]["workflow_state"]
+    assert workflow_state["last_successful_step_id"] == "extract"
+    assert workflow_state["result_artifact_id"] is None
+    assert workflow_state["final_output_source"] is None
+    assert workflow_state["context"]["extracted"] == {
+        "title": "Kernel Demo Source Summary",
+        "fields": ["deadline", "budget", "deliverables"],
+    }
+    assert workflow_state["steps"]["extract"]["status"] == "succeeded"
+    assert workflow_state["steps"]["extract"]["last_action_run_id"] == action_runs[0]["id"]
+    assert workflow_state["steps"]["extract"]["output_artifact_id"] == artifacts[0]["id"]
+    assert workflow_state["steps"]["detect_issues"]["status"] == "failed"
+    assert workflow_state["steps"]["detect_issues"]["last_action_run_id"] == action_runs[1]["id"]
+    assert workflow_state["steps"]["detect_issues"]["error_code"] == "provider_request_failed"
+    assert workflow_state["last_successful_output_artifact_id"] == artifacts[0]["id"]
+    assert {row["action_run_id"] for row in provider_calls} == {
+        action_runs[0]["id"],
+        action_runs[1]["id"],
     }
     assert _event_counts(events) == Counter(
         {
-            "action.failed": 1,
             "workflow.started": 1,
-            "workflow.step_started": 1,
+            "workflow.step_started": 2,
+            "workflow.step_succeeded": 1,
             "workflow.step_failed": 1,
+            "action.started": 2,
+            "action.succeeded": 1,
+            "action.failed": 1,
+            "provider.request_started": 2,
+            "provider.request_succeeded": 1,
+            "provider.request_failed": 1,
+            "artifact.created": 1,
             "workflow.failed": 1,
         }
     )
     workflow_started = _event_by_type(events, "workflow.started")[0]
+    workflow_step_succeeded = _event_by_type(events, "workflow.step_succeeded")[0]
     workflow_step_failed = _event_by_type(events, "workflow.step_failed")[0]
     workflow_failed = _event_by_type(events, "workflow.failed")[0]
     assert workflow_started["job_id"] == job["id"]
@@ -797,7 +822,10 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
     assert workflow_started["scenario_chain_id"] == "scenario_chain_demo"
     assert workflow_started["handoff_id"] == "handoff_demo"
     assert workflow_started["acquisition_source"] == "kernel_demo_ce"
-    assert workflow_step_failed["action_run_id"] == action_runs[0]["id"]
+    assert workflow_step_succeeded["action_run_id"] == action_runs[0]["id"]
+    assert workflow_step_succeeded["artifact_id"] == artifacts[0]["id"]
+    assert workflow_step_succeeded["properties"]["step_id"] == "extract"
+    assert workflow_step_failed["action_run_id"] == action_runs[1]["id"]
     assert workflow_step_failed["properties"]["step_id"] == "detect_issues"
     assert workflow_step_failed["scenario_chain_id"] == "scenario_chain_demo"
     assert workflow_step_failed["handoff_id"] == "handoff_demo"
@@ -808,3 +836,30 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
     assert workflow_failed["scenario_chain_id"] == "scenario_chain_demo"
     assert workflow_failed["handoff_id"] == "handoff_demo"
     assert workflow_failed["acquisition_source"] == "kernel_demo_ce"
+
+
+def test_workflow_runner_uses_generic_safe_provider_message_for_unknown_adapter_exceptions(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        runner = _build_structured_workflow_runner(
+            session,
+            adapter=UnsafeRawTextProviderAdapter(),
+        )
+
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+            asyncio.run(
+                runner.run(
+                    "kernel_demo.single_action_extract_v1",
+                    {"source_text": "deadline budget deliverables"},
+                    _base_context(),
+                )
+            )
+        job = session.execute(sa.select(jobs_table)).mappings().one()
+        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
+
+    assert exc_info.value.error_code == "provider_request_failed"
+    assert exc_info.value.message == "Provider request failed."
+    assert job["error_message_safe"] == "Provider request failed."
+    assert provider_call["error_message_safe"] == "Provider request failed."
+    assert "deadline budget deliverables" not in job["error_message_safe"]

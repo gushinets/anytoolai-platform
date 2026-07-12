@@ -383,6 +383,16 @@ class SequentialWorkflowRunner:
                     context=state.context,
                 )
             except Exception as exc:
+                state.step_state[step.step_id] = self._build_step_state(
+                    step=step,
+                    action_type=action_config.action_type,
+                    status=ActionRunStatus.failed.value,
+                    attempt_count=0,
+                    last_action_run_id=None,
+                    output_artifact_id=None,
+                    skip_reason=None,
+                    error_code=self._error_code_for_exception(exc),
+                )
                 self._remember_failed_step(
                     state,
                     step=step,
@@ -410,13 +420,15 @@ class SequentialWorkflowRunner:
                     user_id=job.metadata.get("user_id"),
                     skip_reason=skip_reason,
                 )
-                state.step_state[step.step_id] = {
-                    "status": ActionRunStatus.skipped.value,
-                    "attempt_count": 0,
-                    "last_action_run_id": skipped_action_run.id,
-                    "output_artifact_id": None,
-                    "skip_reason": skip_reason,
-                }
+                state.step_state[step.step_id] = self._build_step_state(
+                    step=step,
+                    action_type=action_config.action_type,
+                    status=ActionRunStatus.skipped.value,
+                    attempt_count=0,
+                    last_action_run_id=skipped_action_run.id,
+                    output_artifact_id=None,
+                    skip_reason=skip_reason,
+                )
                 job = self._persist_job_state(job, state)
                 self._event_emitter.emit(
                     "workflow.step_skipped",
@@ -447,6 +459,16 @@ class SequentialWorkflowRunner:
                 context=state.context,
             )
         except Exception as exc:
+            state.step_state[step.step_id] = self._build_step_state(
+                step=step,
+                action_type=action_config.action_type,
+                status=ActionRunStatus.failed.value,
+                attempt_count=0,
+                last_action_run_id=None,
+                output_artifact_id=None,
+                skip_reason=None,
+                error_code=self._error_code_for_exception(exc),
+            )
             self._remember_failed_step(
                 state,
                 step=step,
@@ -475,14 +497,16 @@ class SequentialWorkflowRunner:
                 )
             except Exception as exc:
                 last_action_run_id = self._latest_action_run_id(job.id, step.step_id)
-                state.step_state[step.step_id] = {
-                    "status": ActionRunStatus.failed.value,
-                    "attempt_count": attempt_index,
-                    "last_action_run_id": last_action_run_id,
-                    "output_artifact_id": None,
-                    "skip_reason": None,
-                    "error_code": self._error_code_for_exception(exc),
-                }
+                state.step_state[step.step_id] = self._build_step_state(
+                    step=step,
+                    action_type=action_config.action_type,
+                    status=ActionRunStatus.failed.value,
+                    attempt_count=attempt_index,
+                    last_action_run_id=last_action_run_id,
+                    output_artifact_id=None,
+                    skip_reason=None,
+                    error_code=self._error_code_for_exception(exc),
+                )
                 job = self._persist_job_state(job, state)
                 if attempt_index <= step.retry_count:
                     continue
@@ -513,14 +537,16 @@ class SequentialWorkflowRunner:
                     context=state.context,
                 )
             except Exception as exc:
-                state.step_state[step.step_id] = {
-                    "status": ActionRunStatus.failed.value,
-                    "attempt_count": attempt_index,
-                    "last_action_run_id": result.action_run_id,
-                    "output_artifact_id": result.output_artifact_id,
-                    "skip_reason": None,
-                    "error_code": self._error_code_for_exception(exc),
-                }
+                state.step_state[step.step_id] = self._build_step_state(
+                    step=step,
+                    action_type=action_config.action_type,
+                    status=ActionRunStatus.failed.value,
+                    attempt_count=attempt_index,
+                    last_action_run_id=result.action_run_id,
+                    output_artifact_id=result.output_artifact_id,
+                    skip_reason=None,
+                    error_code=self._error_code_for_exception(exc),
+                )
                 job = self._persist_job_state(job, state)
                 self._remember_failed_step(
                     state,
@@ -541,14 +567,16 @@ class SequentialWorkflowRunner:
             state.last_successful_step_id = step.step_id
             state.last_successful_output = state.step_outputs[step.step_id]
             state.last_successful_output_artifact_id = result.output_artifact_id
-            state.step_state[step.step_id] = {
-                "status": result.status.value,
-                "attempt_count": attempt_index,
-                "last_action_run_id": result.action_run_id,
-                "output_artifact_id": result.output_artifact_id,
-                "skip_reason": None,
-                "output_mapping_applied": applied_outputs,
-            }
+            state.step_state[step.step_id] = self._build_step_state(
+                step=step,
+                action_type=action_config.action_type,
+                status=result.status.value,
+                attempt_count=attempt_index,
+                last_action_run_id=result.action_run_id,
+                output_artifact_id=result.output_artifact_id,
+                skip_reason=None,
+                output_mapping_applied=applied_outputs,
+            )
             job = self._persist_job_state(job, state)
             artifact_context = (
                 step_event_context
@@ -768,7 +796,7 @@ class SequentialWorkflowRunner:
 
     def _safe_error_message_for_exception(self, exc: Exception) -> str:
         if isinstance(exc, ProviderGatewayExecutionError):
-            return self._redact_sensitive_error_message(exc.message)
+            return exc.message
         if isinstance(exc, PlatformError):
             raw = str(exc).strip() or type(exc).__name__
             return self._redact_sensitive_error_message(raw)
@@ -853,6 +881,35 @@ class SequentialWorkflowRunner:
             },
         )
 
+    @staticmethod
+    def _build_step_state(
+        *,
+        step: WorkflowStepDefinition,
+        action_type: str,
+        status: str,
+        attempt_count: int,
+        last_action_run_id: str | None,
+        output_artifact_id: str | None,
+        skip_reason: str | None,
+        error_code: str | None = None,
+        output_mapping_applied: Any | None = None,
+    ) -> dict[str, Any]:
+        step_state = {
+            "status": status,
+            "retry_count": step.retry_count,
+            "attempt_count": attempt_count,
+            "action_type": action_type,
+            "action_config_id": step.action_config_id,
+            "last_action_run_id": last_action_run_id,
+            "output_artifact_id": output_artifact_id,
+            "skip_reason": skip_reason,
+        }
+        if error_code is not None:
+            step_state["error_code"] = error_code
+        if output_mapping_applied is not None:
+            step_state["output_mapping_applied"] = output_mapping_applied
+        return step_state
+
 
 def _context_from_record(record: JobRecord) -> ExecutionContext:
     return ExecutionContext(
@@ -915,43 +972,14 @@ def _persist_failed_workflow_job_after_rollback(
         else:
             stored = repository.update(recovered_record)
 
-        if failed_step is not None:
-            persisted_failed_action_run_id = _existing_action_run_id(
-                failed_step.action_run_id,
-                action_run_repository,
-            )
-            step_context = enrich_event_context(
-                _context_from_record(stored),
-                step_id=failed_step.step_id,
-                action_type=failed_step.action_type,
-                action_config_id=failed_step.action_config_id,
-            )
-            event_emitter.emit(
-                "workflow.step_started",
-                step_context,
-                properties={
-                    "step_id": failed_step.step_id,
-                    "retry_count": failed_step.retry_count,
-                },
-            )
-            event_emitter.emit(
-                "workflow.step_failed",
-                (
-                    step_context
-                    if persisted_failed_action_run_id is None
-                    else enrich_event_context(
-                        step_context,
-                        action_run_id=persisted_failed_action_run_id,
-                    )
-                ),
-                result_status=ActionRunStatus.failed.value,
-                properties={
-                    "step_id": failed_step.step_id,
-                    "retry_count": failed_step.retry_count,
-                    "attempt_count": failed_step.attempt_count,
-                    "error_code": failed_step.error_code,
-                },
-            )
+        recovered_workflow_state = stored.metadata.get("workflow_state")
+        _emit_recovered_workflow_step_events(
+            event_emitter,
+            stored,
+            workflow_state=recovered_workflow_state,
+            failed_step=failed_step,
+            action_run_repository=action_run_repository,
+        )
 
         event_emitter.emit(
             "workflow.failed",
@@ -1010,36 +1038,235 @@ def _sanitize_workflow_state_for_recovery(
 ) -> dict[str, Any]:
     raw_steps = workflow_state.get("steps") if isinstance(workflow_state, Mapping) else None
     recovered_steps: dict[str, Any] = {}
-    if failed_step is not None:
-        raw_step_state = raw_steps.get(failed_step.step_id) if isinstance(raw_steps, Mapping) else None
+    if isinstance(raw_steps, Mapping):
+        for step_id, raw_step_state in raw_steps.items():
+            if not isinstance(raw_step_state, Mapping):
+                continue
+            recovered_steps[str(step_id)] = _sanitize_workflow_step_state_for_recovery(
+                raw_step_state,
+                action_run_repository=action_run_repository,
+                artifact_repository=artifact_repository,
+            )
+
+    if failed_step is not None and failed_step.step_id not in recovered_steps:
         persisted_action_run_id = _existing_action_run_id(
             failed_step.action_run_id,
             action_run_repository,
         )
         recovered_steps[failed_step.step_id] = {
             "status": ActionRunStatus.failed.value,
+            "retry_count": failed_step.retry_count,
             "attempt_count": failed_step.attempt_count,
+            "action_type": failed_step.action_type,
+            "action_config_id": failed_step.action_config_id,
             "last_action_run_id": persisted_action_run_id,
-            "output_artifact_id": _existing_artifact_id(
-                (
-                    raw_step_state.get("output_artifact_id")
-                    if isinstance(raw_step_state, Mapping)
-                    else None
-                ),
-                artifact_repository,
-            ),
+            "output_artifact_id": None,
             "skip_reason": None,
             "error_code": failed_step.error_code,
         }
 
     return {
         "steps": recovered_steps,
-        "context": {},
-        "last_successful_step_id": None,
-        "last_successful_output_artifact_id": None,
-        "final_output_source": None,
+        "context": (
+            normalize_mapping(workflow_state.get("context", {}))
+            if isinstance(workflow_state, Mapping)
+            and isinstance(workflow_state.get("context"), Mapping)
+            else {}
+        ),
+        "last_successful_step_id": _optional_str(
+            workflow_state.get("last_successful_step_id")
+            if isinstance(workflow_state, Mapping)
+            else None
+        ),
+        "last_successful_output_artifact_id": _existing_artifact_id(
+            (
+                workflow_state.get("last_successful_output_artifact_id")
+                if isinstance(workflow_state, Mapping)
+                else None
+            ),
+            artifact_repository,
+        ),
+        "final_output_source": _optional_str(
+            workflow_state.get("final_output_source")
+            if isinstance(workflow_state, Mapping)
+            else None
+        ),
         "result_artifact_id": None,
     }
+
+
+def _sanitize_workflow_step_state_for_recovery(
+    raw_step_state: Mapping[str, Any],
+    *,
+    action_run_repository: ActionRunRepository,
+    artifact_repository: ArtifactRepository,
+) -> dict[str, Any]:
+    recovered_step = {
+        "status": _optional_str(raw_step_state.get("status")) or ActionRunStatus.failed.value,
+        "retry_count": _optional_int(raw_step_state.get("retry_count")) or 0,
+        "attempt_count": _optional_int(raw_step_state.get("attempt_count")) or 0,
+        "action_type": _optional_str(raw_step_state.get("action_type")),
+        "action_config_id": _optional_str(raw_step_state.get("action_config_id")),
+        "last_action_run_id": _existing_action_run_id(
+            raw_step_state.get("last_action_run_id"),
+            action_run_repository,
+        ),
+        "output_artifact_id": _existing_artifact_id(
+            raw_step_state.get("output_artifact_id"),
+            artifact_repository,
+        ),
+        "skip_reason": _optional_str(raw_step_state.get("skip_reason")),
+    }
+    error_code = _optional_str(raw_step_state.get("error_code"))
+    if error_code is not None:
+        recovered_step["error_code"] = error_code
+    output_mapping_applied = raw_step_state.get("output_mapping_applied")
+    if output_mapping_applied is not None:
+        recovered_step["output_mapping_applied"] = output_mapping_applied
+    return recovered_step
+
+
+def _emit_recovered_workflow_step_events(
+    event_emitter: EventEmitter,
+    record: JobRecord,
+    *,
+    workflow_state: Any,
+    failed_step: _WorkflowFailedStepRecovery | None,
+    action_run_repository: ActionRunRepository,
+) -> None:
+    recovered_step_ids: set[str] = set()
+    raw_steps = workflow_state.get("steps") if isinstance(workflow_state, Mapping) else None
+    if isinstance(raw_steps, Mapping):
+        for step_id, raw_step_state in raw_steps.items():
+            if not isinstance(step_id, str) or not isinstance(raw_step_state, Mapping):
+                continue
+            recovered_step_ids.add(step_id)
+            _emit_recovered_workflow_step_event(
+                event_emitter,
+                record,
+                step_id=step_id,
+                raw_step_state=raw_step_state,
+            )
+
+    if failed_step is None or failed_step.step_id in recovered_step_ids:
+        return
+
+    persisted_failed_action_run_id = _existing_action_run_id(
+        failed_step.action_run_id,
+        action_run_repository,
+    )
+    step_context = enrich_event_context(
+        _context_from_record(record),
+        step_id=failed_step.step_id,
+        action_type=failed_step.action_type,
+        action_config_id=failed_step.action_config_id,
+    )
+    event_emitter.emit(
+        "workflow.step_started",
+        step_context,
+        properties={
+            "step_id": failed_step.step_id,
+            "retry_count": failed_step.retry_count,
+        },
+    )
+    event_emitter.emit(
+        "workflow.step_failed",
+        (
+            step_context
+            if persisted_failed_action_run_id is None
+            else enrich_event_context(
+                step_context,
+                action_run_id=persisted_failed_action_run_id,
+            )
+        ),
+        result_status=ActionRunStatus.failed.value,
+        properties={
+            "step_id": failed_step.step_id,
+            "retry_count": failed_step.retry_count,
+            "attempt_count": failed_step.attempt_count,
+            "error_code": failed_step.error_code,
+        },
+    )
+
+
+def _emit_recovered_workflow_step_event(
+    event_emitter: EventEmitter,
+    record: JobRecord,
+    *,
+    step_id: str,
+    raw_step_state: Mapping[str, Any],
+) -> None:
+    retry_count = _optional_int(raw_step_state.get("retry_count")) or 0
+    step_context = enrich_event_context(
+        _context_from_record(record),
+        step_id=step_id,
+        action_type=_optional_str(raw_step_state.get("action_type")),
+        action_config_id=_optional_str(raw_step_state.get("action_config_id")),
+    )
+    action_run_id = _optional_str(raw_step_state.get("last_action_run_id"))
+    if action_run_id is not None:
+        step_context = enrich_event_context(step_context, action_run_id=action_run_id)
+    output_artifact_id = _optional_str(raw_step_state.get("output_artifact_id"))
+    if output_artifact_id is not None:
+        step_context = enrich_event_context(step_context, artifact_id=output_artifact_id)
+
+    status = _optional_str(raw_step_state.get("status"))
+    if status == ActionRunStatus.skipped.value:
+        event_emitter.emit(
+            "workflow.step_skipped",
+            step_context,
+            result_status=ActionRunStatus.skipped.value,
+            properties={
+                "step_id": step_id,
+                "retry_count": retry_count,
+                "skip_reason": _optional_str(raw_step_state.get("skip_reason")),
+            },
+        )
+        return
+
+    event_emitter.emit(
+        "workflow.step_started",
+        enrich_event_context(step_context, artifact_id=None),
+        properties={
+            "step_id": step_id,
+            "retry_count": retry_count,
+        },
+    )
+
+    if status == ActionRunStatus.succeeded.value:
+        event_emitter.emit(
+            "workflow.step_succeeded",
+            step_context,
+            result_status=ActionRunStatus.succeeded.value,
+            properties={
+                "step_id": step_id,
+                "retry_count": retry_count,
+                "attempt_count": _optional_int(raw_step_state.get("attempt_count")) or 0,
+                "output_artifact_id": output_artifact_id,
+            },
+        )
+        return
+
+    if status == ActionRunStatus.failed.value:
+        event_emitter.emit(
+            "workflow.step_failed",
+            step_context,
+            result_status=ActionRunStatus.failed.value,
+            properties={
+                "step_id": step_id,
+                "retry_count": retry_count,
+                "attempt_count": _optional_int(raw_step_state.get("attempt_count")) or 0,
+                "error_code": _optional_str(raw_step_state.get("error_code")),
+            },
+        )
+
+
+def _optional_str(value: Any) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+def _optional_int(value: Any) -> int | None:
+    return value if isinstance(value, int) else None
 
 
 def _existing_artifact_id(

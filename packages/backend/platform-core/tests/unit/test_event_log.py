@@ -824,5 +824,5 @@ def test_provider_gateway_does_not_persist_provider_call_when_event_dimensions_a
         ).scalar_one()
 
     assert exc_info.value.error_code == "provider_request_failed"
-    assert field_name in exc_info.value.message
+    assert exc_info.value.message == "Provider request failed."
     assert provider_call_count == 0

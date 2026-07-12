@@ -149,6 +149,14 @@ class CancelledRunner:
         raise asyncio.CancelledError()
 
 
+class UnsafeRawTextProviderAdapter:
+    async def complete(self, request: Any) -> Any:
+        raise RuntimeError(
+            "provider echoed prompt="
+            f"{request.prompt}; user_text=deadline budget deliverables"
+        )
+
+
 def _seed_job(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
     *,
@@ -441,3 +449,37 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
             assert event_row["guest_id"] == "guest_demo", event_row["event_type"]
             assert event_row["user_id"] == "user_demo", event_row["event_type"]
             assert event_row["scenario_chain_id"] == "scenario_chain_demo", event_row["event_type"]
+
+
+def test_production_worker_provider_failure_uses_generic_safe_message(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_job(
+        session_factory,
+        input_payload={"source_text": "deadline budget deliverables"},
+    )
+    worker = build_worker(
+        session_factory=session_factory,
+        config_root=CONFIG_ROOT,
+        provider_adapters={"fake": UnsafeRawTextProviderAdapter()},
+    )
+
+    result = asyncio.run(worker.process_next_job())
+
+    assert result is not None
+    assert result.id == job.id
+    assert result.status is JobStatus.failed
+    assert result.error_code == "provider_request_failed"
+    assert result.error_message_safe == "Provider request failed."
+
+    with transaction_boundary(session_factory) as session:
+        stored_job = session.execute(
+            sa.select(jobs_table).where(jobs_table.c.id == job.id)
+        ).mappings().one()
+        provider_call = session.execute(
+            sa.select(provider_calls_table).where(provider_calls_table.c.job_id == job.id)
+        ).mappings().one()
+
+    assert stored_job["error_message_safe"] == "Provider request failed."
+    assert provider_call["error_message_safe"] == "Provider request failed."
+    assert "deadline budget deliverables" not in stored_job["error_message_safe"]

@@ -185,6 +185,7 @@ class ActionRunner:
                 },
             )
         )
+        self._register_success_recovery(succeeded)
         return ActionResult(
             action_run_id=succeeded.id,
             action_type=action_type,
@@ -325,6 +326,15 @@ class ActionRunner:
             ),
         )
 
+    def _register_success_recovery(self, action_run: ActionRunRecord) -> None:
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _persist_succeeded_action_run_after_rollback(
+                recovery_session_factory,
+                action_run,
+            ),
+        )
+
 
 class ActionRunService:
     def __init__(self, repository: ActionRunRepository, event_emitter: EventEmitter) -> None:
@@ -448,6 +458,7 @@ def _persist_failed_action_run_after_rollback(
                 output_artifact_id=persisted_artifact_id,
             )
             stored = action_run_repository.create(failed_record)
+            event_emitter.emit("action.started", _context_from_record(stored))
             event_emitter.emit(
                 "action.failed",
                 _context_from_record(stored),
@@ -461,4 +472,35 @@ def _persist_failed_action_run_after_rollback(
             error_code=error_code,
             metadata_updates=metadata_updates,
             output_artifact_id=persisted_artifact_id,
+        )
+
+
+def _persist_succeeded_action_run_after_rollback(
+    recovery_session_factory: Any,
+    record: ActionRunRecord,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        action_run_repository = ActionRunRepository(recovery_session)
+        artifact_repository = ArtifactRepository(recovery_session)
+        event_emitter = EventEmitter(EventLogRepository(recovery_session))
+
+        persisted_artifact_id = record.output_artifact_id
+        if (
+            persisted_artifact_id is not None
+            and artifact_repository.get(persisted_artifact_id) is None
+        ):
+            persisted_artifact_id = None
+
+        recovered_record = replace(record, output_artifact_id=persisted_artifact_id)
+        existing = action_run_repository.get(record.id)
+        if existing is None:
+            stored = action_run_repository.create(recovered_record)
+            event_emitter.emit("action.started", _context_from_record(stored))
+        else:
+            stored = action_run_repository.update(recovered_record)
+
+        event_emitter.emit(
+            "action.succeeded",
+            _context_from_record(stored),
+            result_status=stored.status.value,
         )

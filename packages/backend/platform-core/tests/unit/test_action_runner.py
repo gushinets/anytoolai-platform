@@ -352,7 +352,16 @@ def test_action_runner_persists_failed_state_when_exception_escapes_transaction_
     assert provider_call["action_run_id"] == action_run["id"]
     assert provider_call["status"] == ProviderCallStatus.failed
     assert provider_call["error_code"] == "provider_request_failed"
-    assert _event_counts(events) == Counter({"action.failed": 1})
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_failed": 1,
+            "action.failed": 1,
+        }
+    )
+    assert provider_call["error_message_safe"] == "Provider request failed."
+    assert _event_by_type(events, "provider.request_failed")["action_run_id"] == action_run["id"]
     assert _event_by_type(events, "action.failed")["action_run_id"] == action_run["id"]
     assert _event_by_type(events, "action.failed")["workflow_version"] == 1
 

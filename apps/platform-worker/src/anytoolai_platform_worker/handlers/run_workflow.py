@@ -196,7 +196,7 @@ def _safe_error_code(exc: Exception) -> str:
 
 def _safe_error_message(exc: Exception) -> str:
     if isinstance(exc, ProviderGatewayExecutionError):
-        return _redact(exc.message)
+        return exc.message
     if isinstance(exc, PlatformError):
         return _redact(str(exc))
     return "Workflow execution failed."
