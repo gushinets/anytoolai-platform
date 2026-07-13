@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import Any
@@ -373,6 +374,12 @@ class SequentialWorkflowRunner:
                 result_artifact_id=final_artifact.id,
                 metadata={"workflow_state": self._workflow_state_metadata(state)},
             )
+        except asyncio.CancelledError:
+            self._register_cancellation_recovery(
+                self._build_cancellation_recovery_record(job, state),
+                failed_step=state.failed_step,
+            )
+            raise
         except Exception as exc:
             error_code = self._error_code_for_exception(exc)
             failed_job = self._build_failed_job_record(
@@ -531,6 +538,37 @@ class SequentialWorkflowRunner:
                     step_input,
                     action_context,
                 )
+            except asyncio.CancelledError as exc:
+                last_action_run_id = self._latest_action_run_id(job.id, step.step_id)
+                state.step_state[step.step_id] = self._build_step_state(
+                    step=step,
+                    action_type=action_config.action_type,
+                    status=ActionRunStatus.failed.value,
+                    started_event_emitted=True,
+                    attempt_count=attempt_index,
+                    last_action_run_id=last_action_run_id,
+                    output_artifact_id=None,
+                    skip_reason=None,
+                    error_code=self._error_code_for_exception(exc),
+                )
+                job = self._persist_job_state(job, state)
+                self._remember_failed_step(
+                    state,
+                    step=step,
+                    action_type=action_config.action_type,
+                    attempt_count=attempt_index,
+                    error_code=self._error_code_for_exception(exc),
+                    action_run_id=last_action_run_id,
+                    started_event_emitted=True,
+                )
+                self._emit_step_failed(
+                    step_event_context,
+                    step=step,
+                    attempt_count=attempt_index,
+                    error_code=self._error_code_for_exception(exc),
+                    action_run_id=last_action_run_id,
+                )
+                raise
             except Exception as exc:
                 last_action_run_id = self._latest_action_run_id(job.id, step.step_id)
                 state.step_state[step.step_id] = self._build_step_state(
@@ -752,6 +790,17 @@ class SequentialWorkflowRunner:
             metadata=metadata,
         )
 
+    def _build_cancellation_recovery_record(
+        self,
+        job: JobRecord,
+        state: "_WorkflowExecutionState",
+    ) -> JobRecord:
+        metadata = {
+            **dict(job.metadata),
+            "workflow_state": self._workflow_state_metadata(state),
+        }
+        return replace(job, metadata=metadata)
+
     def _workflow_state_metadata(
         self,
         state: "_WorkflowExecutionState",
@@ -828,14 +877,18 @@ class SequentialWorkflowRunner:
             raise ValueError(f"missing required workflow context: {field_name}")
         return value
 
-    def _error_code_for_exception(self, exc: Exception) -> str:
+    def _error_code_for_exception(self, exc: BaseException) -> str:
+        if isinstance(exc, asyncio.CancelledError):
+            return "workflow_execution_cancelled"
         if isinstance(exc, ProviderGatewayExecutionError):
             return exc.error_code
         if isinstance(exc, WorkflowExecutionError):
             return exc.code
         return getattr(exc, "code", "workflow_execution_failed")
 
-    def _safe_error_message_for_exception(self, exc: Exception) -> str:
+    def _safe_error_message_for_exception(self, exc: BaseException) -> str:
+        if isinstance(exc, asyncio.CancelledError):
+            return "Workflow execution cancelled."
         if isinstance(exc, ProviderGatewayExecutionError):
             return exc.message
         if isinstance(exc, PlatformError):
@@ -862,6 +915,21 @@ class SequentialWorkflowRunner:
                 recovery_session_factory,
                 job,
                 error_code=error_code,
+                failed_step=failed_step,
+            ),
+        )
+
+    def _register_cancellation_recovery(
+        self,
+        job: JobRecord,
+        *,
+        failed_step: "_WorkflowFailedStepRecovery | None",
+    ) -> None:
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _persist_canceled_workflow_job_after_rollback(
+                recovery_session_factory,
+                job,
                 failed_step=failed_step,
             ),
         )
@@ -1040,6 +1108,47 @@ def _persist_failed_workflow_job_after_rollback(
                 "error_code": error_code,
                 "workflow_version": stored.workflow_version,
             },
+        )
+
+
+def _persist_canceled_workflow_job_after_rollback(
+    recovery_session_factory: Any,
+    record: JobRecord,
+    *,
+    failed_step: "_WorkflowFailedStepRecovery | None",
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        repository = JobRepository(recovery_session)
+        action_run_repository = ActionRunRepository(recovery_session)
+        artifact_repository = ArtifactRepository(recovery_session)
+        event_emitter = EventEmitter(EventLogRepository(recovery_session))
+
+        existing = repository.get(record.id)
+        if existing is None or existing.status not in {JobStatus.running, JobStatus.canceled}:
+            return
+
+        recovered_metadata = {
+            **dict(record.metadata),
+            "workflow_state": _sanitize_workflow_state_for_recovery(
+                record.metadata.get("workflow_state"),
+                action_run_repository=action_run_repository,
+                artifact_repository=artifact_repository,
+                failed_step=failed_step,
+            ),
+        }
+        stored = repository.update(
+            replace(
+                existing,
+                metadata=recovered_metadata,
+            )
+        )
+
+        _emit_recovered_workflow_step_events(
+            event_emitter,
+            stored,
+            workflow_state=stored.metadata.get("workflow_state"),
+            failed_step=failed_step,
+            action_run_repository=action_run_repository,
         )
 
 

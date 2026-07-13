@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from typing import Any, Mapping
 
@@ -133,24 +134,18 @@ class ActionRunner:
                 user_id=context.user_id,
             )
             response = await executor.execute(request, session=self._session)
-        except Exception as exc:
-            error_code = self._error_code_for_exception(exc)
-            metadata_updates = {
-                "error_type": type(exc).__name__,
-                "provider_policy_ref": provider_policy.provider_policy_ref,
-            }
-            output_artifact_id = self._latest_structured_output_artifact_id(action_run.id)
-            self._register_failure_recovery(
+        except asyncio.CancelledError as exc:
+            self._persist_failed_action_run_for_exception(
                 action_run,
-                error_code=error_code,
-                metadata_updates=metadata_updates,
-                output_artifact_id=output_artifact_id,
+                exc,
+                provider_policy_ref=provider_policy.provider_policy_ref,
             )
-            self._action_run_service.mark_failed(
+            raise
+        except Exception as exc:
+            self._persist_failed_action_run_for_exception(
                 action_run,
-                error_code=error_code,
-                metadata_updates=metadata_updates,
-                output_artifact_id=output_artifact_id,
+                exc,
+                provider_policy_ref=provider_policy.provider_policy_ref,
             )
             raise
 
@@ -288,7 +283,35 @@ class ActionRunner:
         )
         return None if artifact is None else artifact.id
 
-    def _error_code_for_exception(self, exc: Exception) -> str:
+    def _persist_failed_action_run_for_exception(
+        self,
+        action_run: ActionRunRecord,
+        exc: BaseException,
+        *,
+        provider_policy_ref: str,
+    ) -> None:
+        error_code = self._error_code_for_exception(exc)
+        metadata_updates = {
+            "error_type": type(exc).__name__,
+            "provider_policy_ref": provider_policy_ref,
+        }
+        output_artifact_id = self._latest_structured_output_artifact_id(action_run.id)
+        self._register_failure_recovery(
+            action_run,
+            error_code=error_code,
+            metadata_updates=metadata_updates,
+            output_artifact_id=output_artifact_id,
+        )
+        self._action_run_service.mark_failed(
+            action_run,
+            error_code=error_code,
+            metadata_updates=metadata_updates,
+            output_artifact_id=output_artifact_id,
+        )
+
+    def _error_code_for_exception(self, exc: BaseException) -> str:
+        if isinstance(exc, asyncio.CancelledError):
+            return "action_execution_cancelled"
         if isinstance(exc, PlatformError):
             return exc.code
         if isinstance(exc, ProviderGatewayExecutionError):

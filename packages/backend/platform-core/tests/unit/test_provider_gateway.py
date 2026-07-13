@@ -592,14 +592,14 @@ def test_gateway_request_cancellation_persists_failed_provider_call(
         provider="fake",
         model="fake-json-v1",
     )
-    gateway = ProviderGateway(
-        {"fake": CancelledAdapter()},
-        build_policy_resolver(policy),
-    )
-
-    with transaction_boundary(session_factory) as session:
-        scenario_session, job, action_run = seed_runtime_chain(session)
-        with pytest.raises(asyncio.CancelledError):
+    with pytest.raises(asyncio.CancelledError):
+        with transaction_boundary(session_factory) as session:
+            gateway = ProviderGateway(
+                {"fake": CancelledAdapter()},
+                build_policy_resolver(policy),
+                event_emitter=EventEmitter(EventLogRepository(session)),
+            )
+            scenario_session, job, action_run = seed_runtime_chain(session)
             asyncio.run(
                 gateway.request(
                     build_request(
@@ -611,12 +611,31 @@ def test_gateway_request_cancellation_persists_failed_provider_call(
                     session=session,
                 )
             )
+
+    with transaction_boundary(session_factory) as session:
         rows = _provider_rows(session)
+        events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(
+                    event_log_table.c.event_type.in_(
+                        ("provider.request_started", "provider.request_failed")
+                    )
+                )
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
 
     assert len(rows) == 1
     assert rows[0]["error_code"] == "provider_request_cancelled"
     assert rows[0]["status"] == ProviderCallStatus.failed
     assert rows[0]["failure_kind"] == "cancelled"
+    assert [event_row["event_type"] for event_row in events] == [
+        "provider.request_started",
+        "provider.request_failed",
+    ]
+    assert events[0]["provider_call_id"] == rows[0]["id"]
+    assert events[1]["provider_call_id"] == rows[0]["id"]
 
 
 def test_gateway_unknown_adapter_exception_uses_generic_safe_message(

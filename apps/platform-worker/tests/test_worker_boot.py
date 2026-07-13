@@ -17,6 +17,7 @@ from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
+from anytoolai_platform_core.providers.models import ProviderCallStatus
 from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.storage.db import (
@@ -173,6 +174,12 @@ class UnsafeRawTextProviderAdapter:
             "provider echoed prompt="
             f"{request.prompt}; user_text=deadline budget deliverables"
         )
+
+
+class CancelledProviderAdapter:
+    async def complete(self, request: Any) -> Any:
+        del request
+        raise asyncio.CancelledError()
 
 
 def _seed_job(
@@ -596,6 +603,90 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
             assert event_row["guest_id"] == "guest_demo", event_row["event_type"]
             assert event_row["user_id"] == "user_demo", event_row["event_type"]
             assert event_row["scenario_chain_id"] == "scenario_chain_demo", event_row["event_type"]
+
+
+def test_production_worker_cancellation_recovers_inflight_action_and_provider_ledger(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_job(
+        session_factory,
+        input_payload={"source_text": "deadline budget deliverables"},
+    )
+    worker = build_worker(
+        session_factory=session_factory,
+        config_root=CONFIG_ROOT,
+        provider_adapters={"fake": CancelledProviderAdapter()},
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(worker.process_next_job())
+
+    with transaction_boundary(session_factory) as session:
+        stored_job = session.execute(
+            sa.select(jobs_table).where(jobs_table.c.id == job.id)
+        ).mappings().one()
+        action_run = session.execute(
+            sa.select(action_runs_table).where(action_runs_table.c.job_id == job.id)
+        ).mappings().one()
+        provider_call = session.execute(
+            sa.select(provider_calls_table).where(provider_calls_table.c.job_id == job.id)
+        ).mappings().one()
+        events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.job_id == job.id)
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert stored_job["status"] is JobStatus.canceled
+    assert stored_job["completed_at"] is not None
+    workflow_state = stored_job["metadata"]["workflow_state"]
+    assert workflow_state["steps"]["extract"]["status"] == "failed"
+    assert workflow_state["steps"]["extract"]["error_code"] == "workflow_execution_cancelled"
+    assert workflow_state["steps"]["extract"]["last_action_run_id"] == action_run["id"]
+
+    assert action_run["status"].value == "failed"
+    assert action_run["error_code"] == "action_execution_cancelled"
+    assert provider_call["action_run_id"] == action_run["id"]
+    assert provider_call["status"] == ProviderCallStatus.failed
+    assert provider_call["error_code"] == "provider_request_cancelled"
+    assert provider_call["failure_kind"] == "cancelled"
+
+    event_types = [event_row["event_type"] for event_row in events]
+    assert {
+        "workflow.started",
+        "workflow.step_started",
+        "workflow.step_failed",
+        "workflow.canceled",
+        "action.started",
+        "action.failed",
+        "provider.request_started",
+        "provider.request_failed",
+    }.issubset(event_types)
+    assert "workflow.failed" not in event_types
+
+    workflow_step_failed = next(
+        event_row for event_row in events if event_row["event_type"] == "workflow.step_failed"
+    )
+    action_failed = next(
+        event_row for event_row in events if event_row["event_type"] == "action.failed"
+    )
+    provider_failed = next(
+        event_row for event_row in events if event_row["event_type"] == "provider.request_failed"
+    )
+    workflow_canceled = next(
+        event_row for event_row in events if event_row["event_type"] == "workflow.canceled"
+    )
+    assert workflow_step_failed["action_run_id"] == action_run["id"]
+    assert workflow_step_failed["properties"]["error_code"] == "workflow_execution_cancelled"
+    assert action_failed["action_run_id"] == action_run["id"]
+    assert action_failed["properties"]["error_code"] == "action_execution_cancelled"
+    assert provider_failed["provider_call_id"] == provider_call["id"]
+    assert provider_failed["action_run_id"] == action_run["id"]
+    assert provider_failed["properties"]["error_code"] == "provider_request_cancelled"
+    assert workflow_canceled["job_id"] == job.id
+    assert workflow_canceled["result_status"] == JobStatus.canceled.value
 
 
 def test_production_worker_provider_failure_uses_generic_safe_message(

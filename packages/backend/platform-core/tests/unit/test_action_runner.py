@@ -113,6 +113,12 @@ class AlwaysFailFakeAdapter:
         raise RuntimeError("provider exploded with secret_token=abc123")
 
 
+class CancelledFakeAdapter:
+    async def complete(self, request: Any) -> Any:
+        del request
+        raise asyncio.CancelledError()
+
+
 class GenericExecutor:
     executor_id = "structured_llm"
 
@@ -401,6 +407,48 @@ def test_action_runner_persists_succeeded_state_when_later_failure_rolls_back_tr
             "action.succeeded": 1,
         }
     )
+
+
+def test_action_runner_persists_failed_state_when_cancellation_escapes_transaction_boundary(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with pytest.raises(asyncio.CancelledError):
+        with transaction_boundary(session_factory) as session:
+            runner = _build_runner(session, fake_adapter=CancelledFakeAdapter())
+            asyncio.run(
+                runner.run(
+                    "text.extract_structured_fields",
+                    "kernel_demo.extract_structured_fields_v1",
+                    {"source_text": "deadline budget deliverables"},
+                    _context(
+                        step_id="extract",
+                        action_type="text.extract_structured_fields",
+                        action_config_id="kernel_demo.extract_structured_fields_v1",
+                    ),
+                )
+            )
+
+    with transaction_boundary(session_factory) as session:
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
+        events = _event_rows(session)
+
+    assert action_run["status"].value == "failed"
+    assert action_run["error_code"] == "action_execution_cancelled"
+    assert provider_call["action_run_id"] == action_run["id"]
+    assert provider_call["status"] == ProviderCallStatus.failed
+    assert provider_call["error_code"] == "provider_request_cancelled"
+    assert provider_call["failure_kind"] == "cancelled"
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_failed": 1,
+            "action.failed": 1,
+        }
+    )
+    assert _event_by_type(events, "provider.request_failed")["action_run_id"] == action_run["id"]
+    assert _event_by_type(events, "action.failed")["action_run_id"] == action_run["id"]
 
 
 def test_action_runner_marks_failed_on_input_validation_error(
