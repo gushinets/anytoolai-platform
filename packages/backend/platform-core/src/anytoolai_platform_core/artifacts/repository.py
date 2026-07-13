@@ -21,6 +21,10 @@ class ArtifactRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    @property
+    def session(self) -> Session:
+        return self._session
+
     def create(self, record: ArtifactRecord) -> ArtifactRecord:
         self._session.execute(sa.insert(artifacts_table).values(asdict(record)))
         self._session.flush()

@@ -26,6 +26,10 @@ Scenario session stores:
 - `completed_at` nullable;
 - `expires_at` nullable.
 
+For worker-owned workflow execution, `metadata["input"]` is the durable JSON object passed as
+`scenario.input` to the workflow runner. The worker loads it from the linked scenario session,
+not from the job row. Missing or non-object input is recorded as a safe failed job.
+
 Initial statuses:
 
 - `started`

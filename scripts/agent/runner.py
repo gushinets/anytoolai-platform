@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tomllib
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -101,6 +102,28 @@ def uv_executable() -> str:
 
 def uv_install_command(*args: str, python: str) -> list[str]:
     return [uv_executable(), "pip", "install", "--python", python, *args]
+
+
+def build_system_requirements(project_root: Path) -> list[str]:
+    pyproject_path = project_root / "pyproject.toml"
+    try:
+        pyproject = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise RuntimeError(f"Unable to read {pyproject_path}: {exc}") from exc
+
+    build_system = pyproject.get("build-system")
+    if not isinstance(build_system, dict):
+        raise RuntimeError(f"{pyproject_path} is missing [build-system].")
+
+    requires = build_system.get("requires")
+    if not isinstance(requires, list) or not requires or not all(
+        isinstance(item, str) for item in requires
+    ):
+        raise RuntimeError(
+            f"{pyproject_path} is missing a non-empty string-only build-system.requires list."
+        )
+
+    return requires
 
 
 def quick_check_python() -> str:
@@ -202,6 +225,20 @@ def full_check() -> int:
     if exit_code != 0:
         return exit_code
     env = baseline_env()
+    try:
+        build_requirements = build_system_requirements(FREELANCER_SUITE_ROOT)
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    exit_code = run_with_env(
+        uv_install_command(
+            *build_requirements,
+            python=quick_check_python(),
+        ),
+        env,
+    )
+    if exit_code != 0:
+        return exit_code
     exit_code = run_with_env(
         uv_install_command(
             "--no-build-isolation",

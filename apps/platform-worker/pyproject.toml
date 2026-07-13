@@ -6,9 +6,22 @@ build-backend = "setuptools.build_meta"
 name = "anytoolai-platform-worker"
 version = "0.1.0"
 requires-python = ">=3.12"
+dependencies = [
+    "anytoolai-platform-actions",
+    "anytoolai-platform-core",
+    "psycopg[binary]>=3.2",
+    "sqlalchemy>=2.0",
+]
+
+[project.scripts]
+anytoolai-platform-worker = "anytoolai_platform_worker.main:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.uv.sources]
+anytoolai-platform-core = { path = "../../packages/backend/platform-core", editable = true }
+anytoolai-platform-actions = { path = "../../packages/backend/platform-actions", editable = true }

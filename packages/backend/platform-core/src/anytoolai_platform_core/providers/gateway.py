@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
-import inspect
+from pathlib import Path
 from time import perf_counter
 from typing import Any
 
@@ -13,7 +14,13 @@ from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter, enrich_event_context
+from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.adapters.base import ProviderAdapter
+from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
+from anytoolai_platform_core.providers.adapters.litellm import (
+    LiteLLMProviderAdapter,
+    build_litellm_router,
+)
 from anytoolai_platform_core.providers.models import (
     ProviderCallRecord,
     ProviderCallStatus,
@@ -41,6 +48,9 @@ _SECRET_KEYS = {
 _MAX_STRING_LENGTH = 500
 _MAX_COLLECTION_ITEMS = 20
 _MAX_NESTING_DEPTH = 4
+_GENERIC_PROVIDER_FAILURE_MESSAGE = "Provider request failed."
+_PROVIDER_TIMEOUT_MESSAGE = "Provider request timed out."
+_PROVIDER_CANCELLED_MESSAGE = "Provider request cancelled."
 
 
 @dataclass
@@ -73,6 +83,30 @@ class ProviderGatewayExecutionError(RuntimeError):
         self.message = message
         self.resolved_request = resolved_request
         self.failure_kind = failure_kind
+
+
+class LazyLiteLLMProviderAdapter:
+    """Delay router/env resolution until a LiteLLM-backed job actually runs."""
+
+    def __init__(self, config_root: Path | None = None) -> None:
+        self._config_root = config_root
+        self._adapter: LiteLLMProviderAdapter | None = None
+
+    async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
+        if self._adapter is None:
+            self._adapter = LiteLLMProviderAdapter(build_litellm_router(self._config_root))
+        return await self._adapter.complete(request)
+
+
+def build_default_provider_adapters(
+    config_root: Path | None = None,
+) -> dict[str, ProviderAdapter]:
+    """Build production adapters without exposing concrete adapters to composition roots."""
+
+    return {
+        "fake": FakeProviderAdapter(),
+        "litellm": LazyLiteLLMProviderAdapter(config_root),
+    }
 
 
 class ProviderGateway:
@@ -248,6 +282,7 @@ class ProviderGateway:
                 self._register_provider_call_recovery(
                     session=gateway_state.recovery_session,
                     recovery_state=recovery_state,
+                    emit_events=self._event_emitter is not None,
                 )
 
             started = perf_counter()
@@ -289,7 +324,7 @@ class ProviderGateway:
                     model=response.model,
                     error_code=self._response_error_code(response),
                     error_type=response.error_type or type(response).__name__,
-                    message=response.error_message_safe or "provider response failed",
+                    message=self._safe_response_error_message(response),
                     resolved_request=attempt_request,
                     failure_kind=response.failure_kind
                     or self._failure_kind_for_status(response.status),
@@ -302,7 +337,7 @@ class ProviderGateway:
                     model=attempt_request.model,
                     error_code="provider_request_cancelled",
                     error_type="CancelledError",
-                    message="provider request cancelled",
+                    message=_PROVIDER_CANCELLED_MESSAGE,
                     resolved_request=attempt_request,
                     failure_kind="cancelled",
                 )
@@ -324,22 +359,23 @@ class ProviderGateway:
                     error=error,
                 )
                 raise
-            except TimeoutError as exc:
+            except TimeoutError:
                 error = ProviderGatewayExecutionError(
                     provider_policy_ref=attempt_request.provider_policy_ref,
                     provider=attempt_request.provider,
                     model=attempt_request.model,
                     error_code="provider_request_timed_out",
                     error_type="TimeoutError",
-                    message=(
-                        "provider request exceeded configured timeout of "
-                        f"{attempt_request.timeout_seconds} second(s)"
-                    ),
+                    message=_PROVIDER_TIMEOUT_MESSAGE,
                     resolved_request=attempt_request,
                     failure_kind="timeout",
                 )
             except ProviderGatewayExecutionError as exc:  # pragma: no cover - defensive seam
-                error = exc
+                error = self._sanitize_provider_gateway_error(
+                    exc,
+                    resolved_request=attempt_request,
+                    failure_kind="transport",
+                )
             except Exception as exc:  # pragma: no cover - exercised by tests via adapters
                 error = ProviderGatewayExecutionError(
                     provider_policy_ref=attempt_request.provider_policy_ref,
@@ -586,6 +622,7 @@ class ProviderGateway:
         *,
         session: Session | None,
         recovery_state: dict[str, ProviderCallRecord],
+        emit_events: bool,
     ) -> None:
         if session is None:
             return
@@ -594,6 +631,7 @@ class ProviderGateway:
             lambda recovery_session_factory: _persist_provider_call_after_rollback(
                 recovery_session_factory,
                 recovery_state["record"],
+                emit_events=emit_events,
             ),
         )
 
@@ -625,11 +663,35 @@ class ProviderGateway:
         return "provider_request_failed"
 
     def _safe_error_message(self, error: Exception) -> str:
-        raw = str(error).strip() or type(error).__name__
-        lowered = raw.lower()
-        if any(secret_key in lowered for secret_key in _SECRET_KEYS):
-            return "[redacted provider error]"
-        return raw[:_MAX_STRING_LENGTH]
+        return self._safe_message_for_code(self._safe_error_code(error))
+
+    def _safe_response_error_message(self, response: ProviderResponse) -> str:
+        return self._safe_message_for_code(self._response_error_code(response))
+
+    def _safe_message_for_code(self, error_code: str) -> str:
+        if error_code == "provider_request_timed_out":
+            return _PROVIDER_TIMEOUT_MESSAGE
+        if error_code == "provider_request_cancelled":
+            return _PROVIDER_CANCELLED_MESSAGE
+        return _GENERIC_PROVIDER_FAILURE_MESSAGE
+
+    def _sanitize_provider_gateway_error(
+        self,
+        error: ProviderGatewayExecutionError,
+        *,
+        resolved_request: ResolvedProviderRequest | None = None,
+        failure_kind: str | None = None,
+    ) -> ProviderGatewayExecutionError:
+        return ProviderGatewayExecutionError(
+            provider_policy_ref=error.provider_policy_ref,
+            provider=error.provider,
+            model=error.model,
+            error_code=error.error_code,
+            error_type=error.error_type,
+            message=self._safe_message_for_code(error.error_code),
+            resolved_request=error.resolved_request or resolved_request,
+            failure_kind=error.failure_kind or failure_kind,
+        )
 
     def _is_success_status(self, status: ProviderCallStatus) -> bool:
         return status is ProviderCallStatus.succeeded
@@ -659,6 +721,8 @@ class ProviderGateway:
             job_id=request.job_id,
             workflow_id=request.workflow_id,
             workflow_version=request.workflow_version,
+            guest_id=_metadata_str(request.metadata, "guest_id"),
+            user_id=_metadata_str(request.metadata, "user_id"),
             scenario_chain_id=_metadata_str(request.metadata, "scenario_chain_id"),
             action_type=request.action_type,
             action_config_id=request.action_config_id,
@@ -842,12 +906,16 @@ class ProviderGateway:
 def _persist_provider_call_after_rollback(
     recovery_session_factory: Any,
     record: ProviderCallRecord,
+    *,
+    emit_events: bool,
 ) -> None:
     with transaction_boundary(recovery_session_factory) as recovery_session:
         repository = ProviderCallRepository(recovery_session)
         existing = repository.get(record.id)
         if existing is None:
-            repository.create(record)
+            stored = repository.create(record)
+            if emit_events:
+                _emit_recovered_provider_events(recovery_session, stored)
             return
         repository.update(record)
 
@@ -855,3 +923,117 @@ def _persist_provider_call_after_rollback(
 def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
     value = metadata.get(key)
     return value if isinstance(value, str) and value else None
+
+
+def _emit_recovered_provider_events(
+    session: Session,
+    record: ProviderCallRecord,
+) -> None:
+    event_emitter = EventEmitter(
+        EventLogRepository(session),
+    )
+    context = _provider_event_context_from_record(
+        record,
+        pydantic_run_id=record.pydantic_run_id,
+    )
+    event_emitter.emit(
+        "provider.request_started",
+        context,
+        properties=_provider_event_properties_from_record(record),
+    )
+    if record.status is ProviderCallStatus.succeeded:
+        event_emitter.emit(
+            "provider.request_succeeded",
+            _provider_event_context_from_record(
+                record,
+                pydantic_run_id=record.pydantic_run_id,
+                litellm_response_id=record.litellm_response_id,
+            ),
+            result_status=record.status.value,
+            properties=_provider_event_properties_from_record(
+                record,
+                pydantic_run_id=record.pydantic_run_id,
+                litellm_response_id=record.litellm_response_id,
+                total_tokens=record.total_tokens,
+                http_status=record.http_status,
+            ),
+        )
+        return
+
+    if record.status in (ProviderCallStatus.failed, ProviderCallStatus.timed_out):
+        event_emitter.emit(
+            "provider.request_failed",
+            _provider_event_context_from_record(
+                record,
+                pydantic_run_id=record.pydantic_run_id,
+            ),
+            result_status=record.status.value,
+            properties=_provider_event_properties_from_record(
+                record,
+                pydantic_run_id=record.pydantic_run_id,
+                error_code=record.error_code,
+                failure_kind=record.failure_kind,
+            ),
+        )
+
+
+def _provider_event_context_from_record(
+    record: ProviderCallRecord,
+    *,
+    pydantic_run_id: str | None = None,
+    litellm_response_id: str | None = None,
+) -> ExecutionContext:
+    request_metadata = record.metadata.get("request_metadata")
+    if not isinstance(request_metadata, Mapping):
+        request_metadata = {}
+    return ExecutionContext(
+        tenant_id=record.tenant_id,
+        region=record.region,
+        product_id=record.product_id,
+        frontend_id=record.frontend_id,
+        scenario_session_id=record.scenario_session_id,
+        job_id=record.job_id,
+        workflow_id=record.workflow_id,
+        workflow_version=record.workflow_version,
+        guest_id=_metadata_str(request_metadata, "guest_id"),
+        user_id=_metadata_str(request_metadata, "user_id"),
+        scenario_chain_id=_metadata_str(request_metadata, "scenario_chain_id"),
+        action_run_id=record.action_run_id,
+        action_type=record.action_type,
+        action_config_id=record.action_config_id,
+        provider_policy_ref=record.provider_policy_ref,
+        provider_call_id=record.id,
+        provider=record.provider,
+        model=record.model,
+        physical_call_index=record.physical_call_index,
+        pydantic_run_id=pydantic_run_id,
+        litellm_response_id=litellm_response_id,
+        handoff_id=_metadata_str(request_metadata, "handoff_id"),
+        acquisition_source=_metadata_str(request_metadata, "acquisition_source"),
+    )
+
+
+def _provider_event_properties_from_record(
+    record: ProviderCallRecord,
+    *,
+    pydantic_run_id: str | None = None,
+    litellm_response_id: str | None = None,
+    total_tokens: int | None = None,
+    http_status: int | None = None,
+    error_code: str | None = None,
+    failure_kind: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "provider_call_id": record.id,
+        "action_run_id": record.action_run_id,
+        "provider_policy_ref": record.provider_policy_ref,
+        "physical_call_index": record.physical_call_index,
+        "semantic_attempt_index": record.semantic_attempt_index,
+        "transport_attempt_index": record.transport_attempt_index,
+        "pydantic_run_id": pydantic_run_id,
+        "litellm_response_id": litellm_response_id,
+        "total_tokens": total_tokens,
+        "http_status": http_status,
+        "failure_kind": failure_kind,
+        "error_code": error_code,
+    }

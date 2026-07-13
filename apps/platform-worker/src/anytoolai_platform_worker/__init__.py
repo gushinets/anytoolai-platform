@@ -1,0 +1,1 @@
+"""AnytoolAI platform worker application."""

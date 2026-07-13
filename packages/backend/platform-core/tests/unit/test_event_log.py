@@ -485,6 +485,7 @@ def test_platform_taxonomy_covers_required_groups_and_events() -> None:
     assert "quota.checked" in PLATFORM_EVENTS
     assert "scenario.started" in PLATFORM_EVENTS
     assert "workflow.started" in PLATFORM_EVENTS
+    assert "workflow.canceled" in PLATFORM_EVENTS
     assert "workflow.step_started" in PLATFORM_EVENTS
     assert "workflow.step_failed" in PLATFORM_EVENTS
     assert "action.started" in PLATFORM_EVENTS
@@ -528,7 +529,7 @@ def test_runtime_services_emit_required_success_events(
             )
         )
         action = action_service.start(make_action_run(scenario.id, job.id))
-        artifact_service.create(
+        result_artifact = artifact_service.create(
             make_artifact(
                 scenario.id,
                 job_id=job.id,
@@ -547,6 +548,7 @@ def test_runtime_services_emit_required_success_events(
             replace(
                 job,
                 status=JobStatus.succeeded,
+                result_artifact_id=result_artifact.id,
                 completed_at=utc_now(),
             )
         )
@@ -823,5 +825,5 @@ def test_provider_gateway_does_not_persist_provider_call_when_event_dimensions_a
         ).scalar_one()
 
     assert exc_info.value.error_code == "provider_request_failed"
-    assert field_name in exc_info.value.message
+    assert exc_info.value.message == "Provider request failed."
     assert provider_call_count == 0

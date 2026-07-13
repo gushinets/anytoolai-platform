@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import Counter
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -14,7 +15,7 @@ from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActi
 from anytoolai_platform_core.actions.executor import ActionExecutorResponse
 from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
 from anytoolai_platform_core.actions.repository import ActionRunRepository
-from anytoolai_platform_core.actions.runner import ActionRunService, ActionRunner
+from anytoolai_platform_core.actions.runner import ActionRunner, ActionRunService
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
@@ -28,9 +29,11 @@ from anytoolai_platform_core.providers.gateway import (
     ProviderGateway,
     ProviderGatewayExecutionError,
 )
-from anytoolai_platform_core.providers.models import ProviderResponse, ProviderUsage
+from anytoolai_platform_core.providers.models import ProviderResponse
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
+from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
+from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.storage.db import (
     action_runs_table,
     artifacts_table,
@@ -42,6 +45,9 @@ from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
 )
+from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
+from anytoolai_platform_core.workflows.errors import WorkflowConditionEvaluationError
+from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import (
     SequentialWorkflowRunner,
@@ -110,6 +116,27 @@ def _base_context() -> ExecutionContext:
     )
 
 
+def _seed_context_scenario(
+    session: sa.orm.Session,
+    context: ExecutionContext | None = None,
+) -> None:
+    seeded = context or _base_context()
+    ScenarioSessionRepository(session).create(
+        ScenarioSessionRecord(
+            id=seeded.scenario_session_id or "scenario_session_demo",
+            tenant_id=seeded.tenant_id,
+            region=seeded.region,
+            product_id=seeded.product_id,
+            frontend_id=seeded.frontend_id,
+            scenario_id="smoke_start",
+            scenario_version=1,
+            guest_id=seeded.guest_id,
+            user_id=seeded.user_id,
+            scenario_chain_id=seeded.scenario_chain_id,
+        )
+    )
+
+
 def _event_rows(session: sa.orm.Session) -> list[dict[str, Any]]:
     return list(session.execute(sa.select(event_log_table)).mappings())
 
@@ -155,6 +182,14 @@ class AlwaysFailAdapter:
         raise RuntimeError("provider exploded with secret_token=abc123")
 
 
+class UnsafeRawTextProviderAdapter:
+    async def complete(self, request: Any) -> ProviderResponse:
+        raise RuntimeError(
+            "provider returned raw prompt="
+            f"{request.prompt}; customer_text=deadline budget deliverables"
+        )
+
+
 class FailOnSecondCallAdapter:
     def __init__(self) -> None:
         self.call_count = 0
@@ -177,6 +212,21 @@ class ExplodingActionRunner:
     ) -> Any:
         del action_type, action_config_id, input_payload, context
         raise RuntimeError("workflow exploded with secret_token=abc123")
+
+
+class ValidationFailingActionRunner:
+    async def run(
+        self,
+        action_type: str,
+        action_config_id: str,
+        input_payload: dict[str, Any],
+        context: ExecutionContext,
+    ) -> Any:
+        del action_type, action_config_id, input_payload, context
+        raise StructuredOutputValidationError(
+            reason="schema_mismatch",
+            error_type="StructuredOutputSchemaMismatchError",
+        )
 
 
 def _build_recording_workflow_runner(
@@ -259,13 +309,15 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_structured_workflow_runner(session)
 
         result = asyncio.run(
             runner.run(
                 "kernel_demo.single_action_extract_v1",
                 {"source_text": "deadline budget deliverables"},
-                _base_context(),
+                context,
             )
         )
         job = session.execute(sa.select(jobs_table)).mappings().one()
@@ -331,6 +383,180 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
     assert workflow_succeeded["acquisition_source"] == "kernel_demo_ce"
 
 
+def test_workflow_runner_executes_an_existing_claimed_job_without_duplicate_job(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
+        runner = _build_structured_workflow_runner(session)
+        repository = JobRepository(session)
+        claimed = WorkflowJobService(
+            repository,
+            EventEmitter(EventLogRepository(session)),
+        ).claim_created(
+            repository.create(
+                JobRecord(
+                    tenant_id="tenant_demo",
+                    region="eu-central",
+                    product_id="kernel_demo",
+                    frontend_id="kernel_demo_ce",
+                    scenario_session_id="scenario_session_demo",
+                    workflow_id="kernel_demo.single_action_extract_v1",
+                    workflow_version=1,
+                )
+            ).id
+        )
+        assert claimed is not None
+
+        result = asyncio.run(
+            runner.run_claimed_job(
+                claimed,
+                {"source_text": "deadline budget deliverables"},
+                context,
+            )
+        )
+        jobs = list(session.execute(sa.select(jobs_table)).mappings())
+        action_runs = list(session.execute(sa.select(action_runs_table)).mappings())
+        provider_calls = list(session.execute(sa.select(provider_calls_table)).mappings())
+        artifacts = list(session.execute(sa.select(artifacts_table)).mappings())
+
+    assert result.status is JobStatus.succeeded
+    assert len(jobs) == 1
+    assert jobs[0]["id"] == claimed.id
+    assert jobs[0]["status"] is JobStatus.succeeded
+    assert jobs[0]["result_artifact_id"] == result.result_artifact_id
+    assert action_runs[0]["job_id"] == claimed.id
+    assert provider_calls[0]["job_id"] == claimed.id
+    assert all(artifact["job_id"] == claimed.id for artifact in artifacts)
+
+
+def test_workflow_runner_recovers_failed_state_for_existing_claimed_job_after_rollback(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    context = _base_context()
+    with transaction_boundary(session_factory) as session:
+        _seed_context_scenario(session, context)
+        repository = JobRepository(session)
+        claimed = WorkflowJobService(
+            repository,
+            EventEmitter(EventLogRepository(session)),
+        ).claim_created(
+            repository.create(
+                JobRecord(
+                    tenant_id="tenant_demo",
+                    region="eu-central",
+                    product_id="kernel_demo",
+                    frontend_id="kernel_demo_ce",
+                    scenario_session_id="scenario_session_demo",
+                    workflow_id="kernel_demo.single_action_extract_v1",
+                    workflow_version=1,
+                )
+            ).id
+        )
+        assert claimed is not None
+        claimed_job_id = claimed.id
+
+    with pytest.raises(ProviderGatewayExecutionError):
+        with transaction_boundary(session_factory) as session:
+            runner = _build_structured_workflow_runner(session, adapter=AlwaysFailAdapter())
+            job = JobRepository(session).get(claimed_job_id)
+            assert job is not None
+            asyncio.run(
+                runner.run_claimed_job(
+                    job,
+                    {"source_text": "deadline budget deliverables"},
+                    context,
+                )
+            )
+
+    with transaction_boundary(session_factory) as session:
+        job = session.execute(
+            sa.select(jobs_table).where(jobs_table.c.id == claimed_job_id)
+        ).mappings().one()
+        events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.job_id == claimed_job_id)
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert job["status"] is JobStatus.failed
+    assert job["error_code"] == "provider_request_failed"
+    assert job["error_message_safe"] == "Provider request failed."
+    assert job["metadata"]["workflow_state"]["steps"]["extract"]["status"] == "failed"
+    assert job["metadata"]["workflow_state"]["steps"]["extract"]["error_code"] == (
+        "provider_request_failed"
+    )
+    event_types = [event_row["event_type"] for event_row in events]
+    assert {
+        "workflow.started",
+        "action.started",
+        "provider.request_started",
+        "provider.request_failed",
+        "action.failed",
+        "workflow.step_started",
+        "workflow.step_failed",
+        "workflow.failed",
+    }.issubset(event_types)
+    assert event_types.count("workflow.started") == 1
+    workflow_step_started = _event_by_type(events, "workflow.step_started")[0]
+    action_failed = _event_by_type(events, "action.failed")[0]
+    workflow_step_failed = _event_by_type(events, "workflow.step_failed")[0]
+    workflow_failed = _event_by_type(events, "workflow.failed")[0]
+    assert workflow_step_started["job_id"] == claimed_job_id
+    assert workflow_step_started["properties"]["step_id"] == "extract"
+    assert workflow_step_failed["job_id"] == claimed_job_id
+    assert workflow_step_failed["action_run_id"] == action_failed["action_run_id"]
+    assert workflow_step_failed["properties"]["step_id"] == "extract"
+    assert workflow_step_failed["properties"]["error_code"] == "provider_request_failed"
+    assert workflow_failed["job_id"] == claimed_job_id
+    assert workflow_failed["properties"]["error_code"] == "provider_request_failed"
+
+
+def test_workflow_runner_rejects_claimed_job_context_with_mismatched_ownership_dimensions(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
+        runner = _build_structured_workflow_runner(session)
+        repository = JobRepository(session)
+        claimed = WorkflowJobService(
+            repository,
+            EventEmitter(EventLogRepository(session)),
+        ).claim_created(
+            repository.create(
+                JobRecord(
+                    tenant_id="tenant_demo",
+                    region="eu-central",
+                    product_id="kernel_demo",
+                    frontend_id="kernel_demo_ce",
+                    scenario_session_id="scenario_session_demo",
+                    workflow_id="kernel_demo.single_action_extract_v1",
+                    workflow_version=1,
+                )
+            ).id
+        )
+        assert claimed is not None
+
+        with pytest.raises(ValueError, match="product_id"):
+            asyncio.run(
+                runner.run_claimed_job(
+                    claimed,
+                    {"source_text": "deadline budget deliverables"},
+                    replace(context, product_id="kernel_demo_other"),
+                )
+            )
+
+        action_run_count = session.execute(
+            sa.select(sa.func.count()).select_from(action_runs_table)
+        ).scalar_one()
+
+    assert action_run_count == 0
+
+
 def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mappings(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
@@ -345,6 +571,8 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
         }
     )
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_recording_workflow_runner(session, executor=executor)
 
         result = asyncio.run(
@@ -354,7 +582,7 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
                     "source_text": "deadline budget deliverables",
                     "taxonomy": ["timeline", "scope"],
                 },
-                _base_context(),
+                context,
             )
         )
         job = session.execute(sa.select(jobs_table)).mappings().one()
@@ -405,6 +633,8 @@ def test_workflow_runner_skips_step_and_records_reason(
         }
     )
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_recording_workflow_runner(session, executor=executor)
 
         result = asyncio.run(
@@ -414,7 +644,7 @@ def test_workflow_runner_skips_step_and_records_reason(
                     "source_text": "deadline budget deliverables",
                     "run_optional_step": False,
                 },
-                _base_context(),
+                context,
             )
         )
         action_runs = list(
@@ -442,13 +672,15 @@ def test_workflow_runner_retries_step_without_mixing_provider_retry_layers(
 ) -> None:
     adapter = FailOnceThenSucceedAdapter()
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_structured_workflow_runner(session, adapter=adapter)
 
         result = asyncio.run(
             runner.run(
                 "kernel_demo.retry_extract_v1",
                 {"source_text": "deadline budget deliverables"},
-                _base_context(),
+                context,
             )
         )
         action_runs = list(
@@ -478,11 +710,13 @@ def test_workflow_runner_stops_after_failed_step(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_structured_workflow_runner(session, adapter=AlwaysFailAdapter())
 
         with pytest.raises(
             ProviderGatewayExecutionError,
-            match="\\[redacted provider error\\]",
+            match="Provider request failed\\.",
         ):
             asyncio.run(
                 runner.run(
@@ -491,7 +725,7 @@ def test_workflow_runner_stops_after_failed_step(
                         "source_text": "deadline budget deliverables",
                         "taxonomy": ["timeline", "scope"],
                     },
-                    _base_context(),
+                    context,
                 )
             )
         job = session.execute(sa.select(jobs_table)).mappings().one()
@@ -499,8 +733,8 @@ def test_workflow_runner_stops_after_failed_step(
         events = _event_rows(session)
 
     assert job["status"].value == "failed"
-    assert job["error_code"] == "workflow_execution_failed"
-    assert job["error_message_safe"] == "Workflow execution failed."
+    assert job["error_code"] == "provider_request_failed"
+    assert job["error_message_safe"] == "Provider request failed."
     assert job["completed_at"] is not None
     assert job["result_artifact_id"] is None
     assert [row["step_id"] for row in action_runs] == ["extract"]
@@ -574,6 +808,8 @@ def test_workflow_runner_persists_generic_safe_message_for_unknown_exceptions(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
         runner = _build_workflow_runner_with_action_runner(
             session,
             action_runner=ExplodingActionRunner(),
@@ -584,7 +820,7 @@ def test_workflow_runner_persists_generic_safe_message_for_unknown_exceptions(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
                     {"source_text": "deadline budget deliverables"},
-                    _base_context(),
+                    context,
                 )
             )
         job = session.execute(sa.select(jobs_table)).mappings().one()
@@ -595,9 +831,39 @@ def test_workflow_runner_persists_generic_safe_message_for_unknown_exceptions(
     assert "secret_token" not in job["error_message_safe"]
 
 
+def test_workflow_runner_preserves_safe_validation_failure_category(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
+        runner = _build_workflow_runner_with_action_runner(
+            session,
+            action_runner=ValidationFailingActionRunner(),
+        )
+
+        with pytest.raises(StructuredOutputValidationError):
+            asyncio.run(
+                runner.run(
+                    "kernel_demo.single_action_extract_v1",
+                    {"source_text": "invalid output"},
+                    context,
+                )
+            )
+        job = session.execute(sa.select(jobs_table)).mappings().one()
+
+    assert job["status"].value == "failed"
+    assert job["error_code"] == "structured_output_validation_failed"
+    assert job["error_message_safe"] == "Structured output validation failed."
+
+
 def test_workflow_runner_persists_failed_state_when_exception_escapes_transaction_boundary(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
+    context = _base_context()
+    with transaction_boundary(session_factory) as session:
+        _seed_context_scenario(session, context)
+
     with pytest.raises(RuntimeError):
         with transaction_boundary(session_factory) as session:
             runner = _build_workflow_runner_with_action_runner(
@@ -608,7 +874,7 @@ def test_workflow_runner_persists_failed_state_when_exception_escapes_transactio
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
                     {"source_text": "deadline budget deliverables"},
-                    _base_context(),
+                    context,
                 )
             )
 
@@ -641,6 +907,9 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     adapter = FailOnSecondCallAdapter()
+    context = _base_context()
+    with transaction_boundary(session_factory) as session:
+        _seed_context_scenario(session, context)
 
     with pytest.raises(ProviderGatewayExecutionError):
         with transaction_boundary(session_factory) as session:
@@ -652,7 +921,7 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
                         "source_text": "deadline budget deliverables",
                         "taxonomy": ["timeline", "scope"],
                     },
-                    _base_context(),
+                    context,
                 )
             )
 
@@ -663,45 +932,62 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
                 sa.select(action_runs_table).order_by(action_runs_table.c.created_at, action_runs_table.c.id)
             ).mappings()
         )
+        provider_calls = list(
+            session.execute(
+                sa.select(provider_calls_table).order_by(
+                    provider_calls_table.c.created_at,
+                    provider_calls_table.c.id,
+                )
+            ).mappings()
+        )
         artifacts = list(session.execute(sa.select(artifacts_table)).mappings())
         events = _event_rows(session)
 
     assert adapter.call_count == 2
     assert job["status"].value == "failed"
-    assert job["error_code"] == "workflow_execution_failed"
-    assert job["error_message_safe"] == "Workflow execution failed."
-    assert len(action_runs) == 1
-    assert action_runs[0]["step_id"] == "detect_issues"
-    assert action_runs[0]["status"].value == "failed"
-    assert artifacts == []
+    assert job["error_code"] == "provider_request_failed"
+    assert job["error_message_safe"] == "Provider request failed."
+    assert [row["step_id"] for row in action_runs] == ["extract", "detect_issues"]
+    assert [row["status"].value for row in action_runs] == ["succeeded", "failed"]
+    assert len(artifacts) == 1
     assert job["result_artifact_id"] is None
-    assert job["metadata"]["workflow_state"] == {
-        "steps": {
-            "detect_issues": {
-                "status": "failed",
-                "attempt_count": 1,
-                "last_action_run_id": action_runs[0]["id"],
-                "output_artifact_id": None,
-                "skip_reason": None,
-                "error_code": "workflow_execution_failed",
-            }
-        },
-        "context": {},
-        "last_successful_step_id": None,
-        "last_successful_output_artifact_id": None,
-        "final_output_source": None,
-        "result_artifact_id": None,
+    workflow_state = job["metadata"]["workflow_state"]
+    assert workflow_state["last_successful_step_id"] == "extract"
+    assert workflow_state["result_artifact_id"] is None
+    assert workflow_state["final_output_source"] is None
+    assert workflow_state["context"]["extracted"] == {
+        "title": "Kernel Demo Source Summary",
+        "fields": ["deadline", "budget", "deliverables"],
+    }
+    assert workflow_state["steps"]["extract"]["status"] == "succeeded"
+    assert workflow_state["steps"]["extract"]["last_action_run_id"] == action_runs[0]["id"]
+    assert workflow_state["steps"]["extract"]["output_artifact_id"] == artifacts[0]["id"]
+    assert workflow_state["steps"]["detect_issues"]["status"] == "failed"
+    assert workflow_state["steps"]["detect_issues"]["last_action_run_id"] == action_runs[1]["id"]
+    assert workflow_state["steps"]["detect_issues"]["error_code"] == "provider_request_failed"
+    assert workflow_state["last_successful_output_artifact_id"] == artifacts[0]["id"]
+    assert {row["action_run_id"] for row in provider_calls} == {
+        action_runs[0]["id"],
+        action_runs[1]["id"],
     }
     assert _event_counts(events) == Counter(
         {
-            "action.failed": 1,
             "workflow.started": 1,
-            "workflow.step_started": 1,
+            "workflow.step_started": 2,
+            "workflow.step_succeeded": 1,
             "workflow.step_failed": 1,
+            "action.started": 2,
+            "action.succeeded": 1,
+            "action.failed": 1,
+            "provider.request_started": 2,
+            "provider.request_succeeded": 1,
+            "provider.request_failed": 1,
+            "artifact.created": 1,
             "workflow.failed": 1,
         }
     )
     workflow_started = _event_by_type(events, "workflow.started")[0]
+    workflow_step_succeeded = _event_by_type(events, "workflow.step_succeeded")[0]
     workflow_step_failed = _event_by_type(events, "workflow.step_failed")[0]
     workflow_failed = _event_by_type(events, "workflow.failed")[0]
     assert workflow_started["job_id"] == job["id"]
@@ -710,7 +996,10 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
     assert workflow_started["scenario_chain_id"] == "scenario_chain_demo"
     assert workflow_started["handoff_id"] == "handoff_demo"
     assert workflow_started["acquisition_source"] == "kernel_demo_ce"
-    assert workflow_step_failed["action_run_id"] == action_runs[0]["id"]
+    assert workflow_step_succeeded["action_run_id"] == action_runs[0]["id"]
+    assert workflow_step_succeeded["artifact_id"] == artifacts[0]["id"]
+    assert workflow_step_succeeded["properties"]["step_id"] == "extract"
+    assert workflow_step_failed["action_run_id"] == action_runs[1]["id"]
     assert workflow_step_failed["properties"]["step_id"] == "detect_issues"
     assert workflow_step_failed["scenario_chain_id"] == "scenario_chain_demo"
     assert workflow_step_failed["handoff_id"] == "handoff_demo"
@@ -721,3 +1010,72 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
     assert workflow_failed["scenario_chain_id"] == "scenario_chain_demo"
     assert workflow_failed["handoff_id"] == "handoff_demo"
     assert workflow_failed["acquisition_source"] == "kernel_demo_ce"
+
+
+def test_workflow_runner_recovery_does_not_synthesize_step_started_for_pre_start_failure(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    context = _base_context()
+    with transaction_boundary(session_factory) as session:
+        _seed_context_scenario(session, context)
+
+    with pytest.raises(WorkflowConditionEvaluationError):
+        with transaction_boundary(session_factory) as session:
+            runner = _build_recording_workflow_runner(
+                session,
+                executor=RecordingExecutor(
+                    {
+                        "extract": {"title": "Extracted", "fields": ["deadline", "budget"]},
+                        "optional_extract": {"title": "Optional", "fields": ["ignored"]},
+                    }
+                ),
+            )
+            asyncio.run(
+                runner.run(
+                    "kernel_demo.conditional_skip_extract_v1",
+                    {"source_text": "deadline budget deliverables"},
+                    context,
+                )
+            )
+
+    with transaction_boundary(session_factory) as session:
+        job = session.execute(sa.select(jobs_table)).mappings().one()
+        events = _event_rows(session)
+
+    step_started_events = _event_by_type(events, "workflow.step_started")
+    step_failed_events = _event_by_type(events, "workflow.step_failed")
+    assert job["error_code"] == "workflow_condition_evaluation_failed"
+    assert len(step_started_events) == 1
+    assert step_started_events[0]["properties"]["step_id"] == "extract"
+    assert len(step_failed_events) == 1
+    assert step_failed_events[0]["properties"]["step_id"] == "optional_extract"
+    assert job["metadata"]["workflow_state"]["steps"]["optional_extract"]["started_event_emitted"] is False
+
+
+def test_workflow_runner_uses_generic_safe_provider_message_for_unknown_adapter_exceptions(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
+        runner = _build_structured_workflow_runner(
+            session,
+            adapter=UnsafeRawTextProviderAdapter(),
+        )
+
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+            asyncio.run(
+                runner.run(
+                    "kernel_demo.single_action_extract_v1",
+                    {"source_text": "deadline budget deliverables"},
+                    context,
+                )
+            )
+        job = session.execute(sa.select(jobs_table)).mappings().one()
+        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
+
+    assert exc_info.value.error_code == "provider_request_failed"
+    assert exc_info.value.message == "Provider request failed."
+    assert job["error_message_safe"] == "Provider request failed."
+    assert provider_call["error_message_safe"] == "Provider request failed."
+    assert "deadline budget deliverables" not in job["error_message_safe"]

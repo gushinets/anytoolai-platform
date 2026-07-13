@@ -21,5 +21,7 @@ services:
     build:
       context: ../..
       dockerfile: infra/docker/platform-worker.Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://anytoolai:anytoolai@postgres:5432/anytoolai
     depends_on:
       - postgres

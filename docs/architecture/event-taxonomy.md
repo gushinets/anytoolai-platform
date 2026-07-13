@@ -54,6 +54,7 @@ Current MVP-A runtime-owned emission points:
   - `scenario.failed`
 - workflow/job service:
   - `workflow.started`
+  - `workflow.canceled`
   - `workflow.step_started`
   - `workflow.step_skipped`
   - `workflow.step_succeeded`
@@ -112,6 +113,7 @@ Generated documentation mirrors that source in:
 ### `workflow`
 
 - `workflow.started`
+- `workflow.canceled`
 - `workflow.step_started`
 - `workflow.step_skipped`
 - `workflow.step_succeeded`

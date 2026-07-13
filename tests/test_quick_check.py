@@ -123,7 +123,7 @@ def test_ensure_virtualenv_cleans_legacy_environment_once_new_environment_is_act
     assert migrate_calls == ["migrate"]
 
 
-def test_bootstrap_uses_uv_for_all_install_steps(monkeypatch, tmp_path) -> None:
+def test_bootstrap_syncs_root_environment_from_locked_uv_state(monkeypatch, tmp_path) -> None:
     quick_check = load_quick_check_module()
     project_one = tmp_path / "project-one"
     project_two = tmp_path / "project-two"
@@ -131,11 +131,6 @@ def test_bootstrap_uses_uv_for_all_install_steps(monkeypatch, tmp_path) -> None:
 
     monkeypatch.setattr(quick_check.sys, "executable", "/tmp/.quick-check-venv/bin/python")
     monkeypatch.setattr(quick_check, "EDITABLE_PROJECTS", [project_one, project_two])
-    monkeypatch.setattr(
-        quick_check,
-        "dev_dependency_group",
-        lambda: ["pytest>=8.0", "ruff>=0.5"],
-    )
     monkeypatch.setattr(
         quick_check.shutil,
         "which",
@@ -153,13 +148,14 @@ def test_bootstrap_uses_uv_for_all_install_steps(monkeypatch, tmp_path) -> None:
     assert commands == [
         [
             "/usr/local/bin/uv",
-            "pip",
-            "install",
+            "sync",
             "--python",
             "/tmp/.quick-check-venv/bin/python",
-            "--upgrade",
-            "setuptools>=82",
-            "wheel",
+            "--active",
+            "--locked",
+            "--no-default-groups",
+            "--group",
+            "dev",
         ],
         [
             "/usr/local/bin/uv",
@@ -167,26 +163,6 @@ def test_bootstrap_uses_uv_for_all_install_steps(monkeypatch, tmp_path) -> None:
             "install",
             "--python",
             "/tmp/.quick-check-venv/bin/python",
-            "--no-build-isolation",
-            "-e",
-            ".",
-        ],
-        [
-            "/usr/local/bin/uv",
-            "pip",
-            "install",
-            "--python",
-            "/tmp/.quick-check-venv/bin/python",
-            "pytest>=8.0",
-            "ruff>=0.5",
-        ],
-        [
-            "/usr/local/bin/uv",
-            "pip",
-            "install",
-            "--python",
-            "/tmp/.quick-check-venv/bin/python",
-            "--no-build-isolation",
             "--no-deps",
             "-e",
             str(project_one),
@@ -197,7 +173,6 @@ def test_bootstrap_uses_uv_for_all_install_steps(monkeypatch, tmp_path) -> None:
             "install",
             "--python",
             "/tmp/.quick-check-venv/bin/python",
-            "--no-build-isolation",
             "--no-deps",
             "-e",
             str(project_two),
@@ -240,3 +215,19 @@ def test_runtime_env_strips_pythonpath_from_direct_invocation(monkeypatch, tmp_p
     env = quick_check.runtime_env()
 
     assert "PYTHONPATH" not in env
+
+
+def test_runtime_env_exports_virtualenv_for_managed_quick_check(monkeypatch, tmp_path) -> None:
+    quick_check = load_quick_check_module()
+    repo_root = tmp_path / "repo"
+    tmp_root = repo_root / ".quick-check-tmp"
+    managed_venv = repo_root / ".quick-check-venv"
+
+    monkeypatch.setattr(quick_check, "ROOT", repo_root)
+    monkeypatch.setattr(quick_check, "TMP_ROOT", tmp_root)
+    monkeypatch.setattr(quick_check.sys, "prefix", str(managed_venv))
+    monkeypatch.setattr(quick_check.sys, "base_prefix", str(repo_root / ".python-base"))
+
+    env = quick_check.runtime_env()
+
+    assert env["VIRTUAL_ENV"] == str(managed_venv)

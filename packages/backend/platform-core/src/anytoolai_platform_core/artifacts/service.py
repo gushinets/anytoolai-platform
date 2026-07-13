@@ -1,18 +1,27 @@
 from __future__ import annotations
 
+from typing import Any
+
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
+from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.storage.transactions import (
+    register_rollback_recovery_callback,
+    transaction_boundary,
+)
 
 
 class ArtifactService:
     def __init__(self, repository: ArtifactRepository, event_emitter: EventEmitter) -> None:
         self._repository = repository
+        self._session = repository.session
         self._event_emitter = event_emitter
 
     def create(self, record: ArtifactRecord) -> ArtifactRecord:
         stored = self._repository.create(record)
+        self._register_recovery(stored)
         self._event_emitter.emit(
             "artifact.created",
             _context_from_record(stored),
@@ -20,6 +29,15 @@ class ArtifactService:
             properties={"artifact_type": stored.artifact_type},
         )
         return stored
+
+    def _register_recovery(self, record: ArtifactRecord) -> None:
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _persist_artifact_after_rollback(
+                recovery_session_factory,
+                record,
+            ),
+        )
 
     def create_structured_output_artifact(
         self,
@@ -91,3 +109,25 @@ def _context_from_record(record: ArtifactRecord) -> ExecutionContext:
         artifact_id=record.id,
         action_run_id=record.action_run_id,
     )
+
+
+def _persist_artifact_after_rollback(
+    recovery_session_factory: Any,
+    record: ArtifactRecord,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        repository = ArtifactRepository(recovery_session)
+        event_emitter = EventEmitter(EventLogRepository(recovery_session))
+
+        existing = repository.get(record.id)
+        if existing is None:
+            stored = repository.create(record)
+            event_emitter.emit(
+                "artifact.created",
+                _context_from_record(stored),
+                result_status=stored.status.value,
+                properties={"artifact_type": stored.artifact_type},
+            )
+            return
+
+        repository.update(record)

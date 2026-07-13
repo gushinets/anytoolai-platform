@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from typing import Any, Mapping
 
@@ -133,24 +134,18 @@ class ActionRunner:
                 user_id=context.user_id,
             )
             response = await executor.execute(request, session=self._session)
-        except Exception as exc:
-            error_code = self._error_code_for_exception(exc)
-            metadata_updates = {
-                "error_type": type(exc).__name__,
-                "provider_policy_ref": provider_policy.provider_policy_ref,
-            }
-            output_artifact_id = self._latest_structured_output_artifact_id(action_run.id)
-            self._register_failure_recovery(
+        except asyncio.CancelledError as exc:
+            self._persist_failed_action_run_for_exception(
                 action_run,
-                error_code=error_code,
-                metadata_updates=metadata_updates,
-                output_artifact_id=output_artifact_id,
+                exc,
+                provider_policy_ref=provider_policy.provider_policy_ref,
             )
-            self._action_run_service.mark_failed(
+            raise
+        except Exception as exc:
+            self._persist_failed_action_run_for_exception(
                 action_run,
-                error_code=error_code,
-                metadata_updates=metadata_updates,
-                output_artifact_id=output_artifact_id,
+                exc,
+                provider_policy_ref=provider_policy.provider_policy_ref,
             )
             raise
 
@@ -185,6 +180,7 @@ class ActionRunner:
                 },
             )
         )
+        self._register_success_recovery(succeeded)
         return ActionResult(
             action_run_id=succeeded.id,
             action_type=action_type,
@@ -287,7 +283,35 @@ class ActionRunner:
         )
         return None if artifact is None else artifact.id
 
-    def _error_code_for_exception(self, exc: Exception) -> str:
+    def _persist_failed_action_run_for_exception(
+        self,
+        action_run: ActionRunRecord,
+        exc: BaseException,
+        *,
+        provider_policy_ref: str,
+    ) -> None:
+        error_code = self._error_code_for_exception(exc)
+        metadata_updates = {
+            "error_type": type(exc).__name__,
+            "provider_policy_ref": provider_policy_ref,
+        }
+        output_artifact_id = self._latest_structured_output_artifact_id(action_run.id)
+        self._register_failure_recovery(
+            action_run,
+            error_code=error_code,
+            metadata_updates=metadata_updates,
+            output_artifact_id=output_artifact_id,
+        )
+        self._action_run_service.mark_failed(
+            action_run,
+            error_code=error_code,
+            metadata_updates=metadata_updates,
+            output_artifact_id=output_artifact_id,
+        )
+
+    def _error_code_for_exception(self, exc: BaseException) -> str:
+        if isinstance(exc, asyncio.CancelledError):
+            return "action_execution_cancelled"
         if isinstance(exc, PlatformError):
             return exc.code
         if isinstance(exc, ProviderGatewayExecutionError):
@@ -322,6 +346,15 @@ class ActionRunner:
                 error_code=error_code,
                 metadata_updates=metadata_updates,
                 output_artifact_id=output_artifact_id,
+            ),
+        )
+
+    def _register_success_recovery(self, action_run: ActionRunRecord) -> None:
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _persist_succeeded_action_run_after_rollback(
+                recovery_session_factory,
+                action_run,
             ),
         )
 
@@ -448,6 +481,7 @@ def _persist_failed_action_run_after_rollback(
                 output_artifact_id=persisted_artifact_id,
             )
             stored = action_run_repository.create(failed_record)
+            event_emitter.emit("action.started", _context_from_record(stored))
             event_emitter.emit(
                 "action.failed",
                 _context_from_record(stored),
@@ -461,4 +495,35 @@ def _persist_failed_action_run_after_rollback(
             error_code=error_code,
             metadata_updates=metadata_updates,
             output_artifact_id=persisted_artifact_id,
+        )
+
+
+def _persist_succeeded_action_run_after_rollback(
+    recovery_session_factory: Any,
+    record: ActionRunRecord,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        action_run_repository = ActionRunRepository(recovery_session)
+        artifact_repository = ArtifactRepository(recovery_session)
+        event_emitter = EventEmitter(EventLogRepository(recovery_session))
+
+        persisted_artifact_id = record.output_artifact_id
+        if (
+            persisted_artifact_id is not None
+            and artifact_repository.get(persisted_artifact_id) is None
+        ):
+            persisted_artifact_id = None
+
+        recovered_record = replace(record, output_artifact_id=persisted_artifact_id)
+        existing = action_run_repository.get(record.id)
+        if existing is None:
+            stored = action_run_repository.create(recovered_record)
+            event_emitter.emit("action.started", _context_from_record(stored))
+        else:
+            stored = action_run_repository.update(recovered_record)
+
+        event_emitter.emit(
+            "action.succeeded",
+            _context_from_record(stored),
+            result_status=stored.status.value,
         )

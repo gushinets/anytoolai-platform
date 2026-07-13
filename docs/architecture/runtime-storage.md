@@ -522,6 +522,32 @@ The repositories are intentionally boring and explicit.
 
 This keeps behavior easy to read, easy to test, and easy to replace later if the runtime grows.
 
+Job lifecycle operations add the worker coordination boundary without changing the repository's
+caller-owned transaction rule:
+
+- `claim_created(job_id)` conditionally changes only `created` to `running` and sets `started_at`;
+- `cancel_created(job_id)` conditionally changes only `created` to `canceled`;
+- `mark_failed_from_created(...)` exists for poison-job terminalization when runtime integrity
+  checks prove a `created` job cannot be executed safely;
+- `mark_succeeded(...)` and `mark_failed(...)` conditionally transition only `running` jobs;
+- the job service persists `workflow.started` in the claim transaction and `workflow.canceled` in
+  the cancellation transaction;
+- failed transitions always fill `completed_at`, `error_code`, and `error_message_safe`;
+- the worker commits claim/start before opening the workflow execution transaction.
+
+Critical job invariants are repository-enforced, not just conventional:
+
+- job creation requires a real scenario-session row with matching tenant/region/product/frontend
+  dimensions;
+- successful terminal transitions require `completed_at` plus an existing final artifact linked back
+  to the same job and `scenario_session_id`;
+- unrestricted `update(...)` is limited to same-status mutations so lifecycle status changes must go
+  through explicit repository transition methods.
+
+Repeated claims and claims of terminal jobs are no-ops. No lease, distributed lock, or queue engine
+is part of this MVP slice. The runnable worker performs minimal PostgreSQL polling to discover a
+created job id; the conditional update, not the discovery query, owns claim idempotency.
+
 ## Testing Strategy
 
 The storage slice is covered in:

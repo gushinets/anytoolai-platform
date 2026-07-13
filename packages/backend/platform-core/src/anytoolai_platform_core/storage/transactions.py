@@ -29,7 +29,7 @@ def transaction_boundary(session_factory: sessionmaker[Session]) -> Iterator[Ses
         try:
             with session.begin():
                 yield session
-        except Exception as exc:
+        except BaseException as exc:
             for callback in _pop_rollback_recovery_callbacks(session):
                 try:
                     callback(_independent_session_factory(session))

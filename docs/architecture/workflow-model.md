@@ -114,11 +114,24 @@ Selection order:
 The selected payload is validated against `workflow.output_schema_ref` before the final artifact is
 persisted and linked through `jobs.result_artifact_id`.
 
+## Worker-owned execution
+
+The worker claims a `created` job before invoking the runner. The claimed-job runner entrypoint
+accepts that existing `running` job and never creates a second job row. Its input comes from the
+linked scenario session's `metadata["input"]`; the session and job identifiers remain in the
+execution context for every action, provider call, artifact, and event.
+
+The conditional claim and `workflow.started` event commit together before action execution. If
+workflow execution fails, the job is marked `failed` with `completed_at`, a safe error code/message,
+and a `workflow.failed` event. Existing rollback-recovery callbacks keep that failure durable when
+the execution transaction escapes.
+
 ## Events
 
 Workflow runtime emits:
 
 - `workflow.started`
+- `workflow.canceled`
 - `workflow.step_started`
 - `workflow.step_skipped`
 - `workflow.step_succeeded`
