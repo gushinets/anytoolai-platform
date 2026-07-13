@@ -501,8 +501,18 @@ def test_workflow_runner_recovers_failed_state_for_existing_claimed_job_after_ro
         "workflow.failed",
     }.issubset(event_types)
     assert event_types.count("workflow.started") == 1
-    assert event_types.index("workflow.step_started") < event_types.index("workflow.step_failed")
-    assert event_types.index("workflow.step_failed") < event_types.index("workflow.failed")
+    workflow_step_started = _event_by_type(events, "workflow.step_started")[0]
+    action_failed = _event_by_type(events, "action.failed")[0]
+    workflow_step_failed = _event_by_type(events, "workflow.step_failed")[0]
+    workflow_failed = _event_by_type(events, "workflow.failed")[0]
+    assert workflow_step_started["job_id"] == claimed_job_id
+    assert workflow_step_started["properties"]["step_id"] == "extract"
+    assert workflow_step_failed["job_id"] == claimed_job_id
+    assert workflow_step_failed["action_run_id"] == action_failed["action_run_id"]
+    assert workflow_step_failed["properties"]["step_id"] == "extract"
+    assert workflow_step_failed["properties"]["error_code"] == "provider_request_failed"
+    assert workflow_failed["job_id"] == claimed_job_id
+    assert workflow_failed["properties"]["error_code"] == "provider_request_failed"
 
 
 def test_workflow_runner_rejects_claimed_job_context_with_mismatched_ownership_dimensions(

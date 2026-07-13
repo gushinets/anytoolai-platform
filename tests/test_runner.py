@@ -21,6 +21,11 @@ def test_full_check_uses_uv_for_freelancer_suite_install(monkeypatch) -> None:
 
     monkeypatch.setattr(runner, "quick_check", lambda: 0)
     monkeypatch.setattr(runner, "quick_check_python", lambda: quick_check_python)
+    monkeypatch.setattr(
+        runner,
+        "build_system_requirements",
+        lambda project_root: ["setuptools>=68", "wheel"],
+    )
     monkeypatch.setattr(runner.shutil, "which", lambda name: "/usr/local/bin/uv" if name == "uv" else None)
     monkeypatch.setattr(
         runner,
@@ -46,20 +51,50 @@ def test_full_check_uses_uv_for_freelancer_suite_install(monkeypatch) -> None:
         "install",
         "--python",
         quick_check_python,
+        "setuptools>=68",
+        "wheel",
+    ]
+    assert "PYTHONPATH" not in commands[0][1]
+    assert commands[1][0] == [
+        "/usr/local/bin/uv",
+        "pip",
+        "install",
+        "--python",
+        quick_check_python,
         "--no-build-isolation",
         "--no-deps",
         "-e",
         str(runner.FREELANCER_SUITE_ROOT),
     ]
-    assert "PYTHONPATH" not in commands[0][1]
-    assert commands[1][0] == [
+    assert "PYTHONPATH" not in commands[1][1]
+    assert commands[2][0] == [
         quick_check_python,
         "-m",
         "pytest",
         "tests/e2e",
         "packages/backend/product-platforms/freelancer-suite/tests",
     ]
-    assert "PYTHONPATH" not in commands[1][1]
+    assert "PYTHONPATH" not in commands[2][1]
+
+
+def test_build_system_requirements_reads_declared_build_dependencies(tmp_path) -> None:
+    runner = load_runner_module()
+    project_root = tmp_path / "freelancer-suite"
+    project_root.mkdir()
+    (project_root / "pyproject.toml").write_text(
+        "\n".join(
+            [
+                "[build-system]",
+                'requires = ["setuptools>=68", "wheel"]',
+                'build-backend = "setuptools.build_meta"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    requirements = runner.build_system_requirements(project_root)
+
+    assert requirements == ["setuptools>=68", "wheel"]
 
 
 def test_runner_env_uses_workspace_owned_temp_and_cache_dirs(monkeypatch, tmp_path) -> None:
