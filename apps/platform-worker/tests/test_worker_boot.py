@@ -770,5 +770,23 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
         "workflow.failed",
     }.issubset(event_types)
     assert event_types.count("workflow.started") == 1
-    assert event_types.index("workflow.step_started") < event_types.index("workflow.step_failed")
-    assert event_types.index("workflow.step_failed") < event_types.index("workflow.failed")
+    workflow_step_started = next(
+        event_row for event_row in events if event_row["event_type"] == "workflow.step_started"
+    )
+    action_failed = next(
+        event_row for event_row in events if event_row["event_type"] == "action.failed"
+    )
+    workflow_step_failed = next(
+        event_row for event_row in events if event_row["event_type"] == "workflow.step_failed"
+    )
+    workflow_failed = next(
+        event_row for event_row in events if event_row["event_type"] == "workflow.failed"
+    )
+    assert workflow_step_started["job_id"] == job.id
+    assert workflow_step_started["properties"]["step_id"] == "extract"
+    assert workflow_step_failed["job_id"] == job.id
+    assert workflow_step_failed["action_run_id"] == action_failed["action_run_id"]
+    assert workflow_step_failed["properties"]["step_id"] == "extract"
+    assert workflow_step_failed["properties"]["error_code"] == "provider_request_failed"
+    assert workflow_failed["job_id"] == job.id
+    assert workflow_failed["properties"]["error_code"] == "provider_request_failed"
