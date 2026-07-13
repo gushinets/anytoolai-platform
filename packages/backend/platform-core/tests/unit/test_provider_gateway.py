@@ -14,6 +14,8 @@ from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.config.registry import ConfigRegistry
+from anytoolai_platform_core.events.emitter import EventEmitter
+from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.gateway import (
     ProviderGateway,
@@ -34,9 +36,10 @@ from anytoolai_platform_core.providers.models import (
     StructuredOutputMode,
 )
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
+from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
-from anytoolai_platform_core.storage.db import provider_calls_table
+from anytoolai_platform_core.storage.db import event_log_table, provider_calls_table
 from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
@@ -287,6 +290,23 @@ class UnsafeRawTextAdapter:
         raise RuntimeError(
             "provider raw response echoed prompt="
             f"{request.prompt}; user_text=deadline budget deliverables"
+        )
+
+
+class UnsafeGatewayErrorAdapter:
+    async def complete(self, request: Any) -> ProviderResponse:
+        raise ProviderGatewayExecutionError(
+            provider_policy_ref=request.provider_policy_ref,
+            provider=request.provider,
+            model=request.model,
+            error_code="provider_request_failed",
+            error_type="CustomAdapterGatewayError",
+            message=(
+                "adapter echoed prompt="
+                f"{request.prompt}; user_text=deadline budget deliverables"
+            ),
+            resolved_request=request,
+            failure_kind="transport",
         )
 
 
@@ -637,6 +657,86 @@ def test_gateway_unknown_adapter_exception_uses_generic_safe_message(
     assert rows[0]["metadata"]["error"]["type"] == "RuntimeError"
     assert rows[0]["metadata"]["error"]["message_safe"] == "Provider request failed."
     assert "deadline budget deliverables" not in rows[0]["error_message_safe"]
+
+
+def test_gateway_sanitizes_adapter_raised_provider_gateway_execution_error(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    policy = ProviderPolicy(
+        provider_policy_ref="unsafe_gateway_error_policy_v1",
+        provider="fake",
+        model="fake-json-v1",
+    )
+    gateway = ProviderGateway(
+        {"fake": UnsafeGatewayErrorAdapter()},
+        build_policy_resolver(policy),
+    )
+
+    with transaction_boundary(session_factory) as session:
+        scenario_session, job, action_run = seed_runtime_chain(session)
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+            asyncio.run(
+                gateway.request(
+                    build_request(
+                        scenario_session,
+                        job,
+                        action_run,
+                        provider_policy_ref="unsafe_gateway_error_policy_v1",
+                        prompt="rewrite this client note verbatim",
+                    ),
+                    session=session,
+                )
+            )
+        rows = _provider_rows(session)
+
+    assert exc_info.value.error_code == "provider_request_failed"
+    assert exc_info.value.error_type == "CustomAdapterGatewayError"
+    assert exc_info.value.message == "Provider request failed."
+    assert "rewrite this client note verbatim" not in exc_info.value.message
+    assert len(rows) == 1
+    assert rows[0]["error_message_safe"] == "Provider request failed."
+    assert rows[0]["metadata"]["error"]["type"] == "CustomAdapterGatewayError"
+    assert rows[0]["metadata"]["error"]["message_safe"] == "Provider request failed."
+
+
+def test_gateway_recovery_preserves_started_event_pydantic_run_id(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    policy = ProviderPolicy(
+        provider_policy_ref="recovered_started_event_policy_v1",
+        provider="fake",
+        model="fake-json-v1",
+    )
+
+    with pytest.raises(ProviderGatewayExecutionError):
+        with transaction_boundary(session_factory) as session:
+            gateway = ProviderGateway(
+                {"fake": AlwaysFailAdapter()},
+                build_policy_resolver(policy),
+                provider_call_repository=ProviderCallRepository(session),
+                event_emitter=EventEmitter(EventLogRepository(session)),
+            )
+            scenario_session, job, action_run = seed_runtime_chain(session)
+            asyncio.run(
+                gateway.request(
+                    build_request(
+                        scenario_session,
+                        job,
+                        action_run,
+                        provider_policy_ref="recovered_started_event_policy_v1",
+                    ),
+                    session=session,
+                )
+            )
+
+    with transaction_boundary(session_factory) as session:
+        started_event = session.execute(
+            sa.select(event_log_table).where(
+                event_log_table.c.event_type == "provider.request_started"
+            )
+        ).mappings().one()
+
+    assert started_event["pydantic_run_id"] == "pydantic-run-demo"
 
 
 def test_gateway_skips_persistence_when_required_dimensions_are_invalid(

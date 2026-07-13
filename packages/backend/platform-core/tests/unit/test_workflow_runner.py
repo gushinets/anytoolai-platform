@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import Counter
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -45,6 +46,7 @@ from anytoolai_platform_core.storage.transactions import (
     transaction_boundary,
 )
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
+from anytoolai_platform_core.workflows.errors import WorkflowConditionEvaluationError
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import (
@@ -427,6 +429,48 @@ def test_workflow_runner_executes_an_existing_claimed_job_without_duplicate_job(
     assert action_runs[0]["job_id"] == claimed.id
     assert provider_calls[0]["job_id"] == claimed.id
     assert all(artifact["job_id"] == claimed.id for artifact in artifacts)
+
+
+def test_workflow_runner_rejects_claimed_job_context_with_mismatched_ownership_dimensions(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
+        runner = _build_structured_workflow_runner(session)
+        repository = JobRepository(session)
+        claimed = WorkflowJobService(
+            repository,
+            EventEmitter(EventLogRepository(session)),
+        ).claim_created(
+            repository.create(
+                JobRecord(
+                    tenant_id="tenant_demo",
+                    region="eu-central",
+                    product_id="kernel_demo",
+                    frontend_id="kernel_demo_ce",
+                    scenario_session_id="scenario_session_demo",
+                    workflow_id="kernel_demo.single_action_extract_v1",
+                    workflow_version=1,
+                )
+            ).id
+        )
+        assert claimed is not None
+
+        with pytest.raises(ValueError, match="product_id"):
+            asyncio.run(
+                runner.run_claimed_job(
+                    claimed,
+                    {"source_text": "deadline budget deliverables"},
+                    replace(context, product_id="kernel_demo_other"),
+                )
+            )
+
+        action_run_count = session.execute(
+            sa.select(sa.func.count()).select_from(action_runs_table)
+        ).scalar_one()
+
+    assert action_run_count == 0
 
 
 def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mappings(
@@ -882,6 +926,46 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
     assert workflow_failed["scenario_chain_id"] == "scenario_chain_demo"
     assert workflow_failed["handoff_id"] == "handoff_demo"
     assert workflow_failed["acquisition_source"] == "kernel_demo_ce"
+
+
+def test_workflow_runner_recovery_does_not_synthesize_step_started_for_pre_start_failure(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    context = _base_context()
+    with transaction_boundary(session_factory) as session:
+        _seed_context_scenario(session, context)
+
+    with pytest.raises(WorkflowConditionEvaluationError):
+        with transaction_boundary(session_factory) as session:
+            runner = _build_recording_workflow_runner(
+                session,
+                executor=RecordingExecutor(
+                    {
+                        "extract": {"title": "Extracted", "fields": ["deadline", "budget"]},
+                        "optional_extract": {"title": "Optional", "fields": ["ignored"]},
+                    }
+                ),
+            )
+            asyncio.run(
+                runner.run(
+                    "kernel_demo.conditional_skip_extract_v1",
+                    {"source_text": "deadline budget deliverables"},
+                    context,
+                )
+            )
+
+    with transaction_boundary(session_factory) as session:
+        job = session.execute(sa.select(jobs_table)).mappings().one()
+        events = _event_rows(session)
+
+    step_started_events = _event_by_type(events, "workflow.step_started")
+    step_failed_events = _event_by_type(events, "workflow.step_failed")
+    assert job["error_code"] == "workflow_condition_evaluation_failed"
+    assert len(step_started_events) == 1
+    assert step_started_events[0]["properties"]["step_id"] == "extract"
+    assert len(step_failed_events) == 1
+    assert step_failed_events[0]["properties"]["step_id"] == "optional_extract"
+    assert job["metadata"]["workflow_state"]["steps"]["optional_extract"]["started_event_emitted"] is False
 
 
 def test_workflow_runner_uses_generic_safe_provider_message_for_unknown_adapter_exceptions(

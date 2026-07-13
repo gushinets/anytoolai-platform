@@ -366,6 +366,43 @@ def test_action_runner_persists_failed_state_when_exception_escapes_transaction_
     assert _event_by_type(events, "action.failed")["workflow_version"] == 1
 
 
+def test_action_runner_persists_succeeded_state_when_later_failure_rolls_back_transaction_boundary(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with pytest.raises(RuntimeError, match="force rollback"):
+        with transaction_boundary(session_factory) as session:
+            runner = _build_runner(session)
+            asyncio.run(
+                runner.run(
+                    "text.extract_structured_fields",
+                    "kernel_demo.extract_structured_fields_v1",
+                    {"source_text": "deadline budget deliverables"},
+                    _context(
+                        step_id="extract",
+                        action_type="text.extract_structured_fields",
+                        action_config_id="kernel_demo.extract_structured_fields_v1",
+                    ),
+                )
+            )
+            raise RuntimeError("force rollback")
+
+    with transaction_boundary(session_factory) as session:
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        events = _event_rows(session)
+
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] is not None
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_succeeded": 1,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+
+
 def test_action_runner_marks_failed_on_input_validation_error(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

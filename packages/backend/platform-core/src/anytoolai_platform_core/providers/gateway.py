@@ -371,7 +371,11 @@ class ProviderGateway:
                     failure_kind="timeout",
                 )
             except ProviderGatewayExecutionError as exc:  # pragma: no cover - defensive seam
-                error = exc
+                error = self._sanitize_provider_gateway_error(
+                    exc,
+                    resolved_request=attempt_request,
+                    failure_kind="transport",
+                )
             except Exception as exc:  # pragma: no cover - exercised by tests via adapters
                 error = ProviderGatewayExecutionError(
                     provider_policy_ref=attempt_request.provider_policy_ref,
@@ -671,6 +675,24 @@ class ProviderGateway:
             return _PROVIDER_CANCELLED_MESSAGE
         return _GENERIC_PROVIDER_FAILURE_MESSAGE
 
+    def _sanitize_provider_gateway_error(
+        self,
+        error: ProviderGatewayExecutionError,
+        *,
+        resolved_request: ResolvedProviderRequest | None = None,
+        failure_kind: str | None = None,
+    ) -> ProviderGatewayExecutionError:
+        return ProviderGatewayExecutionError(
+            provider_policy_ref=error.provider_policy_ref,
+            provider=error.provider,
+            model=error.model,
+            error_code=error.error_code,
+            error_type=error.error_type,
+            message=self._safe_message_for_code(error.error_code),
+            resolved_request=error.resolved_request or resolved_request,
+            failure_kind=error.failure_kind or failure_kind,
+        )
+
     def _is_success_status(self, status: ProviderCallStatus) -> bool:
         return status is ProviderCallStatus.succeeded
 
@@ -910,7 +932,10 @@ def _emit_recovered_provider_events(
     event_emitter = EventEmitter(
         EventLogRepository(session),
     )
-    context = _provider_event_context_from_record(record)
+    context = _provider_event_context_from_record(
+        record,
+        pydantic_run_id=record.pydantic_run_id,
+    )
     event_emitter.emit(
         "provider.request_started",
         context,

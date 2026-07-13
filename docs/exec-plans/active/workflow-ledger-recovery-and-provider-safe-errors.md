@@ -58,10 +58,10 @@ Preserve a coherent durable workflow execution ledger across rollback recovery a
 
 ## Validation
 
-- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_action_runner.py packages/backend/platform-core/tests/unit/test_workflow_runner.py packages/backend/platform-core/tests/unit/test_provider_gateway.py --basetemp D:\\Devpy\\anytoolai-platform\\.quick-check-tmp\\pytest-finding-fix -q`
-- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_event_log.py --basetemp D:\\Devpy\\anytoolai-platform\\.quick-check-tmp\\pytest-event-log-finding-fix -q`
-- [x] `uv run python -m pytest packages/backend/platform-actions/tests/test_structured_llm_executor.py packages/backend/platform-core/tests/unit/test_structured_output.py --basetemp D:\\Devpy\\anytoolai-platform\\.quick-check-tmp\\pytest-structured-finding-fix -q`
-- [x] `uv run python -m pytest apps/platform-worker/tests/test_worker_boot.py --basetemp D:\\Devpy\\anytoolai-platform\\.quick-check-tmp\\pytest-worker-finding-fix -q`
+- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_action_runner.py packages/backend/platform-core/tests/unit/test_workflow_runner.py packages/backend/platform-core/tests/unit/test_provider_gateway.py --basetemp .quick-check-tmp/pytest-finding-fix -q`
+- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_event_log.py --basetemp .quick-check-tmp/pytest-event-log-finding-fix -q`
+- [x] `uv run python -m pytest packages/backend/platform-actions/tests/test_structured_llm_executor.py packages/backend/platform-core/tests/unit/test_structured_output.py --basetemp .quick-check-tmp/pytest-structured-finding-fix -q`
+- [x] `uv run python -m pytest apps/platform-worker/tests/test_worker_boot.py --basetemp .quick-check-tmp/pytest-worker-finding-fix -q`
 - [x] `python scripts/agent/quick_check.py`
 
 ## Decision log
