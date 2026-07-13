@@ -630,3 +630,54 @@ def test_production_worker_provider_failure_uses_generic_safe_message(
     assert stored_job["error_message_safe"] == "Provider request failed."
     assert provider_call["error_message_safe"] == "Provider request failed."
     assert "deadline budget deliverables" not in stored_job["error_message_safe"]
+
+
+def test_production_worker_provider_failure_preserves_claimed_job_recovery_state(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_job(
+        session_factory,
+        input_payload={"source_text": "deadline budget deliverables"},
+    )
+    worker = build_worker(
+        session_factory=session_factory,
+        config_root=CONFIG_ROOT,
+        provider_adapters={"fake": UnsafeRawTextProviderAdapter()},
+    )
+
+    result = asyncio.run(worker.process_next_job())
+
+    assert result is not None
+    assert result.id == job.id
+    assert result.status is JobStatus.failed
+    assert result.error_code == "provider_request_failed"
+
+    with transaction_boundary(session_factory) as session:
+        stored_job = session.execute(
+            sa.select(jobs_table).where(jobs_table.c.id == job.id)
+        ).mappings().one()
+        events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.job_id == job.id)
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    workflow_state = stored_job["metadata"]["workflow_state"]
+    assert workflow_state["steps"]["extract"]["status"] == "failed"
+    assert workflow_state["steps"]["extract"]["error_code"] == "provider_request_failed"
+    event_types = [event_row["event_type"] for event_row in events]
+    assert {
+        "workflow.started",
+        "action.started",
+        "provider.request_started",
+        "provider.request_failed",
+        "action.failed",
+        "workflow.step_started",
+        "workflow.step_failed",
+        "workflow.failed",
+    }.issubset(event_types)
+    assert event_types.count("workflow.started") == 1
+    assert event_types.index("workflow.step_started") < event_types.index("workflow.step_failed")
+    assert event_types.index("workflow.step_failed") < event_types.index("workflow.failed")

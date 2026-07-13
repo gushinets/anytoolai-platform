@@ -1014,8 +1014,14 @@ def _persist_failed_workflow_job_after_rollback(
                 _context_from_record(stored),
                 properties={"workflow_version": stored.workflow_version},
             )
-        else:
+        elif existing.status is JobStatus.running:
+            stored = repository.mark_failed(recovered_record)
+        elif existing.status is JobStatus.failed:
             stored = repository.update(recovered_record)
+        else:
+            raise RuntimeError(
+                f"job {record.id} cannot recover failed workflow from {existing.status.value}"
+            )
 
         recovered_workflow_state = stored.metadata.get("workflow_state")
         _emit_recovered_workflow_step_events(

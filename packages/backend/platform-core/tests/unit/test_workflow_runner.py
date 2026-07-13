@@ -431,6 +431,80 @@ def test_workflow_runner_executes_an_existing_claimed_job_without_duplicate_job(
     assert all(artifact["job_id"] == claimed.id for artifact in artifacts)
 
 
+def test_workflow_runner_recovers_failed_state_for_existing_claimed_job_after_rollback(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    context = _base_context()
+    with transaction_boundary(session_factory) as session:
+        _seed_context_scenario(session, context)
+        repository = JobRepository(session)
+        claimed = WorkflowJobService(
+            repository,
+            EventEmitter(EventLogRepository(session)),
+        ).claim_created(
+            repository.create(
+                JobRecord(
+                    tenant_id="tenant_demo",
+                    region="eu-central",
+                    product_id="kernel_demo",
+                    frontend_id="kernel_demo_ce",
+                    scenario_session_id="scenario_session_demo",
+                    workflow_id="kernel_demo.single_action_extract_v1",
+                    workflow_version=1,
+                )
+            ).id
+        )
+        assert claimed is not None
+        claimed_job_id = claimed.id
+
+    with pytest.raises(ProviderGatewayExecutionError):
+        with transaction_boundary(session_factory) as session:
+            runner = _build_structured_workflow_runner(session, adapter=AlwaysFailAdapter())
+            job = JobRepository(session).get(claimed_job_id)
+            assert job is not None
+            asyncio.run(
+                runner.run_claimed_job(
+                    job,
+                    {"source_text": "deadline budget deliverables"},
+                    context,
+                )
+            )
+
+    with transaction_boundary(session_factory) as session:
+        job = session.execute(
+            sa.select(jobs_table).where(jobs_table.c.id == claimed_job_id)
+        ).mappings().one()
+        events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.job_id == claimed_job_id)
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert job["status"] is JobStatus.failed
+    assert job["error_code"] == "provider_request_failed"
+    assert job["error_message_safe"] == "Provider request failed."
+    assert job["metadata"]["workflow_state"]["steps"]["extract"]["status"] == "failed"
+    assert job["metadata"]["workflow_state"]["steps"]["extract"]["error_code"] == (
+        "provider_request_failed"
+    )
+    event_types = [event_row["event_type"] for event_row in events]
+    assert {
+        "workflow.started",
+        "action.started",
+        "provider.request_started",
+        "provider.request_failed",
+        "action.failed",
+        "workflow.step_started",
+        "workflow.step_failed",
+        "workflow.failed",
+    }.issubset(event_types)
+    assert event_types.count("workflow.started") == 1
+    assert event_types.index("workflow.step_started") < event_types.index("workflow.step_failed")
+    assert event_types.index("workflow.step_failed") < event_types.index("workflow.failed")
+
+
 def test_workflow_runner_rejects_claimed_job_context_with_mismatched_ownership_dimensions(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

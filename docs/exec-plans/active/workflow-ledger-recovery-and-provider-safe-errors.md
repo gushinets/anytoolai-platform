@@ -77,6 +77,7 @@ Preserve a coherent durable workflow execution ledger across rollback recovery a
 | 2026-07-13 | Read the core architecture/runtime docs and confirmed `just` is unavailable in the shell | Inspect the current code and tests to verify each reported finding against the branch state |
 | 2026-07-13 | Verified both findings against current code: workflow rollback still collapsed durable history, and gateway safe-error handling still defaulted to raw exception text for unknown adapter failures | Implement recovery across artifact/action/provider/workflow surfaces and replace provider safe-message defaults |
 | 2026-07-13 | Added rollback recovery for successful action runs, artifacts, provider lifecycle events, and full workflow step state/event replay; replaced provider safe-message defaults with code-based generic messages and updated worker propagation/tests | Run focused suites plus baseline quick check and close out the handoff |
+| 2026-07-13 | Verified claimed-job rollback recovery still used `update()` for `running -> failed`, which breaks after the claim transaction commits, then switched recovery to a lifecycle-safe failure transition and added claimed-job worker coverage | Run full backend/worker suites plus quick-check wrappers |
 
 ## Open questions
 
