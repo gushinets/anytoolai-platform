@@ -4,6 +4,7 @@ import asyncio
 
 from anytoolai_platform_worker.composition import build_worker
 from anytoolai_platform_worker.settings import WorkerSettings
+from anytoolai_platform_core.common.logging import configure_json_logging
 
 
 async def run() -> None:
@@ -16,6 +17,7 @@ async def run() -> None:
 
 
 def main() -> None:
+    configure_json_logging("platform-worker")
     try:
         asyncio.run(run())
     except KeyboardInterrupt:

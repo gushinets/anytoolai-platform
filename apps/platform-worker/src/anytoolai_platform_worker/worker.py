@@ -6,6 +6,11 @@ import asyncio
 import logging
 
 from anytoolai_platform_core.workflows.models import JobRecord
+from anytoolai_platform_core.common.logging import (
+    bind_log_context,
+    log_event,
+    reset_log_context,
+)
 
 from anytoolai_platform_worker.handlers.run_workflow import RunWorkflowHandler
 from anytoolai_platform_worker.queues import DatabaseJobQueue
@@ -26,7 +31,32 @@ class Worker:
         self._poll_interval_seconds = poll_interval_seconds
 
     async def process_job(self, job_id: str) -> JobRecord | None:
-        return await self._workflow_handler.handle(job_id)
+        token = bind_log_context(job_id=job_id)
+        log_event(logger, "worker.job_started", job_id=job_id)
+        try:
+            result = await self._workflow_handler.handle(job_id)
+        except asyncio.CancelledError:
+            log_event(logger, "worker.job_cancelled", job_id=job_id)
+            raise
+        except Exception:
+            logger.exception(
+                "worker.job_failed",
+                extra={"event": "worker.job_failed", "fields": {"job_id": job_id}},
+            )
+            raise
+        else:
+            if result is not None:
+                log_event(
+                    logger,
+                    "worker.job_completed",
+                    job_id=result.id,
+                    scenario_session_id=result.scenario_session_id,
+                    workflow_id=result.workflow_id,
+                    status=result.status.value,
+                )
+            return result
+        finally:
+            reset_log_context(token)
 
     def cancel_job(self, job_id: str) -> JobRecord | None:
         return self._workflow_handler.cancel(job_id)

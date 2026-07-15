@@ -50,8 +50,8 @@ use passing placeholders, silent skips, permanent xfails, or ignored failures.
 
 ## Validation
 
-- [ ] `python scripts/agent/runner.py doctor`
-- [ ] `python scripts/agent/runner.py quick-check`
+- [x] `python scripts/agent/runner.py doctor`
+- [x] `python scripts/agent/runner.py quick-check` (248 passed on the complete stacked implementation)
 - [ ] Child-specific checks recorded in each child plan.
 
 ## Decision log
@@ -71,6 +71,8 @@ use passing placeholders, silent skips, permanent xfails, or ignored failures.
 | 2026-07-15 | Began ANY-127 on `codex/any-127-truthful-ci`. | Align runner, dependencies, and CI. |
 | 2026-07-15 | ANY-127 is locally complete and green; began ANY-128. | Enforce documentation and generated-artifact freshness. |
 | 2026-07-15 | ANY-128 is locally complete and green; began ANY-129. | Add lightweight worktree-aware runtime commands. |
+| 2026-07-15 | ANY-129 is locally complete and green; began ANY-130. | Add structured privacy-safe diagnostics. |
+| 2026-07-15 | All five child implementations are locally committed and the stacked baseline is green. | Reauthenticate GitHub, publish the five branches/PRs, and merge sequentially. |
 
 ## Open questions
 

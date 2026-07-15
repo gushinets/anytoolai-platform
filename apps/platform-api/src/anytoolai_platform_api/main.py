@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import os
+import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from time import perf_counter
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -18,9 +20,16 @@ from anytoolai_platform_api.errors import (
 )
 from anytoolai_platform_api.routers.health import router as health_router
 from anytoolai_platform_api.routers.runtime_config import router as runtime_config_router
+from anytoolai_platform_core.common.logging import (
+    bind_log_context,
+    configure_json_logging,
+    log_event,
+    reset_log_context,
+)
 
 CORS_ORIGINS_ENV = "ANYTOOLAI_API_CORS_ORIGINS"
 CHROME_EXTENSION_ORIGIN_REGEX = r"^chrome-extension://[a-p]{32}$"
+logger = logging.getLogger(__name__)
 
 
 def create_app(
@@ -28,6 +37,7 @@ def create_app(
     *,
     database_url: str | None = None,
 ) -> FastAPI:
+    configure_json_logging("platform-api")
     runtime = build_runtime(config_root, database_url=database_url)
     app = FastAPI(title="AnytoolAI Platform API", version="0.1.0")
     app.state.runtime = runtime
@@ -65,9 +75,35 @@ def _install_request_context(app: FastAPI) -> None:
     ) -> Response:
         request_id = request.headers.get(REQUEST_ID_HEADER) or f"req_{uuid4().hex}"
         request.state.request_id = request_id
-        response = await call_next(request)
-        response.headers[REQUEST_ID_HEADER] = request_id
-        return response
+        token = bind_log_context(request_id=request_id)
+        started = perf_counter()
+        try:
+            response = await call_next(request)
+            response.headers[REQUEST_ID_HEADER] = request_id
+            log_event(
+                logger,
+                "http.request_completed",
+                method=request.method,
+                path=request.url.path,
+                status_code=response.status_code,
+                duration_ms=round((perf_counter() - started) * 1000, 2),
+            )
+            return response
+        except Exception:
+            logger.exception(
+                "http.request_failed",
+                extra={
+                    "event": "http.request_failed",
+                    "fields": {
+                        "method": request.method,
+                        "path": request.url.path,
+                        "status_code": 500,
+                    },
+                },
+            )
+            raise
+        finally:
+            reset_log_context(token)
 
 
 def _install_error_handlers(app: FastAPI) -> None:

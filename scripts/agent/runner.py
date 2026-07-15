@@ -315,17 +315,22 @@ def full_check() -> int:
     )
 
 
-def collect_context() -> int:
-    print(f"Repository: {ROOT}")
-    for command in (
-        ["git", "status", "--short"],
-        ["git", "diff", "--stat"],
-        [sys.executable, "--version"],
-        [uv_executable(), "--version"],
-    ):
-        exit_code = run(command)
-        if exit_code != 0:
-            print(f"Context section unavailable: {' '.join(command)}", file=sys.stderr)
+def collect_context(
+    *,
+    failure_file: Path | None = None,
+    log_lines: int = 100,
+) -> int:
+    script_dir = str(Path(__file__).resolve().parent)
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+    from collect_context import write_bundle
+
+    try:
+        target = write_bundle(failure_file=failure_file, log_lines=log_lines)
+    except OSError as exc:
+        print(f"DIAG001: unable to write context bundle: {exc}", file=sys.stderr)
+        return 1
+    print(f"Sanitized context written to {target}")
     return 0
 
 
@@ -554,6 +559,17 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         type=float,
         help="Override readiness timeout in seconds.",
     )
+    parser.add_argument(
+        "--failure-file",
+        type=Path,
+        help="Optional command-output file to sanitize into collect-context.",
+    )
+    parser.add_argument(
+        "--log-lines",
+        type=int,
+        default=100,
+        help="Recent API/worker log lines to collect (1-1000).",
+    )
     return parser.parse_args(argv)
 
 
@@ -575,6 +591,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             os.environ["ANYTOOLAI_POSTGRES_PORT"] = str(args.postgres_port)
         if args.ready_timeout is not None:
             os.environ["ANYTOOLAI_READY_TIMEOUT"] = str(args.ready_timeout)
+    if args.failure_file is not None or args.log_lines != 100:
+        if args.command != "collect-context":
+            print("--failure-file and --log-lines are only valid with collect-context", file=sys.stderr)
+            return 2
+        return collect_context(failure_file=args.failure_file, log_lines=args.log_lines)
     return COMMANDS[args.command]()
 
 
