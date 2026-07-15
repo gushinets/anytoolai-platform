@@ -56,6 +56,7 @@ This directory is the system of record for agents. Keep it current. If a decisio
 - `agent/task-sizing.md`
 - `agent/failure-recovery.md`
 - `agent/repo-navigation.md`
+- `agent/worktree-runtime.md`
 
 ## Executable plans
 

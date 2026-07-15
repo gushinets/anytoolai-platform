@@ -6,10 +6,18 @@ build-backend = "setuptools.build_meta"
 name = "anytoolai-platform-api"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["fastapi", "pydantic", "anytoolai-platform-core"]
+dependencies = [
+    "fastapi",
+    "pydantic",
+    "anytoolai-platform-core",
+    "uvicorn>=0.30",
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.uv.sources]
+anytoolai-platform-core = { path = "../../packages/backend/platform-core", editable = true }

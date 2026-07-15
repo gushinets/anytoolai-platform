@@ -166,3 +166,80 @@ def test_quick_check_strips_pythonpath_from_subprocess_env(monkeypatch) -> None:
 
     assert exit_code == 0
     assert "PYTHONPATH" not in recorded
+
+
+def test_runtime_identity_is_stable_and_worktree_specific(monkeypatch, tmp_path) -> None:
+    runner = load_runner_module()
+    monkeypatch.delenv("ANYTOOLAI_API_PORT", raising=False)
+    monkeypatch.delenv("ANYTOOLAI_POSTGRES_PORT", raising=False)
+
+    first = runner.runtime_identity(tmp_path / "worktree-a")
+    repeated = runner.runtime_identity(tmp_path / "worktree-a")
+    second = runner.runtime_identity(tmp_path / "worktree-b")
+
+    assert first == repeated
+    assert first.compose_project.startswith("anytoolai-")
+    assert first.compose_project != second.compose_project
+    assert (first.api_port, first.postgres_port) != (second.api_port, second.postgres_port)
+
+
+def test_runtime_identity_supports_explicit_port_overrides(monkeypatch, tmp_path) -> None:
+    runner = load_runner_module()
+    monkeypatch.setenv("ANYTOOLAI_API_PORT", "18123")
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_PORT", "15555")
+
+    identity = runner.runtime_identity(tmp_path)
+
+    assert identity.api_port == 18123
+    assert identity.postgres_port == 15555
+
+
+def test_dev_up_fails_before_compose_when_port_is_occupied(monkeypatch) -> None:
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(runner, "port_available", lambda port: port != identity.api_port)
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env: (_ for _ in ()).throw(AssertionError("compose must not run")),
+    )
+
+    assert runner.dev_up() == 1
+
+
+def test_dev_ready_waits_for_health(monkeypatch) -> None:
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(runner.urllib.request, "urlopen", lambda url, timeout: Response())
+
+    assert runner.dev_ready() == 0
+
+
+def test_dev_status_and_down_are_scoped_to_worktree_project(monkeypatch) -> None:
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    commands: list[list[str]] = []
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env: commands.append(list(command)) or 0,
+    )
+
+    assert runner.dev_status() == 0
+    assert runner.dev_down() == 0
+    assert all(identity.compose_project in command for command in commands)
+    assert commands[0][-1] == "ps"
+    assert commands[1][-2:] == ["down", "--remove-orphans"]

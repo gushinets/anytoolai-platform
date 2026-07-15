@@ -37,6 +37,9 @@ Python dependency management uses `uv`, not `pip`. Use `uv add <package>` for ru
 Generated docs are written by `generate-docs`. Use `generate-docs --check` in review and CI to
 detect drift without changing tracked files.
 
+Use `dev-up`, `dev-status`, and `dev-down` through the runner for a worktree-isolated Compose
+environment. The status command prints the derived API and database endpoints.
+
 `full-check` runs the baseline, locked frontend compile checks, and the implemented Freelancer suite
 tests. Kernel and browser smoke commands will be added only when feature issues deliver real vertical
 slices.

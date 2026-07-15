@@ -70,6 +70,7 @@ use passing placeholders, silent skips, permanent xfails, or ignored failures.
 | 2026-07-15 | ANY-126 implementation is locally complete; publishing is blocked by GitHub authentication. | Begin ANY-127 on its stacked child branch. |
 | 2026-07-15 | Began ANY-127 on `codex/any-127-truthful-ci`. | Align runner, dependencies, and CI. |
 | 2026-07-15 | ANY-127 is locally complete and green; began ANY-128. | Enforce documentation and generated-artifact freshness. |
+| 2026-07-15 | ANY-128 is locally complete and green; began ANY-129. | Add lightweight worktree-aware runtime commands. |
 
 ## Open questions
 
