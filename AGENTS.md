@@ -120,6 +120,13 @@ Architecture validation:
 python scripts/agent/runner.py validate-architecture
 ```
 
+Documentation and generated-artifact validation:
+
+```bash
+python scripts/agent/runner.py validate-docs
+python scripts/agent/runner.py generate-docs --check
+```
+
 Frontend checks:
 
 ```bash

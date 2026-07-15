@@ -19,8 +19,14 @@ validate-configs:
 validate-architecture:
     {{python_cmd}} scripts/agent/runner.py validate-architecture
 
+validate-docs:
+    {{python_cmd}} scripts/agent/runner.py validate-docs
+
 generate-docs:
     {{python_cmd}} scripts/agent/runner.py generate-docs
+
+check-generated-docs:
+    {{python_cmd}} scripts/agent/runner.py generate-docs --check
 
 dev-up:
     {{python_cmd}} scripts/agent/runner.py dev-up

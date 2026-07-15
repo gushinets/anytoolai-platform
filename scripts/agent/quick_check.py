@@ -24,6 +24,8 @@ PYTEST_TARGETS = [
     "tests/architecture",
     "tests/test_quick_check.py",
     "tests/test_runner.py",
+    "tests/test_docs_generation.py",
+    "tests/test_validate_docs.py",
     "packages/backend/platform-sdk/tests",
     "packages/backend/platform-core/tests",
     "packages/backend/platform-actions/tests",
@@ -278,6 +280,8 @@ def main() -> int:
         [
             [sys.executable, "scripts/agent/validate_configs.py"],
             [sys.executable, "scripts/agent/validate_architecture.py"],
+            [sys.executable, "scripts/agent/validate_docs.py"],
+            [sys.executable, "scripts/agent/runner.py", "generate-docs", "--check"],
             [sys.executable, "-m", "pytest", *PYTEST_TARGETS],
         ]
     )
