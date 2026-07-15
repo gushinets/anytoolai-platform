@@ -7,8 +7,9 @@
 - Created: 2026-07-15
 - Last updated: 2026-07-15
 - Review date: 2026-07-15
-- Next action: validate worktree identity, ports, readiness, status, and teardown.
-- Blocker: GitHub authentication is required to publish the prepared branch.
+- Next action: complete fresh CI on PR #28, then merge.
+- Blocker: None. The PR was rebased onto current `main` after ANY-128 merged; it inherits the
+  pinned pnpm setup required by full-check CI.
 - Linear: ANY-129
 
 ## Goal
@@ -36,3 +37,4 @@ host-port collisions.
 | Date | Progress | Next |
 |---|---|---|
 | 2026-07-15 | Added path-derived project/ports, collision preflight, actual health readiness, endpoint discovery, and scoped teardown. | Publish after GitHub authentication is restored. |
+| 2026-07-15 | Rebased PR #28 onto merged ANY-128; previous red full-check was CI tool provisioning, not worktree-runtime behavior. | Push with lease and verify fresh CI. |
