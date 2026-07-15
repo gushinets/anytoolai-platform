@@ -31,6 +31,12 @@ check-generated-docs:
 dev-up:
     {{python_cmd}} scripts/agent/runner.py dev-up
 
+dev-ready:
+    {{python_cmd}} scripts/agent/runner.py dev-ready
+
+dev-status:
+    {{python_cmd}} scripts/agent/runner.py dev-status
+
 dev-down:
     {{python_cmd}} scripts/agent/runner.py dev-down
 

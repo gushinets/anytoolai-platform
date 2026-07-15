@@ -6,17 +6,28 @@ services:
       POSTGRES_PASSWORD: anytoolai
       POSTGRES_DB: anytoolai
     ports:
-      - "5432:5432"
+      - "${ANYTOOLAI_POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anytoolai -d anytoolai"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
   platform-api:
     build:
       context: ../..
       dockerfile: infra/docker/platform-api.Dockerfile
     environment:
-      DATABASE_URL: postgresql://anytoolai:anytoolai@postgres:5432/anytoolai
+      DATABASE_URL: postgresql+psycopg://anytoolai:anytoolai@postgres:5432/anytoolai
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
-      - "8000:8000"
+      - "${ANYTOOLAI_API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
   platform-worker:
     build:
       context: ../..
@@ -24,4 +35,5 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://anytoolai:anytoolai@postgres:5432/anytoolai
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy

@@ -2,19 +2,26 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
+import time
 import tomllib
+import urllib.error
+import urllib.request
 from collections.abc import Sequence
 from pathlib import Path
+from typing import NamedTuple
 
 ROOT = Path(__file__).resolve().parents[2]
 QUICK_CHECK_VENV = ROOT / ".quick-check-venv"
 TMP_ROOT = ROOT / ".quick-check-tmp"
+COMPOSE_FILE = ROOT / "infra" / "compose" / "docker-compose.yml"
 FREELANCER_SUITE_ROOT = ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite"
 REQUIRED_MODULES = ["pytest", "yaml", "pydantic"]
 REQUIRED_TOOLS = ["uv"]
@@ -355,12 +362,160 @@ def generate_docs(*, check: bool = False) -> int:
     return 0
 
 
+class RuntimeIdentity(NamedTuple):
+    worktree_hash: str
+    compose_project: str
+    postgres_port: int
+    api_port: int
+
+    @property
+    def api_url(self) -> str:
+        return f"http://127.0.0.1:{self.api_port}"
+
+    @property
+    def database_url(self) -> str:
+        return (
+            f"postgresql://anytoolai:anytoolai@127.0.0.1:{self.postgres_port}/anytoolai"
+        )
+
+
+def normalized_repo_path(path: Path = ROOT) -> str:
+    return os.path.normcase(str(path.resolve())).replace("\\", "/")
+
+
+def runtime_identity(path: Path = ROOT) -> RuntimeIdentity:
+    digest = hashlib.sha256(normalized_repo_path(path).encode("utf-8")).hexdigest()[:8]
+    offset = int(digest[:4], 16) % 1000
+    return RuntimeIdentity(
+        worktree_hash=digest,
+        compose_project=f"anytoolai-{digest}",
+        postgres_port=_port_override("ANYTOOLAI_POSTGRES_PORT", 15432 + offset),
+        api_port=_port_override("ANYTOOLAI_API_PORT", 18000 + offset),
+    )
+
+
+def _port_override(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        port = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer port") from exc
+    if not 1 <= port <= 65535:
+        raise ValueError(f"{name} must be between 1 and 65535")
+    return port
+
+
+def port_available(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as candidate:
+        candidate.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            candidate.bind(("127.0.0.1", port))
+        except OSError:
+            return False
+    return True
+
+
+def _compose_env(identity: RuntimeIdentity) -> dict[str, str]:
+    env = runner_env()
+    env["ANYTOOLAI_POSTGRES_PORT"] = str(identity.postgres_port)
+    env["ANYTOOLAI_API_PORT"] = str(identity.api_port)
+    return env
+
+
+def _compose_command(identity: RuntimeIdentity, *args: str) -> list[str]:
+    return [
+        "docker",
+        "compose",
+        "--project-name",
+        identity.compose_project,
+        "-f",
+        str(COMPOSE_FILE),
+        *args,
+    ]
+
+
+def print_runtime_endpoints(identity: RuntimeIdentity) -> None:
+    print(f"Compose project: {identity.compose_project}")
+    print(f"API: {identity.api_url}")
+    print(f"Database: {identity.database_url}")
+
+
 def dev_up() -> int:
-    return run(["docker", "compose", "-f", "infra/compose/docker-compose.yml", "up", "-d"])
+    try:
+        identity = runtime_identity()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
+    occupied = [
+        (name, port)
+        for name, port in (
+            ("API", identity.api_port),
+            ("PostgreSQL", identity.postgres_port),
+        )
+        if not port_available(port)
+    ]
+    if occupied:
+        for name, port in occupied:
+            variable = "ANYTOOLAI_API_PORT" if name == "API" else "ANYTOOLAI_POSTGRES_PORT"
+            print(
+                f"DEV002: {name} port {port} is occupied. Override with {variable} "
+                f"or --{name.lower().replace('postgresql', 'postgres')}-port.",
+                file=sys.stderr,
+            )
+        return 1
+    print_runtime_endpoints(identity)
+    exit_code = run_with_env(
+        _compose_command(identity, "up", "-d", "--remove-orphans"),
+        _compose_env(identity),
+    )
+    return dev_ready() if exit_code == 0 else exit_code
+
+
+def dev_ready() -> int:
+    try:
+        identity = runtime_identity()
+        timeout = float(os.environ.get("ANYTOOLAI_READY_TIMEOUT", "90"))
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
+    deadline = time.monotonic() + timeout
+    health_url = f"{identity.api_url}/health"
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(health_url, timeout=2) as response:
+                if response.status == 200:
+                    print_runtime_endpoints(identity)
+                    print("Development environment is ready")
+                    return 0
+        except (OSError, urllib.error.URLError):
+            pass
+        time.sleep(0.5)
+    print(
+        f"DEV003: readiness timed out after {timeout:g}s for {health_url}. "
+        "Rerun: python scripts/agent/runner.py dev-status",
+        file=sys.stderr,
+    )
+    return 1
+
+
+def dev_status() -> int:
+    identity = runtime_identity()
+    print_runtime_endpoints(identity)
+    return run_with_env(
+        _compose_command(identity, "ps"),
+        _compose_env(identity),
+    )
 
 
 def dev_down() -> int:
-    return run(["docker", "compose", "-f", "infra/compose/docker-compose.yml", "down"])
+    identity = runtime_identity()
+    print_runtime_endpoints(identity)
+    return run_with_env(
+        _compose_command(identity, "down", "--remove-orphans"),
+        _compose_env(identity),
+    )
 
 
 COMMANDS = {
@@ -374,6 +529,8 @@ COMMANDS = {
     "collect-context": collect_context,
     "generate-docs": generate_docs,
     "dev-up": dev_up,
+    "dev-ready": dev_ready,
+    "dev-status": dev_status,
     "dev-down": dev_down,
 }
 
@@ -386,6 +543,17 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         action="store_true",
         help="Check generated documents without modifying tracked files.",
     )
+    parser.add_argument("--api-port", type=int, help="Override the worktree API host port.")
+    parser.add_argument(
+        "--postgres-port",
+        type=int,
+        help="Override the worktree PostgreSQL host port.",
+    )
+    parser.add_argument(
+        "--ready-timeout",
+        type=float,
+        help="Override readiness timeout in seconds.",
+    )
     return parser.parse_args(argv)
 
 
@@ -396,6 +564,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("--check is only valid with generate-docs", file=sys.stderr)
             return 2
         return generate_docs(check=True)
+    runtime_options = (args.api_port, args.postgres_port, args.ready_timeout)
+    if any(value is not None for value in runtime_options):
+        if not args.command.startswith("dev-"):
+            print("runtime port/timeout overrides are only valid with dev-* commands", file=sys.stderr)
+            return 2
+        if args.api_port is not None:
+            os.environ["ANYTOOLAI_API_PORT"] = str(args.api_port)
+        if args.postgres_port is not None:
+            os.environ["ANYTOOLAI_POSTGRES_PORT"] = str(args.postgres_port)
+        if args.ready_timeout is not None:
+            os.environ["ANYTOOLAI_READY_TIMEOUT"] = str(args.ready_timeout)
     return COMMANDS[args.command]()
 
 
