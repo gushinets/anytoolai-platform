@@ -2,9 +2,9 @@
   "name": "@anytoolai/web-mirror",
   "private": true,
   "scripts": {
-    "build": "echo build web-mirror",
+    "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "lint": "echo lint web-mirror"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@anytoolai/web-result-kit": "workspace:*",

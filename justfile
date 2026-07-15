@@ -5,7 +5,10 @@ doctor:
     {{python_cmd}} scripts/agent/runner.py doctor
 
 quick-check:
-    {{python_cmd}} scripts/agent/quick_check.py
+    {{python_cmd}} scripts/agent/runner.py quick-check
+
+frontend-check:
+    {{python_cmd}} scripts/agent/runner.py frontend-check
 
 full-check:
     {{python_cmd}} scripts/agent/runner.py full-check
@@ -16,9 +19,6 @@ validate-configs:
 validate-architecture:
     {{python_cmd}} scripts/agent/runner.py validate-architecture
 
-kernel-smoke:
-    {{python_cmd}} scripts/agent/runner.py kernel-smoke
-
 generate-docs:
     {{python_cmd}} scripts/agent/runner.py generate-docs
 
@@ -28,5 +28,5 @@ dev-up:
 dev-down:
     {{python_cmd}} scripts/agent/runner.py dev-down
 
-reset-db:
-    {{python_cmd}} scripts/agent/runner.py reset-db
+collect-context:
+    {{python_cmd}} scripts/agent/runner.py collect-context

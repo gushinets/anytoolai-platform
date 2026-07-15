@@ -38,10 +38,10 @@ What user-visible or platform-visible result should exist after this plan?
 
 ## Validation
 
-- [ ] `just quick-check`
-- [ ] `just validate-configs`
-- [ ] `just validate-architecture`
-- [ ] `just kernel-smoke`
+- [ ] `python scripts/agent/runner.py quick-check`
+- [ ] `python scripts/agent/runner.py frontend-check` when relevant
+- [ ] `python scripts/agent/runner.py validate-configs`
+- [ ] `python scripts/agent/runner.py validate-architecture`
 
 ## Decision log
 

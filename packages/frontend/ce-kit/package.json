@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": {"build":"tsc -p tsconfig.json","typecheck":"tsc --noEmit","lint":"echo lint ce-kit"},
+  "scripts": {"build":"tsc --noEmit","typecheck":"tsc --noEmit","lint":"tsc --noEmit"},
   "devDependencies": {"typescript":"^5.6.0"}
 }

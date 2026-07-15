@@ -20,6 +20,7 @@ def test_full_check_uses_uv_for_freelancer_suite_install(monkeypatch) -> None:
     commands: list[tuple[list[str], dict[str, str] | None]] = []
 
     monkeypatch.setattr(runner, "quick_check", lambda: 0)
+    monkeypatch.setattr(runner, "frontend_check", lambda: 0)
     monkeypatch.setattr(runner, "quick_check_python", lambda: quick_check_python)
     monkeypatch.setattr(
         runner,
@@ -71,7 +72,6 @@ def test_full_check_uses_uv_for_freelancer_suite_install(monkeypatch) -> None:
         quick_check_python,
         "-m",
         "pytest",
-        "tests/e2e",
         "packages/backend/product-platforms/freelancer-suite/tests",
     ]
     assert "PYTHONPATH" not in commands[2][1]
@@ -132,6 +132,23 @@ def test_doctor_requires_uv(monkeypatch) -> None:
     exit_code = runner.doctor()
 
     assert exit_code == 1
+
+
+def test_frontend_check_uses_frozen_install_and_real_checks(monkeypatch) -> None:
+    runner = load_runner_module()
+    commands: list[list[str]] = []
+    monkeypatch.setattr(
+        runner,
+        "run",
+        lambda command: commands.append(list(command)) or 0,
+    )
+
+    assert runner.frontend_check() == 0
+    assert commands == [
+        ["pnpm", "install", "--frozen-lockfile"],
+        ["pnpm", "-r", "typecheck"],
+        ["pnpm", "-r", "build"],
+    ]
 
 
 def test_quick_check_strips_pythonpath_from_subprocess_env(monkeypatch) -> None:

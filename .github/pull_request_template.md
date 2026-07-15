@@ -28,10 +28,11 @@ Out of scope:
 
 ## Validation
 
-- [ ] `just quick-check`
-- [ ] `just validate-configs`
-- [ ] `just validate-architecture`
-- [ ] `just kernel-smoke`
+- [ ] `python scripts/agent/runner.py quick-check`
+- [ ] `python scripts/agent/runner.py frontend-check` when frontend code changes
+- [ ] `python scripts/agent/runner.py validate-configs`
+- [ ] `python scripts/agent/runner.py validate-architecture`
+- [ ] real feature-owned smoke evidence when the changed vertical slice supports it
 
 ## Follow-up debt
 

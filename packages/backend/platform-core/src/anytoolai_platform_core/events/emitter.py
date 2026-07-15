@@ -8,7 +8,7 @@ import math
 from typing import Any
 from uuid import UUID
 
-from anytoolai_platform_core.common.ids import new_id
+from anytoolai_platform_core.common.ids import new_ordered_id
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.envelope import EventEnvelope
@@ -64,7 +64,7 @@ class EventEmitter:
         sanitized_properties = sanitize_event_properties(properties or {})
         error_code = _extract_error_code(sanitized_properties)
         envelope = EventEnvelope(
-            event_id=new_id("event"),
+            event_id=new_ordered_id("event"),
             event_type=event_type,
             timestamp=utc_now(),
             tenant_id=context.tenant_id,
