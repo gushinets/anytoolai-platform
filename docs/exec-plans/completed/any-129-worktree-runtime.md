@@ -2,14 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-07-15
 - Last updated: 2026-07-15
 - Review date: 2026-07-15
-- Next action: complete fresh CI on PR #28, then merge.
-- Blocker: None. The PR was rebased onto current `main` after ANY-128 merged; it inherits the
-  pinned pnpm setup required by full-check CI.
+- Next action: None; PR #28 merged to `main`.
+- Blocker: None.
 - Linear: ANY-129
 
 ## Goal
@@ -38,3 +37,4 @@ host-port collisions.
 |---|---|---|
 | 2026-07-15 | Added path-derived project/ports, collision preflight, actual health readiness, endpoint discovery, and scoped teardown. | Publish after GitHub authentication is restored. |
 | 2026-07-15 | Rebased PR #28 onto merged ANY-128; previous red full-check was CI tool provisioning, not worktree-runtime behavior. | Push with lease and verify fresh CI. |
+| 2026-07-15 | Fresh CI passed and PR #28 merged. | Archive this completed plan. |

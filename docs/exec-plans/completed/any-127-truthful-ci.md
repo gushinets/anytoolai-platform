@@ -2,13 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-07-15
 - Last updated: 2026-07-15
 - Review date: 2026-07-15
-- Next action: implement and validate canonical runner, locked frontend checks, and CI parity.
-- Blocker: GitHub authentication is required to publish the prepared branch.
+- Next action: None; PR #26 merged to `main`.
+- Blocker: None.
 - Linear: `ANY-127`
 
 ## Goal
@@ -37,6 +37,7 @@ repository behavior.
 | Date | Progress | Next |
 |---|---|---|
 | 2026-07-15 | Added the canonical command surface, frozen pnpm install, real TypeScript checks, pinned actions, and removed placeholder gates. | Review and publish after GitHub authentication is restored. |
+| 2026-07-15 | PR #26 merged; pinned pnpm setup passed fresh full-check CI in each dependent child PR. | Archive this completed plan. |
 
 The previous timestamp-plus-random-ID test ordering exposed real nondeterminism. Runtime IDs now
 include a sortable creation prefix while remaining opaque and unique, so same-timestamp ledger rows

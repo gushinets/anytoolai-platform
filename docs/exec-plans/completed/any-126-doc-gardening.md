@@ -2,13 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-07-15
 - Last updated: 2026-07-15
 - Review date: 2026-07-15
-- Next action: validate and publish the documentation gardening PR.
-- Blocker: GitHub authentication is required to publish the prepared branch.
+- Next action: None; PR #25 merged to `main`.
+- Blocker: None.
 - Linear: `ANY-126`
 
 ## Goal
@@ -74,6 +74,7 @@ documentation.
 |---|---|---|
 | 2026-07-15 | Created plan after doctor passed through the documented Python fallback. | Inventory active/completed plans. |
 | 2026-07-15 | Archived 33 verified plans, normalized the four remaining active plans, corrected conclusive drift, and updated quality/debt records. | Review and publish the child PR after GitHub authentication is restored. |
+| 2026-07-15 | PR #25 merged and subsequent harness work resolved the recorded ordering regression. | Archive this completed plan. |
 
 ## Open questions
 

@@ -2,14 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-07-15
 - Last updated: 2026-07-15
 - Review date: 2026-07-15
-- Next action: complete fresh CI on PR #27, then merge.
-- Blocker: None. The PR was rebased onto current `main` after ANY-127 added the pinned pnpm
-  setup required by full-check CI.
+- Next action: None; PR #27 merged to `main`.
+- Blocker: None.
 - Linear: ANY-128
 
 ## Goal
@@ -38,3 +37,4 @@ drift from canonical sources.
 |---|---|---|
 | 2026-07-15 | Added stable DOC error codes, plan/link validation, deterministic five-document generation, non-mutating drift checks, and real docs CI. | Run the complete baseline and publish after GitHub authentication is restored. |
 | 2026-07-15 | Rebased PR #27 onto merged ANY-127 so it inherits pinned pnpm setup; previous red full-check was CI tool provisioning, not validator behavior. | Push with lease and verify fresh CI. |
+| 2026-07-15 | Fresh CI passed and PR #27 merged. | Archive this completed plan. |
