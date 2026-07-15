@@ -38,3 +38,4 @@ tmp/
 temp/
 .tmp/
 .pytest-tmp
+.agent/

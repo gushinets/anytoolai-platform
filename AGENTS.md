@@ -135,7 +135,9 @@ python scripts/agent/runner.py frontend-check
 
 ## If stuck
 
-Do not guess. Update the execution plan with the blocker, run `scripts/agent/collect-context.sh`, and ask for the missing contract or decision.
+Do not guess. Update the execution plan with the blocker, run
+`python scripts/agent/runner.py collect-context` (optionally with `--failure-file`), and ask for
+the missing contract or decision.
 
 ## Agent style
 
