@@ -7,8 +7,9 @@
 - Created: 2026-07-15
 - Last updated: 2026-07-15
 - Review date: 2026-07-15
-- Next action: implement validators and deterministic generated documents.
-- Blocker: GitHub authentication is required to publish the prepared branch.
+- Next action: complete fresh CI on PR #27, then merge.
+- Blocker: None. The PR was rebased onto current `main` after ANY-127 added the pinned pnpm
+  setup required by full-check CI.
 - Linear: ANY-128
 
 ## Goal
@@ -36,3 +37,4 @@ drift from canonical sources.
 | Date | Progress | Next |
 |---|---|---|
 | 2026-07-15 | Added stable DOC error codes, plan/link validation, deterministic five-document generation, non-mutating drift checks, and real docs CI. | Run the complete baseline and publish after GitHub authentication is restored. |
+| 2026-07-15 | Rebased PR #27 onto merged ANY-127 so it inherits pinned pnpm setup; previous red full-check was CI tool provisioning, not validator behavior. | Push with lease and verify fresh CI. |
