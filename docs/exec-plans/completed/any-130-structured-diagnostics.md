@@ -2,14 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-07-15
 - Last updated: 2026-07-15
 - Review date: 2026-07-15
-- Next action: complete fresh CI on PR #29, then merge.
-- Blocker: None. The PR was rebased onto current `main` after ANY-129 merged; it inherits the
-  pinned pnpm setup required by full-check CI.
+- Next action: None; PR #29 merged to `main`.
+- Blocker: None.
 - Linear: ANY-130
 
 ## Goal
@@ -40,3 +39,4 @@ repository-local context bundle.
 |---|---|---|
 | 2026-07-15 | Added parseable redacted JSON logs for existing API/worker paths and a sanitized best-effort context bundle under .agent/context. | Publish after GitHub authentication is restored. |
 | 2026-07-15 | Rebased PR #29 onto merged ANY-129; previous red full-check was CI tool provisioning, not diagnostics behavior. | Push with lease and verify fresh CI. |
+| 2026-07-15 | Fresh CI passed and PR #29 merged. | Archive this completed plan. |

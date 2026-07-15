@@ -2,13 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-07-15
 - Last updated: 2026-07-15
 - Review date: 2026-07-15
-- Next action: deliver ANY-126, then begin ANY-127.
-- Blocker: GitHub authentication is required before the prepared child branches can be published.
+- Next action: None; all five child PRs are merged and verified.
+- Blocker: None.
 - Linear: `ANY-122`
 
 ## Goal
@@ -34,11 +34,11 @@ and MVP-B continue under their own feature plans.
 
 ## Delivery order
 
-- [ ] `ANY-126` documentation gardening.
-- [ ] `ANY-127` canonical commands and CI.
-- [ ] `ANY-128` documentation/generated freshness.
-- [ ] `ANY-129` worktree-aware runtime.
-- [ ] `ANY-130` structured diagnostics.
+- [x] `ANY-126` documentation gardening (PR #25).
+- [x] `ANY-127` canonical commands and CI (PR #26).
+- [x] `ANY-128` documentation/generated freshness (PR #27).
+- [x] `ANY-129` worktree-aware runtime (PR #28).
+- [x] `ANY-130` structured diagnostics (PR #29).
 
 Each child issue uses one child execution plan and one cohesive PR.
 
@@ -52,7 +52,7 @@ use passing placeholders, silent skips, permanent xfails, or ignored failures.
 
 - [x] `python scripts/agent/runner.py doctor`
 - [x] `python scripts/agent/runner.py quick-check` (248 passed on the complete stacked implementation)
-- [ ] Child-specific checks recorded in each child plan.
+- [x] Child-specific checks recorded in each child plan.
 
 ## Decision log
 
@@ -73,6 +73,7 @@ use passing placeholders, silent skips, permanent xfails, or ignored failures.
 | 2026-07-15 | ANY-128 is locally complete and green; began ANY-129. | Add lightweight worktree-aware runtime commands. |
 | 2026-07-15 | ANY-129 is locally complete and green; began ANY-130. | Add structured privacy-safe diagnostics. |
 | 2026-07-15 | All five child implementations are locally committed and the stacked baseline is green. | Reauthenticate GitHub, publish the five branches/PRs, and merge sequentially. |
+| 2026-07-15 | PRs #25–#29 merged to `main`; each fresh Linux/Windows/docs/frontend/full-check gate passed. | Archive the completed execution plans and close ANY-122. |
 
 ## Open questions
 
