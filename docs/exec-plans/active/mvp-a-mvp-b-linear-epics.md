@@ -1,8 +1,21 @@
 # MVP-A and MVP-B Linear-ready Epics
 
+## Status
+
+- State: active
+- Owner: product/engineering
+- Created: 2026-06-23
+- Last updated: 2026-07-15
+- Review date: 2026-07-15
+- Next action: keep the delivery map aligned with active MVP-A/MVP-B issues.
+- Blocker: none
+
 ## Overview
 
 This file contains implementation-ready epic descriptions for importing into Linear.
+
+`docs/product-specs/mvp-scope-source-of-truth.md` controls product scope when this delivery map
+and the product specification differ.
 
 Use the same structure for every Linear ticket:
 

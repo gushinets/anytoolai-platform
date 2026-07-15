@@ -47,7 +47,7 @@ Deep rules live in `docs/architecture/llm-runtime.md`.
 - `apps/platform-api` is the composition root that wires platform + bundles.
 - Extensions must not contain system prompts.
 - Frontend must not choose provider/model.
-- Provider calls must go through `platform-core/providers/gateway.py` and provider adapters.
+- Provider calls must go through `packages/backend/platform-core/src/anytoolai_platform_core/providers/gateway.py` and provider adapters.
 - `litellm` imports are allowed only in the Provider Gateway/provider adapter layer.
 - `pydantic_ai` imports are allowed only in `platform-actions` structured LLM executor code.
 - Direct `openai`, `anthropic`, `google.genai`, `@google/genai`, `cohere`, and `mistralai` imports outside approved provider boundaries are forbidden.
@@ -66,6 +66,10 @@ For any non-trivial work:
 2. Run `just doctor`.
 3. Read the relevant architecture docs.
 4. Keep changes small and reviewable.
+
+Feature PRs own the tests and documentation for the behavior they introduce. Do not use placeholders,
+silent skips, permanent expected failures, or ignored failures as evidence that unfinished MVP-A/MVP-B
+behavior works.
 
 `just` is the preferred local command interface. If `just` is unavailable or a shell integration fails,
 use the shell-independent fallback command that matches the task:

@@ -2,10 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-06-29
 - Last updated: 2026-06-29
+- Completion note: superseded by current repository documentation and
+  `any-126-doc-gardening.md`.
 
 ## Goal
 

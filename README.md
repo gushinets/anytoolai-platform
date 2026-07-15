@@ -1,8 +1,10 @@
-# AnytoolAI Agent-First Starter Repo
+# AnytoolAI Platform
 
-This is the first-commit starter repository for AnytoolAI MVP-A and MVP-B.
+This repository contains the AnytoolAI platform monorepo and its current MVP-A/MVP-B implementation.
 
-The repo is intentionally agent-friendly: short `AGENTS.md`, repo-local docs, executable plans, validation scripts, architecture tests, config validation, CI templates, and generated documentation placeholders are included from day one.
+The repo is intentionally agent-friendly: short `AGENTS.md`, repo-local docs, executable plans,
+validation scripts, architecture tests, config validation, CI, and generated documentation are kept
+alongside the implementation.
 
 ## Quick start
 

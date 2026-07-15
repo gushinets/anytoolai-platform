@@ -1,4 +1,4 @@
-# Harness Engineering Map for First Commit
+# Harness Engineering Map
 
 This document maps each major lesson from OpenAI's harness engineering article into concrete repository assets.
 
@@ -39,6 +39,10 @@ Repo asset:
 
 Reason: Codex must be able to boot, inspect, query, and validate the system.
 
+Current status: partial. PostgreSQL Compose and canonical checks exist. Worktree isolation, safe
+context collection, and structured runtime diagnostics are tracked by ANY-129 and ANY-130.
+`kernel-smoke` is currently a placeholder and is not validation evidence.
+
 ## 4. Repository knowledge is the system of record
 
 Repo asset:
@@ -78,7 +82,7 @@ Repo asset:
 
 - `tests/architecture/*`
 - `scripts/agent/validate-architecture.py`
-- `.github/workflows/architecture.yml`
+- `.github/workflows/backend.yml`
 
 Reason: documentation alone cannot stop drift in an agent-generated codebase. LLM/provider import boundaries are enforced here so actions, products, and extensions cannot bypass Provider Gateway.
 
@@ -125,12 +129,13 @@ Reason: agents can modify and improve the whole harness, not just product code.
 
 Repo asset:
 
-- `just quick-check`
-- `just full-check`
-- `just kernel-smoke`
+- `python scripts/agent/runner.py quick-check`
+- `python scripts/agent/runner.py full-check`
 - `scripts/agent/summarize-failures.sh`
 
-Reason: Codex should validate current state, implement, re-run checks, and iterate.
+Reason: Codex should validate current state, implement, re-run checks, and iterate. A kernel or browser
+smoke command becomes evidence only after its underlying vertical slice exists; placeholders do not
+count.
 
 ## 13. Entropy and garbage collection
 
