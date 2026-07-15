@@ -1,115 +1,100 @@
 # Config Registry
 
-Generated-doc mirror of MVP-A config definitions.
+<!-- Generated file. Do not edit by hand. -->
+Canonical source: configs/kernel via ConfigLoader.
 
-Definitions live in YAML/Markdown and are loaded from the repo. Runtime editing through admin UI is not part of MVP-A.
+## Tenants
 
-## Load Order
+- anytoolai
 
-The current loader reads definitions in this order:
+## Regions
 
-1. tenant defaults
-2. regions
-3. provider policies
-4. action definitions
-5. products
-6. prompts
-7. schemas
-8. cross-reference validation
+- default
 
-LiteLLM router deployment config is separate from the ConfigRegistry load order. It lives in
-`configs/kernel/litellm_router.yaml` and is consumed by provider-adapter bootstrap, not by the
-registry loader.
+## Provider policies
 
-Provider policies remain the owner of platform intent, including:
+- default_fake_provider_v1
+- default_text_generation_v1
 
-- provider selection
-- model-group selection
-- timeout policy
-- structured-output mode
-- nested retry policy
+## Action definitions
 
-LiteLLM router config remains the owner of deployments, routing, credentials, and provider-specific
-transport settings.
+- document.generate_from_template
+- text.compare_and_classify
+- text.compose_persuasive_text
+- text.compose_reply
+- text.detect_issues_by_taxonomy
+- text.extract_structured_fields
+- text.generate_clarifying_questions
+- text.generate_gap_rewrites
+- text.score_match_by_rubric
+- text.score_multidimensional_axes
+- text.synthesize_angle
 
-## Required Definition Types
+## Action configurations
 
-- product definition
-- frontend definition
-- scenario definition
-- workflow definition
-- action definition
-- action configuration
-- prompt reference/version
-- provider policy
-- quota policy
-- handoff definition
-- event envelope contract
+- kernel_demo.detect_issues_v1
+- kernel_demo.extract_structured_fields_v1
+- kernel_demo.generate_report_v1
 
-## Kernel Config Paths
+## Workflows
 
-```text
-configs/kernel/default_tenant.yaml
-configs/kernel/regions.yaml
-configs/kernel/provider_policies.yaml
-configs/kernel/litellm_router.yaml
-configs/kernel/action_definitions/
-configs/kernel/products/kernel_demo/product.yaml
-configs/kernel/products/kernel_demo/frontends.yaml
-configs/kernel/products/kernel_demo/scenarios.yaml
-configs/kernel/products/kernel_demo/workflows.yaml
-configs/kernel/products/kernel_demo/action_configs.yaml
-configs/kernel/products/kernel_demo/prompts/
-configs/kernel/products/kernel_demo/schemas/
-configs/kernel/products/kernel_demo/handoffs.yaml
-configs/kernel/products/kernel_demo/quotas.yaml
-```
+- kernel_demo.conditional_skip_extract_v1
+- kernel_demo.extract_detect_report_v1
+- kernel_demo.retry_extract_v1
+- kernel_demo.single_action_extract_v1
 
-## Ownership And Fallbacks
+## Scenarios
 
-- `default_tenant.yaml`, `regions.yaml`, and `provider_policies.yaml` are top-level single sources for their definition types.
-- `litellm_router.yaml` is a top-level provider deployment/routing config file and is intentionally
-  separate from provider policies. Provider policies describe platform intent; LiteLLM router config
-  describes deployment/model-group routing.
-- Each product directory is loaded from `product.yaml` first, with dedicated child files then loaded for action configs, workflows, scenarios, quotas, handoffs, prompts, and schemas.
-- `frontends.yaml` is used when present; otherwise the loader falls back to the `frontends` field in `product.yaml`.
-- `analytics.yaml` is used when present; otherwise the loader falls back to the `analytics` field in `product.yaml`.
-- `quota_policy_ref` comes from `product.yaml` when set. If it is omitted and `quotas.yaml` defines exactly one quota policy, the loader uses that single quota policy ID as a fallback. If multiple quota policies exist and `product.yaml` omits `quota_policy_ref`, loading fails.
-- Prompts are discovered from `products/*/prompts/*.md`, excluding `README.md`.
-- Schemas are discovered from both `configs/kernel/schemas/*.json` and `products/*/schemas/*.json`.
+- kernel_demo.handoff_smoke_source_v1
+- kernel_demo.handoff_smoke_target_v1
+- kernel_demo.multi_step_workflow_smoke_v1
+- kernel_demo.quota_exhausted_smoke_v1
+- kernel_demo.single_action_smoke_v1
 
-## Merge And Override Behavior
+## Products
 
-- The loader does not silently merge `frontends.yaml` with `product.yaml` frontends. If `frontends.yaml` exists, it replaces the fallback from `product.yaml`.
-- The loader does not silently merge `analytics.yaml` with `product.yaml` analytics. If `analytics.yaml` exists, it replaces the fallback from `product.yaml`.
-- Cross-reference validation happens only after all configured definitions, prompts, and schemas have been loaded.
+- kernel_demo
 
-## Validation Rules
+## Prompts
 
-- All YAML configs validate before runtime startup.
-- Broken references fail startup.
-- Product scenario references must exist in scenario config.
-- Scenario workflow references must exist in workflow config.
-- Workflow steps must reference existing action configs.
-- Action configs must reference known action types.
-- Action configs must include `prompt_ref` and `provider_policy_ref`.
-- Frontends must not choose prompt/provider/model.
+- kernel_demo.detect_issues.v1
+- kernel_demo.extract_structured_fields.v1
+- kernel_demo.generate_report.v1
 
-## Provider Policy Contract
+## Schemas
 
-Provider policies use `provider_policy_ref` and the ADR-0007 nested retry contract.
+- kernel.schemas.compare_classify_input_v1
+- kernel.schemas.compare_classify_output_v1
+- kernel.schemas.compose_persuasive_text_input_v1
+- kernel.schemas.compose_persuasive_text_output_v1
+- kernel.schemas.compose_reply_input_v1
+- kernel.schemas.compose_reply_output_v1
+- kernel.schemas.extract_input_v1
+- kernel.schemas.extract_output_v1
+- kernel.schemas.generate_document_input_v1
+- kernel.schemas.generate_document_output_v1
+- kernel.schemas.generate_gap_rewrites_input_v1
+- kernel.schemas.generate_gap_rewrites_output_v1
+- kernel.schemas.generate_questions_input_v1
+- kernel.schemas.generate_questions_output_v1
+- kernel.schemas.issue_detection_input_v1
+- kernel.schemas.issue_detection_output_v1
+- kernel.schemas.score_match_input_v1
+- kernel.schemas.score_match_output_v1
+- kernel.schemas.score_multidim_input_v1
+- kernel.schemas.score_multidim_output_v1
+- kernel.schemas.synthesize_angle_input_v1
+- kernel.schemas.synthesize_angle_output_v1
+- kernel_demo.extract_input_v1
+- kernel_demo.extract_output_v1
+- kernel_demo.generic_text_input_v1
+- kernel_demo.issues_output_v1
+- kernel_demo.report_output_v1
 
-Current retry shape:
+## Quotas
 
-```text
-retry_policy.transport.owner
-retry_policy.transport.max_attempts
-retry_policy.transport.litellm_num_retries_per_attempt
+- kernel_demo.guest_quota_v1
 
-retry_policy.validation.owner
-retry_policy.validation.max_attempts
+## Handoffs
 
-retry_policy.hard_limits.max_physical_provider_calls_per_action
-```
-
-Legacy flat fields such as `max_retries` are rejected by the loader.
+- kernel_demo_source_to_target_v1

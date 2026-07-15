@@ -52,6 +52,9 @@ def render_event_catalog_markdown() -> str:
     lines = [
         "# Event Catalog",
         "",
+        "<!-- Generated file. Do not edit by hand. -->",
+        "Canonical source: configs/kernel/platform_events.yaml.",
+        "",
         "Generated-doc mirror of the MVP-A platform event taxonomy from "
         "`configs/kernel/platform_events.yaml`.",
         "",

@@ -13,6 +13,8 @@ python scripts/agent/runner.py doctor
 python scripts/agent/runner.py quick-check
 python scripts/agent/runner.py frontend-check
 python scripts/agent/runner.py full-check
+python scripts/agent/runner.py validate-docs
+python scripts/agent/runner.py generate-docs --check
 ```
 
 `python scripts/agent/runner.py <command>` is the canonical cross-platform interface. Use
@@ -31,6 +33,9 @@ GitHub Actions runs this same baseline command on both Linux and Windows, and th
 
 Python dependency management uses `uv`, not `pip`. Use `uv add <package>` for runtime dependencies,
 `uv add --dev <package>` for dev dependencies, and do not hand-edit `uv.lock`.
+
+Generated docs are written by `generate-docs`. Use `generate-docs --check` in review and CI to
+detect drift without changing tracked files.
 
 `full-check` runs the baseline, locked frontend compile checks, and the implemented Freelancer suite
 tests. Kernel and browser smoke commands will be added only when feature issues deliver real vertical

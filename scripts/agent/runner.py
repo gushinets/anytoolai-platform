@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 from collections.abc import Sequence
 from pathlib import Path
@@ -244,6 +245,10 @@ def validate_architecture() -> int:
     return run([sys.executable, "scripts/agent/validate_architecture.py"])
 
 
+def validate_docs() -> int:
+    return run([sys.executable, "scripts/agent/validate_docs.py"])
+
+
 def quick_check() -> int:
     return run_with_env([sys.executable, "scripts/agent/quick_check.py"], baseline_env())
 
@@ -317,53 +322,36 @@ def collect_context() -> int:
     return 0
 
 
-def generate_docs() -> int:
+def generate_docs(*, check: bool = False) -> int:
+    script_dir = str(Path(__file__).resolve().parent)
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+    from docs_generation import render_documents, write_documents
+
     generated_dir = ROOT / "docs" / "generated"
-    generated_dir.mkdir(parents=True, exist_ok=True)
+    if not check:
+        write_documents(generated_dir)
+        print("Generated docs refreshed")
+        return 0
 
-    action_registry = generated_dir / "action-registry.md"
-    lines = [
-        "# Action Registry",
-        "",
-        "Generated-doc mirror of MVP-A Wave 1 action definitions.",
-        "",
-        "All action types are product-neutral and should be runnable through the generic action "
-        "runner.",
-        "",
-        "| Old atom | Platform action type |",
-        "|---|---|",
-        *[f"| {old_atom} | {action_type} |" for old_atom, action_type in ACTION_REGISTRY_ROWS],
-        "",
-        "`generate_proposal` is not a platform action type.",
-        "",
-    ]
-    action_registry.write_text("\n".join(lines), encoding="utf-8")
-
-    taxonomy_module_path = (
-        ROOT
-        / "packages"
-        / "backend"
-        / "platform-core"
-        / "src"
-        / "anytoolai_platform_core"
-        / "events"
-        / "taxonomy.py"
-    )
-    spec = importlib.util.spec_from_file_location(
-        "anytoolai_platform_core.events.taxonomy",
-        taxonomy_module_path,
-    )
-    if spec is None or spec.loader is None:
-        raise RuntimeError("unable to load platform event taxonomy module for docs generation")
-    taxonomy_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(taxonomy_module)
-
-    event_catalog = generated_dir / "event-catalog.md"
-    event_catalog.write_text(
-        taxonomy_module.render_event_catalog_markdown(),
-        encoding="utf-8",
-    )
-    print("Generated docs refreshed")
+    with tempfile.TemporaryDirectory(prefix="anytoolai-generated-docs-") as temporary:
+        temporary_dir = Path(temporary)
+        write_documents(temporary_dir)
+        drift: list[str] = []
+        for name in sorted(render_documents()):
+            tracked = generated_dir / name
+            candidate = temporary_dir / name
+            if not tracked.exists() or tracked.read_bytes() != candidate.read_bytes():
+                drift.append(name)
+    if drift:
+        for name in drift:
+            print(
+                f"[DOCGEN001] docs/generated/{name} is stale. "
+                "Run: python scripts/agent/runner.py generate-docs",
+                file=sys.stderr,
+            )
+        return 1
+    print("Generated documentation is current")
     return 0
 
 
@@ -379,6 +367,7 @@ COMMANDS = {
     "doctor": doctor,
     "validate-configs": validate_configs,
     "validate-architecture": validate_architecture,
+    "validate-docs": validate_docs,
     "quick-check": quick_check,
     "frontend-check": frontend_check,
     "full-check": full_check,
@@ -392,11 +381,21 @@ COMMANDS = {
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run AnytoolAI agent and dev commands.")
     parser.add_argument("command", choices=COMMANDS)
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Check generated documents without modifying tracked files.",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
+    if args.check:
+        if args.command != "generate-docs":
+            print("--check is only valid with generate-docs", file=sys.stderr)
+            return 2
+        return generate_docs(check=True)
     return COMMANDS[args.command]()
 
 
