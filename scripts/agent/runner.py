@@ -171,8 +171,35 @@ def run_sequence(commands: Sequence[Sequence[str]]) -> int:
     for command in commands:
         exit_code = run(command)
         if exit_code != 0:
+            print(
+                "CHECK FAILED. Smallest rerun: " + " ".join(command),
+                file=sys.stderr,
+            )
             return exit_code
     return 0
+
+
+def probe_tool(tool: str) -> tuple[bool, str]:
+    executable = shutil.which(tool)
+    if executable is None:
+        return False, "not found"
+    command = [executable, "version"] if tool == "docker" else [executable, "--version"]
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=runner_env(),
+            shell=False,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return False, f"unusable ({exc})"
+    output = (completed.stdout or completed.stderr).strip().splitlines()
+    detail = output[0] if output else f"exit {completed.returncode}"
+    return completed.returncode == 0, f"{executable} ({detail})"
 
 
 def doctor() -> int:
@@ -190,14 +217,15 @@ def doctor() -> int:
             errors.append(f"Missing required Python module: {module}")
 
     for tool in REQUIRED_TOOLS:
-        path = shutil.which(tool)
-        print(f"Required tool {tool}: {path if path else 'not found'}")
-        if not path:
-            errors.append(f"Missing required tool: {tool}")
+        usable, detail = probe_tool(tool)
+        print(f"Required tool {tool}: {detail}")
+        if not usable:
+            errors.append(f"Required tool is unavailable: {tool}")
 
     for tool in OPTIONAL_TOOLS:
-        path = shutil.which(tool)
-        print(f"Optional tool {tool}: {path if path else 'not found'}")
+        usable, detail = probe_tool(tool)
+        status = "ok" if usable else "warning"
+        print(f"Optional tool {tool}: {status} - {detail}")
 
     if errors:
         for error in errors:
@@ -220,8 +248,21 @@ def quick_check() -> int:
     return run_with_env([sys.executable, "scripts/agent/quick_check.py"], baseline_env())
 
 
+def frontend_check() -> int:
+    return run_sequence(
+        [
+            ["pnpm", "install", "--frozen-lockfile"],
+            ["pnpm", "-r", "typecheck"],
+            ["pnpm", "-r", "build"],
+        ]
+    )
+
+
 def full_check() -> int:
     exit_code = quick_check()
+    if exit_code != 0:
+        return exit_code
+    exit_code = frontend_check()
     if exit_code != 0:
         return exit_code
     env = baseline_env()
@@ -256,16 +297,24 @@ def full_check() -> int:
             quick_check_python(),
             "-m",
             "pytest",
-            "tests/e2e",
             "packages/backend/product-platforms/freelancer-suite/tests",
         ],
         env,
     )
 
 
-def kernel_smoke() -> int:
-    print("Kernel smoke placeholder: runtime implementation will be added in MVP-A slices.")
-    return run([sys.executable, "-m", "pytest", "tests/e2e", "-q"])
+def collect_context() -> int:
+    print(f"Repository: {ROOT}")
+    for command in (
+        ["git", "status", "--short"],
+        ["git", "diff", "--stat"],
+        [sys.executable, "--version"],
+        [uv_executable(), "--version"],
+    ):
+        exit_code = run(command)
+        if exit_code != 0:
+            print(f"Context section unavailable: {' '.join(command)}", file=sys.stderr)
+    return 0
 
 
 def generate_docs() -> int:
@@ -326,22 +375,17 @@ def dev_down() -> int:
     return run(["docker", "compose", "-f", "infra/compose/docker-compose.yml", "down"])
 
 
-def reset_db() -> int:
-    print("Reset DB placeholder.")
-    return 0
-
-
 COMMANDS = {
     "doctor": doctor,
     "validate-configs": validate_configs,
     "validate-architecture": validate_architecture,
     "quick-check": quick_check,
+    "frontend-check": frontend_check,
     "full-check": full_check,
-    "kernel-smoke": kernel_smoke,
+    "collect-context": collect_context,
     "generate-docs": generate_docs,
     "dev-up": dev_up,
     "dev-down": dev_down,
-    "reset-db": reset_db,
 }
 
 

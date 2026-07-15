@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": {"build":"echo build kernel-demo-ce","typecheck":"tsc --noEmit","lint":"echo lint kernel-demo-ce"},
+  "scripts": {"build":"tsc --noEmit","typecheck":"tsc --noEmit","lint":"tsc --noEmit"},
   "dependencies": {"@anytoolai/ce-kit":"workspace:*","react":"^19.0.0","react-dom":"^19.0.0","wxt":"^0.20.0"},
   "devDependencies": {"typescript":"^5.6.0"}
 }

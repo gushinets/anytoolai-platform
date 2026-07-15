@@ -63,7 +63,7 @@ Deep rules live in `docs/architecture/llm-runtime.md`.
 For any non-trivial work:
 
 1. Create or update an execution plan in `docs/exec-plans/active/`.
-2. Run `just doctor`.
+2. Run `python scripts/agent/runner.py doctor`.
 3. Read the relevant architecture docs.
 4. Keep changes small and reviewable.
 
@@ -71,32 +71,28 @@ Feature PRs own the tests and documentation for the behavior they introduce. Do 
 silent skips, permanent expected failures, or ignored failures as evidence that unfinished MVP-A/MVP-B
 behavior works.
 
-`just` is the preferred local command interface. If `just` is unavailable or a shell integration fails,
-use the shell-independent fallback command that matches the task:
-
-- canonical baseline backend checks: `python scripts/agent/quick_check.py`
-- repo checks in the managed environment: `uv run python scripts/agent/runner.py <command>`
+`python scripts/agent/runner.py <command>` is the canonical Windows/Linux command interface.
+`just` recipes are optional thin aliases.
 
 Python package management uses `uv`, not `pip`.
 
 - Use `uv add <package>` for runtime dependencies.
 - Use `uv add --dev <package>` for dev dependencies.
-- Use `uv run python scripts/agent/runner.py <command>` for repo checks through the managed environment.
+- Use `python scripts/agent/runner.py <command>` for repository checks.
 - Do not hand-edit `uv.lock`.
 
-Linux alias when Python 3 is exposed as `python3`: `python3 scripts/agent/quick_check.py`
-Windows PowerShell fallback when the Python launcher is configured: `py -3 scripts/agent/quick_check.py`
+Linux alias when Python 3 is exposed as `python3`: `python3 scripts/agent/runner.py <command>`
 
 ## Validation commands
 
 Fast check:
 
 ```bash
-just quick-check
+python scripts/agent/runner.py quick-check
 ```
 
 Baseline quick-check includes config validation, architecture validation, and a DB-free backend pytest subset.
-It does not provision a test DB and does not include frontend checks, `tests/e2e`, or `kernel-smoke`.
+It does not provision a test DB and does not include frontend checks.
 The Python entrypoint self-manages `.quick-check-venv` instead of installing into a system interpreter.
 It must re-exec into that environment even if the caller already has another virtualenv active.
 It strips caller-provided `PYTHONPATH`, so no manual `PYTHONPATH` setup is required.
@@ -105,41 +101,29 @@ GitHub Actions runs this same command on Linux CI and Windows PowerShell, and th
 Full check:
 
 ```bash
-just full-check
+python scripts/agent/runner.py full-check
 ```
 
 Use full check or dedicated smoke commands for broader validation outside the baseline gate.
-`just full-check` currently runs the same baseline and then `tests/e2e`.
-Those e2e placeholders are DB-free today; when DB-backed coverage is introduced, use an explicit test-only DB contract there instead of changing quick-check.
+`full-check` runs the baseline, locked frontend checks, and implemented product-suite tests. Smoke
+checks become required only after a feature issue supplies a real vertical slice.
 
 Config validation:
 
 ```bash
-just validate-configs
+python scripts/agent/runner.py validate-configs
 ```
 
 Architecture validation:
 
 ```bash
-just validate-architecture
+python scripts/agent/runner.py validate-architecture
 ```
 
-Kernel smoke:
+Frontend checks:
 
 ```bash
-just kernel-smoke
-```
-
-Fallback form:
-
-```bash
-python scripts/agent/quick_check.py
-```
-
-Linux alias:
-
-```bash
-python3 scripts/agent/quick_check.py
+python scripts/agent/runner.py frontend-check
 ```
 
 ## If stuck

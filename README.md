@@ -9,57 +9,32 @@ alongside the implementation.
 ## Quick start
 
 ```bash
-just doctor
-just quick-check
-just validate-configs
-just validate-architecture
+python scripts/agent/runner.py doctor
+python scripts/agent/runner.py quick-check
+python scripts/agent/runner.py frontend-check
+python scripts/agent/runner.py full-check
 ```
 
-`just` is the preferred human-facing command interface.
-
-The canonical baseline backend command is:
-
-```bash
-python scripts/agent/quick_check.py
-```
-
-On shells where Python 3 is exposed as `python3`, use:
-
-```bash
-python3 scripts/agent/quick_check.py
-```
-
-Windows PowerShell fallback when the Python launcher is configured:
-
-```powershell
-py -3 scripts/agent/quick_check.py
-```
-
-`just quick-check` is a thin wrapper around the same entrypoint. The baseline gate includes:
+`python scripts/agent/runner.py <command>` is the canonical cross-platform interface. Use
+`python3` where that is the Python 3 executable. `just` recipes are optional thin aliases.
+The baseline gate includes:
 
 - config validation
 - architecture validation
 - a DB-free backend pytest subset
 
-It intentionally excludes frontend checks, `tests/e2e`, `kernel-smoke`, and any test DB provisioning.
+It intentionally excludes frontend checks and any test DB provisioning.
 The script self-manages `.quick-check-venv` so it does not need to install packages into a system Python.
 It always re-execs into `.quick-check-venv`, even if you started from another active virtualenv.
 It strips caller-provided `PYTHONPATH`, so no manual `PYTHONPATH` setup is required.
 GitHub Actions runs this same baseline command on both Linux and Windows, and the backend workflow is required on pull requests plus pushes to `main`.
 
-Other Python-owned commands still route through the runner:
-
-```bash
-uv run python scripts/agent/runner.py doctor
-uv run python scripts/agent/runner.py full-check
-```
-
 Python dependency management uses `uv`, not `pip`. Use `uv add <package>` for runtime dependencies,
 `uv add --dev <package>` for dev dependencies, and do not hand-edit `uv.lock`.
 
-`just full-check` runs the same baseline first and then runs `tests/e2e`.
-Today those e2e placeholders are DB-free, so no extra test DB settings are required.
-When DB-backed e2e coverage is added, it must use an explicit test-only database configuration; `quick-check` will remain DB-free and must not provision or select a test DB implicitly.
+`full-check` runs the baseline, locked frontend compile checks, and the implemented Freelancer suite
+tests. Kernel and browser smoke commands will be added only when feature issues deliver real vertical
+slices.
 
 ## MVPs
 

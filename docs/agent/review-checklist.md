@@ -32,7 +32,7 @@
 
 ## Validation
 
-- [ ] `just quick-check`
-- [ ] `just validate-configs`
-- [ ] `just validate-architecture`
+- [ ] `python scripts/agent/runner.py quick-check`
+- [ ] `python scripts/agent/runner.py validate-configs`
+- [ ] `python scripts/agent/runner.py validate-architecture`
 - [ ] Relevant smoke test
