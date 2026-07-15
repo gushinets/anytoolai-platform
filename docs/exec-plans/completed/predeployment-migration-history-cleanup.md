@@ -2,10 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-06-22
 - Last updated: 2026-06-22
+- Completion note: superseded by the accepted migration compatibility contract in
+  `docs/adr/0007-llm-runtime-pydanticai-litellm-sdk.md` and the current migration chain.
 
 ## Goal
 

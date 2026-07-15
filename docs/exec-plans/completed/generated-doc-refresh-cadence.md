@@ -2,8 +2,10 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
+- Completion note: superseded by ANY-128 and
+  `any-122-agent-first-repository-transition.md`.
 
 ## Goal
 

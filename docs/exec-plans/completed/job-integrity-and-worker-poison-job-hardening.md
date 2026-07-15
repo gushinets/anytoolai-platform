@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: complete
+- State: completed
 - Owner: agent
 - Created: 2026-07-13
 - Last updated: 2026-07-13

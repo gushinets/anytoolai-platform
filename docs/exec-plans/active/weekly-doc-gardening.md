@@ -4,7 +4,12 @@
 
 - State: active
 - Owner: agent
-- Last run: 2026-07-08
+- Created: 2026-07-08
+- Last updated: 2026-07-15
+- Review date: 2026-07-15
+- Last run: 2026-07-15
+- Next action: repeat the inventory and discrepancy review after the next MVP feature merge.
+- Blocker: none
 
 ## Goal
 
@@ -34,3 +39,16 @@ Keep repository knowledge aligned with code behavior.
 - [x] `python scripts/agent/runner.py validate-configs`
 - [x] `python scripts/agent/runner.py validate-architecture`
 - [x] `python scripts/agent/quick_check.py`
+
+## 2026-07-15 Run Notes
+
+- Inventoried every plan in `active/` and `completed/`; implementation-complete plans were
+  verified against goals, tests, and merged history before archival.
+- Retained the ANY-122 transition, this recurring gardening plan, and the MVP delivery map as the
+  authoritative active plans.
+- Marked older architecture audits as superseded by current repository documentation and ANY-126.
+- Recorded generated-document freshness under ANY-128 instead of keeping an overlapping plan active.
+- Rechecked indexed links and corrected stale repository orientation, command evidence, and provider
+  gateway paths.
+- Recorded truthful-CI, worktree isolation, structured diagnostics, and placeholder-smoke gaps in
+  the quality and debt trackers.
