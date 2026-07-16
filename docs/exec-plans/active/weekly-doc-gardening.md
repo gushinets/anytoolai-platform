@@ -5,10 +5,10 @@
 - State: active
 - Owner: agent
 - Created: 2026-07-08
-- Last updated: 2026-07-15
+- Last updated: 2026-07-16
 - Review date: 2026-07-15
 - Last run: 2026-07-15
-- Next action: repeat the inventory and discrepancy review after the next MVP feature merge.
+- Next action: repeat the inventory, papercut, and discrepancy review after the next MVP feature merge.
 - Blocker: none
 
 ## Goal
@@ -23,6 +23,8 @@ Keep repository knowledge aligned with code behavior.
 - [x] Update `docs/tech-debt-tracker.md`.
 - [x] Move completed execution plans.
 - [x] Open targeted cleanup tasks for stale docs.
+- [ ] Review `PAPERCUTS.md`, consolidate duplicates, and promote recurring actionable friction into
+  documentation, helper scripts, tech debt, or Linear issues.
 
 ## 2026-07-08 Run Notes
 

@@ -1,0 +1,22 @@
+# Agent Papercuts
+
+This tracked log captures minor repository and tooling friction encountered by agents. Search for the
+same underlying problem before adding an entry, append entries oldest-to-newest, and keep sensitive
+information out of the log. Product bugs, blockers, and tracked issues belong in their established
+workflows.
+
+Use the agent environment's local time. Use the exact model or agent identity when available;
+otherwise use `unknown`.
+
+```text
+## YYYY-MM-DD HH:MM - <model or agent, or unknown> - <operating system>
+
+<What you were doing> → <what got in the way>. Include a likely cause, workaround, or suggested fix
+when known.
+```
+
+## 2026-07-16 13:02 - Codex (GPT-5) - Windows
+
+Running the canonical `quick-check` → the isolated environment removed editable packages, then could
+not restore build requirements because sandbox networking blocked PyPI. Rerunning with approved
+network access restored the dependencies and passed all checks.

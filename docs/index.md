@@ -80,5 +80,6 @@ This directory is the system of record for agents. Keep it current. If a decisio
 
 ## Maintenance
 
+- `../PAPERCUTS.md` — minor agent workflow friction reviewed during documentation gardening.
 - `quality-score.md`
 - `tech-debt-tracker.md`

@@ -139,6 +139,26 @@ Do not guess. Update the execution plan with the blocker, run
 `python scripts/agent/runner.py collect-context` (optionally with `--failure-file`), and ask for
 the missing contract or decision.
 
+## Log papercuts
+
+When you encounter minor repository or tooling friction while working—a failed tool call, confusing
+setup, flaky command, stale cache, misleading error, missing helper, or non-obvious gotcha—record it
+in the repository-root `PAPERCUTS.md`, including when working from a nested directory.
+
+Create the file if needed. Before appending, search it for the same underlying problem and do not add
+a duplicate. Use the environment's local time and this format:
+
+```text
+## YYYY-MM-DD HH:MM - <model or agent, or unknown> - <operating system>
+
+<What you were doing> → <what got in the way>. Include a likely cause, workaround, or suggested fix
+when known.
+```
+
+Keep entries concise and redact secrets, credentials, personal data, and unnecessary logs. Log
+without interrupting the main task. Papercuts are minor workflow friction; this file is not a
+completed-work log or a substitute for product bugs, blockers, or tracked issues.
+
 ## Agent style
 
 Prefer boring, explicit, searchable code. Avoid clever abstractions until a second product or workflow proves the need.
