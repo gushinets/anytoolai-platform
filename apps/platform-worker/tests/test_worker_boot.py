@@ -176,6 +176,21 @@ class UnsafeRawTextProviderAdapter:
         )
 
 
+class FailOnSecondCallProviderAdapter:
+    def __init__(self) -> None:
+        self.call_count = 0
+        self._delegate = FakeProviderAdapter(FIXTURE_ROOT)
+
+    async def complete(self, request: Any) -> Any:
+        self.call_count += 1
+        if self.call_count == 2:
+            raise RuntimeError(
+                "provider echoed prompt="
+                f"{request.prompt}; user_text=deadline budget deliverables"
+            )
+        return await self._delegate.complete(request)
+
+
 class CancelledProviderAdapter:
     async def complete(self, request: Any) -> Any:
         del request
@@ -187,11 +202,12 @@ def _seed_job(
     *,
     input_payload: Any = None,
     created_at: Any = None,
+    workflow_id: str = "kernel_demo.single_action_extract_v1",
 ) -> JobRecord:
     metadata = {} if input_payload is None else {"input": input_payload}
     with transaction_boundary(session_factory) as session:
         scenario = ScenarioSessionRepository(session).create(_scenario(**metadata))
-        job = _job(scenario.id)
+        job = replace(_job(scenario.id), workflow_id=workflow_id)
         if created_at is not None:
             job = replace(job, created_at=created_at)
         return JobRepository(session).create(job)
@@ -726,14 +742,19 @@ def test_production_worker_provider_failure_uses_generic_safe_message(
 def test_production_worker_provider_failure_preserves_claimed_job_recovery_state(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
+    adapter = FailOnSecondCallProviderAdapter()
     job = _seed_job(
         session_factory,
-        input_payload={"source_text": "deadline budget deliverables"},
+        input_payload={
+            "source_text": "deadline budget deliverables",
+            "taxonomy": ["timeline", "scope"],
+        },
+        workflow_id="kernel_demo.extract_detect_report_v1",
     )
     worker = build_worker(
         session_factory=session_factory,
         config_root=CONFIG_ROOT,
-        provider_adapters={"fake": UnsafeRawTextProviderAdapter()},
+        provider_adapters={"fake": adapter},
     )
 
     result = asyncio.run(worker.process_next_job())
@@ -747,6 +768,27 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
         stored_job = session.execute(
             sa.select(jobs_table).where(jobs_table.c.id == job.id)
         ).mappings().one()
+        action_runs = list(
+            session.execute(
+                sa.select(action_runs_table)
+                .where(action_runs_table.c.job_id == job.id)
+                .order_by(action_runs_table.c.created_at, action_runs_table.c.id)
+            ).mappings()
+        )
+        provider_calls = list(
+            session.execute(
+                sa.select(provider_calls_table)
+                .where(provider_calls_table.c.job_id == job.id)
+                .order_by(provider_calls_table.c.created_at, provider_calls_table.c.id)
+            ).mappings()
+        )
+        artifacts = list(
+            session.execute(
+                sa.select(artifacts_table)
+                .where(artifacts_table.c.job_id == job.id)
+                .order_by(artifacts_table.c.created_at, artifacts_table.c.id)
+            ).mappings()
+        )
         events = list(
             session.execute(
                 sa.select(event_log_table)
@@ -755,26 +797,44 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
             ).mappings()
         )
 
+    assert adapter.call_count == 2
     workflow_state = stored_job["metadata"]["workflow_state"]
-    assert workflow_state["steps"]["extract"]["status"] == "failed"
-    assert workflow_state["steps"]["extract"]["error_code"] == "provider_request_failed"
+    assert workflow_state["steps"]["extract"]["status"] == "succeeded"
+    assert workflow_state["steps"]["detect_issues"]["status"] == "failed"
+    assert workflow_state["steps"]["detect_issues"]["error_code"] == "provider_request_failed"
+    assert [row["step_id"] for row in action_runs] == ["extract", "detect_issues"]
+    assert [row["status"].value for row in action_runs] == ["succeeded", "failed"]
+    assert len(provider_calls) == 2
+    assert len(artifacts) == 1
     event_types = [event_row["event_type"] for event_row in events]
-    assert {
+    assert event_types == [
         "workflow.started",
+        "workflow.step_started",
+        "action.started",
+        "provider.request_started",
+        "provider.request_succeeded",
+        "artifact.created",
+        "action.succeeded",
+        "workflow.step_succeeded",
+        "workflow.step_started",
         "action.started",
         "provider.request_started",
         "provider.request_failed",
         "action.failed",
-        "workflow.step_started",
         "workflow.step_failed",
         "workflow.failed",
-    }.issubset(event_types)
-    assert event_types.count("workflow.started") == 1
-    workflow_step_started = next(
+    ]
+    workflow_step_started_events = [
         event_row for event_row in events if event_row["event_type"] == "workflow.step_started"
+    ]
+    workflow_step_succeeded = next(
+        event_row for event_row in events if event_row["event_type"] == "workflow.step_succeeded"
     )
     action_failed = next(
         event_row for event_row in events if event_row["event_type"] == "action.failed"
+    )
+    provider_failed = next(
+        event_row for event_row in events if event_row["event_type"] == "provider.request_failed"
     )
     workflow_step_failed = next(
         event_row for event_row in events if event_row["event_type"] == "workflow.step_failed"
@@ -782,11 +842,16 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
     workflow_failed = next(
         event_row for event_row in events if event_row["event_type"] == "workflow.failed"
     )
-    assert workflow_step_started["job_id"] == job.id
-    assert workflow_step_started["properties"]["step_id"] == "extract"
+    assert workflow_step_started_events[0]["job_id"] == job.id
+    assert workflow_step_started_events[0]["properties"]["step_id"] == "extract"
+    assert workflow_step_started_events[1]["properties"]["step_id"] == "detect_issues"
+    assert workflow_step_succeeded["action_run_id"] == action_runs[0]["id"]
+    assert workflow_step_succeeded["artifact_id"] == artifacts[0]["id"]
     assert workflow_step_failed["job_id"] == job.id
     assert workflow_step_failed["action_run_id"] == action_failed["action_run_id"]
-    assert workflow_step_failed["properties"]["step_id"] == "extract"
+    assert workflow_step_failed["properties"]["step_id"] == "detect_issues"
     assert workflow_step_failed["properties"]["error_code"] == "provider_request_failed"
+    assert provider_failed["provider_call_id"] == provider_calls[1]["id"]
+    assert provider_failed["action_run_id"] == action_runs[1]["id"]
     assert workflow_failed["job_id"] == job.id
     assert workflow_failed["properties"]["error_code"] == "provider_request_failed"

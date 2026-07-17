@@ -18,6 +18,7 @@ from anytoolai_platform_core.actions.runner import (
     ActionInputValidationError,
     ActionRunService,
     ActionRunner,
+    _recover_action_events_after_rollback,
 )
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
@@ -146,7 +147,12 @@ class InvalidStructuredOutputAdapter:
 
 def _event_rows(session: sa.orm.Session) -> list[dict[str, Any]]:
     return list(
-        session.execute(sa.select(event_log_table)).mappings()
+        session.execute(
+            sa.select(event_log_table).order_by(
+                event_log_table.c.timestamp,
+                event_log_table.c.event_id,
+            )
+        ).mappings()
     )
 
 
@@ -398,6 +404,52 @@ def test_action_runner_persists_succeeded_state_when_later_failure_rolls_back_tr
 
     assert action_run["status"].value == "succeeded"
     assert action_run["output_artifact_id"] is not None
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_succeeded": 1,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+
+
+def test_action_recovery_rerun_does_not_duplicate_recovered_events(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with pytest.raises(RuntimeError, match="force rollback"):
+        with transaction_boundary(session_factory) as session:
+            runner = _build_runner(session)
+            result = asyncio.run(
+                runner.run(
+                    "text.extract_structured_fields",
+                    "kernel_demo.extract_structured_fields_v1",
+                    {"source_text": "deadline budget deliverables"},
+                    _context(
+                        step_id="extract",
+                        action_type="text.extract_structured_fields",
+                        action_config_id="kernel_demo.extract_structured_fields_v1",
+                    ),
+                )
+            )
+            raise RuntimeError(f"force rollback {result.action_run_id}")
+
+    with transaction_boundary(session_factory) as session:
+        action_run_id = session.execute(sa.select(action_runs_table.c.id)).scalar_one()
+
+    _recover_action_events_after_rollback(session_factory, action_run_id)
+
+    with transaction_boundary(session_factory) as session:
+        events = _event_rows(session)
+
+    assert [event_row["event_type"] for event_row in events] == [
+        "action.started",
+        "provider.request_started",
+        "provider.request_succeeded",
+        "artifact.created",
+        "action.succeeded",
+    ]
     assert _event_counts(events) == Counter(
         {
             "action.started": 1,

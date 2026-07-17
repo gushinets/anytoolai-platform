@@ -138,7 +138,14 @@ def _seed_context_scenario(
 
 
 def _event_rows(session: sa.orm.Session) -> list[dict[str, Any]]:
-    return list(session.execute(sa.select(event_log_table)).mappings())
+    return list(
+        session.execute(
+            sa.select(event_log_table).order_by(
+                event_log_table.c.timestamp,
+                event_log_table.c.event_id,
+            )
+        ).mappings()
+    )
 
 
 def _event_counts(rows: list[dict[str, Any]]) -> Counter[str]:
@@ -986,6 +993,23 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
             "workflow.failed": 1,
         }
     )
+    assert [row["event_type"] for row in events] == [
+        "workflow.started",
+        "workflow.step_started",
+        "action.started",
+        "provider.request_started",
+        "provider.request_succeeded",
+        "artifact.created",
+        "action.succeeded",
+        "workflow.step_succeeded",
+        "workflow.step_started",
+        "action.started",
+        "provider.request_started",
+        "provider.request_failed",
+        "action.failed",
+        "workflow.step_failed",
+        "workflow.failed",
+    ]
     workflow_started = _event_by_type(events, "workflow.started")[0]
     workflow_step_succeeded = _event_by_type(events, "workflow.step_succeeded")[0]
     workflow_step_failed = _event_by_type(events, "workflow.step_failed")[0]

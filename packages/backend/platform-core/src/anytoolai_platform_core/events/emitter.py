@@ -56,6 +56,8 @@ class EventEmitter:
         context: ExecutionContext,
         result_status: str | None = None,
         properties: dict[str, Any] | None = None,
+        *,
+        timestamp: datetime | None = None,
     ) -> EventEnvelope:
         self._validate_event_type(event_type)
         self._require_dimension(context.tenant_id, "tenant_id")
@@ -66,7 +68,7 @@ class EventEmitter:
         envelope = EventEnvelope(
             event_id=new_ordered_id("event"),
             event_type=event_type,
-            timestamp=utc_now(),
+            timestamp=timestamp or utc_now(),
             tenant_id=context.tenant_id,
             region=context.region,
             product_id=context.product_id,

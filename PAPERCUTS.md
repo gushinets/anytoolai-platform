@@ -20,3 +20,9 @@ when known.
 Running the canonical `quick-check` → the isolated environment removed editable packages, then could
 not restore build requirements because sandbox networking blocked PyPI. Rerunning with approved
 network access restored the dependencies and passed all checks.
+## 2026-07-17 15:15 - Codex (GPT-5) - Windows
+
+Running focused `uv run pytest` suites for workflow recovery review в†’ `uv` first tried to use a
+blocked global cache path, and `pytest` then failed to enumerate a reused `.tmp\\pytest-of-jackd`
+base temp directory with `PermissionError`. Using repo-local `UV_CACHE_DIR` plus a fresh
+`--basetemp` let the suites pass; the harness could set those defaults automatically for agent runs.

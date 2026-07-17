@@ -32,6 +32,7 @@ from anytoolai_platform_core.providers.models import (
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.storage.transactions import (
+    RollbackRecoveryPhase,
     register_rollback_recovery_callback,
     transaction_boundary,
 )
@@ -628,12 +629,21 @@ class ProviderGateway:
             return
         register_rollback_recovery_callback(
             session,
-            lambda recovery_session_factory: _persist_provider_call_after_rollback(
+            lambda recovery_session_factory: _recover_provider_call_row_after_rollback(
                 recovery_session_factory,
                 recovery_state["record"],
-                emit_events=emit_events,
             ),
+            phase=RollbackRecoveryPhase.provider_rows,
         )
+        if emit_events:
+            register_rollback_recovery_callback(
+                session,
+                lambda recovery_session_factory: _recover_provider_call_events_after_rollback(
+                    recovery_session_factory,
+                    recovery_state["record"].id,
+                ),
+                phase=RollbackRecoveryPhase.provider_events,
+            )
 
     @staticmethod
     def _update_recovery_state(
@@ -903,21 +913,32 @@ class ProviderGateway:
         return str(value)[:_MAX_STRING_LENGTH]
 
 
-def _persist_provider_call_after_rollback(
+def _recover_provider_call_row_after_rollback(
     recovery_session_factory: Any,
     record: ProviderCallRecord,
-    *,
-    emit_events: bool,
 ) -> None:
     with transaction_boundary(recovery_session_factory) as recovery_session:
         repository = ProviderCallRepository(recovery_session)
         existing = repository.get(record.id)
         if existing is None:
-            stored = repository.create(record)
-            if emit_events:
-                _emit_recovered_provider_events(recovery_session, stored)
+            repository.create(record)
             return
         repository.update(record)
+
+
+def _recover_provider_call_events_after_rollback(
+    recovery_session_factory: Any,
+    provider_call_id: str,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        repository = ProviderCallRepository(recovery_session)
+        stored = repository.get(provider_call_id)
+        if stored is None:
+            return
+        _emit_recovered_provider_events(
+            EventLogRepository(recovery_session),
+            stored,
+        )
 
 
 def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
@@ -926,55 +947,68 @@ def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
 
 
 def _emit_recovered_provider_events(
-    session: Session,
+    event_log_repository: EventLogRepository,
     record: ProviderCallRecord,
 ) -> None:
-    event_emitter = EventEmitter(
-        EventLogRepository(session),
-    )
+    event_emitter = EventEmitter(event_log_repository)
     context = _provider_event_context_from_record(
         record,
         pydantic_run_id=record.pydantic_run_id,
     )
-    event_emitter.emit(
-        "provider.request_started",
-        context,
-        properties=_provider_event_properties_from_record(record),
-    )
-    if record.status is ProviderCallStatus.succeeded:
+    if not event_log_repository.exists_event(
+        event_type="provider.request_started",
+        provider_call_id=record.id,
+    ):
         event_emitter.emit(
-            "provider.request_succeeded",
-            _provider_event_context_from_record(
-                record,
-                pydantic_run_id=record.pydantic_run_id,
-                litellm_response_id=record.litellm_response_id,
-            ),
-            result_status=record.status.value,
-            properties=_provider_event_properties_from_record(
-                record,
-                pydantic_run_id=record.pydantic_run_id,
-                litellm_response_id=record.litellm_response_id,
-                total_tokens=record.total_tokens,
-                http_status=record.http_status,
-            ),
+            "provider.request_started",
+            context,
+            properties=_provider_event_properties_from_record(record),
+            timestamp=record.started_at or record.created_at,
         )
+    if record.status is ProviderCallStatus.succeeded:
+        if not event_log_repository.exists_event(
+            event_type="provider.request_succeeded",
+            provider_call_id=record.id,
+        ):
+            event_emitter.emit(
+                "provider.request_succeeded",
+                _provider_event_context_from_record(
+                    record,
+                    pydantic_run_id=record.pydantic_run_id,
+                    litellm_response_id=record.litellm_response_id,
+                ),
+                result_status=record.status.value,
+                properties=_provider_event_properties_from_record(
+                    record,
+                    pydantic_run_id=record.pydantic_run_id,
+                    litellm_response_id=record.litellm_response_id,
+                    total_tokens=record.total_tokens,
+                    http_status=record.http_status,
+                ),
+                timestamp=record.completed_at or record.started_at or record.created_at,
+            )
         return
 
     if record.status in (ProviderCallStatus.failed, ProviderCallStatus.timed_out):
-        event_emitter.emit(
-            "provider.request_failed",
-            _provider_event_context_from_record(
-                record,
-                pydantic_run_id=record.pydantic_run_id,
-            ),
-            result_status=record.status.value,
-            properties=_provider_event_properties_from_record(
-                record,
-                pydantic_run_id=record.pydantic_run_id,
-                error_code=record.error_code,
-                failure_kind=record.failure_kind,
-            ),
-        )
+        if not event_log_repository.exists_event(
+            event_type="provider.request_failed",
+            provider_call_id=record.id,
+        ):
+            event_emitter.emit(
+                "provider.request_failed",
+                _provider_event_context_from_record(
+                    record,
+                    pydantic_run_id=record.pydantic_run_id,
+                ),
+                result_status=record.status.value,
+                properties=_provider_event_properties_from_record(
+                    record,
+                    pydantic_run_id=record.pydantic_run_id,
+                    error_code=record.error_code,
+                    failure_kind=record.failure_kind,
+                ),
+                timestamp=record.completed_at or record.started_at or record.created_at,
+            )
 
 
 def _provider_event_context_from_record(

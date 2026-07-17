@@ -399,6 +399,54 @@ def test_event_emitter_persists_round_trip_and_maps_dimensions(
     assert stored.properties["scenario_id"] == "smoke_start"
 
 
+def test_event_emitter_preserves_explicit_replay_timestamp(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    replayed_at = datetime(2026, 7, 13, 10, 30, tzinfo=UTC)
+
+    with transaction_boundary(session_factory) as session:
+        emitter = _build_emitter(session)
+        created = emitter.emit(
+            "workflow.started",
+            make_execution_context(),
+            properties={"workflow_version": 1},
+            timestamp=replayed_at,
+        )
+        stored = EventLogRepository(session).get(created.event_id)
+
+    assert stored is not None
+    assert stored.timestamp == replayed_at
+
+
+def test_event_log_repository_exists_event_can_match_step_id(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        repository = EventLogRepository(session)
+        emitter = EventEmitter(repository)
+        emitter.emit(
+            "workflow.step_failed",
+            make_execution_context(action_run_id="action_run_demo"),
+            result_status="failed",
+            properties={
+                "step_id": "detect_issues",
+                "attempt_count": 1,
+                "error_code": "provider_request_failed",
+            },
+        )
+
+        assert repository.exists_event(
+            event_type="workflow.step_failed",
+            job_id="job_demo",
+            step_id="detect_issues",
+        )
+        assert not repository.exists_event(
+            event_type="workflow.step_failed",
+            job_id="job_demo",
+            step_id="extract",
+        )
+
+
 def test_event_emitter_rejects_missing_tenant_id(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

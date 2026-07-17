@@ -123,8 +123,9 @@ execution context for every action, provider call, artifact, and event.
 
 The conditional claim and `workflow.started` event commit together before action execution. If
 workflow execution fails, the job is marked `failed` with `completed_at`, a safe error code/message,
-and a `workflow.failed` event. Existing rollback-recovery callbacks keep that failure durable when
-the execution transaction escapes.
+and a `workflow.failed` event. If the execution transaction escapes and rolls back, shared
+rollback-recovery orchestration rebuilds the durable workflow/action/provider/artifact history in a
+separate recovery pass without introducing a durable workflow engine.
 
 ## Events
 
@@ -141,6 +142,43 @@ Workflow runtime emits:
 
 Real action executions still emit their normal action/provider/artifact events through
 `ActionRunner`, `ProviderGateway`, and `ArtifactService`.
+
+## Escaped rollback recovery
+
+MVP-A still uses simple sequential execution inside one caller-owned `transaction_boundary()`.
+When a workflow exception escapes that boundary after some rows or events were already flushed,
+runtime code does not rely on ad hoc callback registration order to repair durable history.
+
+Instead, the shared rollback executor runs explicit recovery phases:
+
+1. recover durable runtime rows for artifacts, provider calls, action runs, and the workflow job;
+2. replay only the missing lifecycle events in causal order.
+
+For a failed workflow, the ordered replay contract is:
+
+1. `workflow.started` first when the running job row exists but its start event is missing;
+2. for each persisted step in workflow order:
+   - `workflow.step_started`
+   - child `action.started`
+   - child provider request events in attempt order
+   - child `artifact.created` events
+   - child action terminal event
+   - step terminal event
+3. `workflow.failed` or handler-owned `workflow.canceled` last.
+
+This recovery is idempotent enough to tolerate partial durable state. Existing rows and existing
+events suppress only their own replay. For example, a pre-claimed worker job may already have
+durably committed `workflow.started`; later rollback recovery must preserve that row/event pair
+without duplicating it while still backfilling any missing downstream events.
+
+Replay uses the original transition timestamps where they are available from recovered rows:
+
+- `jobs.started_at` for `workflow.started`
+- `jobs.completed_at` for workflow terminal events
+- related action timestamps for step started/terminal events when available
+
+This keeps escaped rollback recovery causally valid while staying inside MVP-A's non-durable
+sequential-runner scope.
 
 ## Non-goals
 

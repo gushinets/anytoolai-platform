@@ -65,11 +65,22 @@ For these atoms the repo now includes:
 - `platform.event_log` action lifecycle rows
 
 When an executor or input-validation error is raised and the exception escapes the caller's
-`transaction_boundary()`, `ActionRunner` still preserves durable failed action state by replaying
-`platform.action_runs` failed persistence and the `action.failed` event in an independent recovery
-transaction. The original exception is still re-raised to the caller. If the caller catches the
-exception inside the active transaction boundary, the normal in-transaction failed update/event
-path is committed instead.
+`transaction_boundary()`, `ActionRunner` still preserves durable action state through the shared
+rollback-recovery contract. It first replays the final `platform.action_runs` row snapshot in a
+row-recovery phase, then participates in workflow-owned ordered event backfill. The original
+exception is still re-raised to the caller. If the caller catches the exception inside the active
+transaction boundary, the normal in-transaction failed update/event path is committed instead.
+
+Action event recovery is no longer treated as an isolated `action.failed` replay. For a recovered
+action run, the durable event set must stay aligned with the recovered child runtime state:
+
+- `action.started` comes from `action_runs.started_at`
+- provider request events are backfilled from recovered `provider_calls`
+- `artifact.created` is backfilled from recovered artifacts linked to the action run
+- `action.succeeded` or `action.failed` comes from `action_runs.completed_at`
+
+Missing events are emitted only when that specific durable event is absent. Existing action,
+provider, or artifact events are not duplicated just because the recovery callback runs again.
 
 Canonical artifact linkage is also runner-owned: `output_artifact_id` may reference only an
 existing `structured_output` artifact for the same `action_run`. Arbitrary executor metadata values

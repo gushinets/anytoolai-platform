@@ -16,6 +16,7 @@ from anytoolai_platform_core.actions.executor import (
 from anytoolai_platform_core.actions.models import ActionResult, ActionRunRecord, ActionRunStatus
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
+from anytoolai_platform_core.artifacts.service import _emit_recovered_artifact_created_event
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
@@ -23,7 +24,10 @@ from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
+from anytoolai_platform_core.providers.gateway import _emit_recovered_provider_events
+from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.storage.transactions import (
+    RollbackRecoveryPhase,
     register_rollback_recovery_callback,
     transaction_boundary,
 )
@@ -296,17 +300,21 @@ class ActionRunner:
             "provider_policy_ref": provider_policy_ref,
         }
         output_artifact_id = self._latest_structured_output_artifact_id(action_run.id)
-        self._register_failure_recovery(
+        failed_action_run = _build_failed_action_run_record(
             action_run,
             error_code=error_code,
             metadata_updates=metadata_updates,
             output_artifact_id=output_artifact_id,
         )
-        self._action_run_service.mark_failed(
-            action_run,
+        self._register_failure_recovery(
+            failed_action_run,
             error_code=error_code,
             metadata_updates=metadata_updates,
             output_artifact_id=output_artifact_id,
+        )
+        self._action_run_service.mark_failed(
+            failed_action_run,
+            error_code=error_code,
         )
 
     def _error_code_for_exception(self, exc: BaseException) -> str:
@@ -340,22 +348,40 @@ class ActionRunner:
     ) -> None:
         register_rollback_recovery_callback(
             self._session,
-            lambda recovery_session_factory: _persist_failed_action_run_after_rollback(
+            lambda recovery_session_factory: _recover_failed_action_run_row_after_rollback(
                 recovery_session_factory,
                 action_run,
                 error_code=error_code,
                 metadata_updates=metadata_updates,
                 output_artifact_id=output_artifact_id,
             ),
+            phase=RollbackRecoveryPhase.action_rows,
+        )
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _recover_action_events_after_rollback(
+                recovery_session_factory,
+                action_run.id,
+            ),
+            phase=RollbackRecoveryPhase.action_events,
         )
 
     def _register_success_recovery(self, action_run: ActionRunRecord) -> None:
         register_rollback_recovery_callback(
             self._session,
-            lambda recovery_session_factory: _persist_succeeded_action_run_after_rollback(
+            lambda recovery_session_factory: _recover_succeeded_action_run_row_after_rollback(
                 recovery_session_factory,
                 action_run,
             ),
+            phase=RollbackRecoveryPhase.action_rows,
+        )
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _recover_action_events_after_rollback(
+                recovery_session_factory,
+                action_run.id,
+            ),
+            phase=RollbackRecoveryPhase.action_events,
         )
 
 
@@ -447,7 +473,7 @@ def _build_failed_action_run_record(
         status=ActionRunStatus.failed,
         error_code=error_code,
         output_artifact_id=output_artifact_id or record.output_artifact_id,
-        completed_at=utc_now(),
+        completed_at=record.completed_at or utc_now(),
         metadata={
             **dict(record.metadata),
             **({} if metadata_updates is None else dict(metadata_updates)),
@@ -455,7 +481,7 @@ def _build_failed_action_run_record(
     )
 
 
-def _persist_failed_action_run_after_rollback(
+def _recover_failed_action_run_row_after_rollback(
     recovery_session_factory: Any,
     record: ActionRunRecord,
     *,
@@ -466,7 +492,6 @@ def _persist_failed_action_run_after_rollback(
     with transaction_boundary(recovery_session_factory) as recovery_session:
         action_run_repository = ActionRunRepository(recovery_session)
         artifact_repository = ArtifactRepository(recovery_session)
-        event_emitter = EventEmitter(EventLogRepository(recovery_session))
 
         persisted_artifact_id = output_artifact_id
         if persisted_artifact_id is not None and artifact_repository.get(persisted_artifact_id) is None:
@@ -480,32 +505,30 @@ def _persist_failed_action_run_after_rollback(
                 metadata_updates=metadata_updates,
                 output_artifact_id=persisted_artifact_id,
             )
-            stored = action_run_repository.create(failed_record)
-            event_emitter.emit("action.started", _context_from_record(stored))
-            event_emitter.emit(
-                "action.failed",
-                _context_from_record(stored),
-                result_status=stored.status.value,
-                properties={"error_code": error_code},
-            )
+            action_run_repository.create(failed_record)
             return
 
-        ActionRunService(action_run_repository, event_emitter).mark_failed(
-            existing,
-            error_code=error_code,
-            metadata_updates=metadata_updates,
-            output_artifact_id=persisted_artifact_id,
+        action_run_repository.update(
+            _build_failed_action_run_record(
+                replace(
+                    record,
+                    started_at=existing.started_at or record.started_at,
+                    created_at=existing.created_at,
+                ),
+                error_code=error_code,
+                metadata_updates=metadata_updates,
+                output_artifact_id=persisted_artifact_id,
+            )
         )
 
 
-def _persist_succeeded_action_run_after_rollback(
+def _recover_succeeded_action_run_row_after_rollback(
     recovery_session_factory: Any,
     record: ActionRunRecord,
 ) -> None:
     with transaction_boundary(recovery_session_factory) as recovery_session:
         action_run_repository = ActionRunRepository(recovery_session)
         artifact_repository = ArtifactRepository(recovery_session)
-        event_emitter = EventEmitter(EventLogRepository(recovery_session))
 
         persisted_artifact_id = record.output_artifact_id
         if (
@@ -517,13 +540,76 @@ def _persist_succeeded_action_run_after_rollback(
         recovered_record = replace(record, output_artifact_id=persisted_artifact_id)
         existing = action_run_repository.get(record.id)
         if existing is None:
-            stored = action_run_repository.create(recovered_record)
-            event_emitter.emit("action.started", _context_from_record(stored))
+            action_run_repository.create(recovered_record)
         else:
-            stored = action_run_repository.update(recovered_record)
+            action_run_repository.update(recovered_record)
 
-        event_emitter.emit(
-            "action.succeeded",
-            _context_from_record(stored),
-            result_status=stored.status.value,
+
+def _recover_action_events_after_rollback(
+    recovery_session_factory: Any,
+    action_run_id: str,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        _emit_recovered_action_events(
+            EventLogRepository(recovery_session),
+            action_run_id=action_run_id,
+            action_run_repository=ActionRunRepository(recovery_session),
+            provider_call_repository=ProviderCallRepository(recovery_session),
+            artifact_repository=ArtifactRepository(recovery_session),
         )
+
+
+def _emit_recovered_action_events(
+    event_log_repository: EventLogRepository,
+    *,
+    action_run_id: str,
+    action_run_repository: ActionRunRepository,
+    provider_call_repository: ProviderCallRepository,
+    artifact_repository: ArtifactRepository,
+) -> ActionRunRecord | None:
+    action_run = action_run_repository.get(action_run_id)
+    if action_run is None:
+        return None
+
+    event_emitter = EventEmitter(event_log_repository)
+    if not event_log_repository.exists_event(
+        event_type="action.started",
+        action_run_id=action_run.id,
+    ):
+        event_emitter.emit(
+            "action.started",
+            _context_from_record(action_run),
+            timestamp=action_run.started_at or action_run.created_at,
+        )
+
+    for provider_call in provider_call_repository.list_for_action_run(action_run.id):
+        _emit_recovered_provider_events(event_log_repository, provider_call)
+
+    for artifact in artifact_repository.list_for_action_run(action_run.id):
+        _emit_recovered_artifact_created_event(event_log_repository, artifact)
+
+    if action_run.status is ActionRunStatus.succeeded:
+        if not event_log_repository.exists_event(
+            event_type="action.succeeded",
+            action_run_id=action_run.id,
+        ):
+            event_emitter.emit(
+                "action.succeeded",
+                _context_from_record(action_run),
+                result_status=action_run.status.value,
+                timestamp=action_run.completed_at or action_run.started_at or action_run.created_at,
+            )
+        return action_run
+
+    if action_run.status is ActionRunStatus.failed and not event_log_repository.exists_event(
+        event_type="action.failed",
+        action_run_id=action_run.id,
+    ):
+        event_emitter.emit(
+            "action.failed",
+            _context_from_record(action_run),
+            result_status=action_run.status.value,
+            properties={"error_code": action_run.error_code},
+            timestamp=action_run.completed_at or action_run.started_at or action_run.created_at,
+        )
+    return action_run
