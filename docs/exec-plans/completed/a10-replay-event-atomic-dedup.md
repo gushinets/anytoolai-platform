@@ -2,13 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-07-17
 - Last updated: 2026-07-17
 - Review date: 2026-07-17
 - Last run: 2026-07-17
-- Next action: patch replay-only event insertion to dedupe atomically, add focused tests, and validate.
+- Next action: none; replay event atomic dedup implementation and validation are complete.
 - Blocker: none
 
 ## Goal
@@ -43,18 +43,19 @@ persist duplicate semantic events.
 
 ## Implementation steps
 
-- [ ] Verify the race is still present in current recovery code.
-- [ ] Add deterministic replay IDs plus conflict-safe insert for replayed events only.
-- [ ] Update replay call sites and add focused tests.
-- [ ] Run targeted validation.
+- [x] Verify the race is still present in current recovery code.
+- [x] Add deterministic replay IDs plus conflict-safe insert for replayed events only.
+- [x] Update replay call sites and add focused tests.
+- [x] Run targeted validation.
 
 ## Validation
 
-- [ ] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_event_log.py packages/backend/platform-core/tests/unit/test_workflow_runner.py packages/backend/platform-core/tests/unit/test_action_runner.py packages/backend/platform-core/tests/unit/test_provider_gateway.py -q`
-- [ ] `python scripts/agent/runner.py quick-check`
+- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_event_log.py packages/backend/platform-core/tests/unit/test_workflow_runner.py packages/backend/platform-core/tests/unit/test_action_runner.py packages/backend/platform-core/tests/unit/test_provider_gateway.py -q`
+- [x] `python scripts/agent/runner.py quick-check`
 
 ## Progress log
 
 | Date | Progress | Next |
 |---|---|---|
 | 2026-07-17 | Verified the recovery race is still present: replay paths still do `exists_event(...)` followed by plain insert with a fresh `event_id`. | Patch replay-only atomic dedup and validate it with focused regressions. |
+| 2026-07-17 | Implemented deterministic replay IDs, conflict-safe replay insert handling, replay call-site wiring, and focused event-log coverage; targeted suites and repo quick-check passed. | None. |
