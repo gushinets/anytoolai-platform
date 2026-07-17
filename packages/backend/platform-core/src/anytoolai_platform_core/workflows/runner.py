@@ -1401,6 +1401,7 @@ def _emit_recovered_workflow_step_event(
     )
     step_timestamp = _workflow_step_started_timestamp(record, action_run)
     step_terminal_timestamp = _workflow_step_terminal_timestamp(record, action_run)
+    step_failed_timestamp = _workflow_step_failed_timestamp(record, action_run)
 
     status = _optional_str(raw_step_state.get("status"))
     if status == ActionRunStatus.skipped.value:
@@ -1492,7 +1493,7 @@ def _emit_recovered_workflow_step_event(
                 "attempt_count": attempt_count,
                 "error_code": _optional_str(raw_step_state.get("error_code")),
             },
-            timestamp=step_terminal_timestamp,
+            timestamp=step_failed_timestamp,
         )
 
 
@@ -1524,6 +1525,18 @@ def _workflow_step_terminal_timestamp(
         (action_run.completed_at if action_run is not None else None)
         or _workflow_step_started_timestamp(record, action_run)
         or record.completed_at
+        or record.created_at
+    )
+
+
+def _workflow_step_failed_timestamp(
+    record: JobRecord,
+    action_run: ActionRunRecord | None,
+) -> Any:
+    return (
+        (action_run.completed_at if action_run is not None else None)
+        or record.completed_at
+        or _workflow_step_started_timestamp(record, action_run)
         or record.created_at
     )
 

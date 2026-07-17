@@ -1068,11 +1068,20 @@ def test_workflow_runner_recovery_does_not_synthesize_step_started_for_pre_start
 
     step_started_events = _event_by_type(events, "workflow.step_started")
     step_failed_events = _event_by_type(events, "workflow.step_failed")
+    workflow_failed_events = _event_by_type(events, "workflow.failed")
     assert job["error_code"] == "workflow_condition_evaluation_failed"
     assert len(step_started_events) == 1
     assert step_started_events[0]["properties"]["step_id"] == "extract"
     assert len(step_failed_events) == 1
     assert step_failed_events[0]["properties"]["step_id"] == "optional_extract"
+    assert len(workflow_failed_events) == 1
+    event_types = [str(event["event_type"]) for event in events]
+    step_failed_index = event_types.index("workflow.step_failed")
+    assert step_failed_index > event_types.index("workflow.step_succeeded")
+    assert step_failed_index > event_types.index("action.succeeded")
+    assert step_failed_index == event_types.index("workflow.failed") - 1
+    assert step_failed_events[0]["timestamp"] == job["completed_at"]
+    assert step_failed_events[0]["timestamp"] == workflow_failed_events[0]["timestamp"]
     assert job["metadata"]["workflow_state"]["steps"]["optional_extract"]["started_event_emitted"] is False
 
 
