@@ -1081,8 +1081,8 @@ def test_workflow_runner_recovery_does_not_synthesize_step_started_for_pre_start
     assert step_failed_index > event_types.index("workflow.step_succeeded")
     assert step_failed_index > event_types.index("action.succeeded")
     assert step_failed_index == event_types.index("workflow.failed") - 1
-    assert step_failed_events[0]["timestamp"] == job["completed_at"]
-    assert step_failed_events[0]["timestamp"] == workflow_failed_events[0]["timestamp"]
+    assert step_failed_events[0]["timestamp"] < workflow_failed_events[0]["timestamp"]
+    assert workflow_failed_events[0]["timestamp"] == job["completed_at"]
     assert job["metadata"]["workflow_state"]["steps"]["optional_extract"]["started_event_emitted"] is False
 
 

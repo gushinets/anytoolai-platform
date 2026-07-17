@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from datetime import timedelta
 from typing import Any
 
 import sqlalchemy as sa
@@ -1541,6 +1542,8 @@ def _workflow_step_failed_timestamp(
     record: JobRecord,
     action_run: ActionRunRecord | None,
 ) -> Any:
+    if action_run is None and record.completed_at is not None:
+        return record.completed_at - timedelta(microseconds=1)
     return (
         (action_run.completed_at if action_run is not None else None)
         or record.completed_at
