@@ -39,6 +39,8 @@ class EventLogRepository:
                     self._session.execute(insert_statement)
             except sa.exc.IntegrityError:
                 stored = self.get(record.event_id)
+                if stored is None:
+                    raise
                 return _require_stored_event(stored, record.event_id, "create")
         else:
             self._session.execute(insert_statement)

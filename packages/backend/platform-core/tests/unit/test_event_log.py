@@ -21,6 +21,7 @@ from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.context.execution_context import ExecutionContext
+from anytoolai_platform_core.events.envelope import EventEnvelope
 from anytoolai_platform_core.events.emitter import EventEmitter, EventValidationError
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.events.taxonomy import PLATFORM_EVENT_GROUPS, PLATFORM_EVENTS
@@ -506,6 +507,49 @@ def test_event_emitter_replay_dedupes_atomic_id_while_preserving_step_identity(
     assert other_step.event_id != first.event_id
     assert len(rows) == 2
     assert [row["properties"]["step_id"] for row in rows] == ["detect_issues", "extract"]
+
+
+def test_event_log_repository_replay_reraises_non_duplicate_integrity_error(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        repository = EventLogRepository(session)
+        replay_error = sa.exc.IntegrityError(
+            statement="insert into platform.event_log ...",
+            params={},
+            orig=RuntimeError("synthetic replay failure"),
+        )
+        envelope = EventEnvelope(
+            event_id="event_replay_010_demo",
+            event_type="workflow.started",
+            timestamp=datetime(2026, 7, 17, 12, 0, tzinfo=UTC),
+            tenant_id="tenant_demo",
+            region="eu-central",
+            product_id="kernel_demo",
+            frontend_id="kernel_demo_ce",
+            scenario_session_id="scenario_session_demo",
+            job_id="job_demo",
+            workflow_id="wf_smoke",
+            workflow_version=1,
+            properties={"workflow_version": 1},
+        )
+
+        original_execute = session.execute
+
+        def fail_insert(*args: Any, **kwargs: Any) -> Any:
+            statement = args[0] if args else None
+            if isinstance(statement, sa.sql.dml.Insert) and statement.table is event_log_table:
+                raise replay_error
+            return original_execute(*args, **kwargs)
+
+        monkeypatch.setattr(session, "execute", fail_insert)
+        monkeypatch.setattr(repository, "get", lambda event_id: None)
+
+        with pytest.raises(sa.exc.IntegrityError) as exc_info:
+            repository.create(envelope, allow_existing_event_id=True)
+
+    assert exc_info.value is replay_error
 
 
 def test_event_emitter_rejects_missing_tenant_id(
