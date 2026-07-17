@@ -52,6 +52,7 @@ from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import (
     SequentialWorkflowRunner,
     WorkflowJobService,
+    _emit_recovered_workflow_events,
 )
 from sqlalchemy import event
 
@@ -1083,6 +1084,143 @@ def test_workflow_runner_recovery_does_not_synthesize_step_started_for_pre_start
     assert step_failed_events[0]["timestamp"] == job["completed_at"]
     assert step_failed_events[0]["timestamp"] == workflow_failed_events[0]["timestamp"]
     assert job["metadata"]["workflow_state"]["steps"]["optional_extract"]["started_event_emitted"] is False
+
+
+def test_workflow_recovery_replays_all_step_action_attempts_in_order(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    context = _base_context()
+    first_started_at = utc_now()
+    first_completed_at = first_started_at + timedelta(seconds=5)
+    second_started_at = first_completed_at + timedelta(seconds=5)
+    second_completed_at = second_started_at + timedelta(seconds=5)
+
+    with transaction_boundary(session_factory) as session:
+        _seed_context_scenario(session, context)
+        job = JobRepository(session).create(
+            JobRecord(
+                tenant_id=context.tenant_id,
+                region=context.region,
+                product_id=context.product_id,
+                frontend_id=context.frontend_id,
+                scenario_session_id=context.scenario_session_id or "scenario_session_demo",
+                workflow_id="kernel_demo.retry_extract_v1",
+                workflow_version=1,
+                status=JobStatus.succeeded,
+                started_at=first_started_at,
+                completed_at=second_completed_at,
+                metadata={
+                    "guest_id": context.guest_id,
+                    "user_id": context.user_id,
+                    "scenario_chain_id": context.scenario_chain_id,
+                    "handoff_id": context.handoff_id,
+                    "acquisition_source": context.acquisition_source,
+                    "workflow_state": {
+                        "steps": {
+                            "extract": {
+                                "status": ActionRunStatus.succeeded.value,
+                                "retry_count": 1,
+                                "attempt_count": 2,
+                                "action_type": "text.extract_structured_fields",
+                                "action_config_id": "kernel_demo.extract_structured_fields_v1",
+                                "last_action_run_id": "action_run_retry_2",
+                                "output_artifact_id": None,
+                                "skip_reason": None,
+                                "started_event_emitted": True,
+                            }
+                        },
+                        "context": {},
+                        "last_successful_step_id": "extract",
+                        "last_successful_output_artifact_id": None,
+                        "final_output_source": None,
+                        "result_artifact_id": None,
+                    },
+                },
+            )
+        )
+        repository = ActionRunRepository(session)
+        repository.create(
+            ActionRunRecord(
+                id="action_run_retry_1",
+                tenant_id=context.tenant_id,
+                region=context.region,
+                product_id=context.product_id,
+                frontend_id=context.frontend_id,
+                scenario_session_id=context.scenario_session_id or "scenario_session_demo",
+                job_id=job.id,
+                workflow_id=job.workflow_id,
+                step_id="extract",
+                action_type="text.extract_structured_fields",
+                action_config_id="kernel_demo.extract_structured_fields_v1",
+                status=ActionRunStatus.failed,
+                error_code="provider_request_failed",
+                created_at=first_started_at,
+                started_at=first_started_at,
+                completed_at=first_completed_at,
+                metadata={"workflow_version": 1},
+            )
+        )
+        repository.create(
+            ActionRunRecord(
+                id="action_run_retry_2",
+                tenant_id=context.tenant_id,
+                region=context.region,
+                product_id=context.product_id,
+                frontend_id=context.frontend_id,
+                scenario_session_id=context.scenario_session_id or "scenario_session_demo",
+                job_id=job.id,
+                workflow_id=job.workflow_id,
+                step_id="extract",
+                action_type="text.extract_structured_fields",
+                action_config_id="kernel_demo.extract_structured_fields_v1",
+                status=ActionRunStatus.succeeded,
+                created_at=second_started_at,
+                started_at=second_started_at,
+                completed_at=second_completed_at,
+                metadata={"workflow_version": 1},
+            )
+        )
+        _emit_recovered_workflow_events(
+            session,
+            job_id=job.id,
+            terminal_event_type="workflow.succeeded",
+            terminal_error_code=None,
+        )
+
+    with transaction_boundary(session_factory) as session:
+        _emit_recovered_workflow_events(
+            session,
+            job_id=job.id,
+            terminal_event_type="workflow.succeeded",
+            terminal_error_code=None,
+        )
+        events = _event_rows(session)
+
+    assert [row["event_type"] for row in events] == [
+        "workflow.started",
+        "workflow.step_started",
+        "action.started",
+        "action.failed",
+        "action.started",
+        "action.succeeded",
+        "workflow.step_succeeded",
+        "workflow.succeeded",
+    ]
+    assert _event_counts(events) == Counter(
+        {
+            "workflow.started": 1,
+            "workflow.step_started": 1,
+            "action.started": 2,
+            "action.failed": 1,
+            "action.succeeded": 1,
+            "workflow.step_succeeded": 1,
+            "workflow.succeeded": 1,
+        }
+    )
+    workflow_step_started = _event_by_type(events, "workflow.step_started")[0]
+    workflow_step_succeeded = _event_by_type(events, "workflow.step_succeeded")[0]
+    assert workflow_step_started["timestamp"] == first_started_at
+    assert workflow_step_succeeded["timestamp"] == second_completed_at
 
 
 def test_workflow_runner_uses_generic_safe_provider_message_for_unknown_adapter_exceptions(

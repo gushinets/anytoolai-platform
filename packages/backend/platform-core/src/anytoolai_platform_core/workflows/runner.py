@@ -1396,14 +1396,16 @@ def _emit_recovered_workflow_step_event(
     )
     action_run_id = _optional_str(raw_step_state.get("last_action_run_id"))
     output_artifact_id = _optional_str(raw_step_state.get("output_artifact_id"))
-    action_run = (
-        None
-        if action_run_id is None
-        else action_run_repository.get(action_run_id)
+    step_action_runs = action_run_repository.list_for_job_step(record.id, step_id)
+    terminal_action_run = _resolved_terminal_action_run(
+        step_action_runs,
+        action_run_id=action_run_id,
+        action_run_repository=action_run_repository,
     )
-    step_timestamp = _workflow_step_started_timestamp(record, action_run)
-    step_terminal_timestamp = _workflow_step_terminal_timestamp(record, action_run)
-    step_failed_timestamp = _workflow_step_failed_timestamp(record, action_run)
+    initial_action_run = step_action_runs[0] if step_action_runs else terminal_action_run
+    step_timestamp = _workflow_step_started_timestamp(record, initial_action_run)
+    step_terminal_timestamp = _workflow_step_terminal_timestamp(record, terminal_action_run)
+    step_failed_timestamp = _workflow_step_failed_timestamp(record, terminal_action_run)
 
     status = _optional_str(raw_step_state.get("status"))
     if status == ActionRunStatus.skipped.value:
@@ -1448,10 +1450,10 @@ def _emit_recovered_workflow_step_event(
             replay=True,
         )
 
-    if action_run_id is not None:
+    for step_action_run in step_action_runs:
         _emit_recovered_action_events(
             event_log_repository,
-            action_run_id=action_run_id,
+            action_run_id=step_action_run.id,
             action_run_repository=action_run_repository,
             provider_call_repository=provider_call_repository,
             artifact_repository=artifact_repository,
@@ -1545,6 +1547,24 @@ def _workflow_step_failed_timestamp(
         or _workflow_step_started_timestamp(record, action_run)
         or record.created_at
     )
+
+
+def _resolved_terminal_action_run(
+    action_runs: list[ActionRunRecord],
+    *,
+    action_run_id: str | None,
+    action_run_repository: ActionRunRepository,
+) -> ActionRunRecord | None:
+    if action_run_id is not None:
+        for action_run in action_runs:
+            if action_run.id == action_run_id:
+                return action_run
+        stored = action_run_repository.get(action_run_id)
+        if stored is not None:
+            return stored
+    if action_runs:
+        return action_runs[-1]
+    return None
 
 
 def _step_started_event_emitted(
