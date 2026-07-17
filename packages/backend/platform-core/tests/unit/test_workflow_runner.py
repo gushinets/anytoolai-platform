@@ -190,6 +190,12 @@ class AlwaysFailAdapter:
         raise RuntimeError("provider exploded with secret_token=abc123")
 
 
+class CancelledAdapter:
+    async def complete(self, request: Any) -> ProviderResponse:
+        del request
+        raise asyncio.CancelledError()
+
+
 class UnsafeRawTextProviderAdapter:
     async def complete(self, request: Any) -> ProviderResponse:
         raise RuntimeError(
@@ -521,6 +527,80 @@ def test_workflow_runner_recovers_failed_state_for_existing_claimed_job_after_ro
     assert workflow_step_failed["properties"]["error_code"] == "provider_request_failed"
     assert workflow_failed["job_id"] == claimed_job_id
     assert workflow_failed["properties"]["error_code"] == "provider_request_failed"
+
+
+def test_workflow_runner_recovers_canceled_state_for_existing_claimed_job_after_rollback(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    context = _base_context()
+    with transaction_boundary(session_factory) as session:
+        _seed_context_scenario(session, context)
+        repository = JobRepository(session)
+        claimed = WorkflowJobService(
+            repository,
+            EventEmitter(EventLogRepository(session)),
+        ).claim_created(
+            repository.create(
+                JobRecord(
+                    tenant_id="tenant_demo",
+                    region="eu-central",
+                    product_id="kernel_demo",
+                    frontend_id="kernel_demo_ce",
+                    scenario_session_id="scenario_session_demo",
+                    workflow_id="kernel_demo.single_action_extract_v1",
+                    workflow_version=1,
+                )
+            ).id
+        )
+        assert claimed is not None
+        claimed_job_id = claimed.id
+
+    with pytest.raises(asyncio.CancelledError):
+        with transaction_boundary(session_factory) as session:
+            runner = _build_structured_workflow_runner(session, adapter=CancelledAdapter())
+            job = JobRepository(session).get(claimed_job_id)
+            assert job is not None
+            asyncio.run(
+                runner.run_claimed_job(
+                    job,
+                    {"source_text": "deadline budget deliverables"},
+                    context,
+                )
+            )
+
+    with transaction_boundary(session_factory) as session:
+        job = session.execute(
+            sa.select(jobs_table).where(jobs_table.c.id == claimed_job_id)
+        ).mappings().one()
+        events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.job_id == claimed_job_id)
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert job["status"] is JobStatus.canceled
+    assert job["completed_at"] is not None
+    assert job["metadata"]["workflow_state"]["steps"]["extract"]["status"] == "failed"
+    assert job["metadata"]["workflow_state"]["steps"]["extract"]["error_code"] == (
+        "workflow_execution_cancelled"
+    )
+    assert [event_row["event_type"] for event_row in events] == [
+        "workflow.started",
+        "workflow.step_started",
+        "action.started",
+        "provider.request_started",
+        "provider.request_failed",
+        "action.failed",
+        "workflow.step_failed",
+        "workflow.canceled",
+    ]
+    workflow_step_failed = _event_by_type(events, "workflow.step_failed")[0]
+    workflow_canceled = _event_by_type(events, "workflow.canceled")[0]
+    assert workflow_step_failed["timestamp"] < workflow_canceled["timestamp"]
+    assert workflow_canceled["job_id"] == claimed_job_id
+    assert workflow_canceled["result_status"] == JobStatus.canceled.value
 
 
 def test_workflow_runner_rejects_claimed_job_context_with_mismatched_ownership_dimensions(

@@ -34,6 +34,8 @@ from anytoolai_platform_core.storage.transactions import (
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
 from anytoolai_platform_core.structured_output.schemas import normalize_mapping, normalize_schema_mapping
 
+_OUTPUT_ARTIFACT_ID_UNSET = object()
+
 
 class ActionInputValidationError(PlatformError):
     def __init__(self, message: str = "Action input validation failed.") -> None:
@@ -410,7 +412,7 @@ class ActionRunService:
         *,
         error_code: str,
         metadata_updates: Mapping[str, Any] | None = None,
-        output_artifact_id: str | None = None,
+        output_artifact_id: str | None | object = _OUTPUT_ARTIFACT_ID_UNSET,
     ) -> ActionRunRecord:
         failed_record = _build_failed_action_run_record(
             record,
@@ -466,13 +468,18 @@ def _build_failed_action_run_record(
     *,
     error_code: str,
     metadata_updates: Mapping[str, Any] | None = None,
-    output_artifact_id: str | None = None,
+    output_artifact_id: str | None | object = _OUTPUT_ARTIFACT_ID_UNSET,
 ) -> ActionRunRecord:
+    resolved_output_artifact_id = (
+        record.output_artifact_id
+        if output_artifact_id is _OUTPUT_ARTIFACT_ID_UNSET
+        else output_artifact_id
+    )
     return replace(
         record,
         status=ActionRunStatus.failed,
         error_code=error_code,
-        output_artifact_id=output_artifact_id or record.output_artifact_id,
+        output_artifact_id=resolved_output_artifact_id,
         completed_at=record.completed_at or utc_now(),
         metadata={
             **dict(record.metadata),

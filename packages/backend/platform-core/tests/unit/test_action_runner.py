@@ -13,12 +13,14 @@ from sqlalchemy import event
 
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.executor import ActionExecutorResponse
+from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.actions.runner import (
     ActionInputValidationError,
     ActionRunService,
     ActionRunner,
     _recover_action_events_after_rollback,
+    _recover_failed_action_run_row_after_rollback,
 )
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
@@ -501,6 +503,44 @@ def test_action_runner_persists_failed_state_when_cancellation_escapes_transacti
     )
     assert _event_by_type(events, "provider.request_failed")["action_run_id"] == action_run["id"]
     assert _event_by_type(events, "action.failed")["action_run_id"] == action_run["id"]
+
+
+def test_failed_action_recovery_clears_output_artifact_id_when_artifact_row_rolled_back(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    record = ActionRunRecord(
+        id="action_run_missing_artifact",
+        tenant_id="tenant_demo",
+        region="eu-central",
+        product_id="kernel_demo",
+        frontend_id="kernel_demo_ce",
+        scenario_session_id="scenario_session_demo",
+        job_id="job_demo",
+        workflow_id="kernel_demo.extract_detect_report_v1",
+        step_id="extract",
+        action_type="text.extract_structured_fields",
+        action_config_id="kernel_demo.extract_structured_fields_v1",
+        status=ActionRunStatus.running,
+        output_artifact_id="artifact_rolled_back",
+        metadata={"workflow_version": 1},
+    )
+
+    _recover_failed_action_run_row_after_rollback(
+        session_factory,
+        record,
+        error_code="provider_request_failed",
+        metadata_updates={},
+        output_artifact_id="artifact_rolled_back",
+    )
+
+    with transaction_boundary(session_factory) as session:
+        action_run = session.execute(
+            sa.select(action_runs_table).where(action_runs_table.c.id == record.id)
+        ).mappings().one()
+
+    assert action_run["status"].value == "failed"
+    assert action_run["error_code"] == "provider_request_failed"
+    assert action_run["output_artifact_id"] is None
 
 
 def test_action_runner_marks_failed_on_input_validation_error(

@@ -802,7 +802,12 @@ class SequentialWorkflowRunner:
             **dict(job.metadata),
             "workflow_state": self._workflow_state_metadata(state),
         }
-        return replace(job, metadata=metadata)
+        return replace(
+            job,
+            status=JobStatus.canceled,
+            completed_at=utc_now(),
+            metadata=metadata,
+        )
 
     def _workflow_state_metadata(
         self,
@@ -1129,12 +1134,16 @@ def _recover_canceled_workflow_row_after_rollback(
                 failed_step=failed_step,
             ),
         }
-        stored = repository.update(
-            replace(
-                existing,
-                metadata=recovered_metadata,
-            )
+        recovered_record = replace(
+            existing,
+            status=JobStatus.canceled,
+            completed_at=record.completed_at or existing.completed_at or utc_now(),
+            metadata=recovered_metadata,
         )
+        if existing.status is JobStatus.running:
+            stored = repository.mark_canceled(recovered_record)
+        else:
+            stored = repository.update(recovered_record)
 
         del stored
 
@@ -1162,7 +1171,7 @@ def _recover_canceled_workflow_events_after_rollback(
         _emit_recovered_workflow_events(
             recovery_session,
             job_id=job_id,
-            terminal_event_type=None,
+            terminal_event_type="workflow.canceled",
             terminal_error_code=None,
         )
 
