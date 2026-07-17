@@ -580,6 +580,7 @@ def _emit_recovered_action_events(
             "action.started",
             _context_from_record(action_run),
             timestamp=action_run.started_at or action_run.created_at,
+            replay=True,
         )
 
     for provider_call in provider_call_repository.list_for_action_run(action_run.id):
@@ -598,6 +599,7 @@ def _emit_recovered_action_events(
                 _context_from_record(action_run),
                 result_status=action_run.status.value,
                 timestamp=action_run.completed_at or action_run.started_at or action_run.created_at,
+                replay=True,
             )
         return action_run
 
@@ -611,5 +613,6 @@ def _emit_recovered_action_events(
             result_status=action_run.status.value,
             properties={"error_code": action_run.error_code},
             timestamp=action_run.completed_at or action_run.started_at or action_run.created_at,
+            replay=True,
         )
     return action_run

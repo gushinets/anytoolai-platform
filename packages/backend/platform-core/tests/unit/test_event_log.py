@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -445,6 +445,67 @@ def test_event_log_repository_exists_event_can_match_step_id(
             job_id="job_demo",
             step_id="extract",
         )
+
+
+def test_event_emitter_replay_dedupes_atomic_id_while_preserving_step_identity(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    replayed_at = datetime(2026, 7, 13, 10, 30, tzinfo=UTC)
+
+    with transaction_boundary(session_factory) as session:
+        repository = EventLogRepository(session)
+        emitter = EventEmitter(repository)
+        context = make_execution_context(action_run_id="action_run_demo")
+
+        first = emitter.emit(
+            "workflow.step_failed",
+            context,
+            result_status="failed",
+            properties={
+                "step_id": "detect_issues",
+                "attempt_count": 1,
+                "error_code": "provider_request_failed",
+            },
+            timestamp=replayed_at,
+            replay=True,
+        )
+        duplicate = emitter.emit(
+            "workflow.step_failed",
+            context,
+            result_status="failed",
+            properties={
+                "step_id": "detect_issues",
+                "attempt_count": 1,
+                "error_code": "provider_request_failed",
+            },
+            timestamp=replayed_at + timedelta(minutes=5),
+            replay=True,
+        )
+        other_step = emitter.emit(
+            "workflow.step_failed",
+            context,
+            result_status="failed",
+            properties={
+                "step_id": "extract",
+                "attempt_count": 1,
+                "error_code": "provider_request_failed",
+            },
+            timestamp=replayed_at + timedelta(minutes=10),
+            replay=True,
+        )
+        rows = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.event_type == "workflow.step_failed")
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert first.event_id == duplicate.event_id
+    assert duplicate.timestamp == replayed_at
+    assert other_step.event_id != first.event_id
+    assert len(rows) == 2
+    assert [row["properties"]["step_id"] for row in rows] == ["detect_issues", "extract"]
 
 
 def test_event_emitter_rejects_missing_tenant_id(

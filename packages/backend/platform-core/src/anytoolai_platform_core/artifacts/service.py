@@ -166,4 +166,5 @@ def _emit_recovered_artifact_created_event(
         result_status=record.status.value,
         properties={"artifact_type": record.artifact_type},
         timestamp=record.created_at,
+        replay=True,
     )

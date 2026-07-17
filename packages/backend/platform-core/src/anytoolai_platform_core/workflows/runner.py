@@ -1333,6 +1333,7 @@ def _emit_recovered_workflow_events(
             _context_from_record(record),
             properties={"workflow_version": record.workflow_version},
             timestamp=record.started_at or record.created_at,
+            replay=True,
         )
 
     workflow_state = record.metadata.get("workflow_state")
@@ -1370,6 +1371,7 @@ def _emit_recovered_workflow_events(
         result_status=record.status.value,
         properties=terminal_properties,
         timestamp=record.completed_at or record.started_at or record.created_at,
+        replay=True,
     )
 
 
@@ -1426,6 +1428,7 @@ def _emit_recovered_workflow_step_event(
                     "skip_reason": _optional_str(raw_step_state.get("skip_reason")),
                 },
                 timestamp=step_terminal_timestamp or step_timestamp,
+                replay=True,
             )
         return
 
@@ -1442,6 +1445,7 @@ def _emit_recovered_workflow_step_event(
                 "retry_count": retry_count,
             },
             timestamp=step_timestamp,
+            replay=True,
         )
 
     if action_run_id is not None:
@@ -1475,6 +1479,7 @@ def _emit_recovered_workflow_step_event(
                 "output_artifact_id": output_artifact_id,
             },
             timestamp=step_terminal_timestamp,
+            replay=True,
         )
         return
 
@@ -1494,6 +1499,7 @@ def _emit_recovered_workflow_step_event(
                 "error_code": _optional_str(raw_step_state.get("error_code")),
             },
             timestamp=step_failed_timestamp,
+            replay=True,
         )
 
 

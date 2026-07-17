@@ -12,7 +12,10 @@ from anytoolai_platform_core.common.ids import new_ordered_id
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.envelope import EventEnvelope
-from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.events.repository import (
+    EventLogRepository,
+    build_replay_event_id,
+)
 from anytoolai_platform_core.events.taxonomy import PLATFORM_EVENTS
 
 MAX_PROPERTY_DEPTH = 5
@@ -58,6 +61,7 @@ class EventEmitter:
         properties: dict[str, Any] | None = None,
         *,
         timestamp: datetime | None = None,
+        replay: bool = False,
     ) -> EventEnvelope:
         self._validate_event_type(event_type)
         self._require_dimension(context.tenant_id, "tenant_id")
@@ -65,8 +69,38 @@ class EventEmitter:
 
         sanitized_properties = sanitize_event_properties(properties or {})
         error_code = _extract_error_code(sanitized_properties)
+        event_id = (
+            build_replay_event_id(
+                event_type=event_type,
+                tenant_id=context.tenant_id,
+                region=context.region,
+                product_id=context.product_id,
+                frontend_id=context.frontend_id,
+                scenario_session_id=context.scenario_session_id,
+                job_id=context.job_id,
+                workflow_id=context.workflow_id,
+                workflow_version=context.workflow_version,
+                action_run_id=context.action_run_id,
+                action_type=context.action_type,
+                action_config_id=context.action_config_id,
+                provider_policy_ref=context.provider_policy_ref,
+                provider_call_id=context.provider_call_id,
+                provider=context.provider,
+                model=context.model,
+                physical_call_index=context.physical_call_index,
+                pydantic_run_id=context.pydantic_run_id,
+                litellm_response_id=context.litellm_response_id,
+                artifact_id=context.artifact_id,
+                handoff_id=context.handoff_id,
+                result_status=result_status,
+                error_code=error_code,
+                step_id=_replay_step_id(sanitized_properties),
+            )
+            if replay
+            else new_ordered_id("event")
+        )
         envelope = EventEnvelope(
-            event_id=new_ordered_id("event"),
+            event_id=event_id,
             event_type=event_type,
             timestamp=timestamp or utc_now(),
             tenant_id=context.tenant_id,
@@ -97,6 +131,11 @@ class EventEmitter:
             acquisition_source=context.acquisition_source,
             properties=sanitized_properties,
         )
+        if replay:
+            return self._repository.create(
+                envelope,
+                allow_existing_event_id=True,
+            )
         return self._repository.create(envelope)
 
     @staticmethod
@@ -199,3 +238,8 @@ def _is_safe_numeric_usage_counter(key: str, value: Any) -> bool:
 def _extract_error_code(properties: dict[str, Any]) -> str | None:
     error_code = properties.get("error_code")
     return error_code if isinstance(error_code, str) and error_code else None
+
+
+def _replay_step_id(properties: dict[str, Any]) -> str | None:
+    step_id = properties.get("step_id")
+    return step_id if isinstance(step_id, str) and step_id else None

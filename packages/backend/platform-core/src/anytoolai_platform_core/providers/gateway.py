@@ -964,6 +964,7 @@ def _emit_recovered_provider_events(
             context,
             properties=_provider_event_properties_from_record(record),
             timestamp=record.started_at or record.created_at,
+            replay=True,
         )
     if record.status is ProviderCallStatus.succeeded:
         if not event_log_repository.exists_event(
@@ -986,6 +987,7 @@ def _emit_recovered_provider_events(
                     http_status=record.http_status,
                 ),
                 timestamp=record.completed_at or record.started_at or record.created_at,
+                replay=True,
             )
         return
 
@@ -1008,6 +1010,7 @@ def _emit_recovered_provider_events(
                     failure_kind=record.failure_kind,
                 ),
                 timestamp=record.completed_at or record.started_at or record.created_at,
+                replay=True,
             )
 
 
