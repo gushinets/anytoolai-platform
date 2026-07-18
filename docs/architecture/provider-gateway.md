@@ -123,8 +123,14 @@ The gateway must not:
 
 If a later action-layer exception escapes the caller's `transaction_boundary()` and rolls back the
 main unit of work, `ProviderGateway` still preserves each already-executed physical attempt by
-replaying the final `platform.provider_calls` row snapshot in an independent recovery transaction.
-This keeps the ledger contract intact without swallowing the original exception.
+replaying the final `platform.provider_calls` row snapshot in the shared row-recovery phase. This
+keeps the ledger contract intact without swallowing the original exception.
+
+Escaped rollback recovery also has an event-completeness contract. Every recovered
+`platform.provider_calls` row with `status=failed` or `status=timed_out` must have a matching
+`provider.request_failed` event, and every recovered succeeded row must have its matching
+`provider.request_succeeded` event. Row existence alone is not treated as proof that the matching
+provider event already exists.
 
 Key ledger fields:
 
@@ -154,6 +160,16 @@ When the shared event emitter is configured, the gateway emits:
 
 The event log remains the domain source of truth. LiteLLM callbacks and PydanticAI tracing are
 auxiliary only.
+
+During escaped rollback recovery, provider events are backfilled from recovered ledger rows using
+their original timestamps when available:
+
+- `provider.request_started` from `provider_calls.started_at`
+- terminal provider events from `provider_calls.completed_at`
+
+Replay is idempotent at the event level. If the ledger row already exists but one matching provider
+event is missing, recovery emits only the missing event and does not duplicate the rest of that
+provider call's history.
 
 Provider-event correlation data is persisted both in top-level `event_log` columns and in
 `event_log.properties`. It includes:

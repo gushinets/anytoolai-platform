@@ -65,9 +65,20 @@ unsafe exception text never enter job failure fields.
 
 The job's `scenario_session_id` and `job_id` are propagated to workflow events, action runs,
 provider-call ledger rows, and artifacts. The final workflow artifact points back to the job, while
-action/provider artifacts retain their action-run linkage. Existing rollback-recovery callbacks
-preserve failed workflow, action, and provider state when an execution exception escapes its
-transaction boundary.
+action/provider artifacts retain their action-run linkage. If an execution exception escapes its
+transaction boundary after the earlier claim transaction already committed `created -> running` and
+`workflow.started`, later rollback recovery must treat that claimed-job start as already durable.
+
+The recovery contract is therefore:
+
+1. the claim transaction owns the first durable `workflow.started`;
+2. the later execution transaction may still need recovery for failed workflow/action/provider rows;
+3. ordered event backfill must recreate only the missing downstream lifecycle events and must not
+   duplicate the earlier claimed-job `workflow.started`.
+
+This keeps claimed-job worker execution aligned with the same causal event history as direct runner
+usage while preserving correlation fields across the job row, workflow events, action runs,
+provider calls, and artifacts.
 
 `JobRepository` also enforces the critical success contract directly: a `succeeded` transition must
 carry `completed_at` plus a real final artifact linked back to the same job.

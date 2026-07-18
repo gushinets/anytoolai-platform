@@ -55,6 +55,18 @@ class ProviderCallRepository:
         )
         return None if row is None else ProviderCallRecord(**dict(row))
 
+    def list_for_action_run(self, action_run_id: str) -> list[ProviderCallRecord]:
+        rows = self._session.execute(
+            sa.select(provider_calls_table)
+            .where(provider_calls_table.c.action_run_id == action_run_id)
+            .order_by(
+                provider_calls_table.c.physical_call_index,
+                provider_calls_table.c.created_at,
+                provider_calls_table.c.id,
+            )
+        ).mappings()
+        return [ProviderCallRecord(**dict(row)) for row in rows]
+
     def update(self, record: ProviderCallRecord) -> ProviderCallRecord:
         values = asdict(record)
         values.pop("id")

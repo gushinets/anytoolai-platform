@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from datetime import timedelta
 from typing import Any
 
 import sqlalchemy as sa
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
 from anytoolai_platform_core.actions.repository import ActionRunRepository
-from anytoolai_platform_core.actions.runner import ActionRunner
+from anytoolai_platform_core.actions.runner import ActionRunner, _emit_recovered_action_events
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.common.errors import PlatformError
@@ -22,8 +23,10 @@ from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter, enrich_event_context
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
+from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.storage.db import action_runs_table
 from anytoolai_platform_core.storage.transactions import (
+    RollbackRecoveryPhase,
     register_rollback_recovery_callback,
     transaction_boundary,
 )
@@ -799,7 +802,12 @@ class SequentialWorkflowRunner:
             **dict(job.metadata),
             "workflow_state": self._workflow_state_metadata(state),
         }
-        return replace(job, metadata=metadata)
+        return replace(
+            job,
+            status=JobStatus.canceled,
+            completed_at=utc_now(),
+            metadata=metadata,
+        )
 
     def _workflow_state_metadata(
         self,
@@ -911,12 +919,21 @@ class SequentialWorkflowRunner:
     ) -> None:
         register_rollback_recovery_callback(
             self._session,
-            lambda recovery_session_factory: _persist_failed_workflow_job_after_rollback(
+            lambda recovery_session_factory: _recover_failed_workflow_row_after_rollback(
                 recovery_session_factory,
                 job,
-                error_code=error_code,
                 failed_step=failed_step,
             ),
+            phase=RollbackRecoveryPhase.workflow_rows,
+        )
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _recover_failed_workflow_events_after_rollback(
+                recovery_session_factory,
+                job.id,
+                error_code=error_code,
+            ),
+            phase=RollbackRecoveryPhase.workflow_events,
         )
 
     def _register_cancellation_recovery(
@@ -927,11 +944,20 @@ class SequentialWorkflowRunner:
     ) -> None:
         register_rollback_recovery_callback(
             self._session,
-            lambda recovery_session_factory: _persist_canceled_workflow_job_after_rollback(
+            lambda recovery_session_factory: _recover_canceled_workflow_row_after_rollback(
                 recovery_session_factory,
                 job,
                 failed_step=failed_step,
             ),
+            phase=RollbackRecoveryPhase.workflow_rows,
+        )
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _recover_canceled_workflow_events_after_rollback(
+                recovery_session_factory,
+                job.id,
+            ),
+            phase=RollbackRecoveryPhase.workflow_events,
         )
 
     @staticmethod
@@ -1055,18 +1081,16 @@ _SECRET_KEYS = frozenset(
 )
 
 
-def _persist_failed_workflow_job_after_rollback(
+def _recover_failed_workflow_row_after_rollback(
     recovery_session_factory: Any,
     record: JobRecord,
     *,
-    error_code: str,
     failed_step: "_WorkflowFailedStepRecovery | None",
 ) -> None:
     with transaction_boundary(recovery_session_factory) as recovery_session:
         repository = JobRepository(recovery_session)
         action_run_repository = ActionRunRepository(recovery_session)
         artifact_repository = ArtifactRepository(recovery_session)
-        event_emitter = EventEmitter(EventLogRepository(recovery_session))
 
         existing = repository.get(record.id)
         recovered_record = _rebuild_failed_workflow_record_for_recovery(
@@ -1076,42 +1100,17 @@ def _persist_failed_workflow_job_after_rollback(
             failed_step=failed_step,
         )
         if existing is None:
-            stored = repository.create(recovered_record)
-            event_emitter.emit(
-                "workflow.started",
-                _context_from_record(stored),
-                properties={"workflow_version": stored.workflow_version},
-            )
+            repository.create(recovered_record)
         elif existing.status is JobStatus.running:
-            stored = repository.mark_failed(recovered_record)
+            repository.mark_failed(recovered_record)
         elif existing.status is JobStatus.failed:
-            stored = repository.update(recovered_record)
+            repository.update(recovered_record)
         else:
             raise RuntimeError(
                 f"job {record.id} cannot recover failed workflow from {existing.status.value}"
             )
 
-        recovered_workflow_state = stored.metadata.get("workflow_state")
-        _emit_recovered_workflow_step_events(
-            event_emitter,
-            stored,
-            workflow_state=recovered_workflow_state,
-            failed_step=failed_step,
-            action_run_repository=action_run_repository,
-        )
-
-        event_emitter.emit(
-            "workflow.failed",
-            _context_from_record(stored),
-            result_status=stored.status.value,
-            properties={
-                "error_code": error_code,
-                "workflow_version": stored.workflow_version,
-            },
-        )
-
-
-def _persist_canceled_workflow_job_after_rollback(
+def _recover_canceled_workflow_row_after_rollback(
     recovery_session_factory: Any,
     record: JobRecord,
     *,
@@ -1121,7 +1120,6 @@ def _persist_canceled_workflow_job_after_rollback(
         repository = JobRepository(recovery_session)
         action_run_repository = ActionRunRepository(recovery_session)
         artifact_repository = ArtifactRepository(recovery_session)
-        event_emitter = EventEmitter(EventLogRepository(recovery_session))
 
         existing = repository.get(record.id)
         if existing is None or existing.status not in {JobStatus.running, JobStatus.canceled}:
@@ -1136,19 +1134,45 @@ def _persist_canceled_workflow_job_after_rollback(
                 failed_step=failed_step,
             ),
         }
-        stored = repository.update(
-            replace(
-                existing,
-                metadata=recovered_metadata,
-            )
+        recovered_record = replace(
+            existing,
+            status=JobStatus.canceled,
+            completed_at=record.completed_at or existing.completed_at or utc_now(),
+            metadata=recovered_metadata,
+        )
+        if existing.status is JobStatus.running:
+            stored = repository.mark_canceled(recovered_record)
+        else:
+            stored = repository.update(recovered_record)
+
+        del stored
+
+
+def _recover_failed_workflow_events_after_rollback(
+    recovery_session_factory: Any,
+    job_id: str,
+    *,
+    error_code: str,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        _emit_recovered_workflow_events(
+            recovery_session,
+            job_id=job_id,
+            terminal_event_type="workflow.failed",
+            terminal_error_code=error_code,
         )
 
-        _emit_recovered_workflow_step_events(
-            event_emitter,
-            stored,
-            workflow_state=stored.metadata.get("workflow_state"),
-            failed_step=failed_step,
-            action_run_repository=action_run_repository,
+
+def _recover_canceled_workflow_events_after_rollback(
+    recovery_session_factory: Any,
+    job_id: str,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        _emit_recovered_workflow_events(
+            recovery_session,
+            job_id=job_id,
+            terminal_event_type="workflow.canceled",
+            terminal_error_code=None,
         )
 
 
@@ -1292,78 +1316,88 @@ def _sanitize_workflow_step_state_for_recovery(
     return recovered_step
 
 
-def _emit_recovered_workflow_step_events(
-    event_emitter: EventEmitter,
-    record: JobRecord,
+def _emit_recovered_workflow_events(
+    recovery_session: Session,
     *,
-    workflow_state: Any,
-    failed_step: _WorkflowFailedStepRecovery | None,
-    action_run_repository: ActionRunRepository,
+    job_id: str,
+    terminal_event_type: str | None,
+    terminal_error_code: str | None,
 ) -> None:
-    recovered_step_ids: set[str] = set()
+    repository = JobRepository(recovery_session)
+    action_run_repository = ActionRunRepository(recovery_session)
+    provider_call_repository = ProviderCallRepository(recovery_session)
+    artifact_repository = ArtifactRepository(recovery_session)
+    event_log_repository = EventLogRepository(recovery_session)
+    event_emitter = EventEmitter(event_log_repository)
+
+    record = repository.get(job_id)
+    if record is None:
+        return
+
+    if not event_log_repository.exists_event(
+        event_type="workflow.started",
+        job_id=record.id,
+    ):
+        event_emitter.emit(
+            "workflow.started",
+            _context_from_record(record),
+            properties={"workflow_version": record.workflow_version},
+            timestamp=record.started_at or record.created_at,
+            replay=True,
+        )
+
+    workflow_state = record.metadata.get("workflow_state")
     raw_steps = workflow_state.get("steps") if isinstance(workflow_state, Mapping) else None
     if isinstance(raw_steps, Mapping):
         for step_id, raw_step_state in raw_steps.items():
             if not isinstance(step_id, str) or not isinstance(raw_step_state, Mapping):
                 continue
-            recovered_step_ids.add(step_id)
             _emit_recovered_workflow_step_event(
-                event_emitter,
+                event_log_repository,
                 record,
                 step_id=step_id,
                 raw_step_state=raw_step_state,
+                action_run_repository=action_run_repository,
+                provider_call_repository=provider_call_repository,
+                artifact_repository=artifact_repository,
             )
 
-    if failed_step is None or failed_step.step_id in recovered_step_ids:
+    if terminal_event_type is None:
+        return
+    if event_log_repository.exists_event(
+        event_type=terminal_event_type,
+        job_id=record.id,
+    ):
         return
 
-    persisted_failed_action_run_id = _existing_action_run_id(
-        failed_step.action_run_id,
-        action_run_repository,
-    )
-    step_context = enrich_event_context(
-        _context_from_record(record),
-        step_id=failed_step.step_id,
-        action_type=failed_step.action_type,
-        action_config_id=failed_step.action_config_id,
-    )
-    if failed_step.started_event_emitted:
-        event_emitter.emit(
-            "workflow.step_started",
-            step_context,
-            properties={
-                "step_id": failed_step.step_id,
-                "retry_count": failed_step.retry_count,
-            },
-        )
+    terminal_properties: dict[str, Any] = {
+        "workflow_version": record.workflow_version,
+    }
+    if terminal_error_code is not None:
+        terminal_properties["error_code"] = terminal_error_code
     event_emitter.emit(
-        "workflow.step_failed",
-        (
-            step_context
-            if persisted_failed_action_run_id is None
-            else enrich_event_context(
-                step_context,
-                action_run_id=persisted_failed_action_run_id,
-            )
-        ),
-        result_status=ActionRunStatus.failed.value,
-        properties={
-            "step_id": failed_step.step_id,
-            "retry_count": failed_step.retry_count,
-            "attempt_count": failed_step.attempt_count,
-            "error_code": failed_step.error_code,
-        },
+        terminal_event_type,
+        _context_from_record(record),
+        result_status=record.status.value,
+        properties=terminal_properties,
+        timestamp=record.completed_at or record.started_at or record.created_at,
+        replay=True,
     )
 
 
 def _emit_recovered_workflow_step_event(
-    event_emitter: EventEmitter,
+    event_log_repository: EventLogRepository,
     record: JobRecord,
     *,
     step_id: str,
     raw_step_state: Mapping[str, Any],
+    action_run_repository: ActionRunRepository,
+    provider_call_repository: ProviderCallRepository,
+    artifact_repository: ArtifactRepository,
 ) -> None:
+    event_emitter = EventEmitter(event_log_repository)
     retry_count = _optional_int(raw_step_state.get("retry_count")) or 0
+    attempt_count = _optional_int(raw_step_state.get("attempt_count")) or 0
     step_context = enrich_event_context(
         _context_from_record(record),
         step_id=step_id,
@@ -1371,61 +1405,113 @@ def _emit_recovered_workflow_step_event(
         action_config_id=_optional_str(raw_step_state.get("action_config_id")),
     )
     action_run_id = _optional_str(raw_step_state.get("last_action_run_id"))
-    if action_run_id is not None:
-        step_context = enrich_event_context(step_context, action_run_id=action_run_id)
     output_artifact_id = _optional_str(raw_step_state.get("output_artifact_id"))
-    if output_artifact_id is not None:
-        step_context = enrich_event_context(step_context, artifact_id=output_artifact_id)
+    step_action_runs = action_run_repository.list_for_job_step(record.id, step_id)
+    terminal_action_run = _resolved_terminal_action_run(
+        step_action_runs,
+        action_run_id=action_run_id,
+        action_run_repository=action_run_repository,
+    )
+    initial_action_run = step_action_runs[0] if step_action_runs else terminal_action_run
+    step_timestamp = _workflow_step_started_timestamp(record, initial_action_run)
+    step_terminal_timestamp = _workflow_step_terminal_timestamp(record, terminal_action_run)
+    step_failed_timestamp = _workflow_step_failed_timestamp(record, terminal_action_run)
 
     status = _optional_str(raw_step_state.get("status"))
     if status == ActionRunStatus.skipped.value:
-        event_emitter.emit(
-            "workflow.step_skipped",
-            step_context,
-            result_status=ActionRunStatus.skipped.value,
-            properties={
-                "step_id": step_id,
-                "retry_count": retry_count,
-                "skip_reason": _optional_str(raw_step_state.get("skip_reason")),
-            },
-        )
+        skipped_context = step_context
+        if action_run_id is not None:
+            skipped_context = enrich_event_context(
+                skipped_context,
+                action_run_id=action_run_id,
+            )
+        if not event_log_repository.exists_event(
+            event_type="workflow.step_skipped",
+            job_id=record.id,
+            step_id=step_id,
+        ):
+            event_emitter.emit(
+                "workflow.step_skipped",
+                skipped_context,
+                result_status=ActionRunStatus.skipped.value,
+                properties={
+                    "step_id": step_id,
+                    "retry_count": retry_count,
+                    "skip_reason": _optional_str(raw_step_state.get("skip_reason")),
+                },
+                timestamp=step_terminal_timestamp or step_timestamp,
+                replay=True,
+            )
         return
 
-    if _step_started_event_emitted(raw_step_state, status):
+    if _step_started_event_emitted(raw_step_state, status) and not event_log_repository.exists_event(
+        event_type="workflow.step_started",
+        job_id=record.id,
+        step_id=step_id,
+    ):
         event_emitter.emit(
             "workflow.step_started",
-            enrich_event_context(step_context, artifact_id=None),
+            step_context,
             properties={
                 "step_id": step_id,
                 "retry_count": retry_count,
             },
+            timestamp=step_timestamp,
+            replay=True,
         )
 
-    if status == ActionRunStatus.succeeded.value:
+    for step_action_run in step_action_runs:
+        _emit_recovered_action_events(
+            event_log_repository,
+            action_run_id=step_action_run.id,
+            action_run_repository=action_run_repository,
+            provider_call_repository=provider_call_repository,
+            artifact_repository=artifact_repository,
+        )
+
+    event_context = step_context
+    if action_run_id is not None:
+        event_context = enrich_event_context(event_context, action_run_id=action_run_id)
+    if output_artifact_id is not None and status == ActionRunStatus.succeeded.value:
+        event_context = enrich_event_context(event_context, artifact_id=output_artifact_id)
+
+    if status == ActionRunStatus.succeeded.value and not event_log_repository.exists_event(
+        event_type="workflow.step_succeeded",
+        job_id=record.id,
+        step_id=step_id,
+    ):
         event_emitter.emit(
             "workflow.step_succeeded",
-            step_context,
+            event_context,
             result_status=ActionRunStatus.succeeded.value,
             properties={
                 "step_id": step_id,
                 "retry_count": retry_count,
-                "attempt_count": _optional_int(raw_step_state.get("attempt_count")) or 0,
+                "attempt_count": attempt_count,
                 "output_artifact_id": output_artifact_id,
             },
+            timestamp=step_terminal_timestamp,
+            replay=True,
         )
         return
 
-    if status == ActionRunStatus.failed.value:
+    if status == ActionRunStatus.failed.value and not event_log_repository.exists_event(
+        event_type="workflow.step_failed",
+        job_id=record.id,
+        step_id=step_id,
+    ):
         event_emitter.emit(
             "workflow.step_failed",
-            step_context,
+            event_context,
             result_status=ActionRunStatus.failed.value,
             properties={
                 "step_id": step_id,
                 "retry_count": retry_count,
-                "attempt_count": _optional_int(raw_step_state.get("attempt_count")) or 0,
+                "attempt_count": attempt_count,
                 "error_code": _optional_str(raw_step_state.get("error_code")),
             },
+            timestamp=step_failed_timestamp,
+            replay=True,
         )
 
 
@@ -1435,6 +1521,62 @@ def _optional_str(value: Any) -> str | None:
 
 def _optional_int(value: Any) -> int | None:
     return value if isinstance(value, int) else None
+
+
+def _workflow_step_started_timestamp(
+    record: JobRecord,
+    action_run: ActionRunRecord | None,
+) -> Any:
+    return (
+        (action_run.started_at if action_run is not None else None)
+        or (action_run.created_at if action_run is not None else None)
+        or record.started_at
+        or record.created_at
+    )
+
+
+def _workflow_step_terminal_timestamp(
+    record: JobRecord,
+    action_run: ActionRunRecord | None,
+) -> Any:
+    return (
+        (action_run.completed_at if action_run is not None else None)
+        or _workflow_step_started_timestamp(record, action_run)
+        or record.completed_at
+        or record.created_at
+    )
+
+
+def _workflow_step_failed_timestamp(
+    record: JobRecord,
+    action_run: ActionRunRecord | None,
+) -> Any:
+    if action_run is None and record.completed_at is not None:
+        return record.completed_at - timedelta(microseconds=1)
+    return (
+        (action_run.completed_at if action_run is not None else None)
+        or record.completed_at
+        or _workflow_step_started_timestamp(record, action_run)
+        or record.created_at
+    )
+
+
+def _resolved_terminal_action_run(
+    action_runs: list[ActionRunRecord],
+    *,
+    action_run_id: str | None,
+    action_run_repository: ActionRunRepository,
+) -> ActionRunRecord | None:
+    if action_run_id is not None:
+        for action_run in action_runs:
+            if action_run.id == action_run_id:
+                return action_run
+        stored = action_run_repository.get(action_run_id)
+        if stored is not None:
+            return stored
+    if action_runs:
+        return action_runs[-1]
+    return None
 
 
 def _step_started_event_emitted(

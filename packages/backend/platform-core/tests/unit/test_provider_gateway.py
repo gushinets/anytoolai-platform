@@ -20,6 +20,7 @@ from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.gateway import (
     ProviderGateway,
     ProviderGatewayExecutionError,
+    _recover_provider_call_events_after_rollback,
 )
 from anytoolai_platform_core.providers.models import (
     ProviderCallStatus,
@@ -756,6 +757,61 @@ def test_gateway_recovery_preserves_started_event_pydantic_run_id(
         ).mappings().one()
 
     assert started_event["pydantic_run_id"] == "pydantic-run-demo"
+
+
+def test_gateway_event_recovery_backfills_missing_failed_event_without_duplicates(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    policy = ProviderPolicy(
+        provider_policy_ref="missing_failed_event_policy_v1",
+        provider="fake",
+        model="fake-json-v1",
+    )
+
+    with transaction_boundary(session_factory) as session:
+        gateway = ProviderGateway(
+            {"fake": AlwaysFailAdapter()},
+            build_policy_resolver(policy),
+            provider_call_repository=ProviderCallRepository(session),
+            event_emitter=EventEmitter(EventLogRepository(session)),
+        )
+        scenario_session, job, action_run = seed_runtime_chain(session)
+        with pytest.raises(ProviderGatewayExecutionError):
+            asyncio.run(
+                gateway.request(
+                    build_request(
+                        scenario_session,
+                        job,
+                        action_run,
+                        provider_policy_ref="missing_failed_event_policy_v1",
+                    ),
+                    session=session,
+                )
+            )
+        provider_call_id = session.execute(sa.select(provider_calls_table.c.id)).scalar_one()
+        session.execute(
+            sa.delete(event_log_table).where(
+                event_log_table.c.event_type == "provider.request_failed",
+                event_log_table.c.provider_call_id == provider_call_id,
+            )
+        )
+
+    _recover_provider_call_events_after_rollback(session_factory, provider_call_id)
+    _recover_provider_call_events_after_rollback(session_factory, provider_call_id)
+
+    with transaction_boundary(session_factory) as session:
+        events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.provider_call_id == provider_call_id)
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert [event_row["event_type"] for event_row in events] == [
+        "provider.request_started",
+        "provider.request_failed",
+    ]
 
 
 def test_gateway_skips_persistence_when_required_dimensions_are_invalid(

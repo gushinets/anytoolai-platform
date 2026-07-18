@@ -81,6 +81,19 @@ For provider events, the event log must persist deterministic correlation to
 These domain events are emitted by runtime-owned execution flow and do not depend on LiteLLM
 callbacks or PydanticAI tracing.
 
+Escaped rollback recovery is part of this durability contract, not a best-effort convenience. When
+runtime code reconstructs durable history after a transaction rollback, the recovered event set must
+be:
+
+- complete relative to recovered runtime state;
+- causally ordered;
+- correlation-preserving across workflow, action, provider, job, and artifact identifiers;
+- idempotent enough not to duplicate events that are already durable.
+
+For example, a recovered failed `provider_calls` row requires a matching
+`provider.request_failed`, and recovered workflow/action terminal events must not appear before the
+recovered `workflow.started` and step-start history they depend on.
+
 ## Taxonomy source
 
 The machine-readable source of truth lives in:

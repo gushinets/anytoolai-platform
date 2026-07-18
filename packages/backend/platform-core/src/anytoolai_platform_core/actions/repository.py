@@ -50,3 +50,17 @@ class ActionRunRepository:
         self._session.flush()
         stored = self.get(record.id)
         return _require_stored_action_run(stored, record.id, "update")
+
+    def list_for_job_step(self, job_id: str, step_id: str) -> list[ActionRunRecord]:
+        rows = self._session.execute(
+            sa.select(action_runs_table)
+            .where(action_runs_table.c.job_id == job_id)
+            .where(action_runs_table.c.step_id == step_id)
+            .order_by(
+                action_runs_table.c.created_at.asc(),
+                action_runs_table.c.started_at.asc().nullslast(),
+                action_runs_table.c.completed_at.asc().nullslast(),
+                action_runs_table.c.id.asc(),
+            )
+        ).mappings()
+        return [ActionRunRecord(**dict(row)) for row in rows]

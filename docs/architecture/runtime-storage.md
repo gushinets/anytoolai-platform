@@ -31,7 +31,8 @@ The runtime storage slice lives in these files:
 The runtime storage slice does not cover:
 
 - config registry storage
-- `platform.event_log`
+- `platform.event_log` schema ownership, although rollback recovery now queries event-log existence
+  to backfill missing lifecycle events
 - quota tables
 - handoff tables
 - product definition tables
@@ -225,6 +226,19 @@ Rules:
 
 This was chosen because the task explicitly required an explicit transaction boundary and no hidden
 commit behavior inside repositories.
+
+Escaped rollback recovery also lives in `storage.transactions.py`. Recovery callbacks register with
+explicit rollback phases instead of depending on accidental FIFO callback order. The current
+contract separates:
+
+1. row recovery for runtime tables such as `platform.artifacts`, `platform.provider_calls`,
+   `platform.action_runs`, and `platform.jobs`;
+2. event recovery that backfills only missing `platform.event_log` rows in causal order.
+
+This lets the runtime rebuild durable history after a rollback without introducing a durable
+workflow engine. Recovered rows become the source for replayed timestamps and correlation values,
+while event-level existence checks prevent duplicate event-log rows when recovery runs against
+partial durable state.
 
 ## Common Runtime Dimensions
 
