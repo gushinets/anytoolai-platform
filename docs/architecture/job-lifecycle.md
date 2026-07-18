@@ -39,6 +39,24 @@ duplicate execution. For each discovered id, the worker handler:
 
 The runner's claimed-job entrypoint never creates another job row.
 
+## A12 scenario runtime start flow
+
+`POST /v1/products/{product_id}/scenarios/{scenario_id}/start` is queue-and-return in A12. It does
+not execute the workflow inline in the API process.
+
+The durable ordering is:
+
+1. create `scenario_sessions` row with `status=started`;
+2. persist `current_checkpoint_id=processing`;
+3. persist `metadata["input"]` from the request body;
+4. create one linked `jobs` row with `status=created`;
+5. commit;
+6. return a stable polling payload containing `scenario_session_id`, `job_id`, `status`,
+   `allowed_next_actions`, and optional `result_artifact_id`.
+
+The job create path already enforces that the linked scenario session exists and that the job's
+tenant, region, product, and frontend dimensions match the session.
+
 If a pre-claim job already has an invalid `scenario_session_id` link or mismatched runtime
 dimensions, the worker terminalizes that poison job as `failed` with a safe integrity error instead
 of leaving it `created`. This prevents one broken row from blocking the queue forever.
@@ -54,6 +72,19 @@ of leaving it `created`. This prevents one broken row from blocking the queue fo
   work is not interrupted by that API path. If the worker task itself is canceled after claim, the
   handler persists `running -> canceled` and `workflow.canceled` in a recovery transaction, then
   re-raises `asyncio.CancelledError` so cooperative shutdown behavior is preserved.
+
+## Session updates during job execution
+
+The worker also advances the linked scenario session:
+
+- claim success: `started -> running`
+- workflow success: `running -> completed`, `current_checkpoint_id -> result_ready`
+- workflow failure: `running -> failed`, `current_checkpoint_id -> failed`
+- worker cancellation after claim: `running -> failed`, `current_checkpoint_id -> failed`
+
+If the workflow runner already terminalized the job before the outer worker error handler runs, the
+worker must still advance the scenario session to the matching terminal state instead of leaving it
+stuck in `running`.
 
 Safe validation errors retain validation-specific codes such as
 `structured_output_validation_failed`. Provider and transport failures retain gateway-owned safe

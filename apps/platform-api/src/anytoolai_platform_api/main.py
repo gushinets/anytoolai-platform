@@ -8,6 +8,7 @@ from time import perf_counter
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 
@@ -16,10 +17,14 @@ from anytoolai_platform_api.errors import (
     REQUEST_ID_HEADER,
     ApiError,
     api_error_handler,
+    request_validation_error_handler,
     unhandled_exception_handler,
 )
 from anytoolai_platform_api.routers.health import router as health_router
 from anytoolai_platform_api.routers.runtime_config import router as runtime_config_router
+from anytoolai_platform_api.routers.scenario_runtime import (
+    router as scenario_runtime_router,
+)
 from anytoolai_platform_core.common.logging import (
     bind_log_context,
     configure_json_logging,
@@ -48,6 +53,7 @@ def create_app(
 
     app.include_router(health_router)
     app.include_router(runtime_config_router)
+    app.include_router(scenario_runtime_router)
     return app
 
 
@@ -56,7 +62,7 @@ def _install_cors(app: FastAPI) -> None:
         CORSMiddleware,
         allow_origins=_configured_cors_origins(),
         allow_origin_regex=CHROME_EXTENSION_ORIGIN_REGEX,
-        allow_methods=["GET", "OPTIONS"],
+        allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Content-Type", REQUEST_ID_HEADER],
         expose_headers=[REQUEST_ID_HEADER],
     )
@@ -108,6 +114,7 @@ def _install_request_context(app: FastAPI) -> None:
 
 def _install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(ApiError, api_error_handler)
+    app.add_exception_handler(RequestValidationError, request_validation_error_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
 
 

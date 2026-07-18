@@ -76,6 +76,26 @@ class ScenarioSessionRepository:
         )
         return None if row is None else ScenarioSessionRecord(**dict(row))
 
+    def get_in_scope(
+        self,
+        scenario_session_id: str,
+        *,
+        tenant_id: str,
+        region: str,
+    ) -> ScenarioSessionRecord | None:
+        row = (
+            self._session.execute(
+                sa.select(scenario_sessions_table).where(
+                    scenario_sessions_table.c.id == scenario_session_id,
+                    scenario_sessions_table.c.tenant_id == tenant_id,
+                    scenario_sessions_table.c.region == region,
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return None if row is None else ScenarioSessionRecord(**dict(row))
+
     def update(
         self,
         record: ScenarioSessionRecord,

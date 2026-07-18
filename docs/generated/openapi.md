@@ -13,6 +13,9 @@ Version: 0.1.0
 |---|---|---|
 | GET | /health | health_health_get |
 | GET | /v1/products/{product_id}/runtime-config | get_runtime_config_v1_products__product_id__runtime_config_get |
+| POST | /v1/products/{product_id}/scenarios/{scenario_id}/start | start_scenario_v1_products__product_id__scenarios__scenario_id__start_post |
+| GET | /v1/scenario-sessions/{scenario_session_id} | get_scenario_session_v1_scenario_sessions__scenario_session_id__get |
+| POST | /v1/scenario-sessions/{scenario_session_id}/next-actions/{next_action_id} | post_next_action_v1_scenario_sessions__scenario_session_id__next_actions__next_action_id__post |
 
 ## Component schemas
 
@@ -24,4 +27,8 @@ Version: 0.1.0
 - RuntimeQuotaSummaryResponse
 - RuntimeRendererHintResponse
 - RuntimeScenarioResponse
+- ScenarioNextActionRequest
+- ScenarioSessionResponse
+- ScenarioStartRequest
+- ScenarioStartResponse
 - ValidationError

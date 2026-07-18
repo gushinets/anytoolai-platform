@@ -51,3 +51,13 @@ class ScenarioSessionRecord:
     last_event_at: datetime = field(default_factory=utc_now)
     completed_at: datetime | None = None
     expires_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class ScenarioSessionSnapshot:
+    scenario_session_id: str
+    job_id: str
+    status: ScenarioSessionStatus
+    allowed_next_actions: tuple[str, ...] = field(default_factory=tuple)
+    result_artifact_id: str | None = None
+    current_checkpoint_id: str | None = None

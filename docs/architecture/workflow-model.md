@@ -121,11 +121,22 @@ accepts that existing `running` job and never creates a second job row. Its inpu
 linked scenario session's `metadata["input"]`; the session and job identifiers remain in the
 execution context for every action, provider call, artifact, and event.
 
+For A12, the public runtime API is queue-and-return:
+
+- `POST /v1/products/{product_id}/scenarios/{scenario_id}/start` creates the scenario session first;
+- it then creates one linked `created` job and returns immediately;
+- `GET /v1/scenario-sessions/{id}` is the frontend-safe polling surface;
+- workflow execution still belongs to the worker process, not the API process.
+
 The conditional claim and `workflow.started` event commit together before action execution. If
 workflow execution fails, the job is marked `failed` with `completed_at`, a safe error code/message,
 and a `workflow.failed` event. If the execution transaction escapes and rolls back, shared
 rollback-recovery orchestration rebuilds the durable workflow/action/provider/artifact history in a
 separate recovery pass without introducing a durable workflow engine.
+
+The public scenario-session payload intentionally compresses workflow internals into safe runtime
+status and checkpoint fields. It must not expose prompts, provider policies, provider/model names,
+retry budgets, PydanticAI run ids, or LiteLLM response ids.
 
 ## Events
 
