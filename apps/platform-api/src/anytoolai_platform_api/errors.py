@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 REQUEST_ID_HEADER = "X-Request-ID"
@@ -29,6 +30,19 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         status_code=500,
         code="internal_server_error",
         message="Internal server error",
+    )
+
+
+async def request_validation_error_handler(
+    request: Request,
+    exc: RequestValidationError,
+) -> JSONResponse:
+    del exc
+    return _error_response(
+        request,
+        status_code=422,
+        code="request_validation_failed",
+        message="Request validation failed.",
     )
 
 

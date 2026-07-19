@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -50,6 +51,43 @@ class RuntimeConfigResponse(BaseModel):
     scenarios: list[RuntimeScenarioResponse]
     quota_summary: RuntimeQuotaSummaryResponse | None
     allowed_ui_capabilities: list[str]
+
+
+class ScenarioStartRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    frontend_id: str
+    input: Any
+    guest_id: str | None = None
+    user_id: str | None = None
+    source_frontend_instance_id: str | None = None
+
+
+class ScenarioNextActionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    checkpoint_id: str
+
+
+class ScenarioStartResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scenario_session_id: str
+    job_id: str
+    status: str
+    allowed_next_actions: list[str] = Field(default_factory=list)
+    result_artifact_id: str | None = None
+
+
+class ScenarioSessionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scenario_session_id: str
+    job_id: str
+    status: str
+    current_checkpoint_id: str | None = None
+    allowed_next_actions: list[str] = Field(default_factory=list)
+    result_artifact_id: str | None = None
 
 
 class ErrorDetailResponse(BaseModel):

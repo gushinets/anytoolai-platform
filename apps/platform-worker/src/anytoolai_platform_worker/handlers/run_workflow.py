@@ -14,8 +14,12 @@ from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
-from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
+from anytoolai_platform_core.scenarios.models import (
+    ScenarioSessionRecord,
+    ScenarioSessionStatus,
+)
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
+from anytoolai_platform_core.scenarios.service import ScenarioSessionService
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
@@ -83,6 +87,21 @@ class RunWorkflowHandler:
                 context = self._execution_context(job, scenario)
                 runner = self._runner_factory(session)
                 await runner.run_claimed_job(job, input_payload, context)
+                updated_job = JobRepository(session).get(job_id)
+                if updated_job is None:
+                    raise LookupError(f"job not found after execution: {job_id}")
+                if updated_job.status is JobStatus.succeeded:
+                    refreshed_scenario = self._load_scenario(session, updated_job)
+                    ScenarioSessionService(
+                        ScenarioSessionRepository(session),
+                        EventEmitter(EventLogRepository(session)),
+                    ).mark_completed(
+                        replace(
+                            refreshed_scenario,
+                            completed_at=updated_job.completed_at or utc_now(),
+                        ),
+                        context=self._execution_context(updated_job, refreshed_scenario),
+                    )
         except asyncio.CancelledError:
             self._persist_handler_cancellation(job_id)
             raise
@@ -104,6 +123,10 @@ class RunWorkflowHandler:
         with transaction_boundary(self._session_factory) as session:
             repository = JobRepository(session)
             emitter = EventEmitter(EventLogRepository(session))
+            scenario_service = ScenarioSessionService(
+                ScenarioSessionRepository(session),
+                emitter,
+            )
             job = repository.get(job_id)
             if job is None or job.status is not JobStatus.created:
                 return None
@@ -115,10 +138,14 @@ class RunWorkflowHandler:
                 "user_id": scenario.user_id,
                 "scenario_chain_id": scenario.scenario_chain_id,
             }
-            return WorkflowJobService(repository, emitter).claim_created(
+            claimed = WorkflowJobService(repository, emitter).claim_created(
                 job_id,
                 metadata=metadata,
             )
+            if claimed is None:
+                return None
+            scenario_service.mark_running(scenario)
+            return claimed
 
     def _get(self, job_id: str) -> JobRecord | None:
         with transaction_boundary(self._session_factory) as session:
@@ -171,19 +198,44 @@ class RunWorkflowHandler:
         with transaction_boundary(self._session_factory) as session:
             repository = JobRepository(session)
             job = repository.get(job_id)
-            if job is None or job.status is not JobStatus.running:
+            if job is None:
                 return
             emitter = EventEmitter(EventLogRepository(session))
-            WorkflowJobService(repository, emitter).mark_failed(
-                replace(
-                    job,
-                    status=JobStatus.failed,
+            if job.status is JobStatus.running:
+                job = WorkflowJobService(repository, emitter).mark_failed(
+                    replace(
+                        job,
+                        status=JobStatus.failed,
+                        error_code=error_code,
+                        error_message_safe=error_message_safe,
+                        completed_at=job.completed_at or utc_now(),
+                    ),
                     error_code=error_code,
-                    error_message_safe=error_message_safe,
-                    completed_at=job.completed_at or utc_now(),
-                ),
-                error_code=error_code,
+                )
+                scenario_error_code = error_code
+            elif job.status is not JobStatus.failed:
+                return
+            else:
+                scenario_error_code = job.error_code or error_code
+            scenario = ScenarioSessionRepository(session).get(
+                job.scenario_session_id,
+                tenant_id=job.tenant_id,
+                region=job.region,
+                product_id=job.product_id,
+                frontend_id=job.frontend_id,
             )
+            if scenario is not None and scenario.status is not ScenarioSessionStatus.failed:
+                ScenarioSessionService(
+                    ScenarioSessionRepository(session),
+                    emitter,
+                ).mark_failed(
+                    replace(
+                        scenario,
+                        completed_at=job.completed_at or utc_now(),
+                    ),
+                    error_code=scenario_error_code,
+                    context=self._execution_context(job, scenario),
+                )
 
     def _persist_created_job_failure(self, job_id: str, exc: Exception) -> None:
         error_code = _safe_error_code(exc)
@@ -209,10 +261,32 @@ class RunWorkflowHandler:
         with transaction_boundary(self._session_factory) as session:
             repository = JobRepository(session)
             job = repository.get(job_id)
-            if job is None or job.status is not JobStatus.running:
+            if job is None:
                 return
             emitter = EventEmitter(EventLogRepository(session))
-            WorkflowJobService(repository, emitter).mark_canceled(job)
+            if job.status is JobStatus.running:
+                job = WorkflowJobService(repository, emitter).mark_canceled(job)
+            elif job.status is not JobStatus.canceled:
+                return
+            scenario = ScenarioSessionRepository(session).get(
+                job.scenario_session_id,
+                tenant_id=job.tenant_id,
+                region=job.region,
+                product_id=job.product_id,
+                frontend_id=job.frontend_id,
+            )
+            if scenario is not None and scenario.status is not ScenarioSessionStatus.failed:
+                ScenarioSessionService(
+                    ScenarioSessionRepository(session),
+                    emitter,
+                ).mark_failed(
+                    replace(
+                        scenario,
+                        completed_at=utc_now(),
+                    ),
+                    error_code="workflow_execution_cancelled",
+                    context=self._execution_context(job, scenario),
+                )
 
 
 def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:

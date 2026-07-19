@@ -41,6 +41,24 @@ class JobRepository:
         )
         return None if row is None else JobRecord(**dict(row))
 
+    def get_latest_for_scenario_session(
+        self,
+        scenario_session_id: str,
+    ) -> JobRecord | None:
+        row = (
+            self._session.execute(
+                sa.select(jobs_table)
+                .where(jobs_table.c.scenario_session_id == scenario_session_id)
+                .order_by(
+                    jobs_table.c.created_at.desc(),
+                    jobs_table.c.id.desc(),
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return None if row is None else JobRecord(**dict(row))
+
     def claim_created(
         self,
         job_id: str,
