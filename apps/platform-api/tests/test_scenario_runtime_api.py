@@ -583,6 +583,52 @@ def test_get_scenario_session_returns_failed_snapshot(tmp_path: Path) -> None:
     }
 
 
+def test_get_scenario_session_returns_failed_checkpoint_for_preclaim_canceled_job(
+    tmp_path: Path,
+) -> None:
+    session_factory = _build_session_factory(tmp_path)
+    app = _create_test_app(session_factory)
+
+    started = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
+            json=_start_payload(),
+        )
+    ).json()
+
+    with transaction_boundary(session_factory) as session:
+        canceled_job = JobRepository(session).cancel_created(started["job_id"])
+        assert canceled_job is not None
+        scenario = ScenarioSessionRepository(session).get_in_scope(
+            started["scenario_session_id"],
+            tenant_id="anytoolai",
+            region="default",
+        )
+        assert scenario is not None
+        assert scenario.current_checkpoint_id == PROCESSING_CHECKPOINT_ID
+
+    response = asyncio.run(
+        _request(
+            app,
+            "GET",
+            f"/v1/scenario-sessions/{started['scenario_session_id']}",
+            request_id="req_preclaim_cancel",
+        )
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {
+        "scenario_session_id": started["scenario_session_id"],
+        "job_id": started["job_id"],
+        "status": "failed",
+        "current_checkpoint_id": FAILED_CHECKPOINT_ID,
+        "allowed_next_actions": [],
+        "result_artifact_id": None,
+    }
+
+
 def test_next_action_validates_checkpoint_and_emits_event(tmp_path: Path) -> None:
     session_factory = _build_session_factory(tmp_path)
     app = _create_test_app(session_factory)

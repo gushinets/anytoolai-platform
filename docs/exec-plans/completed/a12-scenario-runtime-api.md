@@ -5,7 +5,7 @@
 - State: completed
 - Owner: agent
 - Created: 2026-07-18
-- Last updated: 2026-07-18
+- Last updated: 2026-07-19
 - Review date: 2026-07-18
 - Next action: none; implementation, validation, and documentation alignment are complete.
 - Blocker: none
@@ -93,6 +93,7 @@ execution and preserve session/job/artifact/event correlation.
 |---|---|---|
 | 2026-07-18 | Implemented the scenario runtime service, API router, worker session updates, focused tests, and architecture/OpenAPI docs | Add the missing vertical A12 integration test and sync the execution-plan status |
 | 2026-07-18 | Added a true API start -> real worker execution -> polling test with explicit `scenario_session_id` assertions across `provider_calls`, `artifacts`, and related runtime rows/events | None; validation and documentation alignment are complete |
+| 2026-07-19 | Fixed effective checkpoint resolution so pre-claim `created -> canceled` jobs poll as terminal `failed + failed` instead of `failed + processing`, and added core/API regression tests | None; A12 polling snapshots remain frontend-safe and internally consistent |
 
 ## Open questions
 

@@ -84,6 +84,11 @@ Workflow failure or worker cancellation:
   failed + failed
 ```
 
+If a queued job is canceled before the worker claims it, polling must still resolve the frontend
+snapshot as terminal `failed + failed` even if the stored session row still carries the initial
+`processing` checkpoint. Frontends must never observe a terminal failed status paired with the
+processing checkpoint.
+
 `GET /v1/scenario-sessions/{id}` is the frontend-safe polling endpoint for this progression. The
 response must not expose prompts, provider policies, provider/model names, retry budgets,
 PydanticAI run ids, or LiteLLM response ids.

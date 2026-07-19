@@ -68,16 +68,17 @@ def _resolved_checkpoint_id(
     session: ScenarioSessionRecord,
     job: JobRecord | None,
 ) -> str:
+    effective_status = resolve_effective_status(session=session, job=job)
+
     if session.current_checkpoint_id == RESULT_READY_CHECKPOINT_ID:
         return RESULT_READY_CHECKPOINT_ID
     if session.current_checkpoint_id == FAILED_CHECKPOINT_ID:
         return FAILED_CHECKPOINT_ID
-    if session.current_checkpoint_id == PROCESSING_CHECKPOINT_ID:
-        return PROCESSING_CHECKPOINT_ID
-
-    effective_status = resolve_effective_status(session=session, job=job)
     if effective_status is ScenarioSessionStatus.completed:
         return RESULT_READY_CHECKPOINT_ID
     if effective_status is ScenarioSessionStatus.failed:
         return FAILED_CHECKPOINT_ID
+    if session.current_checkpoint_id == PROCESSING_CHECKPOINT_ID:
+        return PROCESSING_CHECKPOINT_ID
+
     return PROCESSING_CHECKPOINT_ID

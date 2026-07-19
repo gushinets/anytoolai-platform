@@ -383,3 +383,39 @@ def test_checkpoint_resolution_falls_back_to_job_state(config_registry) -> None:
     assert resolve_effective_status(session=session, job=failed_job) is ScenarioSessionStatus.failed
     assert failed_state.checkpoint_id == FAILED_CHECKPOINT_ID
     assert failed_state.allowed_next_actions == ()
+
+
+def test_processing_checkpoint_does_not_override_terminal_canceled_job(config_registry) -> None:
+    scenario = config_registry.get_scenario("kernel_demo.single_action_smoke_v1")
+    assert scenario is not None
+
+    session = ScenarioSessionRecord(
+        tenant_id="anytoolai",
+        region="default",
+        product_id="kernel_demo",
+        frontend_id="kernel_demo_ce",
+        scenario_id=scenario.scenario_id,
+        scenario_version=scenario.version,
+        status=ScenarioSessionStatus.started,
+        current_checkpoint_id=PROCESSING_CHECKPOINT_ID,
+    )
+    canceled_job = JobRecord(
+        tenant_id="anytoolai",
+        region="default",
+        product_id="kernel_demo",
+        frontend_id="kernel_demo_ce",
+        scenario_session_id=session.id,
+        workflow_id=scenario.workflow_id,
+        workflow_version=1,
+        status=JobStatus.canceled,
+    )
+
+    checkpoint_state = resolve_checkpoint_state(
+        scenario=scenario,
+        session=session,
+        job=canceled_job,
+    )
+
+    assert resolve_effective_status(session=session, job=canceled_job) is ScenarioSessionStatus.failed
+    assert checkpoint_state.checkpoint_id == FAILED_CHECKPOINT_ID
+    assert checkpoint_state.allowed_next_actions == ()
