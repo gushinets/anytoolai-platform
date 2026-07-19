@@ -716,6 +716,56 @@ def test_get_scenario_session_returns_safe_404(tmp_path: Path) -> None:
     assert "scenario_session_missing" not in response.text
 
 
+def test_get_scenario_session_returns_safe_404_for_persisted_scenario_version_mismatch(
+    tmp_path: Path,
+) -> None:
+    session_factory = _build_session_factory(tmp_path)
+    app = _create_test_app(session_factory)
+
+    started = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
+            json=_start_payload(),
+        )
+    ).json()
+
+    with transaction_boundary(session_factory) as session:
+        scenario = ScenarioSessionRepository(session).get_in_scope(
+            started["scenario_session_id"],
+            tenant_id="anytoolai",
+            region="default",
+        )
+        assert scenario is not None
+        ScenarioSessionRepository(session).update(
+            replace(scenario, scenario_version=scenario.scenario_version + 1),
+            tenant_id=scenario.tenant_id,
+            region=scenario.region,
+            product_id=scenario.product_id,
+            frontend_id=scenario.frontend_id,
+        )
+
+    response = asyncio.run(
+        _request(
+            app,
+            "GET",
+            f"/v1/scenario-sessions/{started['scenario_session_id']}",
+            request_id="req_scenario_version_missing",
+        )
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json() == {
+        "error": {
+            "code": "scenario_not_found",
+            "message": "Scenario not found.",
+            "request_id": "req_scenario_version_missing",
+        }
+    }
+    assert "single_action_smoke_v1" not in response.text
+
+
 def test_openapi_contains_scenario_runtime_endpoints() -> None:
     app = create_app(config_root=CONFIG_ROOT)
     openapi = app.openapi()

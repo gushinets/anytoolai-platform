@@ -31,6 +31,7 @@ from anytoolai_platform_core.scenarios.next_actions import (
 )
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.scenarios.service import (
+    ScenarioNotFoundError,
     ScenarioRuntimeService,
     ScenarioSessionService,
 )
@@ -325,6 +326,80 @@ def test_record_next_action_rejects_non_actionable_processing_checkpoint(
         )
 
         with pytest.raises(ScenarioCheckpointNotActionableError):
+            service.record_next_action(
+                started.scenario_session_id,
+                tenant_id="anytoolai",
+                region="default",
+                next_action_id="copy_result",
+                checkpoint_id=PROCESSING_CHECKPOINT_ID,
+            )
+
+
+def test_get_session_snapshot_rejects_persisted_scenario_version_mismatch(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        service = _runtime_service(session, config_registry=config_registry)
+        started = service.start_session(
+            tenant_id="anytoolai",
+            region="default",
+            product_id="kernel_demo",
+            scenario_id="kernel_demo.single_action_smoke_v1",
+            frontend_id="kernel_demo_ce",
+            input_payload={"source_text": "deadline budget deliverables"},
+        )
+        scenario_session = ScenarioSessionRepository(session).get_in_scope(
+            started.scenario_session_id,
+            tenant_id="anytoolai",
+            region="default",
+        )
+        assert scenario_session is not None
+        ScenarioSessionRepository(session).update(
+            replace(scenario_session, scenario_version=scenario_session.scenario_version + 1),
+            tenant_id=scenario_session.tenant_id,
+            region=scenario_session.region,
+            product_id=scenario_session.product_id,
+            frontend_id=scenario_session.frontend_id,
+        )
+
+        with pytest.raises(ScenarioNotFoundError):
+            service.get_session_snapshot(
+                started.scenario_session_id,
+                tenant_id="anytoolai",
+                region="default",
+            )
+
+
+def test_record_next_action_rejects_persisted_scenario_version_mismatch(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        service = _runtime_service(session, config_registry=config_registry)
+        started = service.start_session(
+            tenant_id="anytoolai",
+            region="default",
+            product_id="kernel_demo",
+            scenario_id="kernel_demo.single_action_smoke_v1",
+            frontend_id="kernel_demo_ce",
+            input_payload={"source_text": "deadline budget deliverables"},
+        )
+        scenario_session = ScenarioSessionRepository(session).get_in_scope(
+            started.scenario_session_id,
+            tenant_id="anytoolai",
+            region="default",
+        )
+        assert scenario_session is not None
+        ScenarioSessionRepository(session).update(
+            replace(scenario_session, scenario_version=scenario_session.scenario_version + 1),
+            tenant_id=scenario_session.tenant_id,
+            region=scenario_session.region,
+            product_id=scenario_session.product_id,
+            frontend_id=scenario_session.frontend_id,
+        )
+
+        with pytest.raises(ScenarioNotFoundError):
             service.record_next_action(
                 started.scenario_session_id,
                 tenant_id="anytoolai",

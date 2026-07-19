@@ -156,7 +156,11 @@ class ScenarioRuntimeService:
             raise LookupError(
                 f"scenario session {scenario_session_id} does not have a linked job"
             )
-        scenario = self._require_product_scenario(session.product_id, session.scenario_id)
+        scenario = self._require_product_scenario(
+            session.product_id,
+            session.scenario_id,
+            scenario_version=session.scenario_version,
+        )
         return self._snapshot_from_records(
             session=session,
             scenario=scenario,
@@ -184,7 +188,11 @@ class ScenarioRuntimeService:
             raise LookupError(
                 f"scenario session {scenario_session_id} does not have a linked job"
             )
-        scenario = self._require_product_scenario(session.product_id, session.scenario_id)
+        scenario = self._require_product_scenario(
+            session.product_id,
+            session.scenario_id,
+            scenario_version=session.scenario_version,
+        )
         checkpoint_state = resolve_checkpoint_state(
             scenario=scenario,
             session=session,
@@ -248,12 +256,16 @@ class ScenarioRuntimeService:
         self,
         product_id: str,
         scenario_id: str,
+        *,
+        scenario_version: int | None = None,
     ) -> ScenarioDefinition:
         product = self._config_registry.get_product(product_id)
         scenario = self._config_registry.get_scenario(scenario_id)
         if product is None or scenario is None:
             raise ScenarioNotFoundError()
         if scenario_id not in product.scenarios:
+            raise ScenarioNotFoundError()
+        if scenario_version is not None and scenario.version != scenario_version:
             raise ScenarioNotFoundError()
         return scenario
 
