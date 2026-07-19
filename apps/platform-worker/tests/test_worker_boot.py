@@ -28,6 +28,7 @@ from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionStatus,
 )
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
+from anytoolai_platform_core.scenarios.service import ScenarioSessionService
 from anytoolai_platform_core.storage.db import (
     action_runs_table,
     artifacts_table,
@@ -330,6 +331,76 @@ def test_worker_failure_is_safe_and_emits_correlated_workflow_failed_event(
     assert scenario is not None
     assert scenario.status is ScenarioSessionStatus.failed
     assert scenario.current_checkpoint_id == FAILED_CHECKPOINT_ID
+
+
+def test_worker_failure_uses_persisted_job_error_code_for_scenario_failure(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_job(session_factory, input_payload={"source_text": "failure"})
+    handler = RunWorkflowHandler(
+        session_factory=session_factory,
+        runner_factory=RecordingRunner,
+    )
+
+    with transaction_boundary(session_factory) as session:
+        repository = JobRepository(session)
+        emitter = EventEmitter(EventLogRepository(session))
+        claimed = WorkflowJobService(repository, emitter).claim_created(job.id)
+        assert claimed is not None
+        scenario_repository = ScenarioSessionRepository(session)
+        scenario = scenario_repository.get(
+            job.scenario_session_id,
+            tenant_id=job.tenant_id,
+            region=job.region,
+            product_id=job.product_id,
+            frontend_id=job.frontend_id,
+        )
+        assert scenario is not None
+        ScenarioSessionService(scenario_repository, emitter).mark_running(scenario)
+        WorkflowJobService(repository, emitter).mark_failed(
+            replace(
+                claimed,
+                status=JobStatus.failed,
+                error_code="provider_request_failed",
+                error_message_safe="Provider request failed.",
+                completed_at=utc_now(),
+            ),
+            error_code="provider_request_failed",
+        )
+
+    handler._persist_handler_failure(
+        job.id,
+        RuntimeError("outer handler failure should not overwrite persisted job error"),
+    )
+
+    result = handler._get(job.id)
+
+    assert result is not None
+    assert result.status is JobStatus.failed
+    assert result.error_code == "provider_request_failed"
+
+    with transaction_boundary(session_factory) as session:
+        scenario = ScenarioSessionRepository(session).get(
+            job.scenario_session_id,
+            tenant_id=job.tenant_id,
+            region=job.region,
+            product_id=job.product_id,
+            frontend_id=job.frontend_id,
+        )
+        scenario_failed = session.execute(
+            sa.select(event_log_table)
+            .where(
+                event_log_table.c.scenario_session_id == job.scenario_session_id,
+                event_log_table.c.event_type == "scenario.failed",
+            )
+            .order_by(event_log_table.c.timestamp.desc(), event_log_table.c.event_id.desc())
+        ).mappings().first()
+
+    assert scenario is not None
+    assert scenario.status is ScenarioSessionStatus.failed
+    assert scenario.current_checkpoint_id == FAILED_CHECKPOINT_ID
+    assert scenario_failed is not None
+    assert scenario_failed["properties"]["error_code"] == "provider_request_failed"
 
 
 def test_worker_cancellation_marks_claimed_job_canceled_and_reraises(

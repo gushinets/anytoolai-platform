@@ -211,8 +211,11 @@ class RunWorkflowHandler:
                     ),
                     error_code=error_code,
                 )
+                scenario_error_code = error_code
             elif job.status is not JobStatus.failed:
                 return
+            else:
+                scenario_error_code = job.error_code or error_code
             scenario = ScenarioSessionRepository(session).get(
                 job.scenario_session_id,
                 tenant_id=job.tenant_id,
@@ -229,7 +232,7 @@ class RunWorkflowHandler:
                         scenario,
                         completed_at=job.completed_at or utc_now(),
                     ),
-                    error_code=error_code,
+                    error_code=scenario_error_code,
                 )
 
     def _persist_created_job_failure(self, job_id: str, exc: Exception) -> None:
