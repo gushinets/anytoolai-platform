@@ -169,13 +169,19 @@ For a failed workflow, the ordered replay contract is:
 
 1. `workflow.started` first when the running job row exists but its start event is missing;
 2. for each persisted step in workflow order:
-   - `workflow.step_started`
+   - `workflow.step_started` only when the original execution reached that step-start boundary
    - child `action.started`
    - child provider request events in attempt order
    - child `artifact.created` events
    - child action terminal event
    - step terminal event
 3. `workflow.failed` or handler-owned `workflow.canceled` last.
+
+The step-start boundary is semantic, not inferred from failure status alone. A `when` resolution
+failure happens before the step starts and therefore recovers `workflow.step_failed` without
+replaying `workflow.step_started`. Input mapping, action execution, provider, and output mapping
+failures happen after the normal runner has emitted `workflow.step_started`, so recovery replays the
+step-start event for those failed steps when it is missing.
 
 This recovery is idempotent enough to tolerate partial durable state. Existing rows and existing
 events suppress only their own replay. For example, a pre-claimed worker job may already have

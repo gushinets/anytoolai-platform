@@ -46,7 +46,10 @@ from anytoolai_platform_core.storage.transactions import (
     transaction_boundary,
 )
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
-from anytoolai_platform_core.workflows.errors import WorkflowConditionEvaluationError
+from anytoolai_platform_core.workflows.errors import (
+    WorkflowConditionEvaluationError,
+    WorkflowMappingResolutionError,
+)
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import (
@@ -1164,6 +1167,100 @@ def test_workflow_runner_recovery_does_not_synthesize_step_started_for_pre_start
     assert step_failed_events[0]["timestamp"] < workflow_failed_events[0]["timestamp"]
     assert workflow_failed_events[0]["timestamp"] == job["completed_at"]
     assert job["metadata"]["workflow_state"]["steps"]["optional_extract"]["started_event_emitted"] is False
+
+
+def test_workflow_runner_caught_condition_failure_does_not_emit_step_started(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
+        runner = _build_recording_workflow_runner(
+            session,
+            executor=RecordingExecutor(
+                {
+                    "extract": {"title": "Extracted", "fields": ["deadline", "budget"]},
+                    "optional_extract": {"title": "Optional", "fields": ["ignored"]},
+                }
+            ),
+        )
+
+        with pytest.raises(WorkflowConditionEvaluationError):
+            asyncio.run(
+                runner.run(
+                    "kernel_demo.conditional_skip_extract_v1",
+                    {"source_text": "deadline budget deliverables"},
+                    context,
+                )
+            )
+        job = session.execute(sa.select(jobs_table)).mappings().one()
+        events = _event_rows(session)
+
+    step_started_events = _event_by_type(events, "workflow.step_started")
+    step_failed_events = _event_by_type(events, "workflow.step_failed")
+    assert job["error_code"] == "workflow_condition_evaluation_failed"
+    assert [event["properties"]["step_id"] for event in step_started_events] == ["extract"]
+    assert len(step_failed_events) == 1
+    assert step_failed_events[0]["properties"]["step_id"] == "optional_extract"
+    assert job["metadata"]["workflow_state"]["steps"]["optional_extract"]["started_event_emitted"] is False
+
+
+def test_workflow_runner_recovery_replays_step_started_for_input_mapping_failure(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    context = _base_context()
+    with transaction_boundary(session_factory) as session:
+        _seed_context_scenario(session, context)
+
+    with pytest.raises(WorkflowMappingResolutionError):
+        with transaction_boundary(session_factory) as session:
+            runner = _build_recording_workflow_runner(
+                session,
+                executor=RecordingExecutor(
+                    {
+                        "extract": {"title": "Extracted", "fields": ["deadline", "budget"]},
+                        "detect_issues": {"issues": [{"severity": "high", "issue": "ignored"}]},
+                        "generate_report": {
+                            "headline": "Report",
+                            "summary": "ignored",
+                        },
+                    }
+                ),
+            )
+            asyncio.run(
+                runner.run(
+                    "kernel_demo.extract_detect_report_v1",
+                    {"source_text": "deadline budget deliverables"},
+                    context,
+                )
+            )
+
+    with transaction_boundary(session_factory) as session:
+        job = session.execute(sa.select(jobs_table)).mappings().one()
+        action_runs = list(
+            session.execute(
+                sa.select(action_runs_table).order_by(
+                    action_runs_table.c.created_at,
+                    action_runs_table.c.id,
+                )
+            ).mappings()
+        )
+        events = _event_rows(session)
+
+    workflow_state = job["metadata"]["workflow_state"]
+    step_started_events = _event_by_type(events, "workflow.step_started")
+    step_failed_events = _event_by_type(events, "workflow.step_failed")
+    assert job["error_code"] == "workflow_mapping_resolution_failed"
+    assert [row["step_id"] for row in action_runs] == ["extract"]
+    assert {event["properties"]["step_id"] for event in step_started_events} == {
+        "extract",
+        "detect_issues",
+    }
+    assert len(step_failed_events) == 1
+    assert step_failed_events[0]["properties"]["step_id"] == "detect_issues"
+    assert step_failed_events[0]["action_run_id"] is None
+    assert workflow_state["steps"]["detect_issues"]["started_event_emitted"] is True
+    assert workflow_state["steps"]["detect_issues"]["last_action_run_id"] is None
 
 
 def test_workflow_recovery_replays_all_step_action_attempts_in_order(
