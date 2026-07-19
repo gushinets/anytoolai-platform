@@ -346,7 +346,12 @@ class ScenarioSessionService:
             frontend_id=record.frontend_id,
         )
 
-    def mark_completed(self, record: ScenarioSessionRecord) -> ScenarioSessionRecord:
+    def mark_completed(
+        self,
+        record: ScenarioSessionRecord,
+        *,
+        context: ExecutionContext | None = None,
+    ) -> ScenarioSessionRecord:
         updated = self._repository.update(
             replace(
                 record,
@@ -360,10 +365,11 @@ class ScenarioSessionService:
             product_id=record.product_id,
             frontend_id=record.frontend_id,
         )
+        event_context = _event_context_from_record(updated, context)
         if record.current_checkpoint_id != RESULT_READY_CHECKPOINT_ID:
             self._event_emitter.emit(
                 "scenario.checkpoint_reached",
-                _context_from_record(updated),
+                event_context,
                 properties={
                     "checkpoint_id": RESULT_READY_CHECKPOINT_ID,
                     "scenario_id": updated.scenario_id,
@@ -372,7 +378,7 @@ class ScenarioSessionService:
             )
         self._event_emitter.emit(
             "scenario.completed",
-            _context_from_record(updated),
+            event_context,
             result_status=updated.status.value,
             properties={
                 "scenario_id": updated.scenario_id,
@@ -381,7 +387,13 @@ class ScenarioSessionService:
         )
         return updated
 
-    def mark_failed(self, record: ScenarioSessionRecord, *, error_code: str) -> ScenarioSessionRecord:
+    def mark_failed(
+        self,
+        record: ScenarioSessionRecord,
+        *,
+        error_code: str,
+        context: ExecutionContext | None = None,
+    ) -> ScenarioSessionRecord:
         updated = self._repository.update(
             replace(
                 record,
@@ -395,10 +407,11 @@ class ScenarioSessionService:
             product_id=record.product_id,
             frontend_id=record.frontend_id,
         )
+        event_context = _event_context_from_record(updated, context)
         if record.current_checkpoint_id != FAILED_CHECKPOINT_ID:
             self._event_emitter.emit(
                 "scenario.checkpoint_reached",
-                _context_from_record(updated),
+                event_context,
                 properties={
                     "checkpoint_id": FAILED_CHECKPOINT_ID,
                     "error_code": error_code,
@@ -408,7 +421,7 @@ class ScenarioSessionService:
             )
         self._event_emitter.emit(
             "scenario.failed",
-            _context_from_record(updated),
+            event_context,
             result_status=updated.status.value,
             properties={
                 "error_code": error_code,
@@ -429,6 +442,23 @@ def _context_from_record(record: ScenarioSessionRecord) -> ExecutionContext:
         guest_id=record.guest_id,
         user_id=record.user_id,
         scenario_chain_id=record.scenario_chain_id,
+    )
+
+
+def _event_context_from_record(
+    record: ScenarioSessionRecord,
+    context: ExecutionContext | None,
+) -> ExecutionContext:
+    event_context = _context_from_record(record)
+    if context is None:
+        return event_context
+    return replace(
+        event_context,
+        job_id=context.job_id,
+        workflow_id=context.workflow_id,
+        workflow_version=context.workflow_version,
+        handoff_id=context.handoff_id,
+        acquisition_source=context.acquisition_source,
     )
 
 

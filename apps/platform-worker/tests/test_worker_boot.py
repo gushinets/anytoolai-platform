@@ -288,9 +288,17 @@ def test_worker_boot_processes_a_claimed_job_from_scenario_session_input(
             product_id=job.product_id,
             frontend_id=job.frontend_id,
         )
+        scenario_completed = session.execute(
+            sa.select(event_log_table).where(
+                event_log_table.c.scenario_session_id == job.scenario_session_id,
+                event_log_table.c.event_type == "scenario.completed",
+            )
+        ).mappings().one()
     assert scenario is not None
     assert scenario.status is ScenarioSessionStatus.completed
     assert scenario.current_checkpoint_id == RESULT_READY_CHECKPOINT_ID
+    assert scenario_completed["job_id"] == job.id
+    assert scenario_completed["workflow_id"] == job.workflow_id
 
 
 def test_worker_failure_is_safe_and_emits_correlated_workflow_failed_event(
@@ -318,6 +326,12 @@ def test_worker_failure_is_safe_and_emits_correlated_workflow_failed_event(
         event_row = session.execute(
             sa.select(event_log_table).where(event_log_table.c.event_type == "workflow.failed")
         ).mappings().one()
+        scenario_failed = session.execute(
+            sa.select(event_log_table).where(
+                event_log_table.c.scenario_session_id == job.scenario_session_id,
+                event_log_table.c.event_type == "scenario.failed",
+            )
+        ).mappings().one()
         scenario = ScenarioSessionRepository(session).get(
             job.scenario_session_id,
             tenant_id=job.tenant_id,
@@ -331,6 +345,8 @@ def test_worker_failure_is_safe_and_emits_correlated_workflow_failed_event(
     assert scenario is not None
     assert scenario.status is ScenarioSessionStatus.failed
     assert scenario.current_checkpoint_id == FAILED_CHECKPOINT_ID
+    assert scenario_failed["job_id"] == job.id
+    assert scenario_failed["workflow_id"] == job.workflow_id
 
 
 def test_worker_failure_uses_persisted_job_error_code_for_scenario_failure(
@@ -400,6 +416,8 @@ def test_worker_failure_uses_persisted_job_error_code_for_scenario_failure(
     assert scenario.status is ScenarioSessionStatus.failed
     assert scenario.current_checkpoint_id == FAILED_CHECKPOINT_ID
     assert scenario_failed is not None
+    assert scenario_failed["job_id"] == job.id
+    assert scenario_failed["workflow_id"] == job.workflow_id
     assert scenario_failed["properties"]["error_code"] == "provider_request_failed"
 
 
@@ -440,7 +458,12 @@ def test_worker_cancellation_marks_claimed_job_canceled_and_reraises(
     assert scenario is not None
     assert scenario.status is ScenarioSessionStatus.failed
     assert scenario.current_checkpoint_id == FAILED_CHECKPOINT_ID
-    assert event_types == ["workflow.started", "workflow.canceled"]
+    assert event_types == [
+        "workflow.started",
+        "workflow.canceled",
+        "scenario.checkpoint_reached",
+        "scenario.failed",
+    ]
 
 
 def test_worker_started_and_failed_events_keep_scenario_identity_for_invalid_input(
@@ -1030,6 +1053,8 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
         "action.failed",
         "workflow.step_failed",
         "workflow.failed",
+        "scenario.checkpoint_reached",
+        "scenario.failed",
     ]
     workflow_step_started_events = [
         event_row for event_row in events if event_row["event_type"] == "workflow.step_started"
@@ -1049,6 +1074,9 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
     workflow_failed = next(
         event_row for event_row in events if event_row["event_type"] == "workflow.failed"
     )
+    scenario_failed = next(
+        event_row for event_row in events if event_row["event_type"] == "scenario.failed"
+    )
     assert workflow_step_started_events[0]["job_id"] == job.id
     assert workflow_step_started_events[0]["properties"]["step_id"] == "extract"
     assert workflow_step_started_events[1]["properties"]["step_id"] == "detect_issues"
@@ -1062,3 +1090,5 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
     assert provider_failed["action_run_id"] == action_runs[1]["id"]
     assert workflow_failed["job_id"] == job.id
     assert workflow_failed["properties"]["error_code"] == "provider_request_failed"
+    assert scenario_failed["job_id"] == job.id
+    assert scenario_failed["workflow_id"] == job.workflow_id

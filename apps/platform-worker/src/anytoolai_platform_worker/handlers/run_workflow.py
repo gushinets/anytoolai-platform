@@ -99,7 +99,8 @@ class RunWorkflowHandler:
                         replace(
                             refreshed_scenario,
                             completed_at=updated_job.completed_at or utc_now(),
-                        )
+                        ),
+                        context=self._execution_context(updated_job, refreshed_scenario),
                     )
         except asyncio.CancelledError:
             self._persist_handler_cancellation(job_id)
@@ -233,6 +234,7 @@ class RunWorkflowHandler:
                         completed_at=job.completed_at or utc_now(),
                     ),
                     error_code=scenario_error_code,
+                    context=self._execution_context(job, scenario),
                 )
 
     def _persist_created_job_failure(self, job_id: str, exc: Exception) -> None:
@@ -283,6 +285,7 @@ class RunWorkflowHandler:
                         completed_at=utc_now(),
                     ),
                     error_code="workflow_execution_cancelled",
+                    context=self._execution_context(job, scenario),
                 )
 
 
