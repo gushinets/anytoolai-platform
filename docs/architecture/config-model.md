@@ -59,6 +59,15 @@ as `max_retries` are invalid.
 
 Frontend must not see system prompts or choose prompt versions.
 
+Quota policy is repo-configured and product-owned:
+
+- `product.yaml` references `quota_policy_ref`;
+- product-local `quotas.yaml` defines the referenced policy;
+- the current quota contract supports `scenario_run` / `lifetime`;
+- runtime enforcement uses `guest_id + product_id + quota_policy_id + period_key`, scoped by
+  tenant and region;
+- the current config contract does not define a scenario-level quota dimension.
+
 Config validation must run in CI and before runtime startup. Broken references must fail startup.
 Missing owned files and missing explicit fields must fail validation with structured diagnostics.
 

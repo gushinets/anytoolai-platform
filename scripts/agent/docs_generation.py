@@ -124,16 +124,18 @@ def render_openapi() -> str:
             "",
             "## Implemented operations",
             "",
-            "| Method | Path | Operation ID |",
-            "|---|---|---|",
+            "| Method | Path | Operation ID | Responses |",
+            "|---|---|---|---|",
         ]
     )
     for path, operations in sorted(schema.get("paths", {}).items()):
         for method, operation in sorted(operations.items()):
             if method.startswith("x-") or not isinstance(operation, dict):
                 continue
+            response_codes = ", ".join(sorted(operation.get("responses", {})))
             lines.append(
-                f"| {method.upper()} | {path} | {operation.get('operationId', '')} |"
+                f"| {method.upper()} | {path} | {operation.get('operationId', '')} | "
+                f"{response_codes} |"
             )
     lines.extend(["", "## Component schemas", ""])
     schemas = schema.get("components", {}).get("schemas", {})

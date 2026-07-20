@@ -84,6 +84,34 @@ Definitions remain in repository configuration; these tables store runtime state
 | acquisition_source | VARCHAR(128) | yes |
 | properties | JSON | no |
 
+## platform.guest_identities
+
+| Column | Type | Nullable |
+|---|---|---|
+| id | VARCHAR(128) | no |
+| tenant_id | VARCHAR(128) | no |
+| region | VARCHAR(64) | no |
+| created_at | DATETIME | no |
+| last_seen_at | DATETIME | yes |
+| metadata | JSON | no |
+
+## platform.guest_quota_usage
+
+| Column | Type | Nullable |
+|---|---|---|
+| id | VARCHAR(128) | no |
+| tenant_id | VARCHAR(128) | no |
+| region | VARCHAR(64) | no |
+| guest_id | VARCHAR(128) | no |
+| product_id | VARCHAR(128) | no |
+| quota_policy_id | VARCHAR(128) | no |
+| period_key | VARCHAR(128) | no |
+| limit_count | INTEGER | no |
+| used_count | INTEGER | no |
+| created_at | DATETIME | no |
+| updated_at | DATETIME | no |
+| metadata | JSON | no |
+
 ## platform.jobs
 
 | Column | Type | Nullable |

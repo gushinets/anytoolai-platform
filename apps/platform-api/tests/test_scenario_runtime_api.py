@@ -16,6 +16,8 @@ from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactSta
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.identity.models import GuestIdentityRecord
+from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.scenarios.checkpoints import (
     FAILED_CHECKPOINT_ID,
@@ -28,7 +30,10 @@ from anytoolai_platform_core.storage.db import (
     action_runs_table,
     artifacts_table,
     event_log_table,
+    guest_quota_usage_table,
+    jobs_table,
     provider_calls_table,
+    scenario_sessions_table,
 )
 from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
@@ -76,6 +81,14 @@ def _build_session_factory(tmp_path: Path) -> sa.orm.sessionmaker[sa.orm.Session
 def _create_test_app(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ):
+    with transaction_boundary(session_factory) as session:
+        GuestIdentityRepository(session).create(
+            GuestIdentityRecord(
+                id="guest_demo",
+                tenant_id="anytoolai",
+                region="default",
+            )
+        )
     app = create_app(config_root=CONFIG_ROOT)
     app.state.runtime = replace(
         app.state.runtime,
@@ -105,6 +118,7 @@ async def _request(
 def _start_payload(**overrides: Any) -> dict[str, Any]:
     payload = {
         "frontend_id": "kernel_demo_ce",
+        "guest_id": "guest_demo",
         "input": {"source_text": "deadline budget deliverables"},
     }
     payload.update(overrides)
@@ -275,6 +289,181 @@ def test_start_scenario_creates_session_and_linked_job(tmp_path: Path) -> None:
     assert job.scenario_session_id == data["scenario_session_id"]
     assert job.product_id == scenario.product_id
     assert job.frontend_id == scenario.frontend_id
+
+
+def test_start_scenario_consumes_guest_quota_and_returns_exhausted_on_n_plus_one(
+    tmp_path: Path,
+) -> None:
+    session_factory = _build_session_factory(tmp_path)
+    app = _create_test_app(session_factory)
+
+    successes = [
+        asyncio.run(
+            _request(
+                app,
+                "POST",
+                "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
+                json=_start_payload(),
+                request_id=f"req_quota_success_{index}",
+            )
+        )
+        for index in range(3)
+    ]
+    exhausted = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
+            json=_start_payload(),
+            request_id="req_quota_exhausted",
+        )
+    )
+
+    assert [response.status_code for response in successes] == [HTTPStatus.OK] * 3
+    assert exhausted.status_code == HTTPStatus.TOO_MANY_REQUESTS
+    assert exhausted.json() == {
+        "error": {
+            "code": "quota_exhausted",
+            "message": "Guest quota exhausted.",
+            "request_id": "req_quota_exhausted",
+        }
+    }
+
+    with transaction_boundary(session_factory) as session:
+        scenario_count = session.execute(
+            sa.select(sa.func.count()).select_from(scenario_sessions_table)
+        ).scalar_one()
+        job_count = session.execute(
+            sa.select(sa.func.count()).select_from(jobs_table)
+        ).scalar_one()
+        event_types = list(
+            session.execute(
+                sa.select(event_log_table.c.event_type).order_by(
+                    event_log_table.c.timestamp,
+                    event_log_table.c.event_id,
+                )
+            ).scalars()
+        )
+
+    assert scenario_count == 3
+    assert job_count == 3
+    assert event_types.count("quota.consumed") == 3
+    assert event_types.count("quota.exhausted") == 1
+
+
+def test_start_scenario_requires_valid_guest_identity_for_quota_product(
+    tmp_path: Path,
+) -> None:
+    session_factory = _build_session_factory(tmp_path)
+    app = _create_test_app(session_factory)
+
+    missing_guest = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
+            json=_start_payload(guest_id=None),
+            request_id="req_missing_guest_start",
+        )
+    )
+    unknown_guest = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
+            json=_start_payload(guest_id="guest_missing"),
+            request_id="req_unknown_guest_start",
+        )
+    )
+
+    assert missing_guest.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert missing_guest.json() == {
+        "error": {
+            "code": "guest_identity_required",
+            "message": "Guest identity is required for this product.",
+            "request_id": "req_missing_guest_start",
+        }
+    }
+    assert unknown_guest.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert unknown_guest.json() == {
+        "error": {
+            "code": "guest_identity_not_found",
+            "message": "Guest identity not found.",
+            "request_id": "req_unknown_guest_start",
+        }
+    }
+
+    with transaction_boundary(session_factory) as session:
+        scenario_count = session.execute(
+            sa.select(sa.func.count()).select_from(scenario_sessions_table)
+        ).scalar_one()
+        job_count = session.execute(
+            sa.select(sa.func.count()).select_from(jobs_table)
+        ).scalar_one()
+        event_types = list(session.execute(sa.select(event_log_table.c.event_type)).scalars())
+
+    assert scenario_count == 0
+    assert job_count == 0
+    assert "quota.consumed" not in event_types
+
+
+def test_parallel_start_scenario_consumes_quota_exactly_to_limit(
+    tmp_path: Path,
+) -> None:
+    session_factory = _build_session_factory(tmp_path)
+    app = _create_test_app(session_factory)
+
+    async def start_parallel_requests() -> list[httpx.Response]:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+        ) as client:
+            return await asyncio.gather(
+                *[
+                    client.post(
+                        "/v1/products/kernel_demo/scenarios/"
+                        "kernel_demo.single_action_smoke_v1/start",
+                        json=_start_payload(),
+                        headers={"X-Request-ID": f"req_parallel_start_{index}"},
+                    )
+                    for index in range(4)
+                ]
+            )
+
+    responses = asyncio.run(start_parallel_requests())
+    status_codes = [response.status_code for response in responses]
+
+    assert status_codes.count(HTTPStatus.OK) == 3
+    assert status_codes.count(HTTPStatus.TOO_MANY_REQUESTS) == 1
+    exhausted_response = next(
+        response for response in responses if response.status_code == HTTPStatus.TOO_MANY_REQUESTS
+    )
+    assert exhausted_response.json()["error"]["code"] == "quota_exhausted"
+
+    with transaction_boundary(session_factory) as session:
+        scenario_count = session.execute(
+            sa.select(sa.func.count()).select_from(scenario_sessions_table)
+        ).scalar_one()
+        job_count = session.execute(
+            sa.select(sa.func.count()).select_from(jobs_table)
+        ).scalar_one()
+        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+        event_types = list(
+            session.execute(
+                sa.select(event_log_table.c.event_type).order_by(
+                    event_log_table.c.timestamp,
+                    event_log_table.c.event_id,
+                )
+            ).scalars()
+        )
+
+    assert scenario_count == 3
+    assert job_count == 3
+    assert usage["used_count"] == 3
+    assert usage["limit_count"] == 3
+    assert event_types.count("quota.consumed") == 3
+    assert event_types.count("quota.exhausted") == 1
 
 
 def test_start_scenario_returns_safe_404_for_unknown_or_unattached_scenario(
@@ -781,6 +970,18 @@ def test_openapi_contains_scenario_runtime_endpoints() -> None:
     assert (
         start_operation["responses"]["200"]["content"]["application/json"]["example"]["status"]
         == "started"
+    )
+    assert (
+        start_operation["responses"]["422"]["content"]["application/json"]["examples"][
+            "guest_required"
+        ]["value"]["error"]["code"]
+        == "guest_identity_required"
+    )
+    assert (
+        start_operation["responses"]["429"]["content"]["application/json"]["example"]["error"][
+            "code"
+        ]
+        == "quota_exhausted"
     )
     assert (
         get_operation["responses"]["200"]["content"]["application/json"]["example"][

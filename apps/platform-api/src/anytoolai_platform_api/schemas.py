@@ -53,6 +53,26 @@ class RuntimeConfigResponse(BaseModel):
     allowed_ui_capabilities: list[str]
 
 
+class GuestIdentityResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    guest_id: str
+
+
+class QuotaStateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    guest_id: str
+    product_id: str
+    quota_policy_id: str
+    unit: str
+    period: str
+    limit_count: int
+    used_count: int
+    remaining_count: int
+    exhausted: bool
+
+
 class ScenarioStartRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

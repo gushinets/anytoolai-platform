@@ -237,6 +237,53 @@ artifacts_table = sa.Table(
     sa.Index("ix_artifacts_status", "status"),
 )
 
+guest_identities_table = sa.Table(
+    "guest_identities",
+    runtime_metadata,
+    sa.Column("id", sa.String(length=128), primary_key=True),
+    sa.Column("tenant_id", sa.String(length=128), nullable=False),
+    sa.Column("region", sa.String(length=64), nullable=False),
+    sa.Column("created_at", utc_datetime, nullable=False),
+    sa.Column("last_seen_at", utc_datetime),
+    sa.Column("metadata", json_document, nullable=False),
+    sa.Index("ix_guest_identities_tenant_region", "tenant_id", "region"),
+    sa.Index("ix_guest_identities_created_at", "created_at"),
+)
+
+guest_quota_usage_table = sa.Table(
+    "guest_quota_usage",
+    runtime_metadata,
+    sa.Column("id", sa.String(length=128), primary_key=True),
+    sa.Column("tenant_id", sa.String(length=128), nullable=False),
+    sa.Column("region", sa.String(length=64), nullable=False),
+    sa.Column("guest_id", sa.String(length=128), nullable=False),
+    sa.Column("product_id", sa.String(length=128), nullable=False),
+    sa.Column("quota_policy_id", sa.String(length=128), nullable=False),
+    sa.Column("period_key", sa.String(length=128), nullable=False),
+    sa.Column("limit_count", sa.Integer(), nullable=False),
+    sa.Column("used_count", sa.Integer(), nullable=False),
+    sa.Column("created_at", utc_datetime, nullable=False),
+    sa.Column("updated_at", utc_datetime, nullable=False),
+    sa.Column("metadata", json_document, nullable=False),
+    sa.CheckConstraint("limit_count >= 0", name="ck_guest_quota_usage_limit_count"),
+    sa.CheckConstraint("used_count >= 0", name="ck_guest_quota_usage_used_count"),
+    sa.UniqueConstraint(
+        "tenant_id",
+        "region",
+        "guest_id",
+        "product_id",
+        "quota_policy_id",
+        "period_key",
+        name="uq_guest_quota_usage_dimension",
+    ),
+    sa.Index("ix_guest_quota_usage_guest_product", "guest_id", "product_id"),
+    sa.Index(
+        "ix_guest_quota_usage_product_policy",
+        "product_id",
+        "quota_policy_id",
+    ),
+)
+
 event_log_table = sa.Table(
     "event_log",
     runtime_metadata,
@@ -291,5 +338,7 @@ runtime_tables = {
     "action_runs": action_runs_table,
     "provider_calls": provider_calls_table,
     "artifacts": artifacts_table,
+    "guest_identities": guest_identities_table,
+    "guest_quota_usage": guest_quota_usage_table,
     "event_log": event_log_table,
 }

@@ -9,6 +9,8 @@ It covers the design that was implemented for:
 - `platform.action_runs`
 - `platform.provider_calls`
 - `platform.artifacts`
+- `platform.guest_identities`
+- `platform.guest_quota_usage`
 
 This is the durable runtime state layer for execution. It is not config storage.
 
@@ -26,6 +28,8 @@ The runtime storage slice lives in these files:
 - `packages/backend/platform-core/src/anytoolai_platform_core/actions/repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/providers/repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/artifacts/repository.py`
+- `packages/backend/platform-core/src/anytoolai_platform_core/identity/repository.py`
+- `packages/backend/platform-core/src/anytoolai_platform_core/quotas/repository.py`
 - `packages/backend/platform-core/tests/unit/test_runtime_storage.py`
 
 The runtime storage slice does not cover:
@@ -33,7 +37,6 @@ The runtime storage slice does not cover:
 - config registry storage
 - `platform.event_log` schema ownership, although rollback recovery now queries event-log existence
   to backfill missing lifecycle events
-- quota tables
 - handoff tables
 - product definition tables
 - billing tables
@@ -455,6 +458,58 @@ Artifact content behavior:
 - structured JSON stays in `content_json`
 - object storage remains a future extension point through `object_storage_key`
 
+### `platform.guest_identities`
+
+Purpose:
+
+- persist opaque frontend-safe guest identifiers created by the API
+
+Key columns:
+
+- `id`
+- `tenant_id`
+- `region`
+- `created_at`
+- `last_seen_at`
+- `metadata`
+
+Guest identity is intentionally product-neutral. Product access is enforced by quota usage rows and
+product policy resolution, not by encoding product meaning into the guest id.
+
+### `platform.guest_quota_usage`
+
+Purpose:
+
+- persist backend-owned guest quota state for access-lite products
+
+Key columns:
+
+- `tenant_id`
+- `region`
+- `guest_id`
+- `product_id`
+- `quota_policy_id`
+- `period_key`
+- `limit_count`
+- `used_count`
+- timestamps and metadata
+
+The unique runtime dimension is:
+
+```text
+tenant_id + region + guest_id + product_id + quota_policy_id + period_key
+```
+
+Quota consumption uses a conditional database update:
+
+```text
+WHERE used_count < limit_count
+```
+
+That conditional update is the MVP-A concurrency guard for repeated or concurrent accepted starts.
+It is independent from provider-call rows, transport retries, validation retries, and provider
+usage/cost telemetry.
+
 ## JSON And Text Strategy
 
 The artifact and metadata strategy was kept intentionally simple.
@@ -576,6 +631,23 @@ The test approach is important:
 - it attaches a second SQLite database as the `platform` schema so schema-qualified table names are
   still exercised
 
+For quota concurrency, SQLite coverage is not treated as production proof. PostgreSQL is the real
+runtime database, so the production-semantics check lives in:
+
+- `apps/platform-api/tests/test_quota_concurrency_postgresql.py`
+
+Run it with a PostgreSQL maintenance database URL:
+
+```powershell
+$env:ANYTOOLAI_POSTGRES_TEST_DATABASE_URL = "postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres"
+uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -q
+```
+
+The test creates and drops a disposable database, applies Alembic migrations, then runs concurrent
+scenario starts through the API transaction path. It verifies that PostgreSQL row locking and the
+conditional quota update allow exactly the first `N` accepted starts, return `429 quota_exhausted`
+for later starts, and keep session/job/quota/event counts consistent.
+
 What the tests cover:
 
 - migration applies on a clean database
@@ -586,8 +658,9 @@ What the tests cover:
 - artifact JSON storage
 - explicit transaction-boundary behavior
 
-This does not fully replace a PostgreSQL integration test, but it gives strong coverage of the
-implemented SQLAlchemy layer while keeping the repo's current baseline checks fast and local.
+SQLite tests give strong fast-path coverage of the implemented SQLAlchemy layer while keeping the
+repo's current baseline checks fast and local. They do not replace the PostgreSQL integration test
+for concurrency semantics.
 
 ## Known Compromises
 
@@ -605,8 +678,8 @@ Why:
 
 Consequence:
 
-- PostgreSQL-specific behavior is represented through SQLAlchemy variants, but not fully exercised by
-  a live PostgreSQL engine in the current baseline suite
+- PostgreSQL-specific behavior is represented through SQLAlchemy variants in the fast suite;
+- production-safe quota concurrency requires the PostgreSQL integration test above.
 
 ### Manual sync between tables and record dataclasses
 

@@ -21,6 +21,7 @@ from anytoolai_platform_api.errors import (
     unhandled_exception_handler,
 )
 from anytoolai_platform_api.routers.health import router as health_router
+from anytoolai_platform_api.routers.identity_quota import router as identity_quota_router
 from anytoolai_platform_api.routers.runtime_config import router as runtime_config_router
 from anytoolai_platform_api.routers.scenario_runtime import (
     router as scenario_runtime_router,
@@ -52,6 +53,7 @@ def create_app(
     _install_error_handlers(app)
 
     app.include_router(health_router)
+    app.include_router(identity_quota_router)
     app.include_router(runtime_config_router)
     app.include_router(scenario_runtime_router)
     return app

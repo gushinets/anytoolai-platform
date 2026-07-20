@@ -23,6 +23,9 @@ from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.identity.repository import GuestIdentityRepository
+from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
+from anytoolai_platform_core.quotas.service import GuestQuotaService
 from anytoolai_platform_core.scenarios.models import ScenarioSessionSnapshot
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.scenarios.service import ScenarioRuntimeService, ScenarioSessionService
@@ -72,6 +75,22 @@ SAFE_422_EXAMPLE = {
     }
 }
 
+SAFE_GUEST_422_EXAMPLE = {
+    "error": {
+        "code": "guest_identity_required",
+        "message": "Guest identity is required for this product.",
+        "request_id": "req_123",
+    }
+}
+
+SAFE_429_EXAMPLE = {
+    "error": {
+        "code": "quota_exhausted",
+        "message": "Guest quota exhausted.",
+        "request_id": "req_123",
+    }
+}
+
 
 @router.post(
     "/v1/products/{product_id}/scenarios/{scenario_id}/start",
@@ -89,8 +108,32 @@ SAFE_422_EXAMPLE = {
         },
         422: {
             "model": ErrorResponse,
-            "description": "Safe validation response for unsupported frontend or invalid input.",
-            "content": {"application/json": {"example": SAFE_422_EXAMPLE}},
+            "description": (
+                "Safe validation response for unsupported frontend, invalid input, missing guest "
+                "identity, or unknown guest identity."
+            ),
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_input": {
+                            "summary": "Scenario input is not a JSON object.",
+                            "value": SAFE_422_EXAMPLE,
+                        },
+                        "guest_required": {
+                            "summary": "Quota-protected product requires guest_id.",
+                            "value": SAFE_GUEST_422_EXAMPLE,
+                        },
+                    }
+                }
+            },
+        },
+        429: {
+            "model": ErrorResponse,
+            "description": (
+                "Quota exhausted. The backend rejects the scenario start before creating any "
+                "scenario session or linked job."
+            ),
+            "content": {"application/json": {"example": SAFE_429_EXAMPLE}},
         },
     },
 )
@@ -102,9 +145,11 @@ def start_scenario(
     session_factory: Annotated[Any, Depends(get_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ScenarioStartResponse:
+    api_error: ApiError | None = None
+    snapshot: ScenarioSessionSnapshot | None = None
     with transaction_boundary(session_factory) as session:
-        snapshot = _wrap_platform_errors(
-            lambda: _runtime_service(session=session, registry=registry).start_session(
+        try:
+            snapshot = _runtime_service(session=session, registry=registry).start_session(
                 tenant_id=settings.default_tenant_id,
                 region=settings.default_region,
                 product_id=product_id,
@@ -115,7 +160,14 @@ def start_scenario(
                 user_id=request.user_id,
                 source_frontend_instance_id=request.source_frontend_instance_id,
             )
-        )
+        except PlatformError as exc:
+            if exc.code != "quota_exhausted":
+                raise _to_api_error(exc) from exc
+            api_error = _to_api_error(exc)
+    if api_error is not None:
+        raise api_error
+    if snapshot is None:
+        raise RuntimeError("scenario start did not produce a snapshot")
     return ScenarioStartResponse.model_validate(_start_response_payload(snapshot))
 
 
@@ -233,6 +285,12 @@ def _runtime_service(
         session_service=ScenarioSessionService(session_repository, event_emitter),
         job_repository=JobRepository(session),
         event_emitter=event_emitter,
+        quota_service=GuestQuotaService(
+            config_registry=registry,
+            quota_repository=QuotaUsageRepository(session),
+            guest_repository=GuestIdentityRepository(session),
+            event_emitter=event_emitter,
+        ),
     )
 
 
@@ -261,7 +319,11 @@ def _status_code_for_platform_error(error: PlatformError) -> int:
         "scenario_next_action_not_allowed",
     }:
         return 409
+    if error.code == "quota_exhausted":
+        return 429
     if error.code in {
+        "guest_identity_required",
+        "guest_identity_not_found",
         "scenario_frontend_invalid",
         "scenario_input_invalid",
     }:

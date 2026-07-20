@@ -26,3 +26,10 @@ Running focused `uv run pytest` suites for workflow recovery review -> `uv` firs
 blocked global cache path, and `pytest` then failed to enumerate a reused `.tmp\\pytest-of-jackd`
 base temp directory with `PermissionError`. Using repo-local `UV_CACHE_DIR` plus a fresh
 `--basetemp` let the suites pass; the harness could set those defaults automatically for agent runs.
+
+## 2026-07-20 23:22 - Codex (GPT-5) - Windows
+
+Running `python scripts/agent/runner.py generate-docs --check` during an A13 review -> the system
+Python path could import the repo package but lacked `yaml`, causing `ModuleNotFoundError`.
+Use the project environment/`uv run` for generated-doc checks or make the runner self-select the
+same dependency-managed interpreter as the canonical checks.

@@ -1,10 +1,13 @@
 # Scenario Session Model
 
-Every scenario start creates `scenario_session_id`.
+Every accepted scenario start creates `scenario_session_id`.
 
 For A12, the public API creates the scenario session before it creates the linked workflow job.
-`POST /v1/products/{product_id}/scenarios/{scenario_id}/start` is therefore the ownership boundary
-for initial session creation, durable session input, and the first frontend-safe polling response.
+With A13 guest quota enabled, `POST /v1/products/{product_id}/scenarios/{scenario_id}/start` first
+passes product, scenario, frontend, input, workflow, and guest quota validation, then consumes quota
+in the same transaction as session/job creation. The endpoint is therefore the ownership boundary
+for backend quota enforcement, initial session creation, durable session input, and the first
+frontend-safe polling response.
 
 Scenario session stores:
 
@@ -72,7 +75,7 @@ The A12 public lifecycle is:
 
 ```text
 API start:
-  started + processing + created job
+  quota consumed + started + processing + created job
 
 Worker claim:
   running + processing
@@ -83,6 +86,12 @@ Workflow success:
 Workflow failure or worker cancellation:
   failed + failed
 ```
+
+An accepted scenario start is the queue-and-return transaction that commits the consumed quota,
+started scenario session, and created linked job. If quota is exhausted, the start is not accepted,
+no scenario session or job is created, and the API returns standardized `quota_exhausted`.
+For quota-protected products, a missing or unknown `guest_id` is also rejected before session/job
+creation with frontend-safe `422`.
 
 If a queued job is canceled before the worker claims it, polling must still resolve the frontend
 snapshot as terminal `failed + failed` even if the stored session row still carries the initial

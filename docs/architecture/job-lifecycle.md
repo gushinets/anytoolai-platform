@@ -46,16 +46,29 @@ not execute the workflow inline in the API process.
 
 The durable ordering is:
 
-1. create `scenario_sessions` row with `status=started`;
-2. persist `current_checkpoint_id=processing`;
-3. persist `metadata["input"]` from the request body;
-4. create one linked `jobs` row with `status=created`;
-5. commit;
-6. return a stable polling payload containing `scenario_session_id`, `job_id`, `status`,
+1. validate product, scenario, frontend, JSON-object input, workflow, guest identity, and quota;
+2. consume quota for the accepted start when the product has a quota policy;
+3. create `scenario_sessions` row with `status=started`;
+4. persist `current_checkpoint_id=processing`;
+5. persist `metadata["input"]` from the request body;
+6. create one linked `jobs` row with `status=created`;
+7. commit;
+8. return a stable polling payload containing `scenario_session_id`, `job_id`, `status`,
    `allowed_next_actions`, and optional `result_artifact_id`.
 
 The job create path already enforces that the linked scenario session exists and that the job's
 tenant, region, product, and frontend dimensions match the session.
+
+This commit is the A13 accepted scenario start boundary. Quota is not consumed on frontend click,
+workflow success, validation retry, transport retry, or provider-call count. If quota is exhausted,
+the API commits `quota.checked`/`quota.exhausted` events, creates no session or job, and returns
+standardized `quota_exhausted` with HTTP `429`. Missing or unknown guest identity for a
+quota-protected product returns HTTP `422` before quota consumption, session creation, or job
+creation.
+
+Concurrent accepted starts for the same guest/product quota dimension are guarded by the quota usage
+row's unique dimension and conditional `used_count < limit_count` update. Only the first `N` starts
+commit sessions/jobs and `quota.consumed`; `N+1` returns `429 quota_exhausted`.
 
 If a pre-claim job already has an invalid `scenario_session_id` link or mismatched runtime
 dimensions, the worker terminalizes that poison job as `failed` with a safe integrity error instead

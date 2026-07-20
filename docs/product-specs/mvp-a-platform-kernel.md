@@ -73,6 +73,16 @@ This validates:
 guest usage -> quota exhausted -> email capture -> waitlist/paywall intent -> early access
 ```
 
+Guest quota is enforced by the backend. The API creates opaque guest ids, frontends may store those
+ids locally, and quota is consumed only when the backend accepts a scenario start by committing the
+started scenario session and linked created job. Quota is not tied to frontend clicks, provider-call
+count, retries, or LLM telemetry.
+
+A13 delivers this access-lite behavior as backend-complete with integration pending. The current
+CE-kit can create and locally persist the opaque guest id, but the real shared CE-kit `getQuota()`
+and `startScenario()` API clients, guest-id propagation, and typed frontend handling for
+`429 quota_exhausted` are deferred to A16.
+
 ### Continuity And Handoff
 
 - product handoff entity
