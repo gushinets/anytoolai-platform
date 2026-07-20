@@ -188,14 +188,18 @@ events suppress only their own replay. For example, a pre-claimed worker job may
 durably committed `workflow.started`; later rollback recovery must preserve that row/event pair
 without duplicating it while still backfilling any missing downstream events.
 
-Replay uses the original transition timestamps where they are available from recovered rows:
+Replay prefers the original transition timestamps where they are available from recovered rows:
 
 - `jobs.started_at` for `workflow.started`
 - `jobs.completed_at` for workflow terminal events
 - related action timestamps for step started/terminal events when available
 
-This keeps escaped rollback recovery causally valid while staying inside MVP-A's non-durable
-sequential-runner scope.
+Within one workflow recovery pass, replay timestamps are deterministic and monotonic in the causal
+sequence above. If a preferred timestamp is not strictly later than the previously replayed or
+observed event timestamp, recovery clamps the next timestamp to the previous timestamp plus one
+microsecond. If the workflow terminal event is clamped later than `jobs.completed_at`, recovery
+updates `jobs.completed_at` to the terminal event timestamp. This keeps escaped rollback recovery
+causally valid while staying inside MVP-A's non-durable sequential-runner scope.
 
 ## Non-goals
 

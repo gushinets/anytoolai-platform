@@ -15,6 +15,7 @@ from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter, enrich_event_context
 from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.events.replay import ReplayTimestampSequencer
 from anytoolai_platform_core.providers.adapters.base import ProviderAdapter
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.adapters.litellm import (
@@ -949,28 +950,41 @@ def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
 def _emit_recovered_provider_events(
     event_log_repository: EventLogRepository,
     record: ProviderCallRecord,
+    *,
+    timestamp_sequencer: ReplayTimestampSequencer | None = None,
 ) -> None:
     event_emitter = EventEmitter(event_log_repository)
     context = _provider_event_context_from_record(
         record,
         pydantic_run_id=record.pydantic_run_id,
     )
-    if not event_log_repository.exists_event(
+    started_timestamp = event_log_repository.event_timestamp(
         event_type="provider.request_started",
         provider_call_id=record.id,
-    ):
+    )
+    if started_timestamp is None:
+        preferred_timestamp = record.started_at or record.created_at
         event_emitter.emit(
             "provider.request_started",
             context,
             properties=_provider_event_properties_from_record(record),
-            timestamp=record.started_at or record.created_at,
+            timestamp=(
+                preferred_timestamp
+                if timestamp_sequencer is None
+                else timestamp_sequencer.next(preferred_timestamp)
+            ),
             replay=True,
         )
+    elif timestamp_sequencer is not None:
+        timestamp_sequencer.observe(started_timestamp)
+
     if record.status is ProviderCallStatus.succeeded:
-        if not event_log_repository.exists_event(
+        succeeded_timestamp = event_log_repository.event_timestamp(
             event_type="provider.request_succeeded",
             provider_call_id=record.id,
-        ):
+        )
+        if succeeded_timestamp is None:
+            preferred_timestamp = record.completed_at or record.started_at or record.created_at
             event_emitter.emit(
                 "provider.request_succeeded",
                 _provider_event_context_from_record(
@@ -986,16 +1000,24 @@ def _emit_recovered_provider_events(
                     total_tokens=record.total_tokens,
                     http_status=record.http_status,
                 ),
-                timestamp=record.completed_at or record.started_at or record.created_at,
+                timestamp=(
+                    preferred_timestamp
+                    if timestamp_sequencer is None
+                    else timestamp_sequencer.next(preferred_timestamp)
+                ),
                 replay=True,
             )
+        elif timestamp_sequencer is not None:
+            timestamp_sequencer.observe(succeeded_timestamp)
         return
 
     if record.status in (ProviderCallStatus.failed, ProviderCallStatus.timed_out):
-        if not event_log_repository.exists_event(
+        failed_timestamp = event_log_repository.event_timestamp(
             event_type="provider.request_failed",
             provider_call_id=record.id,
-        ):
+        )
+        if failed_timestamp is None:
+            preferred_timestamp = record.completed_at or record.started_at or record.created_at
             event_emitter.emit(
                 "provider.request_failed",
                 _provider_event_context_from_record(
@@ -1009,9 +1031,15 @@ def _emit_recovered_provider_events(
                     error_code=record.error_code,
                     failure_kind=record.failure_kind,
                 ),
-                timestamp=record.completed_at or record.started_at or record.created_at,
+                timestamp=(
+                    preferred_timestamp
+                    if timestamp_sequencer is None
+                    else timestamp_sequencer.next(preferred_timestamp)
+                ),
                 replay=True,
             )
+        elif timestamp_sequencer is not None:
+            timestamp_sequencer.observe(failed_timestamp)
 
 
 def _provider_event_context_from_record(

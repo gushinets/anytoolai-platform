@@ -86,7 +86,8 @@ runtime code reconstructs durable history after a transaction rollback, the reco
 be:
 
 - complete relative to recovered runtime state;
-- causally ordered;
+- causally ordered, with replay timestamps clamped monotonically when source timestamps collide or
+  regress;
 - correlation-preserving across workflow, action, provider, job, and artifact identifiers;
 - idempotent enough not to duplicate events that are already durable.
 

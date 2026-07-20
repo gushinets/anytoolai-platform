@@ -156,6 +156,22 @@ def _event_counts(rows: list[dict[str, Any]]) -> Counter[str]:
     return Counter(str(row["event_type"]) for row in rows)
 
 
+def _event_types(rows: list[dict[str, Any]]) -> list[str]:
+    return [str(row["event_type"]) for row in rows]
+
+
+def _assert_event_types(
+    rows: list[dict[str, Any]],
+    expected_event_types: list[str],
+) -> None:
+    assert _event_types(rows) == expected_event_types
+
+
+def _assert_strictly_increasing_event_timestamps(rows: list[dict[str, Any]]) -> None:
+    for previous, current in zip(rows, rows[1:], strict=False):
+        assert previous["timestamp"] < current["timestamp"]
+
+
 def _event_by_type(rows: list[dict[str, Any]], event_type: str) -> list[dict[str, Any]]:
     return [row for row in rows if row["event_type"] == event_type]
 
@@ -506,18 +522,20 @@ def test_workflow_runner_recovers_failed_state_for_existing_claimed_job_after_ro
     assert job["metadata"]["workflow_state"]["steps"]["extract"]["error_code"] == (
         "provider_request_failed"
     )
-    event_types = [event_row["event_type"] for event_row in events]
-    assert {
-        "workflow.started",
-        "action.started",
-        "provider.request_started",
-        "provider.request_failed",
-        "action.failed",
-        "workflow.step_started",
-        "workflow.step_failed",
-        "workflow.failed",
-    }.issubset(event_types)
-    assert event_types.count("workflow.started") == 1
+    _assert_event_types(
+        events,
+        [
+            "workflow.started",
+            "workflow.step_started",
+            "action.started",
+            "provider.request_started",
+            "provider.request_failed",
+            "action.failed",
+            "workflow.step_failed",
+            "workflow.failed",
+        ],
+    )
+    _assert_strictly_increasing_event_timestamps(events)
     workflow_step_started = _event_by_type(events, "workflow.step_started")[0]
     action_failed = _event_by_type(events, "action.failed")[0]
     workflow_step_failed = _event_by_type(events, "workflow.step_failed")[0]
@@ -589,16 +607,20 @@ def test_workflow_runner_recovers_canceled_state_for_existing_claimed_job_after_
     assert job["metadata"]["workflow_state"]["steps"]["extract"]["error_code"] == (
         "workflow_execution_cancelled"
     )
-    assert [event_row["event_type"] for event_row in events] == [
-        "workflow.started",
-        "workflow.step_started",
-        "action.started",
-        "provider.request_started",
-        "provider.request_failed",
-        "action.failed",
-        "workflow.step_failed",
-        "workflow.canceled",
-    ]
+    _assert_event_types(
+        events,
+        [
+            "workflow.started",
+            "workflow.step_started",
+            "action.started",
+            "provider.request_started",
+            "provider.request_failed",
+            "action.failed",
+            "workflow.step_failed",
+            "workflow.canceled",
+        ],
+    )
+    _assert_strictly_increasing_event_timestamps(events)
     workflow_step_failed = _event_by_type(events, "workflow.step_failed")[0]
     workflow_canceled = _event_by_type(events, "workflow.canceled")[0]
     assert workflow_step_failed["timestamp"] < workflow_canceled["timestamp"]
@@ -985,6 +1007,16 @@ def test_workflow_runner_persists_failed_state_when_exception_escapes_transactio
             "workflow.failed": 1,
         }
     )
+    _assert_event_types(
+        events,
+        [
+            "workflow.started",
+            "workflow.step_started",
+            "workflow.step_failed",
+            "workflow.failed",
+        ],
+    )
+    _assert_strictly_increasing_event_timestamps(events)
     workflow_failed = _event_by_type(events, "workflow.failed")[0]
     assert workflow_failed["job_id"] == job["id"]
     assert workflow_failed["guest_id"] == "guest_demo"
@@ -1077,23 +1109,27 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
             "workflow.failed": 1,
         }
     )
-    assert [row["event_type"] for row in events] == [
-        "workflow.started",
-        "workflow.step_started",
-        "action.started",
-        "provider.request_started",
-        "provider.request_succeeded",
-        "artifact.created",
-        "action.succeeded",
-        "workflow.step_succeeded",
-        "workflow.step_started",
-        "action.started",
-        "provider.request_started",
-        "provider.request_failed",
-        "action.failed",
-        "workflow.step_failed",
-        "workflow.failed",
-    ]
+    _assert_event_types(
+        events,
+        [
+            "workflow.started",
+            "workflow.step_started",
+            "action.started",
+            "provider.request_started",
+            "provider.request_succeeded",
+            "artifact.created",
+            "action.succeeded",
+            "workflow.step_succeeded",
+            "workflow.step_started",
+            "action.started",
+            "provider.request_started",
+            "provider.request_failed",
+            "action.failed",
+            "workflow.step_failed",
+            "workflow.failed",
+        ],
+    )
+    _assert_strictly_increasing_event_timestamps(events)
     workflow_started = _event_by_type(events, "workflow.started")[0]
     workflow_step_succeeded = _event_by_type(events, "workflow.step_succeeded")[0]
     workflow_step_failed = _event_by_type(events, "workflow.step_failed")[0]
@@ -1159,11 +1195,19 @@ def test_workflow_runner_recovery_does_not_synthesize_step_started_for_pre_start
     assert len(step_failed_events) == 1
     assert step_failed_events[0]["properties"]["step_id"] == "optional_extract"
     assert len(workflow_failed_events) == 1
-    event_types = [str(event["event_type"]) for event in events]
-    step_failed_index = event_types.index("workflow.step_failed")
-    assert step_failed_index > event_types.index("workflow.step_succeeded")
-    assert step_failed_index > event_types.index("action.succeeded")
-    assert step_failed_index == event_types.index("workflow.failed") - 1
+    _assert_event_types(
+        events,
+        [
+            "workflow.started",
+            "workflow.step_started",
+            "action.started",
+            "action.succeeded",
+            "workflow.step_succeeded",
+            "workflow.step_failed",
+            "workflow.failed",
+        ],
+    )
+    _assert_strictly_increasing_event_timestamps(events)
     assert step_failed_events[0]["timestamp"] < workflow_failed_events[0]["timestamp"]
     assert workflow_failed_events[0]["timestamp"] == job["completed_at"]
     assert job["metadata"]["workflow_state"]["steps"]["optional_extract"]["started_event_emitted"] is False
@@ -1202,6 +1246,18 @@ def test_workflow_runner_caught_condition_failure_does_not_emit_step_started(
     assert [event["properties"]["step_id"] for event in step_started_events] == ["extract"]
     assert len(step_failed_events) == 1
     assert step_failed_events[0]["properties"]["step_id"] == "optional_extract"
+    _assert_event_types(
+        events,
+        [
+            "workflow.started",
+            "workflow.step_started",
+            "action.started",
+            "action.succeeded",
+            "workflow.step_succeeded",
+            "workflow.step_failed",
+            "workflow.failed",
+        ],
+    )
     assert job["metadata"]["workflow_state"]["steps"]["optional_extract"]["started_event_emitted"] is False
 
 
@@ -1256,6 +1312,20 @@ def test_workflow_runner_recovery_replays_step_started_for_input_mapping_failure
         "extract",
         "detect_issues",
     }
+    _assert_event_types(
+        events,
+        [
+            "workflow.started",
+            "workflow.step_started",
+            "action.started",
+            "action.succeeded",
+            "workflow.step_succeeded",
+            "workflow.step_started",
+            "workflow.step_failed",
+            "workflow.failed",
+        ],
+    )
+    _assert_strictly_increasing_event_timestamps(events)
     assert len(step_failed_events) == 1
     assert step_failed_events[0]["properties"]["step_id"] == "detect_issues"
     assert step_failed_events[0]["action_run_id"] is None
@@ -1396,8 +1466,11 @@ def test_workflow_recovery_replays_all_step_action_attempts_in_order(
     )
     workflow_step_started = _event_by_type(events, "workflow.step_started")[0]
     workflow_step_succeeded = _event_by_type(events, "workflow.step_succeeded")[0]
-    assert workflow_step_started["timestamp"] == first_started_at
-    assert workflow_step_succeeded["timestamp"] == second_completed_at
+    workflow_succeeded = _event_by_type(events, "workflow.succeeded")[0]
+    assert workflow_step_started["timestamp"] == first_started_at + timedelta(microseconds=1)
+    assert workflow_step_succeeded["timestamp"] > second_completed_at
+    assert workflow_succeeded["timestamp"] > workflow_step_succeeded["timestamp"]
+    _assert_strictly_increasing_event_timestamps(events)
 
 
 def test_workflow_runner_uses_generic_safe_provider_message_for_unknown_adapter_exceptions(

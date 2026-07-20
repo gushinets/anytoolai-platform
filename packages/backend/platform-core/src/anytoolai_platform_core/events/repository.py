@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import datetime
 from hashlib import sha256
 from typing import Any
 
@@ -68,6 +69,28 @@ class EventLogRepository:
         artifact_id: str | None = None,
         step_id: str | None = None,
     ) -> bool:
+        return (
+            self.event_timestamp(
+                event_type=event_type,
+                job_id=job_id,
+                action_run_id=action_run_id,
+                provider_call_id=provider_call_id,
+                artifact_id=artifact_id,
+                step_id=step_id,
+            )
+            is not None
+        )
+
+    def event_timestamp(
+        self,
+        *,
+        event_type: str,
+        job_id: str | None = None,
+        action_run_id: str | None = None,
+        provider_call_id: str | None = None,
+        artifact_id: str | None = None,
+        step_id: str | None = None,
+    ) -> datetime | None:
         conditions = [event_log_table.c.event_type == event_type]
         if job_id is not None:
             conditions.append(event_log_table.c.job_id == job_id)
@@ -79,15 +102,18 @@ class EventLogRepository:
             conditions.append(event_log_table.c.artifact_id == artifact_id)
 
         rows = self._session.execute(
-            sa.select(event_log_table.c.properties).where(*conditions)
-        ).scalars()
+            sa.select(event_log_table.c.timestamp, event_log_table.c.properties)
+            .where(*conditions)
+            .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+        ).mappings()
         if step_id is None:
-            return rows.first() is not None
+            row = rows.first()
+            return None if row is None else row["timestamp"]
 
-        for properties in rows:
-            if _event_properties_step_id(properties) == step_id:
-                return True
-        return False
+        for row in rows:
+            if _event_properties_step_id(row["properties"]) == step_id:
+                return row["timestamp"]
+        return None
 
 
 def build_replay_event_id(
