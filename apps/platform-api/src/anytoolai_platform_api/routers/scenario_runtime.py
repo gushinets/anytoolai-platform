@@ -59,6 +59,14 @@ SAFE_404_EXAMPLE = {
     }
 }
 
+SAFE_GUEST_404_EXAMPLE = {
+    "error": {
+        "code": "guest_identity_not_found",
+        "message": "Guest identity not found.",
+        "request_id": "req_123",
+    }
+}
+
 SAFE_409_EXAMPLE = {
     "error": {
         "code": "scenario_checkpoint_conflict",
@@ -103,14 +111,30 @@ SAFE_429_EXAMPLE = {
         },
         404: {
             "model": ErrorResponse,
-            "description": "Safe response when the scenario is unknown for the product.",
-            "content": {"application/json": {"example": SAFE_404_EXAMPLE}},
+            "description": (
+                "Safe response when the scenario is unknown for the product or the supplied "
+                "guest identity is unknown."
+            ),
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "scenario_not_found": {
+                            "summary": "Scenario is unknown for the product.",
+                            "value": SAFE_404_EXAMPLE,
+                        },
+                        "guest_not_found": {
+                            "summary": "Supplied guest identity is unknown.",
+                            "value": SAFE_GUEST_404_EXAMPLE,
+                        },
+                    }
+                }
+            },
         },
         422: {
             "model": ErrorResponse,
             "description": (
-                "Safe validation response for unsupported frontend, invalid input, missing guest "
-                "identity, or unknown guest identity."
+                "Safe validation response for unsupported frontend, invalid input, or missing "
+                "guest identity."
             ),
             "content": {
                 "application/json": {
@@ -311,7 +335,11 @@ def _session_response_payload(snapshot: ScenarioSessionSnapshot) -> dict[str, ob
 
 
 def _status_code_for_platform_error(error: PlatformError) -> int:
-    if error.code in {"scenario_not_found", "scenario_session_not_found"}:
+    if error.code in {
+        "guest_identity_not_found",
+        "scenario_not_found",
+        "scenario_session_not_found",
+    }:
         return 404
     if error.code in {
         "scenario_checkpoint_conflict",
@@ -323,7 +351,6 @@ def _status_code_for_platform_error(error: PlatformError) -> int:
         return 429
     if error.code in {
         "guest_identity_required",
-        "guest_identity_not_found",
         "scenario_frontend_invalid",
         "scenario_input_invalid",
     }:

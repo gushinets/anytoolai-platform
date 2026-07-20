@@ -125,16 +125,15 @@ this slice.
 
 Safe API behavior:
 
-- `404` for unknown scenario or unknown session;
+- `404` for unknown scenario, unknown session, or unknown guest identity;
 - `409` for stale checkpoints, non-actionable checkpoints, or disallowed next actions;
-- `422` for invalid frontend selection, non-object scenario input, or missing/unknown guest
-  identity;
+- `422` for invalid frontend selection, non-object scenario input, or missing guest identity;
 - `429` with `quota_exhausted` when the backend rejects a scenario start because quota is exhausted.
 
 Recommended frontend behavior for `429 quota_exhausted`:
 
 - keep quota state advisory in the frontend and treat the backend response as authoritative;
-- disable the run action or show a clear quota exhausted state after the response;
+- disable the run action or show a clear quota-exhausted state after the response;
 - do not show a progress row, job, or partial session for the rejected attempt because the backend
   creates none.
 

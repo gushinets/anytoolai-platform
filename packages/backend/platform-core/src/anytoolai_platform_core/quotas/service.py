@@ -64,6 +64,7 @@ class GuestQuotaService:
         guest_id: str,
         frontend_id: str = "",
         emit_event: bool = True,
+        persist_usage: bool = True,
     ) -> QuotaState:
         policy = self._require_product_quota_policy(product_id)
         self._require_guest(
@@ -71,14 +72,30 @@ class GuestQuotaService:
             tenant_id=tenant_id,
             region=region,
         )
-        usage = self._ensure_usage(
+        usage = self._get_usage(
             tenant_id=tenant_id,
             region=region,
             guest_id=guest_id,
             product_id=product_id,
             policy=policy,
         )
-        state = _state_from_usage(usage, policy)
+        if usage is None and persist_usage:
+            usage = self._ensure_usage(
+                tenant_id=tenant_id,
+                region=region,
+                guest_id=guest_id,
+                product_id=product_id,
+                policy=policy,
+            )
+        state = (
+            _state_from_usage(usage, policy)
+            if usage is not None
+            else _state_from_empty_usage(
+                guest_id=guest_id,
+                product_id=product_id,
+                policy=policy,
+            )
+        )
         if emit_event:
             self._emit_quota_event(
                 "quota.checked",
@@ -208,6 +225,24 @@ class GuestQuotaService:
             metadata={"unit": policy.unit.value, "period": policy.period.value},
         )
 
+    def _get_usage(
+        self,
+        *,
+        tenant_id: str,
+        region: str,
+        guest_id: str,
+        product_id: str,
+        policy: QuotaPolicy,
+    ) -> QuotaUsageRecord | None:
+        return self._quota_repository.get_by_dimension(
+            tenant_id=tenant_id,
+            region=region,
+            guest_id=guest_id,
+            product_id=product_id,
+            quota_policy_id=policy.quota_policy_id,
+            period_key=_period_key(policy),
+        )
+
     def _emit_quota_event(
         self,
         event_type: str,
@@ -266,6 +301,26 @@ def _state_from_usage(record: QuotaUsageRecord, policy: QuotaPolicy) -> QuotaSta
         used_count=record.used_count,
         remaining_count=remaining_count,
         exhausted=remaining_count <= 0,
+    )
+
+
+def _state_from_empty_usage(
+    *,
+    guest_id: str,
+    product_id: str,
+    policy: QuotaPolicy,
+) -> QuotaState:
+    return QuotaState(
+        guest_id=guest_id,
+        product_id=product_id,
+        quota_policy_id=policy.quota_policy_id,
+        unit=policy.unit,
+        period=policy.period,
+        period_key=_period_key(policy),
+        limit_count=policy.limit_count,
+        used_count=0,
+        remaining_count=policy.limit_count,
+        exhausted=policy.limit_count <= 0,
     )
 
 

@@ -20,6 +20,7 @@ The runtime storage slice lives in these files:
 
 - `migrations/platform/env.py`
 - `migrations/platform/versions/0001_runtime_tables.py`
+- `migrations/platform/versions/0003_guest_quota.py`
 - `migrations/platform/versions/0005_provider_calls_error_message_safe.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/db.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/transactions.py`
@@ -117,7 +118,7 @@ tables.
 Responsibilities:
 
 - create the `platform` schema when the backend dialect supports schemas
-- create the five runtime tables
+- create the original five execution runtime tables
 - create indexes for common runtime lookups
 - define the initial enum constraints at the database level
 - support downgrade for the same tables
@@ -659,7 +660,7 @@ What the tests cover:
 
 - migration applies on a clean database
 - required fields fail at the DB layer
-- create/read/update for all five repositories
+- create/read/update for all seven repositories
 - status transitions
 - artifact text storage
 - artifact JSON storage

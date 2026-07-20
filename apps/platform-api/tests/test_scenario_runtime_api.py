@@ -56,11 +56,16 @@ def _sqlite_url(database_path: Path) -> str:
 def _build_session_factory(tmp_path: Path) -> sa.orm.sessionmaker[sa.orm.Session]:
     main_db = tmp_path / "api-main.sqlite3"
     platform_db = tmp_path / "api-platform.sqlite3"
-    engine = sa.create_engine(_sqlite_url(main_db), future=True)
+    engine = sa.create_engine(
+        _sqlite_url(main_db),
+        future=True,
+        connect_args={"timeout": 30.0},
+    )
 
     @event.listens_for(engine, "connect")
     def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
         del connection_record
+        dbapi_connection.execute("PRAGMA busy_timeout = 30000")
         dbapi_connection.execute(
             f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
         )
@@ -384,7 +389,7 @@ def test_start_scenario_requires_valid_guest_identity_for_quota_product(
             "request_id": "req_missing_guest_start",
         }
     }
-    assert unknown_guest.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert unknown_guest.status_code == HTTPStatus.NOT_FOUND
     assert unknown_guest.json() == {
         "error": {
             "code": "guest_identity_not_found",
@@ -970,6 +975,12 @@ def test_openapi_contains_scenario_runtime_endpoints() -> None:
     assert (
         start_operation["responses"]["200"]["content"]["application/json"]["example"]["status"]
         == "started"
+    )
+    assert (
+        start_operation["responses"]["404"]["content"]["application/json"]["examples"][
+            "guest_not_found"
+        ]["value"]["error"]["code"]
+        == "guest_identity_not_found"
     )
     assert (
         start_operation["responses"]["422"]["content"]["application/json"]["examples"][

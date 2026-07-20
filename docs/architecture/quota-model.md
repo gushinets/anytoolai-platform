@@ -39,7 +39,8 @@ API behavior:
 - `POST /v1/products/{product_id}/scenarios/{scenario_id}/start` returns `429` with
   `quota_exhausted` when the backend rejects the start for exhausted quota;
 - the rejected start is not visible as a half-created session or job to the frontend;
-- missing or unknown guest identity for a quota-protected product returns frontend-safe `422`.
+- missing guest identity for a quota-protected product returns frontend-safe `422`;
+- unknown guest identity for a quota-protected product returns frontend-safe `404`.
 
 Concurrency proof:
 

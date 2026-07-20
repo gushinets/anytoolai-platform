@@ -63,6 +63,11 @@ def upgrade() -> None:
         sa.Column("metadata", json_document, nullable=False),
         sa.CheckConstraint("limit_count >= 0", name="ck_guest_quota_usage_limit_count"),
         sa.CheckConstraint("used_count >= 0", name="ck_guest_quota_usage_used_count"),
+        sa.ForeignKeyConstraint(
+            ["guest_id"],
+            [f"{PLATFORM_SCHEMA}.guest_identities.id"],
+            name="fk_guest_quota_usage_guest_id",
+        ),
         sa.UniqueConstraint(
             "tenant_id",
             "region",

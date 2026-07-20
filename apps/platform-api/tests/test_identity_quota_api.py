@@ -12,7 +12,7 @@ from alembic.config import Config
 from anytoolai_platform_api.bootstrap import RuntimeStorageDependencies
 from anytoolai_platform_api.main import create_app
 from anytoolai_platform_core.events.repository import EventLogRepository
-from anytoolai_platform_core.storage.db import event_log_table
+from anytoolai_platform_core.storage.db import event_log_table, guest_quota_usage_table
 from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
@@ -146,8 +146,12 @@ def test_quota_check_endpoint_returns_current_state(tmp_path: Path) -> None:
                 )
             ).scalars()
         )
+        usage_count = session.execute(
+            sa.select(sa.func.count()).select_from(guest_quota_usage_table)
+        ).scalar_one()
 
-    assert "quota.checked" in event_types
+    assert event_types == ["guest.created"]
+    assert usage_count == 0
     assert "quota.consumed" not in event_types
 
 

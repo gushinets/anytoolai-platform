@@ -90,8 +90,9 @@ Workflow failure or worker cancellation:
 An accepted scenario start is the queue-and-return transaction that commits the consumed quota,
 started scenario session, and created linked job. If quota is exhausted, the start is not accepted,
 no scenario session or job is created, and the API returns standardized `quota_exhausted`.
-For quota-protected products, a missing or unknown `guest_id` is also rejected before session/job
-creation with frontend-safe `422`.
+For quota-protected products, a missing `guest_id` is also rejected before session/job creation with
+frontend-safe `422`; an unknown `guest_id` is rejected before session/job creation with
+frontend-safe `404`.
 
 If a queued job is canceled before the worker claims it, polling must still resolve the frontend
 snapshot as terminal `failed + failed` even if the stored session row still carries the initial

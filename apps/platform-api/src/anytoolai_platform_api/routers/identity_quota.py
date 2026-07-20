@@ -95,6 +95,8 @@ def get_product_quota(
                 region=settings.default_region,
                 product_id=product_id,
                 guest_id=guest_id,
+                emit_event=False,
+                persist_usage=False,
             )
         )
     return QuotaStateResponse.model_validate(_quota_state_payload(state))

@@ -77,6 +77,8 @@ persistence. Full CE-kit quota/start integration is intentionally deferred to A1
 - [x] Frontend equivalent via Corepack because `pnpm` is not directly on PATH:
   `corepack pnpm install --frozen-lockfile`, `corepack pnpm -r typecheck`,
   `corepack pnpm -r build`
+- [ ] PostgreSQL quota concurrency/production-semantics test:
+  blocked because Docker was unavailable and no disposable PostgreSQL database URL was provided.
 
 ## Progress Log
 

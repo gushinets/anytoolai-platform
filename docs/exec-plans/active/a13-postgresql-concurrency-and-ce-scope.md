@@ -53,7 +53,7 @@ real `createGuestIdentity()` local persistence in CE-kit.
 
 ## Validation Plan
 
-- [x] API/quota focused tests.
+- [x] API/quota-focused tests.
 - [ ] PostgreSQL test against a live disposable PostgreSQL database.
 - [x] PostgreSQL test guard executed and reported explicit skip without
   `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`.

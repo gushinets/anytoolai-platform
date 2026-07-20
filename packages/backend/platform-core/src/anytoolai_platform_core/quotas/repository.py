@@ -10,6 +10,16 @@ from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.quotas.models import QuotaUsageRecord
 from anytoolai_platform_core.storage.db import guest_quota_usage_table
 
+EXPECTED_USAGE_DIMENSION_CONSTRAINT = "uq_guest_quota_usage_dimension"
+SQLITE_USAGE_DIMENSION_COLUMNS = (
+    "tenant_id",
+    "region",
+    "guest_id",
+    "product_id",
+    "quota_policy_id",
+    "period_key",
+)
+
 
 def _usage_dimension_filters(
     *,
@@ -38,6 +48,22 @@ def _require_stored_usage(
     if stored is None:
         raise RuntimeError(f"quota usage round-trip failed after {operation}: {record_id}")
     return stored
+
+
+def _is_expected_usage_dimension_race(error: IntegrityError) -> bool:
+    constraint_name = getattr(getattr(error.orig, "diag", None), "constraint_name", None)
+    if constraint_name == EXPECTED_USAGE_DIMENSION_CONSTRAINT:
+        return True
+
+    message = str(error.orig)
+    if EXPECTED_USAGE_DIMENSION_CONSTRAINT in message:
+        return True
+    if "UNIQUE constraint failed" not in message:
+        return False
+    return all(
+        f"guest_quota_usage.{column}" in message
+        for column in SQLITE_USAGE_DIMENSION_COLUMNS
+    )
 
 
 class QuotaUsageRepository:
@@ -122,8 +148,9 @@ class QuotaUsageRepository:
                 self._session.execute(
                     sa.insert(guest_quota_usage_table).values(asdict(record))
                 )
-        except IntegrityError:
-            pass
+        except IntegrityError as exc:
+            if not _is_expected_usage_dimension_race(exc):
+                raise
         self._session.flush()
 
         stored = self.get_by_dimension(

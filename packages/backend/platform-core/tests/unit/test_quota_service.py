@@ -14,7 +14,7 @@ from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.identity.service import GuestIdentityService
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
 from anytoolai_platform_core.quotas.service import GuestQuotaService, QuotaExhaustedError
-from anytoolai_platform_core.storage.db import event_log_table
+from anytoolai_platform_core.storage.db import event_log_table, guest_quota_usage_table
 from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
@@ -126,6 +126,30 @@ def test_guest_create_and_quota_check_do_not_consume(
     assert second.remaining_count == 3
     assert event_types.count("guest.created") == 1
     assert event_types.count("quota.checked") == 2
+
+
+def test_quota_check_can_be_read_only_without_usage_or_events(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        guest_id = _create_guest(session)
+        state = _quota_service(session).check_quota(
+            tenant_id="anytoolai",
+            region="default",
+            product_id="kernel_demo",
+            guest_id=guest_id,
+            emit_event=False,
+            persist_usage=False,
+        )
+        usage_count = session.execute(
+            sa.select(sa.func.count()).select_from(guest_quota_usage_table)
+        ).scalar_one()
+        event_types = _event_types(session)
+
+    assert state.used_count == 0
+    assert state.remaining_count == 3
+    assert usage_count == 0
+    assert event_types == ["guest.created"]
 
 
 def test_quota_consume_exhausted_and_repeat_calls(

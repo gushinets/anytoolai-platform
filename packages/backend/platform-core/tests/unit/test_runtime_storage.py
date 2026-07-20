@@ -317,6 +317,10 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
                 schema="platform",
             )
         }
+        quota_foreign_keys = sa.inspect(connection).get_foreign_keys(
+            "guest_quota_usage",
+            schema="platform",
+        )
 
     assert {
         "scenario_sessions",
@@ -372,6 +376,11 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "limit_count",
         "used_count",
     } <= quota_columns
+    assert any(
+        foreign_key["referred_table"] == "guest_identities"
+        and foreign_key["constrained_columns"] == ["guest_id"]
+        for foreign_key in quota_foreign_keys
+    )
 
 
 def test_runtime_migration_upgrade_from_0004_adds_provider_call_error_message_safe(
@@ -1033,3 +1042,24 @@ def test_quota_usage_repository_ensures_and_consumes_conditionally(
     assert consumed is not None
     assert consumed.used_count == 1
     assert exhausted is None
+
+
+def test_quota_usage_repository_reraises_unexpected_integrity_errors(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    session = session_factory()
+    try:
+        guest = GuestIdentityRepository(session).create(make_guest_identity())
+        with pytest.raises(IntegrityError):
+            QuotaUsageRepository(session).ensure_usage(
+                tenant_id=guest.tenant_id,
+                region=guest.region,
+                guest_id=guest.id,
+                product_id="kernel_demo",
+                quota_policy_id="kernel_demo.guest_quota_v1",
+                period_key="lifetime",
+                limit_count=-1,
+            )
+    finally:
+        session.rollback()
+        session.close()
