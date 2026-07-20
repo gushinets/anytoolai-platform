@@ -65,7 +65,13 @@ real `createGuestIdentity()` local persistence in CE-kit.
 
 ```powershell
 $env:ANYTOOLAI_POSTGRES_TEST_DATABASE_URL = "postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres"
-uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -q
+uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q
+```
+
+The SQLite/ASGI stress test remains available outside the quick-check fast path:
+
+```powershell
+uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_stress.py -m slow -q
 ```
 
 ## Progress Log

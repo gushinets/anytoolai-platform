@@ -640,13 +640,20 @@ Run it with a PostgreSQL maintenance database URL:
 
 ```powershell
 $env:ANYTOOLAI_POSTGRES_TEST_DATABASE_URL = "postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres"
-uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -q
+uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q
 ```
 
 The test creates and drops a disposable database, applies Alembic migrations, then runs concurrent
 scenario starts through the API transaction path. It verifies that PostgreSQL row locking and the
 conditional quota update allow exactly the first `N` accepted starts, return `429 quota_exhausted`
 for later starts, and keep session/job/quota/event counts consistent.
+
+`python scripts/agent/runner.py quick-check` excludes `slow` tests with `-m "not slow"` so the
+required fast path stays deterministic. Run SQLite/ASGI stress checks intentionally with:
+
+```powershell
+uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_stress.py -m slow -q
+```
 
 What the tests cover:
 
