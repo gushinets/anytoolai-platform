@@ -54,7 +54,10 @@ stored in the handoff row or returned to the frontend.
 - Only `created` and `viewed` can expire. Consent already recorded as `accepted` does not later
   expire.
 - Unknown tokens return safe `404`; accepting an expired token returns safe `410`.
-- Request logs use the route template `/v1/handoffs/{handoff_token}` and never the plaintext token.
+- Structured application request logs use route templates such as
+  `/v1/handoffs/{handoff_token}` and never the plaintext token. The supported API launch disables
+  Uvicorn's separate plaintext access logger because it would otherwise log the raw bearer URL;
+  the structured application request event remains the authoritative access record.
 
 ## Lifecycle and guarded operations
 
