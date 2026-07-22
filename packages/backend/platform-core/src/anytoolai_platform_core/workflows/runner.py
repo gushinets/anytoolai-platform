@@ -22,6 +22,10 @@ from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter, enrich_event_context
 from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.events.replay import (
+    ReplayTimestampSequencer,
+    sequence_existing_replay_event,
+)
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.storage.db import action_runs_table
@@ -1329,21 +1333,30 @@ def _emit_recovered_workflow_events(
     artifact_repository = ArtifactRepository(recovery_session)
     event_log_repository = EventLogRepository(recovery_session)
     event_emitter = EventEmitter(event_log_repository)
+    timestamp_sequencer = ReplayTimestampSequencer()
 
     record = repository.get(job_id)
     if record is None:
         return
 
-    if not event_log_repository.exists_event(
+    workflow_started_event = event_log_repository.find_event(
         event_type="workflow.started",
         job_id=record.id,
-    ):
+    )
+    if workflow_started_event is None:
+        preferred_timestamp = record.started_at or record.created_at
         event_emitter.emit(
             "workflow.started",
             _context_from_record(record),
             properties={"workflow_version": record.workflow_version},
-            timestamp=record.started_at or record.created_at,
+            timestamp=timestamp_sequencer.next(preferred_timestamp),
             replay=True,
+        )
+    else:
+        sequence_existing_replay_event(
+            event_log_repository,
+            timestamp_sequencer,
+            workflow_started_event,
         )
 
     workflow_state = record.metadata.get("workflow_state")
@@ -1360,15 +1373,30 @@ def _emit_recovered_workflow_events(
                 action_run_repository=action_run_repository,
                 provider_call_repository=provider_call_repository,
                 artifact_repository=artifact_repository,
+                timestamp_sequencer=timestamp_sequencer,
             )
 
     if terminal_event_type is None:
         return
-    if event_log_repository.exists_event(
+    terminal_event = event_log_repository.find_event(
         event_type=terminal_event_type,
         job_id=record.id,
-    ):
+    )
+    if terminal_event is not None:
+        terminal_event = sequence_existing_replay_event(
+            event_log_repository,
+            timestamp_sequencer,
+            terminal_event,
+        )
+        if record.completed_at is None or record.completed_at < terminal_event.timestamp:
+            repository.update(replace(record, completed_at=terminal_event.timestamp))
         return
+
+    terminal_timestamp = timestamp_sequencer.next(
+        record.completed_at or record.started_at or record.created_at
+    )
+    if record.completed_at is None or record.completed_at < terminal_timestamp:
+        record = repository.update(replace(record, completed_at=terminal_timestamp))
 
     terminal_properties: dict[str, Any] = {
         "workflow_version": record.workflow_version,
@@ -1380,7 +1408,7 @@ def _emit_recovered_workflow_events(
         _context_from_record(record),
         result_status=record.status.value,
         properties=terminal_properties,
-        timestamp=record.completed_at or record.started_at or record.created_at,
+        timestamp=terminal_timestamp,
         replay=True,
     )
 
@@ -1394,6 +1422,7 @@ def _emit_recovered_workflow_step_event(
     action_run_repository: ActionRunRepository,
     provider_call_repository: ProviderCallRepository,
     artifact_repository: ArtifactRepository,
+    timestamp_sequencer: ReplayTimestampSequencer,
 ) -> None:
     event_emitter = EventEmitter(event_log_repository)
     retry_count = _optional_int(raw_step_state.get("retry_count")) or 0
@@ -1425,11 +1454,13 @@ def _emit_recovered_workflow_step_event(
                 skipped_context,
                 action_run_id=action_run_id,
             )
-        if not event_log_repository.exists_event(
+        skipped_event = event_log_repository.find_event(
             event_type="workflow.step_skipped",
             job_id=record.id,
             step_id=step_id,
-        ):
+        )
+        if skipped_event is None:
+            preferred_timestamp = step_terminal_timestamp or step_timestamp
             event_emitter.emit(
                 "workflow.step_skipped",
                 skipped_context,
@@ -1439,26 +1470,40 @@ def _emit_recovered_workflow_step_event(
                     "retry_count": retry_count,
                     "skip_reason": _optional_str(raw_step_state.get("skip_reason")),
                 },
-                timestamp=step_terminal_timestamp or step_timestamp,
+                timestamp=timestamp_sequencer.next(preferred_timestamp),
                 replay=True,
+            )
+        else:
+            sequence_existing_replay_event(
+                event_log_repository,
+                timestamp_sequencer,
+                skipped_event,
             )
         return
 
-    if _step_started_event_emitted(raw_step_state, status) and not event_log_repository.exists_event(
-        event_type="workflow.step_started",
-        job_id=record.id,
-        step_id=step_id,
-    ):
-        event_emitter.emit(
-            "workflow.step_started",
-            step_context,
-            properties={
-                "step_id": step_id,
-                "retry_count": retry_count,
-            },
-            timestamp=step_timestamp,
-            replay=True,
+    if _step_started_event_emitted(raw_step_state, status):
+        started_event = event_log_repository.find_event(
+            event_type="workflow.step_started",
+            job_id=record.id,
+            step_id=step_id,
         )
+        if started_event is None:
+            event_emitter.emit(
+                "workflow.step_started",
+                step_context,
+                properties={
+                    "step_id": step_id,
+                    "retry_count": retry_count,
+                },
+                timestamp=timestamp_sequencer.next(step_timestamp),
+                replay=True,
+            )
+        else:
+            sequence_existing_replay_event(
+                event_log_repository,
+                timestamp_sequencer,
+                started_event,
+            )
 
     for step_action_run in step_action_runs:
         _emit_recovered_action_events(
@@ -1467,6 +1512,7 @@ def _emit_recovered_workflow_step_event(
             action_run_repository=action_run_repository,
             provider_call_repository=provider_call_repository,
             artifact_repository=artifact_repository,
+            timestamp_sequencer=timestamp_sequencer,
         )
 
     event_context = step_context
@@ -1475,44 +1521,60 @@ def _emit_recovered_workflow_step_event(
     if output_artifact_id is not None and status == ActionRunStatus.succeeded.value:
         event_context = enrich_event_context(event_context, artifact_id=output_artifact_id)
 
-    if status == ActionRunStatus.succeeded.value and not event_log_repository.exists_event(
-        event_type="workflow.step_succeeded",
-        job_id=record.id,
-        step_id=step_id,
-    ):
-        event_emitter.emit(
-            "workflow.step_succeeded",
-            event_context,
-            result_status=ActionRunStatus.succeeded.value,
-            properties={
-                "step_id": step_id,
-                "retry_count": retry_count,
-                "attempt_count": attempt_count,
-                "output_artifact_id": output_artifact_id,
-            },
-            timestamp=step_terminal_timestamp,
-            replay=True,
+    if status == ActionRunStatus.succeeded.value:
+        succeeded_event = event_log_repository.find_event(
+            event_type="workflow.step_succeeded",
+            job_id=record.id,
+            step_id=step_id,
         )
+        if succeeded_event is None:
+            event_emitter.emit(
+                "workflow.step_succeeded",
+                event_context,
+                result_status=ActionRunStatus.succeeded.value,
+                properties={
+                    "step_id": step_id,
+                    "retry_count": retry_count,
+                    "attempt_count": attempt_count,
+                    "output_artifact_id": output_artifact_id,
+                },
+                timestamp=timestamp_sequencer.next(step_terminal_timestamp),
+                replay=True,
+            )
+        else:
+            sequence_existing_replay_event(
+                event_log_repository,
+                timestamp_sequencer,
+                succeeded_event,
+            )
         return
 
-    if status == ActionRunStatus.failed.value and not event_log_repository.exists_event(
-        event_type="workflow.step_failed",
-        job_id=record.id,
-        step_id=step_id,
-    ):
-        event_emitter.emit(
-            "workflow.step_failed",
-            event_context,
-            result_status=ActionRunStatus.failed.value,
-            properties={
-                "step_id": step_id,
-                "retry_count": retry_count,
-                "attempt_count": attempt_count,
-                "error_code": _optional_str(raw_step_state.get("error_code")),
-            },
-            timestamp=step_failed_timestamp,
-            replay=True,
+    if status == ActionRunStatus.failed.value:
+        failed_event = event_log_repository.find_event(
+            event_type="workflow.step_failed",
+            job_id=record.id,
+            step_id=step_id,
         )
+        if failed_event is None:
+            event_emitter.emit(
+                "workflow.step_failed",
+                event_context,
+                result_status=ActionRunStatus.failed.value,
+                properties={
+                    "step_id": step_id,
+                    "retry_count": retry_count,
+                    "attempt_count": attempt_count,
+                    "error_code": _optional_str(raw_step_state.get("error_code")),
+                },
+                timestamp=timestamp_sequencer.next(step_failed_timestamp),
+                replay=True,
+            )
+        else:
+            sequence_existing_replay_event(
+                event_log_repository,
+                timestamp_sequencer,
+                failed_event,
+            )
 
 
 def _optional_str(value: Any) -> str | None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import datetime
 from hashlib import sha256
 from typing import Any
 
@@ -8,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from anytoolai_platform_core.events.envelope import EventEnvelope
+from anytoolai_platform_core.events.replay import is_replay_owned_event_id
 from anytoolai_platform_core.storage.db import event_log_table
 
 
@@ -68,6 +70,48 @@ class EventLogRepository:
         artifact_id: str | None = None,
         step_id: str | None = None,
     ) -> bool:
+        return (
+            self.find_event(
+                event_type=event_type,
+                job_id=job_id,
+                action_run_id=action_run_id,
+                provider_call_id=provider_call_id,
+                artifact_id=artifact_id,
+                step_id=step_id,
+            )
+            is not None
+        )
+
+    def event_timestamp(
+        self,
+        *,
+        event_type: str,
+        job_id: str | None = None,
+        action_run_id: str | None = None,
+        provider_call_id: str | None = None,
+        artifact_id: str | None = None,
+        step_id: str | None = None,
+    ) -> datetime | None:
+        event = self.find_event(
+            event_type=event_type,
+            job_id=job_id,
+            action_run_id=action_run_id,
+            provider_call_id=provider_call_id,
+            artifact_id=artifact_id,
+            step_id=step_id,
+        )
+        return None if event is None else event.timestamp
+
+    def find_event(
+        self,
+        *,
+        event_type: str,
+        job_id: str | None = None,
+        action_run_id: str | None = None,
+        provider_call_id: str | None = None,
+        artifact_id: str | None = None,
+        step_id: str | None = None,
+    ) -> EventEnvelope | None:
         conditions = [event_log_table.c.event_type == event_type]
         if job_id is not None:
             conditions.append(event_log_table.c.job_id == job_id)
@@ -79,15 +123,34 @@ class EventLogRepository:
             conditions.append(event_log_table.c.artifact_id == artifact_id)
 
         rows = self._session.execute(
-            sa.select(event_log_table.c.properties).where(*conditions)
-        ).scalars()
+            sa.select(event_log_table)
+            .where(*conditions)
+            .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+        ).mappings()
         if step_id is None:
-            return rows.first() is not None
+            row = rows.first()
+            return None if row is None else EventEnvelope(**dict(row))
 
-        for properties in rows:
-            if _event_properties_step_id(properties) == step_id:
-                return True
-        return False
+        for row in rows:
+            if _event_properties_step_id(row["properties"]) == step_id:
+                return EventEnvelope(**dict(row))
+        return None
+
+    def update_replay_event_timestamp(
+        self,
+        event_id: str,
+        timestamp: datetime,
+    ) -> EventEnvelope:
+        if not is_replay_owned_event_id(event_id):
+            raise ValueError("only replay-owned event timestamps may be repaired")
+        self._session.execute(
+            sa.update(event_log_table)
+            .where(event_log_table.c.event_id == event_id)
+            .values(timestamp=timestamp)
+        )
+        self._session.flush()
+        stored = self.get(event_id)
+        return _require_stored_event(stored, event_id, "timestamp repair")
 
 
 def build_replay_event_id(

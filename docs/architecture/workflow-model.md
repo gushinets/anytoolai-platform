@@ -169,7 +169,7 @@ For a failed workflow, the ordered replay contract is:
 
 1. `workflow.started` first when the running job row exists but its start event is missing;
 2. for each persisted step in workflow order:
-   - `workflow.step_started`
+   - `workflow.step_started` only when the original execution reached that step-start boundary
    - child `action.started`
    - child provider request events in attempt order
    - child `artifact.created` events
@@ -177,18 +177,32 @@ For a failed workflow, the ordered replay contract is:
    - step terminal event
 3. `workflow.failed` or handler-owned `workflow.canceled` last.
 
+The step-start boundary is semantic, not inferred from failure status alone. A `when` resolution
+failure happens before the step starts and therefore recovers `workflow.step_failed` without
+replaying `workflow.step_started`. Input mapping, action execution, provider, and output mapping
+failures happen after the normal runner has emitted `workflow.step_started`, so recovery replays the
+step-start event for those failed steps when it is missing.
+
 This recovery is idempotent enough to tolerate partial durable state. Existing rows and existing
 events suppress only their own replay. For example, a pre-claimed worker job may already have
 durably committed `workflow.started`; later rollback recovery must preserve that row/event pair
 without duplicating it while still backfilling any missing downstream events.
 
-Replay uses the original transition timestamps where they are available from recovered rows:
+Replay prefers the original transition timestamps where they are available from recovered rows:
 
 - `jobs.started_at` for `workflow.started`
 - `jobs.completed_at` for workflow terminal events
 - related action timestamps for step started/terminal events when available
 
-This keeps escaped rollback recovery causally valid while staying inside MVP-A's non-durable
+Within one workflow recovery pass, replay timestamps are deterministic and monotonic in the causal
+sequence above. If a preferred timestamp is not strictly later than the previously replayed or
+observed event timestamp, recovery clamps the next timestamp to the previous timestamp plus one
+microsecond. If a pre-existing deterministic replay-owned event already exists but its timestamp
+collides or regresses relative to that causal sequence, recovery repairs that replay-owned event
+timestamp instead of emitting a duplicate. Ordinary non-replay committed events are not rewritten by
+rollback recovery. If the workflow terminal event is clamped or repaired later than
+`jobs.completed_at`, recovery updates `jobs.completed_at` to the terminal event timestamp. This
+keeps escaped rollback recovery causally valid while staying inside MVP-A's non-durable
 sequential-runner scope.
 
 ## Non-goals

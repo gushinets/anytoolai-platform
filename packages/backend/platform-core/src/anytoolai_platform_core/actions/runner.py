@@ -23,6 +23,10 @@ from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.events.replay import (
+    ReplayTimestampSequencer,
+    sequence_existing_replay_event,
+)
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
 from anytoolai_platform_core.providers.gateway import _emit_recovered_provider_events
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
@@ -573,53 +577,103 @@ def _emit_recovered_action_events(
     action_run_repository: ActionRunRepository,
     provider_call_repository: ProviderCallRepository,
     artifact_repository: ArtifactRepository,
+    timestamp_sequencer: ReplayTimestampSequencer | None = None,
 ) -> ActionRunRecord | None:
     action_run = action_run_repository.get(action_run_id)
     if action_run is None:
         return None
 
     event_emitter = EventEmitter(event_log_repository)
-    if not event_log_repository.exists_event(
+    started_event = event_log_repository.find_event(
         event_type="action.started",
         action_run_id=action_run.id,
-    ):
+    )
+    if started_event is None:
+        preferred_timestamp = action_run.started_at or action_run.created_at
         event_emitter.emit(
             "action.started",
             _context_from_record(action_run),
-            timestamp=action_run.started_at or action_run.created_at,
+            timestamp=(
+                preferred_timestamp
+                if timestamp_sequencer is None
+                else timestamp_sequencer.next(preferred_timestamp)
+            ),
             replay=True,
+        )
+    elif timestamp_sequencer is not None:
+        sequence_existing_replay_event(
+            event_log_repository,
+            timestamp_sequencer,
+            started_event,
         )
 
     for provider_call in provider_call_repository.list_for_action_run(action_run.id):
-        _emit_recovered_provider_events(event_log_repository, provider_call)
+        _emit_recovered_provider_events(
+            event_log_repository,
+            provider_call,
+            timestamp_sequencer=timestamp_sequencer,
+        )
 
     for artifact in artifact_repository.list_for_action_run(action_run.id):
-        _emit_recovered_artifact_created_event(event_log_repository, artifact)
+        _emit_recovered_artifact_created_event(
+            event_log_repository,
+            artifact,
+            timestamp_sequencer=timestamp_sequencer,
+        )
 
     if action_run.status is ActionRunStatus.succeeded:
-        if not event_log_repository.exists_event(
+        succeeded_event = event_log_repository.find_event(
             event_type="action.succeeded",
             action_run_id=action_run.id,
-        ):
+        )
+        if succeeded_event is None:
+            preferred_timestamp = (
+                action_run.completed_at or action_run.started_at or action_run.created_at
+            )
             event_emitter.emit(
                 "action.succeeded",
                 _context_from_record(action_run),
                 result_status=action_run.status.value,
-                timestamp=action_run.completed_at or action_run.started_at or action_run.created_at,
+                timestamp=(
+                    preferred_timestamp
+                    if timestamp_sequencer is None
+                    else timestamp_sequencer.next(preferred_timestamp)
+                ),
                 replay=True,
+            )
+        elif timestamp_sequencer is not None:
+            sequence_existing_replay_event(
+                event_log_repository,
+                timestamp_sequencer,
+                succeeded_event,
             )
         return action_run
 
-    if action_run.status is ActionRunStatus.failed and not event_log_repository.exists_event(
-        event_type="action.failed",
-        action_run_id=action_run.id,
-    ):
-        event_emitter.emit(
-            "action.failed",
-            _context_from_record(action_run),
-            result_status=action_run.status.value,
-            properties={"error_code": action_run.error_code},
-            timestamp=action_run.completed_at or action_run.started_at or action_run.created_at,
-            replay=True,
+    if action_run.status is ActionRunStatus.failed:
+        failed_event = event_log_repository.find_event(
+            event_type="action.failed",
+            action_run_id=action_run.id,
         )
+        if failed_event is None:
+            preferred_timestamp = (
+                action_run.completed_at or action_run.started_at or action_run.created_at
+            )
+            event_emitter.emit(
+                "action.failed",
+                _context_from_record(action_run),
+                result_status=action_run.status.value,
+                properties={"error_code": action_run.error_code},
+                timestamp=(
+                    preferred_timestamp
+                    if timestamp_sequencer is None
+                    else timestamp_sequencer.next(preferred_timestamp)
+                ),
+                replay=True,
+            )
+        elif timestamp_sequencer is not None:
+            sequence_existing_replay_event(
+                event_log_repository,
+                timestamp_sequencer,
+                failed_event,
+            )
     return action_run
