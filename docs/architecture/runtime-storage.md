@@ -659,6 +659,10 @@ scenario starts through the API transaction path. It verifies that PostgreSQL ro
 conditional quota update allow exactly the first `N` accepted starts, return `429 quota_exhausted`
 for later starts, and keep session/job/quota/event counts consistent.
 
+The backend GitHub Actions workflow also runs this PostgreSQL test in the dedicated
+`postgresql-quota-concurrency` job with a disposable PostgreSQL service. That job is the required
+production-dialect proof; quick-check remains intentionally DB-free and fast.
+
 `python scripts/agent/runner.py quick-check` excludes `slow` tests with `-m "not slow"` so the
 required fast path stays deterministic. Run SQLite/ASGI stress checks intentionally with:
 

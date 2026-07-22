@@ -5,13 +5,13 @@
 - State: active
 - Owner: agent
 - Created: 2026-07-20
-- Last updated: 2026-07-20
+- Last updated: 2026-07-22
 - Review date: 2026-07-20
-- Next action: run `apps/platform-api/tests/test_quota_concurrency_postgresql.py` against a
-  disposable PostgreSQL database.
+- Next action: confirm the dedicated GitHub Actions PostgreSQL quota-concurrency job is required in
+  branch protection.
 - Blocker: Docker daemon is unavailable in this environment and no
   `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was provided, so PostgreSQL-specific execution could not
-  be completed locally.
+  be completed locally. CI now provisions PostgreSQL for the required production-dialect proof.
 
 ## Decision
 
@@ -55,6 +55,8 @@ real `createGuestIdentity()` local persistence in CE-kit.
 
 - [x] API/quota-focused tests.
 - [ ] PostgreSQL test against a live disposable PostgreSQL database.
+- [x] Dedicated GitHub Actions job provisions PostgreSQL and runs the production-dialect quota
+  concurrency test.
 - [x] PostgreSQL test guard executed and reported explicit skip without
   `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`.
 - [x] Docs validation and generated-docs check.
@@ -79,3 +81,4 @@ uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_stress.py
 | Date | Progress | Next |
 |---|---|---|
 | 2026-07-20 | Added the PostgreSQL-backed API quota concurrency test, clarified that CE-kit quota/start remain deferred, documented PostgreSQL as the production concurrency proof, and validated the runnable fast suite. Docker Compose startup failed locally because the Docker daemon was unavailable. | Run the PostgreSQL test on a Docker-enabled host or with `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` pointing at a disposable PostgreSQL maintenance DB. |
+| 2026-07-22 | Added a dedicated backend CI job with a PostgreSQL service that runs `apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql"` against a disposable database URL. | Confirm the new workflow job is configured as a required check for PRs. |
