@@ -18,4 +18,7 @@ text.extract_structured_fields
 -> document.generate_from_template
 ```
 
-The handoff smoke may be represented as source and target scenarios as long as it proves source session -> handoff token -> target session.
+The implemented `kernel_demo_source_to_target_v1` handoff maps the canonical source workflow-result
+artifact into a separate safe preview and schema-valid target input. It requires consent, uses the
+`immediate` policy, creates a linked target session and queued target job, and proves that worker
+action/provider/artifact lineage remains under that target session with the runtime `handoff_id`.

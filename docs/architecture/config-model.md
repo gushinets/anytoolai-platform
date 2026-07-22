@@ -152,7 +152,21 @@ and tests.
 - scenario session status: `started`, `waiting_for_user`, `running`, `completed`, `failed`, `expired`
 - job status: `created`, `running`, `succeeded`, `failed`, `canceled`
 - handoff status: `created`, `viewed`, `accepted`, `declined`, `consumed`, `expired`, `failed`
+- handoff target start policy: `immediate`, `deferred`
 
 Future frontend types such as mobile clients should be added by extending `FrontendType`, updating
 tests, and then allowing configs to use the new value. Future human-input job states require the
 same enum update plus separate runtime work for persistence, timeout handling, APIs, and events.
+
+## Handoff definitions
+
+An MVP-A handoff definition explicitly owns `handoff_id`, source product/scenario, target
+product/frontend/scenario, `consent_required`, `target_start_policy`, `context_mapping`, and
+`preview_mapping`. Consent must be true. Mapping values may read only
+`artifact.content_json...`; context fields become target input and preview fields become the
+separately bounded public preview.
+
+Cross-reference validation requires both scenarios to be owned by their declared products and the
+target frontend to exist, belong to the target product, and be enabled. Both mappings are required.
+The target start policy is config-owned; runtime code must not infer it from product ids or frontend
+behavior.

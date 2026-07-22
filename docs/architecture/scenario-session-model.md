@@ -59,12 +59,14 @@ Initial statuses:
 Current A12 checkpoints are:
 
 - `processing`: non-actionable state while the job is `created` or `running`;
+- `handoff_ready`: non-actionable state for an accepted deferred handoff with no job yet;
 - `result_ready`: actionable success state after the linked workflow job succeeded;
 - `failed`: terminal safe-failure state with no next actions.
 
 `allowed_next_actions` is derived from the current checkpoint:
 
 - `processing` -> `[]`
+- `handoff_ready` -> `[]`
 - `failed` -> `[]`
 - `result_ready` -> `ScenarioDefinition.allowed_next_actions`
 
@@ -106,3 +108,16 @@ response must not expose prompts, provider policies, provider/model names, retry
 PydanticAI run ids, or LiteLLM response ids.
 
 Without `scenario_session_id`, there is no user journey.
+
+## A17 linked handoff sessions
+
+Handoff acceptance always creates the target session immediately. It sets
+`parent_scenario_session_id` to the source session, inherits the source `scenario_chain_id` (falling
+back to the source session id), and persists `handoff_id`, source session id, source artifact id, and
+mapped target input in target metadata.
+
+For an `immediate` definition the target session is `started/processing` and has a newly queued job.
+For a `deferred` definition it is `waiting_for_user/handoff_ready`, has no job, consumes no quota,
+and is still a valid polling snapshot. Consequently `ScenarioSessionSnapshot.job_id` and the public
+`ScenarioSessionResponse.job_id` are nullable, while ordinary start responses continue to return a
+non-null job id.

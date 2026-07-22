@@ -77,6 +77,14 @@ Current MVP-A runtime-owned emission points:
   - `provider.request_failed`
 - artifact service:
   - `artifact.created`
+- handoff service:
+  - `handoff.created`
+  - `handoff.viewed`
+  - `handoff.accepted`
+  - `handoff.declined`
+  - `handoff.expired`
+  - `handoff.failed`
+  - `handoff.consumed`
 
 Other taxonomy groups remain part of the platform contract even when their concrete runtime service
 slice lands later.
@@ -175,6 +183,15 @@ Generated documentation mirrors that source in:
 - `handoff.accepted`
 - `handoff.declined`
 - `handoff.consumed`
+- `handoff.expired`
+- `handoff.failed`
+
+Handoff lifecycle events are emitted only when the guarded durable transition changes state.
+Created/viewed/declined/expired/failed correlate primarily to the source session; accepted uses the
+pre-generated target session id; consumed uses the linked target session and job. Every event keeps
+the shared scenario chain and runtime `handoff_id`. Target workflow, action, provider, and artifact
+events retain those dimensions under the target session. Tokens, mapped context, preview source
+paths, raw artifacts, prompts, and LLM debug/provider payloads are forbidden event properties.
 
 ### `client`
 

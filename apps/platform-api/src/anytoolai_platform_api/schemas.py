@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
-from typing import Literal
+from datetime import datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -107,7 +107,7 @@ class ScenarioSessionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scenario_session_id: str
-    job_id: str
+    job_id: str | None
     status: str
     current_checkpoint_id: str | None = None
     allowed_next_actions: list[str] = Field(default_factory=list)
@@ -126,3 +126,43 @@ class ErrorResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     error: ErrorDetailResponse
+
+
+class HandoffCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    handoff_definition_id: str
+    source_scenario_session_id: str
+    source_artifact_id: str
+
+
+class HandoffAcceptRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    guest_id: str | None = None
+    source_frontend_instance_id: str | None = None
+
+
+class HandoffCreateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    handoff_id: str
+    handoff_token: str
+    status: str
+    expires_at: datetime
+
+
+class HandoffPreviewResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    handoff_id: str
+    status: str
+    source_product_id: str
+    source_product_display_name: str
+    target_product_id: str
+    target_product_display_name: str
+    target_scenario_id: str
+    preview: dict[str, Any]
+    expires_at: datetime
+    target_scenario_session_id: str | None = None
+    target_job_id: str | None = None

@@ -4,7 +4,11 @@ from anytoolai_platform_sdk.contracts.action import (
     ActionExecutor,
 )
 from anytoolai_platform_sdk.contracts.event import EventEnvelope
-from anytoolai_platform_sdk.contracts.handoff import HandoffDefinition, HandoffStatus
+from anytoolai_platform_sdk.contracts.handoff import (
+    HandoffDefinition,
+    HandoffStartPolicy,
+    HandoffStatus,
+)
 from anytoolai_platform_sdk.contracts.product import (
     FrontendDefinition,
     FrontendType,
@@ -43,6 +47,7 @@ __all__ = [
     "FrontendDefinition",
     "FrontendType",
     "HandoffDefinition",
+    "HandoffStartPolicy",
     "HandoffStatus",
     "JobStatus",
     "ProductDefinition",

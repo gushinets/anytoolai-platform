@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
-from typing import Any, Mapping
+from typing import Any
 
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.ids import new_id
@@ -13,12 +14,14 @@ from anytoolai_platform_core.products.models import FrontendDefinition
 from anytoolai_platform_core.quotas.service import GuestQuotaService
 from anytoolai_platform_core.scenarios.checkpoints import (
     FAILED_CHECKPOINT_ID,
+    HANDOFF_READY_CHECKPOINT_ID,
     PROCESSING_CHECKPOINT_ID,
     RESULT_READY_CHECKPOINT_ID,
     resolve_checkpoint_state,
     resolve_effective_status,
 )
 from anytoolai_platform_core.scenarios.models import (
+    LinkedScenarioSessionResult,
     ScenarioDefinition,
     ScenarioSessionRecord,
     ScenarioSessionSnapshot,
@@ -152,6 +155,109 @@ class ScenarioRuntimeService:
             job=job,
         )
 
+    def create_linked_session(
+        self,
+        *,
+        tenant_id: str,
+        region: str,
+        product_id: str,
+        scenario_id: str,
+        frontend_id: str,
+        input_payload: Mapping[str, Any],
+        scenario_session_id: str,
+        scenario_chain_id: str,
+        parent_scenario_session_id: str,
+        handoff_id: str,
+        source_artifact_id: str,
+        guest_id: str | None,
+        user_id: str | None,
+        source_frontend_instance_id: str | None,
+        queue_workflow: bool,
+    ) -> LinkedScenarioSessionResult:
+        scenario = self._require_product_scenario(product_id, scenario_id)
+        self._require_enabled_frontend(product_id, frontend_id)
+        if not isinstance(input_payload, Mapping):
+            raise ScenarioInputInvalidError()
+        workflow = self._config_registry.get_workflow(scenario.workflow_id)
+        if workflow is None:
+            raise LookupError(f"workflow not found: {scenario.workflow_id}")
+
+        if queue_workflow and self._quota_service is not None:
+            self._quota_service.consume_for_accepted_start(
+                tenant_id=tenant_id,
+                region=region,
+                product_id=product_id,
+                frontend_id=frontend_id,
+                guest_id=guest_id,
+                scenario_id=scenario.scenario_id,
+                scenario_session_id=scenario_session_id,
+                scenario_chain_id=scenario_chain_id,
+            )
+
+        session_record = ScenarioSessionRecord(
+            id=scenario_session_id,
+            tenant_id=tenant_id,
+            region=region,
+            product_id=product_id,
+            frontend_id=frontend_id,
+            scenario_id=scenario.scenario_id,
+            scenario_version=scenario.version,
+            guest_id=guest_id,
+            user_id=user_id,
+            status=(
+                ScenarioSessionStatus.started
+                if queue_workflow
+                else ScenarioSessionStatus.waiting_for_user
+            ),
+            current_checkpoint_id=(
+                PROCESSING_CHECKPOINT_ID if queue_workflow else HANDOFF_READY_CHECKPOINT_ID
+            ),
+            scenario_chain_id=scenario_chain_id,
+            parent_scenario_session_id=parent_scenario_session_id,
+            source_frontend_instance_id=source_frontend_instance_id,
+            metadata={
+                "input": dict(input_payload),
+                "handoff_id": handoff_id,
+                "source_scenario_session_id": parent_scenario_session_id,
+                "source_artifact_id": source_artifact_id,
+            },
+        )
+        event_context = ExecutionContext(
+            tenant_id=tenant_id,
+            region=region,
+            product_id=product_id,
+            frontend_id=frontend_id,
+            scenario_session_id=scenario_session_id,
+            scenario_chain_id=scenario_chain_id,
+            guest_id=guest_id,
+            user_id=user_id,
+            handoff_id=handoff_id,
+            acquisition_source=frontend_id,
+        )
+        stored_session = self._session_service.start(session_record, context=event_context)
+        if not queue_workflow:
+            return LinkedScenarioSessionResult(session=stored_session)
+
+        job = self._job_repository.create(
+            JobRecord(
+                tenant_id=tenant_id,
+                region=region,
+                product_id=product_id,
+                frontend_id=frontend_id,
+                scenario_session_id=stored_session.id,
+                workflow_id=workflow.workflow_id,
+                workflow_version=workflow.version,
+                metadata={
+                    "guest_id": guest_id,
+                    "user_id": user_id,
+                    "scenario_chain_id": scenario_chain_id,
+                    "handoff_id": handoff_id,
+                    "acquisition_source": frontend_id,
+                },
+            )
+        )
+        return LinkedScenarioSessionResult(session=stored_session, job=job)
+
     def get_session_snapshot(
         self,
         scenario_session_id: str,
@@ -167,10 +273,6 @@ class ScenarioRuntimeService:
         if session is None:
             raise ScenarioSessionNotFoundError()
         job = self._job_repository.get_latest_for_scenario_session(session.id)
-        if job is None:
-            raise LookupError(
-                f"scenario session {scenario_session_id} does not have a linked job"
-            )
         scenario = self._require_product_scenario(
             session.product_id,
             session.scenario_id,
@@ -199,10 +301,6 @@ class ScenarioRuntimeService:
         if session is None:
             raise ScenarioSessionNotFoundError()
         job = self._job_repository.get_latest_for_scenario_session(session.id)
-        if job is None:
-            raise LookupError(
-                f"scenario session {scenario_session_id} does not have a linked job"
-            )
         scenario = self._require_product_scenario(
             session.product_id,
             session.scenario_id,
@@ -218,6 +316,8 @@ class ScenarioRuntimeService:
             current_checkpoint=checkpoint_state,
             next_action_id=next_action_id,
         )
+        if job is None:
+            raise RuntimeError("non-actionable session unexpectedly accepted a next action")
         self._event_emitter.emit(
             "client.next_action_clicked",
             ExecutionContext(
@@ -251,7 +351,7 @@ class ScenarioRuntimeService:
         *,
         session: ScenarioSessionRecord,
         scenario: ScenarioDefinition,
-        job: JobRecord,
+        job: JobRecord | None,
     ) -> ScenarioSessionSnapshot:
         checkpoint_state = resolve_checkpoint_state(
             scenario=scenario,
@@ -260,10 +360,10 @@ class ScenarioRuntimeService:
         )
         return ScenarioSessionSnapshot(
             scenario_session_id=session.id,
-            job_id=job.id,
+            job_id=None if job is None else job.id,
             status=resolve_effective_status(session=session, job=job),
             allowed_next_actions=checkpoint_state.allowed_next_actions,
-            result_artifact_id=job.result_artifact_id,
+            result_artifact_id=None if job is None else job.result_artifact_id,
             current_checkpoint_id=checkpoint_state.checkpoint_id,
         )
 
@@ -307,11 +407,16 @@ class ScenarioSessionService:
         self._repository = repository
         self._event_emitter = event_emitter
 
-    def start(self, record: ScenarioSessionRecord) -> ScenarioSessionRecord:
+    def start(
+        self,
+        record: ScenarioSessionRecord,
+        *,
+        context: ExecutionContext | None = None,
+    ) -> ScenarioSessionRecord:
         stored = self._repository.create(record)
         self._event_emitter.emit(
             "scenario.started",
-            _context_from_record(stored),
+            _event_context_from_record(stored, context),
             properties={
                 "scenario_id": stored.scenario_id,
                 "scenario_version": stored.scenario_version,

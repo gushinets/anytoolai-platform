@@ -14,6 +14,7 @@ from anytoolai_platform_core.storage.db import (
     event_log_table,
     guest_quota_usage_table,
     jobs_table,
+    product_handoffs_table,
     scenario_sessions_table,
 )
 from anytoolai_platform_core.storage.transactions import (
@@ -21,8 +22,9 @@ from anytoolai_platform_core.storage.transactions import (
     transaction_boundary,
 )
 from sqlalchemy.engine import URL, make_url
+from test_handoffs_api import _create as _create_handoff
+from test_handoffs_api import _seed_source as _seed_handoff_source
 from test_scenario_runtime_api import (
-    CONFIG_ROOT,
     REPO_ROOT,
     _create_test_app,
     _start_payload,
@@ -63,9 +65,7 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
                             "/v1/products/kernel_demo/scenarios/"
                             "kernel_demo.single_action_smoke_v1/start",
                             json=_start_payload(),
-                            headers={
-                                "X-Request-ID": f"req_pg_quota_parallel_{index}"
-                            },
+                            headers={"X-Request-ID": f"req_pg_quota_parallel_{index}"},
                         )
                         for index in range(request_count)
                     ]
@@ -90,9 +90,7 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
                 sa.select(sa.func.count()).select_from(jobs_table)
             ).scalar_one()
             usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
-            event_types = list(
-                session.execute(sa.select(event_log_table.c.event_type)).scalars()
-            )
+            event_types = list(session.execute(sa.select(event_log_table.c.event_type)).scalars())
 
         assert scenario_count == 3
         assert job_count == 3
@@ -100,6 +98,72 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
         assert usage["limit_count"] == 3
         assert event_types.count("quota.consumed") == 3
         assert event_types.count("quota.exhausted") == request_count - 3
+    finally:
+        engine.dispose()
+        _drop_database(maintenance_url, database_name)
+
+
+@pytest.mark.postgresql
+@pytest.mark.slow
+def test_postgresql_parallel_handoff_accept_creates_one_target() -> None:
+    maintenance_url = _require_postgres_test_url()
+    database_name = f"anytoolai_a17_handoff_test_{uuid4().hex[:12]}"
+    test_url = maintenance_url.set(database=database_name)
+    _create_database(maintenance_url, database_name)
+    engine = sa.create_engine(test_url, future=True)
+    try:
+        _upgrade_database(engine, test_url)
+        session_factory = build_session_factory(engine)
+        app = _create_test_app(session_factory)
+        with transaction_boundary(session_factory) as session:
+            source_session_id, artifact_id = _seed_handoff_source(session)
+        created = _create_handoff(app, source_session_id, artifact_id).json()
+
+        async def accept_twice() -> list[httpx.Response]:
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app),
+                base_url="http://testserver",
+            ) as client:
+                path = f"/v1/handoffs/{created['handoff_token']}/accept"
+                return await asyncio.gather(
+                    client.post(path, json={}, headers={"X-Request-ID": "req_pg_handoff_1"}),
+                    client.post(path, json={}, headers={"X-Request-ID": "req_pg_handoff_2"}),
+                )
+
+        responses = asyncio.run(accept_twice())
+        assert sorted(response.status_code for response in responses) == [200, 409]
+        with transaction_boundary(session_factory) as session:
+            handoff = (
+                session.execute(
+                    sa.select(product_handoffs_table).where(
+                        product_handoffs_table.c.id == created["handoff_id"]
+                    )
+                )
+                .mappings()
+                .one()
+            )
+            target_session_count = session.execute(
+                sa.select(sa.func.count())
+                .select_from(scenario_sessions_table)
+                .where(scenario_sessions_table.c.parent_scenario_session_id == source_session_id)
+            ).scalar_one()
+            target_job_count = session.execute(
+                sa.select(sa.func.count())
+                .select_from(jobs_table)
+                .where(jobs_table.c.scenario_session_id == handoff["target_scenario_session_id"])
+            ).scalar_one()
+            accepted_events = session.execute(
+                sa.select(sa.func.count())
+                .select_from(event_log_table)
+                .where(
+                    event_log_table.c.event_type == "handoff.accepted",
+                    event_log_table.c.handoff_id == created["handoff_id"],
+                )
+            ).scalar_one()
+        assert handoff["status"] == "consumed"
+        assert target_session_count == 1
+        assert target_job_count == 1
+        assert accepted_events == 1
     finally:
         engine.dispose()
         _drop_database(maintenance_url, database_name)

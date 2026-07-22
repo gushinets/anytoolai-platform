@@ -11,6 +11,7 @@ It covers the design that was implemented for:
 - `platform.artifacts`
 - `platform.guest_identities`
 - `platform.guest_quota_usage`
+- `platform.product_handoffs`
 
 This is the durable runtime state layer for execution. It is not config storage.
 
@@ -21,8 +22,10 @@ The runtime storage slice lives in these files:
 - `migrations/platform/env.py`
 - `migrations/platform/versions/0001_runtime_tables.py`
 - `migrations/platform/versions/0003_guest_quota.py`
+- `migrations/platform/versions/0004_handoffs.py`
 - `migrations/platform/versions/0005_provider_calls_error_message_safe.py`
 - `migrations/platform/versions/0007_guest_quota_dimension.py`
+- `migrations/platform/versions/0008_handoffs_compat.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/db.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/transactions.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/scenarios/repository.py`
@@ -32,6 +35,7 @@ The runtime storage slice lives in these files:
 - `packages/backend/platform-core/src/anytoolai_platform_core/artifacts/repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/identity/repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/quotas/repository.py`
+- `packages/backend/platform-core/src/anytoolai_platform_core/handoffs/repository.py`
 - `packages/backend/platform-core/tests/unit/test_runtime_storage.py`
 
 The runtime storage slice does not cover:
@@ -39,7 +43,6 @@ The runtime storage slice does not cover:
 - config registry storage
 - `platform.event_log` schema ownership, although rollback recovery now queries event-log existence
   to backfill missing lifecycle events
-- handoff tables
 - product definition tables
 - billing tables
 - admin editing flows
@@ -63,8 +66,27 @@ For the Provider Gateway ADR-0007 realignment:
 - `0007_guest_quota_dimension.py` is a compatibility upgrade for databases already upgraded
   through the original A13 guest quota migration before `0003` was baseline-folded; its downgrade is
   a no-op because the current `0006` schema already includes the dimension fields from `0003`
+- `0004_handoffs.py` creates the final `platform.product_handoffs` schema for clean databases
+- `0008_handoffs_compat.py` creates that table only when absent, repairing databases stamped past
+  the historical placeholder `0004`; its downgrade is intentionally a no-op so downgrading a
+  compatibility marker never destroys backend-owned handoff history
 
 This keeps fresh installs and already-upgraded databases on the same final schema.
+
+### Handoff storage and transition enforcement
+
+`platform.product_handoffs` stores the hashed token, source and target dimensions, explicit policy,
+mapped context and preview JSON, safe failure code/metadata, and timestamps for every lifecycle
+state. It has a unique token hash, unique nullable target-session linkage, foreign keys to runtime
+sessions/jobs/artifacts, and indexes for definition, source session, target session, and
+status/expiry lookups.
+
+`HandoffRepository` follows the caller-owned transaction rule but deliberately does not expose a
+generic status-changing update. `mark_viewed`, `claim_accept`, `decline`, `expire_if_due`,
+`consume`, and `mark_failed` use conditional SQL updates. The acceptance compare-and-swap is the
+storage-level double-accept guard, while `attach_target` validates that the record is accepted and
+the target rows belong to the same tenant/region and expected target session. State, linkage, quota,
+and events therefore commit or roll back together.
 
 ### Provider Policy Ref Compatibility
 

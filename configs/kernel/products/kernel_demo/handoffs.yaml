@@ -3,7 +3,12 @@ handoffs:
     source_product_id: kernel_demo
     source_scenario_id: kernel_demo.handoff_smoke_source_v1
     target_product_id: kernel_demo
+    target_frontend_id: kernel_demo_ce
     target_scenario_id: kernel_demo.handoff_smoke_target_v1
+    target_start_policy: immediate
     consent_required: true
     context_mapping:
-      source_artifact_id: $.source_artifact_id
+      source_text: artifact.content_json.title
+    preview_mapping:
+      title: artifact.content_json.title
+      fields: artifact.content_json.fields
