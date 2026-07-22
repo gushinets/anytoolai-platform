@@ -144,10 +144,13 @@ class HandoffService:
         record = self._by_token(token, tenant_id=tenant_id, region=region)
         record = self.expire(record)
         if record.status is HandoffStatus.created:
-            transition = self._repository.mark_viewed(record.id, self._clock())
+            now = self._clock()
+            transition = self._repository.mark_viewed(record.id, now)
             record = transition.record
             if transition.changed:
                 self._emit("handoff.viewed", record)
+            else:
+                record = self.expire(record, now=now)
         return self.build_safe_preview(record)
 
     def accept(self, token: str, command: AcceptHandoffCommand) -> HandoffAccepted:
@@ -177,6 +180,7 @@ class HandoffService:
         )
         if claimed is None:
             current = self.get_by_id(record.id, tenant_id=command.tenant_id, region=command.region)
+            current = self.expire(current, now=now)
             raise _terminal_error(current.status)
         target_session_id = new_id("scenario_session")
         try:
@@ -245,14 +249,17 @@ class HandoffService:
         record = self.expire(self._by_token(token, tenant_id=tenant_id, region=region))
         if record.status is HandoffStatus.expired:
             raise HandoffExpiredError()
-        transition = self._repository.decline(record.id, self._clock())
+        now = self._clock()
+        transition = self._repository.decline(record.id, now)
         if not transition.changed:
-            raise _terminal_error(transition.record.status)
+            current = self.expire(transition.record, now=now)
+            raise _terminal_error(current.status)
         self._emit("handoff.declined", transition.record)
         return self.build_safe_preview(transition.record)
 
-    def expire(self, record: HandoffRecord) -> HandoffRecord:
-        transition = self._repository.expire_if_due(record.id, self._clock())
+    def expire(self, record: HandoffRecord, *, now: datetime | None = None) -> HandoffRecord:
+        effective_now = self._clock() if now is None else now
+        transition = self._repository.expire_if_due(record.id, effective_now)
         if transition.changed:
             self._emit("handoff.expired", transition.record)
         return transition.record

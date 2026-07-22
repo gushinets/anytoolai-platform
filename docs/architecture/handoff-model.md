@@ -77,10 +77,10 @@ The repository has explicit operations rather than a generic status update:
 | `create` | inserts only a new `created` record |
 | `get_by_id` | tenant/region-scoped internal lookup |
 | `get_by_token_hash` | tenant/region-scoped public-flow lookup |
-| `mark_viewed` | atomic `created -> viewed`; repeat is unchanged |
+| `mark_viewed` | atomic unexpired `created -> viewed`; repeat is unchanged |
 | `claim_accept` | compare-and-swap from unexpired `created\|viewed -> accepted` |
 | `attach_target` | accepted record and valid target session/job linkage |
-| `decline` | atomic `created\|viewed -> declined` |
+| `decline` | atomic unexpired `created\|viewed -> declined` |
 | `expire_if_due` | atomic due `created\|viewed -> expired` |
 | `consume` | `accepted -> consumed` with the matching linked durable job |
 | `mark_failed` | `created\|viewed -> failed` after rolled-back orchestration |

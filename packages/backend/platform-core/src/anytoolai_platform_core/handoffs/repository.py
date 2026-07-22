@@ -68,6 +68,7 @@ class HandoffRepository:
             from_statuses=(HandoffStatus.created,),
             to_status=HandoffStatus.viewed,
             values={"viewed_at": now, "updated_at": now},
+            extra_conditions=(product_handoffs_table.c.expires_at > now,),
         )
         return HandoffTransitionResult(self._require(handoff_id), changed)
 
@@ -132,6 +133,7 @@ class HandoffRepository:
             from_statuses=(HandoffStatus.created, HandoffStatus.viewed),
             to_status=HandoffStatus.declined,
             values={"declined_at": now, "updated_at": now},
+            extra_conditions=(product_handoffs_table.c.expires_at > now,),
         )
         return HandoffTransitionResult(self._require(handoff_id), changed)
 
@@ -194,12 +196,14 @@ class HandoffRepository:
         from_statuses: tuple[HandoffStatus, ...],
         to_status: HandoffStatus,
         values: dict[str, object],
+        extra_conditions: tuple[sa.ColumnElement[bool], ...] = (),
     ) -> bool:
         result = self._session.execute(
             sa.update(product_handoffs_table)
             .where(
                 product_handoffs_table.c.id == handoff_id,
                 product_handoffs_table.c.status.in_(from_statuses),
+                *extra_conditions,
             )
             .values(status=to_status, **values)
         )

@@ -360,3 +360,71 @@ def test_handoff_decline_expiry_and_deferred_target(tmp_path: Path) -> None:
         )
         assert snapshot.job_id is None
         assert snapshot.current_checkpoint_id == "handoff_ready"
+
+
+@pytest.mark.parametrize("operation", ["preview", "decline", "accept"])
+def test_handoff_transition_cannot_cross_expiry_boundary(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    factory = _session_factory(tmp_path)
+    registry = build_config_registry(CONFIG_ROOT)
+    created_at = datetime(2026, 7, 22, 12, 0, tzinfo=UTC)
+    with transaction_boundary(factory) as session:
+        source_id, artifact_id = _seed_source(session)
+        created = _create(
+            _service(session, registry, clock=lambda: created_at),
+            source_id,
+            artifact_id,
+        )
+
+    expires_at = created.preview.expires_at
+    clock_values = iter((expires_at - timedelta(microseconds=1), expires_at))
+    with transaction_boundary(factory) as session:
+        service = _service(session, registry, clock=lambda: next(clock_values))
+        if operation == "preview":
+            preview = service.get_preview(
+                created.handoff_token,
+                tenant_id="anytoolai",
+                region="default",
+            )
+            assert preview.status is HandoffStatus.expired
+        elif operation == "decline":
+            with pytest.raises(HandoffExpiredError):
+                service.decline(
+                    created.handoff_token,
+                    tenant_id="anytoolai",
+                    region="default",
+                )
+        else:
+            with pytest.raises(HandoffExpiredError):
+                service.accept(
+                    created.handoff_token,
+                    AcceptHandoffCommand(tenant_id="anytoolai", region="default"),
+                )
+
+        row = (
+            session.execute(
+                sa.select(product_handoffs_table).where(
+                    product_handoffs_table.c.id == created.preview.handoff_id
+                )
+            )
+            .mappings()
+            .one()
+        )
+        event_types = list(
+            session.execute(
+                sa.select(event_log_table.c.event_type).where(
+                    event_log_table.c.handoff_id == created.preview.handoff_id
+                )
+            ).scalars()
+        )
+
+        assert row["status"] == HandoffStatus.expired.value
+        assert row["viewed_at"] is None
+        assert row["declined_at"] is None
+        assert row["accepted_at"] is None
+        assert event_types.count("handoff.expired") == 1
+        assert "handoff.viewed" not in event_types
+        assert "handoff.declined" not in event_types
+        assert "handoff.accepted" not in event_types
