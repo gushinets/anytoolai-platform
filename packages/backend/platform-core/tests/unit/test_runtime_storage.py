@@ -388,6 +388,57 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
     )
 
 
+def test_quota_dimension_downgrade_to_0006_preserves_current_0003_schema(
+    tmp_path: Path,
+) -> None:
+    main_db = tmp_path / "runtime-downgrade-main.sqlite3"
+    platform_db = tmp_path / "runtime-downgrade-platform.sqlite3"
+    engine = _build_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+
+    try:
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "head")
+            command.downgrade(alembic_config, "0006")
+            quota_columns = {
+                column["name"]
+                for column in sa.inspect(connection).get_columns(
+                    "guest_quota_usage",
+                    schema="platform",
+                )
+            }
+            index_names = {
+                index["name"]
+                for index in sa.inspect(connection).get_indexes(
+                    "guest_quota_usage",
+                    schema="platform",
+                )
+            }
+            unique_constraints = {
+                constraint["name"]: set(constraint["column_names"])
+                for constraint in sa.inspect(connection).get_unique_constraints(
+                    "guest_quota_usage",
+                    schema="platform",
+                )
+            }
+
+        assert {"quota_dimension", "dimension_key", "scenario_id"} <= quota_columns
+        assert "ix_guest_quota_usage_dimension" in index_names
+        assert unique_constraints["uq_guest_quota_usage_dimension"] == {
+            "tenant_id",
+            "region",
+            "guest_id",
+            "product_id",
+            "quota_policy_id",
+            "quota_dimension",
+            "dimension_key",
+            "period_key",
+        }
+    finally:
+        engine.dispose()
+
+
 def test_runtime_migration_upgrade_from_0004_adds_provider_call_error_message_safe(
     tmp_path: Path,
 ) -> None:

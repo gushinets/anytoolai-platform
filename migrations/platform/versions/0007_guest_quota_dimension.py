@@ -96,35 +96,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    existing_columns = _column_names()
-    if "quota_dimension" not in existing_columns:
-        return
-
-    op.drop_index(
-        "ix_guest_quota_usage_dimension",
-        table_name=TABLE_NAME,
-        schema=PLATFORM_SCHEMA,
-    )
-    if op.get_bind().dialect.name == "postgresql":
-        op.drop_constraint(
-            "uq_guest_quota_usage_dimension",
-            TABLE_NAME,
-            schema=PLATFORM_SCHEMA,
-            type_="unique",
-        )
-        op.create_unique_constraint(
-            "uq_guest_quota_usage_dimension",
-            TABLE_NAME,
-            [
-                "tenant_id",
-                "region",
-                "guest_id",
-                "product_id",
-                "quota_policy_id",
-                "period_key",
-            ],
-            schema=PLATFORM_SCHEMA,
-        )
-    op.drop_column(TABLE_NAME, "scenario_id", schema=PLATFORM_SCHEMA)
-    op.drop_column(TABLE_NAME, "dimension_key", schema=PLATFORM_SCHEMA)
-    op.drop_column(TABLE_NAME, "quota_dimension", schema=PLATFORM_SCHEMA)
+    # The current baseline-folded 0003 migration already owns the quota-dimension columns,
+    # index, and unique constraint. Downgrading from 0007 to the current 0006 revision must
+    # therefore keep that schema intact.
+    return

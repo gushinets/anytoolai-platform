@@ -59,8 +59,10 @@ For the Provider Gateway ADR-0007 realignment:
 - `0006_event_log_provider_policy_ref_compat.py` renames the old
   `platform.event_log.provider_policy_id` column to `provider_policy_ref` for databases already
   upgraded through the previous chain
-- `0007_guest_quota_dimension.py` adds policy-driven quota dimension fields for databases already
-  upgraded through the original A13 guest quota migration
+- `0003_guest_quota.py` owns the current guest quota dimension schema for clean databases
+- `0007_guest_quota_dimension.py` is a compatibility upgrade for databases already upgraded
+  through the original A13 guest quota migration before `0003` was baseline-folded; its downgrade is
+  a no-op because the current `0006` schema already includes the dimension fields from `0003`
 
 This keeps fresh installs and already-upgraded databases on the same final schema.
 
