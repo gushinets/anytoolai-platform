@@ -17,12 +17,18 @@ class QuotaPeriod(StrEnum):
     lifetime = "lifetime"
 
 
+class QuotaDimension(StrEnum):
+    product = "product"
+    scenario = "scenario"
+
+
 @dataclass(frozen=True)
 class QuotaPolicy:
     quota_policy_id: str
     unit: QuotaUnit
     limit_count: int
     period: QuotaPeriod
+    dimension: QuotaDimension
     schema_version: int = 1
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -34,8 +40,11 @@ class QuotaUsageRecord:
     guest_id: str
     product_id: str
     quota_policy_id: str
+    quota_dimension: QuotaDimension
+    dimension_key: str
     period_key: str
     limit_count: int
+    scenario_id: str | None = None
     id: str = field(default_factory=lambda: new_id("guest_quota_usage"))
     used_count: int = 0
     created_at: datetime = field(default_factory=utc_now)
@@ -48,6 +57,9 @@ class QuotaState:
     guest_id: str
     product_id: str
     quota_policy_id: str
+    quota_dimension: QuotaDimension
+    dimension_key: str
+    scenario_id: str | None
     unit: QuotaUnit
     period: QuotaPeriod
     period_key: str

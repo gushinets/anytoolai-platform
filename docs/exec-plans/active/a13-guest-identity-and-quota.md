@@ -43,9 +43,11 @@ persistence. Full CE-kit quota/start integration is intentionally deferred to A1
   config/frontend/input validation and before session/job creation.
 - If quota is exhausted, no scenario session or job is created; quota check/exhausted events are
   committed and the API returns standardized `quota_exhausted`.
-- Quota policy is resolved from `product.quota_policy_ref`; the current config contract has no
-  scenario-level quota dimension, so the required dimension is
-  `tenant_id + region + guest_id + product_id + quota_policy_id + period_key`.
+- Quota policy is resolved from `product.quota_policy_ref`; policy config declares `dimension:
+  product` for shared product-wide counters or `dimension: scenario` for scenario-specific
+  counters. The resolved persisted dimension is
+  `tenant_id + region + guest_id + product_id + quota_policy_id + quota_dimension + dimension_key
+  + period_key`.
 - Quota state is independent from workflow success, provider-call ledger rows, PydanticAI
   validation retries, LiteLLM transport attempts, and usage/cost telemetry.
 
@@ -88,3 +90,4 @@ persistence. Full CE-kit quota/start integration is intentionally deferred to A1
 | 2026-07-20 | Implemented guest identity, quota persistence/services, API endpoints, CE guest-id storage helper, scenario-start enforcement, tests, and docs. Canonical quick-check passed with a fresh basetemp override for the known stale pytest temp root; frontend typecheck/build passed through Corepack pnpm. | None. |
 | 2026-07-20 | Follow-up clarified A13 as backend-complete with integration pending, added explicit scenario-start `429` OpenAPI metadata, guest `422` API tests, real parallel HTTP start coverage, a slow stress test, and CE-kit deferred-helper comments. | A16 must replace CE-kit demo/deferred start/quota helpers with the real Platform API client and integration tests. |
 | 2026-07-20 | Added PostgreSQL-backed quota concurrency integration coverage gated by `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` and clarified that SQLite stress tests are not production proof. Docker CLI was present locally, but the daemon was unavailable during this pass. | Run the PostgreSQL test on a Docker-enabled host or against a disposable PostgreSQL test database. |
+| 2026-07-22 | Added explicit quota policy dimensions for product-wide and scenario-specific quota counters, persisted resolved dimension keys, and aligned tests/docs with configurable scope. | Run focused validation and refresh generated docs. |

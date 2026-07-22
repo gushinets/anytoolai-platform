@@ -64,9 +64,11 @@ Quota policy is repo-configured and product-owned:
 - `product.yaml` references `quota_policy_ref`;
 - product-local `quotas.yaml` defines the referenced policy;
 - the current quota contract supports `scenario_run` / `lifetime`;
-- runtime enforcement uses `guest_id + product_id + quota_policy_id + period_key`, scoped by
-  tenant and region;
-- the current config contract does not define a scenario-level quota dimension.
+- each quota policy must declare `dimension: product` or `dimension: scenario`;
+- `product` dimension shares one quota counter across all scenarios for the guest/product;
+- `scenario` dimension creates one quota counter per guest/product/scenario;
+- runtime enforcement uses `guest_id + product_id + quota_policy_id + quota_dimension +
+  dimension_key + period_key`, scoped by tenant and region.
 
 Config validation must run in CI and before runtime startup. Broken references must fail startup.
 Missing owned files and missing explicit fields must fail validation with structured diagnostics.
@@ -146,6 +148,7 @@ and tests.
 - validation retry owner: `pydantic_ai`
 - quota unit: `scenario_run`
 - quota period: `lifetime`
+- quota dimension: `product`, `scenario`
 - scenario session status: `started`, `waiting_for_user`, `running`, `completed`, `failed`, `expired`
 - job status: `created`, `running`, `succeeded`, `failed`, `canceled`
 - handoff status: `created`, `viewed`, `accepted`, `declined`, `consumed`, `expired`, `failed`

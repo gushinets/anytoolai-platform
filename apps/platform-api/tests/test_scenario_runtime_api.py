@@ -356,6 +356,55 @@ def test_start_scenario_consumes_guest_quota_and_returns_exhausted_on_n_plus_one
     assert event_types.count("quota.exhausted") == 1
 
 
+def test_start_scenario_product_quota_dimension_is_shared_across_scenarios(
+    tmp_path: Path,
+) -> None:
+    session_factory = _build_session_factory(tmp_path)
+    app = _create_test_app(session_factory)
+
+    first = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
+            json=_start_payload(),
+            request_id="req_product_quota_first",
+        )
+    )
+    second = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/products/kernel_demo/scenarios/kernel_demo.multi_step_workflow_smoke_v1/start",
+            json=_start_payload(),
+            request_id="req_product_quota_second",
+        )
+    )
+
+    assert first.status_code == HTTPStatus.OK
+    assert second.status_code == HTTPStatus.OK
+
+    with transaction_boundary(session_factory) as session:
+        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+        consumed_events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.event_type == "quota.consumed")
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert usage["quota_dimension"] == "product"
+    assert usage["dimension_key"] == "kernel_demo"
+    assert usage["scenario_id"] is None
+    assert usage["used_count"] == 2
+    assert consumed_events[-1]["properties"]["scenario_id"] == (
+        "kernel_demo.multi_step_workflow_smoke_v1"
+    )
+    assert consumed_events[-1]["properties"]["quota_dimension"] == "product"
+    assert consumed_events[-1]["properties"]["quota_dimension_key"] == "kernel_demo"
+
+
 def test_start_scenario_requires_valid_guest_identity_for_quota_product(
     tmp_path: Path,
 ) -> None:
@@ -467,6 +516,8 @@ def test_parallel_start_scenario_consumes_quota_exactly_to_limit(
     assert job_count == 3
     assert usage["used_count"] == 3
     assert usage["limit_count"] == 3
+    assert usage["quota_dimension"] == "product"
+    assert usage["dimension_key"] == "kernel_demo"
     assert event_types.count("quota.consumed") == 3
     assert event_types.count("quota.exhausted") == 1
 

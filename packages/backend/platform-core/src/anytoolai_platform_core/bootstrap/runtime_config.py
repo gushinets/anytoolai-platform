@@ -40,6 +40,7 @@ class RuntimeQuotaSummary:
     unit: str
     limit_count: int
     period: str
+    dimension: str
 
 
 @dataclass(frozen=True)
@@ -140,6 +141,7 @@ def _build_quota_summary(
         unit=_safe_value(quota_policy.unit),
         limit_count=quota_policy.limit_count,
         period=_safe_value(quota_policy.period),
+        dimension=_safe_value(quota_policy.dimension),
     )
 
 

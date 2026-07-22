@@ -33,3 +33,8 @@ Running `python scripts/agent/runner.py generate-docs --check` during an A13 rev
 Python path could import the repo package but lacked `yaml`, causing `ModuleNotFoundError`.
 Use the project environment/`uv run` for generated-doc checks or make the runner self-select the
 same dependency-managed interpreter as the canonical checks.
+## 2026-07-22 12:33 - GPT-5 Codex - Windows
+
+Parallel PowerShell file reads through `multi_tool_use.parallel` → most `shell_command` calls failed
+with `windows sandbox: CreateProcessWithLogonW failed: 1056`. Retrying the reads as smaller
+individual/limited parallel batches worked; likely transient Windows sandbox process/session state.

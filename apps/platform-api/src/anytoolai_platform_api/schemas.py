@@ -39,6 +39,7 @@ class RuntimeQuotaSummaryResponse(BaseModel):
     unit: str
     limit_count: int
     period: str
+    dimension: str
 
 
 class RuntimeConfigResponse(BaseModel):
@@ -65,6 +66,9 @@ class QuotaStateResponse(BaseModel):
     guest_id: str
     product_id: str
     quota_policy_id: str
+    quota_dimension: str
+    dimension_key: str
+    scenario_id: str | None = None
     unit: str
     period: str
     limit_count: int

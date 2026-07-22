@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from anytoolai_platform_core.common.time import utc_now
-from anytoolai_platform_core.quotas.models import QuotaUsageRecord
+from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaUsageRecord
 from anytoolai_platform_core.storage.db import guest_quota_usage_table
 
 EXPECTED_USAGE_DIMENSION_CONSTRAINT = "uq_guest_quota_usage_dimension"
@@ -17,6 +17,8 @@ SQLITE_USAGE_DIMENSION_COLUMNS = (
     "guest_id",
     "product_id",
     "quota_policy_id",
+    "quota_dimension",
+    "dimension_key",
     "period_key",
 )
 
@@ -28,6 +30,8 @@ def _usage_dimension_filters(
     guest_id: str,
     product_id: str,
     quota_policy_id: str,
+    quota_dimension: QuotaDimension,
+    dimension_key: str,
     period_key: str,
 ) -> tuple[sa.ColumnElement[bool], ...]:
     return (
@@ -36,6 +40,8 @@ def _usage_dimension_filters(
         guest_quota_usage_table.c.guest_id == guest_id,
         guest_quota_usage_table.c.product_id == product_id,
         guest_quota_usage_table.c.quota_policy_id == quota_policy_id,
+        guest_quota_usage_table.c.quota_dimension == quota_dimension.value,
+        guest_quota_usage_table.c.dimension_key == dimension_key,
         guest_quota_usage_table.c.period_key == period_key,
     )
 
@@ -48,6 +54,12 @@ def _require_stored_usage(
     if stored is None:
         raise RuntimeError(f"quota usage round-trip failed after {operation}: {record_id}")
     return stored
+
+
+def _record_from_row(row: sa.RowMapping) -> QuotaUsageRecord:
+    data = dict(row)
+    data["quota_dimension"] = QuotaDimension(data["quota_dimension"])
+    return QuotaUsageRecord(**data)
 
 
 def _is_expected_usage_dimension_race(error: IntegrityError) -> bool:
@@ -80,7 +92,7 @@ class QuotaUsageRepository:
             .mappings()
             .one_or_none()
         )
-        return None if row is None else QuotaUsageRecord(**dict(row))
+        return None if row is None else _record_from_row(row)
 
     def get_by_dimension(
         self,
@@ -90,6 +102,8 @@ class QuotaUsageRepository:
         guest_id: str,
         product_id: str,
         quota_policy_id: str,
+        quota_dimension: QuotaDimension,
+        dimension_key: str,
         period_key: str,
     ) -> QuotaUsageRecord | None:
         row = (
@@ -101,6 +115,8 @@ class QuotaUsageRepository:
                         guest_id=guest_id,
                         product_id=product_id,
                         quota_policy_id=quota_policy_id,
+                        quota_dimension=quota_dimension,
+                        dimension_key=dimension_key,
                         period_key=period_key,
                     )
                 )
@@ -108,7 +124,7 @@ class QuotaUsageRepository:
             .mappings()
             .one_or_none()
         )
-        return None if row is None else QuotaUsageRecord(**dict(row))
+        return None if row is None else _record_from_row(row)
 
     def ensure_usage(
         self,
@@ -118,6 +134,9 @@ class QuotaUsageRepository:
         guest_id: str,
         product_id: str,
         quota_policy_id: str,
+        quota_dimension: QuotaDimension,
+        dimension_key: str,
+        scenario_id: str | None,
         period_key: str,
         limit_count: int,
         metadata: dict[str, object] | None = None,
@@ -128,6 +147,8 @@ class QuotaUsageRepository:
             guest_id=guest_id,
             product_id=product_id,
             quota_policy_id=quota_policy_id,
+            quota_dimension=quota_dimension,
+            dimension_key=dimension_key,
             period_key=period_key,
         )
         if existing is not None:
@@ -139,6 +160,9 @@ class QuotaUsageRepository:
             guest_id=guest_id,
             product_id=product_id,
             quota_policy_id=quota_policy_id,
+            quota_dimension=quota_dimension,
+            dimension_key=dimension_key,
+            scenario_id=scenario_id,
             period_key=period_key,
             limit_count=limit_count,
             metadata=dict(metadata or {}),
@@ -159,6 +183,8 @@ class QuotaUsageRepository:
             guest_id=guest_id,
             product_id=product_id,
             quota_policy_id=quota_policy_id,
+            quota_dimension=quota_dimension,
+            dimension_key=dimension_key,
             period_key=period_key,
         )
         return _require_stored_usage(stored, record.id, "ensure")

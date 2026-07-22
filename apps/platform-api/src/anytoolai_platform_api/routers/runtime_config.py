@@ -109,6 +109,7 @@ RUNTIME_CONFIG_EXAMPLE = {
         "unit": "scenario_run",
         "limit_count": 3,
         "period": "lifetime",
+        "dimension": "product",
     },
     "allowed_ui_capabilities": [
         "capture_email",

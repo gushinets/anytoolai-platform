@@ -13,6 +13,7 @@ Rules:
 
 - quota enforcement is backend-owned;
 - check quota before accepting a scenario start;
+- resolve quota scope from the repo-configured quota policy dimension;
 - consume quota on accepted scenario start, in the same transaction that creates the started
   scenario session and linked created job;
 - do not consume quota on frontend clicks or intent;
@@ -41,6 +42,9 @@ API behavior:
 - the rejected start is not visible as a half-created session or job to the frontend;
 - missing guest identity for a quota-protected product returns frontend-safe `422`;
 - unknown guest identity for a quota-protected product returns frontend-safe `404`.
+- `GET /v1/products/{product_id}/quota?guest_id={guest_id}` returns product-wide quota state for
+  product-dimension policies; scenario-dimension policies require `scenario_id` so the backend can
+  identify the counter.
 
 Concurrency proof:
 
@@ -49,14 +53,23 @@ Concurrency proof:
 - `apps/platform-api/tests/test_quota_concurrency_postgresql.py` is the PostgreSQL-backed
   integration check for concurrent accepted starts and `N+1` exhaustion behavior.
 
-The quota dimension currently supported by the config contract is:
+Quota policy config owns the quota dimension. Supported values:
+
+- `product`: one product-wide quota counter shared by all scenarios under the product;
+- `scenario`: one quota counter per `guest_id + product_id + scenario_id`.
+
+The persisted quota uniqueness path is:
 
 ```text
-tenant_id + region + guest_id + product_id + quota_policy_id + period_key
+tenant_id + region + guest_id + product_id + quota_policy_id + quota_dimension + dimension_key + period_key
 ```
 
-`product.quota_policy_ref` resolves the quota policy from repo config. The current config contract
-does not expose a scenario-level quota dimension.
+For product-wide policies, `dimension_key = product_id` and `scenario_id` is not persisted on the
+usage row. For scenario-specific policies, `dimension_key = scenario_id` and `scenario_id` is
+persisted on the usage row. Quota events include `quota_dimension` and `quota_dimension_key`; for
+scenario-specific policies they also include `quota_scenario_id`.
+
+`product.quota_policy_ref` resolves the quota policy from repo config.
 
 The MVP-A conversion path is:
 

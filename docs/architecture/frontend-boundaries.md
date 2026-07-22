@@ -85,6 +85,8 @@ The A12/A13 public runtime surface is:
 
 For products with `quota_policy_ref`, `guest_id` is required and must be an opaque id created by
 `POST /v1/identity/guest`.
+When a product's quota policy uses `dimension: scenario`, quota state checks also provide
+`scenario_id`; product-wide policies do not require it.
 
 `startScenario()` returns a stable queue-and-return payload:
 

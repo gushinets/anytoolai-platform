@@ -22,6 +22,7 @@ The runtime storage slice lives in these files:
 - `migrations/platform/versions/0001_runtime_tables.py`
 - `migrations/platform/versions/0003_guest_quota.py`
 - `migrations/platform/versions/0005_provider_calls_error_message_safe.py`
+- `migrations/platform/versions/0007_guest_quota_dimension.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/db.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/transactions.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/scenarios/repository.py`
@@ -58,6 +59,8 @@ For the Provider Gateway ADR-0007 realignment:
 - `0006_event_log_provider_policy_ref_compat.py` renames the old
   `platform.event_log.provider_policy_id` column to `provider_policy_ref` for databases already
   upgraded through the previous chain
+- `0007_guest_quota_dimension.py` adds policy-driven quota dimension fields for databases already
+  upgraded through the original A13 guest quota migration
 
 This keeps fresh installs and already-upgraded databases on the same final schema.
 
@@ -490,6 +493,9 @@ Key columns:
 - `guest_id`
 - `product_id`
 - `quota_policy_id`
+- `quota_dimension`
+- `dimension_key`
+- `scenario_id` nullable
 - `period_key`
 - `limit_count`
 - `used_count`
@@ -498,8 +504,12 @@ Key columns:
 The unique runtime dimension is:
 
 ```text
-tenant_id + region + guest_id + product_id + quota_policy_id + period_key
+tenant_id + region + guest_id + product_id + quota_policy_id + quota_dimension + dimension_key + period_key
 ```
+
+For product-wide policies, `quota_dimension = product`, `dimension_key = product_id`, and
+`scenario_id` is null. For scenario-specific policies, `quota_dimension = scenario`,
+`dimension_key = scenario_id`, and `scenario_id` stores the scoped scenario.
 
 Quota consumption uses a conditional database update:
 

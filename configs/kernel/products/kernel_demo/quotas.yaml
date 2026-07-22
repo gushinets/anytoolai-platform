@@ -3,3 +3,4 @@ quota_policies:
     unit: scenario_run
     limit_count: 3
     period: lifetime
+    dimension: product

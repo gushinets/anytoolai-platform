@@ -38,6 +38,9 @@ from anytoolai_platform_core.providers.models import (
     StructuredOutputMode as CoreStructuredOutputMode,
 )
 from anytoolai_platform_core.quotas.models import (
+    QuotaDimension as CoreQuotaDimension,
+)
+from anytoolai_platform_core.quotas.models import (
     QuotaPeriod as CoreQuotaPeriod,
 )
 from anytoolai_platform_core.quotas.models import (
@@ -74,6 +77,7 @@ from anytoolai_platform_sdk.contracts import (
     ProductDefinition,
     PromptRef,
     ProviderPolicy,
+    QuotaDimension,
     QuotaPeriod,
     QuotaPolicy,
     QuotaUnit,
@@ -128,6 +132,7 @@ def enum_values(enum_type: type[StrEnum]) -> set[str]:
         (FrontendType, CoreFrontendType),
         (HandoffStatus, CoreHandoffStatus),
         (JobStatus, CoreJobStatus),
+        (QuotaDimension, CoreQuotaDimension),
         (QuotaPeriod, CoreQuotaPeriod),
         (QuotaUnit, CoreQuotaUnit),
         (ScenarioSessionStatus, CoreScenarioSessionStatus),

@@ -34,6 +34,9 @@ QUOTA_RESPONSE_EXAMPLE = {
     "guest_id": "guest_123",
     "product_id": "kernel_demo",
     "quota_policy_id": "kernel_demo.guest_quota_v1",
+    "quota_dimension": "product",
+    "dimension_key": "kernel_demo",
+    "scenario_id": None,
     "unit": "scenario_run",
     "period": "lifetime",
     "limit_count": 3,
@@ -87,6 +90,7 @@ def get_product_quota(
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
+    scenario_id: Annotated[str | None, Query(min_length=1)] = None,
 ) -> QuotaStateResponse:
     with transaction_boundary(session_factory) as session:
         state = _wrap_platform_errors(
@@ -95,6 +99,7 @@ def get_product_quota(
                 region=settings.default_region,
                 product_id=product_id,
                 guest_id=guest_id,
+                scenario_id=scenario_id,
                 emit_event=False,
                 persist_usage=False,
             )
@@ -128,6 +133,9 @@ def _quota_state_payload(state: QuotaState) -> dict[str, object]:
         "guest_id": state.guest_id,
         "product_id": state.product_id,
         "quota_policy_id": state.quota_policy_id,
+        "quota_dimension": state.quota_dimension.value,
+        "dimension_key": state.dimension_key,
+        "scenario_id": state.scenario_id,
         "unit": state.unit.value,
         "period": state.period.value,
         "limit_count": state.limit_count,
@@ -145,6 +153,8 @@ def _status_code_for_platform_error(error: PlatformError) -> int:
     }:
         return 404
     if error.code == "guest_identity_required":
+        return 422
+    if error.code == "quota_dimension_required":
         return 422
     if error.code == "quota_exhausted":
         return 429

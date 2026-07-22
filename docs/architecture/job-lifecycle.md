@@ -66,9 +66,11 @@ standardized `quota_exhausted` with HTTP `429`. Missing guest identity for a quo
 product returns HTTP `422`; an unknown guest identity returns HTTP `404`. Both are rejected before
 quota consumption, session creation, or job creation.
 
-Concurrent accepted starts for the same guest/product quota dimension are guarded by the quota usage
-row's unique dimension and conditional `used_count < limit_count` update. Only the first `N` starts
-commit sessions/jobs and `quota.consumed`; `N+1` returns `429 quota_exhausted`.
+Concurrent accepted starts for the same configured guest/product quota dimension are guarded by the
+quota usage row's unique dimension and conditional `used_count < limit_count` update. Product-wide
+policies share one counter across product scenarios; scenario-specific policies use separate
+counters per scenario. Only the first `N` starts for that resolved dimension commit sessions/jobs
+and `quota.consumed`; `N+1` returns `429 quota_exhausted`.
 
 If a pre-claim job already has an invalid `scenario_session_id` link or mismatched runtime
 dimensions, the worker terminalizes that poison job as `failed` with a safe integrity error instead

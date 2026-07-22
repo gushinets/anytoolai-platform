@@ -55,6 +55,9 @@ def upgrade() -> None:
         sa.Column("guest_id", sa.String(length=128), nullable=False),
         sa.Column("product_id", sa.String(length=128), nullable=False),
         sa.Column("quota_policy_id", sa.String(length=128), nullable=False),
+        sa.Column("quota_dimension", sa.String(length=64), nullable=False),
+        sa.Column("dimension_key", sa.String(length=128), nullable=False),
+        sa.Column("scenario_id", sa.String(length=128)),
         sa.Column("period_key", sa.String(length=128), nullable=False),
         sa.Column("limit_count", sa.Integer(), nullable=False),
         sa.Column("used_count", sa.Integer(), nullable=False),
@@ -74,6 +77,8 @@ def upgrade() -> None:
             "guest_id",
             "product_id",
             "quota_policy_id",
+            "quota_dimension",
+            "dimension_key",
             "period_key",
             name="uq_guest_quota_usage_dimension",
         ),
@@ -83,6 +88,12 @@ def upgrade() -> None:
         "ix_guest_quota_usage_guest_product",
         "guest_quota_usage",
         ["guest_id", "product_id"],
+        schema=PLATFORM_SCHEMA,
+    )
+    op.create_index(
+        "ix_guest_quota_usage_dimension",
+        "guest_quota_usage",
+        ["quota_dimension", "dimension_key"],
         schema=PLATFORM_SCHEMA,
     )
     op.create_index(

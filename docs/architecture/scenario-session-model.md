@@ -8,6 +8,8 @@ passes product, scenario, frontend, input, workflow, and guest quota validation,
 in the same transaction as session/job creation. The endpoint is therefore the ownership boundary
 for backend quota enforcement, initial session creation, durable session input, and the first
 frontend-safe polling response.
+The quota policy decides whether the consumed counter is product-wide or specific to the scenario
+being started.
 
 Scenario session stores:
 

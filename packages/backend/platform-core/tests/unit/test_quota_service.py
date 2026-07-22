@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -8,10 +9,12 @@ import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
+from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.identity.service import GuestIdentityService
+from anytoolai_platform_core.quotas.models import QuotaDimension
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
 from anytoolai_platform_core.quotas.service import GuestQuotaService, QuotaExhaustedError
 from anytoolai_platform_core.storage.db import event_log_table, guest_quota_usage_table
@@ -78,12 +81,29 @@ def _create_guest(
     return guest.id
 
 
-def _quota_service(session: sa.orm.Session) -> GuestQuotaService:
+def _quota_service(
+    session: sa.orm.Session,
+    *,
+    registry: ConfigRegistry | None = None,
+) -> GuestQuotaService:
     return GuestQuotaService(
-        config_registry=build_config_registry(CONFIG_ROOT),
+        config_registry=registry or build_config_registry(CONFIG_ROOT),
         quota_repository=QuotaUsageRepository(session),
         guest_repository=GuestIdentityRepository(session),
         event_emitter=EventEmitter(EventLogRepository(session)),
+    )
+
+
+def _registry_with_quota_dimension(dimension: QuotaDimension) -> ConfigRegistry:
+    registry = build_config_registry(CONFIG_ROOT)
+    policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
+    assert policy is not None
+    return replace(
+        registry,
+        quotas={
+            **dict(registry.quotas),
+            policy.quota_policy_id: replace(policy, dimension=dimension),
+        },
     )
 
 
@@ -126,6 +146,128 @@ def test_guest_create_and_quota_check_do_not_consume(
     assert second.remaining_count == 3
     assert event_types.count("guest.created") == 1
     assert event_types.count("quota.checked") == 2
+
+
+def test_product_dimension_shares_quota_across_scenarios(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        guest_id = _create_guest(session)
+        service = _quota_service(session)
+
+        first = service.consume_for_accepted_start(
+            tenant_id="anytoolai",
+            region="default",
+            product_id="kernel_demo",
+            frontend_id="kernel_demo_ce",
+            guest_id=guest_id,
+            scenario_id="kernel_demo.single_action_smoke_v1",
+        )
+        second = service.consume_for_accepted_start(
+            tenant_id="anytoolai",
+            region="default",
+            product_id="kernel_demo",
+            frontend_id="kernel_demo_ce",
+            guest_id=guest_id,
+            scenario_id="kernel_demo.multi_step_workflow_smoke_v1",
+        )
+        usages = list(session.execute(sa.select(guest_quota_usage_table)).mappings())
+        consumed_events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.event_type == "quota.consumed")
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert first is not None
+    assert second is not None
+    assert first.quota_dimension is QuotaDimension.product
+    assert second.quota_dimension is QuotaDimension.product
+    assert first.dimension_key == "kernel_demo"
+    assert second.dimension_key == "kernel_demo"
+    assert len(usages) == 1
+    assert usages[0]["quota_dimension"] == "product"
+    assert usages[0]["dimension_key"] == "kernel_demo"
+    assert usages[0]["scenario_id"] is None
+    assert usages[0]["used_count"] == 2
+    assert consumed_events[-1]["properties"]["scenario_id"] == (
+        "kernel_demo.multi_step_workflow_smoke_v1"
+    )
+    assert consumed_events[-1]["properties"]["quota_dimension"] == "product"
+    assert consumed_events[-1]["properties"]["quota_dimension_key"] == "kernel_demo"
+
+
+def test_scenario_dimension_uses_independent_counters_and_events(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    registry = _registry_with_quota_dimension(QuotaDimension.scenario)
+    first_scenario_id = "kernel_demo.single_action_smoke_v1"
+    second_scenario_id = "kernel_demo.multi_step_workflow_smoke_v1"
+
+    with transaction_boundary(session_factory) as session:
+        guest_id = _create_guest(session)
+        service = _quota_service(session, registry=registry)
+
+        first_scenario_states = [
+            service.consume_for_accepted_start(
+                tenant_id="anytoolai",
+                region="default",
+                product_id="kernel_demo",
+                frontend_id="kernel_demo_ce",
+                guest_id=guest_id,
+                scenario_id=first_scenario_id,
+            )
+            for _ in range(3)
+        ]
+        with pytest.raises(QuotaExhaustedError):
+            service.consume_for_accepted_start(
+                tenant_id="anytoolai",
+                region="default",
+                product_id="kernel_demo",
+                frontend_id="kernel_demo_ce",
+                guest_id=guest_id,
+                scenario_id=first_scenario_id,
+            )
+        second_scenario_state = service.consume_for_accepted_start(
+            tenant_id="anytoolai",
+            region="default",
+            product_id="kernel_demo",
+            frontend_id="kernel_demo_ce",
+            guest_id=guest_id,
+            scenario_id=second_scenario_id,
+        )
+        usages = {
+            row["scenario_id"]: row
+            for row in session.execute(sa.select(guest_quota_usage_table)).mappings()
+        }
+        consumed_event = (
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.event_type == "quota.consumed")
+                .order_by(event_log_table.c.timestamp.desc(), event_log_table.c.event_id.desc())
+            )
+            .mappings()
+            .first()
+        )
+
+    assert [state.used_count for state in first_scenario_states if state is not None] == [
+        1,
+        2,
+        3,
+    ]
+    assert second_scenario_state is not None
+    assert second_scenario_state.used_count == 1
+    assert second_scenario_state.quota_dimension is QuotaDimension.scenario
+    assert second_scenario_state.dimension_key == second_scenario_id
+    assert usages[first_scenario_id]["used_count"] == 3
+    assert usages[second_scenario_id]["used_count"] == 1
+    assert usages[first_scenario_id]["dimension_key"] == first_scenario_id
+    assert usages[second_scenario_id]["dimension_key"] == second_scenario_id
+    assert consumed_event is not None
+    assert consumed_event["properties"]["quota_dimension"] == "scenario"
+    assert consumed_event["properties"]["quota_dimension_key"] == second_scenario_id
+    assert consumed_event["properties"]["quota_scenario_id"] == second_scenario_id
 
 
 def test_quota_check_can_be_read_only_without_usage_or_events(
@@ -209,6 +351,9 @@ def test_quota_conditional_consume_blocks_stale_concurrent_read(
             guest_id=guest_id,
             product_id="kernel_demo",
             quota_policy_id="kernel_demo.guest_quota_v1",
+            quota_dimension=QuotaDimension.product,
+            dimension_key="kernel_demo",
+            scenario_id=None,
             period_key="lifetime",
             limit_count=1,
         )

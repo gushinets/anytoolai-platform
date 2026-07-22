@@ -105,6 +105,9 @@ Definitions remain in repository configuration; these tables store runtime state
 | guest_id | VARCHAR(128) | no |
 | product_id | VARCHAR(128) | no |
 | quota_policy_id | VARCHAR(128) | no |
+| quota_dimension | VARCHAR(64) | no |
+| dimension_key | VARCHAR(128) | no |
+| scenario_id | VARCHAR(128) | yes |
 | period_key | VARCHAR(128) | no |
 | limit_count | INTEGER | no |
 | used_count | INTEGER | no |

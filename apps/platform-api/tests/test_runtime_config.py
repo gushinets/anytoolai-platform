@@ -66,6 +66,7 @@ def test_runtime_config_returns_frontend_safe_metadata() -> None:
         "unit": "scenario_run",
         "limit_count": EXPECTED_QUOTA_LIMIT,
         "period": "lifetime",
+        "dimension": "product",
     }
     assert {
         "capture_email",

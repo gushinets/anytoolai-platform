@@ -82,9 +82,11 @@ Other taxonomy groups remain part of the platform contract even when their concr
 slice lands later.
 
 For A13, `quota.consumed` is emitted only for backend-accepted scenario starts. `quota.exhausted`
-is emitted when the backend rejects a scenario start because the guest/product quota is exhausted.
-These events do not depend on frontend clicks, workflow success, provider calls, validation retries,
-transport retries, PydanticAI telemetry, or LiteLLM telemetry.
+is emitted when the backend rejects a scenario start because the configured guest quota dimension is
+exhausted. Quota events include `quota_dimension` and `quota_dimension_key`; scenario-dimension
+quota events also include `quota_scenario_id`. These events do not depend on frontend clicks,
+workflow success, provider calls, validation retries, transport retries, PydanticAI telemetry, or
+LiteLLM telemetry.
 
 For provider events, the event log must persist deterministic correlation to
 `platform.provider_calls` through `provider_call_id`, `action_run_id`, `provider_policy_ref`,

@@ -17,6 +17,7 @@ from anytoolai_platform_core.identity.models import GuestIdentityRecord
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.models import ProviderCallRecord, ProviderCallStatus
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
+from anytoolai_platform_core.quotas.models import QuotaDimension
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
 from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionRecord,
@@ -363,6 +364,7 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "ix_artifacts_job_id",
         "ix_guest_identities_tenant_region",
         "ix_guest_quota_usage_guest_product",
+        "ix_guest_quota_usage_dimension",
         "ix_jobs_status",
         "ix_event_log_action_run_id",
         "ix_event_log_provider_call_id",
@@ -372,6 +374,9 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "guest_id",
         "product_id",
         "quota_policy_id",
+        "quota_dimension",
+        "dimension_key",
+        "scenario_id",
         "period_key",
         "limit_count",
         "used_count",
@@ -1022,6 +1027,9 @@ def test_quota_usage_repository_ensures_and_consumes_conditionally(
             guest_id=guest.id,
             product_id="kernel_demo",
             quota_policy_id="kernel_demo.guest_quota_v1",
+            quota_dimension=QuotaDimension.product,
+            dimension_key="kernel_demo",
+            scenario_id=None,
             period_key="lifetime",
             limit_count=1,
         )
@@ -1032,6 +1040,9 @@ def test_quota_usage_repository_ensures_and_consumes_conditionally(
             guest_id=guest.id,
             product_id="kernel_demo",
             quota_policy_id="kernel_demo.guest_quota_v1",
+            quota_dimension=QuotaDimension.product,
+            dimension_key="kernel_demo",
+            scenario_id=None,
             period_key="lifetime",
             limit_count=1,
         )
@@ -1042,6 +1053,56 @@ def test_quota_usage_repository_ensures_and_consumes_conditionally(
     assert consumed is not None
     assert consumed.used_count == 1
     assert exhausted is None
+
+
+def test_quota_usage_repository_keys_usage_by_configured_dimension(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        guest = GuestIdentityRepository(session).create(make_guest_identity())
+        repository = QuotaUsageRepository(session)
+
+        first = repository.ensure_usage(
+            tenant_id=guest.tenant_id,
+            region=guest.region,
+            guest_id=guest.id,
+            product_id="kernel_demo",
+            quota_policy_id="kernel_demo.guest_quota_v1",
+            quota_dimension=QuotaDimension.scenario,
+            dimension_key="kernel_demo.single_action_smoke_v1",
+            scenario_id="kernel_demo.single_action_smoke_v1",
+            period_key="lifetime",
+            limit_count=1,
+        )
+        repeated = repository.ensure_usage(
+            tenant_id=guest.tenant_id,
+            region=guest.region,
+            guest_id=guest.id,
+            product_id="kernel_demo",
+            quota_policy_id="kernel_demo.guest_quota_v1",
+            quota_dimension=QuotaDimension.scenario,
+            dimension_key="kernel_demo.single_action_smoke_v1",
+            scenario_id="kernel_demo.single_action_smoke_v1",
+            period_key="lifetime",
+            limit_count=1,
+        )
+        second = repository.ensure_usage(
+            tenant_id=guest.tenant_id,
+            region=guest.region,
+            guest_id=guest.id,
+            product_id="kernel_demo",
+            quota_policy_id="kernel_demo.guest_quota_v1",
+            quota_dimension=QuotaDimension.scenario,
+            dimension_key="kernel_demo.multi_step_workflow_smoke_v1",
+            scenario_id="kernel_demo.multi_step_workflow_smoke_v1",
+            period_key="lifetime",
+            limit_count=1,
+        )
+
+    assert repeated.id == first.id
+    assert second.id != first.id
+    assert first.quota_dimension is QuotaDimension.scenario
+    assert second.dimension_key == "kernel_demo.multi_step_workflow_smoke_v1"
 
 
 def test_quota_usage_repository_reraises_unexpected_integrity_errors(
@@ -1057,6 +1118,9 @@ def test_quota_usage_repository_reraises_unexpected_integrity_errors(
                 guest_id=guest.id,
                 product_id="kernel_demo",
                 quota_policy_id="kernel_demo.guest_quota_v1",
+                quota_dimension=QuotaDimension.product,
+                dimension_key="kernel_demo",
+                scenario_id=None,
                 period_key="lifetime",
                 limit_count=-1,
             )
