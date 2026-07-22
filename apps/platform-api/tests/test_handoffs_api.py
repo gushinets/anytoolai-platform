@@ -19,8 +19,10 @@ from anytoolai_platform_core.scenarios.repository import ScenarioSessionReposito
 from anytoolai_platform_core.storage.db import (
     action_runs_table,
     event_log_table,
+    guest_quota_usage_table,
     product_handoffs_table,
     provider_calls_table,
+    scenario_sessions_table,
 )
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
@@ -249,6 +251,93 @@ def test_handoff_api_persists_failed_acceptance_and_openapi_contract(tmp_path: P
     assert "/v1/handoffs/{handoff_token}" in paths
     assert "/v1/handoffs/{handoff_token}/accept" in paths
     assert "/v1/handoffs/{handoff_token}/decline" in paths
+
+
+def test_immediate_handoff_quota_exhaustion_is_durable_and_safe(tmp_path: Path) -> None:
+    factory = _build_session_factory(tmp_path)
+    app = _create_test_app(factory)
+    registry = app.state.runtime.config_registry
+    policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
+    assert policy is not None
+    app.state.runtime = replace(
+        app.state.runtime,
+        config_registry=replace(
+            registry,
+            quotas={
+                **dict(registry.quotas),
+                policy.quota_policy_id: replace(policy, limit_count=0),
+            },
+        ),
+    )
+    with transaction_boundary(factory) as session:
+        source_id, artifact_id = _seed_source(session)
+
+    created = _create(app, source_id, artifact_id).json()
+    rejected = asyncio.run(
+        _request(
+            app,
+            "POST",
+            f"/v1/handoffs/{created['handoff_token']}/accept",
+            {},
+        )
+    )
+
+    assert rejected.status_code == HTTPStatus.TOO_MANY_REQUESTS
+    assert rejected.json() == {
+        "error": {
+            "code": "quota_exhausted",
+            "message": "Guest quota exhausted.",
+            "request_id": "req_handoff",
+        }
+    }
+
+    with transaction_boundary(factory) as session:
+        handoff = (
+            session.execute(
+                sa.select(product_handoffs_table).where(
+                    product_handoffs_table.c.id == created["handoff_id"]
+                )
+            )
+            .mappings()
+            .one()
+        )
+        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+        quota_events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.handoff_id == created["handoff_id"])
+                .where(event_log_table.c.event_type.like("quota.%"))
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+        linked_target_count = session.execute(
+            sa.select(sa.func.count())
+            .select_from(scenario_sessions_table)
+            .where(scenario_sessions_table.c.parent_scenario_session_id == source_id)
+        ).scalar_one()
+        handoff_event_types = list(
+            session.execute(
+                sa.select(event_log_table.c.event_type).where(
+                    event_log_table.c.handoff_id == created["handoff_id"]
+                )
+            ).scalars()
+        )
+
+    assert handoff["status"] == "failed"
+    assert handoff["error_code"] == "quota_exhausted"
+    assert handoff["target_scenario_session_id"] is None
+    assert handoff["target_job_id"] is None
+    assert usage["limit_count"] == 0
+    assert usage["used_count"] == 0
+    assert [event["event_type"] for event in quota_events] == [
+        "quota.checked",
+        "quota.exhausted",
+    ]
+    assert quota_events[-1]["error_code"] == "quota_exhausted"
+    assert quota_events[-1]["properties"]["exhausted"] is True
+    assert linked_target_count == 0
+    assert "handoff.accepted" not in handoff_event_types
+    assert handoff_event_types.count("handoff.failed") == 1
 
 
 def test_immediate_handoff_worker_keeps_target_runtime_lineage(tmp_path: Path) -> None:

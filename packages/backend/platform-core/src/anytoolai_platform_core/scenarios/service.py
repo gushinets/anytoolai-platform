@@ -192,6 +192,7 @@ class ScenarioRuntimeService:
                 scenario_id=scenario.scenario_id,
                 scenario_session_id=scenario_session_id,
                 scenario_chain_id=scenario_chain_id,
+                handoff_id=handoff_id,
             )
 
         session_record = ScenarioSessionRecord(

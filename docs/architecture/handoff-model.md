@@ -135,6 +135,12 @@ If target orchestration fails after acceptance is claimed, that transaction roll
 transaction changes the original pre-consent row to `failed`, stores a bounded safe error code, and
 emits `handoff.failed`. Acceptance conflicts are not treated as orchestration failures.
 
+Target quota exhaustion follows the same rollback rule, but quota audit state is not discarded.
+The quota service recovers the ensured target quota row plus `quota.checked` and
+`quota.exhausted` after the acceptance rollback, retaining target scenario/session-chain and
+runtime `handoff_id` correlation. The API returns safe `429 quota_exhausted`; no target session,
+job, quota consumption, `handoff.accepted`, or `handoff.consumed` remains durable.
+
 ## API
 
 - `POST /v1/handoffs` creates from a definition, source session, and canonical result artifact.

@@ -112,6 +112,11 @@ be:
 - correlation-preserving across workflow, action, provider, job, and artifact identifiers;
 - idempotent enough not to duplicate events that are already durable.
 
+If immediate handoff acceptance observes target quota exhaustion and then rolls back its accept
+claim, quota recovery must retain one `quota.checked` / `quota.exhausted` pair with the target
+product, frontend, scenario-session/chain, guest, and `handoff_id`. This is the rollback equivalent
+of the ordinary scenario-start path, which commits those same events before returning HTTP 429.
+
 When idempotent recovery encounters an existing deterministic replay-owned event whose timestamp no
 longer fits the causal sequence, recovery may repair that replay-owned timestamp. It must not
 rewrite ordinary non-replay committed events indiscriminately.

@@ -35,6 +35,15 @@ quota consumed
 If quota is exhausted, no scenario session or job is created and the API returns
 `quota_exhausted`.
 
+Immediate handoff acceptance uses the same quota contract. A rejected target start must leave the
+quota usage dimension and the `quota.checked` / `quota.exhausted` audit pair durable, return safe
+HTTP 429, and create no target session or job. Because handoff acceptance has already made a
+conditional accept claim inside its transaction, it cannot commit that transaction the way the
+ordinary scenario-start router does. The quota service therefore registers an exhaustion-only
+rollback recovery callback: after rollback it re-ensures the same usage dimension and re-emits the
+same checked/exhausted pair in an independent transaction. It never consumes quota during recovery.
+The handoff failure transaction then records `failed` with safe `quota_exhausted`.
+
 API behavior:
 
 - `POST /v1/products/{product_id}/scenarios/{scenario_id}/start` returns `429` with

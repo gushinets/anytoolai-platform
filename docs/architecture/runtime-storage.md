@@ -262,9 +262,11 @@ Escaped rollback recovery also lives in `storage.transactions.py`. Recovery call
 explicit rollback phases instead of depending on accidental FIFO callback order. The current
 contract separates:
 
-1. row recovery for runtime tables such as `platform.artifacts`, `platform.provider_calls`,
+1. quota-exhaustion recovery, which re-ensures the rejected target quota dimension and its
+   checked/exhausted audit events without consuming quota;
+2. row recovery for runtime tables such as `platform.artifacts`, `platform.provider_calls`,
    `platform.action_runs`, and `platform.jobs`;
-2. event recovery that backfills only missing `platform.event_log` rows in causal order.
+3. event recovery that backfills only missing `platform.event_log` rows in causal order.
 
 This lets the runtime rebuild durable history after a rollback without introducing a durable
 workflow engine. Recovered rows become the source for replayed timestamps and correlation values,

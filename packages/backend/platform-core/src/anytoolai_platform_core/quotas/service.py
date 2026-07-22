@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sqlalchemy.orm import Session, sessionmaker
+
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
+from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.identity.service import GuestIdentityNotFoundError
 from anytoolai_platform_core.quotas.models import (
@@ -16,6 +19,11 @@ from anytoolai_platform_core.quotas.models import (
     QuotaUsageRecord,
 )
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
+from anytoolai_platform_core.storage.transactions import (
+    RollbackRecoveryPhase,
+    register_rollback_recovery_callback,
+    transaction_boundary,
+)
 
 
 class ProductNotFoundError(PlatformError):
@@ -57,6 +65,21 @@ class ResolvedQuotaDimension:
     quota_dimension: QuotaDimension
     dimension_key: str
     scenario_id: str | None
+
+
+@dataclass(frozen=True)
+class QuotaExhaustionRecovery:
+    tenant_id: str
+    region: str
+    product_id: str
+    frontend_id: str
+    guest_id: str
+    scenario_id: str
+    scenario_session_id: str | None
+    scenario_chain_id: str | None
+    handoff_id: str | None
+    policy: QuotaPolicy
+    dimension: ResolvedQuotaDimension
 
 
 class GuestQuotaService:
@@ -144,6 +167,7 @@ class GuestQuotaService:
         scenario_id: str,
         scenario_session_id: str | None = None,
         scenario_chain_id: str | None = None,
+        handoff_id: str | None = None,
     ) -> QuotaState | None:
         product = self._config_registry.get_product(product_id)
         if product is None:
@@ -180,6 +204,7 @@ class GuestQuotaService:
             "scenario_id": scenario_id,
             "scenario_session_id": scenario_session_id,
             "scenario_chain_id": scenario_chain_id,
+            "handoff_id": handoff_id,
         }
         self._emit_quota_event(
             "quota.checked",
@@ -198,6 +223,21 @@ class GuestQuotaService:
                 error_code="quota_exhausted",
                 **context_kwargs,
             )
+            self._register_exhaustion_recovery(
+                QuotaExhaustionRecovery(
+                    tenant_id=tenant_id,
+                    region=region,
+                    product_id=product_id,
+                    frontend_id=frontend_id,
+                    guest_id=guest_id,
+                    scenario_id=scenario_id,
+                    scenario_session_id=scenario_session_id,
+                    scenario_chain_id=scenario_chain_id,
+                    handoff_id=handoff_id,
+                    policy=policy,
+                    dimension=dimension,
+                )
+            )
             raise QuotaExhaustedError()
 
         consumed_state = _state_from_usage(consumed, policy)
@@ -208,6 +248,20 @@ class GuestQuotaService:
             **context_kwargs,
         )
         return consumed_state
+
+    def _register_exhaustion_recovery(
+        self,
+        recovery: QuotaExhaustionRecovery,
+    ) -> None:
+        register_rollback_recovery_callback(
+            self._quota_repository.session,
+            lambda recovery_session_factory: _recover_quota_exhaustion(
+                recovery_session_factory,
+                config_registry=self._config_registry,
+                recovery=recovery,
+            ),
+            phase=RollbackRecoveryPhase.quota_exhaustion,
+        )
 
     def _require_product_quota_policy(self, product_id: str) -> QuotaPolicy:
         product = self._config_registry.get_product(product_id)
@@ -299,6 +353,7 @@ class GuestQuotaService:
         scenario_id: str | None = None,
         scenario_session_id: str | None = None,
         scenario_chain_id: str | None = None,
+        handoff_id: str | None = None,
         result_status: str | None = None,
         error_code: str | None = None,
     ) -> None:
@@ -331,9 +386,62 @@ class GuestQuotaService:
                 guest_id=state.guest_id,
                 scenario_session_id=scenario_session_id,
                 scenario_chain_id=scenario_chain_id,
+                handoff_id=handoff_id,
             ),
             result_status=result_status,
             properties=properties,
+        )
+
+
+def _recover_quota_exhaustion(
+    recovery_session_factory: sessionmaker[Session],
+    *,
+    config_registry: ConfigRegistry,
+    recovery: QuotaExhaustionRecovery,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as session:
+        quota_repository = QuotaUsageRepository(session)
+        usage = quota_repository.ensure_usage(
+            tenant_id=recovery.tenant_id,
+            region=recovery.region,
+            guest_id=recovery.guest_id,
+            product_id=recovery.product_id,
+            quota_policy_id=recovery.policy.quota_policy_id,
+            quota_dimension=recovery.dimension.quota_dimension,
+            dimension_key=recovery.dimension.dimension_key,
+            scenario_id=recovery.dimension.scenario_id,
+            period_key=_period_key(recovery.policy),
+            limit_count=recovery.policy.limit_count,
+            metadata={
+                "unit": recovery.policy.unit.value,
+                "period": recovery.policy.period.value,
+                "quota_dimension": recovery.dimension.quota_dimension.value,
+                "dimension_key": recovery.dimension.dimension_key,
+            },
+        )
+        state = _state_from_usage(usage, recovery.policy)
+        service = GuestQuotaService(
+            config_registry=config_registry,
+            quota_repository=quota_repository,
+            guest_repository=GuestIdentityRepository(session),
+            event_emitter=EventEmitter(EventLogRepository(session)),
+        )
+        context = {
+            "tenant_id": recovery.tenant_id,
+            "region": recovery.region,
+            "frontend_id": recovery.frontend_id,
+            "scenario_id": recovery.scenario_id,
+            "scenario_session_id": recovery.scenario_session_id,
+            "scenario_chain_id": recovery.scenario_chain_id,
+            "handoff_id": recovery.handoff_id,
+        }
+        service._emit_quota_event("quota.checked", state=state, **context)
+        service._emit_quota_event(
+            "quota.exhausted",
+            state=state,
+            result_status="failed",
+            error_code="quota_exhausted",
+            **context,
         )
 
 

@@ -82,6 +82,10 @@ class QuotaUsageRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    @property
+    def session(self) -> Session:
+        return self._session
+
     def get(self, usage_id: str) -> QuotaUsageRecord | None:
         row = (
             self._session.execute(
