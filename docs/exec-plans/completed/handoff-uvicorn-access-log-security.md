@@ -17,8 +17,8 @@ existing structured, route-template-safe AnytoolAI request log.
 
 ## Research
 
-- The supported API runtime launches Uvicorn from `infra/docker/platform-api.Dockerfile` with
-  default access logging enabled.
+- Before this change, the supported API runtime launched Uvicorn from
+  `infra/docker/platform-api.Dockerfile` with default access logging enabled.
 - Uvicorn logs the raw request target independently of FastAPI middleware.
 - The application middleware already emits structured completion/failure events through
   `_safe_request_path()`, covering all token-bearing preview, accept, and decline routes.
