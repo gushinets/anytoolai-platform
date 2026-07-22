@@ -32,3 +32,20 @@ base temp directory with `PermissionError`. Using repo-local `UV_CACHE_DIR` plus
 Running `python scripts/agent/runner.py generate-docs --check` directly -> the system Python lacked
 `yaml`, while `uv run` also hit the known global cache permission problem. Reusing
 `.quick-check-venv\\Scripts\\python.exe` ran the same generated-doc check successfully.
+## 2026-07-20 23:22 - Codex (GPT-5) - Windows
+
+Running `python scripts/agent/runner.py generate-docs --check` during an A13 review -> the system
+Python path could import the repo package but lacked `yaml`, causing `ModuleNotFoundError`.
+Use the project environment/`uv run` for generated-doc checks or make the runner self-select the
+same dependency-managed interpreter as the canonical checks.
+## 2026-07-22 12:33 - GPT-5 Codex - Windows
+
+Parallel PowerShell file reads through `multi_tool_use.parallel` → most `shell_command` calls failed
+with `windows sandbox: CreateProcessWithLogonW failed: 1056`. Retrying the reads as smaller
+ individual/limited parallel batches worked; likely transient Windows sandbox process/session state.
+
+## 2026-07-22 13:05 - Codex (GPT-5) - Windows
+
+Using `rg` to inspect the checked-out PR during review → `rg.exe` failed with Access Denied under
+the Windows sandbox. PowerShell file reads still worked; investigate the sandbox executable policy or
+provide a repository-approved search fallback.

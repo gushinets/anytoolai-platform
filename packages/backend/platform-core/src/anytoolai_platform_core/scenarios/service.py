@@ -10,6 +10,7 @@ from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.products.models import FrontendDefinition
+from anytoolai_platform_core.quotas.service import GuestQuotaService
 from anytoolai_platform_core.scenarios.checkpoints import (
     FAILED_CHECKPOINT_ID,
     PROCESSING_CHECKPOINT_ID,
@@ -64,12 +65,14 @@ class ScenarioRuntimeService:
         session_service: ScenarioSessionService,
         job_repository: JobRepository,
         event_emitter: EventEmitter,
+        quota_service: GuestQuotaService | None = None,
     ) -> None:
         self._config_registry = config_registry
         self._session_repository = session_repository
         self._session_service = session_service
         self._job_repository = job_repository
         self._event_emitter = event_emitter
+        self._quota_service = quota_service
 
     def start_session(
         self,
@@ -95,6 +98,18 @@ class ScenarioRuntimeService:
             raise LookupError(f"workflow not found: {scenario.workflow_id}")
 
         scenario_session_id = new_id("scenario_session")
+        if self._quota_service is not None:
+            self._quota_service.consume_for_accepted_start(
+                tenant_id=tenant_id,
+                region=region,
+                product_id=product_id,
+                frontend_id=frontend_id,
+                guest_id=guest_id,
+                scenario_id=scenario.scenario_id,
+                scenario_session_id=scenario_session_id,
+                scenario_chain_id=scenario_session_id,
+            )
+
         session_record = ScenarioSessionRecord(
             id=scenario_session_id,
             tenant_id=tenant_id,

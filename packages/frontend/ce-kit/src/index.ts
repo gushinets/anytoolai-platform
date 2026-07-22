@@ -1,19 +1,15 @@
-export type ScenarioStartRequest = {
-  productId: string;
-  scenarioId: string;
-  input: unknown;
-};
-
-export async function createGuestIdentity(): Promise<{ guestId: string }> {
-  return { guestId: "guest_demo" };
-}
+export { createGuestIdentity } from "./identity/guestIdentity";
+export type { GuestIdentity, GuestIdentityOptions } from "./identity/guestIdentity";
+export { getQuota } from "./quota/getQuota";
+export type { QuotaRequest } from "./quota/getQuota";
+export { startScenario } from "./scenarios/startScenario";
+export type {
+  ScenarioStartDemoResponse,
+  ScenarioStartRequest,
+} from "./scenarios/startScenario";
 
 export async function getRuntimeConfig(productId: string): Promise<{ productId: string }> {
   return { productId };
-}
-
-export async function startScenario(_request: ScenarioStartRequest): Promise<{ scenarioSessionId: string }> {
-  return { scenarioSessionId: "ssn_demo" };
 }
 
 export async function pollJob(jobId: string): Promise<{ jobId: string; status: string }> {

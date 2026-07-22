@@ -15,8 +15,14 @@ class QuotaPeriod(StrEnum):
     lifetime = "lifetime"
 
 
+class QuotaDimension(StrEnum):
+    product = "product"
+    scenario = "scenario"
+
+
 class QuotaPolicy(ContractModel):
     quota_policy_id: str
     unit: QuotaUnit
     limit_count: int = Field(gt=0)
     period: QuotaPeriod
+    dimension: QuotaDimension

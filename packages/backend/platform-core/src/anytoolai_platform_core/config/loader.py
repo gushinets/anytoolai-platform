@@ -42,7 +42,12 @@ from anytoolai_platform_core.providers.models import (
     ProviderValidationRetryPolicy,
     StructuredOutputMode,
 )
-from anytoolai_platform_core.quotas.models import QuotaPeriod, QuotaPolicy, QuotaUnit
+from anytoolai_platform_core.quotas.models import (
+    QuotaDimension,
+    QuotaPeriod,
+    QuotaPolicy,
+    QuotaUnit,
+)
 from anytoolai_platform_core.scenarios.models import ScenarioDefinition
 from anytoolai_platform_core.workflows.models import (
     WorkflowDefinition,
@@ -1495,8 +1500,9 @@ class ConfigLoader:
                 unit = quota_data.get("unit")
                 limit_count = quota_data.get("limit_count")
                 period = quota_data.get("period")
+                dimension = quota_data.get("dimension")
 
-                if not all([quota_id, limit_count is not None, unit, period]):
+                if not all([quota_id, limit_count is not None, unit, period, dimension]):
                     raise InvalidConfigShapeError(
                         path,
                         f"Quota policy missing required fields: {quota_data}",
@@ -1528,6 +1534,14 @@ class ConfigLoader:
                         file_path=path,
                         config_id=quota_id,
                         ref_type="period",
+                    ),
+                    dimension=parse_enum_value(
+                        QuotaDimension,
+                        dimension,
+                        field_name="quota dimension",
+                        file_path=path,
+                        config_id=quota_id,
+                        ref_type="dimension",
                     ),
                     metadata={"_file_path": str(path)},
                 )

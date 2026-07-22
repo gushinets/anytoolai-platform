@@ -84,6 +84,9 @@ def test_loader_builds_registry_from_current_tree() -> None:
     )
     assert registry.get_prompt("kernel_demo.extract_structured_fields.v1") is not None
     assert registry.get_provider_policy("default_fake_provider_v1") is not None
+    quota_policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
+    assert quota_policy is not None
+    assert quota_policy.dimension.value == "product"
     assert registry.get_schema("kernel.schemas.extract_input_v1") is not None
     assert registry.get_schema("kernel_demo.generic_text_input_v1") is not None
 
@@ -452,6 +455,26 @@ def test_loader_fails_on_invalid_quota_period(tmp_path: Path) -> None:
         ref_type="period",
         ref_value="daily",
         message_part="quota period",
+    )
+
+
+def test_loader_fails_on_invalid_quota_dimension(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "quotas.yaml"
+    data = _load_yaml(path)
+    data["quota_policies"][0]["dimension"] = "frontend"
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo.guest_quota_v1",
+        ref_type="dimension",
+        ref_value="frontend",
+        message_part="quota dimension",
     )
 
 

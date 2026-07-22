@@ -231,3 +231,29 @@ def test_runtime_env_exports_virtualenv_for_managed_quick_check(monkeypatch, tmp
     env = quick_check.runtime_env()
 
     assert env["VIRTUAL_ENV"] == str(managed_venv)
+
+
+def test_main_excludes_slow_tests_from_fast_pytest_path(monkeypatch) -> None:
+    quick_check = load_quick_check_module()
+    commands: list[list[str]] = []
+
+    monkeypatch.setattr(quick_check, "ensure_virtualenv", lambda: None)
+    monkeypatch.setattr(quick_check, "bootstrap", lambda: 0)
+    monkeypatch.setattr(quick_check.sys, "executable", "/tmp/.quick-check-venv/bin/python")
+    monkeypatch.setattr(
+        quick_check,
+        "run_sequence",
+        lambda sequence: commands.extend(list(command) for command in sequence) or 0,
+    )
+
+    assert quick_check.main() == 0
+
+    pytest_command = commands[-1]
+    assert pytest_command[:5] == [
+        "/tmp/.quick-check-venv/bin/python",
+        "-m",
+        "pytest",
+        "-m",
+        "not slow",
+    ]
+    assert pytest_command[5:] == quick_check.PYTEST_TARGETS
