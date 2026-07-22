@@ -337,14 +337,27 @@ def _handoff_mapping(
     *,
     field_name: str,
     path: Path,
+    config_id: str | None,
+    ref_type: str,
+    ref_value: str,
 ) -> dict[str, str]:
     if not isinstance(value, dict):
-        raise InvalidConfigShapeError(path, f"Handoff {field_name} must be a mapping")
+        raise InvalidConfigShapeError(
+            path,
+            f"Handoff {field_name} must be a mapping",
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=ref_value,
+        )
     normalized: dict[str, str] = {}
     for target, source in value.items():
         if not isinstance(target, str) or not target.strip():
             raise InvalidConfigShapeError(
-                path, f"Handoff {field_name} targets must be non-empty strings"
+                path,
+                f"Handoff {field_name} targets must be non-empty strings",
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value,
             )
         if (
             any(marker in target for marker in ("[", "]", ".."))
@@ -352,18 +365,31 @@ def _handoff_mapping(
             or target.endswith(".")
         ):
             raise InvalidConfigShapeError(
-                path, f"Handoff {field_name} target path is unsupported: {target}"
+                path,
+                f"Handoff {field_name} target path is unsupported: {target}",
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value,
             )
         if not isinstance(source, str) or not source.strip():
             raise InvalidConfigShapeError(
-                path, f"Handoff {field_name} sources must be non-empty strings"
+                path,
+                f"Handoff {field_name} sources must be non-empty strings",
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value,
             )
         if (
-            source != "artifact.content_json" and not source.startswith("artifact.content_json.")
-        ) or any(marker in source for marker in ("[", "]", "..")):
+            (source != "artifact.content_json" and not source.startswith("artifact.content_json."))
+            or any(marker in source for marker in ("[", "]", ".."))
+            or source.endswith(".")
+        ):
             raise InvalidConfigShapeError(
                 path,
                 f"Handoff {field_name} source must use artifact.content_json paths: {source}",
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value,
             )
         normalized[target] = source
     return normalized
@@ -1601,11 +1627,17 @@ class ConfigLoader:
                     handoff_data.get("context_mapping"),
                     field_name="context_mapping",
                     path=path,
+                    config_id=handoff_id,
+                    ref_type="context_mapping",
+                    ref_value=_stringify_config_value(handoff_data.get("context_mapping")),
                 )
                 preview_mapping = _handoff_mapping(
                     handoff_data.get("preview_mapping"),
                     field_name="preview_mapping",
                     path=path,
+                    config_id=handoff_id,
+                    ref_type="preview_mapping",
+                    ref_value=_stringify_config_value(handoff_data.get("preview_mapping")),
                 )
 
                 if not all(

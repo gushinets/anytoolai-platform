@@ -148,6 +148,29 @@ def test_loader_rejects_unsafe_or_broken_handoff_contracts(
     assert message in str(exc_info.value)
 
 
+def test_loader_rejects_trailing_dot_handoff_source_with_identity(
+    tmp_path: Path,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    data = _load_yaml(handoff_path)
+    mapping = {"source_text": "artifact.content_json."}
+    data["handoffs"][0]["context_mapping"] = mapping
+    _write_yaml(handoff_path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=handoff_path,
+        config_id="kernel_demo_source_to_target_v1",
+        ref_type="context_mapping",
+        ref_value='{"source_text": "artifact.content_json."}',
+        message_part="must use artifact.content_json paths",
+    )
+
+
 def test_loader_preserves_provider_policy_yaml_metadata() -> None:
     registry = ConfigLoader(CONFIG_ROOT).load()
 

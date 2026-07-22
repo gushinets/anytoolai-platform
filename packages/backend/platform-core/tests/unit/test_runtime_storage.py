@@ -519,13 +519,62 @@ def test_handoff_compatibility_revision_repairs_database_stamped_at_0007(
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
             command.upgrade(alembic_config, "head")
+            inspector = sa.inspect(connection)
             table_names = set(
                 connection.execute(
                     sa.text("SELECT name FROM platform.sqlite_master WHERE type = 'table'")
                 ).scalars()
             )
+            handoff_columns = {
+                column["name"]
+                for column in inspector.get_columns(
+                    "product_handoffs",
+                    schema="platform",
+                )
+            }
+            handoff_indexes = {
+                index["name"]
+                for index in inspector.get_indexes(
+                    "product_handoffs",
+                    schema="platform",
+                )
+            }
+            handoff_foreign_keys = {
+                foreign_key["name"]
+                for foreign_key in inspector.get_foreign_keys(
+                    "product_handoffs",
+                    schema="platform",
+                )
+            }
 
         assert "product_handoffs" in table_names
+        assert {
+            "id",
+            "handoff_definition_id",
+            "token_hash",
+            "status",
+            "source_scenario_session_id",
+            "source_job_id",
+            "source_artifact_id",
+            "target_scenario_session_id",
+            "target_job_id",
+            "context_payload",
+            "preview_payload",
+            "expires_at",
+        } <= handoff_columns
+        assert {
+            "ix_product_handoffs_definition",
+            "ix_product_handoffs_source_session",
+            "ix_product_handoffs_target_session",
+            "ix_product_handoffs_status_expiry",
+        } <= handoff_indexes
+        assert {
+            "fk_product_handoffs_source_session",
+            "fk_product_handoffs_source_job",
+            "fk_product_handoffs_source_artifact",
+            "fk_product_handoffs_target_session",
+            "fk_product_handoffs_target_job",
+        } == handoff_foreign_keys
     finally:
         engine.dispose()
 

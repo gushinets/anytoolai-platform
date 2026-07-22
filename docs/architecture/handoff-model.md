@@ -75,12 +75,12 @@ The repository has explicit operations rather than a generic status update:
 | `get_by_id` | tenant/region-scoped internal lookup |
 | `get_by_token_hash` | tenant/region-scoped public-flow lookup |
 | `mark_viewed` | atomic `created -> viewed`; repeat is unchanged |
-| `claim_accept` | compare-and-swap from unexpired `created|viewed -> accepted` |
+| `claim_accept` | compare-and-swap from unexpired `created\|viewed -> accepted` |
 | `attach_target` | accepted record and valid target session/job linkage |
-| `decline` | atomic `created|viewed -> declined` |
-| `expire_if_due` | atomic due `created|viewed -> expired` |
+| `decline` | atomic `created\|viewed -> declined` |
+| `expire_if_due` | atomic due `created\|viewed -> expired` |
 | `consume` | `accepted -> consumed` with the matching linked durable job |
-| `mark_failed` | `created|viewed -> failed` after rolled-back orchestration |
+| `mark_failed` | `created\|viewed -> failed` after rolled-back orchestration |
 
 Concurrent or sequential accept calls cannot both claim the record. A repeated accept returns
 `409 handoff_already_accepted` and does not create another target session, job, quota consumption,
