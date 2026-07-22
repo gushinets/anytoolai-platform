@@ -37,4 +37,10 @@ same dependency-managed interpreter as the canonical checks.
 
 Parallel PowerShell file reads through `multi_tool_use.parallel` → most `shell_command` calls failed
 with `windows sandbox: CreateProcessWithLogonW failed: 1056`. Retrying the reads as smaller
-individual/limited parallel batches worked; likely transient Windows sandbox process/session state.
+ individual/limited parallel batches worked; likely transient Windows sandbox process/session state.
+
+## 2026-07-22 13:05 - Codex (GPT-5) - Windows
+
+Using `rg` to inspect the checked-out PR during review → `rg.exe` failed with Access Denied under
+the Windows sandbox. PowerShell file reads still worked; investigate the sandbox executable policy or
+provide a repository-approved search fallback.
