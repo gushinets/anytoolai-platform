@@ -39,6 +39,7 @@ class RuntimeQuotaSummaryResponse(BaseModel):
     unit: str
     limit_count: int
     period: str
+    dimension: str
 
 
 class RuntimeConfigResponse(BaseModel):
@@ -51,6 +52,29 @@ class RuntimeConfigResponse(BaseModel):
     scenarios: list[RuntimeScenarioResponse]
     quota_summary: RuntimeQuotaSummaryResponse | None
     allowed_ui_capabilities: list[str]
+
+
+class GuestIdentityResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    guest_id: str
+
+
+class QuotaStateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    guest_id: str
+    product_id: str
+    quota_policy_id: str
+    quota_dimension: str
+    dimension_key: str
+    scenario_id: str | None = None
+    unit: str
+    period: str
+    limit_count: int
+    used_count: int
+    remaining_count: int
+    exhausted: bool
 
 
 class ScenarioStartRequest(BaseModel):

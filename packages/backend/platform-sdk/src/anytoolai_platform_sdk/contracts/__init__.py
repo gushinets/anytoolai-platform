@@ -19,7 +19,12 @@ from anytoolai_platform_sdk.contracts.provider import (
     ProviderValidationRetryPolicy,
     StructuredOutputMode,
 )
-from anytoolai_platform_sdk.contracts.quota import QuotaPeriod, QuotaPolicy, QuotaUnit
+from anytoolai_platform_sdk.contracts.quota import (
+    QuotaDimension,
+    QuotaPeriod,
+    QuotaPolicy,
+    QuotaUnit,
+)
 from anytoolai_platform_sdk.contracts.scenario import (
     ScenarioDefinition,
     ScenarioSessionStatus,
@@ -47,6 +52,7 @@ __all__ = [
     "ProviderRetryPolicy",
     "ProviderTransportRetryPolicy",
     "ProviderValidationRetryPolicy",
+    "QuotaDimension",
     "QuotaPeriod",
     "QuotaPolicy",
     "QuotaUnit",

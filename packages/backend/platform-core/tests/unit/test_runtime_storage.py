@@ -13,8 +13,12 @@ from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.common.time import utc_now
+from anytoolai_platform_core.identity.models import GuestIdentityRecord
+from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.models import ProviderCallRecord, ProviderCallStatus
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
+from anytoolai_platform_core.quotas.models import QuotaDimension
+from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
 from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionRecord,
     ScenarioSessionStatus,
@@ -176,6 +180,15 @@ def make_artifact(scenario_session_id: str, **overrides: Any) -> ArtifactRecord:
     return ArtifactRecord(**values)
 
 
+def make_guest_identity(**overrides: Any) -> GuestIdentityRecord:
+    values = {
+        "tenant_id": "tenant_demo",
+        "region": "eu-central",
+    }
+    values.update(overrides)
+    return GuestIdentityRecord(**values)
+
+
 def seed_runtime_chain(
     session: sa.orm.Session,
 ) -> tuple[ScenarioSessionRecord, JobRecord, ActionRunRecord]:
@@ -291,6 +304,24 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
                 schema="platform",
             )
         }
+        guest_columns = {
+            column["name"]
+            for column in sa.inspect(connection).get_columns(
+                "guest_identities",
+                schema="platform",
+            )
+        }
+        quota_columns = {
+            column["name"]
+            for column in sa.inspect(connection).get_columns(
+                "guest_quota_usage",
+                schema="platform",
+            )
+        }
+        quota_foreign_keys = sa.inspect(connection).get_foreign_keys(
+            "guest_quota_usage",
+            schema="platform",
+        )
 
     assert {
         "scenario_sessions",
@@ -298,6 +329,8 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "action_runs",
         "provider_calls",
         "artifacts",
+        "guest_identities",
+        "guest_quota_usage",
     }.issubset(table_names)
     assert "created_at" in scenario_session_columns
     assert scenario_session_columns["created_at"]["nullable"] is False
@@ -329,10 +362,81 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "ix_action_runs_job_id",
         "ix_provider_calls_job_id",
         "ix_artifacts_job_id",
+        "ix_guest_identities_tenant_region",
+        "ix_guest_quota_usage_guest_product",
+        "ix_guest_quota_usage_dimension",
         "ix_jobs_status",
         "ix_event_log_action_run_id",
         "ix_event_log_provider_call_id",
     }.issubset(index_names)
+    assert {"id", "tenant_id", "region", "created_at", "last_seen_at", "metadata"} <= guest_columns
+    assert {
+        "guest_id",
+        "product_id",
+        "quota_policy_id",
+        "quota_dimension",
+        "dimension_key",
+        "scenario_id",
+        "period_key",
+        "limit_count",
+        "used_count",
+    } <= quota_columns
+    assert any(
+        foreign_key["referred_table"] == "guest_identities"
+        and foreign_key["constrained_columns"] == ["guest_id"]
+        for foreign_key in quota_foreign_keys
+    )
+
+
+def test_quota_dimension_downgrade_to_0006_preserves_current_0003_schema(
+    tmp_path: Path,
+) -> None:
+    main_db = tmp_path / "runtime-downgrade-main.sqlite3"
+    platform_db = tmp_path / "runtime-downgrade-platform.sqlite3"
+    engine = _build_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+
+    try:
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "head")
+            command.downgrade(alembic_config, "0006")
+            quota_columns = {
+                column["name"]
+                for column in sa.inspect(connection).get_columns(
+                    "guest_quota_usage",
+                    schema="platform",
+                )
+            }
+            index_names = {
+                index["name"]
+                for index in sa.inspect(connection).get_indexes(
+                    "guest_quota_usage",
+                    schema="platform",
+                )
+            }
+            unique_constraints = {
+                constraint["name"]: set(constraint["column_names"])
+                for constraint in sa.inspect(connection).get_unique_constraints(
+                    "guest_quota_usage",
+                    schema="platform",
+                )
+            }
+
+        assert {"quota_dimension", "dimension_key", "scenario_id"} <= quota_columns
+        assert "ix_guest_quota_usage_dimension" in index_names
+        assert unique_constraints["uq_guest_quota_usage_dimension"] == {
+            "tenant_id",
+            "region",
+            "guest_id",
+            "product_id",
+            "quota_policy_id",
+            "quota_dimension",
+            "dimension_key",
+            "period_key",
+        }
+    finally:
+        engine.dispose()
 
 
 def test_runtime_migration_upgrade_from_0004_adds_provider_call_error_message_safe(
@@ -930,6 +1034,147 @@ def test_artifact_repository_required_fields(
     try:
         with pytest.raises(IntegrityError):
             ArtifactRepository(session).create(broken)
+    finally:
+        session.rollback()
+        session.close()
+
+
+def test_guest_identity_repository_create_read_touch(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        repository = GuestIdentityRepository(session)
+        created = repository.create(make_guest_identity())
+
+        assert created.id.startswith("guest_")
+        assert repository.get(
+            created.id,
+            tenant_id=created.tenant_id,
+            region=created.region,
+        ) == created
+        assert (
+            repository.get(
+                created.id,
+                tenant_id="tenant_other",
+                region=created.region,
+            )
+            is None
+        )
+
+        touched = repository.touch(created)
+
+    assert touched.last_seen_at is not None
+
+
+def test_quota_usage_repository_ensures_and_consumes_conditionally(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        guest = GuestIdentityRepository(session).create(make_guest_identity())
+        repository = QuotaUsageRepository(session)
+        usage = repository.ensure_usage(
+            tenant_id=guest.tenant_id,
+            region=guest.region,
+            guest_id=guest.id,
+            product_id="kernel_demo",
+            quota_policy_id="kernel_demo.guest_quota_v1",
+            quota_dimension=QuotaDimension.product,
+            dimension_key="kernel_demo",
+            scenario_id=None,
+            period_key="lifetime",
+            limit_count=1,
+        )
+
+        repeated = repository.ensure_usage(
+            tenant_id=guest.tenant_id,
+            region=guest.region,
+            guest_id=guest.id,
+            product_id="kernel_demo",
+            quota_policy_id="kernel_demo.guest_quota_v1",
+            quota_dimension=QuotaDimension.product,
+            dimension_key="kernel_demo",
+            scenario_id=None,
+            period_key="lifetime",
+            limit_count=1,
+        )
+        consumed = repository.consume_if_available(usage)
+        exhausted = repository.consume_if_available(usage)
+
+    assert repeated.id == usage.id
+    assert consumed is not None
+    assert consumed.used_count == 1
+    assert exhausted is None
+
+
+def test_quota_usage_repository_keys_usage_by_configured_dimension(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        guest = GuestIdentityRepository(session).create(make_guest_identity())
+        repository = QuotaUsageRepository(session)
+
+        first = repository.ensure_usage(
+            tenant_id=guest.tenant_id,
+            region=guest.region,
+            guest_id=guest.id,
+            product_id="kernel_demo",
+            quota_policy_id="kernel_demo.guest_quota_v1",
+            quota_dimension=QuotaDimension.scenario,
+            dimension_key="kernel_demo.single_action_smoke_v1",
+            scenario_id="kernel_demo.single_action_smoke_v1",
+            period_key="lifetime",
+            limit_count=1,
+        )
+        repeated = repository.ensure_usage(
+            tenant_id=guest.tenant_id,
+            region=guest.region,
+            guest_id=guest.id,
+            product_id="kernel_demo",
+            quota_policy_id="kernel_demo.guest_quota_v1",
+            quota_dimension=QuotaDimension.scenario,
+            dimension_key="kernel_demo.single_action_smoke_v1",
+            scenario_id="kernel_demo.single_action_smoke_v1",
+            period_key="lifetime",
+            limit_count=1,
+        )
+        second = repository.ensure_usage(
+            tenant_id=guest.tenant_id,
+            region=guest.region,
+            guest_id=guest.id,
+            product_id="kernel_demo",
+            quota_policy_id="kernel_demo.guest_quota_v1",
+            quota_dimension=QuotaDimension.scenario,
+            dimension_key="kernel_demo.multi_step_workflow_smoke_v1",
+            scenario_id="kernel_demo.multi_step_workflow_smoke_v1",
+            period_key="lifetime",
+            limit_count=1,
+        )
+
+    assert repeated.id == first.id
+    assert second.id != first.id
+    assert first.quota_dimension is QuotaDimension.scenario
+    assert second.dimension_key == "kernel_demo.multi_step_workflow_smoke_v1"
+
+
+def test_quota_usage_repository_reraises_unexpected_integrity_errors(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    session = session_factory()
+    try:
+        guest = GuestIdentityRepository(session).create(make_guest_identity())
+        with pytest.raises(IntegrityError):
+            QuotaUsageRepository(session).ensure_usage(
+                tenant_id=guest.tenant_id,
+                region=guest.region,
+                guest_id=guest.id,
+                product_id="kernel_demo",
+                quota_policy_id="kernel_demo.guest_quota_v1",
+                quota_dimension=QuotaDimension.product,
+                dimension_key="kernel_demo",
+                scenario_id=None,
+                period_key="lifetime",
+                limit_count=-1,
+            )
     finally:
         session.rollback()
         session.close()

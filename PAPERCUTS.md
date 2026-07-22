@@ -26,3 +26,21 @@ Running focused `uv run pytest` suites for workflow recovery review -> `uv` firs
 blocked global cache path, and `pytest` then failed to enumerate a reused `.tmp\\pytest-of-jackd`
 base temp directory with `PermissionError`. Using repo-local `UV_CACHE_DIR` plus a fresh
 `--basetemp` let the suites pass; the harness could set those defaults automatically for agent runs.
+
+## 2026-07-20 23:22 - Codex (GPT-5) - Windows
+
+Running `python scripts/agent/runner.py generate-docs --check` during an A13 review -> the system
+Python path could import the repo package but lacked `yaml`, causing `ModuleNotFoundError`.
+Use the project environment/`uv run` for generated-doc checks or make the runner self-select the
+same dependency-managed interpreter as the canonical checks.
+## 2026-07-22 12:33 - GPT-5 Codex - Windows
+
+Parallel PowerShell file reads through `multi_tool_use.parallel` → most `shell_command` calls failed
+with `windows sandbox: CreateProcessWithLogonW failed: 1056`. Retrying the reads as smaller
+ individual/limited parallel batches worked; likely transient Windows sandbox process/session state.
+
+## 2026-07-22 13:05 - Codex (GPT-5) - Windows
+
+Using `rg` to inspect the checked-out PR during review → `rg.exe` failed with Access Denied under
+the Windows sandbox. PowerShell file reads still worked; investigate the sandbox executable policy or
+provide a repository-approved search fallback.

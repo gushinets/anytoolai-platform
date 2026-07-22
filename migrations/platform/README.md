@@ -13,3 +13,6 @@ MVP-A runtime tables:
 - email_captures
 - paywall_intents
 - product_handoffs
+
+Migration `0003` currently implements the A13 guest identity and guest quota usage tables.
+Email capture and paywall intent remain separate access-lite slices.

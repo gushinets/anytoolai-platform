@@ -33,6 +33,7 @@ PYTEST_TARGETS = [
     "apps/platform-api/tests",
     "apps/platform-worker/tests",
 ]
+FAST_PYTEST_MARK_EXPRESSION = "not slow"
 
 
 def print_command(command: Sequence[str]) -> None:
@@ -283,7 +284,14 @@ def main() -> int:
             [sys.executable, "scripts/agent/validate_architecture.py"],
             [sys.executable, "scripts/agent/validate_docs.py"],
             [sys.executable, "scripts/agent/runner.py", "generate-docs", "--check"],
-            [sys.executable, "-m", "pytest", *PYTEST_TARGETS],
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-m",
+                FAST_PYTEST_MARK_EXPRESSION,
+                *PYTEST_TARGETS,
+            ],
         ]
     )
 
