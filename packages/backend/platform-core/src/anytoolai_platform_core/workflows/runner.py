@@ -22,7 +22,10 @@ from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter, enrich_event_context
 from anytoolai_platform_core.events.repository import EventLogRepository
-from anytoolai_platform_core.events.replay import ReplayTimestampSequencer
+from anytoolai_platform_core.events.replay import (
+    ReplayTimestampSequencer,
+    sequence_existing_replay_event,
+)
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.storage.db import action_runs_table
@@ -1336,11 +1339,11 @@ def _emit_recovered_workflow_events(
     if record is None:
         return
 
-    workflow_started_timestamp = event_log_repository.event_timestamp(
+    workflow_started_event = event_log_repository.find_event(
         event_type="workflow.started",
         job_id=record.id,
     )
-    if workflow_started_timestamp is None:
+    if workflow_started_event is None:
         preferred_timestamp = record.started_at or record.created_at
         event_emitter.emit(
             "workflow.started",
@@ -1350,7 +1353,11 @@ def _emit_recovered_workflow_events(
             replay=True,
         )
     else:
-        timestamp_sequencer.observe(workflow_started_timestamp)
+        sequence_existing_replay_event(
+            event_log_repository,
+            timestamp_sequencer,
+            workflow_started_event,
+        )
 
     workflow_state = record.metadata.get("workflow_state")
     raw_steps = workflow_state.get("steps") if isinstance(workflow_state, Mapping) else None
@@ -1371,14 +1378,18 @@ def _emit_recovered_workflow_events(
 
     if terminal_event_type is None:
         return
-    terminal_event_timestamp = event_log_repository.event_timestamp(
+    terminal_event = event_log_repository.find_event(
         event_type=terminal_event_type,
         job_id=record.id,
     )
-    if terminal_event_timestamp is not None:
-        timestamp_sequencer.observe(terminal_event_timestamp)
-        if record.completed_at is None or record.completed_at < terminal_event_timestamp:
-            repository.update(replace(record, completed_at=terminal_event_timestamp))
+    if terminal_event is not None:
+        terminal_event = sequence_existing_replay_event(
+            event_log_repository,
+            timestamp_sequencer,
+            terminal_event,
+        )
+        if record.completed_at is None or record.completed_at < terminal_event.timestamp:
+            repository.update(replace(record, completed_at=terminal_event.timestamp))
         return
 
     terminal_timestamp = timestamp_sequencer.next(
@@ -1443,12 +1454,12 @@ def _emit_recovered_workflow_step_event(
                 skipped_context,
                 action_run_id=action_run_id,
             )
-        skipped_timestamp = event_log_repository.event_timestamp(
+        skipped_event = event_log_repository.find_event(
             event_type="workflow.step_skipped",
             job_id=record.id,
             step_id=step_id,
         )
-        if skipped_timestamp is None:
+        if skipped_event is None:
             preferred_timestamp = step_terminal_timestamp or step_timestamp
             event_emitter.emit(
                 "workflow.step_skipped",
@@ -1463,16 +1474,20 @@ def _emit_recovered_workflow_step_event(
                 replay=True,
             )
         else:
-            timestamp_sequencer.observe(skipped_timestamp)
+            sequence_existing_replay_event(
+                event_log_repository,
+                timestamp_sequencer,
+                skipped_event,
+            )
         return
 
     if _step_started_event_emitted(raw_step_state, status):
-        started_timestamp = event_log_repository.event_timestamp(
+        started_event = event_log_repository.find_event(
             event_type="workflow.step_started",
             job_id=record.id,
             step_id=step_id,
         )
-        if started_timestamp is None:
+        if started_event is None:
             event_emitter.emit(
                 "workflow.step_started",
                 step_context,
@@ -1484,7 +1499,11 @@ def _emit_recovered_workflow_step_event(
                 replay=True,
             )
         else:
-            timestamp_sequencer.observe(started_timestamp)
+            sequence_existing_replay_event(
+                event_log_repository,
+                timestamp_sequencer,
+                started_event,
+            )
 
     for step_action_run in step_action_runs:
         _emit_recovered_action_events(
@@ -1503,12 +1522,12 @@ def _emit_recovered_workflow_step_event(
         event_context = enrich_event_context(event_context, artifact_id=output_artifact_id)
 
     if status == ActionRunStatus.succeeded.value:
-        succeeded_timestamp = event_log_repository.event_timestamp(
+        succeeded_event = event_log_repository.find_event(
             event_type="workflow.step_succeeded",
             job_id=record.id,
             step_id=step_id,
         )
-        if succeeded_timestamp is None:
+        if succeeded_event is None:
             event_emitter.emit(
                 "workflow.step_succeeded",
                 event_context,
@@ -1523,16 +1542,20 @@ def _emit_recovered_workflow_step_event(
                 replay=True,
             )
         else:
-            timestamp_sequencer.observe(succeeded_timestamp)
+            sequence_existing_replay_event(
+                event_log_repository,
+                timestamp_sequencer,
+                succeeded_event,
+            )
         return
 
     if status == ActionRunStatus.failed.value:
-        failed_timestamp = event_log_repository.event_timestamp(
+        failed_event = event_log_repository.find_event(
             event_type="workflow.step_failed",
             job_id=record.id,
             step_id=step_id,
         )
-        if failed_timestamp is None:
+        if failed_event is None:
             event_emitter.emit(
                 "workflow.step_failed",
                 event_context,
@@ -1547,7 +1570,11 @@ def _emit_recovered_workflow_step_event(
                 replay=True,
             )
         else:
-            timestamp_sequencer.observe(failed_timestamp)
+            sequence_existing_replay_event(
+                event_log_repository,
+                timestamp_sequencer,
+                failed_event,
+            )
 
 
 def _optional_str(value: Any) -> str | None:

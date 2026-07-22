@@ -26,3 +26,9 @@ Running focused `uv run pytest` suites for workflow recovery review -> `uv` firs
 blocked global cache path, and `pytest` then failed to enumerate a reused `.tmp\\pytest-of-jackd`
 base temp directory with `PermissionError`. Using repo-local `UV_CACHE_DIR` plus a fresh
 `--basetemp` let the suites pass; the harness could set those defaults automatically for agent runs.
+
+## 2026-07-22 13:45 - Codex (GPT-5) - Windows
+
+Running `python scripts/agent/runner.py generate-docs --check` directly -> the system Python lacked
+`yaml`, while `uv run` also hit the known global cache permission problem. Reusing
+`.quick-check-venv\\Scripts\\python.exe` ran the same generated-doc check successfully.

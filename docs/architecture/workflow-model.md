@@ -197,9 +197,13 @@ Replay prefers the original transition timestamps where they are available from 
 Within one workflow recovery pass, replay timestamps are deterministic and monotonic in the causal
 sequence above. If a preferred timestamp is not strictly later than the previously replayed or
 observed event timestamp, recovery clamps the next timestamp to the previous timestamp plus one
-microsecond. If the workflow terminal event is clamped later than `jobs.completed_at`, recovery
-updates `jobs.completed_at` to the terminal event timestamp. This keeps escaped rollback recovery
-causally valid while staying inside MVP-A's non-durable sequential-runner scope.
+microsecond. If a pre-existing deterministic replay-owned event already exists but its timestamp
+collides or regresses relative to that causal sequence, recovery repairs that replay-owned event
+timestamp instead of emitting a duplicate. Ordinary non-replay committed events are not rewritten by
+rollback recovery. If the workflow terminal event is clamped or repaired later than
+`jobs.completed_at`, recovery updates `jobs.completed_at` to the terminal event timestamp. This
+keeps escaped rollback recovery causally valid while staying inside MVP-A's non-durable
+sequential-runner scope.
 
 ## Non-goals
 

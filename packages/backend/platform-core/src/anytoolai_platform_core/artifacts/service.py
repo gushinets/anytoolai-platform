@@ -7,7 +7,10 @@ from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
-from anytoolai_platform_core.events.replay import ReplayTimestampSequencer
+from anytoolai_platform_core.events.replay import (
+    ReplayTimestampSequencer,
+    sequence_existing_replay_event,
+)
 from anytoolai_platform_core.storage.transactions import (
     RollbackRecoveryPhase,
     register_rollback_recovery_callback,
@@ -158,13 +161,17 @@ def _emit_recovered_artifact_created_event(
     *,
     timestamp_sequencer: ReplayTimestampSequencer | None = None,
 ) -> None:
-    existing_timestamp = event_log_repository.event_timestamp(
+    existing_event = event_log_repository.find_event(
         event_type="artifact.created",
         artifact_id=record.id,
     )
-    if existing_timestamp is not None:
+    if existing_event is not None:
         if timestamp_sequencer is not None:
-            timestamp_sequencer.observe(existing_timestamp)
+            sequence_existing_replay_event(
+                event_log_repository,
+                timestamp_sequencer,
+                existing_event,
+            )
         return
     EventEmitter(event_log_repository).emit(
         "artifact.created",
