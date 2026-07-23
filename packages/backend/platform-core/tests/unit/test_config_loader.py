@@ -78,10 +78,12 @@ def test_loader_builds_registry_from_current_tree() -> None:
     assert registry.get_product("kernel_demo") is not None
     assert registry.get_scenario("kernel_demo.single_action_smoke_v1") is not None
     assert registry.get_workflow("kernel_demo.extract_detect_report_v1") is not None
-    assert (
-        registry.get_action_configuration("kernel_demo.extract_structured_fields_v1")
-        is not None
-    )
+    handoff = registry.get_handoff("kernel_demo_source_to_target_v1")
+    assert handoff is not None
+    assert handoff.target_frontend_id == "kernel_demo_ce"
+    assert handoff.target_start_policy.value == "immediate"
+    assert handoff.context_mapping == {"source_text": "artifact.content_json.title"}
+    assert registry.get_action_configuration("kernel_demo.extract_structured_fields_v1") is not None
     assert registry.get_prompt("kernel_demo.extract_structured_fields.v1") is not None
     assert registry.get_provider_policy("default_fake_provider_v1") is not None
     quota_policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
@@ -111,6 +113,64 @@ def test_loader_builds_registry_from_current_tree() -> None:
         registry.products["another"] = product
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("consent_required", False, "consent_required: true"),
+        ("target_frontend_id", "missing_frontend", "target frontend is not enabled"),
+        (
+            "context_mapping",
+            {"source_text": "artifact.metadata.raw"},
+            "must use artifact.content_json paths",
+        ),
+        (
+            "preview_mapping",
+            {"preview..title": "artifact.content_json.title"},
+            "target path is unsupported",
+        ),
+    ],
+)
+def test_loader_rejects_unsafe_or_broken_handoff_contracts(
+    tmp_path: Path,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    data = _load_yaml(handoff_path)
+    data["handoffs"][0][field] = value
+    _write_yaml(handoff_path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert message in str(exc_info.value)
+
+
+def test_loader_rejects_trailing_dot_handoff_source_with_identity(
+    tmp_path: Path,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    data = _load_yaml(handoff_path)
+    mapping = {"source_text": "artifact.content_json."}
+    data["handoffs"][0]["context_mapping"] = mapping
+    _write_yaml(handoff_path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=handoff_path,
+        config_id="kernel_demo_source_to_target_v1",
+        ref_type="context_mapping",
+        ref_value='{"source_text": "artifact.content_json."}',
+        message_part="must use artifact.content_json paths",
+    )
+
+
 def test_loader_preserves_provider_policy_yaml_metadata() -> None:
     registry = ConfigLoader(CONFIG_ROOT).load()
 
@@ -128,9 +188,7 @@ def test_loader_preserves_provider_policy_yaml_metadata() -> None:
 
 
 def test_default_text_generation_policy_has_no_duplicate_retry_key_in_yaml() -> None:
-    provider_policies_yaml = (CONFIG_ROOT / "provider_policies.yaml").read_text(
-        encoding="utf-8"
-    )
+    provider_policies_yaml = (CONFIG_ROOT / "provider_policies.yaml").read_text(encoding="utf-8")
     default_policy_start = provider_policies_yaml.index(
         "  - provider_policy_ref: default_text_generation_v1"
     )
@@ -316,9 +374,7 @@ def test_loader_rejects_non_zero_litellm_num_retries_per_attempt(
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "provider_policies.yaml"
     data = _load_yaml(path)
-    data["provider_policies"][1]["retry_policy"]["transport"][
-        "litellm_num_retries_per_attempt"
-    ] = 1
+    data["provider_policies"][1]["retry_policy"]["transport"]["litellm_num_retries_per_attempt"] = 1
     _write_yaml(path, data)
 
     with pytest.raises(RegistryLoadError) as exc_info:

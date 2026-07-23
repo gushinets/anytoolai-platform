@@ -1,4 +1,4 @@
-"""MVP-A backend-owned product handoffs."""
+"""Create product handoffs for databases stamped past placeholder revision 0004."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0004"
-down_revision = "0003"
+revision = "0008"
+down_revision = "0007"
 branch_labels = None
 depends_on = None
 
@@ -26,6 +26,9 @@ def _enum_type(name: str, *values: str) -> sa.Enum:
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    if sa.inspect(bind).has_table("product_handoffs", schema=PLATFORM_SCHEMA):
+        return
     json_document = _json_document_type()
     op.create_table(
         "product_handoffs",
@@ -136,4 +139,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("product_handoffs", schema=PLATFORM_SCHEMA)
+    # Canonical revision 0004 owns the table. Keep it when returning to 0007.
+    return

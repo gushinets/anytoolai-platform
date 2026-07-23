@@ -107,6 +107,19 @@ def _registry_with_quota_dimension(dimension: QuotaDimension) -> ConfigRegistry:
     )
 
 
+def _registry_with_quota_limit(limit_count: int) -> ConfigRegistry:
+    registry = build_config_registry(CONFIG_ROOT)
+    policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
+    assert policy is not None
+    return replace(
+        registry,
+        quotas={
+            **dict(registry.quotas),
+            policy.quota_policy_id: replace(policy, limit_count=limit_count),
+        },
+    )
+
+
 def _event_types(session: sa.orm.Session) -> list[str]:
     return list(
         session.execute(
@@ -338,6 +351,52 @@ def test_quota_consume_exhausted_and_repeat_calls(
     assert exhausted.exhausted is True
     assert event_types.count("quota.consumed") == 3
     assert event_types.count("quota.exhausted") == 1
+
+
+def test_quota_exhaustion_recovery_survives_caller_transaction_rollback(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    registry = _registry_with_quota_limit(0)
+    with transaction_boundary(session_factory) as session:
+        guest_id = _create_guest(session)
+
+    with pytest.raises(QuotaExhaustedError), transaction_boundary(
+        session_factory
+    ) as session:
+        _quota_service(session, registry=registry).consume_for_accepted_start(
+            tenant_id="anytoolai",
+            region="default",
+            product_id="kernel_demo",
+            frontend_id="kernel_demo_ce",
+            guest_id=guest_id,
+            scenario_id="kernel_demo.handoff_smoke_target_v1",
+            scenario_session_id="scenario_session_rejected_handoff",
+            scenario_chain_id="scenario_chain_handoff",
+            handoff_id="handoff_quota_recovery",
+        )
+
+    with transaction_boundary(session_factory) as session:
+        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+        quota_events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.handoff_id == "handoff_quota_recovery")
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert usage["limit_count"] == 0
+    assert usage["used_count"] == 0
+    assert [event["event_type"] for event in quota_events] == [
+        "quota.checked",
+        "quota.exhausted",
+    ]
+    assert all(
+        event["scenario_session_id"] == "scenario_session_rejected_handoff"
+        for event in quota_events
+    )
+    assert quota_events[-1]["error_code"] == "quota_exhausted"
+    assert quota_events[-1]["properties"]["exhausted"] is True
 
 
 def test_quota_conditional_consume_blocks_stale_concurrent_read(

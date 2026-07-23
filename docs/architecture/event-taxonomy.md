@@ -77,6 +77,14 @@ Current MVP-A runtime-owned emission points:
   - `provider.request_failed`
 - artifact service:
   - `artifact.created`
+- handoff service:
+  - `handoff.created`
+  - `handoff.viewed`
+  - `handoff.accepted`
+  - `handoff.declined`
+  - `handoff.expired`
+  - `handoff.failed`
+  - `handoff.consumed`
 
 Other taxonomy groups remain part of the platform contract even when their concrete runtime service
 slice lands later.
@@ -103,6 +111,15 @@ be:
   regress;
 - correlation-preserving across workflow, action, provider, job, and artifact identifiers;
 - idempotent enough not to duplicate events that are already durable.
+
+If immediate handoff acceptance observes target quota exhaustion and then rolls back its accept
+claim, quota recovery must retain one `quota.checked` / `quota.exhausted` pair with the target
+product, frontend, scenario-session/chain, guest, and `handoff_id`. This is the rollback equivalent
+of the ordinary scenario-start path, which commits those same events before returning HTTP 429.
+Recovery ownership and the terminal `failed` transition are one conditional update in the same
+transaction that recreates this pair and emits `handoff.failed`. Parallel claimants cannot each
+append a recovered event chain, and no committed pre-terminal reservation can outlive its failure
+event.
 
 When idempotent recovery encounters an existing deterministic replay-owned event whose timestamp no
 longer fits the causal sequence, recovery may repair that replay-owned timestamp. It must not
@@ -175,6 +192,19 @@ Generated documentation mirrors that source in:
 - `handoff.accepted`
 - `handoff.declined`
 - `handoff.consumed`
+- `handoff.expired`
+- `handoff.failed`
+
+Handoff lifecycle events are emitted only when the guarded durable transition changes state.
+Created/viewed/declined/expired/failed correlate primarily to the source session; accepted uses the
+pre-generated target session id; consumed uses the linked target session and job. Every event keeps
+the shared scenario chain and runtime `handoff_id`. Source-side handoff events also carry the
+canonical source job and source artifact dimensions. Target-side events do not reuse those source
+rows as top-level runtime dimensions: accepted has no target job yet, while consumed carries the
+linked target job. Protected event properties retain canonical source and target identifiers for
+auditing. Target workflow, action, provider, and artifact events retain their own dimensions under
+the target session. Tokens, mapped context, preview source paths, raw artifacts, prompts, and LLM
+debug/provider payloads are forbidden event properties.
 
 ### `client`
 

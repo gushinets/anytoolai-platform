@@ -58,6 +58,8 @@ Generated-doc mirror of the MVP-A platform event taxonomy from `configs/kernel/p
 - `handoff.accepted`
 - `handoff.declined`
 - `handoff.consumed`
+- `handoff.expired`
+- `handoff.failed`
 
 ### client
 

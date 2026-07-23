@@ -14,6 +14,7 @@ _ROLLBACK_CALLBACK_ORDER_KEY = "rollback_recovery_callback_order"
 
 
 class RollbackRecoveryPhase(IntEnum):
+    quota_exhaustion = 5
     artifact_rows = 10
     provider_rows = 20
     action_rows = 30
