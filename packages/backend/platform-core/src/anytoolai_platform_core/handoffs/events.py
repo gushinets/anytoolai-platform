@@ -14,6 +14,7 @@ def emit_handoff_event(
     job_id: str | None = None,
     properties: dict[str, object] | None = None,
 ) -> None:
+    is_target_event = scenario_session_id is not None
     target_scenario_session_id = scenario_session_id or record.target_scenario_session_id
     event_properties = {
         **(properties or {}),
@@ -23,6 +24,7 @@ def emit_handoff_event(
         "target_scenario_session_id": target_scenario_session_id,
         "source_job_id": record.source_job_id,
         "source_artifact_id": record.source_artifact_id,
+        "target_job_id": record.target_job_id,
     }
     event_emitter.emit(
         event_type,
@@ -38,8 +40,8 @@ def emit_handoff_event(
             guest_id=record.accepted_by_guest_id or record.created_by_guest_id,
             scenario_session_id=scenario_session_id or record.source_scenario_session_id,
             scenario_chain_id=record.scenario_chain_id,
-            job_id=job_id if job_id is not None else record.source_job_id,
-            artifact_id=record.source_artifact_id,
+            job_id=job_id if is_target_event else record.source_job_id,
+            artifact_id=None if is_target_event else record.source_artifact_id,
             handoff_id=record.id,
         ),
         result_status=record.status.value,

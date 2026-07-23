@@ -198,9 +198,13 @@ Generated documentation mirrors that source in:
 Handoff lifecycle events are emitted only when the guarded durable transition changes state.
 Created/viewed/declined/expired/failed correlate primarily to the source session; accepted uses the
 pre-generated target session id; consumed uses the linked target session and job. Every event keeps
-the shared scenario chain and runtime `handoff_id`. Target workflow, action, provider, and artifact
-events retain those dimensions under the target session. Tokens, mapped context, preview source
-paths, raw artifacts, prompts, and LLM debug/provider payloads are forbidden event properties.
+the shared scenario chain and runtime `handoff_id`. Source-side handoff events also carry the
+canonical source job and source artifact dimensions. Target-side events do not reuse those source
+rows as top-level runtime dimensions: accepted has no target job yet, while consumed carries the
+linked target job. Protected event properties retain canonical source and target identifiers for
+auditing. Target workflow, action, provider, and artifact events retain their own dimensions under
+the target session. Tokens, mapped context, preview source paths, raw artifacts, prompts, and LLM
+debug/provider payloads are forbidden event properties.
 
 ### `client`
 

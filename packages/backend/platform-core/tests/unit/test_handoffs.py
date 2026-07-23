@@ -80,6 +80,7 @@ def test_handoff_event_helper_preserves_canonical_correlation(tmp_path: Path) ->
                 "target_scenario_session_id": "caller_target_session",
                 "source_job_id": "caller_source_job",
                 "source_artifact_id": "caller_source_artifact",
+                "target_job_id": "caller_target_job",
             },
         )
         event_row = (
@@ -102,6 +103,7 @@ def test_handoff_event_helper_preserves_canonical_correlation(tmp_path: Path) ->
         assert event_row["properties"]["target_scenario_session_id"] is None
         assert event_row["properties"]["source_job_id"] == record.source_job_id
         assert event_row["properties"]["source_artifact_id"] == record.source_artifact_id
+        assert event_row["properties"]["target_job_id"] is None
 
 
 def _session_factory(tmp_path: Path):
@@ -234,6 +236,43 @@ def _create(service: HandoffService, scenario_id: str, artifact_id: str):
     )
 
 
+def _assert_handoff_event_chain_lineage(session, handoff_id: str) -> None:
+    event_rows = list(session.execute(sa.select(event_log_table)).mappings())
+    event_types = [row["event_type"] for row in event_rows]
+    assert event_types.count("handoff.viewed") == 1
+    assert event_types.count("handoff.accepted") == 1
+    assert event_types.count("handoff.consumed") == 1
+
+    record = HandoffRepository(session).get_by_id(
+        handoff_id,
+        tenant_id="anytoolai",
+        region="default",
+    )
+    assert record is not None
+    created_event = next(row for row in event_rows if row["event_type"] == "handoff.created")
+    accepted_event = next(row for row in event_rows if row["event_type"] == "handoff.accepted")
+    consumed_event = next(row for row in event_rows if row["event_type"] == "handoff.consumed")
+
+    assert created_event["scenario_session_id"] == record.source_scenario_session_id
+    assert created_event["job_id"] == record.source_job_id
+    assert created_event["artifact_id"] == record.source_artifact_id
+    assert accepted_event["scenario_session_id"] == record.target_scenario_session_id
+    assert accepted_event["job_id"] is None
+    assert accepted_event["artifact_id"] is None
+    assert (
+        accepted_event["properties"]["source_scenario_session_id"]
+        == record.source_scenario_session_id
+    )
+    assert (
+        accepted_event["properties"]["target_scenario_session_id"]
+        == record.target_scenario_session_id
+    )
+    assert consumed_event["scenario_session_id"] == record.target_scenario_session_id
+    assert consumed_event["job_id"] == record.target_job_id
+    assert consumed_event["artifact_id"] is None
+    assert consumed_event["properties"]["target_job_id"] == record.target_job_id
+
+
 def test_handoff_create_view_accept_and_double_accept(tmp_path: Path) -> None:
     factory = _session_factory(tmp_path)
     registry = build_config_registry(CONFIG_ROOT)
@@ -277,10 +316,7 @@ def test_handoff_create_view_accept_and_double_accept(tmp_path: Path) -> None:
                 AcceptHandoffCommand(tenant_id="anytoolai", region="default"),
             )
         assert error.value.code == "handoff_already_accepted"
-        events = list(session.execute(sa.select(event_log_table.c.event_type)).scalars())
-        assert events.count("handoff.viewed") == 1
-        assert events.count("handoff.accepted") == 1
-        assert events.count("handoff.consumed") == 1
+        _assert_handoff_event_chain_lineage(session, created.preview.handoff_id)
 
 
 @pytest.mark.parametrize(
