@@ -94,9 +94,12 @@ That means:
 - final validation failure creates a `structured_output_debug_raw` artifact
 - canonical `action_runs.output_artifact_id` may point only to a real `structured_output` artifact;
   debug raw artifacts stay debug-only and must not become the canonical result pointer
-- consumers that cross a trust boundary after persistence, including handoff creation, revalidate
-  the complete mutable artifact body against its declared workflow output schema before deriving a
-  mapped subset
+- consumers that cross a trust boundary after persistence, including handoff creation, capture one
+  workflow/schema-version-checked artifact snapshot, validate its complete body, and derive every
+  mapped subset only from the normalized snapshot returned by that validation
+- consumers must not re-read mutable artifact content between full-body validation and mapping; if
+  one immutable snapshot cannot be retained, validation and mapping must share a transaction and
+  row lock
 
 ## Safety
 

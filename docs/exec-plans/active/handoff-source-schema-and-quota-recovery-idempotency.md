@@ -2,14 +2,15 @@
 
 ## Status
 
-- State: completed
+- State: blocked
 - Owner: agent
 - Created: 2026-07-23
-- Last updated: 2026-07-23
+- Last updated: 2026-07-23 (validation status corrected)
 - Review date: 2026-07-23
-- Next action: run the PostgreSQL-marked concurrency test in CI or a configured local environment
-- Blocker: none; local PostgreSQL execution was unavailable because
-  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was unset and Docker was not running
+- Next action: run and pass the PostgreSQL-marked concurrency test in CI or against a configured
+  local PostgreSQL database
+- Blocker: validation incomplete; the required PostgreSQL-marked concurrency test has not passed
+  because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was unset and Docker was not running locally
 
 ## Scope
 
@@ -62,7 +63,7 @@ quick-check.
 - Full platform-core suite: passed.
 - Full platform-api suite: passed with the three PostgreSQL-marked tests skipped.
 - New PostgreSQL concurrency test collected successfully; execution requires the documented
-  maintenance database URL and was unavailable locally.
+  maintenance database URL, was unavailable locally, and remains required before completion.
 - Config, architecture, documentation, generated-doc freshness, source lint, and format checks
   passed.
 - Exact canonical DB-free aggregate: 335 passed.

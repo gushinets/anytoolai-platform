@@ -32,7 +32,7 @@ identifiers, while preserving durable accepted, consumed, declined, and failed s
 
 ## Validation result
 
-- Terminal-state and expired API focused cases: 5 passed.
+- Terminal-state and expired API-focused cases: 5 passed.
 - Full handoff unit selection: 17 passed.
 - Full handoff API selection: 5 passed.
 - Canonical DB-free aggregate: 334 passed, 3 deselected.
