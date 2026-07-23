@@ -1,5 +1,8 @@
 # Execution Plan: Handoff Quota Failure Reservation Transition Guard
 
+> Superseded on 2026-07-23 by atomic quota-failure finalization. Recovery no longer commits a
+> pre-terminal reservation; see `docs/exec-plans/active/handoff-quota-failure-atomic-finalization.md`.
+
 ## Status
 
 - State: completed

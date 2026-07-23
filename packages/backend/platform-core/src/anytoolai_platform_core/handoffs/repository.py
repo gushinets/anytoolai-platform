@@ -104,27 +104,26 @@ class HandoffRepository:
         self._session.flush()
         return self._require(handoff_id)
 
-    def reserve_quota_failure_recovery(
+    def finalize_quota_failure_recovery(
         self,
         handoff_id: str,
         *,
         error_code: str,
         now: datetime,
-    ) -> bool:
-        """Reserve quota rollback recovery without changing lifecycle status."""
-        result = self._session.execute(
-            sa.update(product_handoffs_table)
-            .where(
-                product_handoffs_table.c.id == handoff_id,
-                product_handoffs_table.c.status.in_([HandoffStatus.created, HandoffStatus.viewed]),
-                _failure_not_reserved(),
-            )
-            .values(error_code=error_code, updated_at=now)
+    ) -> HandoffTransitionResult:
+        """Atomically claim and finalize quota rollback recovery."""
+        changed = self._transition(
+            handoff_id,
+            from_statuses=(HandoffStatus.created, HandoffStatus.viewed),
+            to_status=HandoffStatus.failed,
+            values={
+                "failed_at": now,
+                "error_code": error_code,
+                "updated_at": now,
+            },
+            extra_conditions=(_failure_not_reserved(),),
         )
-        changed = result.rowcount > 0
-        if changed:
-            self._session.flush()
-        return changed
+        return HandoffTransitionResult(self._require(handoff_id), changed)
 
     def attach_target(
         self,

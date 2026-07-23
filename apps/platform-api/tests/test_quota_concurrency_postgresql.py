@@ -12,7 +12,8 @@ import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
 from anytoolai_platform_api.routers.handoffs import _service as _handoff_service
-from anytoolai_platform_core.handoffs.repository import HandoffRepository
+from anytoolai_platform_core.handoffs.models import AcceptHandoffCommand
+from anytoolai_platform_core.handoffs.service import HandoffAcceptanceExecutionError
 from anytoolai_platform_core.storage.db import (
     event_log_table,
     guest_quota_usage_table,
@@ -282,7 +283,7 @@ def test_postgresql_parallel_exhausted_handoff_accept_recovers_quota_once() -> N
 
 @pytest.mark.postgresql
 @pytest.mark.slow
-def test_postgresql_reserved_quota_failure_blocks_decline_and_expiry() -> None:
+def test_postgresql_quota_recovery_finalizes_without_router_transaction() -> None:
     maintenance_url = _require_postgres_test_url()
     database_name = f"anytoolai_a17_handoff_reservation_test_{uuid4().hex[:12]}"
     test_url = maintenance_url.set(database=database_name)
@@ -292,72 +293,84 @@ def test_postgresql_reserved_quota_failure_blocks_decline_and_expiry() -> None:
         _upgrade_database(engine, test_url)
         session_factory = build_session_factory(engine)
         app = _create_test_app(session_factory)
+        registry = app.state.runtime.config_registry
+        policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
+        assert policy is not None
+        app.state.runtime = replace(
+            app.state.runtime,
+            config_registry=replace(
+                registry,
+                quotas={
+                    **dict(registry.quotas),
+                    policy.quota_policy_id: replace(policy, limit_count=0),
+                },
+            ),
+        )
         with transaction_boundary(session_factory) as session:
             source_session_id, artifact_id = _seed_handoff_source(session)
         created = _create_handoff(app, source_session_id, artifact_id).json()
 
-        with transaction_boundary(session_factory) as session:
-            repository = HandoffRepository(session)
-            record = repository.get_by_id(
-                created["handoff_id"],
-                tenant_id="anytoolai",
-                region="default",
-            )
-            assert record is not None
-            assert repository.reserve_quota_failure_recovery(
-                record.id,
-                error_code="quota_exhausted",
-                now=record.created_at,
-            )
-
-        async def decline_reserved() -> httpx.Response:
-            async with httpx.AsyncClient(
-                transport=httpx.ASGITransport(app=app),
-                base_url="http://testserver",
-            ) as client:
-                return await client.post(
-                    f"/v1/handoffs/{created['handoff_token']}/decline",
-                    headers={"X-Request-ID": "req_pg_handoff_reserved_decline"},
-                )
-
-        declined = asyncio.run(decline_reserved())
-        assert declined.status_code == HTTPStatus.CONFLICT
-        assert declined.json()["error"]["code"] == "handoff_failed"
-
-        with transaction_boundary(session_factory) as session:
-            repository = HandoffRepository(session)
-            record = repository.get_by_id(
-                created["handoff_id"],
-                tenant_id="anytoolai",
-                region="default",
-            )
-            assert record is not None
-            expiry = repository.expire_if_due(record.id, record.expires_at)
-            assert expiry.changed is False
-            failed = _handoff_service(
+        with (
+            pytest.raises(HandoffAcceptanceExecutionError) as acceptance_error,
+            transaction_boundary(session_factory) as session,
+        ):
+            _handoff_service(
                 session,
                 app.state.runtime.config_registry,
-            ).mark_failed(
-                record.id,
-                tenant_id="anytoolai",
-                region="default",
-                error_code="quota_exhausted",
+            ).accept(
+                created["handoff_token"],
+                AcceptHandoffCommand(
+                    tenant_id="anytoolai",
+                    region="default",
+                ),
+            )
+        assert acceptance_error.value.error_code == "quota_exhausted"
+
+        with transaction_boundary(session_factory) as session:
+            handoff = (
+                session.execute(
+                    sa.select(product_handoffs_table).where(
+                        product_handoffs_table.c.id == created["handoff_id"]
+                    )
+                )
+                .mappings()
+                .one()
             )
             event_types = list(
                 session.execute(
                     sa.select(event_log_table.c.event_type).where(
-                        event_log_table.c.handoff_id == record.id
+                        event_log_table.c.handoff_id == created["handoff_id"]
                     )
                 ).scalars()
             )
 
-        assert failed.status.value == "failed"
-        assert failed.error_code == "quota_exhausted"
-        assert failed.declined_at is None
-        assert failed.expired_at is None
+        assert handoff["status"] == "failed"
+        assert handoff["error_code"] == "quota_exhausted"
         assert event_types.count("handoff.failed") == 1
-        assert "handoff.declined" not in event_types
-        assert "handoff.expired" not in event_types
+        assert event_types.count("quota.checked") == 1
+        assert event_types.count("quota.exhausted") == 1
+
+        with transaction_boundary(session_factory) as session:
+            repeated = _handoff_service(
+                session,
+                app.state.runtime.config_registry,
+            ).mark_failed(
+                created["handoff_id"],
+                tenant_id="anytoolai",
+                region="default",
+                error_code="quota_exhausted",
+            )
+            handoff_failed_count = session.execute(
+                sa.select(sa.func.count())
+                .select_from(event_log_table)
+                .where(
+                    event_log_table.c.handoff_id == created["handoff_id"],
+                    event_log_table.c.event_type == "handoff.failed",
+                )
+            ).scalar_one()
+
+        assert repeated.status.value == "failed"
+        assert handoff_failed_count == 1
     finally:
         engine.dispose()
         _drop_database(maintenance_url, database_name)

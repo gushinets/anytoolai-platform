@@ -7,8 +7,8 @@ from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.ids import new_id
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
-from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
+from anytoolai_platform_core.handoffs.events import emit_handoff_event
 from anytoolai_platform_core.handoffs.models import (
     AcceptHandoffCommand,
     CreateHandoffCommand,
@@ -360,31 +360,13 @@ class HandoffService:
         job_id: str | None = None,
         properties: dict[str, object] | None = None,
     ) -> None:
-        event_properties = {
-            "handoff_definition_id": record.handoff_definition_id,
-            "source_scenario_session_id": record.source_scenario_session_id,
-            "target_scenario_session_id": scenario_session_id or record.target_scenario_session_id,
-            **(properties or {}),
-        }
-        self._events.emit(
+        emit_handoff_event(
+            self._events,
             event_type,
-            ExecutionContext(
-                tenant_id=record.tenant_id,
-                region=record.region,
-                product_id=(
-                    record.target_product_id if scenario_session_id else record.source_product_id
-                ),
-                frontend_id=(
-                    record.target_frontend_id if scenario_session_id else record.source_frontend_id
-                ),
-                guest_id=record.accepted_by_guest_id or record.created_by_guest_id,
-                scenario_session_id=scenario_session_id or record.source_scenario_session_id,
-                scenario_chain_id=record.scenario_chain_id,
-                job_id=job_id,
-                handoff_id=record.id,
-            ),
-            result_status=record.status.value,
-            properties=event_properties,
+            record,
+            scenario_session_id=scenario_session_id,
+            job_id=job_id,
+            properties=properties,
         )
 
 

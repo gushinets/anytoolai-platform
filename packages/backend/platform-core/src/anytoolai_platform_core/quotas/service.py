@@ -10,6 +10,7 @@ from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.handoffs.events import emit_handoff_event
 from anytoolai_platform_core.handoffs.repository import HandoffRepository
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.identity.service import GuestIdentityNotFoundError
@@ -402,6 +403,7 @@ def _recover_quota_exhaustion(
     recovery: QuotaExhaustionRecovery,
 ) -> None:
     with transaction_boundary(recovery_session_factory) as session:
+        failed_handoff = None
         if recovery.handoff_id is not None:
             handoffs = HandoffRepository(session)
             handoff = handoffs.get_by_id(
@@ -409,12 +411,15 @@ def _recover_quota_exhaustion(
                 tenant_id=recovery.tenant_id,
                 region=recovery.region,
             )
-            if handoff is not None and not handoffs.reserve_quota_failure_recovery(
-                handoff.id,
-                error_code="quota_exhausted",
-                now=utc_now(),
-            ):
-                return
+            if handoff is not None:
+                failure = handoffs.finalize_quota_failure_recovery(
+                    handoff.id,
+                    error_code="quota_exhausted",
+                    now=utc_now(),
+                )
+                if not failure.changed:
+                    return
+                failed_handoff = failure.record
         quota_repository = QuotaUsageRepository(session)
         usage = quota_repository.ensure_usage(
             tenant_id=recovery.tenant_id,
@@ -435,11 +440,12 @@ def _recover_quota_exhaustion(
             },
         )
         state = _state_from_usage(usage, recovery.policy)
+        event_emitter = EventEmitter(EventLogRepository(session))
         service = GuestQuotaService(
             config_registry=config_registry,
             quota_repository=quota_repository,
             guest_repository=GuestIdentityRepository(session),
-            event_emitter=EventEmitter(EventLogRepository(session)),
+            event_emitter=event_emitter,
         )
         context = {
             "tenant_id": recovery.tenant_id,
@@ -458,6 +464,13 @@ def _recover_quota_exhaustion(
             error_code="quota_exhausted",
             **context,
         )
+        if failed_handoff is not None:
+            emit_handoff_event(
+                event_emitter,
+                "handoff.failed",
+                failed_handoff,
+                properties={"error_code": "quota_exhausted"},
+            )
 
 
 def _state_from_usage(record: QuotaUsageRecord, policy: QuotaPolicy) -> QuotaState:

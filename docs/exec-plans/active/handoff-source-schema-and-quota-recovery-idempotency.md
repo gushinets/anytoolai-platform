@@ -5,7 +5,7 @@
 - State: blocked
 - Owner: agent
 - Created: 2026-07-23
-- Last updated: 2026-07-23 (validation status corrected)
+- Last updated: 2026-07-23 (atomic recovery finalization follow-up)
 - Review date: 2026-07-23
 - Next action: run and pass the PostgreSQL-marked concurrency test in CI or against a configured
   local PostgreSQL database
@@ -40,12 +40,10 @@ Both findings are present on the current branch:
 - Reuse the structured-output validator to normalize and validate the full artifact body with the
   source workflow output schema before applying context or preview mappings. Preserve target input
   schema validation.
-- Add an atomic handoff quota-recovery reservation using the existing safe `error_code` field.
-  Acceptance CAS will require that no recovery is reserved. For a real handoff, only the recovery
-  transaction that changes the marker will ensure quota state and emit the recovered audit pair;
-  non-handoff scenario-start recovery behavior remains unchanged.
-- Keep the router's existing separate `mark_failed()` transaction as the owner of the terminal
-  `failed` transition and `handoff.failed` event.
+- Atomically finalize the handoff as `failed` in the quota recovery transaction that restores quota
+  state and events. Only the transaction that wins the conditional transition emits the recovered
+  audit pair and `handoff.failed`; non-handoff scenario-start recovery remains unchanged.
+- Keep the router's existing separate `mark_failed()` call as an idempotent no-op after recovery.
 - Add a source-schema regression test and PostgreSQL parallel exhausted-accept coverage, plus
   focused repository/quota tests as needed.
 - Update the handoff, structured-output, quota/event durability documentation and complete this

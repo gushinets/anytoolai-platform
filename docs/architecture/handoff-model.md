@@ -81,13 +81,14 @@ The repository has explicit operations rather than a generic status update:
 | `create` | inserts only a new `created` record |
 | `get_by_id` | tenant/region-scoped internal lookup |
 | `get_by_token_hash` | tenant/region-scoped public-flow lookup |
-| `mark_viewed` | atomic unexpired, unreserved `created -> viewed`; repeat is unchanged |
-| `claim_accept` | compare-and-swap from unexpired, unreserved `created\|viewed -> accepted` |
+| `mark_viewed` | atomic unexpired `created -> viewed`; repeat is unchanged |
+| `claim_accept` | compare-and-swap from unexpired `created\|viewed -> accepted` |
 | `attach_target` | accepted record and valid target session/job linkage |
-| `decline` | atomic unexpired, unreserved `created\|viewed -> declined` |
-| `expire_if_due` | atomic due, unreserved `created\|viewed -> expired` |
+| `decline` | atomic unexpired `created\|viewed -> declined` |
+| `expire_if_due` | atomic due `created\|viewed -> expired` |
 | `consume` | `accepted -> consumed` with the matching linked durable job |
-| `mark_failed` | `created\|viewed -> failed`, including a reserved rollback failure |
+| `mark_failed` | idempotent `created\|viewed -> failed` for ordinary recovery |
+| `finalize_quota_failure_recovery` | atomic single-owner `created\|viewed -> failed` |
 
 Concurrent or sequential accept calls cannot both claim the record. A repeated accept returns
 `409 handoff_already_accepted` and does not create another target session, job, quota consumption,
@@ -144,14 +145,14 @@ transaction changes the original pre-consent row to `failed`, stores a bounded s
 emits `handoff.failed`. Acceptance conflicts are not treated as orchestration failures.
 
 Target quota exhaustion follows the same rollback rule, but quota audit state is not discarded.
-After the acceptance rollback, quota recovery atomically reserves the handoff's safe
-`quota_exhausted` failure marker. Every non-failure transition out of `created`/`viewed` requires
-that no failure is reserved, so view, accept, decline, and expiry cannot overtake the reservation.
-Only `mark_failed` may consume it. The recovery owner restores the ensured target quota row plus one
-`quota.checked` / `quota.exhausted` pair; the router's existing failure transaction then finalizes
-`failed` and emits `handoff.failed`. Correlation retains the target scenario/session chain and
-runtime `handoff_id`. The owning request returns safe `429 quota_exhausted`; concurrent requests
-may receive the safe terminal conflict. No target session, job, quota consumption,
+After the acceptance rollback, one recovery transaction conditionally finalizes the handoff as
+`failed`, stores safe `quota_exhausted`, restores the ensured target quota row, and emits the single
+`quota.checked` / `quota.exhausted` pair plus `handoff.failed`. These state and event writes commit
+or roll back together, so no durable pre-terminal failure marker exists and process interruption
+cannot strand the token in `created`/`viewed`. The router's later `mark_failed` call is an
+idempotent no-op after successful recovery. Correlation retains the target scenario/session chain
+and runtime `handoff_id`. The owning request returns safe `429 quota_exhausted`; concurrent
+requests may receive the safe terminal conflict. No target session, job, quota consumption,
 `handoff.accepted`, `handoff.declined`, `handoff.expired`, or `handoff.consumed` remains durable.
 
 ## API
