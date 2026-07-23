@@ -11,6 +11,8 @@ import pytest
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
+from anytoolai_platform_api.routers.handoffs import _service as _handoff_service
+from anytoolai_platform_core.handoffs.repository import HandoffRepository
 from anytoolai_platform_core.storage.db import (
     event_log_table,
     guest_quota_usage_table,
@@ -273,6 +275,89 @@ def test_postgresql_parallel_exhausted_handoff_accept_recovers_quota_once() -> N
         assert target_session_count == 0
         assert usage["limit_count"] == 0
         assert usage["used_count"] == 0
+    finally:
+        engine.dispose()
+        _drop_database(maintenance_url, database_name)
+
+
+@pytest.mark.postgresql
+@pytest.mark.slow
+def test_postgresql_reserved_quota_failure_blocks_decline_and_expiry() -> None:
+    maintenance_url = _require_postgres_test_url()
+    database_name = f"anytoolai_a17_handoff_reservation_test_{uuid4().hex[:12]}"
+    test_url = maintenance_url.set(database=database_name)
+    _create_database(maintenance_url, database_name)
+    engine = sa.create_engine(test_url, future=True)
+    try:
+        _upgrade_database(engine, test_url)
+        session_factory = build_session_factory(engine)
+        app = _create_test_app(session_factory)
+        with transaction_boundary(session_factory) as session:
+            source_session_id, artifact_id = _seed_handoff_source(session)
+        created = _create_handoff(app, source_session_id, artifact_id).json()
+
+        with transaction_boundary(session_factory) as session:
+            repository = HandoffRepository(session)
+            record = repository.get_by_id(
+                created["handoff_id"],
+                tenant_id="anytoolai",
+                region="default",
+            )
+            assert record is not None
+            assert repository.reserve_quota_failure_recovery(
+                record.id,
+                error_code="quota_exhausted",
+                now=record.created_at,
+            )
+
+        async def decline_reserved() -> httpx.Response:
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app),
+                base_url="http://testserver",
+            ) as client:
+                return await client.post(
+                    f"/v1/handoffs/{created['handoff_token']}/decline",
+                    headers={"X-Request-ID": "req_pg_handoff_reserved_decline"},
+                )
+
+        declined = asyncio.run(decline_reserved())
+        assert declined.status_code == HTTPStatus.CONFLICT
+        assert declined.json()["error"]["code"] == "handoff_failed"
+
+        with transaction_boundary(session_factory) as session:
+            repository = HandoffRepository(session)
+            record = repository.get_by_id(
+                created["handoff_id"],
+                tenant_id="anytoolai",
+                region="default",
+            )
+            assert record is not None
+            expiry = repository.expire_if_due(record.id, record.expires_at)
+            assert expiry.changed is False
+            failed = _handoff_service(
+                session,
+                app.state.runtime.config_registry,
+            ).mark_failed(
+                record.id,
+                tenant_id="anytoolai",
+                region="default",
+                error_code="quota_exhausted",
+            )
+            event_types = list(
+                session.execute(
+                    sa.select(event_log_table.c.event_type).where(
+                        event_log_table.c.handoff_id == record.id
+                    )
+                ).scalars()
+            )
+
+        assert failed.status.value == "failed"
+        assert failed.error_code == "quota_exhausted"
+        assert failed.declined_at is None
+        assert failed.expired_at is None
+        assert event_types.count("handoff.failed") == 1
+        assert "handoff.declined" not in event_types
+        assert "handoff.expired" not in event_types
     finally:
         engine.dispose()
         _drop_database(maintenance_url, database_name)

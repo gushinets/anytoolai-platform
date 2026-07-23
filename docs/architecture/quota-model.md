@@ -43,10 +43,11 @@ ordinary scenario-start router does. The quota service therefore registers an ex
 rollback recovery callback: after rollback it re-ensures the same usage dimension and re-emits the
 same checked/exhausted pair in an independent transaction. For handoffs, that callback first claims
 an atomic recovery reservation on the handoff row. Only the reservation owner restores state and
-emits the pair, while acceptance compare-and-swap excludes the reserved row; concurrent accepts
-therefore cannot duplicate recovery audit events for one exhausted token. Recovery never consumes
-quota. The handoff failure transaction then records `failed` with safe `quota_exhausted` and emits
-the single handoff failure event.
+emits the pair. All non-failure pre-consent transitions—view, accept, decline, and expiry—exclude a
+reserved row, so none can overtake quota failure before finalization. Concurrent accepts therefore
+cannot duplicate recovery audit events, and decline/expiry cannot leave a mixed terminal state.
+Recovery never consumes quota. The handoff failure transaction then records `failed` with safe
+`quota_exhausted` and emits the single handoff failure event.
 
 API behavior:
 

@@ -68,7 +68,10 @@ class HandoffRepository:
             from_statuses=(HandoffStatus.created,),
             to_status=HandoffStatus.viewed,
             values={"viewed_at": now, "updated_at": now},
-            extra_conditions=(product_handoffs_table.c.expires_at > now,),
+            extra_conditions=(
+                product_handoffs_table.c.expires_at > now,
+                _failure_not_reserved(),
+            ),
         )
         return HandoffTransitionResult(self._require(handoff_id), changed)
 
@@ -86,7 +89,7 @@ class HandoffRepository:
                 product_handoffs_table.c.id == handoff_id,
                 product_handoffs_table.c.status.in_([HandoffStatus.created, HandoffStatus.viewed]),
                 product_handoffs_table.c.expires_at > now,
-                product_handoffs_table.c.error_code.is_(None),
+                _failure_not_reserved(),
             )
             .values(
                 status=HandoffStatus.accepted,
@@ -114,7 +117,7 @@ class HandoffRepository:
             .where(
                 product_handoffs_table.c.id == handoff_id,
                 product_handoffs_table.c.status.in_([HandoffStatus.created, HandoffStatus.viewed]),
-                product_handoffs_table.c.error_code.is_(None),
+                _failure_not_reserved(),
             )
             .values(error_code=error_code, updated_at=now)
         )
@@ -156,7 +159,10 @@ class HandoffRepository:
             from_statuses=(HandoffStatus.created, HandoffStatus.viewed),
             to_status=HandoffStatus.declined,
             values={"declined_at": now, "updated_at": now},
-            extra_conditions=(product_handoffs_table.c.expires_at > now,),
+            extra_conditions=(
+                product_handoffs_table.c.expires_at > now,
+                _failure_not_reserved(),
+            ),
         )
         return HandoffTransitionResult(self._require(handoff_id), changed)
 
@@ -167,6 +173,7 @@ class HandoffRepository:
                 product_handoffs_table.c.id == handoff_id,
                 product_handoffs_table.c.status.in_([HandoffStatus.created, HandoffStatus.viewed]),
                 product_handoffs_table.c.expires_at <= now,
+                _failure_not_reserved(),
             )
             .values(
                 status=HandoffStatus.expired,
@@ -291,3 +298,7 @@ class HandoffRepository:
             .one_or_none()
         )
         return None if row is None else HandoffRecord(**dict(row))
+
+
+def _failure_not_reserved() -> sa.ColumnElement[bool]:
+    return product_handoffs_table.c.error_code.is_(None)

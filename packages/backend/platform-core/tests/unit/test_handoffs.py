@@ -473,6 +473,73 @@ def test_handoff_transition_cannot_cross_expiry_boundary(
         assert "handoff.accepted" not in event_types
 
 
+@pytest.mark.parametrize("competing_transition", ["decline", "expire"])
+def test_reserved_quota_failure_blocks_competing_terminal_transition(
+    tmp_path: Path,
+    competing_transition: str,
+) -> None:
+    factory = _session_factory(tmp_path)
+    registry = build_config_registry(CONFIG_ROOT)
+    created_at = datetime(2026, 7, 23, 12, 0, tzinfo=UTC)
+    with transaction_boundary(factory) as session:
+        source_id, artifact_id = _seed_source(session)
+        created = _create(
+            _service(session, registry, clock=lambda: created_at),
+            source_id,
+            artifact_id,
+        )
+        reserved = HandoffRepository(session).reserve_quota_failure_recovery(
+            created.preview.handoff_id,
+            error_code="quota_exhausted",
+            now=created_at,
+        )
+        assert reserved is True
+
+    with transaction_boundary(factory) as session:
+        service = _service(session, registry, clock=lambda: created_at)
+        if competing_transition == "decline":
+            with pytest.raises(HandoffNotActionableError) as error:
+                service.decline(
+                    created.handoff_token,
+                    tenant_id="anytoolai",
+                    region="default",
+                )
+            assert error.value.code == "handoff_failed"
+        else:
+            record = service.get_by_id(
+                created.preview.handoff_id,
+                tenant_id="anytoolai",
+                region="default",
+            )
+            unchanged = service.expire(record, now=created.preview.expires_at)
+            assert unchanged.status is HandoffStatus.created
+            assert unchanged.error_code == "quota_exhausted"
+
+    with transaction_boundary(factory) as session:
+        service = _service(session, registry)
+        failed = service.mark_failed(
+            created.preview.handoff_id,
+            tenant_id="anytoolai",
+            region="default",
+            error_code="quota_exhausted",
+        )
+        event_types = list(
+            session.execute(
+                sa.select(event_log_table.c.event_type).where(
+                    event_log_table.c.handoff_id == created.preview.handoff_id
+                )
+            ).scalars()
+        )
+
+        assert failed.status is HandoffStatus.failed
+        assert failed.error_code == "quota_exhausted"
+        assert failed.declined_at is None
+        assert failed.expired_at is None
+        assert event_types.count("handoff.failed") == 1
+        assert "handoff.declined" not in event_types
+        assert "handoff.expired" not in event_types
+
+
 @pytest.mark.parametrize(
     "terminal_status",
     [

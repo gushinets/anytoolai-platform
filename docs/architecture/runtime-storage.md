@@ -84,9 +84,12 @@ status/expiry lookups.
 `HandoffRepository` follows the caller-owned transaction rule but deliberately does not expose a
 generic status-changing update. `mark_viewed`, `claim_accept`, `decline`, `expire_if_due`,
 `consume`, and `mark_failed` use conditional SQL updates. The acceptance compare-and-swap is the
-storage-level double-accept guard, while `attach_target` validates that the record is accepted and
-the target rows belong to the same tenant/region and expected target session. State, linkage, quota,
-and events therefore commit or roll back together.
+storage-level double-accept guard. A reserved rollback failure is represented by a safe non-null
+`error_code` while the row remains `created`/`viewed`; every non-failure transition from those
+statuses requires `error_code IS NULL`, leaving `mark_failed` as the sole finalizer. This prevents
+decline or expiry from overtaking quota-failure recovery. `attach_target` validates that the record
+is accepted and the target rows belong to the same tenant/region and expected target session.
+State, linkage, quota, and events therefore commit or roll back together.
 
 ### Provider Policy Ref Compatibility
 

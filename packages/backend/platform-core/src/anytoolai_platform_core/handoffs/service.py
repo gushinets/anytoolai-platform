@@ -269,6 +269,8 @@ class HandoffService:
             current = self.expire(transition.record, now=now)
             if _token_is_expired(current, now):
                 raise HandoffExpiredError()
+            if current.error_code is not None:
+                raise HandoffNotActionableError("handoff_failed")
             raise _terminal_error(current.status)
         self._emit("handoff.declined", transition.record)
         return self.build_safe_preview(transition.record)

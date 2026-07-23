@@ -118,6 +118,8 @@ product, frontend, scenario-session/chain, guest, and `handoff_id`. This is the 
 of the ordinary scenario-start path, which commits those same events before returning HTTP 429.
 Recovery ownership is reserved atomically on the handoff row before this pair is recreated, so
 parallel claimants cannot each append their own recovered pair for the same token and outcome.
+Once reserved, view, accept, decline, and expiry compare-and-swap operations cannot change the row;
+`handoff.failed` is therefore the only permitted terminal event for that recovery outcome.
 
 When idempotent recovery encounters an existing deterministic replay-owned event whose timestamp no
 longer fits the causal sequence, recovery may repair that replay-owned timestamp. It must not
