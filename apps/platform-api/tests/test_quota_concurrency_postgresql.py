@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from dataclasses import replace
 from http import HTTPStatus
 from uuid import uuid4
 
@@ -31,6 +32,7 @@ from test_scenario_runtime_api import (
 )
 
 POSTGRES_TEST_DATABASE_URL_ENV = "ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"
+SCENARIO_START_QUOTA_LIMIT = 3
 
 
 @pytest.mark.postgresql
@@ -74,8 +76,11 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
         responses = asyncio.run(start_many())
         status_codes = [response.status_code for response in responses]
 
-        assert status_codes.count(HTTPStatus.OK) == 3
-        assert status_codes.count(HTTPStatus.TOO_MANY_REQUESTS) == request_count - 3
+        assert status_codes.count(HTTPStatus.OK) == SCENARIO_START_QUOTA_LIMIT
+        assert (
+            status_codes.count(HTTPStatus.TOO_MANY_REQUESTS)
+            == request_count - SCENARIO_START_QUOTA_LIMIT
+        )
         assert all(
             response.json()["error"]["code"] == "quota_exhausted"
             for response in responses
@@ -92,12 +97,12 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
             usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
             event_types = list(session.execute(sa.select(event_log_table.c.event_type)).scalars())
 
-        assert scenario_count == 3
-        assert job_count == 3
-        assert usage["used_count"] == 3
-        assert usage["limit_count"] == 3
-        assert event_types.count("quota.consumed") == 3
-        assert event_types.count("quota.exhausted") == request_count - 3
+        assert scenario_count == SCENARIO_START_QUOTA_LIMIT
+        assert job_count == SCENARIO_START_QUOTA_LIMIT
+        assert usage["used_count"] == SCENARIO_START_QUOTA_LIMIT
+        assert usage["limit_count"] == SCENARIO_START_QUOTA_LIMIT
+        assert event_types.count("quota.consumed") == SCENARIO_START_QUOTA_LIMIT
+        assert event_types.count("quota.exhausted") == request_count - SCENARIO_START_QUOTA_LIMIT
     finally:
         engine.dispose()
         _drop_database(maintenance_url, database_name)
@@ -164,6 +169,110 @@ def test_postgresql_parallel_handoff_accept_creates_one_target() -> None:
         assert target_session_count == 1
         assert target_job_count == 1
         assert accepted_events == 1
+    finally:
+        engine.dispose()
+        _drop_database(maintenance_url, database_name)
+
+
+@pytest.mark.postgresql
+@pytest.mark.slow
+def test_postgresql_parallel_exhausted_handoff_accept_recovers_quota_once() -> None:
+    maintenance_url = _require_postgres_test_url()
+    database_name = f"anytoolai_a17_handoff_exhausted_test_{uuid4().hex[:12]}"
+    test_url = maintenance_url.set(database=database_name)
+    _create_database(maintenance_url, database_name)
+    engine = sa.create_engine(test_url, future=True)
+    try:
+        _upgrade_database(engine, test_url)
+        session_factory = build_session_factory(engine)
+        app = _create_test_app(session_factory)
+        registry = app.state.runtime.config_registry
+        policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
+        assert policy is not None
+        app.state.runtime = replace(
+            app.state.runtime,
+            config_registry=replace(
+                registry,
+                quotas={
+                    **dict(registry.quotas),
+                    policy.quota_policy_id: replace(policy, limit_count=0),
+                },
+            ),
+        )
+        with transaction_boundary(session_factory) as session:
+            source_session_id, artifact_id = _seed_handoff_source(session)
+        created = _create_handoff(app, source_session_id, artifact_id).json()
+        request_count = 8
+
+        async def accept_many() -> list[httpx.Response]:
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app),
+                base_url="http://testserver",
+            ) as client:
+                path = f"/v1/handoffs/{created['handoff_token']}/accept"
+                return await asyncio.gather(
+                    *[
+                        client.post(
+                            path,
+                            json={},
+                            headers={"X-Request-ID": f"req_pg_handoff_exhausted_{index}"},
+                        )
+                        for index in range(request_count)
+                    ]
+                )
+
+        responses = asyncio.run(accept_many())
+        assert any(
+            response.status_code == HTTPStatus.TOO_MANY_REQUESTS
+            and response.json()["error"]["code"] == "quota_exhausted"
+            for response in responses
+        )
+        assert all(
+            response.status_code in {HTTPStatus.CONFLICT, HTTPStatus.TOO_MANY_REQUESTS}
+            for response in responses
+        )
+
+        with transaction_boundary(session_factory) as session:
+            handoff = (
+                session.execute(
+                    sa.select(product_handoffs_table).where(
+                        product_handoffs_table.c.id == created["handoff_id"]
+                    )
+                )
+                .mappings()
+                .one()
+            )
+            quota_event_types = list(
+                session.execute(
+                    sa.select(event_log_table.c.event_type).where(
+                        event_log_table.c.handoff_id == created["handoff_id"],
+                        event_log_table.c.event_type.in_(["quota.checked", "quota.exhausted"]),
+                    )
+                ).scalars()
+            )
+            handoff_failed_count = session.execute(
+                sa.select(sa.func.count())
+                .select_from(event_log_table)
+                .where(
+                    event_log_table.c.handoff_id == created["handoff_id"],
+                    event_log_table.c.event_type == "handoff.failed",
+                )
+            ).scalar_one()
+            target_session_count = session.execute(
+                sa.select(sa.func.count())
+                .select_from(scenario_sessions_table)
+                .where(scenario_sessions_table.c.parent_scenario_session_id == source_session_id)
+            ).scalar_one()
+            usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+
+        assert handoff["status"] == "failed"
+        assert handoff["error_code"] == "quota_exhausted"
+        assert quota_event_types.count("quota.checked") == 1
+        assert quota_event_types.count("quota.exhausted") == 1
+        assert handoff_failed_count == 1
+        assert target_session_count == 0
+        assert usage["limit_count"] == 0
+        assert usage["used_count"] == 0
     finally:
         engine.dispose()
         _drop_database(maintenance_url, database_name)

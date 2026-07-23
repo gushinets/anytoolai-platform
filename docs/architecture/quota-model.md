@@ -41,8 +41,12 @@ HTTP 429, and create no target session or job. Because handoff acceptance has al
 conditional accept claim inside its transaction, it cannot commit that transaction the way the
 ordinary scenario-start router does. The quota service therefore registers an exhaustion-only
 rollback recovery callback: after rollback it re-ensures the same usage dimension and re-emits the
-same checked/exhausted pair in an independent transaction. It never consumes quota during recovery.
-The handoff failure transaction then records `failed` with safe `quota_exhausted`.
+same checked/exhausted pair in an independent transaction. For handoffs, that callback first claims
+an atomic recovery reservation on the handoff row. Only the reservation owner restores state and
+emits the pair, while acceptance compare-and-swap excludes the reserved row; concurrent accepts
+therefore cannot duplicate recovery audit events for one exhausted token. Recovery never consumes
+quota. The handoff failure transaction then records `failed` with safe `quota_exhausted` and emits
+the single handoff failure event.
 
 API behavior:
 

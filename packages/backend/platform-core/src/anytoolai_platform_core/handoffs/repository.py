@@ -86,6 +86,7 @@ class HandoffRepository:
                 product_handoffs_table.c.id == handoff_id,
                 product_handoffs_table.c.status.in_([HandoffStatus.created, HandoffStatus.viewed]),
                 product_handoffs_table.c.expires_at > now,
+                product_handoffs_table.c.error_code.is_(None),
             )
             .values(
                 status=HandoffStatus.accepted,
@@ -99,6 +100,28 @@ class HandoffRepository:
             return None
         self._session.flush()
         return self._require(handoff_id)
+
+    def reserve_quota_failure_recovery(
+        self,
+        handoff_id: str,
+        *,
+        error_code: str,
+        now: datetime,
+    ) -> bool:
+        """Reserve quota rollback recovery without changing lifecycle status."""
+        result = self._session.execute(
+            sa.update(product_handoffs_table)
+            .where(
+                product_handoffs_table.c.id == handoff_id,
+                product_handoffs_table.c.status.in_([HandoffStatus.created, HandoffStatus.viewed]),
+                product_handoffs_table.c.error_code.is_(None),
+            )
+            .values(error_code=error_code, updated_at=now)
+        )
+        changed = result.rowcount > 0
+        if changed:
+            self._session.flush()
+        return changed
 
     def attach_target(
         self,

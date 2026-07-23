@@ -287,6 +287,49 @@ def test_handoff_context_must_pass_target_workflow_input_schema(tmp_path: Path) 
             _create(_service(session, strict_registry), source_id, artifact_id)
 
 
+def test_handoff_revalidates_full_source_artifact_before_mapping(tmp_path: Path) -> None:
+    factory = _session_factory(tmp_path)
+    registry = build_config_registry(CONFIG_ROOT)
+    source_schema = registry.get_schema("kernel_demo.extract_output_v1")
+    assert source_schema is not None
+    strict_registry = replace(
+        registry,
+        schemas={
+            **registry.schemas,
+            source_schema.schema_ref: replace(
+                source_schema,
+                schema={
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "minLength": 1},
+                        "fields": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                    "required": ["title", "fields"],
+                    "additionalProperties": False,
+                },
+            ),
+        },
+    )
+    with transaction_boundary(factory) as session:
+        source_id, artifact_id = _seed_source(session)
+        artifacts = ArtifactRepository(session)
+        artifact = artifacts.get(artifact_id)
+        assert artifact is not None
+        # The mapped target source_text remains valid; only an unmapped source field is invalid.
+        artifacts.update(
+            replace(
+                artifact,
+                content_json={"title": "target-valid title", "fields": "not-an-array"},
+            )
+        )
+
+        with pytest.raises(HandoffSourceInvalidError):
+            _create(_service(session, strict_registry), source_id, artifact_id)
+
+
 def test_handoff_preview_is_allowlisted_and_bounded(tmp_path: Path) -> None:
     factory = _session_factory(tmp_path)
     registry = build_config_registry(CONFIG_ROOT)
@@ -428,3 +471,115 @@ def test_handoff_transition_cannot_cross_expiry_boundary(
         assert "handoff.viewed" not in event_types
         assert "handoff.declined" not in event_types
         assert "handoff.accepted" not in event_types
+
+
+@pytest.mark.parametrize(
+    "terminal_status",
+    [
+        HandoffStatus.accepted,
+        HandoffStatus.consumed,
+        HandoffStatus.declined,
+        HandoffStatus.failed,
+    ],
+)
+def test_expired_terminal_handoff_token_is_redacted_without_mutating_state(
+    tmp_path: Path,
+    terminal_status: HandoffStatus,
+) -> None:
+    factory = _session_factory(tmp_path)
+    registry = build_config_registry(CONFIG_ROOT)
+    if terminal_status is HandoffStatus.accepted:
+        definition = registry.get_handoff("kernel_demo_source_to_target_v1")
+        assert definition is not None
+        deferred_definition = replace(
+            definition,
+            target_start_policy=HandoffStartPolicy.deferred,
+        )
+        registry = replace(
+            registry,
+            handoffs={deferred_definition.handoff_id: deferred_definition},
+        )
+
+    current = [datetime(2026, 7, 23, 12, 0, tzinfo=UTC)]
+    with transaction_boundary(factory) as session:
+        source_id, artifact_id = _seed_source(session)
+        service = _service(session, registry, clock=lambda: current[0])
+        created = _create(service, source_id, artifact_id)
+
+        if terminal_status in {HandoffStatus.accepted, HandoffStatus.consumed}:
+            service.accept(
+                created.handoff_token,
+                AcceptHandoffCommand(tenant_id="anytoolai", region="default"),
+            )
+        elif terminal_status is HandoffStatus.declined:
+            service.decline(
+                created.handoff_token,
+                tenant_id="anytoolai",
+                region="default",
+            )
+        else:
+            service.mark_failed(
+                created.preview.handoff_id,
+                tenant_id="anytoolai",
+                region="default",
+                error_code="handoff_acceptance_failed",
+            )
+
+        stored = service.get_by_id(
+            created.preview.handoff_id,
+            tenant_id="anytoolai",
+            region="default",
+        )
+        unexpired = service.get_preview(
+            created.handoff_token,
+            tenant_id="anytoolai",
+            region="default",
+        )
+        assert stored.status is terminal_status
+        assert unexpired.status is terminal_status
+        assert unexpired.preview == created.preview.preview
+        assert unexpired.target_scenario_session_id == stored.target_scenario_session_id
+        assert unexpired.target_job_id == stored.target_job_id
+
+    current[0] += timedelta(minutes=31)
+    with transaction_boundary(factory) as session:
+        service = _service(session, registry, clock=lambda: current[0])
+        expired = service.get_preview(
+            created.handoff_token,
+            tenant_id="anytoolai",
+            region="default",
+        )
+        assert expired.status is HandoffStatus.expired
+        assert expired.preview == {}
+        assert expired.target_scenario_session_id is None
+        assert expired.target_job_id is None
+
+        with pytest.raises(HandoffExpiredError):
+            service.accept(
+                created.handoff_token,
+                AcceptHandoffCommand(tenant_id="anytoolai", region="default"),
+            )
+        with pytest.raises(HandoffExpiredError):
+            service.decline(
+                created.handoff_token,
+                tenant_id="anytoolai",
+                region="default",
+            )
+
+        stored = service.get_by_id(
+            created.preview.handoff_id,
+            tenant_id="anytoolai",
+            region="default",
+        )
+        event_types = list(
+            session.execute(
+                sa.select(event_log_table.c.event_type).where(
+                    event_log_table.c.handoff_id == created.preview.handoff_id
+                )
+            ).scalars()
+        )
+        assert stored.status is terminal_status
+        assert stored.expired_at is None
+        assert stored.target_scenario_session_id == unexpired.target_scenario_session_id
+        assert stored.target_job_id == unexpired.target_job_id
+        assert "handoff.expired" not in event_types

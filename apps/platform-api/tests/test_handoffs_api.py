@@ -176,6 +176,32 @@ def test_handoff_api_create_preview_accept_decline_and_expiry(tmp_path: Path) ->
     assert repeated.status_code == HTTPStatus.CONFLICT
     assert repeated.json()["error"]["code"] == "handoff_already_accepted"
 
+    with transaction_boundary(factory) as session:
+        session.execute(
+            sa.update(product_handoffs_table)
+            .where(product_handoffs_table.c.id == created_payload["handoff_id"])
+            .values(expires_at=datetime.now(UTC) - timedelta(seconds=1))
+        )
+    expired_consumed = asyncio.run(_request(app, "GET", f"/v1/handoffs/{token}"))
+    assert expired_consumed.status_code == HTTPStatus.OK
+    assert expired_consumed.json()["status"] == "expired"
+    assert expired_consumed.json()["preview"] == {}
+    assert expired_consumed.json()["target_scenario_session_id"] is None
+    assert expired_consumed.json()["target_job_id"] is None
+    with transaction_boundary(factory) as session:
+        durable_consumed = (
+            session.execute(
+                sa.select(product_handoffs_table).where(
+                    product_handoffs_table.c.id == created_payload["handoff_id"]
+                )
+            )
+            .mappings()
+            .one()
+        )
+        assert durable_consumed["status"] == "consumed"
+        assert durable_consumed["target_scenario_session_id"] is not None
+        assert durable_consumed["target_job_id"] is not None
+
     declined_created = _create(app, source_id, artifact_id).json()
     declined = asyncio.run(
         _request(app, "POST", f"/v1/handoffs/{declined_created['handoff_token']}/decline")
@@ -193,6 +219,9 @@ def test_handoff_api_create_preview_accept_decline_and_expiry(tmp_path: Path) ->
     expired = asyncio.run(_request(app, "GET", f"/v1/handoffs/{expired_created['handoff_token']}"))
     assert expired.status_code == HTTPStatus.OK
     assert expired.json()["status"] == "expired"
+    assert expired.json()["preview"] == {}
+    assert expired.json()["target_scenario_session_id"] is None
+    assert expired.json()["target_job_id"] is None
     expired_accept = asyncio.run(
         _request(app, "POST", f"/v1/handoffs/{expired_created['handoff_token']}/accept", {})
     )

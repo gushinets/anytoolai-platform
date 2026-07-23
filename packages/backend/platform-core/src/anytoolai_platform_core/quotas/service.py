@@ -5,10 +5,12 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session, sessionmaker
 
 from anytoolai_platform_core.common.errors import PlatformError
+from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.handoffs.repository import HandoffRepository
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.identity.service import GuestIdentityNotFoundError
 from anytoolai_platform_core.quotas.models import (
@@ -400,6 +402,19 @@ def _recover_quota_exhaustion(
     recovery: QuotaExhaustionRecovery,
 ) -> None:
     with transaction_boundary(recovery_session_factory) as session:
+        if recovery.handoff_id is not None:
+            handoffs = HandoffRepository(session)
+            handoff = handoffs.get_by_id(
+                recovery.handoff_id,
+                tenant_id=recovery.tenant_id,
+                region=recovery.region,
+            )
+            if handoff is not None and not handoffs.reserve_quota_failure_recovery(
+                handoff.id,
+                error_code="quota_exhausted",
+                now=utc_now(),
+            ):
+                return
         quota_repository = QuotaUsageRepository(session)
         usage = quota_repository.ensure_usage(
             tenant_id=recovery.tenant_id,

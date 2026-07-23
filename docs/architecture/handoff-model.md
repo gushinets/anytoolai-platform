@@ -38,22 +38,26 @@ destinations.
 Creation accepts only the selected completed source session's latest succeeded job result. The
 selected artifact must be a stored JSON-object `structured_output`, belong to that session and job,
 have no action-run owner, and carry `metadata.artifact_role: workflow_result` plus workflow/schema
-metadata from normal finalization.
+metadata from normal finalization. Because artifact rows remain mutable runtime state, creation also
+revalidates the complete `content_json` object with the source workflow's declared output schema
+before resolving any mapping. Provenance metadata alone is not evidence that the current body is
+still schema-valid.
 
 `HandoffPayloadBuilder` resolves only allowlisted config paths. The mapped target context must pass
-the target workflow input schema. Raw provider responses, structured-output debug artifacts,
-prompts, provider/model fields, provider-call metadata, and the complete source artifact are never
-stored in the handoff row or returned to the frontend.
+the target workflow input schema after the full source validation. Raw provider responses,
+structured-output debug artifacts, prompts, provider/model fields, provider-call metadata, and the
+complete source artifact are never stored in the handoff row or returned to the frontend.
 
 ## Tokens and expiry
 
 - Token format: `hnd_` plus `secrets.token_urlsafe(32)` (256 bits of random input).
 - Storage: only `sha256(token).hexdigest()` is persisted; plaintext is returned once on creation.
 - Default lifetime: 30 minutes; the service clock and TTL are injectable for tests.
-- Expiry is enforced before preview, accept, and decline.
-- Only `created` and `viewed` can expire. Consent already recorded as `accepted` does not later
-  expire.
-- Unknown tokens return safe `404`; accepting an expired token returns safe `410`.
+- Token TTL is enforced before preview, accept, and decline for every lifecycle status.
+- Only `created` and `viewed` rows transition to durable `expired`. Terminal `accepted`, `consumed`,
+  `declined`, and `failed` rows retain their auditable status after token TTL elapses.
+- Unknown tokens return safe `404`; accepting or declining through an expired token returns safe
+  `410` regardless of the stored lifecycle status.
 - Structured application request logs use route templates such as
   `/v1/handoffs/{handoff_token}` and never the plaintext token. The supported API launch disables
   Uvicorn's separate plaintext access logger because it would otherwise log the raw bearer URL;
@@ -105,8 +109,9 @@ Preview data comes only from `preview_mapping`. It is JSON-safe and deterministi
 four nesting levels, 20 items per collection, 512 characters per string, and 8 KiB serialized.
 Target context is separate, is not truncated, and must validate against the target input schema.
 The response never exposes token hashes, mapped target context, source session/job/artifact IDs,
-artifact metadata, prompts, providers/models, or debug fields. An expired preview returns HTTP 200
-with `status: expired` so a consent UI can render a safe terminal page.
+artifact metadata, prompts, providers/models, or debug fields. An expired token preview returns
+HTTP 200 with `status: expired`, an empty `preview`, and null target session/job identifiers so a
+consent UI can render a safe terminal page without retaining bearer access to terminal details.
 
 ## Acceptance and session linkage
 
@@ -139,10 +144,14 @@ transaction changes the original pre-consent row to `failed`, stores a bounded s
 emits `handoff.failed`. Acceptance conflicts are not treated as orchestration failures.
 
 Target quota exhaustion follows the same rollback rule, but quota audit state is not discarded.
-The quota service recovers the ensured target quota row plus `quota.checked` and
-`quota.exhausted` after the acceptance rollback, retaining target scenario/session-chain and
-runtime `handoff_id` correlation. The API returns safe `429 quota_exhausted`; no target session,
-job, quota consumption, `handoff.accepted`, or `handoff.consumed` remains durable.
+After the acceptance rollback, quota recovery atomically reserves the handoff's safe
+`quota_exhausted` failure marker. Acceptance compare-and-swap excludes a reserved row, and only the
+recovery owner restores the ensured target quota row plus one `quota.checked` / `quota.exhausted`
+pair. The router's existing failure transaction then finalizes `failed` and emits
+`handoff.failed`. Correlation retains the target scenario/session chain and runtime `handoff_id`.
+The owning request returns safe `429 quota_exhausted`; concurrent requests may receive the safe
+terminal conflict. No target session, job, quota consumption, `handoff.accepted`, or
+`handoff.consumed` remains durable.
 
 ## API
 

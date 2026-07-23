@@ -15,7 +15,11 @@ from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.handoffs.models import HandoffDefinition
 from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
+from anytoolai_platform_core.structured_output.errors import StructuredOutputError
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
+from anytoolai_platform_core.structured_output.validator import (
+    validate_structured_output_value,
+)
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 
@@ -106,7 +110,19 @@ class HandoffPayloadBuilder:
         ):
             raise HandoffPayloadError("source artifact is not a canonical workflow result")
 
-        normalized_artifact = {str(key): value for key, value in artifact.content_json.items()}
+        try:
+            validated_source = validate_structured_output_value(
+                artifact.content_json,
+                schema=source_schema.schema,
+                schema_ref=source_schema.schema_ref,
+                schema_version=source_schema.version,
+            )
+        except StructuredOutputError as exc:
+            raise HandoffPayloadError(
+                "source artifact is invalid for its workflow output schema"
+            ) from exc
+        normalized_artifact = validated_source.normalized_output
+        assert isinstance(normalized_artifact, dict)
         context_payload = _apply_mapping(definition.context_mapping, normalized_artifact)
         preview_payload = _safe_preview(
             _apply_mapping(definition.preview_mapping, normalized_artifact)

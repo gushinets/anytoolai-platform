@@ -142,7 +142,10 @@ class HandoffService:
 
     def get_preview(self, token: str, *, tenant_id: str, region: str) -> HandoffPreview:
         record = self._by_token(token, tenant_id=tenant_id, region=region)
-        record = self.expire(record)
+        now = self._clock()
+        record = self.expire(record, now=now)
+        if _token_is_expired(record, now):
+            return self.build_safe_preview(record, redact_expired_token=True)
         if record.status is HandoffStatus.created:
             now = self._clock()
             transition = self._repository.mark_viewed(record.id, now)
@@ -151,12 +154,15 @@ class HandoffService:
                 self._emit("handoff.viewed", record)
             else:
                 record = self.expire(record, now=now)
+                if _token_is_expired(record, now):
+                    return self.build_safe_preview(record, redact_expired_token=True)
         return self.build_safe_preview(record)
 
     def accept(self, token: str, command: AcceptHandoffCommand) -> HandoffAccepted:
         record = self._by_token(token, tenant_id=command.tenant_id, region=command.region)
-        record = self.expire(record)
-        if record.status is HandoffStatus.expired:
+        now = self._clock()
+        record = self.expire(record, now=now)
+        if _token_is_expired(record, now):
             raise HandoffExpiredError()
         if record.status not in {HandoffStatus.created, HandoffStatus.viewed}:
             raise _terminal_error(record.status)
@@ -181,6 +187,10 @@ class HandoffService:
         if claimed is None:
             current = self.get_by_id(record.id, tenant_id=command.tenant_id, region=command.region)
             current = self.expire(current, now=now)
+            if _token_is_expired(current, now):
+                raise HandoffExpiredError()
+            if current.error_code is not None:
+                raise HandoffNotActionableError("handoff_failed")
             raise _terminal_error(current.status)
         target_session_id = new_id("scenario_session")
         try:
@@ -246,13 +256,19 @@ class HandoffService:
         return HandoffAccepted(preview=self.build_safe_preview(attached))
 
     def decline(self, token: str, *, tenant_id: str, region: str) -> HandoffPreview:
-        record = self.expire(self._by_token(token, tenant_id=tenant_id, region=region))
-        if record.status is HandoffStatus.expired:
+        now = self._clock()
+        record = self.expire(
+            self._by_token(token, tenant_id=tenant_id, region=region),
+            now=now,
+        )
+        if _token_is_expired(record, now):
             raise HandoffExpiredError()
         now = self._clock()
         transition = self._repository.decline(record.id, now)
         if not transition.changed:
             current = self.expire(transition.record, now=now)
+            if _token_is_expired(current, now):
+                raise HandoffExpiredError()
             raise _terminal_error(current.status)
         self._emit("handoff.declined", transition.record)
         return self.build_safe_preview(transition.record)
@@ -299,23 +315,30 @@ class HandoffService:
             )
         return transition.record
 
-    def build_safe_preview(self, record: HandoffRecord) -> HandoffPreview:
+    def build_safe_preview(
+        self,
+        record: HandoffRecord,
+        *,
+        redact_expired_token: bool = False,
+    ) -> HandoffPreview:
         source = self._registry.get_product(record.source_product_id)
         target = self._registry.get_product(record.target_product_id)
         if source is None or target is None:
             raise RuntimeError("handoff product config is unavailable")
         return HandoffPreview(
             handoff_id=record.id,
-            status=record.status,
+            status=HandoffStatus.expired if redact_expired_token else record.status,
             source_product_id=source.product_id,
             source_product_display_name=source.display_name,
             target_product_id=target.product_id,
             target_product_display_name=target.display_name,
             target_scenario_id=record.target_scenario_id,
-            preview=dict(record.preview_payload),
+            preview={} if redact_expired_token else dict(record.preview_payload),
             expires_at=record.expires_at,
-            target_scenario_session_id=record.target_scenario_session_id,
-            target_job_id=record.target_job_id,
+            target_scenario_session_id=(
+                None if redact_expired_token else record.target_scenario_session_id
+            ),
+            target_job_id=None if redact_expired_token else record.target_job_id,
         )
 
     def _by_token(self, token: str, *, tenant_id: str, region: str) -> HandoffRecord:
@@ -386,3 +409,7 @@ def _safe_error_code(error_code: str) -> str:
     ):
         return error_code
     return "handoff_acceptance_failed"
+
+
+def _token_is_expired(record: HandoffRecord, now: datetime) -> bool:
+    return record.expires_at <= now

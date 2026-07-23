@@ -94,6 +94,9 @@ That means:
 - final validation failure creates a `structured_output_debug_raw` artifact
 - canonical `action_runs.output_artifact_id` may point only to a real `structured_output` artifact;
   debug raw artifacts stay debug-only and must not become the canonical result pointer
+- consumers that cross a trust boundary after persistence, including handoff creation, revalidate
+  the complete mutable artifact body against its declared workflow output schema before deriving a
+  mapped subset
 
 ## Safety
 

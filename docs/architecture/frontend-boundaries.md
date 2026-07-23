@@ -149,10 +149,12 @@ The create response is the only response containing the opaque plaintext token. 
 treat it as a short-lived bearer capability, avoid analytics/logging/storage beyond the consent
 navigation need, and never derive or inspect its contents.
 
-The preview response contains only display-safe product/scenario identity, status, expiry, bounded
-config-mapped preview data, and nullable target session/job ids. It never contains hidden target
-context, source artifact/session/job identifiers, token hashes, artifact metadata, prompts,
-providers/models, or debug data. The backend remains authoritative for expiry and terminal status.
+The unexpired preview response contains only display-safe product/scenario identity, status,
+expiry, bounded config-mapped preview data, and nullable target session/job ids. It never contains
+hidden target context, source artifact/session/job identifiers, token hashes, artifact metadata,
+prompts, providers/models, or debug data. After token TTL, preview content and linked target
+identifiers are redacted even when the durable handoff remains in a terminal accepted, consumed,
+declined, or failed state. The backend remains authoritative for expiry and terminal status.
 
 Accept creates and links the target session. An immediate definition may return a target job; a
 deferred definition returns a retrievable `waiting_for_user/handoff_ready` target session with
