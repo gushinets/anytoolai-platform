@@ -5,13 +5,14 @@
 
 ## Status
 
-- State: completed
+- State: blocked
 - Owner: agent
 - Created: 2026-07-23
 - Last updated: 2026-07-23
 - Review date: 2026-07-23
 - Next action: run PostgreSQL-marked coverage in CI or a configured local environment
-- Blocker: none
+- Blocker: validation incomplete because the required PostgreSQL-marked concurrency coverage has
+  not passed; `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` is not configured locally
 
 ## Goal
 

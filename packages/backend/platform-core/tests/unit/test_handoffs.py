@@ -14,6 +14,7 @@ from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.handoffs.events import emit_handoff_event
 from anytoolai_platform_core.handoffs.models import (
     AcceptHandoffCommand,
     CreateHandoffCommand,
@@ -54,6 +55,53 @@ def test_handoff_token_service_enforces_256_bit_minimum() -> None:
     assert len(HandoffTokenService.hash(token)) == SHA256_HEX_LENGTH
     with pytest.raises(ValueError, match="at least 256 bits"):
         HandoffTokenService(entropy_bytes=31).generate()
+
+
+def test_handoff_event_helper_preserves_canonical_correlation(tmp_path: Path) -> None:
+    factory = _session_factory(tmp_path)
+    registry = build_config_registry(CONFIG_ROOT)
+    with transaction_boundary(factory) as session:
+        source_session_id, artifact_id = _seed_source(session)
+        created = _create(_service(session, registry), source_session_id, artifact_id)
+        record = HandoffRepository(session).get_by_id(
+            created.preview.handoff_id,
+            tenant_id="anytoolai",
+            region="default",
+        )
+        assert record is not None
+
+        emit_handoff_event(
+            EventEmitter(EventLogRepository(session)),
+            "handoff.viewed",
+            record,
+            properties={
+                "handoff_id": "caller_handoff",
+                "source_scenario_session_id": "caller_source_session",
+                "target_scenario_session_id": "caller_target_session",
+                "source_job_id": "caller_source_job",
+                "source_artifact_id": "caller_source_artifact",
+            },
+        )
+        event_row = (
+            session.execute(
+                sa.select(event_log_table).where(event_log_table.c.event_type == "handoff.viewed")
+            )
+            .mappings()
+            .one()
+        )
+
+        assert event_row["handoff_id"] == record.id
+        assert event_row["scenario_session_id"] == record.source_scenario_session_id
+        assert event_row["job_id"] == record.source_job_id
+        assert event_row["artifact_id"] == record.source_artifact_id
+        assert event_row["properties"]["handoff_id"] == record.id
+        assert (
+            event_row["properties"]["source_scenario_session_id"]
+            == record.source_scenario_session_id
+        )
+        assert event_row["properties"]["target_scenario_session_id"] is None
+        assert event_row["properties"]["source_job_id"] == record.source_job_id
+        assert event_row["properties"]["source_artifact_id"] == record.source_artifact_id
 
 
 def _session_factory(tmp_path: Path):
@@ -520,6 +568,8 @@ def test_quota_recovery_finalizes_failure_without_router_transaction(tmp_path: P
 
         assert failed.status is HandoffStatus.failed
         assert failed.error_code == "quota_exhausted"
+        assert failed.target_scenario_session_id is None
+        assert failed.target_job_id is None
         assert event_types.count("handoff.failed") == 1
         assert event_types.count("quota.checked") == 1
         assert event_types.count("quota.exhausted") == 1
