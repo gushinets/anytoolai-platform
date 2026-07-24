@@ -211,6 +211,58 @@ def test_loader_rejects_conflicting_handoff_mapping_target_paths(
 
 
 @pytest.mark.parametrize("field_name", ["context_mapping", "preview_mapping"])
+def test_loader_rejects_duplicate_handoff_mapping_target_with_identity(
+    tmp_path: Path,
+    field_name: str,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    duplicate_mapping = [
+        f"    {field_name}:",
+        "      summary.title: artifact.content_json.title",
+        "      summary.title: artifact.content_json.fields",
+    ]
+    other_field_name = (
+        "preview_mapping" if field_name == "context_mapping" else "context_mapping"
+    )
+    valid_mapping = [
+        f"    {other_field_name}:",
+        "      title: artifact.content_json.title",
+    ]
+    handoff_path.write_text(
+        "\n".join(
+            [
+                "handoffs:",
+                "  - handoff_id: kernel_demo_source_to_target_v1",
+                "    source_product_id: kernel_demo",
+                "    source_scenario_id: kernel_demo.handoff_smoke_source_v1",
+                "    target_product_id: kernel_demo",
+                "    target_frontend_id: kernel_demo_ce",
+                "    target_scenario_id: kernel_demo.handoff_smoke_target_v1",
+                "    target_start_policy: immediate",
+                "    consent_required: true",
+                *duplicate_mapping,
+                *valid_mapping,
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=handoff_path,
+        config_id="kernel_demo_source_to_target_v1",
+        ref_type=field_name,
+        ref_value="summary.title",
+        message_part="target path is duplicated: summary.title",
+    )
+
+
+@pytest.mark.parametrize("field_name", ["context_mapping", "preview_mapping"])
 def test_loader_accepts_non_conflicting_handoff_mapping_siblings(
     tmp_path: Path,
     field_name: str,

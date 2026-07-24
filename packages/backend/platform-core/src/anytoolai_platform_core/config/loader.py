@@ -305,7 +305,18 @@ def _build_unique_key_yaml_loader(
     file_path: Path,
 ) -> type[yaml.SafeLoader]:
     class _UniqueKeySafeLoader(yaml.SafeLoader):
-        pass
+        def construct_document(self, node: yaml.nodes.Node) -> Any:
+            duplicate = _find_handoff_mapping_target_duplicate(node)
+            if duplicate is not None:
+                handoff_id, field_name, target_path = duplicate
+                raise InvalidConfigShapeError(
+                    file_path,
+                    f"Handoff {field_name} target path is duplicated: {target_path}",
+                    config_id=handoff_id,
+                    ref_type=field_name,
+                    ref_value=target_path,
+                )
+            return super().construct_document(node)
 
     def _construct_mapping(
         loader: yaml.SafeLoader,
@@ -330,6 +341,51 @@ def _build_unique_key_yaml_loader(
         _construct_mapping,
     )
     return _UniqueKeySafeLoader
+
+
+def _find_handoff_mapping_target_duplicate(
+    root: yaml.nodes.Node,
+) -> tuple[str | None, str, str] | None:
+    handoffs = _yaml_mapping_value(root, "handoffs")
+    if not isinstance(handoffs, yaml.nodes.SequenceNode):
+        return None
+    for handoff in handoffs.value:
+        if not isinstance(handoff, yaml.nodes.MappingNode):
+            continue
+        handoff_id_node = _yaml_mapping_value(handoff, "handoff_id")
+        handoff_id = (
+            handoff_id_node.value
+            if isinstance(handoff_id_node, yaml.nodes.ScalarNode)
+            else None
+        )
+        for field_name in ("context_mapping", "preview_mapping"):
+            mapping = _yaml_mapping_value(handoff, field_name)
+            if not isinstance(mapping, yaml.nodes.MappingNode):
+                continue
+            seen_targets: set[str] = set()
+            for target_node, _source_node in mapping.value:
+                if (
+                    not isinstance(target_node, yaml.nodes.ScalarNode)
+                    or target_node.tag != "tag:yaml.org,2002:str"
+                ):
+                    continue
+                target_path = target_node.value
+                if target_path in seen_targets:
+                    return handoff_id, field_name, target_path
+                seen_targets.add(target_path)
+    return None
+
+
+def _yaml_mapping_value(
+    node: yaml.nodes.Node,
+    key: str,
+) -> yaml.nodes.Node | None:
+    if not isinstance(node, yaml.nodes.MappingNode):
+        return None
+    for key_node, value_node in node.value:
+        if isinstance(key_node, yaml.nodes.ScalarNode) and key_node.value == key:
+            return value_node
+    return None
 
 
 def _handoff_mapping(

@@ -90,6 +90,76 @@ def test_handoff_preview_mapping_executes_non_conflicting_nested_siblings(
     }
 
 
+def test_handoff_context_mapping_executes_non_conflicting_nested_siblings(
+    tmp_path: Path,
+) -> None:
+    registry = build_config_registry(CONFIG_ROOT)
+    definition = registry.get_handoff("kernel_demo_source_to_target_v1")
+    assert definition is not None
+    target_scenario = registry.get_scenario(definition.target_scenario_id)
+    assert target_scenario is not None
+    target_workflow = registry.get_workflow(target_scenario.workflow_id)
+    assert target_workflow is not None
+    target_schema = registry.get_schema(target_workflow.input_schema_ref)
+    assert target_schema is not None
+    registry = replace(
+        registry,
+        handoffs={
+            **dict(registry.handoffs),
+            definition.handoff_id: replace(
+                definition,
+                context_mapping={
+                    "request.source_text": "artifact.content_json.title",
+                    "request.fields": "artifact.content_json.fields",
+                },
+            ),
+        },
+        schemas={
+            **dict(registry.schemas),
+            target_schema.schema_ref: replace(
+                target_schema,
+                schema={
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "type": "object",
+                            "properties": {
+                                "source_text": {"type": "string"},
+                                "fields": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                            },
+                            "required": ["source_text", "fields"],
+                            "additionalProperties": False,
+                        }
+                    },
+                    "required": ["request"],
+                    "additionalProperties": False,
+                },
+            ),
+        },
+    )
+    factory = _session_factory(tmp_path)
+
+    with transaction_boundary(factory) as session:
+        source_session_id, artifact_id = _seed_source(session)
+        created = _create(_service(session, registry), source_session_id, artifact_id)
+        record = HandoffRepository(session).get_by_id(
+            created.preview.handoff_id,
+            tenant_id="anytoolai",
+            region="default",
+        )
+
+    assert record is not None
+    assert record.context_payload == {
+        "request": {
+            "source_text": "Safe summary",
+            "fields": ["deadline", "budget"],
+        }
+    }
+
+
 def test_handoff_event_helper_preserves_canonical_correlation(tmp_path: Path) -> None:
     factory = _session_factory(tmp_path)
     registry = build_config_registry(CONFIG_ROOT)

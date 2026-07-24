@@ -2,14 +2,14 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-07-24
 - Last updated: 2026-07-24
 - Review date: 2026-07-24
-- Next action: commit and push the reviewed changes, then confirm final CI
-- Blocker: publication was not requested; the local canonical quick-check wrapper timed out during
-  aggregate pytest, although its exact 346 fast pytest targets passed in isolated groups
+- Completed: 2026-07-24
+- Next action: commit and publish when requested
+- Blocker: none
 
 ## Goal
 
@@ -48,20 +48,21 @@ order, while preserving valid sibling mappings.
 ## Implementation steps
 
 - [x] Add deterministic prefix-collision validation to the config loader.
-- [x] Add acceptance-criteria tests for context and preview mappings.
+- [x] Preserve handoff id and mapping type in duplicate-target diagnostics.
+- [x] Add duplicate-target and nested-context execution coverage.
+- [x] Add prefix-conflict tests for context and preview mappings.
 - [x] Update stale A17 execution-plan validation evidence.
 - [x] Correct remaining A17 review documentation to use canonical runner commands.
 - [x] Replace PR #36's empty template with a complete description and validation record.
 
 ## Validation
 
-- [ ] `python scripts/agent/runner.py quick-check` final wrapper/CI run after publication
-- [x] Exact fast quick-check pytest target set: 346 passed in isolated groups
+- [x] `python scripts/agent/runner.py quick-check`: 349 passed, 5 deselected
 - [x] `python scripts/agent/runner.py validate-configs`
 - [x] `python scripts/agent/runner.py validate-architecture`
 - [x] `python scripts/agent/runner.py validate-docs`
 - [x] `python scripts/agent/runner.py generate-docs --check`
-- [x] Focused config-loader and handoff tests: 59 passed
+- [x] Focused config-loader and handoff tests: 62 passed
 
 ## Decision log
 
@@ -77,6 +78,8 @@ order, while preserving valid sibling mappings.
 | 2026-07-24 | Confirmed ANY-144 scope and current PR head. | Run doctor, implement validation, and add tests. |
 | 2026-07-24 | Added collision validation and tests; 59 focused tests passed. | Reconcile review documentation and run canonical checks. |
 | 2026-07-24 | All implementation, documentation, PR-description, and local validation work completed. | Publish the changes and confirm final CI. |
+| 2026-07-24 | Review found that duplicate YAML targets lose handoff/mapping diagnostic context and lack dedicated tests. | Add the YAML-node precheck and nested context execution coverage. |
+| 2026-07-24 | Added handoff-aware duplicate diagnostics and missing tests; focused and canonical checks passed. | Commit and publish when requested. |
 
 ## Open questions
 
