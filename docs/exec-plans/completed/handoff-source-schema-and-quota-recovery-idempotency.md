@@ -2,15 +2,12 @@
 
 ## Status
 
-- State: blocked
+- State: completed
 - Owner: agent
 - Created: 2026-07-23
-- Last updated: 2026-07-23 (atomic recovery finalization follow-up)
-- Review date: 2026-07-23
-- Next action: run and pass the PostgreSQL-marked concurrency test in CI or against a configured
-  local PostgreSQL database
-- Blocker: validation incomplete; the required PostgreSQL-marked concurrency test has not passed
-  because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was unset and Docker was not running locally
+- Last updated: 2026-07-24
+- Completed: 2026-07-24
+- Blocker: none
 
 ## Scope
 
@@ -60,8 +57,9 @@ quick-check.
 - Focused structured-output, handoff, quota, and API tests: 36 passed.
 - Full platform-core suite: passed.
 - Full platform-api suite: passed with the three PostgreSQL-marked tests skipped.
-- New PostgreSQL concurrency test collected successfully; execution requires the documented
-  maintenance database URL, was unavailable locally, and remains required before completion.
+- PostgreSQL concurrency coverage passed in the current-head `postgresql-quota-concurrency`
+  GitHub Actions job
+  ([run 30017299390](https://github.com/gushinets/anytoolai-platform/actions/runs/30017299390)).
 - Config, architecture, documentation, generated-doc freshness, source lint, and format checks
   passed.
 - Exact canonical DB-free aggregate: 335 passed.

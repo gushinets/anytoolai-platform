@@ -30,8 +30,9 @@ Each `handoffs.yaml` definition declares:
 
 The config loader rejects unknown or mismatched products/scenarios/frontends, disabled target
 frontends, non-consensual definitions, missing mappings, and paths outside
-`artifact.content_json`. Routes are therefore deployment-owned config, not arbitrary user-created
-destinations.
+`artifact.content_json`. It also rejects duplicate or prefix-conflicting mapping targets so nested
+payload construction never depends on YAML declaration order. Routes are therefore
+deployment-owned config, not arbitrary user-created destinations.
 
 ## Canonical source artifact
 

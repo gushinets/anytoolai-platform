@@ -2,15 +2,12 @@
 
 ## Status
 
-- State: blocked
+- State: completed
 - Owner: agent
 - Created: 2026-07-23
-- Last updated: 2026-07-23
-- Review date: 2026-07-23
-- Next action: run and pass the PostgreSQL-marked recovery test in CI or against a configured local
-  PostgreSQL database
-- Blocker: validation incomplete because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` is not configured
-  locally
+- Last updated: 2026-07-24
+- Completed: 2026-07-24
+- Blocker: none
 
 ## Goal
 
@@ -43,8 +40,8 @@ is terminal, so recovery can become the durable finalization owner without chang
 ## Validation result
 
 - Focused handoff, quota, and API tests: 31 passed.
-- PostgreSQL suite: four tests collected and skipped because the local maintenance database URL was
-  not configured.
+- PostgreSQL suite: passed in the current-head `postgresql-quota-concurrency` GitHub Actions job
+  ([run 30017299390](https://github.com/gushinets/anytoolai-platform/actions/runs/30017299390)).
 - Canonical quick-check: 336 passed, 5 deselected.
 - Config, architecture, documentation, generated-doc freshness, source lint, formatting, and diff
   checks passed.

@@ -57,6 +57,39 @@ def test_handoff_token_service_enforces_256_bit_minimum() -> None:
         HandoffTokenService(entropy_bytes=31).generate()
 
 
+def test_handoff_preview_mapping_executes_non_conflicting_nested_siblings(
+    tmp_path: Path,
+) -> None:
+    registry = build_config_registry(CONFIG_ROOT)
+    definition = registry.get_handoff("kernel_demo_source_to_target_v1")
+    assert definition is not None
+    registry = replace(
+        registry,
+        handoffs={
+            **dict(registry.handoffs),
+            definition.handoff_id: replace(
+                definition,
+                preview_mapping={
+                    "summary.title": "artifact.content_json.title",
+                    "summary.fields": "artifact.content_json.fields",
+                },
+            ),
+        },
+    )
+    factory = _session_factory(tmp_path)
+
+    with transaction_boundary(factory) as session:
+        source_session_id, artifact_id = _seed_source(session)
+        created = _create(_service(session, registry), source_session_id, artifact_id)
+
+    assert created.preview.preview == {
+        "summary": {
+            "title": "Safe summary",
+            "fields": ["deadline", "budget"],
+        }
+    }
+
+
 def test_handoff_event_helper_preserves_canonical_correlation(tmp_path: Path) -> None:
     factory = _session_factory(tmp_path)
     registry = build_config_registry(CONFIG_ROOT)

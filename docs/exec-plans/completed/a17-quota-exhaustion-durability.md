@@ -48,11 +48,12 @@ persisting the handoff as failed.
 
 ## Validation
 
-- [x] `python -m pytest packages/backend/platform-core/tests -q`
-- [x] `python -m pytest apps/platform-api/tests -q`
-- [x] `python scripts/agent/quick_check.py` attempted; product gates passed, while aggregate pytest
-  hit the pre-existing protected `.quick-check-tmp/pytest/pytest-of-jackd` Windows ACL.
-- [x] `python scripts/agent/runner.py quick-check` verified with the same ACL-only wrapper failure.
+- [x] `python scripts/agent/runner.py full-check` passed in current-head CI, including the backend
+  package and platform API test suites
+  ([run 30017299390](https://github.com/gushinets/anytoolai-platform/actions/runs/30017299390)).
+- [x] `python scripts/agent/runner.py quick-check` passed in current-head Windows and Linux CI. An
+  earlier local run reached the pre-existing protected
+  `.quick-check-tmp/pytest/pytest-of-jackd` Windows ACL.
 - [x] The wrapper's exact aggregate selection passed with an explicit writable base temp:
   325 passed, 3 deselected.
 - [x] Config, architecture, docs, generated-doc freshness, Ruff, and diff checks passed.

@@ -392,7 +392,33 @@ def _handoff_mapping(
                 ref_value=ref_value,
             )
         normalized[target] = source
+    conflict = _find_handoff_mapping_target_conflict(normalized)
+    if conflict is not None:
+        parent_path, nested_path = conflict
+        raise InvalidConfigShapeError(
+            path,
+            (
+                f"Handoff {field_name} target paths conflict: "
+                f"{parent_path} is a prefix of {nested_path}"
+            ),
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=f"{parent_path} <> {nested_path}",
+        )
     return normalized
+
+
+def _find_handoff_mapping_target_conflict(
+    mapping: dict[str, str],
+) -> tuple[str, str] | None:
+    parsed_paths = sorted((tuple(path.split(".")), path) for path in mapping)
+    for index, (parent_parts, parent_path) in enumerate(parsed_paths):
+        for nested_parts, nested_path in parsed_paths[index + 1 :]:
+            if len(parent_parts) < len(nested_parts) and (
+                nested_parts[: len(parent_parts)] == parent_parts
+            ):
+                return parent_path, nested_path
+    return None
 
 
 class ConfigLoader:

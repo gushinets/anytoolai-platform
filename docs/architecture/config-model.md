@@ -164,7 +164,9 @@ An MVP-A handoff definition explicitly owns `handoff_id`, source product/scenari
 product/frontend/scenario, `consent_required`, `target_start_policy`, `context_mapping`, and
 `preview_mapping`. Consent must be true. Mapping values may read only
 `artifact.content_json...`; context fields become target input and preview fields become the
-separately bounded public preview.
+separately bounded public preview. Mapping target paths must not duplicate or prefix one another:
+siblings such as `summary.title` and `summary.fields` are valid, while `summary` together with
+`summary.title` is rejected during config loading.
 
 Cross-reference validation requires both scenarios to be owned by their declared products and the
 target frontend to exist, belong to the target product, and be enabled. Both mappings are required.

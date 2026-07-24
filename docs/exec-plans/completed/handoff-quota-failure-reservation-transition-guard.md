@@ -1,18 +1,18 @@
 # Execution Plan: Handoff Quota Failure Reservation Transition Guard
 
 > Superseded on 2026-07-23 by atomic quota-failure finalization. Recovery no longer commits a
-> pre-terminal reservation; see `docs/exec-plans/active/handoff-quota-failure-atomic-finalization.md`.
+> pre-terminal reservation; see
+> `docs/exec-plans/completed/handoff-quota-failure-atomic-finalization.md`.
 
 ## Status
 
-- State: blocked
+- State: completed
 - Owner: agent
 - Created: 2026-07-23
-- Last updated: 2026-07-23
-- Review date: 2026-07-23
-- Next action: run PostgreSQL-marked coverage in CI or a configured local environment
-- Blocker: validation incomplete because the required PostgreSQL-marked concurrency coverage has
-  not passed; `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` is not configured locally
+- Last updated: 2026-07-24
+- Completed: 2026-07-24
+- Blocker: none
+- Completion note: superseded by atomic quota-failure finalization
 
 ## Goal
 
@@ -45,8 +45,8 @@ window and produce contradictory terminal state.
 ## Validation result
 
 - Focused handoff, quota, and API tests: 32 passed.
-- PostgreSQL suite: four tests collected and skipped because the local maintenance database URL was
-  not configured.
+- PostgreSQL suite: passed in the current-head `postgresql-quota-concurrency` GitHub Actions job
+  ([run 30017299390](https://github.com/gushinets/anytoolai-platform/actions/runs/30017299390)).
 - Canonical quick-check: 337 passed, 5 deselected.
 - Config, architecture, documentation, generated-doc freshness, source lint, formatting, and diff
   checks passed.

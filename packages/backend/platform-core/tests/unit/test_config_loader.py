@@ -171,6 +171,67 @@ def test_loader_rejects_trailing_dot_handoff_source_with_identity(
     )
 
 
+@pytest.mark.parametrize("field_name", ["context_mapping", "preview_mapping"])
+@pytest.mark.parametrize(
+    ("first_target", "second_target", "expected_parent", "expected_nested"),
+    [
+        ("summary", "summary.title", "summary", "summary.title"),
+        ("summary.title", "summary", "summary", "summary.title"),
+        ("summary.details", "summary.details.title", "summary.details", "summary.details.title"),
+    ],
+)
+def test_loader_rejects_conflicting_handoff_mapping_target_paths(
+    tmp_path: Path,
+    field_name: str,
+    first_target: str,
+    second_target: str,
+    expected_parent: str,
+    expected_nested: str,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    data = _load_yaml(handoff_path)
+    data["handoffs"][0][field_name] = {
+        first_target: "artifact.content_json.title",
+        second_target: "artifact.content_json.fields",
+    }
+    _write_yaml(handoff_path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=handoff_path,
+        config_id="kernel_demo_source_to_target_v1",
+        ref_type=field_name,
+        ref_value=f"{expected_parent} <> {expected_nested}",
+        message_part=(f"{expected_parent} is a prefix of {expected_nested}"),
+    )
+
+
+@pytest.mark.parametrize("field_name", ["context_mapping", "preview_mapping"])
+def test_loader_accepts_non_conflicting_handoff_mapping_siblings(
+    tmp_path: Path,
+    field_name: str,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    data = _load_yaml(handoff_path)
+    sibling_mapping = {
+        "summary.title": "artifact.content_json.title",
+        "summary.fields": "artifact.content_json.fields",
+    }
+    data["handoffs"][0][field_name] = sibling_mapping
+    _write_yaml(handoff_path, data)
+
+    registry = ConfigLoader(config_root).load()
+    handoff = registry.get_handoff("kernel_demo_source_to_target_v1")
+
+    assert handoff is not None
+    assert getattr(handoff, field_name) == sibling_mapping
+
+
 def test_loader_preserves_provider_policy_yaml_metadata() -> None:
     registry = ConfigLoader(CONFIG_ROOT).load()
 
