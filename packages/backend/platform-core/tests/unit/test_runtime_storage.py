@@ -13,6 +13,7 @@ from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.common.time import utc_now
+from anytoolai_platform_core.handoffs.models import HandoffStatus
 from anytoolai_platform_core.identity.models import GuestIdentityRecord
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.models import ProviderCallRecord, ProviderCallStatus
@@ -28,6 +29,7 @@ from anytoolai_platform_core.storage.db import (
     action_runs_table,
     artifacts_table,
     jobs_table,
+    product_handoffs_table,
     provider_calls_table,
     scenario_sessions_table,
 )
@@ -68,9 +70,7 @@ def _build_runtime_engine(main_db: Path, platform_db: Path) -> sa.Engine:
 
 def _build_alembic_config(database_url: str) -> Config:
     alembic_config = Config()
-    alembic_config.set_main_option(
-        "script_location", str(_repo_root() / "migrations" / "platform")
-    )
+    alembic_config.set_main_option("script_location", str(_repo_root() / "migrations" / "platform"))
     alembic_config.set_main_option("sqlalchemy.url", database_url)
     return alembic_config
 
@@ -88,6 +88,7 @@ def runtime_engine(tmp_path: Path) -> sa.Engine:
 
     yield engine
     engine.dispose()
+
 
 @pytest.fixture
 def session_factory(runtime_engine: sa.Engine) -> sa.orm.sessionmaker[sa.orm.Session]:
@@ -264,6 +265,7 @@ def test_runtime_table_enums_create_check_constraints() -> None:
         action_runs_table.c.status,
         provider_calls_table.c.status,
         artifacts_table.c.status,
+        product_handoffs_table.c.status,
     ]
 
     for column in status_columns:
@@ -322,6 +324,13 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
             "guest_quota_usage",
             schema="platform",
         )
+        handoff_columns = {
+            column["name"]
+            for column in sa.inspect(connection).get_columns(
+                "product_handoffs",
+                schema="platform",
+            )
+        }
 
     assert {
         "scenario_sessions",
@@ -331,6 +340,7 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "artifacts",
         "guest_identities",
         "guest_quota_usage",
+        "product_handoffs",
     }.issubset(table_names)
     assert "created_at" in scenario_session_columns
     assert scenario_session_columns["created_at"]["nullable"] is False
@@ -368,6 +378,9 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "ix_jobs_status",
         "ix_event_log_action_run_id",
         "ix_event_log_provider_call_id",
+        "ix_product_handoffs_source_session",
+        "ix_product_handoffs_target_session",
+        "ix_product_handoffs_status_expiry",
     }.issubset(index_names)
     assert {"id", "tenant_id", "region", "created_at", "last_seen_at", "metadata"} <= guest_columns
     assert {
@@ -386,6 +399,22 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         and foreign_key["constrained_columns"] == ["guest_id"]
         for foreign_key in quota_foreign_keys
     )
+    assert {
+        "id",
+        "handoff_definition_id",
+        "token_hash",
+        "status",
+        "source_scenario_session_id",
+        "source_artifact_id",
+        "target_scenario_session_id",
+        "target_job_id",
+        "context_payload",
+        "preview_payload",
+        "expires_at",
+    } <= handoff_columns
+    assert set(product_handoffs_table.c.status.type.enums) == {
+        status.value for status in HandoffStatus
+    }
 
 
 def test_quota_dimension_downgrade_to_0006_preserves_current_0003_schema(
@@ -468,6 +497,84 @@ def test_runtime_migration_upgrade_from_0004_adds_provider_call_error_message_sa
 
         assert "error_message_safe" in provider_call_columns
         assert provider_call_columns["error_message_safe"]["nullable"] is True
+    finally:
+        engine.dispose()
+
+
+def test_handoff_compatibility_revision_repairs_database_stamped_at_0007(
+    tmp_path: Path,
+) -> None:
+    main_db = tmp_path / "handoff-compat-main.sqlite3"
+    platform_db = tmp_path / "handoff-compat-platform.sqlite3"
+    engine = _build_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+
+    try:
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "head")
+            connection.execute(sa.text("DROP TABLE platform.product_handoffs"))
+            command.stamp(alembic_config, "0007")
+
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "head")
+            inspector = sa.inspect(connection)
+            table_names = set(
+                connection.execute(
+                    sa.text("SELECT name FROM platform.sqlite_master WHERE type = 'table'")
+                ).scalars()
+            )
+            handoff_columns = {
+                column["name"]
+                for column in inspector.get_columns(
+                    "product_handoffs",
+                    schema="platform",
+                )
+            }
+            handoff_indexes = {
+                index["name"]
+                for index in inspector.get_indexes(
+                    "product_handoffs",
+                    schema="platform",
+                )
+            }
+            handoff_foreign_keys = {
+                foreign_key["name"]
+                for foreign_key in inspector.get_foreign_keys(
+                    "product_handoffs",
+                    schema="platform",
+                )
+            }
+
+        assert "product_handoffs" in table_names
+        assert {
+            "id",
+            "handoff_definition_id",
+            "token_hash",
+            "status",
+            "source_scenario_session_id",
+            "source_job_id",
+            "source_artifact_id",
+            "target_scenario_session_id",
+            "target_job_id",
+            "context_payload",
+            "preview_payload",
+            "expires_at",
+        } <= handoff_columns
+        assert {
+            "ix_product_handoffs_definition",
+            "ix_product_handoffs_source_session",
+            "ix_product_handoffs_target_session",
+            "ix_product_handoffs_status_expiry",
+        } <= handoff_indexes
+        assert {
+            "fk_product_handoffs_source_session",
+            "fk_product_handoffs_source_job",
+            "fk_product_handoffs_source_artifact",
+            "fk_product_handoffs_target_session",
+            "fk_product_handoffs_target_job",
+        } == handoff_foreign_keys
     finally:
         engine.dispose()
 
@@ -781,9 +888,7 @@ def test_job_repository_failed_transition_completes_safe_terminal_contract(
     with transaction_boundary(session_factory) as session:
         scenario_session = ScenarioSessionRepository(session).create(make_scenario_session())
         repository = JobRepository(session)
-        claimed = repository.claim_created(
-            repository.create(make_job(scenario_session.id)).id
-        )
+        claimed = repository.claim_created(repository.create(make_job(scenario_session.id)).id)
         assert claimed is not None
 
         failed = repository.mark_failed(replace(claimed, status=JobStatus.failed))
@@ -800,9 +905,7 @@ def test_job_repository_mark_succeeded_requires_valid_result_artifact(
     with transaction_boundary(session_factory) as session:
         scenario_session = ScenarioSessionRepository(session).create(make_scenario_session())
         repository = JobRepository(session)
-        claimed = repository.claim_created(
-            repository.create(make_job(scenario_session.id)).id
-        )
+        claimed = repository.claim_created(repository.create(make_job(scenario_session.id)).id)
         assert claimed is not None
 
         with pytest.raises(ValueError, match="requires result_artifact_id"):
@@ -849,7 +952,9 @@ def test_job_repository_update_rejects_status_and_identity_changes(
         repository = JobRepository(session)
         created = repository.create(make_job(scenario_session.id))
 
-        with pytest.raises(ValueError, match="status changes must use repository lifecycle methods"):
+        with pytest.raises(
+            ValueError, match="status changes must use repository lifecycle methods"
+        ):
             repository.update(replace(created, status=JobStatus.running))
 
         with pytest.raises(ValueError, match="immutable field scenario_session_id"):
@@ -926,9 +1031,7 @@ def test_provider_call_repository_create_read_update(
     with transaction_boundary(session_factory) as session:
         scenario_session, job, action_run = seed_runtime_chain(session)
         repository = ProviderCallRepository(session)
-        created = repository.create(
-            make_provider_call(scenario_session.id, job.id, action_run.id)
-        )
+        created = repository.create(make_provider_call(scenario_session.id, job.id, action_run.id))
 
         assert created.id.startswith("provider_call_")
         assert created.status is ProviderCallStatus.created
@@ -1047,11 +1150,14 @@ def test_guest_identity_repository_create_read_touch(
         created = repository.create(make_guest_identity())
 
         assert created.id.startswith("guest_")
-        assert repository.get(
-            created.id,
-            tenant_id=created.tenant_id,
-            region=created.region,
-        ) == created
+        assert (
+            repository.get(
+                created.id,
+                tenant_id=created.tenant_id,
+                region=created.region,
+            )
+            == created
+        )
         assert (
             repository.get(
                 created.id,

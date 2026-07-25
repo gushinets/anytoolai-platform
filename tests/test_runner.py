@@ -134,6 +134,34 @@ def test_doctor_requires_uv(monkeypatch) -> None:
     assert exit_code == 1
 
 
+def test_doctor_optional_tools_excludes_just(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+
+    assert runner.OPTIONAL_TOOLS == ["node", "pnpm", "docker"]
+
+    probed: list[str] = []
+
+    def fake_probe_tool(name: str) -> tuple[bool, str]:
+        probed.append(name)
+        return True, f"/usr/local/bin/{name}"
+
+    monkeypatch.setattr(runner.sys, "version_info", (3, 12, 1))
+    monkeypatch.setattr(runner.importlib.util, "find_spec", lambda module: object())
+    monkeypatch.setattr(runner, "probe_tool", fake_probe_tool)
+
+    exit_code = runner.doctor()
+
+    assert exit_code == 0
+    assert "just" not in probed
+    assert probed == ["uv", "node", "pnpm", "docker"]
+
+    output = capsys.readouterr().out
+    assert "Optional tool node: ok" in output
+    assert "Optional tool pnpm: ok" in output
+    assert "Optional tool docker: ok" in output
+    assert "just" not in output
+
+
 def test_frontend_check_uses_frozen_install_and_real_checks(monkeypatch) -> None:
     runner = load_runner_module()
     commands: list[list[str]] = []

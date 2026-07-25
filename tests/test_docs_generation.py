@@ -31,4 +31,7 @@ def test_openapi_contains_only_implemented_routes() -> None:
 
     assert "/health" in openapi
     assert "/v1/products/{product_id}/runtime-config" in openapi
-    assert "/v1/handoffs" not in openapi
+    assert "/v1/handoffs" in openapi
+    assert "/v1/handoffs/{handoff_token}" in openapi
+    assert "/v1/handoffs/{handoff_token}/accept" in openapi
+    assert "/v1/handoffs/{handoff_token}/decline" in openapi

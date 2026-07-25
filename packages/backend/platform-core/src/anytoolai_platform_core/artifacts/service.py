@@ -6,11 +6,11 @@ from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactSta
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
-from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.events.replay import (
     ReplayTimestampSequencer,
     sequence_existing_replay_event,
 )
+from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.storage.transactions import (
     RollbackRecoveryPhase,
     register_rollback_recovery_callback,
@@ -122,7 +122,14 @@ def _context_from_record(record: ArtifactRecord) -> ExecutionContext:
         job_id=record.job_id,
         artifact_id=record.id,
         action_run_id=record.action_run_id,
+        scenario_chain_id=_metadata_str(record.metadata, "scenario_chain_id"),
+        handoff_id=_metadata_str(record.metadata, "handoff_id"),
     )
+
+
+def _metadata_str(metadata: dict[str, Any], key: str) -> str | None:
+    value = metadata.get(key)
+    return value if isinstance(value, str) and value else None
 
 
 def _recover_artifact_row_after_rollback(

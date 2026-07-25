@@ -19,6 +19,9 @@ from anytoolai_platform_core.handoffs.models import (
     HandoffDefinition as CoreHandoffDefinition,
 )
 from anytoolai_platform_core.handoffs.models import (
+    HandoffStartPolicy as CoreHandoffStartPolicy,
+)
+from anytoolai_platform_core.handoffs.models import (
     HandoffStatus as CoreHandoffStatus,
 )
 from anytoolai_platform_core.products.models import (
@@ -72,6 +75,7 @@ from anytoolai_platform_sdk.contracts import (
     FrontendDefinition,
     FrontendType,
     HandoffDefinition,
+    HandoffStartPolicy,
     HandoffStatus,
     JobStatus,
     ProductDefinition,
@@ -131,6 +135,7 @@ def enum_values(enum_type: type[StrEnum]) -> set[str]:
         (ActionExecutor, CoreActionExecutor),
         (FrontendType, CoreFrontendType),
         (HandoffStatus, CoreHandoffStatus),
+        (HandoffStartPolicy, CoreHandoffStartPolicy),
         (JobStatus, CoreJobStatus),
         (QuotaDimension, CoreQuotaDimension),
         (QuotaPeriod, CoreQuotaPeriod),

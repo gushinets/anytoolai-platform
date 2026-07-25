@@ -1,6 +1,18 @@
-PYTHON := $(shell command -v python3 2>/dev/null || command -v python)
+PYTHON ?= $(shell \
+	for candidate in python3 python; do \
+		bin="$$(command -v $$candidate 2>/dev/null)"; \
+		if [ -n "$$bin" ] && "$$bin" -c 'import sys; sys.exit(0 if sys.version_info[:2] >= (3, 12) else 1)' >/dev/null 2>&1; then \
+			echo "$$bin"; \
+			exit 0; \
+		fi; \
+	done \
+)
 
-.PHONY: doctor quick-check frontend-check full-check validate-configs validate-architecture validate-docs generate-docs check-generated-docs dev-up dev-ready dev-status dev-down prod-up prod-status prod-down collect-context
+ifeq ($(strip $(PYTHON)),)
+$(error No Python 3.12+ interpreter found (checked python3, python); set PYTHON=/path/to/python3.12+ or install Python 3.12+)
+endif
+
+.PHONY: doctor quick-check frontend-check full-check validate-configs validate-architecture validate-docs generate-docs check-generated-docs dev-up dev-ready dev-status dev-down collect-context
 
 doctor:
 	$(PYTHON) scripts/agent/runner.py doctor

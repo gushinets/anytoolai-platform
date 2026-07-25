@@ -28,7 +28,10 @@ from anytoolai_platform_core.config.registry import (
     SchemaDefinition,
     TenantDefinition,
 )
-from anytoolai_platform_core.handoffs.models import HandoffDefinition
+from anytoolai_platform_core.handoffs.models import (
+    HandoffDefinition,
+    HandoffStartPolicy,
+)
 from anytoolai_platform_core.products.models import (
     FrontendDefinition,
     FrontendType,
@@ -49,12 +52,12 @@ from anytoolai_platform_core.quotas.models import (
     QuotaUnit,
 )
 from anytoolai_platform_core.scenarios.models import ScenarioDefinition
+from anytoolai_platform_core.workflows.errors import WorkflowStepContractValidationError
+from anytoolai_platform_core.workflows.mappings import validate_step_contract
 from anytoolai_platform_core.workflows.models import (
     WorkflowDefinition,
     WorkflowStepDefinition,
 )
-from anytoolai_platform_core.workflows.errors import WorkflowStepContractValidationError
-from anytoolai_platform_core.workflows.mappings import validate_step_contract
 
 VERSION_SUFFIX_PATTERN = re.compile(r"(?P<separator>[._])v(?P<version>\d+)$")
 PROMPT_FRONT_MATTER_PATTERN = re.compile(
@@ -109,9 +112,7 @@ PROVIDER_TRANSPORT_RETRY_POLICY_FIELDS = frozenset(
     {"owner", "max_attempts", "litellm_num_retries_per_attempt"}
 )
 PROVIDER_VALIDATION_RETRY_POLICY_FIELDS = frozenset({"owner", "max_attempts"})
-PROVIDER_RETRY_HARD_LIMIT_FIELDS = frozenset(
-    {"max_physical_provider_calls_per_action"}
-)
+PROVIDER_RETRY_HARD_LIMIT_FIELDS = frozenset({"max_physical_provider_calls_per_action"})
 
 
 def load_yaml_file(path: Path) -> dict[str, Any]:
@@ -169,10 +170,7 @@ def parse_enum_value(
         allowed_values = ", ".join(member.value for member in enum_type)
         raise InvalidConfigShapeError(
             file_path,
-            (
-                f"Invalid {field_name} value {raw_value!r}; "
-                f"expected one of: {allowed_values}"
-            ),
+            (f"Invalid {field_name} value {raw_value!r}; expected one of: {allowed_values}"),
             config_id=config_id,
             ref_type=ref_type or field_name,
             ref_value=str(raw_value),
@@ -241,10 +239,13 @@ def _split_prompt_front_matter(path: Path, content: str) -> tuple[dict[str, Any]
         return {}, content
 
     try:
-        front_matter = yaml.load(
-            match.group("front_matter"),
-            Loader=_build_unique_key_yaml_loader(path),
-        ) or {}
+        front_matter = (
+            yaml.load(
+                match.group("front_matter"),
+                Loader=_build_unique_key_yaml_loader(path),
+            )
+            or {}
+        )
     except yaml.YAMLError as exc:
         raise InvalidConfigShapeError(
             path,
@@ -274,7 +275,7 @@ def _parse_positive_int_field(
             config_id=config_id,
             ref_type=ref_type,
             ref_value=_stringify_config_value(raw_value),
-    )
+        )
     return raw_value
 
 
@@ -304,7 +305,18 @@ def _build_unique_key_yaml_loader(
     file_path: Path,
 ) -> type[yaml.SafeLoader]:
     class _UniqueKeySafeLoader(yaml.SafeLoader):
-        pass
+        def construct_document(self, node: yaml.nodes.Node) -> Any:
+            duplicate = _find_handoff_mapping_target_duplicate(node)
+            if duplicate is not None:
+                handoff_id, field_name, target_path = duplicate
+                raise InvalidConfigShapeError(
+                    file_path,
+                    f"Handoff {field_name} target path is duplicated: {target_path}",
+                    config_id=handoff_id,
+                    ref_type=field_name,
+                    ref_value=target_path,
+                )
+            return super().construct_document(node)
 
     def _construct_mapping(
         loader: yaml.SafeLoader,
@@ -329,6 +341,140 @@ def _build_unique_key_yaml_loader(
         _construct_mapping,
     )
     return _UniqueKeySafeLoader
+
+
+def _find_handoff_mapping_target_duplicate(
+    root: yaml.nodes.Node,
+) -> tuple[str | None, str, str] | None:
+    handoffs = _yaml_mapping_value(root, "handoffs")
+    if not isinstance(handoffs, yaml.nodes.SequenceNode):
+        return None
+    for handoff in handoffs.value:
+        if not isinstance(handoff, yaml.nodes.MappingNode):
+            continue
+        handoff_id_node = _yaml_mapping_value(handoff, "handoff_id")
+        handoff_id = (
+            handoff_id_node.value
+            if isinstance(handoff_id_node, yaml.nodes.ScalarNode)
+            else None
+        )
+        for field_name in ("context_mapping", "preview_mapping"):
+            mapping = _yaml_mapping_value(handoff, field_name)
+            if not isinstance(mapping, yaml.nodes.MappingNode):
+                continue
+            seen_targets: set[str] = set()
+            for target_node, _source_node in mapping.value:
+                if (
+                    not isinstance(target_node, yaml.nodes.ScalarNode)
+                    or target_node.tag != "tag:yaml.org,2002:str"
+                ):
+                    continue
+                target_path = target_node.value
+                if target_path in seen_targets:
+                    return handoff_id, field_name, target_path
+                seen_targets.add(target_path)
+    return None
+
+
+def _yaml_mapping_value(
+    node: yaml.nodes.Node,
+    key: str,
+) -> yaml.nodes.Node | None:
+    if not isinstance(node, yaml.nodes.MappingNode):
+        return None
+    for key_node, value_node in node.value:
+        if isinstance(key_node, yaml.nodes.ScalarNode) and key_node.value == key:
+            return value_node
+    return None
+
+
+def _handoff_mapping(
+    value: Any,
+    *,
+    field_name: str,
+    path: Path,
+    config_id: str | None,
+    ref_type: str,
+    ref_value: str,
+) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise InvalidConfigShapeError(
+            path,
+            f"Handoff {field_name} must be a mapping",
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=ref_value,
+        )
+    normalized: dict[str, str] = {}
+    for target, source in value.items():
+        if not isinstance(target, str) or not target.strip():
+            raise InvalidConfigShapeError(
+                path,
+                f"Handoff {field_name} targets must be non-empty strings",
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value,
+            )
+        if (
+            any(marker in target for marker in ("[", "]", ".."))
+            or target.startswith(".")
+            or target.endswith(".")
+        ):
+            raise InvalidConfigShapeError(
+                path,
+                f"Handoff {field_name} target path is unsupported: {target}",
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value,
+            )
+        if not isinstance(source, str) or not source.strip():
+            raise InvalidConfigShapeError(
+                path,
+                f"Handoff {field_name} sources must be non-empty strings",
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value,
+            )
+        if (
+            (source != "artifact.content_json" and not source.startswith("artifact.content_json."))
+            or any(marker in source for marker in ("[", "]", ".."))
+            or source.endswith(".")
+        ):
+            raise InvalidConfigShapeError(
+                path,
+                f"Handoff {field_name} source must use artifact.content_json paths: {source}",
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value,
+            )
+        normalized[target] = source
+    conflict = _find_handoff_mapping_target_conflict(normalized)
+    if conflict is not None:
+        parent_path, nested_path = conflict
+        raise InvalidConfigShapeError(
+            path,
+            (
+                f"Handoff {field_name} target paths conflict: "
+                f"{parent_path} is a prefix of {nested_path}"
+            ),
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=f"{parent_path} <> {nested_path}",
+        )
+    return normalized
+
+
+def _find_handoff_mapping_target_conflict(
+    mapping: dict[str, str],
+) -> tuple[str, str] | None:
+    parsed_paths = sorted((tuple(path.split(".")), path) for path in mapping)
+    for index, (parent_parts, parent_path) in enumerate(parsed_paths):
+        for nested_parts, nested_path in parsed_paths[index + 1 :]:
+            if len(parent_parts) < len(nested_parts) and (
+                nested_parts[: len(parent_parts)] == parent_parts
+            ):
+                return parent_path, nested_path
+    return None
 
 
 class ConfigLoader:
@@ -776,10 +922,7 @@ class ConfigLoader:
         ):
             raise InvalidConfigShapeError(
                 file_path,
-                (
-                    "retry_policy.transport.litellm_num_retries_per_attempt must be "
-                    "an integer"
-                ),
+                ("retry_policy.transport.litellm_num_retries_per_attempt must be an integer"),
                 config_id=policy_id,
                 ref_type="litellm_num_retries_per_attempt",
                 ref_value=_stringify_config_value(litellm_num_retries),
@@ -787,10 +930,7 @@ class ConfigLoader:
         if litellm_num_retries != 0:
             raise InvalidConfigShapeError(
                 file_path,
-                (
-                    "MVP-A requires "
-                    "retry_policy.transport.litellm_num_retries_per_attempt to be 0"
-                ),
+                ("MVP-A requires retry_policy.transport.litellm_num_retries_per_attempt to be 0"),
                 config_id=policy_id,
                 ref_type="litellm_num_retries_per_attempt",
                 ref_value=_stringify_config_value(litellm_num_retries),
@@ -823,9 +963,7 @@ class ConfigLoader:
             ref_type="max_attempts",
         )
 
-        max_physical_provider_calls_raw = hard_limits.get(
-            "max_physical_provider_calls_per_action"
-        )
+        max_physical_provider_calls_raw = hard_limits.get("max_physical_provider_calls_per_action")
         if max_physical_provider_calls_raw is None:
             raise InvalidConfigShapeError(
                 file_path,
@@ -1563,7 +1701,26 @@ class ConfigLoader:
                 source_product_id = handoff_data.get("source_product_id")
                 source_scenario_id = handoff_data.get("source_scenario_id")
                 target_product_id = handoff_data.get("target_product_id")
+                target_frontend_id = handoff_data.get("target_frontend_id")
                 target_scenario_id = handoff_data.get("target_scenario_id")
+                target_start_policy = handoff_data.get("target_start_policy")
+                consent_required = handoff_data.get("consent_required")
+                context_mapping = _handoff_mapping(
+                    handoff_data.get("context_mapping"),
+                    field_name="context_mapping",
+                    path=path,
+                    config_id=handoff_id,
+                    ref_type="context_mapping",
+                    ref_value=_stringify_config_value(handoff_data.get("context_mapping")),
+                )
+                preview_mapping = _handoff_mapping(
+                    handoff_data.get("preview_mapping"),
+                    field_name="preview_mapping",
+                    path=path,
+                    config_id=handoff_id,
+                    ref_type="preview_mapping",
+                    ref_value=_stringify_config_value(handoff_data.get("preview_mapping")),
+                )
 
                 if not all(
                     [
@@ -1571,12 +1728,24 @@ class ConfigLoader:
                         source_product_id,
                         source_scenario_id,
                         target_product_id,
+                        target_frontend_id,
                         target_scenario_id,
+                        target_start_policy,
                     ]
                 ):
                     raise InvalidConfigShapeError(
                         path,
                         f"Handoff missing required fields: {handoff_data}",
+                    )
+                if consent_required is not True:
+                    raise InvalidConfigShapeError(
+                        path,
+                        "MVP-A handoffs must explicitly set consent_required: true",
+                    )
+                if not context_mapping or not preview_mapping:
+                    raise InvalidConfigShapeError(
+                        path,
+                        "Handoff context_mapping and preview_mapping must be non-empty",
                     )
 
                 if handoff_id in self.handoffs:
@@ -1592,9 +1761,19 @@ class ConfigLoader:
                     source_product_id=source_product_id,
                     source_scenario_id=source_scenario_id,
                     target_product_id=target_product_id,
+                    target_frontend_id=target_frontend_id,
                     target_scenario_id=target_scenario_id,
-                    consent_required=handoff_data.get("consent_required", True),
-                    context_mapping=handoff_data.get("context_mapping", {}),
+                    target_start_policy=parse_enum_value(
+                        HandoffStartPolicy,
+                        target_start_policy,
+                        field_name="handoff target_start_policy",
+                        file_path=path,
+                        config_id=handoff_id,
+                        ref_type="target_start_policy",
+                    ),
+                    consent_required=True,
+                    context_mapping=context_mapping,
+                    preview_mapping=preview_mapping,
                     metadata={"_file_path": str(path)},
                 )
                 self._remember_source("handoff", handoff_id, path)
@@ -1923,6 +2102,38 @@ class ConfigLoader:
                 target_registry=self.scenarios,
                 target_type="scenario",
             )
+            source_product = self.products.get(handoff.source_product_id)
+            target_product = self.products.get(handoff.target_product_id)
+            if (
+                source_product is not None
+                and handoff.source_scenario_id not in source_product.scenarios
+            ):
+                self._append_error(
+                    InvalidConfigShapeError(
+                        source_path,
+                        f"Handoff source scenario is not owned by product: {handoff_id}",
+                    )
+                )
+            if target_product is not None:
+                if handoff.target_scenario_id not in target_product.scenarios:
+                    self._append_error(
+                        InvalidConfigShapeError(
+                            source_path,
+                            f"Handoff target scenario is not owned by product: {handoff_id}",
+                        )
+                    )
+                enabled_frontends = {
+                    frontend.frontend_id
+                    for frontend in target_product.frontends
+                    if frontend.enabled
+                }
+                if handoff.target_frontend_id not in enabled_frontends:
+                    self._append_error(
+                        InvalidConfigShapeError(
+                            source_path,
+                            f"Handoff target frontend is not enabled: {handoff.target_frontend_id}",
+                        )
+                    )
             self._validate_reference(
                 config_id=handoff_id,
                 file_path=source_path,

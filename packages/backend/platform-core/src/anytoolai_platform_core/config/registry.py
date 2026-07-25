@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from anytoolai_platform_core.actions.models import (
     ActionConfiguration,
@@ -70,9 +71,7 @@ def _freeze_value(value: Any) -> Any:
     if isinstance(value, MappingProxyType):
         return value
     if isinstance(value, dict):
-        return MappingProxyType(
-            {key: _freeze_value(item) for key, item in value.items()}
-        )
+        return MappingProxyType({key: _freeze_value(item) for key, item in value.items()})
     if isinstance(value, list):
         return tuple(_freeze_value(item) for item in value)
     if isinstance(value, tuple):
@@ -147,6 +146,7 @@ def _freeze_handoff(definition: HandoffDefinition) -> HandoffDefinition:
     return replace(
         definition,
         context_mapping=_freeze_value(definition.context_mapping),
+        preview_mapping=_freeze_value(definition.preview_mapping),
         metadata=_freeze_value(definition.metadata),
     )
 
@@ -234,12 +234,8 @@ class ConfigRegistry:
 
     def __post_init__(self) -> None:
         """Ensure all mappings are immutable."""
-        object.__setattr__(
-            self, "tenants", _freeze_mapping(dict(self.tenants), _freeze_tenant)
-        )
-        object.__setattr__(
-            self, "regions", _freeze_mapping(dict(self.regions), _freeze_region)
-        )
+        object.__setattr__(self, "tenants", _freeze_mapping(dict(self.tenants), _freeze_tenant))
+        object.__setattr__(self, "regions", _freeze_mapping(dict(self.regions), _freeze_region))
         object.__setattr__(
             self,
             "provider_policies",
@@ -253,9 +249,7 @@ class ConfigRegistry:
         object.__setattr__(
             self,
             "action_configurations",
-            _freeze_mapping(
-                dict(self.action_configurations), _freeze_action_configuration
-            ),
+            _freeze_mapping(dict(self.action_configurations), _freeze_action_configuration),
         )
         object.__setattr__(
             self, "workflows", _freeze_mapping(dict(self.workflows), _freeze_workflow)
@@ -263,21 +257,11 @@ class ConfigRegistry:
         object.__setattr__(
             self, "scenarios", _freeze_mapping(dict(self.scenarios), _freeze_scenario)
         )
-        object.__setattr__(
-            self, "products", _freeze_mapping(dict(self.products), _freeze_product)
-        )
-        object.__setattr__(
-            self, "prompts", _freeze_mapping(dict(self.prompts), _freeze_prompt)
-        )
-        object.__setattr__(
-            self, "schemas", _freeze_mapping(dict(self.schemas), _freeze_schema)
-        )
-        object.__setattr__(
-            self, "quotas", _freeze_mapping(dict(self.quotas), _freeze_quota_policy)
-        )
-        object.__setattr__(
-            self, "handoffs", _freeze_mapping(dict(self.handoffs), _freeze_handoff)
-        )
+        object.__setattr__(self, "products", _freeze_mapping(dict(self.products), _freeze_product))
+        object.__setattr__(self, "prompts", _freeze_mapping(dict(self.prompts), _freeze_prompt))
+        object.__setattr__(self, "schemas", _freeze_mapping(dict(self.schemas), _freeze_schema))
+        object.__setattr__(self, "quotas", _freeze_mapping(dict(self.quotas), _freeze_quota_policy))
+        object.__setattr__(self, "handoffs", _freeze_mapping(dict(self.handoffs), _freeze_handoff))
         object.__setattr__(self, "metadata", _freeze_value(self.metadata))
 
     def get_action_definition(self, action_type: str) -> ActionDefinition | None:
