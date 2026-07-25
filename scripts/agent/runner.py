@@ -25,7 +25,7 @@ COMPOSE_FILE = ROOT / "infra" / "compose" / "docker-compose.yml"
 FREELANCER_SUITE_ROOT = ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite"
 REQUIRED_MODULES = ["pytest", "yaml", "pydantic"]
 REQUIRED_TOOLS = ["uv"]
-OPTIONAL_TOOLS = ["node", "pnpm", "just", "docker"]
+OPTIONAL_TOOLS = ["node", "pnpm", "docker"]
 ACTION_REGISTRY_ROWS = [
     ("A01 `extract_structured`", "`text.extract_structured_fields`"),
     ("A04 `detect_issues`", "`text.detect_issues_by_taxonomy`"),
