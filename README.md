@@ -18,7 +18,9 @@ python scripts/agent/runner.py generate-docs --check
 ```
 
 `python scripts/agent/runner.py <command>` is the canonical cross-platform interface. Use
-`python3` where that is the Python 3 executable. `just` recipes are optional thin aliases.
+`python3` where that is the Python 3 executable. `make <target>` recipes are optional thin
+aliases over the runner (see `Makefile`); on Windows without native GNU Make, run `make` via
+git-bash/WSL or call the runner directly.
 The baseline gate includes:
 
 - config validation

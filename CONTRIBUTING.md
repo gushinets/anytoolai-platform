@@ -12,8 +12,8 @@ This repository is built for AI-assisted development with Codex. Humans steer; a
 6. Run `python scripts/agent/runner.py validate-architecture` after touching imports, package layout, providers, extensions, or product bundles.
 7. Update generated docs when schemas, OpenAPI, actions, or events change.
 
-`python scripts/agent/runner.py <command>` is the canonical local interface. `just` recipes are
-optional thin aliases.
+`python scripts/agent/runner.py <command>` is the canonical local interface. `make <target>`
+recipes are optional thin aliases.
 
 For Python dependencies, use `uv`, not `pip`: `uv add <package>` for runtime dependencies,
 `uv add --dev <package>` for dev dependencies, and never hand-edit `uv.lock`.

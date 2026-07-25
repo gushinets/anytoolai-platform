@@ -1,31 +1,45 @@
-.PHONY: doctor quick-check full-check validate-configs validate-architecture kernel-smoke generate-docs dev-up dev-down reset-db
+PYTHON := $(shell command -v python3 2>/dev/null || command -v python)
+
+.PHONY: doctor quick-check frontend-check full-check validate-configs validate-architecture validate-docs generate-docs check-generated-docs dev-up dev-ready dev-status dev-down collect-context
 
 doctor:
-	python scripts/agent/runner.py doctor
+	$(PYTHON) scripts/agent/runner.py doctor
 
 quick-check:
-	python scripts/agent/quick_check.py
+	$(PYTHON) scripts/agent/runner.py quick-check
+
+frontend-check:
+	$(PYTHON) scripts/agent/runner.py frontend-check
 
 full-check:
-	python scripts/agent/runner.py full-check
+	$(PYTHON) scripts/agent/runner.py full-check
 
 validate-configs:
-	python scripts/agent/runner.py validate-configs
+	$(PYTHON) scripts/agent/runner.py validate-configs
 
 validate-architecture:
-	python scripts/agent/runner.py validate-architecture
+	$(PYTHON) scripts/agent/runner.py validate-architecture
 
-kernel-smoke:
-	python scripts/agent/runner.py kernel-smoke
+validate-docs:
+	$(PYTHON) scripts/agent/runner.py validate-docs
 
 generate-docs:
-	python scripts/agent/runner.py generate-docs
+	$(PYTHON) scripts/agent/runner.py generate-docs
+
+check-generated-docs:
+	$(PYTHON) scripts/agent/runner.py generate-docs --check
 
 dev-up:
-	python scripts/agent/runner.py dev-up
+	$(PYTHON) scripts/agent/runner.py dev-up
+
+dev-ready:
+	$(PYTHON) scripts/agent/runner.py dev-ready
+
+dev-status:
+	$(PYTHON) scripts/agent/runner.py dev-status
 
 dev-down:
-	python scripts/agent/runner.py dev-down
+	$(PYTHON) scripts/agent/runner.py dev-down
 
-reset-db:
-	python scripts/agent/runner.py reset-db
+collect-context:
+	$(PYTHON) scripts/agent/runner.py collect-context
