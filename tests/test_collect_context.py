@@ -31,6 +31,7 @@ def test_collect_includes_useful_sections_without_failure_secrets(monkeypatch, t
     identity = module.runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
     failure = tmp_path / "failure.txt"
     failure.write_text("authorization=Bearer secret person@example.com", encoding="utf-8")
+    monkeypatch.delenv("ANYTOOLAI_POSTGRES_DB", raising=False)
     monkeypatch.setattr(module.runner, "runtime_identity", lambda: identity)
     monkeypatch.setattr(module.runner, "_compose_env", lambda value: {})
     monkeypatch.setattr(
@@ -54,6 +55,30 @@ def test_collect_includes_useful_sections_without_failure_secrets(monkeypatch, t
     assert payload["active_plans"]
     assert "secret" not in serialized
     assert "person@example.com" not in serialized
+
+
+def test_collect_reflects_configured_database_name(monkeypatch, tmp_path) -> None:
+    module = load_module()
+    identity = module.runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_DB", "myproject")
+    monkeypatch.setattr(module.runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(module.runner, "_compose_env", lambda value: {})
+    monkeypatch.setattr(
+        module.runner,
+        "_compose_command",
+        lambda value, *args: ["docker", *args],
+    )
+    monkeypatch.setattr(module, "_tool_versions", lambda: {"python": {"output": "3.12"}})
+    monkeypatch.setattr(module, "_active_plans", lambda: [])
+    monkeypatch.setattr(
+        module,
+        "_run",
+        lambda command, env=None: {"command": list(command), "exit_code": 0, "output": "ok"},
+    )
+
+    payload = module.collect()
+
+    assert payload["runtime"]["database_endpoint"] == "postgresql://127.0.0.1:15555/myproject"
 
 
 def test_write_bundle_uses_repository_local_output(monkeypatch, tmp_path) -> None:

@@ -168,6 +168,17 @@ def test_quick_check_strips_pythonpath_from_subprocess_env(monkeypatch) -> None:
     assert "PYTHONPATH" not in recorded
 
 
+def test_resolve_postgres_db_falls_back_to_dev_default(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.delenv("ANYTOOLAI_POSTGRES_DB", raising=False)
+
+    assert runner.resolve_postgres_db() == "anytoolai"
+
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_DB", "myproject")
+
+    assert runner.resolve_postgres_db() == "myproject"
+
+
 def test_runtime_identity_is_stable_and_worktree_specific(monkeypatch, tmp_path) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_API_PORT", raising=False)
@@ -192,6 +203,77 @@ def test_runtime_identity_supports_explicit_port_overrides(monkeypatch, tmp_path
 
     assert identity.api_port == 18123
     assert identity.postgres_port == 15555
+
+
+def test_check_ports_available_mentions_cli_flag_when_given(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "port_available", lambda port: False)
+
+    result = runner._check_ports_available(
+        "DEV002", [("API", 18123, "ANYTOOLAI_API_PORT", "--api-port")]
+    )
+
+    stderr = capsys.readouterr().err
+    assert result is False
+    assert "DEV002: API port 18123 is occupied." in stderr
+    assert "ANYTOOLAI_API_PORT" in stderr
+    assert "--api-port" in stderr
+
+
+def test_check_ports_available_omits_cli_flag_when_none(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "port_available", lambda port: False)
+
+    result = runner._check_ports_available(
+        "PROD002", [("PostgreSQL", 5432, "ANYTOOLAI_POSTGRES_PORT", None)]
+    )
+
+    assert result is False
+    stderr = capsys.readouterr().err
+    assert "PROD002: PostgreSQL port 5432 is occupied. Override with ANYTOOLAI_POSTGRES_PORT." == stderr.strip()
+    assert "--postgres-port" not in stderr
+
+
+def test_check_ports_available_uses_the_variable_name_given_by_the_caller(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "port_available", lambda port: False)
+
+    runner._check_ports_available(
+        "PROD002", [("API", 8000, "ANYTOOLAI_PROD_API_PORT", None)]
+    )
+
+    stderr = capsys.readouterr().err
+    assert "Override with ANYTOOLAI_PROD_API_PORT." in stderr
+    assert "ANYTOOLAI_API_PORT." not in stderr
+
+
+def test_check_ports_available_uses_the_cli_flag_given_by_the_caller(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "port_available", lambda port: False)
+
+    runner._check_ports_available(
+        "DEV002", [("Redis", 6379, "ANYTOOLAI_REDIS_PORT", "--redis-port")]
+    )
+
+    stderr = capsys.readouterr().err
+    assert "--redis-port" in stderr
+
+
+def test_check_ports_available_returns_true_when_all_free(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "port_available", lambda port: True)
+
+    assert runner._check_ports_available(
+        "DEV002",
+        [
+            ("API", 18123, "ANYTOOLAI_API_PORT", "--api-port"),
+            ("PostgreSQL", 15555, "ANYTOOLAI_POSTGRES_PORT", "--postgres-port"),
+        ],
+    ) is True
 
 
 def test_dev_up_fails_before_compose_when_port_is_occupied(monkeypatch) -> None:
@@ -243,3 +325,163 @@ def test_dev_status_and_down_are_scoped_to_worktree_project(monkeypatch) -> None
     assert all(identity.compose_project in command for command in commands)
     assert commands[0][-1] == "ps"
     assert commands[1][-2:] == ["down", "--remove-orphans"]
+
+
+def test_compose_command_passes_base_and_override_files_explicitly(monkeypatch) -> None:
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+
+    command = runner._compose_command(identity, "ps")
+
+    assert command == [
+        "docker",
+        "compose",
+        "--project-name",
+        "anytoolai-12345678",
+        "-f",
+        str(runner.COMPOSE_FILE),
+        "-f",
+        str(runner.COMPOSE_OVERRIDE_FILE),
+        "ps",
+    ]
+
+
+def test_database_url_is_a_usable_connection_string(monkeypatch) -> None:
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_USER", "devuser")
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_PASSWORD", "devpassword")
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_DB", "devdb")
+
+    url = identity.database_url
+
+    assert url == "postgresql://devuser:devpassword@127.0.0.1:15555/devdb"
+
+
+def test_database_url_falls_back_to_dev_defaults(monkeypatch) -> None:
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.delenv("ANYTOOLAI_POSTGRES_USER", raising=False)
+    monkeypatch.delenv("ANYTOOLAI_POSTGRES_PASSWORD", raising=False)
+    monkeypatch.delenv("ANYTOOLAI_POSTGRES_DB", raising=False)
+
+    assert identity.database_url == "postgresql://anytoolai:anytoolai@127.0.0.1:15555/anytoolai"
+
+
+def test_prod_compose_command_uses_fixed_project_and_prod_files() -> None:
+    runner = load_runner_module()
+
+    command = runner._prod_compose_command("ps")
+
+    assert command == [
+        "docker",
+        "compose",
+        "--project-name",
+        runner.PROD_COMPOSE_PROJECT,
+        "-f",
+        str(runner.COMPOSE_FILE),
+        "-f",
+        str(runner.COMPOSE_PROD_FILE),
+        "ps",
+    ]
+
+
+def test_prod_stack_running_reflects_compose_ps_output(monkeypatch) -> None:
+    runner = load_runner_module()
+
+    class Result:
+        def __init__(self, stdout: str) -> None:
+            self.stdout = stdout
+
+    monkeypatch.setattr(
+        runner.subprocess, "run", lambda *args, **kwargs: Result("container-id-123\n")
+    )
+    assert runner._prod_stack_running() is True
+
+    monkeypatch.setattr(runner.subprocess, "run", lambda *args, **kwargs: Result(""))
+    assert runner._prod_stack_running() is False
+
+
+def test_prod_up_fails_before_compose_when_port_is_occupied(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
+    monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
+    monkeypatch.setattr(runner, "port_available", lambda port: port != 8000)
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env: (_ for _ in ()).throw(AssertionError("compose must not run")),
+    )
+
+    assert runner.prod_up() == 1
+
+
+def test_prod_up_ignores_leftover_dev_port_override(monkeypatch) -> None:
+    runner = load_runner_module()
+    # A leftover ANYTOOLAI_API_PORT from an earlier `dev-up` in the same shell must not
+    # change which port prod checks/binds — prod has its own ANYTOOLAI_PROD_API_PORT.
+    monkeypatch.setenv("ANYTOOLAI_API_PORT", "18123")
+    monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
+    monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
+    checked_ports: list[int] = []
+    monkeypatch.setattr(
+        runner,
+        "port_available",
+        lambda port: checked_ports.append(port) or True,
+    )
+    monkeypatch.setattr(runner, "run_with_env", lambda command, env: 0)
+
+    assert runner.prod_up() == 0
+    assert checked_ports == [8000]
+
+
+def test_prod_up_skips_port_check_when_stack_already_running(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
+    monkeypatch.setattr(runner, "_prod_stack_running", lambda: True)
+    monkeypatch.setattr(
+        runner,
+        "port_available",
+        lambda port: (_ for _ in ()).throw(AssertionError("must not check ports on redeploy")),
+    )
+    commands: list[list[str]] = []
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env: commands.append(list(command)) or 0,
+    )
+
+    assert runner.prod_up() == 0
+    assert commands[0][-4:] == ["up", "-d", "--build", "--remove-orphans"]
+
+
+def test_prod_status_and_down_use_prod_project(monkeypatch) -> None:
+    runner = load_runner_module()
+    commands: list[list[str]] = []
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env: commands.append(list(command)) or 0,
+    )
+
+    assert runner.prod_status() == 0
+    assert runner.prod_down() == 0
+    assert all(runner.PROD_COMPOSE_PROJECT in command for command in commands)
+    assert commands[0][-1] == "ps"
+    assert commands[1][-2:] == ["down", "--remove-orphans"]
+
+
+def test_prod_up_builds_and_removes_orphans(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
+    monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
+    monkeypatch.setattr(runner, "port_available", lambda port: True)
+    commands: list[list[str]] = []
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env: commands.append(list(command)) or 0,
+    )
+
+    assert runner.prod_up() == 0
+    assert commands[0][-4:] == ["up", "-d", "--build", "--remove-orphans"]

@@ -22,6 +22,17 @@ ROOT = Path(__file__).resolve().parents[2]
 QUICK_CHECK_VENV = ROOT / ".quick-check-venv"
 TMP_ROOT = ROOT / ".quick-check-tmp"
 COMPOSE_FILE = ROOT / "infra" / "compose" / "docker-compose.yml"
+COMPOSE_OVERRIDE_FILE = ROOT / "infra" / "compose" / "docker-compose.override.yml"
+COMPOSE_PROD_FILE = ROOT / "infra" / "compose" / "docker-compose.prod.yml"
+PROD_COMPOSE_PROJECT = "anytoolai-prod"
+DEV_DEFAULT_POSTGRES_USER = "anytoolai"
+DEV_DEFAULT_POSTGRES_PASSWORD = "anytoolai"
+DEV_DEFAULT_POSTGRES_DB = "anytoolai"
+
+
+def resolve_postgres_db() -> str:
+    return os.environ.get("ANYTOOLAI_POSTGRES_DB", DEV_DEFAULT_POSTGRES_DB)
+
 FREELANCER_SUITE_ROOT = ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite"
 REQUIRED_MODULES = ["pytest", "yaml", "pydantic"]
 REQUIRED_TOOLS = ["uv"]
@@ -379,9 +390,14 @@ class RuntimeIdentity(NamedTuple):
 
     @property
     def database_url(self) -> str:
-        return (
-            f"postgresql://anytoolai:anytoolai@127.0.0.1:{self.postgres_port}/anytoolai"
-        )
+        # Intentionally not masked: this is the one documented, copy-pasteable connection
+        # string agents/developers are told to use (see docs/agent/worktree-runtime.md).
+        # Masking it (tried once) broke that without eliminating the underlying exposure —
+        # an operator who exported real prod credentials into this shell already has them
+        # in their own environment/history regardless of what this prints.
+        user = os.environ.get("ANYTOOLAI_POSTGRES_USER", DEV_DEFAULT_POSTGRES_USER)
+        password = os.environ.get("ANYTOOLAI_POSTGRES_PASSWORD", DEV_DEFAULT_POSTGRES_PASSWORD)
+        return f"postgresql://{user}:{password}@127.0.0.1:{self.postgres_port}/{resolve_postgres_db()}"
 
 
 def normalized_repo_path(path: Path = ROOT) -> str:
@@ -429,16 +445,20 @@ def _compose_env(identity: RuntimeIdentity) -> dict[str, str]:
     return env
 
 
+def _docker_compose_command(
+    project_name: str, compose_files: Sequence[Path], *args: str
+) -> list[str]:
+    command = ["docker", "compose", "--project-name", project_name]
+    for compose_file in compose_files:
+        command.extend(["-f", str(compose_file)])
+    command.extend(args)
+    return command
+
+
 def _compose_command(identity: RuntimeIdentity, *args: str) -> list[str]:
-    return [
-        "docker",
-        "compose",
-        "--project-name",
-        identity.compose_project,
-        "-f",
-        str(COMPOSE_FILE),
-        *args,
-    ]
+    return _docker_compose_command(
+        identity.compose_project, (COMPOSE_FILE, COMPOSE_OVERRIDE_FILE), *args
+    )
 
 
 def print_runtime_endpoints(identity: RuntimeIdentity) -> None:
@@ -447,28 +467,35 @@ def print_runtime_endpoints(identity: RuntimeIdentity) -> None:
     print(f"Database: {identity.database_url}")
 
 
+def _check_ports_available(
+    error_prefix: str, ports: Sequence[tuple[str, int, str, str | None]]
+) -> bool:
+    occupied = [
+        (name, port, variable, cli_flag)
+        for name, port, variable, cli_flag in ports
+        if not port_available(port)
+    ]
+    for name, port, variable, cli_flag in occupied:
+        message = f"{error_prefix}: {name} port {port} is occupied. Override with {variable}"
+        if cli_flag:
+            message += f" or {cli_flag}"
+        print(f"{message}.", file=sys.stderr)
+    return not occupied
+
+
 def dev_up() -> int:
     try:
         identity = runtime_identity()
     except ValueError as exc:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
-    occupied = [
-        (name, port)
-        for name, port in (
-            ("API", identity.api_port),
-            ("PostgreSQL", identity.postgres_port),
-        )
-        if not port_available(port)
-    ]
-    if occupied:
-        for name, port in occupied:
-            variable = "ANYTOOLAI_API_PORT" if name == "API" else "ANYTOOLAI_POSTGRES_PORT"
-            print(
-                f"DEV002: {name} port {port} is occupied. Override with {variable} "
-                f"or --{name.lower().replace('postgresql', 'postgres')}-port.",
-                file=sys.stderr,
-            )
+    if not _check_ports_available(
+        "DEV002",
+        [
+            ("API", identity.api_port, "ANYTOOLAI_API_PORT", "--api-port"),
+            ("PostgreSQL", identity.postgres_port, "ANYTOOLAI_POSTGRES_PORT", "--postgres-port"),
+        ],
+    ):
         return 1
     print_runtime_endpoints(identity)
     exit_code = run_with_env(
@@ -523,6 +550,63 @@ def dev_down() -> int:
     )
 
 
+def _prod_compose_command(*args: str) -> list[str]:
+    return _docker_compose_command(
+        PROD_COMPOSE_PROJECT, (COMPOSE_FILE, COMPOSE_PROD_FILE), *args
+    )
+
+
+def _prod_stack_running() -> bool:
+    result = subprocess.run(
+        _prod_compose_command("ps", "-q"),
+        cwd=ROOT,
+        env=runner_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return bool(result.stdout.strip())
+
+
+def prod_up() -> int:
+    # Deliberately its own variable, not ANYTOOLAI_API_PORT (dev's per-worktree derived
+    # port) — a leftover dev override in the operator's shell must not silently redirect
+    # which host port prod binds to or preflight-checks. Postgres isn't published in prod
+    # at all (see docker-compose.prod.yml), so there's no Postgres port to check here.
+    try:
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
+    except ValueError as exc:
+        print(f"PROD001: {exc}", file=sys.stderr)
+        return 2
+    try:
+        stack_running = _prod_stack_running()
+    except FileNotFoundError as exc:
+        print(f"Command not found: {exc.filename}", file=sys.stderr)
+        return 127
+    # Skip the port preflight when the anytoolai-prod stack is already up: this is an
+    # in-place redeploy (`docker compose up -d --build` recreates its own containers,
+    # freeing/rebinding their ports itself), not a fresh start racing against something
+    # else. Checking raw socket availability here would otherwise always "detect" the
+    # stack's own already-running containers as an occupied port and block redeploys.
+    if not stack_running and not _check_ports_available(
+        "PROD002",
+        [("API", api_port, "ANYTOOLAI_PROD_API_PORT", None)],
+    ):
+        return 1
+    return run_with_env(
+        _prod_compose_command("up", "-d", "--build", "--remove-orphans"),
+        runner_env(),
+    )
+
+
+def prod_status() -> int:
+    return run_with_env(_prod_compose_command("ps"), runner_env())
+
+
+def prod_down() -> int:
+    return run_with_env(_prod_compose_command("down", "--remove-orphans"), runner_env())
+
+
 COMMANDS = {
     "doctor": doctor,
     "validate-configs": validate_configs,
@@ -537,6 +621,9 @@ COMMANDS = {
     "dev-ready": dev_ready,
     "dev-status": dev_status,
     "dev-down": dev_down,
+    "prod-up": prod_up,
+    "prod-status": prod_status,
+    "prod-down": prod_down,
 }
 
 

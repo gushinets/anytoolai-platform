@@ -1,0 +1,62 @@
+# Production overlay for infra/compose/docker-compose.yml.
+#
+# Invoked explicitly (never auto-merged): `make prod-up` / `python scripts/agent/runner.py prod-up`,
+# which runs `docker compose -f docker-compose.yml -f docker-compose.prod.yml ...`.
+#
+# No bind-mounts, no dev credential fallbacks — every ANYTOOLAI_POSTGRES_* variable is
+# required (`${VAR:?...}`) and must come from the real deployment environment (secret
+# store / CI secrets / exported env), never committed.
+#
+# platform-api runs Alembic migrations from its own entrypoint on every container start
+# (infra/docker/platform-api-entrypoint.sh). `deploy.replicas: 1` documents the intended
+# operational limit — plain `docker compose` (outside Swarm) does NOT enforce this field,
+# and `--scale platform-api=2` overrides it silently. Do not scale platform-api beyond one
+# instance: see infra/deployment/README.md for what actually breaks if you do.
+# Kept in sync by hand with the x-database-url anchor in docker-compose.yml — YAML anchors
+# don't merge across separate `-f` files, so each compose file needs its own copy of this DSN
+# shape (only the credential-interpolation style differs: required here, defaulted there). If
+# you change the connection string format here (driver, host, port), make the same change there.
+x-database-url: &database-url postgresql+psycopg://${ANYTOOLAI_POSTGRES_USER:?ANYTOOLAI_POSTGRES_USER must be set in production}:${ANYTOOLAI_POSTGRES_PASSWORD:?ANYTOOLAI_POSTGRES_PASSWORD must be set in production}@postgres:5432/${ANYTOOLAI_POSTGRES_DB:?ANYTOOLAI_POSTGRES_DB must be set in production}
+
+services:
+  postgres:
+    # Not published to the host by default (unlike dev) — platform-api/platform-worker
+    # reach it over the compose network as `postgres:5432`. Add an explicit `ports:` entry
+    # here (or in a local, uncommitted overlay) if an operator genuinely needs external
+    # access, e.g. for manual psql/admin use.
+    ports: !reset []
+    environment:
+      POSTGRES_USER: ${ANYTOOLAI_POSTGRES_USER:?ANYTOOLAI_POSTGRES_USER must be set in production}
+      POSTGRES_PASSWORD: ${ANYTOOLAI_POSTGRES_PASSWORD:?ANYTOOLAI_POSTGRES_PASSWORD must be set in production}
+      POSTGRES_DB: ${ANYTOOLAI_POSTGRES_DB:?ANYTOOLAI_POSTGRES_DB must be set in production}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+  platform-api:
+    environment:
+      DATABASE_URL: *database-url
+    # Own port variable (not ANYTOOLAI_API_PORT, which dev uses for per-worktree derived
+    # ports) — a leftover dev override in the operator's shell must not silently redirect
+    # which host port prod binds to. `!override` replaces the base file's ports list rather
+    # than appending to it.
+    ports: !override
+      - "${ANYTOOLAI_PROD_API_PORT:-8000}:8000"
+    restart: unless-stopped
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+  platform-worker:
+    environment:
+      DATABASE_URL: *database-url
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M

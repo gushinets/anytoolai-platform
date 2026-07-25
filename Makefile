@@ -1,6 +1,6 @@
 PYTHON := $(shell command -v python3 2>/dev/null || command -v python)
 
-.PHONY: doctor quick-check frontend-check full-check validate-configs validate-architecture validate-docs generate-docs check-generated-docs dev-up dev-ready dev-status dev-down collect-context
+.PHONY: doctor quick-check frontend-check full-check validate-configs validate-architecture validate-docs generate-docs check-generated-docs dev-up dev-ready dev-status dev-down prod-up prod-status prod-down collect-context
 
 doctor:
 	$(PYTHON) scripts/agent/runner.py doctor
@@ -40,6 +40,15 @@ dev-status:
 
 dev-down:
 	$(PYTHON) scripts/agent/runner.py dev-down
+
+prod-up:
+	$(PYTHON) scripts/agent/runner.py prod-up
+
+prod-status:
+	$(PYTHON) scripts/agent/runner.py prod-status
+
+prod-down:
+	$(PYTHON) scripts/agent/runner.py prod-down
 
 collect-context:
 	$(PYTHON) scripts/agent/runner.py collect-context

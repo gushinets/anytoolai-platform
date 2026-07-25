@@ -1,0 +1,18 @@
+# Dev-only overrides for infra/compose/docker-compose.yml.
+#
+# Credential defaults (anytoolai/anytoolai/anytoolai) already live directly in the base file
+# (`${VAR:-anytoolai}`), so this file only needs to carry what's genuinely dev-specific:
+# switching platform-api to its `dev` build target and hot-reload bind-mounts.
+#
+# `make dev-up` / `scripts/agent/runner.py` always pass this file explicitly via a second
+# `-f` (see `_compose_command()`), and a bare `docker compose up` run from infra/compose/
+# also auto-merges it since Compose picks up docker-compose.override.yml by convention when
+# no -f flags are given.
+services:
+  platform-api:
+    build:
+      target: dev
+    volumes:
+      - ../../apps/platform-api/src:/app/apps/platform-api/src
+      - ../../packages/backend/platform-core/src:/app/packages/backend/platform-core/src
+      - ../../migrations/platform:/app/migrations/platform

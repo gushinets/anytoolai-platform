@@ -40,7 +40,9 @@ Generated docs are written by `generate-docs`. Use `generate-docs --check` in re
 detect drift without changing tracked files.
 
 Use `dev-up`, `dev-status`, and `dev-down` through the runner for a worktree-isolated Compose
-environment. The status command prints the derived API and database endpoints.
+environment. The status command prints the derived API and database endpoints. `platform-api`
+runs with hot-reload in this dev environment. For the production overlay (`prod-up`/`prod-status`/
+`prod-down`) and the full dev/prod split, see `infra/deployment/README.md`.
 
 When blocked, `collect-context` writes a privacy-sanitized JSON bundle under the ignored
 `.agent/context/` directory. API and worker runtime logs are structured JSON and use the same

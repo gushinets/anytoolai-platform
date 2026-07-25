@@ -1,14 +1,20 @@
+# Kept in sync by hand with the x-database-url anchor in docker-compose.prod.yml — YAML
+# anchors don't merge across separate `-f` files, so each compose file needs its own copy of
+# this DSN shape. If you change the connection string format here (driver, host, port), make
+# the same change there too.
+x-database-url: &database-url postgresql+psycopg://${ANYTOOLAI_POSTGRES_USER:-anytoolai}:${ANYTOOLAI_POSTGRES_PASSWORD:-anytoolai}@postgres:5432/${ANYTOOLAI_POSTGRES_DB:-anytoolai}
+
 services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_USER: anytoolai
-      POSTGRES_PASSWORD: anytoolai
-      POSTGRES_DB: anytoolai
+      POSTGRES_USER: ${ANYTOOLAI_POSTGRES_USER:-anytoolai}
+      POSTGRES_PASSWORD: ${ANYTOOLAI_POSTGRES_PASSWORD:-anytoolai}
+      POSTGRES_DB: ${ANYTOOLAI_POSTGRES_DB:-anytoolai}
     ports:
       - "${ANYTOOLAI_POSTGRES_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U anytoolai -d anytoolai"]
+      test: ["CMD-SHELL", "pg_isready -U ${ANYTOOLAI_POSTGRES_USER:-anytoolai} -d ${ANYTOOLAI_POSTGRES_DB:-anytoolai}"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -16,8 +22,9 @@ services:
     build:
       context: ../..
       dockerfile: infra/docker/platform-api.Dockerfile
+      target: prod
     environment:
-      DATABASE_URL: postgresql+psycopg://anytoolai:anytoolai@postgres:5432/anytoolai
+      DATABASE_URL: *database-url
     depends_on:
       postgres:
         condition: service_healthy
@@ -33,7 +40,9 @@ services:
       context: ../..
       dockerfile: infra/docker/platform-worker.Dockerfile
     environment:
-      DATABASE_URL: postgresql+psycopg://anytoolai:anytoolai@postgres:5432/anytoolai
+      DATABASE_URL: *database-url
     depends_on:
       postgres:
+        condition: service_healthy
+      platform-api:
         condition: service_healthy
