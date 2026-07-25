@@ -36,7 +36,7 @@ prod-side Postgres port variable.
 
 ## Dev
 
-```
+```bash
 make dev-up      # build + start postgres/platform-api/platform-worker
 make dev-ready   # poll until platform-api /health is up
 make dev-status  # docker compose ps
@@ -54,7 +54,7 @@ make dev-down    # tear down
 
 ## Prod
 
-```
+```bash
 export ANYTOOLAI_POSTGRES_USER=...
 export ANYTOOLAI_POSTGRES_PASSWORD=...
 export ANYTOOLAI_POSTGRES_DB=...

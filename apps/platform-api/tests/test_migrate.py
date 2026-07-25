@@ -68,6 +68,7 @@ def test_main_upgrades_a_real_postgresql_database_to_head(monkeypatch) -> None:
         admin_engine.dispose()
 
     try:
+        monkeypatch.delenv(migrate.PROJECT_DATABASE_URL_ENV, raising=False)
         monkeypatch.setenv(
             migrate.GENERIC_DATABASE_URL_ENV, test_url.render_as_string(hide_password=False)
         )

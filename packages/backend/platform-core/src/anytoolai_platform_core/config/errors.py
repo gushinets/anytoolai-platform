@@ -7,7 +7,7 @@ from pathlib import Path
 from anytoolai_platform_core.common.errors import PlatformError
 
 
-@dataclass(frozen=True)
+@dataclass
 class ConfigError(PlatformError):
     """Structured config error with file path and reference context."""
 
@@ -47,7 +47,7 @@ class ConfigError(PlatformError):
         return "\n".join(parts)
 
 
-@dataclass(frozen=True)
+@dataclass
 class DuplicateConfigIdError(ConfigError):
     """Raised when two configs with the same ID are found."""
 
@@ -74,7 +74,7 @@ class DuplicateConfigIdError(ConfigError):
         object.__setattr__(self, "second_file", second_file)
 
 
-@dataclass(frozen=True)
+@dataclass
 class MissingConfigFileError(ConfigError):
     """Raised when a required config file is missing."""
 
@@ -103,7 +103,7 @@ class MissingConfigFileError(ConfigError):
         object.__setattr__(self, "reason", reason)
 
 
-@dataclass(frozen=True)
+@dataclass
 class BrokenReferenceError(ConfigError):
     """Raised when a config references a non-existent definition."""
 
@@ -130,7 +130,7 @@ class BrokenReferenceError(ConfigError):
         object.__setattr__(self, "target_type", target_type)
 
 
-@dataclass(frozen=True)
+@dataclass
 class InvalidConfigShapeError(ConfigError):
     """Raised when config file shape is invalid (missing required fields)."""
 
@@ -153,7 +153,7 @@ class InvalidConfigShapeError(ConfigError):
         )
 
 
-@dataclass(frozen=True)
+@dataclass
 class RegistryLoadError(ConfigError):
     """Raised when registry loading fails."""
 
