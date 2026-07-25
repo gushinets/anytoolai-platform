@@ -65,6 +65,8 @@ groups:
     - handoff.accepted
     - handoff.declined
     - handoff.consumed
+    - handoff.expired
+    - handoff.failed
   client:
     - client.result_copied
     - client.next_action_clicked

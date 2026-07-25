@@ -56,8 +56,14 @@ class ScenarioSessionRecord:
 @dataclass(frozen=True)
 class ScenarioSessionSnapshot:
     scenario_session_id: str
-    job_id: str
+    job_id: str | None
     status: ScenarioSessionStatus
     allowed_next_actions: tuple[str, ...] = field(default_factory=tuple)
     result_artifact_id: str | None = None
     current_checkpoint_id: str | None = None
+
+
+@dataclass(frozen=True)
+class LinkedScenarioSessionResult:
+    session: ScenarioSessionRecord
+    job: Any | None = None

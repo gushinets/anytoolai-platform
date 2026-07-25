@@ -161,6 +161,10 @@ POST /v1/handoffs/{handoff_token}/decline
 POST /v1/client-events
 ```
 
+MVP-A handoffs are backend-owned bearer-token flows. Only canonical normalized workflow-result
+artifacts may feed config-allowlisted context and preview mappings. User acceptance creates an
+auditable linked target session; only an `immediate` config policy queues the target workflow.
+
 ## Kernel Demo
 
 `kernel_demo` is an internal smoke-test product only. It is not a user product and not part of Freelancer Suite.

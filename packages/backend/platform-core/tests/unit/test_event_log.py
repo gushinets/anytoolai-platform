@@ -318,7 +318,7 @@ def test_event_log_migration_creates_table_at_0002(tmp_path: Path) -> None:
 
 def test_platform_migration_chain_is_single_head() -> None:
     script = ScriptDirectory.from_config(_build_alembic_config("sqlite+pysqlite://"))
-    assert script.get_heads() == ["0007"]
+    assert script.get_heads() == ["0008"]
 
 
 def test_event_log_upgrade_from_0005_renames_provider_policy_column(tmp_path: Path) -> None:

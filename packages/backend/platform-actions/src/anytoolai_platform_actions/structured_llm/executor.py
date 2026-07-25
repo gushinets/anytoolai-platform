@@ -1,37 +1,36 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
-from typing import Any, Mapping
+from typing import Any
 
-from sqlalchemy.orm import Session
-
-from anytoolai_platform_core.artifacts.service import ArtifactService
+from anytoolai_platform_actions.structured_llm.pydanticai_runner import (
+    PydanticAIStructuredRunner,
+    PydanticAIValidationExhaustedError,
+)
 from anytoolai_platform_core.actions.executor import (
     ActionExecutorRequest,
     ActionExecutorResponse,
     ProviderCallInfo,
 )
+from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.providers.gateway import ProviderGateway
 from anytoolai_platform_core.providers.models import ProviderRequest, ProviderResponse
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
-from anytoolai_platform_core.structured_output.service import (
-    StructuredOutputFinalizer,
-    StructuredOutputPersistenceContext,
-)
 from anytoolai_platform_core.structured_output.errors import (
     StructuredOutputError,
     to_safe_validation_error,
 )
+from anytoolai_platform_core.structured_output.service import (
+    StructuredOutputFinalizer,
+    StructuredOutputPersistenceContext,
+)
 from anytoolai_platform_core.structured_output.validator import (
     validate_structured_output,
 )
-
-from anytoolai_platform_actions.structured_llm.pydanticai_runner import (
-    PydanticAIValidationExhaustedError,
-    PydanticAIStructuredRunner,
-)
+from sqlalchemy.orm import Session
 
 
 @dataclass(frozen=True)
@@ -67,9 +66,7 @@ class StructuredLlmActionExecutor:
         action_config = self._require_action_config(request.action_config_id)
         action_definition = self._require_action_definition(action_config.action_type)
         prompt = self._require_prompt(action_config.prompt_ref)
-        response_schema = self._config_registry.get_schema(
-            action_definition.output_schema_ref
-        )
+        response_schema = self._config_registry.get_schema(action_definition.output_schema_ref)
         provider_request = ProviderRequest(
             provider_policy_ref=action_config.provider_policy_ref,
             tenant_id=request.tenant_id,
@@ -196,6 +193,8 @@ class StructuredLlmActionExecutor:
                 scenario_session_id=request.scenario_session_id,
                 job_id=request.job_id,
                 action_run_id=request.action_run_id,
+                handoff_id=_metadata_str(request.metadata, "handoff_id"),
+                scenario_chain_id=_metadata_str(request.metadata, "scenario_chain_id"),
             ),
             schema=schema_mapping,
             schema_ref=None if response_schema is None else response_schema.schema_ref,
@@ -228,3 +227,8 @@ class StructuredLlmActionExecutor:
                 metadata=dict(response.metadata),
             ),
         )
+
+
+def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
+    value = metadata.get(key)
+    return value if isinstance(value, str) and value else None

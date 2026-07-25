@@ -12,6 +12,7 @@ from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 PROCESSING_CHECKPOINT_ID = "processing"
 RESULT_READY_CHECKPOINT_ID = "result_ready"
 FAILED_CHECKPOINT_ID = "failed"
+HANDOFF_READY_CHECKPOINT_ID = "handoff_ready"
 
 
 @dataclass(frozen=True)
@@ -78,7 +79,10 @@ def _resolved_checkpoint_id(
         return RESULT_READY_CHECKPOINT_ID
     if effective_status is ScenarioSessionStatus.failed:
         return FAILED_CHECKPOINT_ID
-    if session.current_checkpoint_id == PROCESSING_CHECKPOINT_ID:
-        return PROCESSING_CHECKPOINT_ID
+    if session.current_checkpoint_id in (
+        PROCESSING_CHECKPOINT_ID,
+        HANDOFF_READY_CHECKPOINT_ID,
+    ):
+        return session.current_checkpoint_id
 
     return PROCESSING_CHECKPOINT_ID
