@@ -188,6 +188,11 @@ POST /v1/handoffs/{handoff_token}/decline
 POST /v1/client-events
 ```
 
+The handoff endpoints implement an opaque 30-minute token, safe mapped preview, guarded
+created/viewed/accepted/declined/consumed/expired/failed lifecycle, and explicit source/target
+session linkage. Accept always creates the target session; config decides whether a target job is
+queued immediately or deferred.
+
 ## Definition Of Done
 
 Platform Kernel is done when:

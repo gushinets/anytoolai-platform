@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-import os
 import logging
+import os
+import re
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from time import perf_counter
 from uuid import uuid4
-
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.responses import Response
 
 from anytoolai_platform_api.bootstrap import build_runtime
 from anytoolai_platform_api.errors import (
@@ -20,6 +16,7 @@ from anytoolai_platform_api.errors import (
     request_validation_error_handler,
     unhandled_exception_handler,
 )
+from anytoolai_platform_api.routers.handoffs import router as handoffs_router
 from anytoolai_platform_api.routers.health import router as health_router
 from anytoolai_platform_api.routers.identity_quota import router as identity_quota_router
 from anytoolai_platform_api.routers.runtime_config import router as runtime_config_router
@@ -32,6 +29,10 @@ from anytoolai_platform_core.common.logging import (
     log_event,
     reset_log_context,
 )
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import Response
 
 CORS_ORIGINS_ENV = "ANYTOOLAI_API_CORS_ORIGINS"
 CHROME_EXTENSION_ORIGIN_REGEX = r"^chrome-extension://[a-p]{32}$"
@@ -54,6 +55,7 @@ def create_app(
 
     app.include_router(health_router)
     app.include_router(identity_quota_router)
+    app.include_router(handoffs_router)
     app.include_router(runtime_config_router)
     app.include_router(scenario_runtime_router)
     return app
@@ -92,7 +94,7 @@ def _install_request_context(app: FastAPI) -> None:
                 logger,
                 "http.request_completed",
                 method=request.method,
-                path=request.url.path,
+                path=_safe_request_path(request),
                 status_code=response.status_code,
                 duration_ms=round((perf_counter() - started) * 1000, 2),
             )
@@ -104,7 +106,7 @@ def _install_request_context(app: FastAPI) -> None:
                     "event": "http.request_failed",
                     "fields": {
                         "method": request.method,
-                        "path": request.url.path,
+                        "path": _safe_request_path(request),
                         "status_code": 500,
                     },
                 },
@@ -118,6 +120,18 @@ def _install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(ApiError, api_error_handler)
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
+
+
+def _safe_request_path(request: Request) -> str:
+    route = request.scope.get("route")
+    route_path = getattr(route, "path", None)
+    if isinstance(route_path, str):
+        return route_path
+    return re.sub(
+        r"(/v1/handoffs/)[^/]+",
+        r"\1{handoff_token}",
+        request.url.path,
+    )
 
 
 app = create_app()

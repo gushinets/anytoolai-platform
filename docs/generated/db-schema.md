@@ -137,6 +137,47 @@ Definitions remain in repository configuration; these tables store runtime state
 | created_at | DATETIME | no |
 | metadata | JSON | no |
 
+## platform.product_handoffs
+
+| Column | Type | Nullable |
+|---|---|---|
+| id | VARCHAR(128) | no |
+| handoff_definition_id | VARCHAR(128) | no |
+| tenant_id | VARCHAR(128) | no |
+| region | VARCHAR(64) | no |
+| token_hash | VARCHAR(64) | no |
+| status | VARCHAR(8) | no |
+| source_product_id | VARCHAR(128) | no |
+| source_frontend_id | VARCHAR(128) | no |
+| source_scenario_id | VARCHAR(128) | no |
+| source_scenario_session_id | VARCHAR(128) | no |
+| source_job_id | VARCHAR(128) | no |
+| source_artifact_id | VARCHAR(128) | no |
+| target_product_id | VARCHAR(128) | no |
+| target_frontend_id | VARCHAR(128) | no |
+| target_scenario_id | VARCHAR(128) | no |
+| target_scenario_session_id | VARCHAR(128) | yes |
+| target_job_id | VARCHAR(128) | yes |
+| scenario_chain_id | VARCHAR(128) | no |
+| created_by_guest_id | VARCHAR(128) | yes |
+| accepted_by_guest_id | VARCHAR(128) | yes |
+| accepted_from_frontend_instance_id | VARCHAR(128) | yes |
+| consent_required | BOOLEAN | no |
+| target_start_policy | VARCHAR(9) | no |
+| context_payload | JSON | no |
+| preview_payload | JSON | no |
+| error_code | VARCHAR(128) | yes |
+| metadata | JSON | no |
+| created_at | DATETIME | no |
+| updated_at | DATETIME | no |
+| expires_at | DATETIME | no |
+| viewed_at | DATETIME | yes |
+| accepted_at | DATETIME | yes |
+| declined_at | DATETIME | yes |
+| consumed_at | DATETIME | yes |
+| expired_at | DATETIME | yes |
+| failed_at | DATETIME | yes |
+
 ## platform.provider_calls
 
 | Column | Type | Nullable |

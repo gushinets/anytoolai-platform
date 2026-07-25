@@ -78,10 +78,12 @@ def test_loader_builds_registry_from_current_tree() -> None:
     assert registry.get_product("kernel_demo") is not None
     assert registry.get_scenario("kernel_demo.single_action_smoke_v1") is not None
     assert registry.get_workflow("kernel_demo.extract_detect_report_v1") is not None
-    assert (
-        registry.get_action_configuration("kernel_demo.extract_structured_fields_v1")
-        is not None
-    )
+    handoff = registry.get_handoff("kernel_demo_source_to_target_v1")
+    assert handoff is not None
+    assert handoff.target_frontend_id == "kernel_demo_ce"
+    assert handoff.target_start_policy.value == "immediate"
+    assert handoff.context_mapping == {"source_text": "artifact.content_json.title"}
+    assert registry.get_action_configuration("kernel_demo.extract_structured_fields_v1") is not None
     assert registry.get_prompt("kernel_demo.extract_structured_fields.v1") is not None
     assert registry.get_provider_policy("default_fake_provider_v1") is not None
     quota_policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
@@ -111,6 +113,177 @@ def test_loader_builds_registry_from_current_tree() -> None:
         registry.products["another"] = product
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("consent_required", False, "consent_required: true"),
+        ("target_frontend_id", "missing_frontend", "target frontend is not enabled"),
+        (
+            "context_mapping",
+            {"source_text": "artifact.metadata.raw"},
+            "must use artifact.content_json paths",
+        ),
+        (
+            "preview_mapping",
+            {"preview..title": "artifact.content_json.title"},
+            "target path is unsupported",
+        ),
+    ],
+)
+def test_loader_rejects_unsafe_or_broken_handoff_contracts(
+    tmp_path: Path,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    data = _load_yaml(handoff_path)
+    data["handoffs"][0][field] = value
+    _write_yaml(handoff_path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert message in str(exc_info.value)
+
+
+def test_loader_rejects_trailing_dot_handoff_source_with_identity(
+    tmp_path: Path,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    data = _load_yaml(handoff_path)
+    mapping = {"source_text": "artifact.content_json."}
+    data["handoffs"][0]["context_mapping"] = mapping
+    _write_yaml(handoff_path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=handoff_path,
+        config_id="kernel_demo_source_to_target_v1",
+        ref_type="context_mapping",
+        ref_value='{"source_text": "artifact.content_json."}',
+        message_part="must use artifact.content_json paths",
+    )
+
+
+@pytest.mark.parametrize("field_name", ["context_mapping", "preview_mapping"])
+@pytest.mark.parametrize(
+    ("first_target", "second_target", "expected_parent", "expected_nested"),
+    [
+        ("summary", "summary.title", "summary", "summary.title"),
+        ("summary.title", "summary", "summary", "summary.title"),
+        ("summary.details", "summary.details.title", "summary.details", "summary.details.title"),
+    ],
+)
+def test_loader_rejects_conflicting_handoff_mapping_target_paths(
+    tmp_path: Path,
+    field_name: str,
+    first_target: str,
+    second_target: str,
+    expected_parent: str,
+    expected_nested: str,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    data = _load_yaml(handoff_path)
+    data["handoffs"][0][field_name] = {
+        first_target: "artifact.content_json.title",
+        second_target: "artifact.content_json.fields",
+    }
+    _write_yaml(handoff_path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=handoff_path,
+        config_id="kernel_demo_source_to_target_v1",
+        ref_type=field_name,
+        ref_value=f"{expected_parent} <> {expected_nested}",
+        message_part=(f"{expected_parent} is a prefix of {expected_nested}"),
+    )
+
+
+@pytest.mark.parametrize("field_name", ["context_mapping", "preview_mapping"])
+def test_loader_rejects_duplicate_handoff_mapping_target_with_identity(
+    tmp_path: Path,
+    field_name: str,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    duplicate_mapping = [
+        f"    {field_name}:",
+        "      summary.title: artifact.content_json.title",
+        "      summary.title: artifact.content_json.fields",
+    ]
+    other_field_name = (
+        "preview_mapping" if field_name == "context_mapping" else "context_mapping"
+    )
+    valid_mapping = [
+        f"    {other_field_name}:",
+        "      title: artifact.content_json.title",
+    ]
+    handoff_path.write_text(
+        "\n".join(
+            [
+                "handoffs:",
+                "  - handoff_id: kernel_demo_source_to_target_v1",
+                "    source_product_id: kernel_demo",
+                "    source_scenario_id: kernel_demo.handoff_smoke_source_v1",
+                "    target_product_id: kernel_demo",
+                "    target_frontend_id: kernel_demo_ce",
+                "    target_scenario_id: kernel_demo.handoff_smoke_target_v1",
+                "    target_start_policy: immediate",
+                "    consent_required: true",
+                *duplicate_mapping,
+                *valid_mapping,
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=handoff_path,
+        config_id="kernel_demo_source_to_target_v1",
+        ref_type=field_name,
+        ref_value="summary.title",
+        message_part="target path is duplicated: summary.title",
+    )
+
+
+@pytest.mark.parametrize("field_name", ["context_mapping", "preview_mapping"])
+def test_loader_accepts_non_conflicting_handoff_mapping_siblings(
+    tmp_path: Path,
+    field_name: str,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    data = _load_yaml(handoff_path)
+    sibling_mapping = {
+        "summary.title": "artifact.content_json.title",
+        "summary.fields": "artifact.content_json.fields",
+    }
+    data["handoffs"][0][field_name] = sibling_mapping
+    _write_yaml(handoff_path, data)
+
+    registry = ConfigLoader(config_root).load()
+    handoff = registry.get_handoff("kernel_demo_source_to_target_v1")
+
+    assert handoff is not None
+    assert getattr(handoff, field_name) == sibling_mapping
+
+
 def test_loader_preserves_provider_policy_yaml_metadata() -> None:
     registry = ConfigLoader(CONFIG_ROOT).load()
 
@@ -128,9 +301,7 @@ def test_loader_preserves_provider_policy_yaml_metadata() -> None:
 
 
 def test_default_text_generation_policy_has_no_duplicate_retry_key_in_yaml() -> None:
-    provider_policies_yaml = (CONFIG_ROOT / "provider_policies.yaml").read_text(
-        encoding="utf-8"
-    )
+    provider_policies_yaml = (CONFIG_ROOT / "provider_policies.yaml").read_text(encoding="utf-8")
     default_policy_start = provider_policies_yaml.index(
         "  - provider_policy_ref: default_text_generation_v1"
     )
@@ -316,9 +487,7 @@ def test_loader_rejects_non_zero_litellm_num_retries_per_attempt(
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "provider_policies.yaml"
     data = _load_yaml(path)
-    data["provider_policies"][1]["retry_policy"]["transport"][
-        "litellm_num_retries_per_attempt"
-    ] = 1
+    data["provider_policies"][1]["retry_policy"]["transport"]["litellm_num_retries_per_attempt"] = 1
     _write_yaml(path, data)
 
     with pytest.raises(RegistryLoadError) as exc_info:

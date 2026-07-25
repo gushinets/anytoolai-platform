@@ -21,11 +21,11 @@ from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter, enrich_event_context
-from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.events.replay import (
     ReplayTimestampSequencer,
     sequence_existing_replay_event,
 )
+from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.storage.db import action_runs_table
@@ -125,9 +125,7 @@ class WorkflowJobService:
             record,
             status=JobStatus.failed,
             error_code=error_code,
-            error_message_safe=(
-                record.error_message_safe or "Workflow execution failed."
-            ),
+            error_message_safe=(record.error_message_safe or "Workflow execution failed."),
             completed_at=record.completed_at or utc_now(),
         )
         updated = self._repository.mark_failed(failed_record)
@@ -147,9 +145,7 @@ class WorkflowJobService:
             record,
             status=JobStatus.failed,
             error_code=error_code,
-            error_message_safe=(
-                record.error_message_safe or "Workflow execution failed."
-            ),
+            error_message_safe=(record.error_message_safe or "Workflow execution failed."),
             completed_at=record.completed_at or utc_now(),
         )
         updated = self._repository.mark_failed_from_created(failed_record)
@@ -278,9 +274,7 @@ class SequentialWorkflowRunner:
             raise ValueError("job and execution context workflow_version do not match")
         for field_name in ("tenant_id", "region", "product_id", "frontend_id"):
             if getattr(context, field_name) != getattr(job, field_name):
-                raise ValueError(
-                    f"job and execution context {field_name} do not match"
-                )
+                raise ValueError(f"job and execution context {field_name} do not match")
 
         workflow = self._require_workflow(job.workflow_id)
         if workflow.version != job.workflow_version:
@@ -410,7 +404,7 @@ class SequentialWorkflowRunner:
         step: WorkflowStepDefinition,
         job: JobRecord,
         job_context: ExecutionContext,
-        state: "_WorkflowExecutionState",
+        state: _WorkflowExecutionState,
     ) -> JobRecord:
         action_config = self._require_action_config(step.action_config_id)
         step_event_context = enrich_event_context(
@@ -709,12 +703,14 @@ class SequentialWorkflowRunner:
                 "workflow_id": workflow.workflow_id,
                 "workflow_version": workflow.version,
                 "artifact_role": "workflow_result",
+                "handoff_id": _metadata_str(job.metadata, "handoff_id"),
+                "scenario_chain_id": _metadata_str(job.metadata, "scenario_chain_id"),
             },
         )
 
     def _select_final_output(
         self,
-        state: "_WorkflowExecutionState",
+        state: _WorkflowExecutionState,
     ) -> tuple[dict[str, Any], str]:
         workflow_output = state.context.get("workflow_output")
         if isinstance(workflow_output, Mapping):
@@ -768,7 +764,7 @@ class SequentialWorkflowRunner:
     def _persist_job_state(
         self,
         job: JobRecord,
-        state: "_WorkflowExecutionState",
+        state: _WorkflowExecutionState,
     ) -> JobRecord:
         metadata = {
             **dict(job.metadata),
@@ -779,7 +775,7 @@ class SequentialWorkflowRunner:
     def _build_failed_job_record(
         self,
         job: JobRecord,
-        state: "_WorkflowExecutionState",
+        state: _WorkflowExecutionState,
         *,
         error_code: str,
         error_message_safe: str,
@@ -800,7 +796,7 @@ class SequentialWorkflowRunner:
     def _build_cancellation_recovery_record(
         self,
         job: JobRecord,
-        state: "_WorkflowExecutionState",
+        state: _WorkflowExecutionState,
     ) -> JobRecord:
         metadata = {
             **dict(job.metadata),
@@ -815,7 +811,7 @@ class SequentialWorkflowRunner:
 
     def _workflow_state_metadata(
         self,
-        state: "_WorkflowExecutionState",
+        state: _WorkflowExecutionState,
     ) -> dict[str, Any]:
         return {
             "steps": dict(state.step_state),
@@ -919,7 +915,7 @@ class SequentialWorkflowRunner:
         job: JobRecord,
         *,
         error_code: str,
-        failed_step: "_WorkflowFailedStepRecovery | None",
+        failed_step: _WorkflowFailedStepRecovery | None,
     ) -> None:
         register_rollback_recovery_callback(
             self._session,
@@ -944,7 +940,7 @@ class SequentialWorkflowRunner:
         self,
         job: JobRecord,
         *,
-        failed_step: "_WorkflowFailedStepRecovery | None",
+        failed_step: _WorkflowFailedStepRecovery | None,
     ) -> None:
         register_rollback_recovery_callback(
             self._session,
@@ -966,7 +962,7 @@ class SequentialWorkflowRunner:
 
     @staticmethod
     def _remember_failed_step(
-        state: "_WorkflowExecutionState",
+        state: _WorkflowExecutionState,
         *,
         step: WorkflowStepDefinition,
         action_type: str,
@@ -987,16 +983,20 @@ class SequentialWorkflowRunner:
         )
 
     def _latest_action_run_id(self, job_id: str, step_id: str) -> str | None:
-        return self._session.execute(
-            sa.select(action_runs_table.c.id)
-            .where(action_runs_table.c.job_id == job_id)
-            .where(action_runs_table.c.step_id == step_id)
-            .order_by(
-                action_runs_table.c.created_at.desc(),
-                action_runs_table.c.started_at.desc().nullslast(),
-                action_runs_table.c.completed_at.desc().nullslast(),
+        return (
+            self._session.execute(
+                sa.select(action_runs_table.c.id)
+                .where(action_runs_table.c.job_id == job_id)
+                .where(action_runs_table.c.step_id == step_id)
+                .order_by(
+                    action_runs_table.c.created_at.desc(),
+                    action_runs_table.c.started_at.desc().nullslast(),
+                    action_runs_table.c.completed_at.desc().nullslast(),
+                )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
 
     def _emit_step_failed(
         self,
@@ -1089,7 +1089,7 @@ def _recover_failed_workflow_row_after_rollback(
     recovery_session_factory: Any,
     record: JobRecord,
     *,
-    failed_step: "_WorkflowFailedStepRecovery | None",
+    failed_step: _WorkflowFailedStepRecovery | None,
 ) -> None:
     with transaction_boundary(recovery_session_factory) as recovery_session:
         repository = JobRepository(recovery_session)
@@ -1114,11 +1114,12 @@ def _recover_failed_workflow_row_after_rollback(
                 f"job {record.id} cannot recover failed workflow from {existing.status.value}"
             )
 
+
 def _recover_canceled_workflow_row_after_rollback(
     recovery_session_factory: Any,
     record: JobRecord,
     *,
-    failed_step: "_WorkflowFailedStepRecovery | None",
+    failed_step: _WorkflowFailedStepRecovery | None,
 ) -> None:
     with transaction_boundary(recovery_session_factory) as recovery_session:
         repository = JobRepository(recovery_session)

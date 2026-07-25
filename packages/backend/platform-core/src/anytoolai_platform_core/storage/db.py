@@ -9,6 +9,7 @@ from sqlalchemy.engine import Engine
 
 from anytoolai_platform_core.actions.models import ActionRunStatus
 from anytoolai_platform_core.artifacts.models import ArtifactStatus
+from anytoolai_platform_core.handoffs.models import HandoffStartPolicy, HandoffStatus
 from anytoolai_platform_core.providers.models import ProviderCallStatus
 from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
 from anytoolai_platform_core.workflows.models import JobStatus
@@ -20,18 +21,14 @@ class UtcDateTime(sa.TypeDecorator[datetime]):
     impl = sa.DateTime(timezone=True)
     cache_ok = True
 
-    def process_bind_param(
-        self, value: datetime | None, dialect: sa.Dialect
-    ) -> datetime | None:
+    def process_bind_param(self, value: datetime | None, dialect: sa.Dialect) -> datetime | None:
         if value is None:
             return None
         if value.tzinfo is None:
             raise ValueError("timezone-aware UTC datetime required")
         return value.astimezone(UTC)
 
-    def process_result_value(
-        self, value: datetime | None, dialect: sa.Dialect
-    ) -> datetime | None:
+    def process_result_value(self, value: datetime | None, dialect: sa.Dialect) -> datetime | None:
         if value is None:
             return None
         if value.tzinfo is None:
@@ -295,6 +292,76 @@ guest_quota_usage_table = sa.Table(
     ),
 )
 
+product_handoffs_table = sa.Table(
+    "product_handoffs",
+    runtime_metadata,
+    sa.Column("id", sa.String(length=128), primary_key=True),
+    sa.Column("handoff_definition_id", sa.String(length=128), nullable=False),
+    sa.Column("tenant_id", sa.String(length=128), nullable=False),
+    sa.Column("region", sa.String(length=64), nullable=False),
+    sa.Column("token_hash", sa.String(length=64), nullable=False, unique=True),
+    sa.Column("status", _enum_type(HandoffStatus, "handoff_status"), nullable=False),
+    sa.Column("source_product_id", sa.String(length=128), nullable=False),
+    sa.Column("source_frontend_id", sa.String(length=128), nullable=False),
+    sa.Column("source_scenario_id", sa.String(length=128), nullable=False),
+    sa.Column("source_scenario_session_id", sa.String(length=128), nullable=False),
+    sa.Column("source_job_id", sa.String(length=128), nullable=False),
+    sa.Column("source_artifact_id", sa.String(length=128), nullable=False),
+    sa.Column("target_product_id", sa.String(length=128), nullable=False),
+    sa.Column("target_frontend_id", sa.String(length=128), nullable=False),
+    sa.Column("target_scenario_id", sa.String(length=128), nullable=False),
+    sa.Column("target_scenario_session_id", sa.String(length=128), unique=True),
+    sa.Column("target_job_id", sa.String(length=128)),
+    sa.Column("scenario_chain_id", sa.String(length=128), nullable=False),
+    sa.Column("created_by_guest_id", sa.String(length=128)),
+    sa.Column("accepted_by_guest_id", sa.String(length=128)),
+    sa.Column("accepted_from_frontend_instance_id", sa.String(length=128)),
+    sa.Column("consent_required", sa.Boolean(), nullable=False),
+    sa.Column(
+        "target_start_policy",
+        _enum_type(HandoffStartPolicy, "handoff_start_policy"),
+        nullable=False,
+    ),
+    sa.Column("context_payload", json_document, nullable=False),
+    sa.Column("preview_payload", json_document, nullable=False),
+    sa.Column("error_code", sa.String(length=128)),
+    sa.Column("metadata", json_document, nullable=False),
+    sa.Column("created_at", utc_datetime, nullable=False),
+    sa.Column("updated_at", utc_datetime, nullable=False),
+    sa.Column("expires_at", utc_datetime, nullable=False),
+    sa.Column("viewed_at", utc_datetime),
+    sa.Column("accepted_at", utc_datetime),
+    sa.Column("declined_at", utc_datetime),
+    sa.Column("consumed_at", utc_datetime),
+    sa.Column("expired_at", utc_datetime),
+    sa.Column("failed_at", utc_datetime),
+    sa.ForeignKeyConstraint(
+        ["source_scenario_session_id"],
+        [f"{PLATFORM_SCHEMA}.scenario_sessions.id"],
+        name="fk_product_handoffs_source_session",
+    ),
+    sa.ForeignKeyConstraint(
+        ["source_job_id"], [f"{PLATFORM_SCHEMA}.jobs.id"], name="fk_product_handoffs_source_job"
+    ),
+    sa.ForeignKeyConstraint(
+        ["source_artifact_id"],
+        [f"{PLATFORM_SCHEMA}.artifacts.id"],
+        name="fk_product_handoffs_source_artifact",
+    ),
+    sa.ForeignKeyConstraint(
+        ["target_scenario_session_id"],
+        [f"{PLATFORM_SCHEMA}.scenario_sessions.id"],
+        name="fk_product_handoffs_target_session",
+    ),
+    sa.ForeignKeyConstraint(
+        ["target_job_id"], [f"{PLATFORM_SCHEMA}.jobs.id"], name="fk_product_handoffs_target_job"
+    ),
+    sa.Index("ix_product_handoffs_definition", "handoff_definition_id"),
+    sa.Index("ix_product_handoffs_source_session", "source_scenario_session_id"),
+    sa.Index("ix_product_handoffs_target_session", "target_scenario_session_id"),
+    sa.Index("ix_product_handoffs_status_expiry", "status", "expires_at"),
+)
+
 event_log_table = sa.Table(
     "event_log",
     runtime_metadata,
@@ -351,5 +418,6 @@ runtime_tables = {
     "artifacts": artifacts_table,
     "guest_identities": guest_identities_table,
     "guest_quota_usage": guest_quota_usage_table,
+    "product_handoffs": product_handoffs_table,
     "event_log": event_log_table,
 }
