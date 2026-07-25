@@ -11,4 +11,4 @@ uv run --project apps/platform-api --no-sync anytoolai-platform-migrate &
 migrate_pid=$!
 wait "$migrate_pid"
 
-exec uv run --project apps/platform-api --no-sync uvicorn anytoolai_platform_api.main:app --host 0.0.0.0 --port 8000 "$@"
+exec uv run --project apps/platform-api --no-sync uvicorn anytoolai_platform_api.main:app --host 0.0.0.0 --port 8000 --no-access-log "$@"
