@@ -1,8 +1,12 @@
-# Kept in sync by hand with the x-database-url anchor in docker-compose.prod.yml — YAML
-# anchors don't merge across separate `-f` files, so each compose file needs its own copy of
-# this DSN shape. If you change the connection string format here (driver, host, port), make
-# the same change there too.
-x-database-url: &database-url postgresql+psycopg://${ANYTOOLAI_POSTGRES_USER:-anytoolai}:${ANYTOOLAI_POSTGRES_PASSWORD:-anytoolai}@postgres:5432/${ANYTOOLAI_POSTGRES_DB:-anytoolai}
+# Credentials are passed to platform-api/platform-worker as discrete env vars (below), not
+# pre-assembled into a DATABASE_URL here. Interpolating raw credentials into a connection-string
+# template breaks silently if a password contains a reserved URL character (@, :, /, %, #) --
+# the app builds the DSN itself via SQLAlchemy's URL.create, which percent-encodes each
+# component correctly (see anytoolai_platform_core.storage.db.build_postgres_url_from_env).
+x-postgres-credentials: &postgres-credentials
+  ANYTOOLAI_POSTGRES_USER: ${ANYTOOLAI_POSTGRES_USER:-anytoolai}
+  ANYTOOLAI_POSTGRES_PASSWORD: ${ANYTOOLAI_POSTGRES_PASSWORD:-anytoolai}
+  ANYTOOLAI_POSTGRES_DB: ${ANYTOOLAI_POSTGRES_DB:-anytoolai}
 
 services:
   postgres:
@@ -18,16 +22,33 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+  # One-shot: applies Alembic migrations to head, then exits. platform-api/platform-worker
+  # depend on it completing successfully rather than running migrations themselves, so any
+  # number of platform-api replicas can start concurrently without racing on schema changes
+  # (see docker-compose.prod.yml's deploy.replicas comment).
+  migrate:
+    build:
+      context: ../..
+      dockerfile: infra/docker/platform-api.Dockerfile
+      target: prod
+    environment:
+      <<: *postgres-credentials
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["uv", "run", "--project", "apps/platform-api", "--no-sync", "anytoolai-platform-migrate"]
   platform-api:
     build:
       context: ../..
       dockerfile: infra/docker/platform-api.Dockerfile
       target: prod
     environment:
-      DATABASE_URL: *database-url
+      <<: *postgres-credentials
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "${ANYTOOLAI_API_PORT:-8000}:8000"
     healthcheck:
@@ -35,19 +56,15 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
-      # The entrypoint runs Alembic migrations to completion before uvicorn starts
-      # listening, so the port is unreachable the whole time migrations run. Without
-      # this, only retries * interval (60s) of grace exists before the healthcheck
-      # marks the container unhealthy and breaks platform-worker's depends_on gate.
-      start_period: 60s
+      start_period: 10s
   platform-worker:
     build:
       context: ../..
       dockerfile: infra/docker/platform-worker.Dockerfile
     environment:
-      DATABASE_URL: *database-url
+      <<: *postgres-credentials
     depends_on:
       postgres:
         condition: service_healthy
-      platform-api:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully

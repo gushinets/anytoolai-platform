@@ -35,9 +35,42 @@ def test_resolve_database_url_falls_back_to_generic_env_var(monkeypatch) -> None
 def test_resolve_database_url_raises_when_unset(monkeypatch) -> None:
     monkeypatch.delenv(migrate.PROJECT_DATABASE_URL_ENV, raising=False)
     monkeypatch.delenv(migrate.GENERIC_DATABASE_URL_ENV, raising=False)
+    monkeypatch.delenv(migrate.POSTGRES_USER_ENV, raising=False)
+    monkeypatch.delenv(migrate.POSTGRES_PASSWORD_ENV, raising=False)
+    monkeypatch.delenv(migrate.POSTGRES_DB_ENV, raising=False)
 
     with pytest.raises(RuntimeError):
         migrate._resolve_database_url()
+
+
+def test_resolve_database_url_error_mentions_all_three_fallbacks(monkeypatch) -> None:
+    monkeypatch.delenv(migrate.PROJECT_DATABASE_URL_ENV, raising=False)
+    monkeypatch.delenv(migrate.GENERIC_DATABASE_URL_ENV, raising=False)
+    monkeypatch.delenv(migrate.POSTGRES_USER_ENV, raising=False)
+    monkeypatch.delenv(migrate.POSTGRES_PASSWORD_ENV, raising=False)
+    monkeypatch.delenv(migrate.POSTGRES_DB_ENV, raising=False)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        migrate._resolve_database_url()
+
+    message = str(exc_info.value)
+    assert migrate.PROJECT_DATABASE_URL_ENV in message
+    assert migrate.GENERIC_DATABASE_URL_ENV in message
+    assert migrate.POSTGRES_USER_ENV in message
+    assert migrate.POSTGRES_PASSWORD_ENV in message
+    assert migrate.POSTGRES_DB_ENV in message
+
+
+def test_resolve_database_url_falls_back_to_postgres_components(monkeypatch) -> None:
+    monkeypatch.delenv(migrate.PROJECT_DATABASE_URL_ENV, raising=False)
+    monkeypatch.delenv(migrate.GENERIC_DATABASE_URL_ENV, raising=False)
+    monkeypatch.setenv(migrate.POSTGRES_USER_ENV, "produser")
+    monkeypatch.setenv(migrate.POSTGRES_PASSWORD_ENV, "p@ss")
+    monkeypatch.setenv(migrate.POSTGRES_DB_ENV, "proddb")
+
+    assert migrate._resolve_database_url() == (
+        "postgresql+psycopg://produser:p%40ss@postgres:5432/proddb"
+    )
 
 
 def _require_postgres_test_url() -> URL:

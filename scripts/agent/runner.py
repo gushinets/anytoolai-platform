@@ -24,10 +24,20 @@ TMP_ROOT = ROOT / ".quick-check-tmp"
 COMPOSE_FILE = ROOT / "infra" / "compose" / "docker-compose.yml"
 COMPOSE_OVERRIDE_FILE = ROOT / "infra" / "compose" / "docker-compose.override.yml"
 COMPOSE_PROD_FILE = ROOT / "infra" / "compose" / "docker-compose.prod.yml"
+# Optional, gitignored (see .gitignore's `.env.*` rule) -- a local convenience so credentials
+# don't have to be re-exported in every shell. Never auto-loaded for dev; only prod commands
+# pass it to `docker compose` via --env-file, and only if it actually exists on disk.
+PROD_ENV_FILE = ROOT / "infra" / "compose" / ".env.prod"
 PROD_COMPOSE_PROJECT = "anytoolai-prod"
 DEV_DEFAULT_POSTGRES_USER = "anytoolai"
 DEV_DEFAULT_POSTGRES_PASSWORD = "anytoolai"
 DEV_DEFAULT_POSTGRES_DB = "anytoolai"
+
+# Bounds `docker compose ps`/`down` calls, which should never legitimately take this long, so a
+# wedged Docker daemon fails fast instead of hanging. Deliberately NOT applied to `up`/`--build`
+# calls (dev_up/prod_up) -- those legitimately take minutes on a cold image build, and a short
+# timeout there would turn a slow-but-healthy build into a false failure.
+COMPOSE_QUERY_TIMEOUT_SECONDS = 60
 
 
 def resolve_postgres_db() -> str:
@@ -154,7 +164,7 @@ def quick_check_python() -> str:
     return sys.executable
 
 
-def run(command: Sequence[str]) -> int:
+def run(command: Sequence[str], *, timeout: float | None = None) -> int:
     print_command(command)
     try:
         completed = subprocess.run(
@@ -163,14 +173,18 @@ def run(command: Sequence[str]) -> int:
             env=runner_env(),
             shell=False,
             check=False,
+            timeout=timeout,
         )
     except FileNotFoundError as exc:
         print(f"Command not found: {exc.filename}", file=sys.stderr)
         return 127
+    except subprocess.TimeoutExpired:
+        print(f"Command timed out after {timeout:g}s: {' '.join(command)}", file=sys.stderr)
+        return 124
     return completed.returncode
 
 
-def run_with_env(command: Sequence[str], env: dict[str, str]) -> int:
+def run_with_env(command: Sequence[str], env: dict[str, str], *, timeout: float | None = None) -> int:
     print_command(command)
     try:
         completed = subprocess.run(
@@ -179,10 +193,14 @@ def run_with_env(command: Sequence[str], env: dict[str, str]) -> int:
             env=env,
             shell=False,
             check=False,
+            timeout=timeout,
         )
     except FileNotFoundError as exc:
         print(f"Command not found: {exc.filename}", file=sys.stderr)
         return 127
+    except subprocess.TimeoutExpired:
+        print(f"Command timed out after {timeout:g}s: {' '.join(command)}", file=sys.stderr)
+        return 124
     return completed.returncode
 
 
@@ -446,9 +464,14 @@ def _compose_env(identity: RuntimeIdentity) -> dict[str, str]:
 
 
 def _docker_compose_command(
-    project_name: str, compose_files: Sequence[Path], *args: str
+    project_name: str,
+    compose_files: Sequence[Path],
+    *args: str,
+    env_file: Path | None = None,
 ) -> list[str]:
     command = ["docker", "compose", "--project-name", project_name]
+    if env_file is not None:
+        command.extend(["--env-file", str(env_file)])
     for compose_file in compose_files:
         command.extend(["-f", str(compose_file)])
     command.extend(args)
@@ -498,6 +521,7 @@ def dev_up() -> int:
     ):
         return 1
     print_runtime_endpoints(identity)
+    # No timeout: a cold image build can legitimately take minutes.
     exit_code = run_with_env(
         _compose_command(identity, "up", "-d", "--remove-orphans"),
         _compose_env(identity),
@@ -538,6 +562,7 @@ def dev_status() -> int:
     return run_with_env(
         _compose_command(identity, "ps"),
         _compose_env(identity),
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
     )
 
 
@@ -547,16 +572,20 @@ def dev_down() -> int:
     return run_with_env(
         _compose_command(identity, "down", "--remove-orphans"),
         _compose_env(identity),
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
     )
 
 
 def _prod_compose_command(*args: str) -> list[str]:
+    env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
     return _docker_compose_command(
-        PROD_COMPOSE_PROJECT, (COMPOSE_FILE, COMPOSE_PROD_FILE), *args
+        PROD_COMPOSE_PROJECT, (COMPOSE_FILE, COMPOSE_PROD_FILE), *args, env_file=env_file
     )
 
 
 def _prod_stack_running() -> bool:
+    # Bounded so a wedged Docker daemon fails this preflight check quickly instead of
+    # hanging prod_up() indefinitely before it ever reaches the normal error path.
     result = subprocess.run(
         _prod_compose_command("ps", "-q"),
         cwd=ROOT,
@@ -564,6 +593,7 @@ def _prod_stack_running() -> bool:
         capture_output=True,
         text=True,
         check=False,
+        timeout=10,
     )
     return bool(result.stdout.strip())
 
@@ -583,6 +613,13 @@ def prod_up() -> int:
     except FileNotFoundError as exc:
         print(f"Command not found: {exc.filename}", file=sys.stderr)
         return 127
+    except subprocess.TimeoutExpired:
+        print(
+            "PROD003: docker compose ps did not respond within 10s — "
+            "is the Docker daemon running and responsive?",
+            file=sys.stderr,
+        )
+        return 1
     # Skip the port preflight when the anytoolai-prod stack is already up: this is an
     # in-place redeploy (`docker compose up -d --build` recreates its own containers,
     # freeing/rebinding their ports itself), not a fresh start racing against something
@@ -593,6 +630,7 @@ def prod_up() -> int:
         [("API", api_port, "ANYTOOLAI_PROD_API_PORT", None)],
     ):
         return 1
+    # No timeout: `--build` can legitimately take minutes on a cold image build.
     return run_with_env(
         _prod_compose_command("up", "-d", "--build", "--remove-orphans"),
         runner_env(),
@@ -600,11 +638,17 @@ def prod_up() -> int:
 
 
 def prod_status() -> int:
-    return run_with_env(_prod_compose_command("ps"), runner_env())
+    return run_with_env(
+        _prod_compose_command("ps"), runner_env(), timeout=COMPOSE_QUERY_TIMEOUT_SECONDS
+    )
 
 
 def prod_down() -> int:
-    return run_with_env(_prod_compose_command("down", "--remove-orphans"), runner_env())
+    return run_with_env(
+        _prod_compose_command("down", "--remove-orphans"),
+        runner_env(),
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+    )
 
 
 COMMANDS = {

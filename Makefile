@@ -55,7 +55,6 @@ dev-down:
 
 prod-up:
 	$(PYTHON) scripts/agent/runner.py prod-up
-	$(PYTHON) scripts/agent/runner.py dev-down
 
 prod-status:
 	$(PYTHON) scripts/agent/runner.py prod-status

@@ -13,6 +13,11 @@ from anytoolai_platform_api.bootstrap import (
     PROJECT_DATABASE_URL_ENV,
 )
 from anytoolai_platform_api.bootstrap import _resolve_database_url as _bootstrap_database_url
+from anytoolai_platform_core.storage.db import (
+    POSTGRES_DB_ENV,
+    POSTGRES_PASSWORD_ENV,
+    POSTGRES_USER_ENV,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 MIGRATIONS_SCRIPT_LOCATION = REPO_ROOT / "migrations" / "platform"
@@ -22,7 +27,9 @@ def _resolve_database_url() -> str:
     database_url = _bootstrap_database_url(None)
     if not database_url:
         raise RuntimeError(
-            f"Set {PROJECT_DATABASE_URL_ENV} or {GENERIC_DATABASE_URL_ENV} before running migrations."
+            f"Set {PROJECT_DATABASE_URL_ENV} or {GENERIC_DATABASE_URL_ENV}, or all of "
+            f"{POSTGRES_USER_ENV}/{POSTGRES_PASSWORD_ENV}/{POSTGRES_DB_ENV}, before running "
+            "migrations."
         )
     return database_url
 

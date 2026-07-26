@@ -13,6 +13,11 @@ for src_path in (PLATFORM_CORE_SRC, PLATFORM_API_SRC):
         sys.path.insert(0, str(src_path))
 
 from anytoolai_platform_api import bootstrap
+from anytoolai_platform_core.storage.db import (
+    POSTGRES_DB_ENV,
+    POSTGRES_PASSWORD_ENV,
+    POSTGRES_USER_ENV,
+)
 
 
 def _patch_storage_builders(
@@ -66,6 +71,9 @@ def test_storage_dependencies_use_project_database_url_env(monkeypatch: Any) -> 
 def test_storage_dependencies_stay_optional_without_database_url(monkeypatch: Any) -> None:
     monkeypatch.delenv(bootstrap.PROJECT_DATABASE_URL_ENV, raising=False)
     monkeypatch.delenv(bootstrap.GENERIC_DATABASE_URL_ENV, raising=False)
+    monkeypatch.delenv(POSTGRES_USER_ENV, raising=False)
+    monkeypatch.delenv(POSTGRES_PASSWORD_ENV, raising=False)
+    monkeypatch.delenv(POSTGRES_DB_ENV, raising=False)
     monkeypatch.setattr(
         bootstrap,
         "create_sync_engine",
@@ -75,6 +83,23 @@ def test_storage_dependencies_stay_optional_without_database_url(monkeypatch: An
     storage = bootstrap._build_storage_dependencies(database_url=None)
 
     assert storage.session_factory is None
+
+
+def test_storage_dependencies_build_url_from_postgres_components(monkeypatch: Any) -> None:
+    calls, engine, session_factory = _patch_storage_builders(monkeypatch)
+    monkeypatch.delenv(bootstrap.PROJECT_DATABASE_URL_ENV, raising=False)
+    monkeypatch.delenv(bootstrap.GENERIC_DATABASE_URL_ENV, raising=False)
+    monkeypatch.setenv(POSTGRES_USER_ENV, "produser")
+    monkeypatch.setenv(POSTGRES_PASSWORD_ENV, "p@ss:w/rd#1%2")
+    monkeypatch.setenv(POSTGRES_DB_ENV, "proddb")
+
+    storage = bootstrap._build_storage_dependencies(database_url=None)
+
+    assert storage.session_factory is session_factory
+    [(_, built_url), _] = calls
+    assert built_url == (
+        "postgresql+psycopg://produser:p%40ss%3Aw%2Frd%231%252@postgres:5432/proddb"
+    )
 
 
 def test_storage_dependencies_prefer_project_database_url_env(monkeypatch: Any) -> None:

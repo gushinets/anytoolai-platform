@@ -9,6 +9,16 @@
 # also auto-merges it since Compose picks up docker-compose.override.yml by convention when
 # no -f flags are given.
 services:
+  # Also switched to `dev` (not just platform-api) so it stays root, matching platform-api's
+  # dev container -- the `prod` target's non-root `platform-api` user could otherwise fail to
+  # read this bind-mounted directory if the host directory's permissions are more restrictive
+  # than this environment's (world-readable), since the container UID won't generally match the
+  # host directory's owner.
+  migrate:
+    build:
+      target: dev
+    volumes:
+      - ../../migrations/platform:/app/migrations/platform
   platform-api:
     build:
       target: dev
