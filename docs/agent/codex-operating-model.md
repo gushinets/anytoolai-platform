@@ -26,7 +26,7 @@ This repo uses `uv` for Python dependency management. Agents should treat `uv` a
 - Use `uv add <package>` for runtime dependencies.
 - Use `uv add --dev <package>` for dev dependencies.
 - Use `python scripts/agent/runner.py <command>` as the canonical cross-platform command interface.
-- Treat `just` recipes as optional thin aliases.
+- Treat `make <target>` recipes as optional thin aliases.
 - Do not hand-edit `uv.lock`; update it only through `uv` commands.
 
 ## CI rule
