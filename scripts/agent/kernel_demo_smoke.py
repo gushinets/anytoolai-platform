@@ -55,7 +55,14 @@ def run(api_url: str, timeout: float) -> int:
             },
         )
         session_id = start["scenario_session_id"]
-    except (OSError, urllib.error.URLError, KeyError, ValueError) as exc:
+    except (
+        OSError,
+        urllib.error.URLError,
+        KeyError,
+        ValueError,
+        TypeError,
+        AttributeError,
+    ) as exc:
         print(
             f"SMOKE001: could not start the kernel_demo smoke scenario against {api_url}: {exc}",
             file=sys.stderr,
@@ -67,13 +74,13 @@ def run(api_url: str, timeout: float) -> int:
     while time.monotonic() < deadline:
         try:
             session = _http_json_request(session_url, timeout=5.0)
-        except (OSError, urllib.error.URLError, ValueError) as exc:
+            status = session.get("status")
+        except (OSError, urllib.error.URLError, ValueError, TypeError, AttributeError) as exc:
             print(
                 f"SMOKE002: lost contact with {session_url} while polling for completion: {exc}",
                 file=sys.stderr,
             )
             return 1
-        status = session.get("status")
         if status == "completed":
             if not session.get("result_artifact_id"):
                 print(
