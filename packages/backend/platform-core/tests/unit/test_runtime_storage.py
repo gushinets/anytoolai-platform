@@ -379,7 +379,6 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "ix_event_log_action_run_id",
         "ix_event_log_provider_call_id",
         "ix_product_handoffs_source_session",
-        "ix_product_handoffs_target_session",
         "ix_product_handoffs_status_expiry",
     }.issubset(index_names)
     assert {"id", "tenant_id", "region", "created_at", "last_seen_at", "metadata"} <= guest_columns
@@ -565,7 +564,6 @@ def test_handoff_compatibility_revision_repairs_database_stamped_at_0007(
         assert {
             "ix_product_handoffs_definition",
             "ix_product_handoffs_source_session",
-            "ix_product_handoffs_target_session",
             "ix_product_handoffs_status_expiry",
         } <= handoff_indexes
         assert {

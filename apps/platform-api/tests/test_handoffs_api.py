@@ -142,6 +142,10 @@ def test_handoff_token_is_redacted_from_request_log_path() -> None:
     request = Request(scope)
     assert _safe_request_path(request) == "/v1/handoffs/{handoff_token}/accept"
     assert token not in _safe_request_path(request)
+    request.scope["path"] = f"/V1/HANDOFFS/{token}/accept"
+    request.scope["raw_path"] = f"/V1/HANDOFFS/{token}/accept".encode()
+    request = Request(request.scope)
+    assert _safe_request_path(request) == "/V1/HANDOFFS/{handoff_token}/accept"
 
     request.scope["route"] = SimpleNamespace(path="/v1/handoffs/{handoff_token}/accept")
     assert _safe_request_path(request) == "/v1/handoffs/{handoff_token}/accept"

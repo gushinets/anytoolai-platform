@@ -566,13 +566,18 @@ def test_handoff_decline_expiry_and_deferred_target(tmp_path: Path) -> None:
                 AcceptHandoffCommand(tenant_id="anytoolai", region="default"),
             )
 
+    definition = registry.get_handoff("kernel_demo_source_to_target_v1")
+    assert definition is not None
     deferred_definition = replace(
-        registry.get_handoff("kernel_demo_source_to_target_v1"),
+        definition,
         target_start_policy=HandoffStartPolicy.deferred,
     )
     deferred_registry = replace(
         registry,
-        handoffs={deferred_definition.handoff_id: deferred_definition},
+        handoffs={
+            **dict(registry.handoffs),
+            deferred_definition.handoff_id: deferred_definition,
+        },
     )
     with transaction_boundary(factory) as session:
         source_id, artifact_id = _seed_source(session, guest_id="guest_deferred")

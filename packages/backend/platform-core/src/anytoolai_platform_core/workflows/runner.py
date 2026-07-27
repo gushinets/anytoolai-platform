@@ -18,6 +18,7 @@ from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import (
     ArtifactService,
     build_artifact_correlation_metadata,
+    metadata_str,
 )
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.time import utc_now
@@ -704,11 +705,11 @@ class SequentialWorkflowRunner:
                 **build_artifact_correlation_metadata(
                     workflow_id=workflow.workflow_id,
                     workflow_version=workflow.version,
-                    guest_id=_metadata_str(job.metadata, "guest_id"),
-                    user_id=_metadata_str(job.metadata, "user_id"),
-                    scenario_chain_id=_metadata_str(job.metadata, "scenario_chain_id"),
-                    handoff_id=_metadata_str(job.metadata, "handoff_id"),
-                    acquisition_source=_metadata_str(job.metadata, "acquisition_source"),
+                    guest_id=metadata_str(job.metadata, "guest_id"),
+                    user_id=metadata_str(job.metadata, "user_id"),
+                    scenario_chain_id=metadata_str(job.metadata, "scenario_chain_id"),
+                    handoff_id=metadata_str(job.metadata, "handoff_id"),
+                    acquisition_source=metadata_str(job.metadata, "acquisition_source"),
                 ),
                 "schema_ref": workflow.output_schema_ref,
                 "schema_version": self._schema_version(workflow.output_schema_ref),
@@ -1072,11 +1073,11 @@ def _context_from_record(record: JobRecord) -> ExecutionContext:
         job_id=record.id,
         workflow_id=record.workflow_id,
         workflow_version=record.workflow_version,
-        guest_id=_metadata_str(record.metadata, "guest_id"),
-        user_id=_metadata_str(record.metadata, "user_id"),
-        scenario_chain_id=_metadata_str(record.metadata, "scenario_chain_id"),
-        handoff_id=_metadata_str(record.metadata, "handoff_id"),
-        acquisition_source=_metadata_str(record.metadata, "acquisition_source"),
+        guest_id=metadata_str(record.metadata, "guest_id"),
+        user_id=metadata_str(record.metadata, "user_id"),
+        scenario_chain_id=metadata_str(record.metadata, "scenario_chain_id"),
+        handoff_id=metadata_str(record.metadata, "handoff_id"),
+        acquisition_source=metadata_str(record.metadata, "acquisition_source"),
     )
 
 
@@ -1187,11 +1188,6 @@ def _recover_canceled_workflow_events_after_rollback(
             terminal_event_type="workflow.canceled",
             terminal_error_code=None,
         )
-
-
-def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
-    value = metadata.get(key)
-    return value if isinstance(value, str) and value else None
 
 
 @dataclass(frozen=True)

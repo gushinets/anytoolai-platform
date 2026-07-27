@@ -62,6 +62,6 @@ GitHub app's thread-listing tool provided the needed read-only fallback.
 ## 2026-07-23 17:23 - Codex (GPT-5) - Windows
 
 Running the required `python scripts/agent/runner.py doctor` before a focused backend change →
-doctor used the system Python and failed because pytest, YAML, and Pydantic were absent, although
-the repository's managed `uv` environment was available. Doctor could bootstrap or inspect the
-managed environment before treating system-interpreter packages as required.
+doctor inspected the system Python first and failed before it could reuse the repository's managed
+environment. Doctor could bootstrap or inspect the managed environment before treating
+system-interpreter packages as required.

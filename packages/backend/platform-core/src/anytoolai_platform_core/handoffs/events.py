@@ -32,10 +32,10 @@ def emit_handoff_event(
             tenant_id=record.tenant_id,
             region=record.region,
             product_id=record.target_product_id
-            if scenario_session_id
+            if is_target_event
             else record.source_product_id,
             frontend_id=record.target_frontend_id
-            if scenario_session_id
+            if is_target_event
             else record.source_frontend_id,
             guest_id=record.accepted_by_guest_id or record.created_by_guest_id,
             scenario_session_id=scenario_session_id or record.source_scenario_session_id,

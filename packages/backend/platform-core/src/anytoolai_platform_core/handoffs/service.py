@@ -148,7 +148,12 @@ class HandoffService:
             return self.build_safe_preview(record, redact_expired_token=True)
         if record.status is HandoffStatus.created:
             now = self._clock()
-            transition = self._repository.mark_viewed(record.id, now)
+            transition = self._repository.mark_viewed(
+                record.id,
+                now,
+                tenant_id=record.tenant_id,
+                region=record.region,
+            )
             record = transition.record
             if transition.changed:
                 self._emit("handoff.viewed", record)
@@ -181,6 +186,8 @@ class HandoffService:
         claimed = self._repository.claim_accept(
             record.id,
             now,
+            tenant_id=record.tenant_id,
+            region=record.region,
             accepted_by_guest_id=effective_guest_id,
             accepted_from_frontend_instance_id=command.source_frontend_instance_id,
         )
@@ -226,6 +233,8 @@ class HandoffService:
             )
             attached = self._repository.attach_target(
                 claimed.id,
+                tenant_id=claimed.tenant_id,
+                region=claimed.region,
                 target_scenario_session_id=linked.session.id,
                 target_job_id=None if linked.job is None else linked.job.id,
                 now=self._clock(),
@@ -233,6 +242,8 @@ class HandoffService:
             if linked.job is not None:
                 transition = self._repository.consume(
                     attached.id,
+                    tenant_id=attached.tenant_id,
+                    region=attached.region,
                     target_job_id=linked.job.id,
                     now=self._clock(),
                 )
@@ -264,7 +275,12 @@ class HandoffService:
         if _token_is_expired(record, now):
             raise HandoffExpiredError()
         now = self._clock()
-        transition = self._repository.decline(record.id, now)
+        transition = self._repository.decline(
+            record.id,
+            now,
+            tenant_id=record.tenant_id,
+            region=record.region,
+        )
         if not transition.changed:
             current = self.expire(transition.record, now=now)
             if _token_is_expired(current, now):
@@ -277,14 +293,31 @@ class HandoffService:
 
     def expire(self, record: HandoffRecord, *, now: datetime | None = None) -> HandoffRecord:
         effective_now = self._clock() if now is None else now
-        transition = self._repository.expire_if_due(record.id, effective_now)
+        transition = self._repository.expire_if_due(
+            record.id,
+            effective_now,
+            tenant_id=record.tenant_id,
+            region=record.region,
+        )
         if transition.changed:
             self._emit("handoff.expired", transition.record)
         return transition.record
 
-    def consume(self, handoff_id: str, target_job_id: str) -> HandoffRecord:
+    def consume(
+        self,
+        handoff_id: str,
+        target_job_id: str,
+        *,
+        tenant_id: str,
+        region: str,
+    ) -> HandoffRecord:
+        record = self.get_by_id(handoff_id, tenant_id=tenant_id, region=region)
         transition = self._repository.consume(
-            handoff_id, target_job_id=target_job_id, now=self._clock()
+            handoff_id,
+            tenant_id=record.tenant_id,
+            region=record.region,
+            target_job_id=target_job_id,
+            now=self._clock(),
         )
         if not transition.changed:
             raise _terminal_error(transition.record.status)
@@ -307,7 +340,11 @@ class HandoffService:
         record = self.get_by_id(handoff_id, tenant_id=tenant_id, region=region)
         safe_error_code = _safe_error_code(error_code)
         transition = self._repository.mark_failed(
-            record.id, error_code=safe_error_code, now=self._clock()
+            record.id,
+            tenant_id=record.tenant_id,
+            region=record.region,
+            error_code=safe_error_code,
+            now=self._clock(),
         )
         if transition.changed:
             self._emit(
@@ -387,7 +424,7 @@ def _safe_error_code(error_code: str) -> str:
         error_code
         and len(error_code) <= MAX_ERROR_CODE_LENGTH
         and all(
-            character.islower() or character.isdigit() or character == "_"
+            ("a" <= character <= "z") or character.isdigit() or character == "_"
             for character in error_code
         )
     ):

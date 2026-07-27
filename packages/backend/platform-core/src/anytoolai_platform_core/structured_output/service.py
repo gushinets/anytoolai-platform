@@ -92,17 +92,7 @@ class StructuredOutputFinalizer:
             action_run_id=persistence_context.action_run_id,
             content_json=validation_result.normalized_output,
             metadata={
-                **build_artifact_correlation_metadata(
-                    workflow_id=persistence_context.workflow_id,
-                    workflow_version=persistence_context.workflow_version,
-                    guest_id=persistence_context.guest_id,
-                    user_id=persistence_context.user_id,
-                    scenario_chain_id=persistence_context.scenario_chain_id,
-                    handoff_id=persistence_context.handoff_id,
-                    acquisition_source=persistence_context.acquisition_source,
-                    action_type=persistence_context.action_type,
-                    action_config_id=persistence_context.action_config_id,
-                ),
+                **_correlation_metadata(persistence_context),
                 "schema_ref": schema_ref,
                 "schema_version": schema_version,
             },
@@ -138,17 +128,7 @@ class StructuredOutputFinalizer:
             action_run_id=persistence_context.action_run_id,
             raw_output_text=raw_text,
             metadata={
-                **build_artifact_correlation_metadata(
-                    workflow_id=persistence_context.workflow_id,
-                    workflow_version=persistence_context.workflow_version,
-                    guest_id=persistence_context.guest_id,
-                    user_id=persistence_context.user_id,
-                    scenario_chain_id=persistence_context.scenario_chain_id,
-                    handoff_id=persistence_context.handoff_id,
-                    acquisition_source=persistence_context.acquisition_source,
-                    action_type=persistence_context.action_type,
-                    action_config_id=persistence_context.action_config_id,
-                ),
+                **_correlation_metadata(persistence_context),
                 "error_code": safe_error.code,
                 "failure_kind": safe_error.failure_kind,
                 "reason": safe_error.reason,
@@ -173,3 +153,19 @@ class StructuredOutputFinalizer:
                 ),
             },
         )
+
+
+def _correlation_metadata(
+    persistence_context: StructuredOutputPersistenceContext,
+) -> dict[str, object]:
+    return build_artifact_correlation_metadata(
+        workflow_id=persistence_context.workflow_id,
+        workflow_version=persistence_context.workflow_version,
+        guest_id=persistence_context.guest_id,
+        user_id=persistence_context.user_id,
+        scenario_chain_id=persistence_context.scenario_chain_id,
+        handoff_id=persistence_context.handoff_id,
+        acquisition_source=persistence_context.acquisition_source,
+        action_type=persistence_context.action_type,
+        action_config_id=persistence_context.action_config_id,
+    )

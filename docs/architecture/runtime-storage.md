@@ -148,7 +148,7 @@ tables.
 Responsibilities:
 
 - create the `platform` schema when the backend dialect supports schemas
-- create the original five execution runtime tables
+- create the execution runtime tables, guest identity/quota tables, and product handoff table
 - create indexes for common runtime lookups
 - define the initial enum constraints at the database level
 - support downgrade for the same tables
@@ -165,7 +165,7 @@ Responsibilities:
 
 - define `PLATFORM_SCHEMA`
 - define a shared `MetaData`
-- define all five `Table(...)` objects
+- define the shared runtime `Table(...)` objects, including `platform.product_handoffs`
 - define reusable SQLAlchemy types
 - expose a small engine factory
 
@@ -190,6 +190,9 @@ Each runtime entity has a small repository class:
 - `ActionRunRepository`
 - `ProviderCallRepository`
 - `ArtifactRepository`
+- `GuestIdentityRepository`
+- `QuotaUsageRepository`
+- `HandoffRepository`
 
 Repository responsibilities:
 
@@ -216,6 +219,9 @@ These records live next to the rest of the domain models:
 - `actions/models.py` -> `ActionRunRecord`
 - `providers/models.py` -> `ProviderCallRecord`
 - `artifacts/models.py` -> `ArtifactRecord`
+- `identity/models.py` -> `GuestIdentityRecord`
+- `quotas/models.py` -> `QuotaUsageRecord`
+- `handoffs/models.py` -> `HandoffRecord`
 
 This keeps the runtime storage surface aligned with the repo's existing model style.
 
@@ -718,7 +724,7 @@ What the tests cover:
 
 - migration applies on a clean database
 - required fields fail at the DB layer
-- create/read/update for all seven repositories
+- create/read/update for all eight repositories
 - status transitions
 - artifact text storage
 - artifact JSON storage

@@ -150,7 +150,8 @@ class GuestQuotaService:
             )
         )
         if emit_event:
-            self._emit_quota_event(
+            _emit_quota_event(
+                self._event_emitter,
                 "quota.checked",
                 state=state,
                 tenant_id=tenant_id,
@@ -260,7 +261,6 @@ class GuestQuotaService:
             self._quota_repository.session,
             lambda recovery_session_factory: _recover_quota_exhaustion(
                 recovery_session_factory,
-                config_registry=self._config_registry,
                 recovery=recovery,
             ),
             phase=RollbackRecoveryPhase.quota_exhaustion,
@@ -360,46 +360,25 @@ class GuestQuotaService:
         result_status: str | None = None,
         error_code: str | None = None,
     ) -> None:
-        properties = {
-            "quota_policy_id": state.quota_policy_id,
-            "quota_dimension": state.quota_dimension.value,
-            "quota_dimension_key": state.dimension_key,
-            "unit": state.unit.value,
-            "period": state.period.value,
-            "period_key": state.period_key,
-            "limit_count": state.limit_count,
-            "used_count": state.used_count,
-            "remaining_count": state.remaining_count,
-            "exhausted": state.exhausted,
-        }
-        if state.scenario_id is not None:
-            properties["quota_scenario_id"] = state.scenario_id
-        if scenario_id is not None:
-            properties["scenario_id"] = scenario_id
-        if error_code is not None:
-            properties["error_code"] = error_code
-
-        self._event_emitter.emit(
+        _emit_quota_event(
+            self._event_emitter,
             event_type,
-            ExecutionContext(
-                tenant_id=tenant_id,
-                region=region,
-                product_id=state.product_id,
-                frontend_id=frontend_id,
-                guest_id=state.guest_id,
-                scenario_session_id=scenario_session_id,
-                scenario_chain_id=scenario_chain_id,
-                handoff_id=handoff_id,
-            ),
+            state=state,
+            tenant_id=tenant_id,
+            region=region,
+            frontend_id=frontend_id,
+            scenario_id=scenario_id,
+            scenario_session_id=scenario_session_id,
+            scenario_chain_id=scenario_chain_id,
+            handoff_id=handoff_id,
             result_status=result_status,
-            properties=properties,
+            error_code=error_code,
         )
 
 
 def _recover_quota_exhaustion(
     recovery_session_factory: sessionmaker[Session],
     *,
-    config_registry: ConfigRegistry,
     recovery: QuotaExhaustionRecovery,
 ) -> None:
     with transaction_boundary(recovery_session_factory) as session:
@@ -414,6 +393,8 @@ def _recover_quota_exhaustion(
             if handoff is not None:
                 failure = handoffs.finalize_quota_failure_recovery(
                     handoff.id,
+                    tenant_id=recovery.tenant_id,
+                    region=recovery.region,
                     error_code="quota_exhausted",
                     now=utc_now(),
                 )
@@ -441,12 +422,6 @@ def _recover_quota_exhaustion(
         )
         state = _state_from_usage(usage, recovery.policy)
         event_emitter = EventEmitter(EventLogRepository(session))
-        service = GuestQuotaService(
-            config_registry=config_registry,
-            quota_repository=quota_repository,
-            guest_repository=GuestIdentityRepository(session),
-            event_emitter=event_emitter,
-        )
         context = {
             "tenant_id": recovery.tenant_id,
             "region": recovery.region,
@@ -456,8 +431,9 @@ def _recover_quota_exhaustion(
             "scenario_chain_id": recovery.scenario_chain_id,
             "handoff_id": recovery.handoff_id,
         }
-        service._emit_quota_event("quota.checked", state=state, **context)
-        service._emit_quota_event(
+        _emit_quota_event(event_emitter, "quota.checked", state=state, **context)
+        _emit_quota_event(
+            event_emitter,
             "quota.exhausted",
             state=state,
             result_status="failed",
@@ -471,6 +447,57 @@ def _recover_quota_exhaustion(
                 failed_handoff,
                 properties={"error_code": "quota_exhausted"},
             )
+
+
+def _emit_quota_event(
+    event_emitter: EventEmitter,
+    event_type: str,
+    *,
+    state: QuotaState,
+    tenant_id: str,
+    region: str,
+    frontend_id: str = "",
+    scenario_id: str | None = None,
+    scenario_session_id: str | None = None,
+    scenario_chain_id: str | None = None,
+    handoff_id: str | None = None,
+    result_status: str | None = None,
+    error_code: str | None = None,
+) -> None:
+    properties = {
+        "quota_policy_id": state.quota_policy_id,
+        "quota_dimension": state.quota_dimension.value,
+        "quota_dimension_key": state.dimension_key,
+        "unit": state.unit.value,
+        "period": state.period.value,
+        "period_key": state.period_key,
+        "limit_count": state.limit_count,
+        "used_count": state.used_count,
+        "remaining_count": state.remaining_count,
+        "exhausted": state.exhausted,
+    }
+    if state.scenario_id is not None:
+        properties["quota_scenario_id"] = state.scenario_id
+    if scenario_id is not None:
+        properties["scenario_id"] = scenario_id
+    if error_code is not None:
+        properties["error_code"] = error_code
+
+    event_emitter.emit(
+        event_type,
+        ExecutionContext(
+            tenant_id=tenant_id,
+            region=region,
+            product_id=state.product_id,
+            frontend_id=frontend_id,
+            guest_id=state.guest_id,
+            scenario_session_id=scenario_session_id,
+            scenario_chain_id=scenario_chain_id,
+            handoff_id=handoff_id,
+        ),
+        result_status=result_status,
+        properties=properties,
+    )
 
 
 def _state_from_usage(record: QuotaUsageRecord, policy: QuotaPolicy) -> QuotaState:

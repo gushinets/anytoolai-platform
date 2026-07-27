@@ -3,10 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
-
 from anytoolai_platform_core.common.ids import new_id
 from anytoolai_platform_core.common.time import utc_now
+from anytoolai_platform_core.workflows.models import JobRecord
 
 
 class ScenarioSessionStatus(StrEnum):
@@ -66,4 +65,4 @@ class ScenarioSessionSnapshot:
 @dataclass(frozen=True)
 class LinkedScenarioSessionResult:
     session: ScenarioSessionRecord
-    job: Any | None = None
+    job: JobRecord | None = None

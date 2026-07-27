@@ -27,7 +27,10 @@ from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionSnapshot,
     ScenarioSessionStatus,
 )
-from anytoolai_platform_core.scenarios.next_actions import validate_next_action
+from anytoolai_platform_core.scenarios.next_actions import (
+    ScenarioCheckpointConflictError,
+    validate_next_action,
+)
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.workflows.models import JobRecord
 from anytoolai_platform_core.workflows.repository import JobRepository
@@ -318,7 +321,7 @@ class ScenarioRuntimeService:
             next_action_id=next_action_id,
         )
         if job is None:
-            raise RuntimeError("non-actionable session unexpectedly accepted a next action")
+            raise ScenarioCheckpointConflictError()
         self._event_emitter.emit(
             "client.next_action_clicked",
             ExecutionContext(

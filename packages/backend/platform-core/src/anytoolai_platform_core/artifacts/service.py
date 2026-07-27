@@ -121,17 +121,17 @@ def _context_from_record(record: ArtifactRecord) -> ExecutionContext:
         frontend_id=record.frontend_id,
         scenario_session_id=record.scenario_session_id,
         job_id=record.job_id,
-        workflow_id=_metadata_str(record.metadata, "workflow_id"),
+        workflow_id=metadata_str(record.metadata, "workflow_id"),
         workflow_version=_metadata_int(record.metadata, "workflow_version"),
         artifact_id=record.id,
-        guest_id=_metadata_str(record.metadata, "guest_id"),
-        user_id=_metadata_str(record.metadata, "user_id"),
-        action_type=_metadata_str(record.metadata, "action_type"),
-        action_config_id=_metadata_str(record.metadata, "action_config_id"),
+        guest_id=metadata_str(record.metadata, "guest_id"),
+        user_id=metadata_str(record.metadata, "user_id"),
+        action_type=metadata_str(record.metadata, "action_type"),
+        action_config_id=metadata_str(record.metadata, "action_config_id"),
         action_run_id=record.action_run_id,
-        scenario_chain_id=_metadata_str(record.metadata, "scenario_chain_id"),
-        handoff_id=_metadata_str(record.metadata, "handoff_id"),
-        acquisition_source=_metadata_str(record.metadata, "acquisition_source"),
+        scenario_chain_id=metadata_str(record.metadata, "scenario_chain_id"),
+        handoff_id=metadata_str(record.metadata, "handoff_id"),
+        acquisition_source=metadata_str(record.metadata, "acquisition_source"),
     )
 
 
@@ -169,7 +169,7 @@ def build_artifact_correlation_metadata(
     return metadata
 
 
-def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
+def metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
     value = metadata.get(key)
     return value if isinstance(value, str) and value else None
 
