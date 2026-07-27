@@ -185,6 +185,32 @@ Generated documentation mirrors that source in:
 
 - `artifact.created`
 
+`artifact.created` inherits every applicable bounded runtime correlation dimension that is available
+to the owning execution at artifact-creation time. Depending on the artifact path, that can include:
+
+- `tenant_id`
+- `region`
+- `product_id`
+- `frontend_id`
+- `guest_id`
+- `user_id`
+- `scenario_session_id`
+- `scenario_chain_id`
+- `job_id`
+- `workflow_id`
+- `workflow_version`
+- `action_run_id`
+- `action_type`
+- `action_config_id`
+- `artifact_id`
+- `handoff_id`
+- `acquisition_source`
+
+The artifact layer remains product-neutral. It preserves these dimensions as generic runtime
+metadata on the artifact record and reconstructs event context from that canonical bounded metadata
+for both ordinary emission and rollback replay. Raw prompts, credentials, provider request/response
+payloads, structured-output bodies, and artifact bodies must not be copied into event properties.
+
 ### `handoff`
 
 - `handoff.created`

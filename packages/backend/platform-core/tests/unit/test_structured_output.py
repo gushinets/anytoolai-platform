@@ -17,6 +17,7 @@ from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.models import ProviderCallRecord
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.storage.db import artifacts_table
+from anytoolai_platform_core.storage.db import event_log_table
 from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
@@ -83,6 +84,15 @@ def _context() -> StructuredOutputPersistenceContext:
         scenario_session_id="scenario_session_demo",
         job_id="job_demo",
         action_run_id="action_run_demo",
+        workflow_id="wf_demo",
+        workflow_version=1,
+        guest_id="guest_demo",
+        user_id="user_demo",
+        scenario_chain_id="scenario_chain_demo",
+        handoff_id="handoff_demo",
+        acquisition_source="kernel_demo_ce",
+        action_type="text.extract_structured_fields",
+        action_config_id="kernel_demo.extract_structured_fields_v1",
     )
 
 
@@ -239,6 +249,9 @@ def test_structured_output_finalizer_persists_debug_artifact_for_validation_fail
                 schema_version=1,
             )
         artifacts = _artifacts(session)
+        event_row = session.execute(
+            sa.select(event_log_table).where(event_log_table.c.event_type == "artifact.created")
+        ).mappings().one()
 
     assert exc_info.value.code == STRUCTURED_OUTPUT_VALIDATION_ERROR_CODE
     assert exc_info.value.reason == reason
@@ -250,3 +263,17 @@ def test_structured_output_finalizer_persists_debug_artifact_for_validation_fail
     assert artifacts[0]["metadata"]["reason"] == reason
     assert artifacts[0]["metadata"]["provider_call_id"].startswith("provider_call_")
     assert artifacts[0]["metadata"]["physical_call_index"] == 2
+    assert event_row["artifact_id"] == artifacts[0]["id"]
+    assert event_row["guest_id"] == "guest_demo"
+    assert event_row["user_id"] == "user_demo"
+    assert event_row["workflow_id"] == "wf_demo"
+    assert event_row["workflow_version"] == 1
+    assert event_row["scenario_chain_id"] == "scenario_chain_demo"
+    assert event_row["handoff_id"] == "handoff_demo"
+    assert event_row["acquisition_source"] == "kernel_demo_ce"
+    assert event_row["action_run_id"] == "action_run_demo"
+    assert event_row["action_type"] == "text.extract_structured_fields"
+    assert event_row["action_config_id"] == "kernel_demo.extract_structured_fields_v1"
+    assert event_row["properties"] == {
+        "artifact_type": "structured_output_debug_raw"
+    }

@@ -68,7 +68,18 @@ def _make_artifact(**overrides: Any) -> ArtifactRecord:
         "action_run_id": "action_run_demo",
         "artifact_type": "structured_output",
         "content_json": {"title": "Kernel Demo Source Summary"},
-        "metadata": {"schema_ref": "kernel.schemas.extract_output_v1"},
+        "metadata": {
+            "schema_ref": "kernel.schemas.extract_output_v1",
+            "workflow_id": "wf_demo",
+            "workflow_version": 1,
+            "guest_id": "guest_demo",
+            "user_id": "user_demo",
+            "scenario_chain_id": "scenario_chain_demo",
+            "handoff_id": "handoff_demo",
+            "acquisition_source": "kernel_demo_ce",
+            "action_type": "text.extract_structured_fields",
+            "action_config_id": "kernel_demo.extract_structured_fields_v1",
+        },
     }
     values.update(overrides)
     return ArtifactRecord(**values)
@@ -94,3 +105,14 @@ def test_artifact_service_persists_created_artifact_once_after_transaction_rollb
     assert Counter(str(row["event_type"]) for row in events) == Counter(
         {"artifact.created": 1}
     )
+    event_row = events[0]
+    assert event_row["workflow_id"] == "wf_demo"
+    assert event_row["workflow_version"] == 1
+    assert event_row["guest_id"] == "guest_demo"
+    assert event_row["user_id"] == "user_demo"
+    assert event_row["scenario_chain_id"] == "scenario_chain_demo"
+    assert event_row["handoff_id"] == "handoff_demo"
+    assert event_row["acquisition_source"] == "kernel_demo_ce"
+    assert event_row["action_run_id"] == "action_run_demo"
+    assert event_row["action_type"] == "text.extract_structured_fields"
+    assert event_row["action_config_id"] == "kernel_demo.extract_structured_fields_v1"

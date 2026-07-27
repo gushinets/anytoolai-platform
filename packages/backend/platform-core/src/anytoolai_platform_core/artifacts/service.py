@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
@@ -120,16 +121,62 @@ def _context_from_record(record: ArtifactRecord) -> ExecutionContext:
         frontend_id=record.frontend_id,
         scenario_session_id=record.scenario_session_id,
         job_id=record.job_id,
+        workflow_id=_metadata_str(record.metadata, "workflow_id"),
+        workflow_version=_metadata_int(record.metadata, "workflow_version"),
         artifact_id=record.id,
+        guest_id=_metadata_str(record.metadata, "guest_id"),
+        user_id=_metadata_str(record.metadata, "user_id"),
+        action_type=_metadata_str(record.metadata, "action_type"),
+        action_config_id=_metadata_str(record.metadata, "action_config_id"),
         action_run_id=record.action_run_id,
         scenario_chain_id=_metadata_str(record.metadata, "scenario_chain_id"),
         handoff_id=_metadata_str(record.metadata, "handoff_id"),
+        acquisition_source=_metadata_str(record.metadata, "acquisition_source"),
     )
 
 
-def _metadata_str(metadata: dict[str, Any], key: str) -> str | None:
+def build_artifact_correlation_metadata(
+    *,
+    workflow_id: str | None = None,
+    workflow_version: int | None = None,
+    guest_id: str | None = None,
+    user_id: str | None = None,
+    scenario_chain_id: str | None = None,
+    handoff_id: str | None = None,
+    acquisition_source: str | None = None,
+    action_type: str | None = None,
+    action_config_id: str | None = None,
+) -> dict[str, object]:
+    metadata: dict[str, object] = {}
+    if isinstance(workflow_id, str) and workflow_id:
+        metadata["workflow_id"] = workflow_id
+    if isinstance(workflow_version, int):
+        metadata["workflow_version"] = workflow_version
+    if isinstance(guest_id, str) and guest_id:
+        metadata["guest_id"] = guest_id
+    if isinstance(user_id, str) and user_id:
+        metadata["user_id"] = user_id
+    if isinstance(scenario_chain_id, str) and scenario_chain_id:
+        metadata["scenario_chain_id"] = scenario_chain_id
+    if isinstance(handoff_id, str) and handoff_id:
+        metadata["handoff_id"] = handoff_id
+    if isinstance(acquisition_source, str) and acquisition_source:
+        metadata["acquisition_source"] = acquisition_source
+    if isinstance(action_type, str) and action_type:
+        metadata["action_type"] = action_type
+    if isinstance(action_config_id, str) and action_config_id:
+        metadata["action_config_id"] = action_config_id
+    return metadata
+
+
+def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
     value = metadata.get(key)
     return value if isinstance(value, str) and value else None
+
+
+def _metadata_int(metadata: Mapping[str, Any], key: str) -> int | None:
+    value = metadata.get(key)
+    return value if isinstance(value, int) else None
 
 
 def _recover_artifact_row_after_rollback(

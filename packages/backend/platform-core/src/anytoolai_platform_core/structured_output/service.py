@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from anytoolai_platform_core.artifacts.models import ArtifactRecord
-from anytoolai_platform_core.artifacts.service import ArtifactService
+from anytoolai_platform_core.artifacts.service import (
+    ArtifactService,
+    build_artifact_correlation_metadata,
+)
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.structured_output.errors import (
     StructuredOutputError,
@@ -25,8 +28,15 @@ class StructuredOutputPersistenceContext:
     scenario_session_id: str
     job_id: str
     action_run_id: str
+    workflow_id: str | None = None
+    workflow_version: int | None = None
+    guest_id: str | None = None
+    user_id: str | None = None
     handoff_id: str | None = None
     scenario_chain_id: str | None = None
+    acquisition_source: str | None = None
+    action_type: str | None = None
+    action_config_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -82,10 +92,19 @@ class StructuredOutputFinalizer:
             action_run_id=persistence_context.action_run_id,
             content_json=validation_result.normalized_output,
             metadata={
+                **build_artifact_correlation_metadata(
+                    workflow_id=persistence_context.workflow_id,
+                    workflow_version=persistence_context.workflow_version,
+                    guest_id=persistence_context.guest_id,
+                    user_id=persistence_context.user_id,
+                    scenario_chain_id=persistence_context.scenario_chain_id,
+                    handoff_id=persistence_context.handoff_id,
+                    acquisition_source=persistence_context.acquisition_source,
+                    action_type=persistence_context.action_type,
+                    action_config_id=persistence_context.action_config_id,
+                ),
                 "schema_ref": schema_ref,
                 "schema_version": schema_version,
-                "handoff_id": persistence_context.handoff_id,
-                "scenario_chain_id": persistence_context.scenario_chain_id,
             },
         )
         return StructuredOutputFinalizationResult(
@@ -119,14 +138,23 @@ class StructuredOutputFinalizer:
             action_run_id=persistence_context.action_run_id,
             raw_output_text=raw_text,
             metadata={
+                **build_artifact_correlation_metadata(
+                    workflow_id=persistence_context.workflow_id,
+                    workflow_version=persistence_context.workflow_version,
+                    guest_id=persistence_context.guest_id,
+                    user_id=persistence_context.user_id,
+                    scenario_chain_id=persistence_context.scenario_chain_id,
+                    handoff_id=persistence_context.handoff_id,
+                    acquisition_source=persistence_context.acquisition_source,
+                    action_type=persistence_context.action_type,
+                    action_config_id=persistence_context.action_config_id,
+                ),
                 "error_code": safe_error.code,
                 "failure_kind": safe_error.failure_kind,
                 "reason": safe_error.reason,
                 "error_type": safe_error.error_type,
                 "schema_ref": schema_ref,
                 "schema_version": schema_version,
-                "handoff_id": persistence_context.handoff_id,
-                "scenario_chain_id": persistence_context.scenario_chain_id,
                 "provider_call_id": None if provider_call is None else provider_call.id,
                 "provider_policy_ref": (
                     None if provider_call is None else provider_call.provider_policy_ref

@@ -491,6 +491,21 @@ Artifact content behavior:
 - structured JSON stays in `content_json`
 - object storage remains a future extension point through `object_storage_key`
 
+Artifact `metadata` may also carry bounded, product-neutral runtime correlation fields needed to
+reconstruct `artifact.created` after transaction boundaries and rollback replay, for example:
+
+- `workflow_id`
+- `workflow_version`
+- `guest_id`
+- `user_id`
+- `scenario_chain_id`
+- `handoff_id`
+- `acquisition_source`
+- action identity fields when applicable
+
+This compatibility-safe metadata is for correlation only. It must not store raw prompts,
+credentials, authorization data, full provider requests/responses, or large artifact bodies.
+
 ### `platform.guest_identities`
 
 Purpose:

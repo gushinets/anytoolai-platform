@@ -15,7 +15,10 @@ from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunSta
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.actions.runner import ActionRunner, _emit_recovered_action_events
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
-from anytoolai_platform_core.artifacts.service import ArtifactService
+from anytoolai_platform_core.artifacts.service import (
+    ArtifactService,
+    build_artifact_correlation_metadata,
+)
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
@@ -698,13 +701,18 @@ class SequentialWorkflowRunner:
             action_run_id=None,
             content_json=payload,
             metadata={
+                **build_artifact_correlation_metadata(
+                    workflow_id=workflow.workflow_id,
+                    workflow_version=workflow.version,
+                    guest_id=_metadata_str(job.metadata, "guest_id"),
+                    user_id=_metadata_str(job.metadata, "user_id"),
+                    scenario_chain_id=_metadata_str(job.metadata, "scenario_chain_id"),
+                    handoff_id=_metadata_str(job.metadata, "handoff_id"),
+                    acquisition_source=_metadata_str(job.metadata, "acquisition_source"),
+                ),
                 "schema_ref": workflow.output_schema_ref,
                 "schema_version": self._schema_version(workflow.output_schema_ref),
-                "workflow_id": workflow.workflow_id,
-                "workflow_version": workflow.version,
                 "artifact_role": "workflow_result",
-                "handoff_id": _metadata_str(job.metadata, "handoff_id"),
-                "scenario_chain_id": _metadata_str(job.metadata, "scenario_chain_id"),
             },
         )
 

@@ -392,6 +392,11 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
     provider_started = _event_by_type(events, "provider.request_started")[0]
     workflow_step_succeeded = _event_by_type(events, "workflow.step_succeeded")[0]
     workflow_succeeded = _event_by_type(events, "workflow.succeeded")[0]
+    workflow_result_artifact_created = next(
+        event
+        for event in _event_by_type(events, "artifact.created")
+        if event["artifact_id"] == final_artifact["id"]
+    )
     assert workflow_started["guest_id"] == "guest_demo"
     assert workflow_started["user_id"] == "user_demo"
     assert workflow_started["scenario_chain_id"] == "scenario_chain_demo"
@@ -409,6 +414,18 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
     assert provider_started["scenario_chain_id"] == "scenario_chain_demo"
     assert provider_started["handoff_id"] == "handoff_demo"
     assert provider_started["acquisition_source"] == "kernel_demo_ce"
+    assert workflow_result_artifact_created["guest_id"] == "guest_demo"
+    assert workflow_result_artifact_created["user_id"] == "user_demo"
+    assert workflow_result_artifact_created["workflow_id"] == "kernel_demo.single_action_extract_v1"
+    assert workflow_result_artifact_created["workflow_version"] == 1
+    assert workflow_result_artifact_created["scenario_chain_id"] == "scenario_chain_demo"
+    assert workflow_result_artifact_created["handoff_id"] == "handoff_demo"
+    assert workflow_result_artifact_created["acquisition_source"] == "kernel_demo_ce"
+    assert workflow_result_artifact_created["job_id"] == job["id"]
+    assert workflow_result_artifact_created["action_run_id"] is None
+    assert workflow_result_artifact_created["properties"] == {
+        "artifact_type": "structured_output"
+    }
     assert workflow_succeeded["guest_id"] == "guest_demo"
     assert workflow_succeeded["user_id"] == "user_demo"
     assert workflow_succeeded["scenario_chain_id"] == "scenario_chain_demo"

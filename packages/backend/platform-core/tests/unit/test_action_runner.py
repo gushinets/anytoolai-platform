@@ -260,7 +260,16 @@ def test_action_runner_executes_extract_structured_fields_and_persists_context(
     assert provider_succeeded["provider_call_id"] == provider_call["id"]
     assert provider_succeeded["action_run_id"] == action_run["id"]
     assert artifact_created["artifact_id"] == artifact["id"]
+    assert artifact_created["guest_id"] == "guest_demo"
+    assert artifact_created["user_id"] == "user_demo"
+    assert artifact_created["workflow_id"] == "kernel_demo.extract_detect_report_v1"
+    assert artifact_created["workflow_version"] == 1
+    assert artifact_created["scenario_chain_id"] is None
+    assert artifact_created["handoff_id"] is None
+    assert artifact_created["acquisition_source"] is None
     assert artifact_created["action_run_id"] == action_run["id"]
+    assert artifact_created["action_type"] == "text.extract_structured_fields"
+    assert artifact_created["action_config_id"] == "kernel_demo.extract_structured_fields_v1"
     assert action_succeeded["action_run_id"] == action_run["id"]
 
 
@@ -698,6 +707,7 @@ def test_action_runner_does_not_link_failed_action_to_debug_raw_artifact(
             )
         action_run = session.execute(sa.select(action_runs_table)).mappings().one()
         artifacts = session.execute(sa.select(artifacts_table)).mappings().all()
+        events = _event_rows(session)
 
     assert exc_info.value.code == "structured_output_validation_failed"
     assert action_run["status"].value == "failed"
@@ -705,6 +715,18 @@ def test_action_runner_does_not_link_failed_action_to_debug_raw_artifact(
     assert len(artifacts) == 1
     assert artifacts[0]["artifact_type"] == "structured_output_debug_raw"
     assert artifacts[0]["action_run_id"] == action_run["id"]
+    artifact_created = _event_by_type(events, "artifact.created")
+    assert artifact_created["artifact_id"] == artifacts[0]["id"]
+    assert artifact_created["guest_id"] == "guest_demo"
+    assert artifact_created["user_id"] == "user_demo"
+    assert artifact_created["workflow_id"] == "kernel_demo.extract_detect_report_v1"
+    assert artifact_created["workflow_version"] == 1
+    assert artifact_created["action_run_id"] == action_run["id"]
+    assert artifact_created["action_type"] == "text.extract_structured_fields"
+    assert artifact_created["action_config_id"] == "kernel_demo.extract_structured_fields_v1"
+    assert artifact_created["properties"] == {
+        "artifact_type": "structured_output_debug_raw"
+    }
 
 
 def test_action_runner_rejects_missing_workflow_version_before_creating_action_run(

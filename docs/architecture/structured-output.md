@@ -92,6 +92,8 @@ That means:
 - every provider event correlates back to the physical row through `provider_call_id`
 - successful final validation creates a `structured_output` artifact
 - final validation failure creates a `structured_output_debug_raw` artifact
+- both artifact types persist only bounded product-neutral runtime correlation metadata needed to
+  reconstruct `artifact.created`, such as workflow/session/identity/handoff dimensions when known
 - canonical `action_runs.output_artifact_id` may point only to a real `structured_output` artifact;
   debug raw artifacts stay debug-only and must not become the canonical result pointer
 - consumers that cross a trust boundary after persistence, including handoff creation, capture one
@@ -110,6 +112,10 @@ provider events.
 
 Raw provider output must not appear in safe user-facing validation errors. It is preserved only in
 the debug artifact path for platform debugging.
+
+Artifact-event correlation metadata must also stay bounded and safe. Do not copy raw prompts,
+credentials, authorization data, full provider requests/responses, or artifact bodies into
+`artifact.created` event properties.
 
 ## Provider Schema Ownership
 
