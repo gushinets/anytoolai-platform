@@ -22,10 +22,31 @@ ROOT = Path(__file__).resolve().parents[2]
 QUICK_CHECK_VENV = ROOT / ".quick-check-venv"
 TMP_ROOT = ROOT / ".quick-check-tmp"
 COMPOSE_FILE = ROOT / "infra" / "compose" / "docker-compose.yml"
+COMPOSE_OVERRIDE_FILE = ROOT / "infra" / "compose" / "docker-compose.override.yml"
+COMPOSE_PROD_FILE = ROOT / "infra" / "compose" / "docker-compose.prod.yml"
+# Optional, gitignored (see .gitignore's `.env.*` rule) -- a local convenience so credentials
+# don't have to be re-exported in every shell. Never auto-loaded for dev; only prod commands
+# pass it to `docker compose` via --env-file, and only if it actually exists on disk.
+PROD_ENV_FILE = ROOT / "infra" / "compose" / ".env.prod"
+PROD_COMPOSE_PROJECT = "anytoolai-prod"
+DEV_DEFAULT_POSTGRES_USER = "anytoolai"
+DEV_DEFAULT_POSTGRES_PASSWORD = "anytoolai"
+DEV_DEFAULT_POSTGRES_DB = "anytoolai"
+
+# Bounds `docker compose ps`/`down` calls, which should never legitimately take this long, so a
+# wedged Docker daemon fails fast instead of hanging. Deliberately NOT applied to `up`/`--build`
+# calls (dev_up/prod_up) -- those legitimately take minutes on a cold image build, and a short
+# timeout there would turn a slow-but-healthy build into a false failure.
+COMPOSE_QUERY_TIMEOUT_SECONDS = 60
+
+
+def resolve_postgres_db() -> str:
+    return os.environ.get("ANYTOOLAI_POSTGRES_DB", DEV_DEFAULT_POSTGRES_DB)
+
 FREELANCER_SUITE_ROOT = ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite"
 REQUIRED_MODULES = ["pytest", "yaml", "pydantic"]
 REQUIRED_TOOLS = ["uv"]
-OPTIONAL_TOOLS = ["node", "pnpm", "just", "docker"]
+OPTIONAL_TOOLS = ["node", "pnpm", "docker"]
 ACTION_REGISTRY_ROWS = [
     ("A01 `extract_structured`", "`text.extract_structured_fields`"),
     ("A04 `detect_issues`", "`text.detect_issues_by_taxonomy`"),
@@ -143,7 +164,7 @@ def quick_check_python() -> str:
     return sys.executable
 
 
-def run(command: Sequence[str]) -> int:
+def run(command: Sequence[str], *, timeout: float | None = None) -> int:
     print_command(command)
     try:
         completed = subprocess.run(
@@ -152,14 +173,18 @@ def run(command: Sequence[str]) -> int:
             env=runner_env(),
             shell=False,
             check=False,
+            timeout=timeout,
         )
     except FileNotFoundError as exc:
         print(f"Command not found: {exc.filename}", file=sys.stderr)
         return 127
+    except subprocess.TimeoutExpired:
+        print(f"Command timed out after {timeout:g}s: {' '.join(command)}", file=sys.stderr)
+        return 124
     return completed.returncode
 
 
-def run_with_env(command: Sequence[str], env: dict[str, str]) -> int:
+def run_with_env(command: Sequence[str], env: dict[str, str], *, timeout: float | None = None) -> int:
     print_command(command)
     try:
         completed = subprocess.run(
@@ -168,10 +193,14 @@ def run_with_env(command: Sequence[str], env: dict[str, str]) -> int:
             env=env,
             shell=False,
             check=False,
+            timeout=timeout,
         )
     except FileNotFoundError as exc:
         print(f"Command not found: {exc.filename}", file=sys.stderr)
         return 127
+    except subprocess.TimeoutExpired:
+        print(f"Command timed out after {timeout:g}s: {' '.join(command)}", file=sys.stderr)
+        return 124
     return completed.returncode
 
 
@@ -379,9 +408,14 @@ class RuntimeIdentity(NamedTuple):
 
     @property
     def database_url(self) -> str:
-        return (
-            f"postgresql://anytoolai:anytoolai@127.0.0.1:{self.postgres_port}/anytoolai"
-        )
+        # Intentionally not masked: this is the one documented, copy-pasteable connection
+        # string agents/developers are told to use (see docs/agent/worktree-runtime.md).
+        # Masking it (tried once) broke that without eliminating the underlying exposure —
+        # an operator who exported real prod credentials into this shell already has them
+        # in their own environment/history regardless of what this prints.
+        user = os.environ.get("ANYTOOLAI_POSTGRES_USER", DEV_DEFAULT_POSTGRES_USER)
+        password = os.environ.get("ANYTOOLAI_POSTGRES_PASSWORD", DEV_DEFAULT_POSTGRES_PASSWORD)
+        return f"postgresql://{user}:{password}@127.0.0.1:{self.postgres_port}/{resolve_postgres_db()}"
 
 
 def normalized_repo_path(path: Path = ROOT) -> str:
@@ -429,16 +463,25 @@ def _compose_env(identity: RuntimeIdentity) -> dict[str, str]:
     return env
 
 
+def _docker_compose_command(
+    project_name: str,
+    compose_files: Sequence[Path],
+    *args: str,
+    env_file: Path | None = None,
+) -> list[str]:
+    command = ["docker", "compose", "--project-name", project_name]
+    if env_file is not None:
+        command.extend(["--env-file", str(env_file)])
+    for compose_file in compose_files:
+        command.extend(["-f", str(compose_file)])
+    command.extend(args)
+    return command
+
+
 def _compose_command(identity: RuntimeIdentity, *args: str) -> list[str]:
-    return [
-        "docker",
-        "compose",
-        "--project-name",
-        identity.compose_project,
-        "-f",
-        str(COMPOSE_FILE),
-        *args,
-    ]
+    return _docker_compose_command(
+        identity.compose_project, (COMPOSE_FILE, COMPOSE_OVERRIDE_FILE), *args
+    )
 
 
 def print_runtime_endpoints(identity: RuntimeIdentity) -> None:
@@ -447,35 +490,56 @@ def print_runtime_endpoints(identity: RuntimeIdentity) -> None:
     print(f"Database: {identity.database_url}")
 
 
+def _check_ports_available(
+    error_prefix: str, ports: Sequence[tuple[str, int, str, str | None]]
+) -> bool:
+    occupied = [
+        (name, port, variable, cli_flag)
+        for name, port, variable, cli_flag in ports
+        if not port_available(port)
+    ]
+    for name, port, variable, cli_flag in occupied:
+        message = f"{error_prefix}: {name} port {port} is occupied. Override with {variable}"
+        if cli_flag:
+            message += f" or {cli_flag}"
+        print(f"{message}.", file=sys.stderr)
+    return not occupied
+
+
 def dev_up() -> int:
     try:
         identity = runtime_identity()
     except ValueError as exc:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
-    occupied = [
-        (name, port)
-        for name, port in (
-            ("API", identity.api_port),
-            ("PostgreSQL", identity.postgres_port),
-        )
-        if not port_available(port)
-    ]
-    if occupied:
-        for name, port in occupied:
-            variable = "ANYTOOLAI_API_PORT" if name == "API" else "ANYTOOLAI_POSTGRES_PORT"
-            print(
-                f"DEV002: {name} port {port} is occupied. Override with {variable} "
-                f"or --{name.lower().replace('postgresql', 'postgres')}-port.",
-                file=sys.stderr,
-            )
+    if not _check_ports_available(
+        "DEV002",
+        [
+            ("API", identity.api_port, "ANYTOOLAI_API_PORT", "--api-port"),
+            ("PostgreSQL", identity.postgres_port, "ANYTOOLAI_POSTGRES_PORT", "--postgres-port"),
+        ],
+    ):
         return 1
     print_runtime_endpoints(identity)
+    # No timeout: a cold image build can legitimately take minutes.
     exit_code = run_with_env(
         _compose_command(identity, "up", "-d", "--remove-orphans"),
         _compose_env(identity),
     )
     return dev_ready() if exit_code == 0 else exit_code
+
+
+def _wait_for_http_ok(url: str, timeout: float) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=2) as response:
+                if response.status == 200:
+                    return True
+        except (OSError, urllib.error.URLError):
+            pass
+        time.sleep(0.5)
+    return False
 
 
 def dev_ready() -> int:
@@ -485,18 +549,11 @@ def dev_ready() -> int:
     except ValueError as exc:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
-    deadline = time.monotonic() + timeout
     health_url = f"{identity.api_url}/health"
-    while time.monotonic() < deadline:
-        try:
-            with urllib.request.urlopen(health_url, timeout=2) as response:
-                if response.status == 200:
-                    print_runtime_endpoints(identity)
-                    print("Development environment is ready")
-                    return 0
-        except (OSError, urllib.error.URLError):
-            pass
-        time.sleep(0.5)
+    if _wait_for_http_ok(health_url, timeout):
+        print_runtime_endpoints(identity)
+        print("Development environment is ready")
+        return 0
     print(
         f"DEV003: readiness timed out after {timeout:g}s for {health_url}. "
         "Rerun: python scripts/agent/runner.py dev-status",
@@ -511,6 +568,7 @@ def dev_status() -> int:
     return run_with_env(
         _compose_command(identity, "ps"),
         _compose_env(identity),
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
     )
 
 
@@ -520,7 +578,123 @@ def dev_down() -> int:
     return run_with_env(
         _compose_command(identity, "down", "--remove-orphans"),
         _compose_env(identity),
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
     )
+
+
+def dev_smoke() -> int:
+    try:
+        identity = runtime_identity()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
+    return run([sys.executable, "scripts/agent/kernel_demo_smoke.py", identity.api_url])
+
+
+def _prod_compose_command(*args: str) -> list[str]:
+    env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
+    return _docker_compose_command(
+        PROD_COMPOSE_PROJECT, (COMPOSE_FILE, COMPOSE_PROD_FILE), *args, env_file=env_file
+    )
+
+
+def _prod_stack_running() -> bool:
+    # Bounded so a wedged Docker daemon fails this preflight check quickly instead of
+    # hanging prod_up() indefinitely before it ever reaches the normal error path.
+    result = subprocess.run(
+        _prod_compose_command("ps", "-q"),
+        cwd=ROOT,
+        env=runner_env(),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    return bool(result.stdout.strip())
+
+
+def prod_up() -> int:
+    # Deliberately its own variable, not ANYTOOLAI_API_PORT (dev's per-worktree derived
+    # port) — a leftover dev override in the operator's shell must not silently redirect
+    # which host port prod binds to or preflight-checks. Postgres isn't published in prod
+    # at all (see docker-compose.prod.yml), so there's no Postgres port to check here.
+    try:
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
+    except ValueError as exc:
+        print(f"PROD001: {exc}", file=sys.stderr)
+        return 2
+    try:
+        stack_running = _prod_stack_running()
+    except FileNotFoundError as exc:
+        print(f"Command not found: {exc.filename}", file=sys.stderr)
+        return 127
+    except subprocess.TimeoutExpired:
+        print(
+            "PROD003: docker compose ps did not respond within 10s — "
+            "is the Docker daemon running and responsive?",
+            file=sys.stderr,
+        )
+        return 1
+    # Skip the port preflight when the anytoolai-prod stack is already up: this is an
+    # in-place redeploy (`docker compose up -d --build` recreates its own containers,
+    # freeing/rebinding their ports itself), not a fresh start racing against something
+    # else. Checking raw socket availability here would otherwise always "detect" the
+    # stack's own already-running containers as an occupied port and block redeploys.
+    if not stack_running and not _check_ports_available(
+        "PROD002",
+        [("API", api_port, "ANYTOOLAI_PROD_API_PORT", None)],
+    ):
+        return 1
+    # No timeout: `--build` can legitimately take minutes on a cold image build.
+    exit_code = run_with_env(
+        _prod_compose_command("up", "-d", "--build", "--remove-orphans"),
+        runner_env(),
+    )
+    return prod_ready() if exit_code == 0 else exit_code
+
+
+def prod_ready() -> int:
+    try:
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
+        timeout = float(os.environ.get("ANYTOOLAI_READY_TIMEOUT", "90"))
+    except ValueError as exc:
+        print(f"PROD001: {exc}", file=sys.stderr)
+        return 2
+    health_url = f"http://127.0.0.1:{api_port}/health"
+    if _wait_for_http_ok(health_url, timeout):
+        print(f"API: http://127.0.0.1:{api_port}")
+        print("Production environment is ready")
+        return 0
+    print(
+        f"PROD004: readiness timed out after {timeout:g}s for {health_url}. "
+        "Rerun: python scripts/agent/runner.py prod-status",
+        file=sys.stderr,
+    )
+    return 1
+
+
+def prod_status() -> int:
+    return run_with_env(
+        _prod_compose_command("ps"), runner_env(), timeout=COMPOSE_QUERY_TIMEOUT_SECONDS
+    )
+
+
+def prod_down() -> int:
+    return run_with_env(
+        _prod_compose_command("down", "--remove-orphans"),
+        runner_env(),
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+    )
+
+
+def prod_smoke() -> int:
+    try:
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
+    except ValueError as exc:
+        print(f"PROD001: {exc}", file=sys.stderr)
+        return 2
+    api_url = f"http://127.0.0.1:{api_port}"
+    return run([sys.executable, "scripts/agent/kernel_demo_smoke.py", api_url])
 
 
 COMMANDS = {
@@ -537,6 +711,12 @@ COMMANDS = {
     "dev-ready": dev_ready,
     "dev-status": dev_status,
     "dev-down": dev_down,
+    "dev-smoke": dev_smoke,
+    "prod-up": prod_up,
+    "prod-ready": prod_ready,
+    "prod-status": prod_status,
+    "prod-down": prod_down,
+    "prod-smoke": prod_smoke,
 }
 
 

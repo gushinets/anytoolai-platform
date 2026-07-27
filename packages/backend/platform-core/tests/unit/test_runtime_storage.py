@@ -564,6 +564,7 @@ def test_handoff_compatibility_revision_repairs_database_stamped_at_0007(
         assert {
             "ix_product_handoffs_definition",
             "ix_product_handoffs_source_session",
+            "ix_product_handoffs_target_session",
             "ix_product_handoffs_status_expiry",
         } <= handoff_indexes
         assert {

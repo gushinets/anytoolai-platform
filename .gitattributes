@@ -3,7 +3,6 @@
 # Scripts and CI/config files should stay LF for Linux runners and Bash.
 *.sh text eol=lf
 Makefile text eol=lf
-justfile text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 *.toml text eol=lf

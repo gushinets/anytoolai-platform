@@ -234,3 +234,8 @@ class StructuredLlmActionExecutor:
                 metadata=dict(response.metadata),
             ),
         )
+
+
+def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
+    value = metadata.get(key)
+    return value if isinstance(value, str) and value else None

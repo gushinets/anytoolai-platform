@@ -2,6 +2,13 @@ import os
 from dataclasses import dataclass
 from math import isfinite
 
+from anytoolai_platform_core.storage.db import (
+    POSTGRES_DB_ENV,
+    POSTGRES_PASSWORD_ENV,
+    POSTGRES_USER_ENV,
+    build_postgres_url_from_env,
+)
+
 PROJECT_DATABASE_URL_ENV = "ANYTOOLAI_DATABASE_URL"
 GENERIC_DATABASE_URL_ENV = "DATABASE_URL"
 POLL_INTERVAL_ENV = "ANYTOOLAI_WORKER_POLL_INTERVAL_SECONDS"
@@ -14,12 +21,15 @@ class WorkerSettings:
 
     @classmethod
     def from_env(cls) -> "WorkerSettings":
-        database_url = os.getenv(PROJECT_DATABASE_URL_ENV) or os.getenv(
-            GENERIC_DATABASE_URL_ENV
+        database_url = (
+            os.getenv(PROJECT_DATABASE_URL_ENV)
+            or os.getenv(GENERIC_DATABASE_URL_ENV)
+            or build_postgres_url_from_env()
         )
         if not database_url:
             raise RuntimeError(
-                f"set {PROJECT_DATABASE_URL_ENV} or {GENERIC_DATABASE_URL_ENV}"
+                f"set {PROJECT_DATABASE_URL_ENV} or {GENERIC_DATABASE_URL_ENV}, or all of "
+                f"{POSTGRES_USER_ENV}/{POSTGRES_PASSWORD_ENV}/{POSTGRES_DB_ENV}"
             )
         poll_interval_seconds = float(os.getenv(POLL_INTERVAL_ENV, "1.0"))
         if not isfinite(poll_interval_seconds) or poll_interval_seconds <= 0:

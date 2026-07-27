@@ -261,6 +261,7 @@ class GuestQuotaService:
             self._quota_repository.session,
             lambda recovery_session_factory: _recover_quota_exhaustion(
                 recovery_session_factory,
+                config_registry=self._config_registry,
                 recovery=recovery,
             ),
             phase=RollbackRecoveryPhase.quota_exhaustion,
@@ -498,6 +499,83 @@ def _emit_quota_event(
         result_status=result_status,
         properties=properties,
     )
+
+
+def _recover_quota_exhaustion(
+    recovery_session_factory: sessionmaker[Session],
+    *,
+    config_registry: ConfigRegistry,
+    recovery: QuotaExhaustionRecovery,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as session:
+        failed_handoff = None
+        if recovery.handoff_id is not None:
+            handoffs = HandoffRepository(session)
+            handoff = handoffs.get_by_id(
+                recovery.handoff_id,
+                tenant_id=recovery.tenant_id,
+                region=recovery.region,
+            )
+            if handoff is not None:
+                failure = handoffs.finalize_quota_failure_recovery(
+                    handoff.id,
+                    error_code="quota_exhausted",
+                    now=utc_now(),
+                )
+                if not failure.changed:
+                    return
+                failed_handoff = failure.record
+        quota_repository = QuotaUsageRepository(session)
+        usage = quota_repository.ensure_usage(
+            tenant_id=recovery.tenant_id,
+            region=recovery.region,
+            guest_id=recovery.guest_id,
+            product_id=recovery.product_id,
+            quota_policy_id=recovery.policy.quota_policy_id,
+            quota_dimension=recovery.dimension.quota_dimension,
+            dimension_key=recovery.dimension.dimension_key,
+            scenario_id=recovery.dimension.scenario_id,
+            period_key=_period_key(recovery.policy),
+            limit_count=recovery.policy.limit_count,
+            metadata={
+                "unit": recovery.policy.unit.value,
+                "period": recovery.policy.period.value,
+                "quota_dimension": recovery.dimension.quota_dimension.value,
+                "dimension_key": recovery.dimension.dimension_key,
+            },
+        )
+        state = _state_from_usage(usage, recovery.policy)
+        event_emitter = EventEmitter(EventLogRepository(session))
+        service = GuestQuotaService(
+            config_registry=config_registry,
+            quota_repository=quota_repository,
+            guest_repository=GuestIdentityRepository(session),
+            event_emitter=event_emitter,
+        )
+        context = {
+            "tenant_id": recovery.tenant_id,
+            "region": recovery.region,
+            "frontend_id": recovery.frontend_id,
+            "scenario_id": recovery.scenario_id,
+            "scenario_session_id": recovery.scenario_session_id,
+            "scenario_chain_id": recovery.scenario_chain_id,
+            "handoff_id": recovery.handoff_id,
+        }
+        service._emit_quota_event("quota.checked", state=state, **context)
+        service._emit_quota_event(
+            "quota.exhausted",
+            state=state,
+            result_status="failed",
+            error_code="quota_exhausted",
+            **context,
+        )
+        if failed_handoff is not None:
+            emit_handoff_event(
+                event_emitter,
+                "handoff.failed",
+                failed_handoff,
+                properties={"error_code": "quota_exhausted"},
+            )
 
 
 def _state_from_usage(record: QuotaUsageRecord, policy: QuotaPolicy) -> QuotaState:

@@ -95,6 +95,8 @@ class StructuredOutputFinalizer:
                 **_correlation_metadata(persistence_context),
                 "schema_ref": schema_ref,
                 "schema_version": schema_version,
+                "handoff_id": persistence_context.handoff_id,
+                "scenario_chain_id": persistence_context.scenario_chain_id,
             },
         )
         return StructuredOutputFinalizationResult(
@@ -135,6 +137,8 @@ class StructuredOutputFinalizer:
                 "error_type": safe_error.error_type,
                 "schema_ref": schema_ref,
                 "schema_version": schema_version,
+                "handoff_id": persistence_context.handoff_id,
+                "scenario_chain_id": persistence_context.scenario_chain_id,
                 "provider_call_id": None if provider_call is None else provider_call.id,
                 "provider_policy_ref": (
                     None if provider_call is None else provider_call.provider_policy_ref

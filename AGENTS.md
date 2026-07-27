@@ -72,7 +72,7 @@ silent skips, permanent expected failures, or ignored failures as evidence that 
 behavior works.
 
 `python scripts/agent/runner.py <command>` is the canonical Windows/Linux command interface.
-`just` recipes are optional thin aliases.
+`make <target>` recipes are optional thin aliases.
 
 Python package management uses `uv`, not `pip`.
 

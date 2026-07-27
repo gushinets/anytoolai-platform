@@ -9,10 +9,14 @@ share default containers or ports.
     python scripts/agent/runner.py dev-up
     python scripts/agent/runner.py dev-ready
     python scripts/agent/runner.py dev-status
+    python scripts/agent/runner.py dev-smoke
     python scripts/agent/runner.py dev-down
 
 dev-up checks both host ports before starting Compose and then waits for the API health endpoint.
 dev-status prints the Compose project, API URL, database URL, and current Compose service state.
+dev-smoke drives a real kernel_demo job through the stack over HTTP and waits for it to complete -
+the only way to confirm platform-worker (no healthcheck of its own) is actually consuming jobs,
+not just running. See "Verifying end-to-end" in `infra/deployment/README.md` for details.
 dev-down is scoped to the derived Compose project and is safe to repeat.
 
 ## Overrides
@@ -24,5 +28,10 @@ Use CLI flags when a derived port is occupied:
 The equivalent environment variables are ANYTOOLAI_API_PORT, ANYTOOLAI_POSTGRES_PORT, and
 ANYTOOLAI_READY_TIMEOUT. Agents should discover endpoints from dev-status rather than assuming
 8000/5432.
+
+Postgres credentials (ANYTOOLAI_POSTGRES_USER/PASSWORD/DB) default to `anytoolai` for all three
+and can be overridden the same way as the port variables. `platform-api` runs with hot-reload in
+this dev runtime (source bind-mounted, uvicorn `--reload`) - see `infra/deployment/README.md` for
+the full dev/prod split.
 
 The runtime never resets databases or tears down a different worktree automatically.

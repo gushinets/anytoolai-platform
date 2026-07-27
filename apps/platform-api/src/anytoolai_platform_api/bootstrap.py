@@ -9,7 +9,7 @@ from typing import Any
 
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.config.registry import ConfigRegistry
-from anytoolai_platform_core.storage.db import create_sync_engine
+from anytoolai_platform_core.storage.db import build_postgres_url_from_env, create_sync_engine
 from anytoolai_platform_core.storage.transactions import build_session_factory
 
 PROJECT_DATABASE_URL_ENV = "ANYTOOLAI_DATABASE_URL"
@@ -60,4 +60,8 @@ def _resolve_database_url(database_url: str | None) -> str | None:
     if project_database_url:
         return project_database_url
 
-    return os.getenv(GENERIC_DATABASE_URL_ENV)
+    generic_database_url = os.getenv(GENERIC_DATABASE_URL_ENV)
+    if generic_database_url:
+        return generic_database_url
+
+    return build_postgres_url_from_env()

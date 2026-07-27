@@ -310,7 +310,18 @@ def _build_unique_key_yaml_loader(
     file_path: Path,
 ) -> type[yaml.SafeLoader]:
     class _UniqueKeySafeLoader(yaml.SafeLoader):
-        pass
+        def construct_document(self, node: yaml.nodes.Node) -> Any:
+            duplicate = _find_handoff_mapping_target_duplicate(node)
+            if duplicate is not None:
+                handoff_id, field_name, target_path = duplicate
+                raise InvalidConfigShapeError(
+                    file_path,
+                    f"Handoff {field_name} target path is duplicated: {target_path}",
+                    config_id=handoff_id,
+                    ref_type=field_name,
+                    ref_value=target_path,
+                )
+            return super().construct_document(node)
 
     def _construct_mapping(
         loader: yaml.SafeLoader,

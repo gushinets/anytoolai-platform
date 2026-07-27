@@ -714,6 +714,8 @@ class SequentialWorkflowRunner:
                 "schema_ref": workflow.output_schema_ref,
                 "schema_version": self._schema_version(workflow.output_schema_ref),
                 "artifact_role": "workflow_result",
+                "handoff_id": _metadata_str(job.metadata, "handoff_id"),
+                "scenario_chain_id": _metadata_str(job.metadata, "scenario_chain_id"),
             },
         )
 

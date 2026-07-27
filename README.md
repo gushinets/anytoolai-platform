@@ -18,7 +18,9 @@ python scripts/agent/runner.py generate-docs --check
 ```
 
 `python scripts/agent/runner.py <command>` is the canonical cross-platform interface. Use
-`python3` where that is the Python 3 executable. `just` recipes are optional thin aliases.
+`python3` where that is the Python 3 executable. `make <target>` recipes are optional thin
+aliases over the runner (see `Makefile`); on Windows without native GNU Make, run `make` via
+git-bash/WSL or call the runner directly.
 The baseline gate includes:
 
 - config validation
@@ -38,7 +40,9 @@ Generated docs are written by `generate-docs`. Use `generate-docs --check` in re
 detect drift without changing tracked files.
 
 Use `dev-up`, `dev-status`, and `dev-down` through the runner for a worktree-isolated Compose
-environment. The status command prints the derived API and database endpoints.
+environment. The status command prints the derived API and database endpoints. `platform-api`
+runs with hot-reload in this dev environment. For the production overlay (`prod-up`/`prod-status`/
+`prod-down`) and the full dev/prod split, see `infra/deployment/README.md`.
 
 When blocked, `collect-context` writes a privacy-sanitized JSON bundle under the ignored
 `.agent/context/` directory. API and worker runtime logs are structured JSON and use the same

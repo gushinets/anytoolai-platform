@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime
 from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Engine, URL
 
 from anytoolai_platform_core.actions.models import ActionRunStatus
 from anytoolai_platform_core.artifacts.models import ArtifactStatus
@@ -15,6 +16,49 @@ from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
 from anytoolai_platform_core.workflows.models import JobStatus
 
 PLATFORM_SCHEMA = "platform"
+
+POSTGRES_USER_ENV = "ANYTOOLAI_POSTGRES_USER"
+POSTGRES_PASSWORD_ENV = "ANYTOOLAI_POSTGRES_PASSWORD"
+POSTGRES_DB_ENV = "ANYTOOLAI_POSTGRES_DB"
+
+# Deliberately distinct from ANYTOOLAI_POSTGRES_PORT, which already means something else (the
+# *published host* port used by scripts/agent/runner.py for dev). These two default to this
+# repo's own compose topology (service name `postgres`, the image's default port) and only need
+# overriding for a different topology (renamed service, Kubernetes Service DNS, etc).
+POSTGRES_INTERNAL_HOST_ENV = "ANYTOOLAI_POSTGRES_INTERNAL_HOST"
+POSTGRES_INTERNAL_PORT_ENV = "ANYTOOLAI_POSTGRES_INTERNAL_PORT"
+_DEFAULT_POSTGRES_INTERNAL_HOST = "postgres"
+_DEFAULT_POSTGRES_INTERNAL_PORT = 5432
+
+
+def build_postgres_url_from_env() -> str | None:
+    """Assemble a DSN from discrete Postgres credential env vars.
+
+    Returns None if any of POSTGRES_USER_ENV/POSTGRES_PASSWORD_ENV/POSTGRES_DB_ENV is unset
+    (not merely empty -- an explicitly empty password is a valid trust-auth setup), so callers
+    can fall back to other resolution strategies.
+
+    This exists because interpolating raw credentials into a connection-string template
+    (e.g. in a compose file) breaks silently when a password contains a reserved URL
+    character (@, :, /, %, #) -- see e.g. `postgresql://u:p@ss@host/db`, which parses as
+    password "p" and host "ss@host". `URL.create` percent-encodes each component instead.
+    """
+    user = os.getenv(POSTGRES_USER_ENV)
+    password = os.getenv(POSTGRES_PASSWORD_ENV)
+    database = os.getenv(POSTGRES_DB_ENV)
+    if user is None or password is None or database is None:
+        return None
+    host = os.getenv(POSTGRES_INTERNAL_HOST_ENV) or _DEFAULT_POSTGRES_INTERNAL_HOST
+    port_env = os.getenv(POSTGRES_INTERNAL_PORT_ENV)
+    port = int(port_env) if port_env else _DEFAULT_POSTGRES_INTERNAL_PORT
+    return URL.create(
+        drivername="postgresql+psycopg",
+        username=user,
+        password=password,
+        host=host,
+        port=port,
+        database=database,
+    ).render_as_string(hide_password=False)
 
 
 class UtcDateTime(sa.TypeDecorator[datetime]):

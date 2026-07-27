@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import socket
 import threading
 from http import HTTPStatus
@@ -12,18 +13,21 @@ import uvicorn
 from fastapi import FastAPI
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-API_DOCKERFILE = REPO_ROOT / "infra" / "docker" / "platform-api.Dockerfile"
+API_ENTRYPOINT = REPO_ROOT / "infra" / "docker" / "platform-api-entrypoint.sh"
 
 
 def _platform_api_command() -> list[str]:
+    # ENTRYPOINT invokes this script (see platform-api.Dockerfile), which execs the real
+    # uvicorn command; there is no CMD line in the Dockerfile to parse.
     command_line = next(
         line
-        for line in API_DOCKERFILE.read_text(encoding="utf-8").splitlines()
-        if line.startswith("CMD ")
+        for line in API_ENTRYPOINT.read_text(encoding="utf-8").splitlines()
+        if "uvicorn" in line
     )
-    command = json.loads(command_line.removeprefix("CMD "))
-    assert isinstance(command, list)
-    return command
+    tokens = shlex.split(command_line)
+    if tokens[0] == "exec":
+        tokens = tokens[1:]
+    return [token for token in tokens if token != "$@"]
 
 
 def test_platform_api_disables_real_uvicorn_access_logger_for_handoff_urls(capfd) -> None:
@@ -48,7 +52,7 @@ def test_platform_api_disables_real_uvicorn_access_logger_for_handoff_urls(capfd
         app,
         host="127.0.0.1",
         port=port,
-        access_log=False,
+        access_log="--no-access-log" not in uvicorn_args,
         log_level="info",
     )
     server = uvicorn.Server(config)
