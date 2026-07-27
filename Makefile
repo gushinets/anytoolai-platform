@@ -53,5 +53,14 @@ dev-status:
 dev-down:
 	$(PYTHON) scripts/agent/runner.py dev-down
 
+prod-up:
+	$(PYTHON) scripts/agent/runner.py prod-up
+
+prod-status:
+	$(PYTHON) scripts/agent/runner.py prod-status
+
+prod-down:
+	$(PYTHON) scripts/agent/runner.py prod-down
+
 collect-context:
 	$(PYTHON) scripts/agent/runner.py collect-context

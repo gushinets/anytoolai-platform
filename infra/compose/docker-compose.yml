@@ -1,26 +1,54 @@
+# Credentials are passed to platform-api/platform-worker as discrete env vars (below), not
+# pre-assembled into a DATABASE_URL here. Interpolating raw credentials into a connection-string
+# template breaks silently if a password contains a reserved URL character (@, :, /, %, #) --
+# the app builds the DSN itself via SQLAlchemy's URL.create, which percent-encodes each
+# component correctly (see anytoolai_platform_core.storage.db.build_postgres_url_from_env).
+x-postgres-credentials: &postgres-credentials
+  ANYTOOLAI_POSTGRES_USER: ${ANYTOOLAI_POSTGRES_USER:-anytoolai}
+  ANYTOOLAI_POSTGRES_PASSWORD: ${ANYTOOLAI_POSTGRES_PASSWORD:-anytoolai}
+  ANYTOOLAI_POSTGRES_DB: ${ANYTOOLAI_POSTGRES_DB:-anytoolai}
+
 services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_USER: anytoolai
-      POSTGRES_PASSWORD: anytoolai
-      POSTGRES_DB: anytoolai
+      POSTGRES_USER: ${ANYTOOLAI_POSTGRES_USER:-anytoolai}
+      POSTGRES_PASSWORD: ${ANYTOOLAI_POSTGRES_PASSWORD:-anytoolai}
+      POSTGRES_DB: ${ANYTOOLAI_POSTGRES_DB:-anytoolai}
     ports:
       - "${ANYTOOLAI_POSTGRES_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U anytoolai -d anytoolai"]
+      test: ["CMD-SHELL", "pg_isready -U ${ANYTOOLAI_POSTGRES_USER:-anytoolai} -d ${ANYTOOLAI_POSTGRES_DB:-anytoolai}"]
       interval: 2s
       timeout: 3s
       retries: 30
+  # One-shot: applies Alembic migrations to head, then exits. platform-api/platform-worker
+  # depend on it completing successfully rather than running migrations themselves, so any
+  # number of platform-api replicas can start concurrently without racing on schema changes
+  # (see docker-compose.prod.yml's deploy.replicas comment).
+  migrate:
+    build:
+      context: ../..
+      dockerfile: infra/docker/platform-api.Dockerfile
+      target: prod
+    environment:
+      <<: *postgres-credentials
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["uv", "run", "--project", "apps/platform-api", "--no-sync", "anytoolai-platform-migrate"]
   platform-api:
     build:
       context: ../..
       dockerfile: infra/docker/platform-api.Dockerfile
+      target: prod
     environment:
-      DATABASE_URL: postgresql+psycopg://anytoolai:anytoolai@postgres:5432/anytoolai
+      <<: *postgres-credentials
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "${ANYTOOLAI_API_PORT:-8000}:8000"
     healthcheck:
@@ -28,12 +56,15 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+      start_period: 10s
   platform-worker:
     build:
       context: ../..
       dockerfile: infra/docker/platform-worker.Dockerfile
     environment:
-      DATABASE_URL: postgresql+psycopg://anytoolai:anytoolai@postgres:5432/anytoolai
+      <<: *postgres-credentials
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import subprocess
 import sys
@@ -106,7 +105,7 @@ def collect(*, failure_file: Path | None = None, log_lines: int = 100) -> dict[s
             "compose_project": identity.compose_project,
             "api_url": identity.api_url,
             "database_endpoint": (
-                f"postgresql://127.0.0.1:{identity.postgres_port}/anytoolai"
+                f"postgresql://127.0.0.1:{identity.postgres_port}/{runner.resolve_postgres_db()}"
             ),
             "compose_status": _run(
                 runner._compose_command(identity, "ps"),

@@ -25,4 +25,9 @@ The equivalent environment variables are ANYTOOLAI_API_PORT, ANYTOOLAI_POSTGRES_
 ANYTOOLAI_READY_TIMEOUT. Agents should discover endpoints from dev-status rather than assuming
 8000/5432.
 
+Postgres credentials (ANYTOOLAI_POSTGRES_USER/PASSWORD/DB) default to `anytoolai` for all three
+and can be overridden the same way as the port variables. `platform-api` runs with hot-reload in
+this dev runtime (source bind-mounted, uvicorn `--reload`) - see `infra/deployment/README.md` for
+the full dev/prod split.
+
 The runtime never resets databases or tears down a different worktree automatically.
