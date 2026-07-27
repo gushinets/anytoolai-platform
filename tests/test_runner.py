@@ -525,6 +525,7 @@ def test_prod_up_ignores_leftover_dev_port_override(monkeypatch) -> None:
     monkeypatch.setenv("ANYTOOLAI_API_PORT", "18123")
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
     monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
+    monkeypatch.setattr(runner, "prod_ready", lambda: 0)
     checked_ports: list[int] = []
     monkeypatch.setattr(
         runner,
@@ -541,6 +542,7 @@ def test_prod_up_skips_port_check_when_stack_already_running(monkeypatch) -> Non
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
     monkeypatch.setattr(runner, "_prod_stack_running", lambda: True)
+    monkeypatch.setattr(runner, "prod_ready", lambda: 0)
     monkeypatch.setattr(
         runner,
         "port_available",
@@ -582,6 +584,7 @@ def test_prod_up_builds_and_removes_orphans(monkeypatch) -> None:
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
     monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
     monkeypatch.setattr(runner, "port_available", lambda port: True)
+    monkeypatch.setattr(runner, "prod_ready", lambda: 0)
     commands: list[list[str]] = []
     timeouts: list[float | None] = []
     monkeypatch.setattr(
@@ -596,6 +599,159 @@ def test_prod_up_builds_and_removes_orphans(monkeypatch) -> None:
     assert commands[0][-4:] == ["up", "-d", "--build", "--remove-orphans"]
     # Deliberately unbounded: --build can legitimately take minutes on a cold build.
     assert timeouts == [None]
+
+
+def test_prod_up_calls_prod_ready_after_successful_up(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
+    monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
+    monkeypatch.setattr(runner, "port_available", lambda port: True)
+    monkeypatch.setattr(runner, "run_with_env", lambda command, env: 0)
+    calls: list[str] = []
+    monkeypatch.setattr(runner, "prod_ready", lambda: calls.append("prod_ready") or 42)
+
+    assert runner.prod_up() == 42
+    assert calls == ["prod_ready"]
+
+
+def test_prod_up_skips_ready_check_when_compose_up_fails(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
+    monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
+    monkeypatch.setattr(runner, "port_available", lambda port: True)
+    monkeypatch.setattr(runner, "run_with_env", lambda command, env: 1)
+    monkeypatch.setattr(
+        runner,
+        "prod_ready",
+        lambda: (_ for _ in ()).throw(AssertionError("must not poll readiness after failed up")),
+    )
+
+    assert runner.prod_up() == 1
+
+
+def test_prod_ready_waits_for_health(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
+    monkeypatch.delenv("ANYTOOLAI_READY_TIMEOUT", raising=False)
+
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    requested_urls: list[str] = []
+
+    def fake_urlopen(url, timeout):
+        requested_urls.append(url)
+        return Response()
+
+    monkeypatch.setattr(runner.urllib.request, "urlopen", fake_urlopen)
+
+    assert runner.prod_ready() == 0
+    assert requested_urls == ["http://127.0.0.1:8000/health"]
+
+
+def test_prod_ready_uses_prod_port_variable_not_dev_port(monkeypatch) -> None:
+    runner = load_runner_module()
+    # A leftover ANYTOOLAI_API_PORT from dev work in the same shell must not redirect
+    # which port prod-ready polls — prod has its own ANYTOOLAI_PROD_API_PORT.
+    monkeypatch.setenv("ANYTOOLAI_API_PORT", "18123")
+    monkeypatch.setenv("ANYTOOLAI_PROD_API_PORT", "18900")
+    monkeypatch.delenv("ANYTOOLAI_READY_TIMEOUT", raising=False)
+
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    requested_urls: list[str] = []
+    monkeypatch.setattr(
+        runner.urllib.request,
+        "urlopen",
+        lambda url, timeout: requested_urls.append(url) or Response(),
+    )
+
+    assert runner.prod_ready() == 0
+    assert requested_urls == ["http://127.0.0.1:18900/health"]
+
+
+def test_prod_ready_times_out_with_prod004(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
+    monkeypatch.setenv("ANYTOOLAI_READY_TIMEOUT", "0")
+    monkeypatch.setattr(
+        runner.urllib.request,
+        "urlopen",
+        lambda url, timeout: (_ for _ in ()).throw(OSError("connection refused")),
+    )
+
+    assert runner.prod_ready() == 1
+    assert "PROD004" in capsys.readouterr().err
+
+
+def test_prod_ready_reports_prod001_for_invalid_port_override(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    monkeypatch.setenv("ANYTOOLAI_PROD_API_PORT", "not-a-port")
+
+    assert runner.prod_ready() == 2
+    assert "PROD001" in capsys.readouterr().err
+
+
+def test_dev_smoke_invokes_kernel_demo_smoke_against_worktree_api_url(monkeypatch) -> None:
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    commands: list[list[str]] = []
+    monkeypatch.setattr(
+        runner, "run", lambda command: commands.append(list(command)) or 0
+    )
+
+    assert runner.dev_smoke() == 0
+    assert commands == [
+        [runner.sys.executable, "scripts/agent/kernel_demo_smoke.py", identity.api_url]
+    ]
+
+
+def test_dev_smoke_reports_dev001_for_invalid_port_override(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+
+    def fake_runtime_identity():
+        raise ValueError("ANYTOOLAI_API_PORT must be an integer port")
+
+    monkeypatch.setattr(runner, "runtime_identity", fake_runtime_identity)
+
+    assert runner.dev_smoke() == 2
+    assert "DEV001" in capsys.readouterr().err
+
+
+def test_prod_smoke_invokes_kernel_demo_smoke_against_prod_port(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.setenv("ANYTOOLAI_PROD_API_PORT", "18900")
+    commands: list[list[str]] = []
+    monkeypatch.setattr(
+        runner, "run", lambda command: commands.append(list(command)) or 0
+    )
+
+    assert runner.prod_smoke() == 0
+    assert commands == [
+        [runner.sys.executable, "scripts/agent/kernel_demo_smoke.py", "http://127.0.0.1:18900"]
+    ]
+
+
+def test_prod_smoke_reports_prod001_for_invalid_port_override(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    monkeypatch.setenv("ANYTOOLAI_PROD_API_PORT", "not-a-port")
+
+    assert runner.prod_smoke() == 2
+    assert "PROD001" in capsys.readouterr().err
 
 
 def test_dev_up_does_not_bound_the_build(monkeypatch) -> None:

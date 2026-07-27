@@ -12,7 +12,7 @@ ifeq ($(strip $(PYTHON)),)
 $(error No Python 3.12+ interpreter found (checked python3, python); set PYTHON=/path/to/python3.12+ or install Python 3.12+)
 endif
 
-.PHONY: doctor quick-check frontend-check full-check validate-configs validate-architecture validate-docs generate-docs check-generated-docs dev-up dev-ready dev-status dev-down collect-context
+.PHONY: doctor quick-check frontend-check full-check validate-configs validate-architecture validate-docs generate-docs check-generated-docs dev-up dev-ready dev-status dev-down dev-smoke prod-up prod-ready prod-status prod-down prod-smoke collect-context
 
 doctor:
 	$(PYTHON) scripts/agent/runner.py doctor
@@ -53,14 +53,23 @@ dev-status:
 dev-down:
 	$(PYTHON) scripts/agent/runner.py dev-down
 
+dev-smoke:
+	$(PYTHON) scripts/agent/runner.py dev-smoke
+
 prod-up:
 	$(PYTHON) scripts/agent/runner.py prod-up
+
+prod-ready:
+	$(PYTHON) scripts/agent/runner.py prod-ready
 
 prod-status:
 	$(PYTHON) scripts/agent/runner.py prod-status
 
 prod-down:
 	$(PYTHON) scripts/agent/runner.py prod-down
+
+prod-smoke:
+	$(PYTHON) scripts/agent/runner.py prod-smoke
 
 collect-context:
 	$(PYTHON) scripts/agent/runner.py collect-context

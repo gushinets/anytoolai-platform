@@ -529,6 +529,19 @@ def dev_up() -> int:
     return dev_ready() if exit_code == 0 else exit_code
 
 
+def _wait_for_http_ok(url: str, timeout: float) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=2) as response:
+                if response.status == 200:
+                    return True
+        except (OSError, urllib.error.URLError):
+            pass
+        time.sleep(0.5)
+    return False
+
+
 def dev_ready() -> int:
     try:
         identity = runtime_identity()
@@ -536,18 +549,11 @@ def dev_ready() -> int:
     except ValueError as exc:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
-    deadline = time.monotonic() + timeout
     health_url = f"{identity.api_url}/health"
-    while time.monotonic() < deadline:
-        try:
-            with urllib.request.urlopen(health_url, timeout=2) as response:
-                if response.status == 200:
-                    print_runtime_endpoints(identity)
-                    print("Development environment is ready")
-                    return 0
-        except (OSError, urllib.error.URLError):
-            pass
-        time.sleep(0.5)
+    if _wait_for_http_ok(health_url, timeout):
+        print_runtime_endpoints(identity)
+        print("Development environment is ready")
+        return 0
     print(
         f"DEV003: readiness timed out after {timeout:g}s for {health_url}. "
         "Rerun: python scripts/agent/runner.py dev-status",
@@ -574,6 +580,15 @@ def dev_down() -> int:
         _compose_env(identity),
         timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
     )
+
+
+def dev_smoke() -> int:
+    try:
+        identity = runtime_identity()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
+    return run([sys.executable, "scripts/agent/kernel_demo_smoke.py", identity.api_url])
 
 
 def _prod_compose_command(*args: str) -> list[str]:
@@ -631,10 +646,31 @@ def prod_up() -> int:
     ):
         return 1
     # No timeout: `--build` can legitimately take minutes on a cold image build.
-    return run_with_env(
+    exit_code = run_with_env(
         _prod_compose_command("up", "-d", "--build", "--remove-orphans"),
         runner_env(),
     )
+    return prod_ready() if exit_code == 0 else exit_code
+
+
+def prod_ready() -> int:
+    try:
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
+        timeout = float(os.environ.get("ANYTOOLAI_READY_TIMEOUT", "90"))
+    except ValueError as exc:
+        print(f"PROD001: {exc}", file=sys.stderr)
+        return 2
+    health_url = f"http://127.0.0.1:{api_port}/health"
+    if _wait_for_http_ok(health_url, timeout):
+        print(f"API: http://127.0.0.1:{api_port}")
+        print("Production environment is ready")
+        return 0
+    print(
+        f"PROD004: readiness timed out after {timeout:g}s for {health_url}. "
+        "Rerun: python scripts/agent/runner.py prod-status",
+        file=sys.stderr,
+    )
+    return 1
 
 
 def prod_status() -> int:
@@ -651,6 +687,16 @@ def prod_down() -> int:
     )
 
 
+def prod_smoke() -> int:
+    try:
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
+    except ValueError as exc:
+        print(f"PROD001: {exc}", file=sys.stderr)
+        return 2
+    api_url = f"http://127.0.0.1:{api_port}"
+    return run([sys.executable, "scripts/agent/kernel_demo_smoke.py", api_url])
+
+
 COMMANDS = {
     "doctor": doctor,
     "validate-configs": validate_configs,
@@ -665,9 +711,12 @@ COMMANDS = {
     "dev-ready": dev_ready,
     "dev-status": dev_status,
     "dev-down": dev_down,
+    "dev-smoke": dev_smoke,
     "prod-up": prod_up,
+    "prod-ready": prod_ready,
     "prod-status": prod_status,
     "prod-down": prod_down,
+    "prod-smoke": prod_smoke,
 }
 
 
