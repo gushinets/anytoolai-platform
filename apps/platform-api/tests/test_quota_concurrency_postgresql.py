@@ -14,6 +14,7 @@ from alembic.config import Config
 from anytoolai_platform_api.routers.handoffs import _service as _handoff_service
 from anytoolai_platform_core.handoffs.models import AcceptHandoffCommand
 from anytoolai_platform_core.handoffs.service import HandoffAcceptanceExecutionError
+from anytoolai_platform_core.quotas.models import QuotaDimension
 from anytoolai_platform_core.storage.db import (
     event_log_table,
     guest_quota_usage_table,
@@ -106,6 +107,115 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
         assert usage["limit_count"] == SCENARIO_START_QUOTA_LIMIT
         assert event_types.count("quota.consumed") == SCENARIO_START_QUOTA_LIMIT
         assert event_types.count("quota.exhausted") == request_count - SCENARIO_START_QUOTA_LIMIT
+    finally:
+        engine.dispose()
+        _drop_database(maintenance_url, database_name)
+
+
+@pytest.mark.postgresql
+@pytest.mark.slow
+def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_independent_counters() -> (
+    None
+):
+    """Production-semantics quota check for the `scenario` dimension under PostgreSQL row locks.
+
+    Mutates the quota policy to dimension=scenario and fires concurrent starts against two
+    different scenario_ids in the same batch. A single disposable database/migration run proves
+    both invariants at once: each scenario_id races on its own (quota_dimension=scenario,
+    dimension_key=scenario_id) row exactly like the product-dimension test races on the shared
+    product row (begin_nested/IntegrityError recovery + the atomic conditional UPDATE both get
+    exercised per-scenario_id here), and different scenario_ids never contend with or leak into
+    each other's counter.
+    """
+
+    maintenance_url = _require_postgres_test_url()
+    database_name = f"anytoolai_a152_quota_scenario_indep_test_{uuid4().hex[:12]}"
+    test_url = maintenance_url.set(database=database_name)
+    _create_database(maintenance_url, database_name)
+    engine = sa.create_engine(test_url, future=True)
+    try:
+        _upgrade_database(engine, test_url)
+        session_factory = build_session_factory(engine)
+        app = _create_test_app(session_factory)
+        registry = app.state.runtime.config_registry
+        policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
+        assert policy is not None
+        app.state.runtime = replace(
+            app.state.runtime,
+            config_registry=replace(
+                registry,
+                quotas={
+                    **dict(registry.quotas),
+                    policy.quota_policy_id: replace(policy, dimension=QuotaDimension.scenario),
+                },
+            ),
+        )
+        requests_per_scenario = 8
+        scenario_ids = (
+            "kernel_demo.single_action_smoke_v1",
+            "kernel_demo.multi_step_workflow_smoke_v1",
+        )
+
+        async def start_many() -> list[httpx.Response]:
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+            ) as client:
+                calls = [
+                    client.post(
+                        f"/v1/products/kernel_demo/scenarios/{scenario_id}/start",
+                        json=_start_payload(),
+                        headers={"X-Request-ID": f"req_pg_quota_indep_{scenario_id}_{index}"},
+                    )
+                    for scenario_id in scenario_ids
+                    for index in range(requests_per_scenario)
+                ]
+                return await asyncio.gather(*calls)
+
+        responses = asyncio.run(start_many())
+        assert len(responses) == requests_per_scenario * len(scenario_ids)
+        status_codes = [response.status_code for response in responses]
+
+        assert status_codes.count(HTTPStatus.OK) == SCENARIO_START_QUOTA_LIMIT * len(scenario_ids)
+        assert status_codes.count(HTTPStatus.TOO_MANY_REQUESTS) == (
+            requests_per_scenario - SCENARIO_START_QUOTA_LIMIT
+        ) * len(scenario_ids)
+        assert all(
+            response.json()["error"]["code"] == "quota_exhausted"
+            for response in responses
+            if response.status_code == HTTPStatus.TOO_MANY_REQUESTS
+        )
+
+        with transaction_boundary(session_factory) as session:
+            scenario_count = session.execute(
+                sa.select(sa.func.count()).select_from(scenario_sessions_table)
+            ).scalar_one()
+            job_count = session.execute(
+                sa.select(sa.func.count()).select_from(jobs_table)
+            ).scalar_one()
+            usage_rows = list(
+                session.execute(
+                    sa.select(guest_quota_usage_table).order_by(
+                        guest_quota_usage_table.c.dimension_key
+                    )
+                ).mappings()
+            )
+            event_types = list(session.execute(sa.select(event_log_table.c.event_type)).scalars())
+
+        assert scenario_count == SCENARIO_START_QUOTA_LIMIT * len(scenario_ids)
+        assert job_count == SCENARIO_START_QUOTA_LIMIT * len(scenario_ids)
+        assert len(usage_rows) == len(scenario_ids)
+        assert {row["dimension_key"] for row in usage_rows} == set(scenario_ids)
+        for row in usage_rows:
+            assert row["quota_dimension"] == "scenario"
+            assert row["scenario_id"] == row["dimension_key"]
+            assert row["used_count"] == SCENARIO_START_QUOTA_LIMIT
+            assert row["limit_count"] == SCENARIO_START_QUOTA_LIMIT
+        assert event_types.count("quota.consumed") == SCENARIO_START_QUOTA_LIMIT * len(scenario_ids)
+        assert event_types.count("quota.exhausted") == (
+            requests_per_scenario - SCENARIO_START_QUOTA_LIMIT
+        ) * len(scenario_ids)
     finally:
         engine.dispose()
         _drop_database(maintenance_url, database_name)

@@ -19,6 +19,7 @@ from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.identity.models import GuestIdentityRecord
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
+from anytoolai_platform_core.quotas.models import QuotaDimension
 from anytoolai_platform_core.scenarios.checkpoints import (
     FAILED_CHECKPOINT_ID,
     PROCESSING_CHECKPOINT_ID,
@@ -518,6 +519,83 @@ def test_parallel_start_scenario_consumes_quota_exactly_to_limit(
     assert usage["limit_count"] == 3
     assert usage["quota_dimension"] == "product"
     assert usage["dimension_key"] == "kernel_demo"
+    assert event_types.count("quota.consumed") == 3
+    assert event_types.count("quota.exhausted") == 1
+
+
+def test_parallel_start_scenario_consumes_quota_exactly_to_limit_for_scenario_dimension(
+    tmp_path: Path,
+) -> None:
+    session_factory = _build_session_factory(tmp_path)
+    app = _create_test_app(session_factory)
+
+    registry = app.state.runtime.config_registry
+    policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
+    assert policy is not None
+    app.state.runtime = replace(
+        app.state.runtime,
+        config_registry=replace(
+            registry,
+            quotas={
+                **dict(registry.quotas),
+                policy.quota_policy_id: replace(policy, dimension=QuotaDimension.scenario),
+            },
+        ),
+    )
+
+    scenario_id = "kernel_demo.single_action_smoke_v1"
+
+    async def start_parallel_requests() -> list[httpx.Response]:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+        ) as client:
+            return await asyncio.gather(
+                *[
+                    client.post(
+                        f"/v1/products/kernel_demo/scenarios/{scenario_id}/start",
+                        json=_start_payload(),
+                        headers={"X-Request-ID": f"req_parallel_start_scenario_dim_{index}"},
+                    )
+                    for index in range(4)
+                ]
+            )
+
+    responses = asyncio.run(start_parallel_requests())
+    status_codes = [response.status_code for response in responses]
+
+    assert status_codes.count(HTTPStatus.OK) == 3
+    assert status_codes.count(HTTPStatus.TOO_MANY_REQUESTS) == 1
+    exhausted_response = next(
+        response for response in responses if response.status_code == HTTPStatus.TOO_MANY_REQUESTS
+    )
+    assert exhausted_response.json()["error"]["code"] == "quota_exhausted"
+
+    with transaction_boundary(session_factory) as session:
+        scenario_count = session.execute(
+            sa.select(sa.func.count()).select_from(scenario_sessions_table)
+        ).scalar_one()
+        job_count = session.execute(
+            sa.select(sa.func.count()).select_from(jobs_table)
+        ).scalar_one()
+        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+        event_types = list(
+            session.execute(
+                sa.select(event_log_table.c.event_type).order_by(
+                    event_log_table.c.timestamp,
+                    event_log_table.c.event_id,
+                )
+            ).scalars()
+        )
+
+    assert scenario_count == 3
+    assert job_count == 3
+    assert usage["used_count"] == 3
+    assert usage["limit_count"] == 3
+    assert usage["quota_dimension"] == "scenario"
+    assert usage["dimension_key"] == scenario_id
+    assert usage["scenario_id"] == scenario_id
     assert event_types.count("quota.consumed") == 3
     assert event_types.count("quota.exhausted") == 1
 
