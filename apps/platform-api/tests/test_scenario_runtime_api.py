@@ -103,6 +103,22 @@ def _create_test_app(
     return app
 
 
+def _with_scenario_dimension(app, policy_id: str) -> None:
+    registry = app.state.runtime.config_registry
+    policy = registry.get_quota_policy(policy_id)
+    assert policy is not None
+    app.state.runtime = replace(
+        app.state.runtime,
+        config_registry=replace(
+            registry,
+            quotas={
+                **dict(registry.quotas),
+                policy.quota_policy_id: replace(policy, dimension=QuotaDimension.scenario),
+            },
+        ),
+    )
+
+
 async def _request(
     app,
     method: str,
@@ -528,20 +544,7 @@ def test_parallel_start_scenario_consumes_quota_exactly_to_limit_for_scenario_di
 ) -> None:
     session_factory = _build_session_factory(tmp_path)
     app = _create_test_app(session_factory)
-
-    registry = app.state.runtime.config_registry
-    policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
-    assert policy is not None
-    app.state.runtime = replace(
-        app.state.runtime,
-        config_registry=replace(
-            registry,
-            quotas={
-                **dict(registry.quotas),
-                policy.quota_policy_id: replace(policy, dimension=QuotaDimension.scenario),
-            },
-        ),
-    )
+    _with_scenario_dimension(app, "kernel_demo.guest_quota_v1")
 
     scenario_id = "kernel_demo.single_action_smoke_v1"
 

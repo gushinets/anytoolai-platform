@@ -14,7 +14,6 @@ from alembic.config import Config
 from anytoolai_platform_api.routers.handoffs import _service as _handoff_service
 from anytoolai_platform_core.handoffs.models import AcceptHandoffCommand
 from anytoolai_platform_core.handoffs.service import HandoffAcceptanceExecutionError
-from anytoolai_platform_core.quotas.models import QuotaDimension
 from anytoolai_platform_core.storage.db import (
     event_log_table,
     guest_quota_usage_table,
@@ -33,6 +32,7 @@ from test_scenario_runtime_api import (
     REPO_ROOT,
     _create_test_app,
     _start_payload,
+    _with_scenario_dimension,
 )
 
 POSTGRES_TEST_DATABASE_URL_ENV = "ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"
@@ -137,19 +137,7 @@ def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_indepe
         _upgrade_database(engine, test_url)
         session_factory = build_session_factory(engine)
         app = _create_test_app(session_factory)
-        registry = app.state.runtime.config_registry
-        policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
-        assert policy is not None
-        app.state.runtime = replace(
-            app.state.runtime,
-            config_registry=replace(
-                registry,
-                quotas={
-                    **dict(registry.quotas),
-                    policy.quota_policy_id: replace(policy, dimension=QuotaDimension.scenario),
-                },
-            ),
-        )
+        _with_scenario_dimension(app, "kernel_demo.guest_quota_v1")
         requests_per_scenario = 8
         scenario_ids = (
             "kernel_demo.single_action_smoke_v1",
