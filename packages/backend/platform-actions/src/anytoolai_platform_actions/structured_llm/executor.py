@@ -15,6 +15,7 @@ from anytoolai_platform_core.actions.executor import (
     ProviderCallInfo,
 )
 from anytoolai_platform_core.artifacts.service import ArtifactService
+from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.providers.gateway import ProviderGateway
 from anytoolai_platform_core.providers.models import ProviderRequest, ProviderResponse
@@ -193,8 +194,15 @@ class StructuredLlmActionExecutor:
                 scenario_session_id=request.scenario_session_id,
                 job_id=request.job_id,
                 action_run_id=request.action_run_id,
-                handoff_id=_metadata_str(request.metadata, "handoff_id"),
-                scenario_chain_id=_metadata_str(request.metadata, "scenario_chain_id"),
+                workflow_id=request.workflow_id,
+                workflow_version=request.workflow_version,
+                guest_id=request.guest_id,
+                user_id=request.user_id,
+                handoff_id=metadata_str(request.metadata, "handoff_id"),
+                scenario_chain_id=metadata_str(request.metadata, "scenario_chain_id"),
+                acquisition_source=metadata_str(request.metadata, "acquisition_source"),
+                action_type=request.action_type,
+                action_config_id=request.action_config_id,
             ),
             schema=schema_mapping,
             schema_ref=None if response_schema is None else response_schema.schema_ref,
@@ -227,8 +235,3 @@ class StructuredLlmActionExecutor:
                 metadata=dict(response.metadata),
             ),
         )
-
-
-def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
-    value = metadata.get(key)
-    return value if isinstance(value, str) and value else None

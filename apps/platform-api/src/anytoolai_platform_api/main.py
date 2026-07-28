@@ -131,6 +131,7 @@ def _safe_request_path(request: Request) -> str:
         r"(/v1/handoffs/)[^/]+",
         r"\1{handoff_token}",
         request.url.path,
+        flags=re.IGNORECASE,
     )
 
 

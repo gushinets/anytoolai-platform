@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from anytoolai_platform_core.artifacts.correlation import (
+    artifact_execution_context_from_record,
+)
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
-from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.replay import (
     ReplayTimestampSequencer,
@@ -29,7 +31,7 @@ class ArtifactService:
         self._register_recovery(stored)
         self._event_emitter.emit(
             "artifact.created",
-            _context_from_record(stored),
+            artifact_execution_context_from_record(stored),
             result_status=stored.status.value,
             properties={"artifact_type": stored.artifact_type},
         )
@@ -110,28 +112,6 @@ class ArtifactService:
                 metadata={} if metadata is None else dict(metadata),
             )
         )
-
-
-def _context_from_record(record: ArtifactRecord) -> ExecutionContext:
-    return ExecutionContext(
-        tenant_id=record.tenant_id,
-        region=record.region,
-        product_id=record.product_id,
-        frontend_id=record.frontend_id,
-        scenario_session_id=record.scenario_session_id,
-        job_id=record.job_id,
-        artifact_id=record.id,
-        action_run_id=record.action_run_id,
-        scenario_chain_id=_metadata_str(record.metadata, "scenario_chain_id"),
-        handoff_id=_metadata_str(record.metadata, "handoff_id"),
-    )
-
-
-def _metadata_str(metadata: dict[str, Any], key: str) -> str | None:
-    value = metadata.get(key)
-    return value if isinstance(value, str) and value else None
-
-
 def _recover_artifact_row_after_rollback(
     recovery_session_factory: Any,
     record: ArtifactRecord,
@@ -182,7 +162,7 @@ def _emit_recovered_artifact_created_event(
         return
     EventEmitter(event_log_repository).emit(
         "artifact.created",
-        _context_from_record(record),
+        artifact_execution_context_from_record(record),
         result_status=record.status.value,
         properties={"artifact_type": record.artifact_type},
         timestamp=(

@@ -78,8 +78,7 @@ This keeps fresh installs and already-upgraded databases on the same final schem
 `platform.product_handoffs` stores the hashed token, source and target dimensions, explicit policy,
 mapped context and preview JSON, safe failure code/metadata, and timestamps for every lifecycle
 state. It has a unique token hash, unique nullable target-session linkage, foreign keys to runtime
-sessions/jobs/artifacts, and indexes for definition, source session, target session, and
-status/expiry lookups.
+sessions/jobs/artifacts, and indexes for definition, source session, and status/expiry lookups.
 
 `HandoffRepository` follows the caller-owned transaction rule but deliberately does not expose a
 generic status-changing update. `mark_viewed`, `claim_accept`, `decline`, `expire_if_due`,
@@ -142,13 +141,13 @@ The implementation is split into four layers.
 
 ### 1. Migration layer
 
-`migrations/platform/versions/0001_runtime_tables.py` defines the durable schema for the runtime
-tables.
+`migrations/platform/versions/0001_runtime_tables.py` defines the durable schema for the initial
+runtime tables, and later revisions extend that shared storage slice with quota and handoff state.
 
 Responsibilities:
 
 - create the `platform` schema when the backend dialect supports schemas
-- create the original five execution runtime tables
+- create the original execution runtime tables
 - create indexes for common runtime lookups
 - define the initial enum constraints at the database level
 - support downgrade for the same tables
@@ -165,7 +164,7 @@ Responsibilities:
 
 - define `PLATFORM_SCHEMA`
 - define a shared `MetaData`
-- define all five `Table(...)` objects
+- define the shared runtime `Table(...)` objects, including guest identity, quota, and handoff state
 - define reusable SQLAlchemy types
 - expose a small engine factory
 
@@ -190,6 +189,9 @@ Each runtime entity has a small repository class:
 - `ActionRunRepository`
 - `ProviderCallRepository`
 - `ArtifactRepository`
+- `GuestIdentityRepository`
+- `QuotaUsageRepository`
+- `HandoffRepository`
 
 Repository responsibilities:
 
@@ -216,6 +218,8 @@ These records live next to the rest of the domain models:
 - `actions/models.py` -> `ActionRunRecord`
 - `providers/models.py` -> `ProviderCallRecord`
 - `artifacts/models.py` -> `ArtifactRecord`
+- `identity/models.py` -> `GuestIdentityRecord`
+- `handoffs/models.py` -> `HandoffRecord`
 
 This keeps the runtime storage surface aligned with the repo's existing model style.
 
@@ -703,7 +707,7 @@ What the tests cover:
 
 - migration applies on a clean database
 - required fields fail at the DB layer
-- create/read/update for all seven repositories
+- create/read/update for all runtime repositories
 - status transitions
 - artifact text storage
 - artifact JSON storage

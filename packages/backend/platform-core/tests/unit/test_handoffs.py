@@ -29,6 +29,7 @@ from anytoolai_platform_core.handoffs.service import (
     HandoffNotActionableError,
     HandoffService,
     HandoffSourceInvalidError,
+    _safe_error_code,
 )
 from anytoolai_platform_core.handoffs.tokens import HandoffTokenService
 from anytoolai_platform_core.identity.models import GuestIdentityRecord
@@ -518,6 +519,34 @@ def test_handoff_revalidates_full_source_artifact_before_mapping(tmp_path: Path)
             _create(_service(session, strict_registry), source_id, artifact_id)
 
 
+def test_handoff_rejects_malformed_target_input_schema(tmp_path: Path) -> None:
+    factory = _session_factory(tmp_path)
+    registry = build_config_registry(CONFIG_ROOT)
+    definition = registry.get_handoff("kernel_demo_source_to_target_v1")
+    assert definition is not None
+    target_scenario = registry.get_scenario(definition.target_scenario_id)
+    assert target_scenario is not None
+    target_workflow = registry.get_workflow(target_scenario.workflow_id)
+    assert target_workflow is not None
+    target_schema = registry.get_schema(target_workflow.input_schema_ref)
+    assert target_schema is not None
+    malformed_registry = replace(
+        registry,
+        schemas={
+            **registry.schemas,
+            target_schema.schema_ref: replace(
+                target_schema,
+                schema={"type": 123},
+            ),
+        },
+    )
+    with transaction_boundary(factory) as session:
+        source_id, artifact_id = _seed_source(session)
+
+        with pytest.raises(HandoffSourceInvalidError):
+            _create(_service(session, malformed_registry), source_id, artifact_id)
+
+
 def test_handoff_preview_is_allowlisted_and_bounded(tmp_path: Path) -> None:
     factory = _session_factory(tmp_path)
     registry = build_config_registry(CONFIG_ROOT)
@@ -566,13 +595,18 @@ def test_handoff_decline_expiry_and_deferred_target(tmp_path: Path) -> None:
                 AcceptHandoffCommand(tenant_id="anytoolai", region="default"),
             )
 
+    definition = registry.get_handoff("kernel_demo_source_to_target_v1")
+    assert definition is not None
     deferred_definition = replace(
-        registry.get_handoff("kernel_demo_source_to_target_v1"),
+        definition,
         target_start_policy=HandoffStartPolicy.deferred,
     )
     deferred_registry = replace(
         registry,
-        handoffs={deferred_definition.handoff_id: deferred_definition},
+        handoffs={
+            **dict(registry.handoffs),
+            deferred_definition.handoff_id: deferred_definition,
+        },
     )
     with transaction_boundary(factory) as session:
         source_id, artifact_id = _seed_source(session, guest_id="guest_deferred")
@@ -737,6 +771,48 @@ def test_quota_recovery_finalizes_failure_without_router_transaction(tmp_path: P
         assert repeated_event_types.count("handoff.failed") == 1
 
 
+def test_handoff_repository_mutations_are_tenant_region_scoped(tmp_path: Path) -> None:
+    factory = _session_factory(tmp_path)
+    registry = build_config_registry(CONFIG_ROOT)
+    with transaction_boundary(factory) as session:
+        source_id, artifact_id = _seed_source(session)
+        created = _create(_service(session, registry), source_id, artifact_id)
+        repository = HandoffRepository(session)
+
+        with pytest.raises(LookupError):
+            repository.mark_viewed(
+                created.preview.handoff_id,
+                datetime.now(UTC),
+                tenant_id="tenant_other",
+                region="default",
+            )
+
+        stored = repository.get_by_id(
+            created.preview.handoff_id,
+            tenant_id="anytoolai",
+            region="default",
+        )
+        assert stored is not None
+        assert stored.status is HandoffStatus.created
+
+
+@pytest.mark.parametrize(
+    ("raw_error_code", "expected"),
+    [
+        ("quota_exhausted", "quota_exhausted"),
+        ("Quota_Exhausted", "handoff_acceptance_failed"),
+        ("quota-exhausted", "handoff_acceptance_failed"),
+        ("quota exhausted", "handoff_acceptance_failed"),
+        ("квота_исчерпана", "handoff_acceptance_failed"),
+    ],
+)
+def test_safe_handoff_error_code_allows_only_ascii_lowercase_identifier(
+    raw_error_code: str,
+    expected: str,
+) -> None:
+    assert _safe_error_code(raw_error_code) == expected
+
+
 @pytest.mark.parametrize(
     "terminal_status",
     [
@@ -755,13 +831,13 @@ def test_expired_terminal_handoff_token_is_redacted_without_mutating_state(
     if terminal_status is HandoffStatus.accepted:
         definition = registry.get_handoff("kernel_demo_source_to_target_v1")
         assert definition is not None
-        deferred_definition = replace(
-            definition,
-            target_start_policy=HandoffStartPolicy.deferred,
-        )
+        deferred_definition = replace(definition, target_start_policy=HandoffStartPolicy.deferred)
         registry = replace(
             registry,
-            handoffs={deferred_definition.handoff_id: deferred_definition},
+            handoffs={
+                **dict(registry.handoffs),
+                deferred_definition.handoff_id: deferred_definition,
+            },
         )
 
     current = [datetime(2026, 7, 23, 12, 0, tzinfo=UTC)]

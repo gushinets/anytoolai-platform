@@ -146,6 +146,15 @@ def test_handoff_token_is_redacted_from_request_log_path() -> None:
     request.scope["route"] = SimpleNamespace(path="/v1/handoffs/{handoff_token}/accept")
     assert _safe_request_path(request) == "/v1/handoffs/{handoff_token}/accept"
 
+    mixed_case_scope = {
+        **scope,
+        "path": f"/V1/HANDOFFS/{token}/accept",
+        "raw_path": f"/V1/HANDOFFS/{token}/accept".encode(),
+    }
+    mixed_case_scope.pop("route", None)
+    mixed_case_request = Request(mixed_case_scope)
+    assert _safe_request_path(mixed_case_request) == "/V1/HANDOFFS/{handoff_token}/accept"
+
 
 def test_handoff_api_create_preview_accept_decline_and_expiry(tmp_path: Path) -> None:
     factory = _build_session_factory(tmp_path)

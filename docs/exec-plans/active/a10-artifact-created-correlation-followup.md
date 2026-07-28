@@ -1,0 +1,108 @@
+# Execution Plan: ANY-90 Artifact Correlation Follow-up
+
+## Status
+
+- State: active
+- Owner: Codex
+- Created: 2026-07-28
+- Last updated: 2026-07-28
+- Review date: 2026-07-28
+- Next action: secure a disposable PostgreSQL maintenance database URL if production-dialect concurrency proof must be rerun locally; the code and non-PostgreSQL validations are complete.
+- Blocker: no `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was configured in this environment, so the required PostgreSQL concurrency suite could only be executed as an explicit skip. `doctor` also remains blocked under the system Python because `pytest`, `yaml`, and `pydantic` are not installed there.
+
+## Goal
+
+Preserve every applicable runtime correlation dimension on `artifact.created` across normal
+artifact creation and rollback recovery while cleaning up overlapping handoff, quota, migration,
+docs, and validation-hardening debt that still affects this replacement PR surface.
+
+## Scope
+
+### In scope
+
+- Canonical artifact metadata helpers and replay reconstruction
+- Structured-output, action, and final-workflow artifact correlation propagation
+- Safe bounded artifact event metadata only
+- Handoff config/runtime consistency fixes that overlap this branch
+- Quota recovery helper cleanup without changing established ANY-88/ANY-89 behavior
+- Handoff migration deduplication and redundant-index cleanup
+- Docs, execution-plan, papercut, and targeted regression updates for still-valid review findings
+
+### Out of scope
+
+- Reordering or redesigning ANY-88 causal replay sequencing
+- Reordering or redesigning ANY-89 step-start replay semantics
+- Product-specific behavior in the generic artifact layer
+- New handoff FK indexes unless a failing query/test proves they are required
+
+## Reviewed
+
+- Core docs: `ARCHITECTURE.md`, `docs/index.md`, MVP scope, core beliefs, platform boundaries,
+  package layering, LLM runtime, MVP-A kernel, harness engineering map
+- Runtime docs: `docs/architecture/runtime-storage.md`, `docs/architecture/event-taxonomy.md`
+- Related work: ANY-15, ANY-88, ANY-89, PR `#23`, closed PR `#40`, current branch state
+- Current implementation areas: artifacts, structured output, workflow runner, handoffs, quotas,
+  scenarios, migrations, access logging, docs generation, PostgreSQL concurrency tests
+
+## Findings Status
+
+- `artifact.created` correlation replay is still incomplete and still valid.
+- Shared artifact metadata string/helper duplication is still present and still valid.
+- Mixed-case `/v1/handoffs/` path redaction fallback is still valid.
+- Runtime-storage inventory counts are stale and still valid.
+- A10 execution-plan accuracy needs a fresh plan file and truthful command recording; still valid.
+- Handoff required-field ordering before mapping normalization is still valid.
+- Handoff payload schema handling still misses `SchemaError`; still valid.
+- Safe handoff error-code allowlist is still too loose for non-ASCII lowercase; still valid.
+- PAPERCUTS has duplicate managed-environment notes; still valid.
+- Uvicorn access-log regression test should set `access_log=False` directly; still valid.
+- PostgreSQL quota concurrency test constants/helpers still need cleanup; still valid.
+- Handoff migrations still duplicate DDL and keep a redundant target-session index; still valid.
+- Structured handoff ownership/enablement diagnostics still need structured fields; still valid.
+- Generic YAML loader still contains handoff-specific duplicate scanning; still valid.
+- SafeLoader `# noqa: S506` is still missing; still valid.
+- Handoff event source/target selection still uses direct truthiness in one path; still valid.
+- Handoff repository mutations are not fully tenant/region scoped; still valid.
+- Quota recovery still constructs a throwaway quota service only to emit events; still valid.
+- `LinkedScenarioSessionResult.job` is still typed as `Any | None`; still valid.
+- Missing-job `result_ready` next-action flow still raises `RuntimeError`; still valid.
+- Handoff test-registry replacement still overwrites unrelated handoff definitions in some tests; still valid.
+- OpenAPI docs-generation test name still overstates its contract; still valid.
+- Full source-artifact revalidation before handoff mapping is already correct and must be preserved.
+- Additional handoff FK indexes from earlier review are outside coherent scope unless new evidence appears.
+
+## Implementation Steps
+
+- [x] Review docs, repository state, branch baseline, and prior review history.
+- [x] Verify each listed finding against the current branch and classify it.
+- [x] Add the shared artifact metadata helper module and route artifact replay through it.
+- [x] Expand structured-output persistence context and unify success/debug artifact metadata construction.
+- [x] Remove duplicated `_metadata_str` implementations and switch remaining callers to the shared helper.
+- [x] Apply handoff/config/runtime hardening updates that remain valid.
+- [x] Deduplicate handoff migration DDL and remove the redundant target-session index.
+- [x] Update runtime-storage/docs/PAPERCUTS/OpenAPI/exec-plan follow-up accuracy.
+- [x] Add or update targeted regression coverage for artifact correlation and still-valid hardening findings.
+- [ ] Run focused suites, PostgreSQL concurrency coverage, and repository validation commands in the required order.
+
+## Validation
+
+- [x] `python scripts/agent/runner.py doctor` attempted and truthfully recorded as blocked by missing system-Python dependencies (`pytest`, `yaml`, `pydantic`).
+- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_artifact_service.py packages/backend/platform-core/tests/unit/test_structured_output.py packages/backend/platform-core/tests/unit/test_workflow_runner.py -q`
+- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_handoffs.py packages/backend/platform-core/tests/unit/test_runtime_storage.py apps/platform-api/tests/test_access_logging.py tests/test_docs_generation.py -q`
+- [ ] `uv run python -m pytest packages/backend/platform-actions/tests/test_structured_llm_executor.py -q`
+- [ ] `uv run python -m pytest apps/platform-api/tests/test_handoffs_api.py -q`
+- [ ] `uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q` (executed and skipped because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` is unset)
+- [x] `python scripts/agent/runner.py validate-configs`
+- [x] `python scripts/agent/runner.py validate-architecture`
+- [x] `python scripts/agent/runner.py validate-docs`
+- [x] `python scripts/agent/runner.py generate-docs --check`
+- [x] `python scripts/agent/runner.py quick-check` (passed after rerunning with `PYTEST_ADDOPTS=--basetemp=.quick-check-tmp\\pytest-any90-final` to avoid a locked stale temp directory)
+
+## Progress Log
+
+| Date | Progress | Next |
+|---|---|---|
+| 2026-07-28 | Confirmed the local branch is effectively at `main`, reviewed ANY-15 / PR `#23` / closed PR `#40`, checked for conflict markers, and verified the current set of still-valid follow-up findings. | Create the fresh execution plan file and implement the shared artifact-correlation contract. |
+| 2026-07-28 | Ran the first two focused validation slices successfully: artifact/workflow tests and handoff/runtime-storage/access-log/docs tests both passed. | Finish implementation, extend the remaining targeted suites, then run the rest of the validation ladder. |
+| 2026-07-28 | Implemented the shared artifact-correlation helper path, expanded structured-output persistence metadata, removed duplicated metadata-string helpers, hardened handoff/config/quota/scenario code paths, deduplicated handoff migration DDL, and updated docs/tests. | Finish the validation ladder and record any remaining external blockers truthfully. |
+| 2026-07-28 | Focused artifact/workflow/action suites passed; focused handoff/config/runtime-storage/API/docs suites passed; `validate-configs`, `validate-architecture`, `validate-docs`, `generate-docs --check`, and `quick-check` passed. The PostgreSQL concurrency suite executed as an explicit skip because no disposable PostgreSQL maintenance URL was configured locally. | Report the completed implementation and the PostgreSQL-environment blocker clearly in the final handoff. |

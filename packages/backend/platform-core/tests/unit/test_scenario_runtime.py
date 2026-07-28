@@ -924,6 +924,38 @@ def test_record_next_action_rejects_non_actionable_processing_checkpoint(
             )
 
 
+def test_record_next_action_returns_safe_error_when_result_ready_job_is_missing(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        service = _runtime_service(session, config_registry=config_registry)
+        session_repository = ScenarioSessionRepository(session)
+        scenario = config_registry.get_scenario("kernel_demo.single_action_smoke_v1")
+        assert scenario is not None
+        started = session_repository.create(
+            ScenarioSessionRecord(
+                tenant_id="anytoolai",
+                region="default",
+                product_id="kernel_demo",
+                frontend_id="kernel_demo_ce",
+                scenario_id=scenario.scenario_id,
+                scenario_version=scenario.version,
+                status=ScenarioSessionStatus.completed,
+                current_checkpoint_id=RESULT_READY_CHECKPOINT_ID,
+            )
+        )
+
+        with pytest.raises(ScenarioCheckpointNotActionableError):
+            service.record_next_action(
+                started.id,
+                tenant_id="anytoolai",
+                region="default",
+                next_action_id="copy_result",
+                checkpoint_id=RESULT_READY_CHECKPOINT_ID,
+            )
+
+
 def test_get_session_snapshot_rejects_persisted_scenario_version_mismatch(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
     config_registry,

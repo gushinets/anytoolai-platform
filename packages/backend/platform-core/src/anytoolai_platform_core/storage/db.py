@@ -413,7 +413,6 @@ product_handoffs_table = sa.Table(
     ),
     sa.Index("ix_product_handoffs_definition", "handoff_definition_id"),
     sa.Index("ix_product_handoffs_source_session", "source_scenario_session_id"),
-    sa.Index("ix_product_handoffs_target_session", "target_scenario_session_id"),
     sa.Index("ix_product_handoffs_status_expiry", "status", "expires_at"),
 )
 

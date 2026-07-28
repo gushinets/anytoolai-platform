@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.hashing import digest_parts
+from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.common.ids import new_id
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
@@ -31,7 +32,10 @@ from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionSnapshot,
     ScenarioSessionStatus,
 )
-from anytoolai_platform_core.scenarios.next_actions import validate_next_action
+from anytoolai_platform_core.scenarios.next_actions import (
+    ScenarioCheckpointNotActionableError,
+    validate_next_action,
+)
 from anytoolai_platform_core.scenarios.repository import (
     MAX_IDEMPOTENCY_KEY_LENGTH,
     ScenarioSessionRepository,
@@ -468,7 +472,7 @@ class ScenarioRuntimeService:
             next_action_id=next_action_id,
         )
         if job is None:
-            raise RuntimeError("non-actionable session unexpectedly accepted a next action")
+            raise ScenarioCheckpointNotActionableError()
         self._event_emitter.emit(
             "client.next_action_clicked",
             ExecutionContext(
@@ -483,7 +487,7 @@ class ScenarioRuntimeService:
                 job_id=job.id,
                 workflow_id=job.workflow_id,
                 workflow_version=job.workflow_version,
-                acquisition_source=_metadata_str(job.metadata, "acquisition_source")
+                acquisition_source=metadata_str(job.metadata, "acquisition_source")
                 or session.frontend_id,
             ),
             properties={
@@ -824,8 +828,3 @@ def _event_context_from_record(
         handoff_id=context.handoff_id,
         acquisition_source=context.acquisition_source,
     )
-
-
-def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
-    value = metadata.get(key)
-    return value if isinstance(value, str) and value else None

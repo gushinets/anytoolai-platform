@@ -36,7 +36,6 @@ from test_scenario_runtime_api import (
 )
 
 POSTGRES_TEST_DATABASE_URL_ENV = "ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"
-SCENARIO_START_QUOTA_LIMIT = 3
 
 
 @pytest.mark.postgresql
@@ -57,7 +56,8 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
         _upgrade_database(engine, test_url)
         session_factory = build_session_factory(engine)
         app = _create_test_app(session_factory)
-        request_count = 16
+        quota_limit = _scenario_start_quota_limit(app)
+        request_count = max(quota_limit + 5, 8)
 
         async def start_many() -> list[httpx.Response]:
             transport = httpx.ASGITransport(app=app)
@@ -80,10 +80,10 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
         responses = asyncio.run(start_many())
         status_codes = [response.status_code for response in responses]
 
-        assert status_codes.count(HTTPStatus.OK) == SCENARIO_START_QUOTA_LIMIT
+        assert status_codes.count(HTTPStatus.OK) == quota_limit
         assert (
             status_codes.count(HTTPStatus.TOO_MANY_REQUESTS)
-            == request_count - SCENARIO_START_QUOTA_LIMIT
+            == request_count - quota_limit
         )
         assert all(
             response.json()["error"]["code"] == "quota_exhausted"
@@ -101,12 +101,12 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
             usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
             event_types = list(session.execute(sa.select(event_log_table.c.event_type)).scalars())
 
-        assert scenario_count == SCENARIO_START_QUOTA_LIMIT
-        assert job_count == SCENARIO_START_QUOTA_LIMIT
-        assert usage["used_count"] == SCENARIO_START_QUOTA_LIMIT
-        assert usage["limit_count"] == SCENARIO_START_QUOTA_LIMIT
-        assert event_types.count("quota.consumed") == SCENARIO_START_QUOTA_LIMIT
-        assert event_types.count("quota.exhausted") == request_count - SCENARIO_START_QUOTA_LIMIT
+        assert scenario_count == quota_limit
+        assert job_count == quota_limit
+        assert usage["used_count"] == quota_limit
+        assert usage["limit_count"] == quota_limit
+        assert event_types.count("quota.consumed") == quota_limit
+        assert event_types.count("quota.exhausted") == request_count - quota_limit
     finally:
         engine.dispose()
         _drop_database(maintenance_url, database_name)
@@ -375,19 +375,7 @@ def test_postgresql_parallel_exhausted_handoff_accept_recovers_quota_once() -> N
         _upgrade_database(engine, test_url)
         session_factory = build_session_factory(engine)
         app = _create_test_app(session_factory)
-        registry = app.state.runtime.config_registry
-        policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
-        assert policy is not None
-        app.state.runtime = replace(
-            app.state.runtime,
-            config_registry=replace(
-                registry,
-                quotas={
-                    **dict(registry.quotas),
-                    policy.quota_policy_id: replace(policy, limit_count=0),
-                },
-            ),
-        )
+        _force_zero_guest_quota(app)
         with transaction_boundary(session_factory) as session:
             source_session_id, artifact_id = _seed_handoff_source(session)
         created = _create_handoff(app, source_session_id, artifact_id).json()
@@ -479,19 +467,7 @@ def test_postgresql_quota_recovery_finalizes_without_router_transaction() -> Non
         _upgrade_database(engine, test_url)
         session_factory = build_session_factory(engine)
         app = _create_test_app(session_factory)
-        registry = app.state.runtime.config_registry
-        policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
-        assert policy is not None
-        app.state.runtime = replace(
-            app.state.runtime,
-            config_registry=replace(
-                registry,
-                quotas={
-                    **dict(registry.quotas),
-                    policy.quota_policy_id: replace(policy, limit_count=0),
-                },
-            ),
-        )
+        _force_zero_guest_quota(app)
         with transaction_boundary(session_factory) as session:
             source_session_id, artifact_id = _seed_handoff_source(session)
         created = _create_handoff(app, source_session_id, artifact_id).json()
@@ -631,3 +607,26 @@ def _drop_database(maintenance_url: URL, database_name: str) -> None:
 
 def _quote_identifier(value: str) -> str:
     return '"' + value.replace('"', '""') + '"'
+
+
+def _scenario_start_quota_limit(app) -> int:
+    registry = app.state.runtime.config_registry
+    policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
+    assert policy is not None
+    return policy.limit_count
+
+
+def _force_zero_guest_quota(app) -> None:
+    registry = app.state.runtime.config_registry
+    policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
+    assert policy is not None
+    app.state.runtime = replace(
+        app.state.runtime,
+        config_registry=replace(
+            registry,
+            quotas={
+                **dict(registry.quotas),
+                policy.quota_policy_id: replace(policy, limit_count=0),
+            },
+        ),
+    )

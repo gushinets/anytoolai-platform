@@ -123,7 +123,7 @@ def load_yaml_file(path: Path) -> dict[str, Any]:
     loader_class = _build_unique_key_yaml_loader(path)
     try:
         with path.open("r", encoding="utf-8") as handle:
-            data = yaml.load(handle, Loader=loader_class) or {}
+            data = yaml.load(handle, Loader=loader_class) or {}  # noqa: S506 - loader_class is a SafeLoader subclass
     except yaml.YAMLError as exc:
         raise InvalidConfigShapeError(
             path,
@@ -305,18 +305,7 @@ def _build_unique_key_yaml_loader(
     file_path: Path,
 ) -> type[yaml.SafeLoader]:
     class _UniqueKeySafeLoader(yaml.SafeLoader):
-        def construct_document(self, node: yaml.nodes.Node) -> Any:
-            duplicate = _find_handoff_mapping_target_duplicate(node)
-            if duplicate is not None:
-                handoff_id, field_name, target_path = duplicate
-                raise InvalidConfigShapeError(
-                    file_path,
-                    f"Handoff {field_name} target path is duplicated: {target_path}",
-                    config_id=handoff_id,
-                    ref_type=field_name,
-                    ref_value=target_path,
-                )
-            return super().construct_document(node)
+        pass
 
     def _construct_mapping(
         loader: yaml.SafeLoader,
@@ -341,51 +330,6 @@ def _build_unique_key_yaml_loader(
         _construct_mapping,
     )
     return _UniqueKeySafeLoader
-
-
-def _find_handoff_mapping_target_duplicate(
-    root: yaml.nodes.Node,
-) -> tuple[str | None, str, str] | None:
-    handoffs = _yaml_mapping_value(root, "handoffs")
-    if not isinstance(handoffs, yaml.nodes.SequenceNode):
-        return None
-    for handoff in handoffs.value:
-        if not isinstance(handoff, yaml.nodes.MappingNode):
-            continue
-        handoff_id_node = _yaml_mapping_value(handoff, "handoff_id")
-        handoff_id = (
-            handoff_id_node.value
-            if isinstance(handoff_id_node, yaml.nodes.ScalarNode)
-            else None
-        )
-        for field_name in ("context_mapping", "preview_mapping"):
-            mapping = _yaml_mapping_value(handoff, field_name)
-            if not isinstance(mapping, yaml.nodes.MappingNode):
-                continue
-            seen_targets: set[str] = set()
-            for target_node, _source_node in mapping.value:
-                if (
-                    not isinstance(target_node, yaml.nodes.ScalarNode)
-                    or target_node.tag != "tag:yaml.org,2002:str"
-                ):
-                    continue
-                target_path = target_node.value
-                if target_path in seen_targets:
-                    return handoff_id, field_name, target_path
-                seen_targets.add(target_path)
-    return None
-
-
-def _yaml_mapping_value(
-    node: yaml.nodes.Node,
-    key: str,
-) -> yaml.nodes.Node | None:
-    if not isinstance(node, yaml.nodes.MappingNode):
-        return None
-    for key_node, value_node in node.value:
-        if isinstance(key_node, yaml.nodes.ScalarNode) and key_node.value == key:
-            return value_node
-    return None
 
 
 def _handoff_mapping(
@@ -1705,6 +1649,21 @@ class ConfigLoader:
                 target_scenario_id = handoff_data.get("target_scenario_id")
                 target_start_policy = handoff_data.get("target_start_policy")
                 consent_required = handoff_data.get("consent_required")
+                if not all(
+                    [
+                        handoff_id,
+                        source_product_id,
+                        source_scenario_id,
+                        target_product_id,
+                        target_frontend_id,
+                        target_scenario_id,
+                        target_start_policy,
+                    ]
+                ):
+                    raise InvalidConfigShapeError(
+                        path,
+                        f"Handoff missing required fields: {handoff_data}",
+                    )
                 context_mapping = _handoff_mapping(
                     handoff_data.get("context_mapping"),
                     field_name="context_mapping",
@@ -1722,21 +1681,6 @@ class ConfigLoader:
                     ref_value=_stringify_config_value(handoff_data.get("preview_mapping")),
                 )
 
-                if not all(
-                    [
-                        handoff_id,
-                        source_product_id,
-                        source_scenario_id,
-                        target_product_id,
-                        target_frontend_id,
-                        target_scenario_id,
-                        target_start_policy,
-                    ]
-                ):
-                    raise InvalidConfigShapeError(
-                        path,
-                        f"Handoff missing required fields: {handoff_data}",
-                    )
                 if consent_required is not True:
                     raise InvalidConfigShapeError(
                         path,
@@ -2112,6 +2056,9 @@ class ConfigLoader:
                     InvalidConfigShapeError(
                         source_path,
                         f"Handoff source scenario is not owned by product: {handoff_id}",
+                        config_id=handoff_id,
+                        ref_type="source_scenario_id",
+                        ref_value=handoff.source_scenario_id,
                     )
                 )
             if target_product is not None:
@@ -2120,6 +2067,9 @@ class ConfigLoader:
                         InvalidConfigShapeError(
                             source_path,
                             f"Handoff target scenario is not owned by product: {handoff_id}",
+                            config_id=handoff_id,
+                            ref_type="target_scenario_id",
+                            ref_value=handoff.target_scenario_id,
                         )
                     )
                 enabled_frontends = {
@@ -2132,6 +2082,9 @@ class ConfigLoader:
                         InvalidConfigShapeError(
                             source_path,
                             f"Handoff target frontend is not enabled: {handoff.target_frontend_id}",
+                            config_id=handoff_id,
+                            ref_type="target_frontend_id",
+                            ref_value=handoff.target_frontend_id,
                         )
                     )
             self._validate_reference(

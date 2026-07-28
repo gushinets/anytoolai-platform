@@ -18,6 +18,7 @@ from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import _emit_recovered_artifact_created_event
 from anytoolai_platform_core.common.errors import PlatformError
+from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
@@ -445,21 +446,16 @@ def _context_from_record(record: ActionRunRecord) -> ExecutionContext:
         workflow_id=record.workflow_id,
         workflow_version=_metadata_int(record.metadata, "workflow_version"),
         step_id=record.step_id,
-        guest_id=_metadata_str(record.metadata, "guest_id"),
-        user_id=_metadata_str(record.metadata, "user_id"),
-        scenario_chain_id=_metadata_str(record.metadata, "scenario_chain_id"),
+        guest_id=metadata_str(record.metadata, "guest_id"),
+        user_id=metadata_str(record.metadata, "user_id"),
+        scenario_chain_id=metadata_str(record.metadata, "scenario_chain_id"),
         action_type=record.action_type,
         action_config_id=record.action_config_id,
         action_run_id=record.id,
-        provider_policy_ref=_metadata_str(record.metadata, "provider_policy_ref"),
-        handoff_id=_metadata_str(record.metadata, "handoff_id"),
-        acquisition_source=_metadata_str(record.metadata, "acquisition_source"),
+        provider_policy_ref=metadata_str(record.metadata, "provider_policy_ref"),
+        handoff_id=metadata_str(record.metadata, "handoff_id"),
+        acquisition_source=metadata_str(record.metadata, "acquisition_source"),
     )
-
-
-def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
-    value = metadata.get(key)
-    return value if isinstance(value, str) and value else None
 
 
 def _metadata_int(metadata: Mapping[str, Any], key: str) -> int | None:

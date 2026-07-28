@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from jsonschema import SchemaError
 from jsonschema import ValidationError as JsonSchemaValidationError
 from jsonschema import validate as validate_json_schema
 
@@ -140,7 +141,7 @@ class HandoffPayloadBuilder:
             normalized_schema = normalize_schema_mapping(target_schema.schema)
             assert normalized_schema is not None
             validate_json_schema(instance=context_payload, schema=normalized_schema)
-        except JsonSchemaValidationError as exc:
+        except (JsonSchemaValidationError, SchemaError) as exc:
             raise HandoffPayloadError(
                 "mapped handoff context is invalid for target workflow"
             ) from exc
