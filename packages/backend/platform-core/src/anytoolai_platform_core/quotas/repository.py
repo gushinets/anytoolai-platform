@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, replace
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -20,6 +21,16 @@ EXPECTED_USAGE_DIMENSION_CONSTRAINT = "uq_guest_quota_usage_dimension"
 # constraint's column list.
 SQLITE_USAGE_DIMENSION_COLUMNS: tuple[str, ...] = unique_constraint_columns(
     guest_quota_usage_table, EXPECTED_USAGE_DIMENSION_CONSTRAINT
+)
+USAGE_DIMENSION_CONFLICT_COLUMNS = (
+    guest_quota_usage_table.c.tenant_id,
+    guest_quota_usage_table.c.region,
+    guest_quota_usage_table.c.guest_id,
+    guest_quota_usage_table.c.product_id,
+    guest_quota_usage_table.c.quota_policy_id,
+    guest_quota_usage_table.c.quota_dimension,
+    guest_quota_usage_table.c.dimension_key,
+    guest_quota_usage_table.c.period_key,
 )
 
 
@@ -164,14 +175,7 @@ class QuotaUsageRepository:
             limit_count=limit_count,
             metadata=dict(metadata or {}),
         )
-        try:
-            with self._session.begin_nested():
-                self._session.execute(
-                    sa.insert(guest_quota_usage_table).values(asdict(record))
-                )
-        except IntegrityError as exc:
-            if not _is_expected_usage_dimension_race(exc):
-                raise
+        self._execute_usage_insert(record)
         self._session.flush()
 
         stored = self.get_by_dimension(
@@ -185,6 +189,33 @@ class QuotaUsageRepository:
             period_key=period_key,
         )
         return _require_stored_usage(stored, record.id, "ensure")
+
+    def _execute_usage_insert(self, record: QuotaUsageRecord) -> None:
+        values = asdict(record)
+        dialect_name = self._session.get_bind().dialect.name
+        if dialect_name == "postgresql":
+            self._session.execute(
+                postgresql.insert(guest_quota_usage_table)
+                .values(values)
+                .on_conflict_do_nothing(index_elements=USAGE_DIMENSION_CONFLICT_COLUMNS)
+            )
+            return
+        if dialect_name == "sqlite":
+            self._session.execute(
+                sqlite.insert(guest_quota_usage_table)
+                .values(values)
+                .on_conflict_do_nothing(index_elements=USAGE_DIMENSION_CONFLICT_COLUMNS)
+            )
+            return
+
+        try:
+            with self._session.begin_nested():
+                self._session.execute(
+                    sa.insert(guest_quota_usage_table).values(values)
+                )
+        except IntegrityError as exc:
+            if not _is_expected_usage_dimension_race(exc):
+                raise
 
     def consume_if_available(self, record: QuotaUsageRecord) -> QuotaUsageRecord | None:
         result = self._session.execute(

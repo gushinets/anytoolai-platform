@@ -223,6 +223,7 @@ def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_indepe
             "kernel_demo.single_action_smoke_v1",
             "kernel_demo.multi_step_workflow_smoke_v1",
         ]
+        assert len(set(scenario_ids)) == 2
         requests_per_scenario = max(scenario_quota_limit + 5, 8)
         requests: list[tuple[str, int]] = [
             (scenario_id, index)
@@ -267,6 +268,10 @@ def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_indepe
         assert status_codes.count(HTTPStatus.OK) == expected_ok
         assert status_codes.count(HTTPStatus.TOO_MANY_REQUESTS) == expected_rejected
         assert all(
+            status_code in {HTTPStatus.OK, HTTPStatus.TOO_MANY_REQUESTS}
+            for status_code in status_codes
+        )
+        assert all(
             response.json()["error"]["code"] == "quota_exhausted"
             for _scenario_id, response in scenario_responses
             if response.status_code == HTTPStatus.TOO_MANY_REQUESTS
@@ -298,6 +303,7 @@ def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_indepe
                     )
                 ).mappings()
             )
+            event_types = list(session.execute(sa.select(event_log_table.c.event_type)).scalars())
 
         assert scenario_count == expected_ok
         assert job_count == expected_ok
@@ -311,6 +317,8 @@ def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_indepe
             assert usage["scenario_id"] == scenario_id
             assert usage["used_count"] == scenario_quota_limit
             assert usage["limit_count"] == scenario_quota_limit
+        assert event_types.count("quota.consumed") == expected_ok
+        assert event_types.count("quota.exhausted") == expected_rejected
     finally:
         engine.dispose()
         _drop_database(maintenance_url, database_name)
