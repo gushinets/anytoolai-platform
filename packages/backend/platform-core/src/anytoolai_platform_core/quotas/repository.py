@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, replace
 
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql, sqlite
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -200,14 +200,6 @@ class QuotaUsageRepository:
                 .on_conflict_do_nothing(index_elements=USAGE_DIMENSION_CONFLICT_COLUMNS)
             )
             return
-        if dialect_name == "sqlite":
-            self._session.execute(
-                sqlite.insert(guest_quota_usage_table)
-                .values(values)
-                .on_conflict_do_nothing(index_elements=USAGE_DIMENSION_CONFLICT_COLUMNS)
-            )
-            return
-
         try:
             with self._session.begin_nested():
                 self._session.execute(
