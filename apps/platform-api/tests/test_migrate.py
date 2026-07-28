@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import os
+import sys
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
+from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from anytoolai_platform_api import migrate
+from sqlalchemy import event
 from sqlalchemy.engine import URL, make_url
 
 POSTGRES_TEST_DATABASE_URL_ENV = "ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"
@@ -86,6 +90,10 @@ def _expected_head_revision() -> str:
     return ScriptDirectory.from_config(config).get_current_head()
 
 
+def _sqlite_url(database_path: Path) -> str:
+    return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
+
+
 @pytest.mark.postgresql
 @pytest.mark.slow
 def test_main_upgrades_a_real_postgresql_database_to_head(monkeypatch) -> None:
@@ -123,3 +131,43 @@ def test_main_upgrades_a_real_postgresql_database_to_head(monkeypatch) -> None:
                 connection.execute(sa.text(f'DROP DATABASE IF EXISTS "{database_name}"'))
         finally:
             admin_engine.dispose()
+
+
+def test_alembic_env_adds_repo_root_for_shared_migration_helpers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    main_db = tmp_path / "migrate-main.sqlite3"
+    platform_db = tmp_path / "migrate-platform.sqlite3"
+    engine = sa.create_engine(_sqlite_url(main_db), future=True)
+
+    @event.listens_for(engine, "connect")
+    def attach_platform_schema(dbapi_connection, connection_record) -> None:  # type: ignore[no-untyped-def]
+        del connection_record
+        dbapi_connection.execute(
+            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
+        )
+
+    monkeypatch.chdir(tmp_path)
+    repo_root = str(migrate.REPO_ROOT.resolve())
+    monkeypatch.setattr(
+        sys,
+        "path",
+        [entry for entry in sys.path if Path(entry or ".").resolve() != Path(repo_root)],
+    )
+
+    alembic_config = Config()
+    alembic_config.set_main_option("script_location", str(migrate.MIGRATIONS_SCRIPT_LOCATION))
+    alembic_config.set_main_option("sqlalchemy.url", _sqlite_url(main_db))
+
+    try:
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "head")
+
+        with engine.connect() as connection:
+            version = connection.execute(sa.text("SELECT version_num FROM alembic_version")).scalar_one()
+    finally:
+        engine.dispose()
+
+    assert version == _expected_head_revision()
