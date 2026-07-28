@@ -89,8 +89,8 @@ docs, and validation-hardening debt that still affects this replacement PR surfa
 - [x] `python scripts/agent/runner.py doctor` attempted and truthfully recorded as blocked by missing system-Python dependencies (`pytest`, `yaml`, `pydantic`).
 - [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_artifact_service.py packages/backend/platform-core/tests/unit/test_structured_output.py packages/backend/platform-core/tests/unit/test_workflow_runner.py -q`
 - [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_handoffs.py packages/backend/platform-core/tests/unit/test_runtime_storage.py apps/platform-api/tests/test_access_logging.py tests/test_docs_generation.py -q`
-- [ ] `uv run python -m pytest packages/backend/platform-actions/tests/test_structured_llm_executor.py -q`
-- [ ] `uv run python -m pytest apps/platform-api/tests/test_handoffs_api.py -q`
+- [x] `uv run python -m pytest packages/backend/platform-actions/tests/test_structured_llm_executor.py -q`
+- [x] `uv run python -m pytest apps/platform-api/tests/test_handoffs_api.py -q`
 - [ ] `uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q` (executed and skipped because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` is unset)
 - [x] `python scripts/agent/runner.py validate-configs`
 - [x] `python scripts/agent/runner.py validate-architecture`

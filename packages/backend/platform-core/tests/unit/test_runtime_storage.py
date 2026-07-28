@@ -666,6 +666,57 @@ def test_scenario_session_idempotency_null_key_does_not_dedupe(
         ) is not None
 
 
+def test_handoff_index_compatibility_revision_replaces_legacy_target_session_index(
+    tmp_path: Path,
+) -> None:
+    main_db = tmp_path / "handoff-index-compat-main.sqlite3"
+    platform_db = tmp_path / "handoff-index-compat-platform.sqlite3"
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(sqlite_url(main_db))
+
+    try:
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "0009")
+            connection.execute(sa.text("DROP INDEX platform.ix_product_handoffs_status_expiry"))
+            connection.execute(
+                sa.text(
+                    "CREATE INDEX platform.ix_product_handoffs_target_session "
+                    "ON product_handoffs (target_scenario_session_id)"
+                )
+            )
+
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "head")
+            upgraded_indexes = {
+                index["name"]
+                for index in sa.inspect(connection).get_indexes(
+                    "product_handoffs",
+                    schema="platform",
+                )
+            }
+
+        assert "ix_product_handoffs_target_session" not in upgraded_indexes
+        assert "ix_product_handoffs_status_expiry" in upgraded_indexes
+
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.downgrade(alembic_config, "0009")
+            downgraded_indexes = {
+                index["name"]
+                for index in sa.inspect(connection).get_indexes(
+                    "product_handoffs",
+                    schema="platform",
+                )
+            }
+
+        assert "ix_product_handoffs_target_session" in downgraded_indexes
+        assert "ix_product_handoffs_status_expiry" not in downgraded_indexes
+    finally:
+        engine.dispose()
+
+
 def test_repositories_respect_explicit_transaction_boundary(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

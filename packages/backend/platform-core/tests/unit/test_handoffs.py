@@ -771,21 +771,211 @@ def test_quota_recovery_finalizes_failure_without_router_transaction(tmp_path: P
         assert repeated_event_types.count("handoff.failed") == 1
 
 
-def test_handoff_repository_mutations_are_tenant_region_scoped(tmp_path: Path) -> None:
+def _create_target_runtime_for_handoff(
+    session,
+    handoff,
+) -> tuple[ScenarioSessionRecord, JobRecord]:
+    target_session = ScenarioSessionRepository(session).create(
+        ScenarioSessionRecord(
+            tenant_id=handoff.tenant_id,
+            region=handoff.region,
+            product_id=handoff.target_product_id,
+            frontend_id=handoff.target_frontend_id,
+            scenario_id=handoff.target_scenario_id,
+            scenario_version=1,
+            status=ScenarioSessionStatus.started,
+            parent_scenario_session_id=handoff.source_scenario_session_id,
+        )
+    )
+    target_job = JobRepository(session).create(
+        JobRecord(
+            tenant_id=handoff.tenant_id,
+            region=handoff.region,
+            product_id=handoff.target_product_id,
+            frontend_id=handoff.target_frontend_id,
+            scenario_session_id=target_session.id,
+            workflow_id="kernel_demo.single_action_extract_v1",
+            workflow_version=1,
+        )
+    )
+    return target_session, target_job
+
+
+def _prepare_scoped_mutation_case(
+    session,
+    repository: HandoffRepository,
+    handoff_id: str,
+    operation: str,
+) -> tuple[object, dict[str, object]]:
+    now = datetime.now(UTC)
+    stored = repository.get_by_id(handoff_id, tenant_id="anytoolai", region="default")
+    assert stored is not None
+    if operation == "mark_viewed":
+        return stored, {"now": now}
+    if operation == "claim_accept":
+        return stored, {
+            "now": now,
+            "accepted_by_guest_id": "guest_accept",
+            "accepted_from_frontend_instance_id": "frontend_instance_accept",
+        }
+    if operation == "attach_target":
+        accepted = repository.claim_accept(
+            handoff_id,
+            now,
+            tenant_id="anytoolai",
+            region="default",
+            accepted_by_guest_id="guest_accept",
+            accepted_from_frontend_instance_id="frontend_instance_accept",
+        )
+        assert accepted is not None
+        target_session, target_job = _create_target_runtime_for_handoff(session, accepted)
+        return accepted, {
+            "now": now,
+            "target_scenario_session_id": target_session.id,
+            "target_job_id": target_job.id,
+        }
+    if operation == "decline":
+        return stored, {"now": now}
+    if operation == "expire_if_due":
+        return stored, {"now": stored.expires_at + timedelta(seconds=1)}
+    if operation == "consume":
+        accepted = repository.claim_accept(
+            handoff_id,
+            now,
+            tenant_id="anytoolai",
+            region="default",
+            accepted_by_guest_id="guest_accept",
+            accepted_from_frontend_instance_id="frontend_instance_accept",
+        )
+        assert accepted is not None
+        target_session, target_job = _create_target_runtime_for_handoff(session, accepted)
+        repository.attach_target(
+            handoff_id,
+            tenant_id="anytoolai",
+            region="default",
+            target_scenario_session_id=target_session.id,
+            target_job_id=target_job.id,
+            now=now,
+        )
+        expected = repository.get_by_id(handoff_id, tenant_id="anytoolai", region="default")
+        assert expected is not None
+        return expected, {
+            "now": now,
+            "target_job_id": target_job.id,
+        }
+    if operation == "mark_failed":
+        return stored, {"now": now, "error_code": "handoff_acceptance_failed"}
+    if operation == "finalize_quota_failure_recovery":
+        return stored, {"now": now, "error_code": "quota_exhausted"}
+    raise AssertionError(f"unexpected operation: {operation}")
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        "mark_viewed",
+        "claim_accept",
+        "attach_target",
+        "decline",
+        "expire_if_due",
+        "consume",
+        "mark_failed",
+        "finalize_quota_failure_recovery",
+    ],
+)
+@pytest.mark.parametrize(
+    ("tenant_id", "region"),
+    [
+        ("tenant_other", "default"),
+        ("anytoolai", "region_other"),
+    ],
+    ids=["wrong-tenant", "wrong-region"],
+)
+def test_handoff_repository_mutations_are_tenant_region_scoped(
+    tmp_path: Path,
+    operation: str,
+    tenant_id: str,
+    region: str,
+) -> None:
     factory = _session_factory(tmp_path)
     registry = build_config_registry(CONFIG_ROOT)
     with transaction_boundary(factory) as session:
         source_id, artifact_id = _seed_source(session)
         created = _create(_service(session, registry), source_id, artifact_id)
         repository = HandoffRepository(session)
+        expected_record, mutation_kwargs = _prepare_scoped_mutation_case(
+            session,
+            repository,
+            created.preview.handoff_id,
+            operation,
+        )
 
-        with pytest.raises(LookupError):
-            repository.mark_viewed(
-                created.preview.handoff_id,
-                datetime.now(UTC),
-                tenant_id="tenant_other",
-                region="default",
+        if operation == "mark_viewed":
+            with pytest.raises(LookupError):
+                repository.mark_viewed(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+        elif operation == "claim_accept":
+            assert (
+                repository.claim_accept(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+                is None
             )
+        elif operation == "attach_target":
+            with pytest.raises(LookupError):
+                repository.attach_target(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+        elif operation == "decline":
+            with pytest.raises(LookupError):
+                repository.decline(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+        elif operation == "expire_if_due":
+            with pytest.raises(LookupError):
+                repository.expire_if_due(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+        elif operation == "consume":
+            with pytest.raises(LookupError):
+                repository.consume(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+        elif operation == "mark_failed":
+            with pytest.raises(LookupError):
+                repository.mark_failed(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+        else:
+            with pytest.raises(LookupError):
+                repository.finalize_quota_failure_recovery(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
 
         stored = repository.get_by_id(
             created.preview.handoff_id,
@@ -793,7 +983,7 @@ def test_handoff_repository_mutations_are_tenant_region_scoped(tmp_path: Path) -
             region="default",
         )
         assert stored is not None
-        assert stored.status is HandoffStatus.created
+        assert stored == expected_record
 
 
 @pytest.mark.parametrize(

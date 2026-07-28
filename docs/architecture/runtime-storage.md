@@ -26,6 +26,7 @@ The runtime storage slice lives in these files:
 - `migrations/platform/versions/0005_provider_calls_error_message_safe.py`
 - `migrations/platform/versions/0007_guest_quota_dimension.py`
 - `migrations/platform/versions/0008_handoffs_compat.py`
+- `migrations/platform/versions/0009_handoffs_index_compat.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/db.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/transactions.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/scenarios/repository.py`
@@ -70,6 +71,9 @@ For the Provider Gateway ADR-0007 realignment:
 - `0008_handoffs_compat.py` creates that table only when absent, repairing databases stamped past
   the historical placeholder `0004`; its downgrade is intentionally a no-op so downgrading a
   compatibility marker never destroys backend-owned handoff history
+- `0009_handoffs_index_compat.py` repairs already-upgraded handoff tables by dropping the obsolete
+  target-session index and ensuring the canonical `status + expires_at` index exists; its downgrade
+  restores the legacy target-session index for the historical revision boundary
 
 This keeps fresh installs and already-upgraded databases on the same final schema.
 
