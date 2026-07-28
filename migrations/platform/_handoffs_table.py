@@ -89,6 +89,12 @@ def create_product_handoffs_table(
         schema=platform_schema,
     )
     op.create_index(
+        "ix_product_handoffs_target_session",
+        "product_handoffs",
+        ["target_scenario_session_id"],
+        schema=platform_schema,
+    )
+    op.create_index(
         "ix_product_handoffs_status_expiry",
         "product_handoffs",
         ["status", "expires_at"],
