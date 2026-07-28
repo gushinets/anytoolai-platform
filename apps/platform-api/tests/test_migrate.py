@@ -145,7 +145,8 @@ def test_alembic_env_adds_repo_root_for_shared_migration_helpers(
     def attach_platform_schema(dbapi_connection, connection_record) -> None:  # type: ignore[no-untyped-def]
         del connection_record
         dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
+            "ATTACH DATABASE ? AS platform",
+            (str(platform_db.resolve()),),
         )
 
     monkeypatch.chdir(tmp_path)
