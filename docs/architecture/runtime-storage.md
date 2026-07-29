@@ -167,6 +167,11 @@ revisions that inspect live schema state remain online-only in practice; during 
 generation they either no-op because the baseline revisions already own the final schema or emit the
 canonical handoff-index cleanup SQL needed for fresh-install `head` output.
 
+For `product_handoffs` migration helpers specifically, new shared table/index existence logic
+belongs in `migrations/platform/_handoffs_table.py`. Historical compatibility revision `0008`
+intentionally keeps its inline schema-qualified `has_table(...)` guard so the revision remains
+self-contained and does not gain a new dependency on mutable helper code after release.
+
 ### 2. Shared SQLAlchemy table layer
 
 `packages/backend/platform-core/src/anytoolai_platform_core/storage/db.py` is the shared storage
@@ -683,16 +688,25 @@ The test approach is important:
 
 - it runs the real Alembic migration chain through `head`
 - it verifies CRUD against the migrated schema
-- it uses SQLite for lightweight CI compatibility
-- it attaches a second SQLite database as the `platform` schema so schema-qualified table names are
-  still exercised
+- it provisions a disposable PostgreSQL database from
+  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`
+- it exercises the real `platform` schema layout against the production dialect instead of a
+  SQLite compatibility harness
 
-For quota concurrency, SQLite coverage is not treated as production proof. PostgreSQL is the real
-runtime database, so the production-semantics check lives in:
+Run the runtime-storage suite with a PostgreSQL maintenance database URL:
+
+```powershell
+$env:ANYTOOLAI_POSTGRES_TEST_DATABASE_URL = "postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres"
+uv run python -m pytest packages/backend/platform-core/tests/unit/test_runtime_storage.py -m "slow and postgresql" -q
+```
+
+The suite creates and drops disposable databases, applies the real Alembic migration chain, then
+verifies repository CRUD, schema constraints, compatibility upgrades, and explicit transaction
+behavior against PostgreSQL.
+
+Quota concurrency remains a separate PostgreSQL production-semantics check in:
 
 - `apps/platform-api/tests/test_quota_concurrency_postgresql.py`
-
-Run it with a PostgreSQL maintenance database URL:
 
 ```powershell
 $env:ANYTOOLAI_POSTGRES_TEST_DATABASE_URL = "postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres"
@@ -706,10 +720,11 @@ for later starts, and keep session/job/quota/event counts consistent.
 
 The backend GitHub Actions workflow also runs this PostgreSQL test in the dedicated
 `postgresql-quota-concurrency` job with a disposable PostgreSQL service. That job is the required
-production-dialect proof; quick-check remains intentionally DB-free and fast.
+production-dialect concurrency proof. Runtime-storage CRUD and migration coverage now also belongs
+to the PostgreSQL-backed path; `quick-check` remains intentionally DB-free and fast.
 
 `python scripts/agent/runner.py quick-check` excludes `slow` tests with `-m "not slow"` so the
-required fast path stays deterministic. Run SQLite/ASGI stress checks intentionally with:
+required fast path stays deterministic. Run the separate ASGI stress checks intentionally with:
 
 ```powershell
 uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_stress.py -m slow -q
@@ -725,28 +740,27 @@ What the tests cover:
 - artifact JSON storage
 - explicit transaction-boundary behavior
 
-SQLite tests give strong fast-path coverage of the implemented SQLAlchemy layer while keeping the
-repo's current baseline checks fast and local. They do not replace the PostgreSQL integration test
-for concurrency semantics.
+These checks now validate the implemented SQLAlchemy layer on the same PostgreSQL dialect used by
+runtime state in production.
 
 ## Known Compromises
 
 The current design intentionally accepts a few compromises:
 
-### SQLite-based verification
+### PostgreSQL verification is opt-in locally
 
-The migration was validated through real Alembic execution on SQLite with an attached schema, not on
-a live PostgreSQL server.
+The migration and repository suite now validates against disposable PostgreSQL databases, but local
+execution still depends on `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`.
 
 Why:
 
-- the current repo baseline is DB-light
-- the task still needed real schema and repository verification
+- the current repo baseline remains DB-free for fast checks
+- PostgreSQL-backed validation needs an explicit disposable maintenance database URL
 
 Consequence:
 
-- PostgreSQL-specific behavior is represented through SQLAlchemy variants in the fast suite;
-- production-safe quota concurrency requires the PostgreSQL integration test above.
+- local quick checks do not execute the storage migration/repository suite by default
+- full runtime-storage validation now requires the PostgreSQL commands above
 
 ### Manual sync between tables and record dataclasses
 

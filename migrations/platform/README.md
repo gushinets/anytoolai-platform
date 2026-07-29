@@ -32,6 +32,10 @@ This is a known, accepted gap, not a defect to fix in ANY-150.
 
 Migration `0010` repairs legacy handoff indexes for already-upgraded databases.
 
+For handoff-specific migration helpers, treat `migrations/platform/_handoffs_table.py` as the
+canonical place for new shared table/index checks. Historical compatibility revision `0008` keeps
+its inline `has_table(...)` guard intentionally so that the revision remains self-contained.
+
 `alembic.ini` in this directory is the checked-in CLI config for explicit Alembic invocations such
 as offline SQL generation:
 

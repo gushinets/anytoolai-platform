@@ -29,6 +29,9 @@ def upgrade() -> None:
     if context.is_offline_mode():
         return
     bind = op.get_bind()
+    # Keep this historical inline guard self-contained. Later revisions may use
+    # migrations.platform._handoffs_table.product_handoffs_table_exists(), but 0008 is a
+    # compatibility revision that intentionally does not depend on mutable helper modules.
     if sa.inspect(bind).has_table("product_handoffs", schema=PLATFORM_SCHEMA):
         return
     json_document = _json_document_type()

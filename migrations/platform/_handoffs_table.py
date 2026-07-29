@@ -1,3 +1,11 @@
+"""Shared helpers for handoff migration revisions.
+
+Historical compatibility revision ``0008_handoffs_compat.py`` intentionally keeps its original
+inline table-existence guard so that the revision remains self-contained. New handoff revisions
+should use the helpers in this module instead of introducing another inline
+``sa.inspect(...).has_table(...)`` variant.
+"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -14,6 +22,10 @@ def product_handoffs_table_exists(
     *,
     platform_schema: str = PLATFORM_SCHEMA,
 ) -> bool:
+    """Return whether the schema-qualified handoff table exists.
+
+    This is the canonical table-existence check for new handoff migration revisions.
+    """
     return sa.inspect(bind).has_table("product_handoffs", schema=platform_schema)
 
 
