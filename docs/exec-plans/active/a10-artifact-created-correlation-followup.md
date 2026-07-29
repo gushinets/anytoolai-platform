@@ -83,7 +83,7 @@ docs, and validation-hardening debt that still affects this replacement PR surfa
 - [x] Update runtime-storage/docs/PAPERCUTS/OpenAPI/exec-plan follow-up accuracy.
 - [x] Add or update targeted regression coverage for artifact correlation and still-valid hardening findings.
 - [ ] Run focused suites, PostgreSQL concurrency coverage, and repository validation commands in the required order.
-- [x] Address PR review follow-up: restore merge-result CI checkout behavior.
+- [x] Review the PostgreSQL CI checkout behavior; retain the existing head-SHA checkout and diagnostics at the user's direction.
 - [x] Address PR review follow-up: preserve the historical 0004/0008 handoff index contract and make the 0009 downgrade exact.
 - [x] Address PR review follow-up: assert every applicable debug-artifact correlation dimension.
 
@@ -111,3 +111,4 @@ docs, and validation-hardening debt that still affects this replacement PR surfa
 | 2026-07-28 | Focused artifact/workflow/action suites passed; focused handoff/config/runtime-storage/API/docs suites passed; `validate-configs`, `validate-architecture`, `validate-docs`, `generate-docs --check`, and `quick-check` passed. The PostgreSQL concurrency suite executed as an explicit skip because no disposable PostgreSQL maintenance URL was configured locally. | Report the completed implementation and the PostgreSQL-environment blocker clearly in the final handoff. |
 | 2026-07-29 | Began review remediation for merge-result CI coverage, migration-history fidelity, and complete debug-artifact correlation assertions. The required system-Python `doctor` check again reported the known missing `pytest`, `yaml`, and `pydantic` modules; validation will use the repository-managed environment. | Apply the three focused fixes, run targeted tests, then rerun repository validation. |
 | 2026-07-29 | Completed all three review fixes. Focused structured-output/runtime-storage/migration tests passed (`51 passed, 1 skipped`); config, architecture, docs, and generated-doc checks passed; canonical `quick-check` passed (`429 passed, 7 deselected`) with a fresh pytest base temp. Full GitHub publishing is paused because the required GitHub CLI is unavailable; the user separately authorized a local commit. | Commit the scoped remediation locally; install and authenticate `gh` before a later push. |
+| 2026-07-29 | Restored the PostgreSQL CI job's head-SHA checkout and checkout diagnostics exactly as requested by the user; no runtime workflow code was changed. | Commit the explicit workflow restoration separately; do not push without a new request. |

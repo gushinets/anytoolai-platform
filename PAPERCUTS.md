@@ -62,3 +62,10 @@ Running the required `python scripts/agent/runner.py doctor` before a focused ba
 doctor used the system Python and failed because pytest, YAML, and Pydantic were absent, although
 the repository's managed `uv` environment was available. Doctor could bootstrap or inspect the
 managed environment before treating system-interpreter packages as required.
+
+## 2026-07-29 19:07 - Codex (GPT-5) - Windows
+
+Restoring one checkout block in a workflow with several identical checkout steps -> a broad
+`apply_patch` context matched the first job instead of the intended PostgreSQL job. Including the
+unique job name in the patch context and verifying against the parent revision caught the mismatch
+before commit.
