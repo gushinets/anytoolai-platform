@@ -83,6 +83,7 @@ class StructuredOutputFinalizer:
             )
             raise safe_error from exc
 
+        provider_call = self._latest_provider_call(persistence_context.action_run_id)
         artifact = self._artifact_service.create_structured_output_artifact(
             tenant_id=persistence_context.tenant_id,
             region=persistence_context.region,
@@ -96,6 +97,7 @@ class StructuredOutputFinalizer:
                 persistence_context=persistence_context,
                 schema_ref=schema_ref,
                 schema_version=schema_version,
+                provider_call=provider_call,
             ),
         )
         return StructuredOutputFinalizationResult(
@@ -112,13 +114,7 @@ class StructuredOutputFinalizer:
         schema_ref: str | None = None,
         schema_version: int | None = None,
     ) -> ArtifactRecord:
-        provider_call = (
-            None
-            if self._provider_call_repository is None
-            else self._provider_call_repository.get_latest_for_action_run(
-                persistence_context.action_run_id
-            )
-        )
+        provider_call = self._latest_provider_call(persistence_context.action_run_id)
         return self._artifact_service.create_structured_output_debug_artifact(
             tenant_id=persistence_context.tenant_id,
             region=persistence_context.region,
@@ -141,6 +137,11 @@ class StructuredOutputFinalizer:
                 "error_type": safe_error.error_type,
             },
         )
+
+    def _latest_provider_call(self, action_run_id: str) -> ProviderCallRecord | None:
+        if self._provider_call_repository is None:
+            return None
+        return self._provider_call_repository.get_latest_for_action_run(action_run_id)
 
 
 def _build_structured_output_artifact_metadata(
@@ -166,6 +167,8 @@ def _build_structured_output_artifact_metadata(
         provider_policy_ref=(
             None if provider_call is None else provider_call.provider_policy_ref
         ),
+        provider=None if provider_call is None else provider_call.provider,
+        model=None if provider_call is None else provider_call.model,
         physical_call_index=(
             None if provider_call is None else provider_call.physical_call_index
         ),
@@ -176,4 +179,7 @@ def _build_structured_output_artifact_metadata(
             None if provider_call is None else provider_call.transport_attempt_index
         ),
         pydantic_run_id=None if provider_call is None else provider_call.pydantic_run_id,
+        litellm_response_id=(
+            None if provider_call is None else provider_call.litellm_response_id
+        ),
     )

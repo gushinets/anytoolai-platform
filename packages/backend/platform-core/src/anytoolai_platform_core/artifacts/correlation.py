@@ -24,10 +24,13 @@ def build_artifact_correlation_metadata(
     artifact_role: str | None = None,
     provider_call_id: str | None = None,
     provider_policy_ref: str | None = None,
+    provider: str | None = None,
+    model: str | None = None,
     physical_call_index: int | None = None,
     semantic_attempt_index: int | None = None,
     transport_attempt_index: int | None = None,
     pydantic_run_id: str | None = None,
+    litellm_response_id: str | None = None,
 ) -> dict[str, object]:
     metadata: dict[str, object] = {}
     _set_str(metadata, "workflow_id", workflow_id)
@@ -44,10 +47,13 @@ def build_artifact_correlation_metadata(
     _set_str(metadata, "artifact_role", artifact_role)
     _set_str(metadata, "provider_call_id", provider_call_id)
     _set_str(metadata, "provider_policy_ref", provider_policy_ref)
+    _set_str(metadata, "provider", provider)
+    _set_str(metadata, "model", model)
     _set_int(metadata, "physical_call_index", physical_call_index)
     _set_int(metadata, "semantic_attempt_index", semantic_attempt_index)
     _set_int(metadata, "transport_attempt_index", transport_attempt_index)
     _set_str(metadata, "pydantic_run_id", pydantic_run_id)
+    _set_str(metadata, "litellm_response_id", litellm_response_id)
     return metadata
 
 
@@ -72,8 +78,11 @@ def artifact_execution_context_from_record(record: ArtifactRecord) -> ExecutionC
         action_run_id=record.action_run_id,
         provider_policy_ref=metadata_str(record.metadata, "provider_policy_ref"),
         provider_call_id=metadata_str(record.metadata, "provider_call_id"),
+        provider=metadata_str(record.metadata, "provider"),
+        model=metadata_str(record.metadata, "model"),
         physical_call_index=_metadata_int(record.metadata, "physical_call_index"),
         pydantic_run_id=metadata_str(record.metadata, "pydantic_run_id"),
+        litellm_response_id=metadata_str(record.metadata, "litellm_response_id"),
     )
 
 

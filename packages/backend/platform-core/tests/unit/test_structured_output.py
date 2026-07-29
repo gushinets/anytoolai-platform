@@ -117,6 +117,8 @@ def _provider_call(action_run_id: str = "action_run_demo") -> ProviderCallRecord
         semantic_attempt_index=2,
         transport_attempt_index=1,
         physical_call_index=2,
+        pydantic_run_id="pydantic_run_demo",
+        litellm_response_id="litellm_response_demo",
     )
 
 
@@ -191,9 +193,11 @@ def test_structured_output_finalizer_persists_success_artifact(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
+        provider_repository = ProviderCallRepository(session)
+        provider_call = provider_repository.create(_provider_call())
         finalizer = StructuredOutputFinalizer(
             artifact_service=_artifact_service(session),
-            provider_call_repository=ProviderCallRepository(session),
+            provider_call_repository=provider_repository,
         )
 
         result = finalizer.finalize(
@@ -232,6 +236,17 @@ def test_structured_output_finalizer_persists_success_artifact(
         artifacts[0]["metadata"]["action_config_id"]
         == "kernel_demo.extract_structured_fields_v1"
     )
+    assert artifacts[0]["metadata"]["provider_call_id"] == provider_call.id
+    assert artifacts[0]["metadata"]["provider_policy_ref"] == "default_fake_provider_v1"
+    assert artifacts[0]["metadata"]["provider"] == "fake"
+    assert artifacts[0]["metadata"]["model"] == "fake-json-v1"
+    assert artifacts[0]["metadata"]["physical_call_index"] == 2
+    assert artifacts[0]["metadata"]["pydantic_run_id"] == "pydantic_run_demo"
+    assert artifacts[0]["metadata"]["litellm_response_id"] == "litellm_response_demo"
+    assert "prompt" not in artifacts[0]["metadata"]
+    assert "credentials" not in artifacts[0]["metadata"]
+    assert "provider_request" not in artifacts[0]["metadata"]
+    assert "provider_response" not in artifacts[0]["metadata"]
     assert events[0]["workflow_id"] == "wf_demo"
     assert events[0]["workflow_version"] == 1
     assert events[0]["guest_id"] == "guest_demo"
@@ -241,6 +256,13 @@ def test_structured_output_finalizer_persists_success_artifact(
     assert events[0]["acquisition_source"] == "kernel_demo_ce"
     assert events[0]["action_type"] == "text.extract_structured_fields"
     assert events[0]["action_config_id"] == "kernel_demo.extract_structured_fields_v1"
+    assert events[0]["provider_call_id"] == provider_call.id
+    assert events[0]["provider_policy_ref"] == "default_fake_provider_v1"
+    assert events[0]["provider"] == "fake"
+    assert events[0]["model"] == "fake-json-v1"
+    assert events[0]["physical_call_index"] == 2
+    assert events[0]["pydantic_run_id"] == "pydantic_run_demo"
+    assert events[0]["litellm_response_id"] == "litellm_response_demo"
     assert events[0]["properties"] == {"artifact_type": "structured_output"}
 
 
@@ -290,8 +312,19 @@ def test_structured_output_finalizer_persists_debug_artifact_for_validation_fail
     assert artifacts[0]["action_run_id"] == "action_run_demo"
     assert artifacts[0]["metadata"]["reason"] == reason
     assert artifacts[0]["metadata"]["provider_call_id"].startswith("provider_call_")
+    assert artifacts[0]["metadata"]["provider_policy_ref"] == "default_fake_provider_v1"
+    assert artifacts[0]["metadata"]["provider"] == "fake"
+    assert artifacts[0]["metadata"]["model"] == "fake-json-v1"
     assert artifacts[0]["metadata"]["physical_call_index"] == 2
+    assert artifacts[0]["metadata"]["pydantic_run_id"] == "pydantic_run_demo"
+    assert artifacts[0]["metadata"]["litellm_response_id"] == "litellm_response_demo"
     assert events[0]["provider_call_id"].startswith("provider_call_")
+    assert events[0]["provider_policy_ref"] == "default_fake_provider_v1"
+    assert events[0]["provider"] == "fake"
+    assert events[0]["model"] == "fake-json-v1"
+    assert events[0]["physical_call_index"] == 2
+    assert events[0]["pydantic_run_id"] == "pydantic_run_demo"
+    assert events[0]["litellm_response_id"] == "litellm_response_demo"
     assert events[0]["workflow_id"] == "wf_demo"
     assert events[0]["workflow_version"] == 1
     assert events[0]["guest_id"] == "guest_demo"
