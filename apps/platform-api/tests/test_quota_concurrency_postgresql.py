@@ -36,6 +36,7 @@ from test_scenario_runtime_api import (
 )
 
 POSTGRES_TEST_DATABASE_URL_ENV = "ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"
+TEST_GUEST_QUOTA_LIMIT = 3
 
 
 @pytest.mark.postgresql
@@ -214,11 +215,7 @@ def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_indepe
         _upgrade_database(engine, test_url)
         session_factory = build_session_factory(engine)
         app = _create_test_app(session_factory)
-        registry = app.state.runtime.config_registry
-        policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
-        assert policy is not None
-        scenario_quota_limit = policy.limit_count
-        _force_scenario_guest_quota(app)
+        scenario_quota_limit = _force_scenario_guest_quota(app)
         scenario_ids = [
             "kernel_demo.single_action_smoke_v1",
             "kernel_demo.multi_step_workflow_smoke_v1",
@@ -637,7 +634,10 @@ def _quote_identifier(value: str) -> str:
 
 
 def _scenario_start_quota_limit(app) -> int:
-    policy = _override_guest_quota_policy(app)
+    policy = _override_guest_quota_policy(
+        app,
+        limit_count=TEST_GUEST_QUOTA_LIMIT,
+    )
     return policy.limit_count
 
 
@@ -645,6 +645,7 @@ def _force_scenario_guest_quota(app) -> int:
     policy = _override_guest_quota_policy(
         app,
         dimension=QuotaDimension.scenario,
+        limit_count=TEST_GUEST_QUOTA_LIMIT,
     )
     return policy.limit_count
 
