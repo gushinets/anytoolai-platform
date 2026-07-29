@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Header
 
 from anytoolai_platform_api.dependencies import (
     get_config_registry,
@@ -27,7 +27,10 @@ from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
 from anytoolai_platform_core.quotas.service import GuestQuotaService
 from anytoolai_platform_core.scenarios.models import ScenarioSessionSnapshot
-from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
+from anytoolai_platform_core.scenarios.repository import (
+    MAX_IDEMPOTENCY_KEY_LENGTH,
+    ScenarioSessionRepository,
+)
 from anytoolai_platform_core.scenarios.service import ScenarioRuntimeService, ScenarioSessionService
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 from anytoolai_platform_core.workflows.repository import JobRepository
@@ -91,10 +94,26 @@ SAFE_GUEST_422_EXAMPLE = {
     }
 }
 
+SAFE_IDEMPOTENCY_KEY_INVALID_422_EXAMPLE = {
+    "error": {
+        "code": "idempotency_key_invalid",
+        "message": f"Idempotency-Key must be at most {MAX_IDEMPOTENCY_KEY_LENGTH} characters.",
+        "request_id": "req_123",
+    }
+}
+
 SAFE_429_EXAMPLE = {
     "error": {
         "code": "quota_exhausted",
         "message": "Guest quota exhausted.",
+        "request_id": "req_123",
+    }
+}
+
+SAFE_IDEMPOTENCY_CONFLICT_409_EXAMPLE = {
+    "error": {
+        "code": "idempotency_key_conflict",
+        "message": "Idempotency-Key was already used with a different request.",
         "request_id": "req_123",
     }
 }
@@ -130,11 +149,22 @@ SAFE_429_EXAMPLE = {
                 }
             },
         },
+        409: {
+            "model": ErrorResponse,
+            "description": (
+                "Idempotency-Key was reused with a request whose scope or input does not "
+                "match the original request. No new scenario session is created and quota "
+                "is not consumed; retry with a new Idempotency-Key or the original request."
+            ),
+            "content": {
+                "application/json": {"example": SAFE_IDEMPOTENCY_CONFLICT_409_EXAMPLE}
+            },
+        },
         422: {
             "model": ErrorResponse,
             "description": (
-                "Safe validation response for unsupported frontend, invalid input, or missing "
-                "guest identity."
+                "Safe validation response for unsupported frontend, invalid input, missing "
+                "guest identity, or an oversized Idempotency-Key."
             ),
             "content": {
                 "application/json": {
@@ -146,6 +176,10 @@ SAFE_429_EXAMPLE = {
                         "guest_required": {
                             "summary": "Quota-protected product requires guest_id.",
                             "value": SAFE_GUEST_422_EXAMPLE,
+                        },
+                        "idempotency_key_invalid": {
+                            "summary": "Idempotency-Key exceeds the maximum length.",
+                            "value": SAFE_IDEMPOTENCY_KEY_INVALID_422_EXAMPLE,
                         },
                     }
                 }
@@ -168,11 +202,18 @@ def start_scenario(
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> ScenarioStartResponse:
-    api_error: ApiError | None = None
-    snapshot: ScenarioSessionSnapshot | None = None
-    with transaction_boundary(session_factory) as session:
-        try:
+    # PlatformError (including quota_exhausted) is caught only after the `with` block
+    # exits, so any failure -- not just the classic pre-insert quota_exhausted -- rolls
+    # back everything written in this transaction (e.g. a scenario_sessions row an
+    # idempotent insert-or-select already committed to before quota ran out). Quota
+    # bookkeeping still survives: GuestQuotaService registers a rollback-recovery
+    # callback before raising quota_exhausted, and transaction_boundary runs it in an
+    # independent transaction after the rollback (see quotas/service.py, ADR in
+    # docs/architecture/quota-model.md).
+    try:
+        with transaction_boundary(session_factory) as session:
             snapshot = _runtime_service(session=session, registry=registry).start_session(
                 tenant_id=settings.default_tenant_id,
                 region=settings.default_region,
@@ -183,15 +224,10 @@ def start_scenario(
                 guest_id=request.guest_id,
                 user_id=request.user_id,
                 source_frontend_instance_id=request.source_frontend_instance_id,
+                idempotency_key=idempotency_key,
             )
-        except PlatformError as exc:
-            if exc.code != "quota_exhausted":
-                raise _to_api_error(exc) from exc
-            api_error = _to_api_error(exc)
-    if api_error is not None:
-        raise api_error
-    if snapshot is None:
-        raise RuntimeError("scenario start did not produce a snapshot")
+    except PlatformError as exc:
+        raise _to_api_error(exc) from exc
     return ScenarioStartResponse.model_validate(_start_response_payload(snapshot))
 
 
@@ -345,6 +381,7 @@ def _status_code_for_platform_error(error: PlatformError) -> int:
         "scenario_checkpoint_conflict",
         "scenario_checkpoint_not_actionable",
         "scenario_next_action_not_allowed",
+        "idempotency_key_conflict",
     }:
         return 409
     if error.code == "quota_exhausted":
@@ -353,6 +390,7 @@ def _status_code_for_platform_error(error: PlatformError) -> int:
         "guest_identity_required",
         "scenario_frontend_invalid",
         "scenario_input_invalid",
+        "idempotency_key_invalid",
     }:
         return 422
     return 500

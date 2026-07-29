@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime
-from hashlib import sha256
 from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
+from anytoolai_platform_core.common.hashing import digest_parts
 from anytoolai_platform_core.events.envelope import EventEnvelope
 from anytoolai_platform_core.events.replay import is_replay_owned_event_id
 from anytoolai_platform_core.storage.db import event_log_table
@@ -207,7 +207,7 @@ def build_replay_event_id(
         error_code or "",
         step_id or "",
     )
-    digest = sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
+    digest = digest_parts(*parts)
     return f"event_replay_{_replay_event_order_rank(event_type):03d}_{digest}"
 
 

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaUsageRecord
 from anytoolai_platform_core.storage.db import guest_quota_usage_table
+from anytoolai_platform_core.storage.db_errors import is_expected_unique_violation
 
 EXPECTED_USAGE_DIMENSION_CONSTRAINT = "uq_guest_quota_usage_dimension"
 SQLITE_USAGE_DIMENSION_COLUMNS = (
@@ -63,18 +64,11 @@ def _record_from_row(row: sa.RowMapping) -> QuotaUsageRecord:
 
 
 def _is_expected_usage_dimension_race(error: IntegrityError) -> bool:
-    constraint_name = getattr(getattr(error.orig, "diag", None), "constraint_name", None)
-    if constraint_name == EXPECTED_USAGE_DIMENSION_CONSTRAINT:
-        return True
-
-    message = str(error.orig)
-    if EXPECTED_USAGE_DIMENSION_CONSTRAINT in message:
-        return True
-    if "UNIQUE constraint failed" not in message:
-        return False
-    return all(
-        f"guest_quota_usage.{column}" in message
-        for column in SQLITE_USAGE_DIMENSION_COLUMNS
+    return is_expected_unique_violation(
+        error,
+        constraint_name=EXPECTED_USAGE_DIMENSION_CONSTRAINT,
+        table_name="guest_quota_usage",
+        columns=SQLITE_USAGE_DIMENSION_COLUMNS,
     )
 
 

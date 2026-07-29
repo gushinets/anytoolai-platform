@@ -71,6 +71,21 @@ class ResolvedQuotaDimension:
 
 
 @dataclass(frozen=True)
+class QuotaValidation:
+    """Everything consume_for_accepted_start needs, resolved ahead of any write.
+
+    Returned by validate_accepted_start(); required by consume_for_accepted_start().
+    A caller cannot consume quota without first validating -- that ordering is a type
+    signature, not a convention -- and callers that must not write anything before
+    quota/guest validation passes (e.g. a keyed insert-or-select) can call
+    validate_accepted_start() as a pure precondition check first.
+    """
+
+    policy: QuotaPolicy
+    dimension: ResolvedQuotaDimension
+
+
+@dataclass(frozen=True)
 class QuotaExhaustionRecovery:
     tenant_id: str
     region: str
@@ -159,19 +174,26 @@ class GuestQuotaService:
             )
         return state
 
-    def consume_for_accepted_start(
+    def validate_accepted_start(
         self,
         *,
         tenant_id: str,
         region: str,
         product_id: str,
-        frontend_id: str,
         guest_id: str | None,
         scenario_id: str,
-        scenario_session_id: str | None = None,
-        scenario_chain_id: str | None = None,
-        handoff_id: str | None = None,
-    ) -> QuotaState | None:
+    ) -> QuotaValidation | None:
+        """Resolve and validate everything an accepted start needs from quota,
+        without writing anything.
+
+        Returns None when the product has no quota policy configured (quota does not
+        apply to this start at all) -- callers should skip consume_for_accepted_start
+        entirely in that case, exactly like a None return from it today. Call this
+        before any durable write for the start (e.g. before inserting the candidate
+        scenario_sessions row) so an invalid/missing/unknown guest_id or a
+        misconfigured policy fails fast instead of paying for a write that then has
+        to be rolled back.
+        """
         product = self._config_registry.get_product(product_id)
         if product is None:
             raise ProductNotFoundError()
@@ -191,6 +213,24 @@ class GuestQuotaService:
             tenant_id=tenant_id,
             region=region,
         )
+        return QuotaValidation(policy=policy, dimension=dimension)
+
+    def consume_for_accepted_start(
+        self,
+        *,
+        tenant_id: str,
+        region: str,
+        product_id: str,
+        frontend_id: str,
+        guest_id: str,
+        scenario_id: str,
+        scenario_session_id: str,
+        validation: QuotaValidation,
+        scenario_chain_id: str | None = None,
+        handoff_id: str | None = None,
+    ) -> QuotaState:
+        policy = validation.policy
+        dimension = validation.dimension
         usage = self._ensure_usage(
             tenant_id=tenant_id,
             region=region,

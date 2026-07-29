@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
 
+from sqlalchemy.exc import IntegrityError
+
 from anytoolai_platform_core.common.errors import PlatformError
+from anytoolai_platform_core.common.hashing import digest_parts
 from anytoolai_platform_core.common.ids import new_id
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
@@ -28,7 +32,11 @@ from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionStatus,
 )
 from anytoolai_platform_core.scenarios.next_actions import validate_next_action
-from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
+from anytoolai_platform_core.scenarios.repository import (
+    MAX_IDEMPOTENCY_KEY_LENGTH,
+    ScenarioSessionRepository,
+    is_expected_idempotency_race,
+)
 from anytoolai_platform_core.workflows.models import JobRecord
 from anytoolai_platform_core.workflows.repository import JobRepository
 
@@ -56,6 +64,22 @@ class ScenarioInputInvalidError(PlatformError):
         super().__init__(
             "scenario_input_invalid",
             "Scenario input must be a JSON object.",
+        )
+
+
+class IdempotencyKeyConflictError(PlatformError):
+    def __init__(self) -> None:
+        super().__init__(
+            "idempotency_key_conflict",
+            "Idempotency-Key was already used with a different request.",
+        )
+
+
+class IdempotencyKeyInvalidError(PlatformError):
+    def __init__(self) -> None:
+        super().__init__(
+            "idempotency_key_invalid",
+            f"Idempotency-Key must be at most {MAX_IDEMPOTENCY_KEY_LENGTH} characters.",
         )
 
 
@@ -89,30 +113,84 @@ class ScenarioRuntimeService:
         guest_id: str | None = None,
         user_id: str | None = None,
         source_frontend_instance_id: str | None = None,
+        idempotency_key: str | None = None,
     ) -> ScenarioSessionSnapshot:
-        scenario = self._require_product_scenario(product_id, scenario_id)
-        self._require_enabled_frontend(product_id, frontend_id)
+        # An empty or whitespace-only header (e.g. a proxy sending "Idempotency-Key: ")
+        # must mean "no key was sent", not a real, distinct empty-string key -- two
+        # different callers both sending a blank header would otherwise be scoped
+        # together as if they shared one key.
+        if idempotency_key is not None:
+            idempotency_key = idempotency_key.strip() or None
+        if idempotency_key is not None and len(idempotency_key) > MAX_IDEMPOTENCY_KEY_LENGTH:
+            raise IdempotencyKeyInvalidError()
 
         if not isinstance(input_payload, Mapping):
             raise ScenarioInputInvalidError()
+
+        idempotency_request_hash = (
+            None
+            if idempotency_key is None
+            else compute_idempotency_request_hash(
+                tenant_id=tenant_id,
+                region=region,
+                product_id=product_id,
+                scenario_id=scenario_id,
+                frontend_id=frontend_id,
+                guest_id=guest_id,
+                user_id=user_id,
+                input_payload=input_payload,
+            )
+        )
+
+        # A replay of an already-accepted start must survive config drift since the
+        # original request: the frontend can be disabled, the quota policy
+        # reconfigured/broken, or the guest identity removed in between -- none of
+        # that may block a legitimate retry (browser back-button, fetch-timeout retry,
+        # flaky mobile network -- exactly the cases Idempotency-Key exists for). Look
+        # up an existing match on the raw, unvalidated identifiers *before* running
+        # any product/scenario/frontend/quota validation, which only a genuinely new
+        # request still needs. get_by_idempotency_key() only needs tenant/region/
+        # product/scenario/guest_id/idempotency_key, none of which require resolving
+        # config first.
+        existing = (
+            self._session_repository.get_by_idempotency_key(
+                tenant_id=tenant_id,
+                region=region,
+                product_id=product_id,
+                scenario_id=scenario_id,
+                guest_id=guest_id,
+                idempotency_key=idempotency_key,
+            )
+            if idempotency_key is not None
+            else None
+        )
+        if existing is not None:
+            if existing.idempotency_request_hash != idempotency_request_hash:
+                raise IdempotencyKeyConflictError()
+            # Deliberately unpinned: a replay must survive config drift, including the
+            # scenario's own configured version moving on since the original accepted
+            # start (an ordinary config deploy, not a code change). Pinning to
+            # existing.scenario_version here would 404 every replay of a session whose
+            # scenario was since bumped -- exactly the retry case Idempotency-Key
+            # exists for. scenario is only used below for allowed_next_actions on an
+            # already-completed session; a version-drifted value there is a much
+            # smaller, cosmetic risk than failing the replay outright.
+            scenario = self._require_product_scenario(existing.product_id, existing.scenario_id)
+            job = self._job_repository.get_latest_for_scenario_session(existing.id)
+            return self._snapshot_from_records(
+                session=existing,
+                scenario=scenario,
+                job=job,
+            )
+
+        scenario = self._require_product_scenario(product_id, scenario_id)
+        self._require_enabled_frontend(product_id, frontend_id)
 
         workflow = self._config_registry.get_workflow(scenario.workflow_id)
         if workflow is None:
             raise LookupError(f"workflow not found: {scenario.workflow_id}")
 
         scenario_session_id = new_id("scenario_session")
-        if self._quota_service is not None:
-            self._quota_service.consume_for_accepted_start(
-                tenant_id=tenant_id,
-                region=region,
-                product_id=product_id,
-                frontend_id=frontend_id,
-                guest_id=guest_id,
-                scenario_id=scenario.scenario_id,
-                scenario_session_id=scenario_session_id,
-                scenario_chain_id=scenario_session_id,
-            )
-
         session_record = ScenarioSessionRecord(
             id=scenario_session_id,
             tenant_id=tenant_id,
@@ -127,9 +205,77 @@ class ScenarioRuntimeService:
             current_checkpoint_id=PROCESSING_CHECKPOINT_ID,
             scenario_chain_id=scenario_session_id,
             source_frontend_instance_id=source_frontend_instance_id,
+            idempotency_key=idempotency_key,
+            idempotency_request_hash=idempotency_request_hash,
             metadata={"input": dict(input_payload)},
         )
-        stored_session = self._session_service.start(session_record)
+
+        # Validate guest identity/quota policy before any write: consume_for_accepted_start()
+        # now requires this result as a parameter, so it is structurally impossible to
+        # reach quota consumption without validating first. Doing this before the
+        # insert-or-select means a request with an invalid/missing/unknown guest_id
+        # fails fast without ever inserting a scenario_sessions row (and the event it
+        # would emit) that would just be rolled back a moment later.
+        quota_validation = (
+            self._quota_service.validate_accepted_start(
+                tenant_id=tenant_id,
+                region=region,
+                product_id=product_id,
+                guest_id=guest_id,
+                scenario_id=scenario.scenario_id,
+            )
+            if self._quota_service is not None
+            else None
+        )
+
+        # The atomic insert-or-select must run before quota consumption: it is the
+        # only thing that can tell N concurrent requests sharing one Idempotency-Key
+        # apart from N genuinely distinct requests (the lookup above only closes the
+        # common sequential-replay case; two concurrent requests for a brand-new key
+        # can both miss it and reach here). Gating quota on its outcome means a losing
+        # duplicate never touches quota at all, instead of racing to consume it and
+        # needing a refund. If quota is exhausted after a fresh insert here, this
+        # error propagates uncaught so the caller's transaction rolls back the insert
+        # (and its scenario.started event) via normal DB rollback, while
+        # GuestQuotaService's already-registered rollback-recovery callback persists
+        # the quota-exhaustion audit trail in an independent transaction.
+        stored_session, inserted = self._session_service.start_or_get_existing(session_record)
+
+        if not inserted:
+            if (
+                idempotency_key is not None
+                and stored_session.idempotency_request_hash != idempotency_request_hash
+            ):
+                raise IdempotencyKeyConflictError()
+            # Re-resolve from the row that actually won the race, not the `scenario`
+            # this (losing) request resolved a moment ago: under a rolling config
+            # deploy that bumps the scenario version between the two concurrent
+            # requests, the winner's stored_session.scenario_version can differ from
+            # this request's locally-resolved scenario.version. Unpinned for the same
+            # config-drift reason as the early-lookup replay branch above.
+            scenario = self._require_product_scenario(
+                stored_session.product_id, stored_session.scenario_id
+            )
+            job = self._job_repository.get_latest_for_scenario_session(stored_session.id)
+            return self._snapshot_from_records(
+                session=stored_session,
+                scenario=scenario,
+                job=job,
+            )
+
+        if self._quota_service is not None and quota_validation is not None:
+            assert guest_id is not None  # validate_accepted_start already required this
+            self._quota_service.consume_for_accepted_start(
+                tenant_id=tenant_id,
+                region=region,
+                product_id=product_id,
+                frontend_id=frontend_id,
+                guest_id=guest_id,
+                scenario_id=scenario.scenario_id,
+                scenario_session_id=stored_session.id,
+                scenario_chain_id=stored_session.scenario_chain_id,
+                validation=quota_validation,
+            )
 
         job = self._job_repository.create(
             JobRecord(
@@ -183,17 +329,27 @@ class ScenarioRuntimeService:
             raise LookupError(f"workflow not found: {scenario.workflow_id}")
 
         if queue_workflow and self._quota_service is not None:
-            self._quota_service.consume_for_accepted_start(
+            quota_validation = self._quota_service.validate_accepted_start(
                 tenant_id=tenant_id,
                 region=region,
                 product_id=product_id,
-                frontend_id=frontend_id,
                 guest_id=guest_id,
                 scenario_id=scenario.scenario_id,
-                scenario_session_id=scenario_session_id,
-                scenario_chain_id=scenario_chain_id,
-                handoff_id=handoff_id,
             )
+            if quota_validation is not None:
+                assert guest_id is not None  # validate_accepted_start already required this
+                self._quota_service.consume_for_accepted_start(
+                    tenant_id=tenant_id,
+                    region=region,
+                    product_id=product_id,
+                    frontend_id=frontend_id,
+                    guest_id=guest_id,
+                    scenario_id=scenario.scenario_id,
+                    scenario_session_id=scenario_session_id,
+                    scenario_chain_id=scenario_chain_id,
+                    handoff_id=handoff_id,
+                    validation=quota_validation,
+                )
 
         session_record = ScenarioSessionRecord(
             id=scenario_session_id,
@@ -425,6 +581,61 @@ class ScenarioSessionService:
         )
         return stored
 
+    def start_or_get_existing(
+        self,
+        record: ScenarioSessionRecord,
+        *,
+        context: ExecutionContext | None = None,
+    ) -> tuple[ScenarioSessionRecord, bool]:
+        """Insert-or-select on the idempotency-key uniqueness constraint.
+
+        Returns (session, inserted) -- inserted is True only when this call created the
+        row and therefore emitted scenario.started; a replay of an existing key must not
+        re-emit the event or let the caller re-consume quota.
+
+        Deliberately does not do its own optimistic pre-read: ScenarioRuntimeService.
+        start_session() is this method's only caller, and it already does an
+        equivalent get_by_idempotency_key() lookup immediately before calling this
+        (to let a sequential replay skip validation/quota entirely, not just skip the
+        insert) -- a second identical SELECT here would be redundant on every call. A
+        true sequential duplicate that somehow still reaches this point (or a genuine
+        concurrent race) is caught below via the INSERT's own IntegrityError, which
+        this repository's constraint guarantees will fire.
+        """
+        if record.idempotency_key is None:
+            return self.start(record, context=context), True
+
+        try:
+            with self._repository.session.begin_nested():
+                stored = self._repository.create(record)
+        except IntegrityError as exc:
+            if not is_expected_idempotency_race(exc):
+                raise
+            raced = self._repository.get_by_idempotency_key(
+                tenant_id=record.tenant_id,
+                region=record.region,
+                product_id=record.product_id,
+                scenario_id=record.scenario_id,
+                guest_id=record.guest_id,
+                idempotency_key=record.idempotency_key,
+            )
+            if raced is None:
+                raise RuntimeError(
+                    "scenario session idempotency race but no row found: "
+                    f"{record.id}"
+                ) from exc
+            return raced, False
+
+        self._event_emitter.emit(
+            "scenario.started",
+            _event_context_from_record(stored, context),
+            properties={
+                "scenario_id": stored.scenario_id,
+                "scenario_version": stored.scenario_version,
+            },
+        )
+        return stored, True
+
     def checkpoint(
         self,
         record: ScenarioSessionRecord,
@@ -551,6 +762,44 @@ class ScenarioSessionService:
             },
         )
         return updated
+
+
+def compute_idempotency_request_hash(
+    *,
+    tenant_id: str,
+    region: str,
+    product_id: str,
+    scenario_id: str,
+    frontend_id: str,
+    guest_id: str | None,
+    user_id: str | None,
+    input_payload: Mapping[str, Any],
+) -> str:
+    """Hash the parts of a scenario-start request that must match on replay.
+
+    source_frontend_instance_id is deliberately excluded: it identifies where the
+    request came from (telemetry/origin), not what the request asks for, so a retry
+    from a second tab with the same Idempotency-Key must still be treated as the same
+    logical request rather than a hash-mismatch conflict.
+    """
+    try:
+        canonical_input = json.dumps(dict(input_payload), sort_keys=True, separators=(",", ":"))
+    except TypeError as exc:
+        # isinstance(input_payload, Mapping) only guarantees the container shape, not
+        # that every value inside it is JSON-serializable (e.g. a datetime or a
+        # custom object). Surface the same safe validation error the caller already
+        # raises for a non-Mapping payload instead of an unhandled TypeError.
+        raise ScenarioInputInvalidError() from exc
+    return digest_parts(
+        tenant_id,
+        region,
+        product_id,
+        scenario_id,
+        frontend_id,
+        guest_id or "",
+        user_id or "",
+        canonical_input,
+    )
 
 
 def _context_from_record(record: ScenarioSessionRecord) -> ExecutionContext:
