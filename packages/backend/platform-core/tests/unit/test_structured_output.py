@@ -328,5 +328,10 @@ def test_structured_output_finalizer_persists_debug_artifact_for_validation_fail
     assert events[0]["workflow_id"] == "wf_demo"
     assert events[0]["workflow_version"] == 1
     assert events[0]["guest_id"] == "guest_demo"
+    assert events[0]["user_id"] == "user_demo"
+    assert events[0]["scenario_chain_id"] == "scenario_chain_demo"
     assert events[0]["handoff_id"] == "handoff_demo"
+    assert events[0]["acquisition_source"] == "kernel_demo_ce"
+    assert events[0]["action_type"] == "text.extract_structured_fields"
+    assert events[0]["action_config_id"] == "kernel_demo.extract_structured_fields_v1"
     assert events[0]["properties"] == {"artifact_type": "structured_output_debug_raw"}

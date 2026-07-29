@@ -5,7 +5,7 @@
 - State: active
 - Owner: Codex
 - Created: 2026-07-28
-- Last updated: 2026-07-28
+- Last updated: 2026-07-29
 - Review date: 2026-07-28
 - Next action: secure a disposable PostgreSQL maintenance database URL if production-dialect concurrency proof must be rerun locally; the code and non-PostgreSQL validations are complete.
 - Blocker: no `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was configured in this environment, so the required PostgreSQL concurrency suite could only be executed as an explicit skip. `doctor` also remains blocked under the system Python because `pytest`, `yaml`, and `pydantic` are not installed there.
@@ -83,6 +83,9 @@ docs, and validation-hardening debt that still affects this replacement PR surfa
 - [x] Update runtime-storage/docs/PAPERCUTS/OpenAPI/exec-plan follow-up accuracy.
 - [x] Add or update targeted regression coverage for artifact correlation and still-valid hardening findings.
 - [ ] Run focused suites, PostgreSQL concurrency coverage, and repository validation commands in the required order.
+- [x] Address PR review follow-up: restore merge-result CI checkout behavior.
+- [x] Address PR review follow-up: preserve the historical 0004/0008 handoff index contract and make the 0009 downgrade exact.
+- [x] Address PR review follow-up: assert every applicable debug-artifact correlation dimension.
 
 ## Validation
 
@@ -106,3 +109,5 @@ docs, and validation-hardening debt that still affects this replacement PR surfa
 | 2026-07-28 | Ran the first two focused validation slices successfully: artifact/workflow tests and handoff/runtime-storage/access-log/docs tests both passed. | Finish implementation, extend the remaining targeted suites, then run the rest of the validation ladder. |
 | 2026-07-28 | Implemented the shared artifact-correlation helper path, expanded structured-output persistence metadata, removed duplicated metadata-string helpers, hardened handoff/config/quota/scenario code paths, deduplicated handoff migration DDL, and updated docs/tests. | Finish the validation ladder and record any remaining external blockers truthfully. |
 | 2026-07-28 | Focused artifact/workflow/action suites passed; focused handoff/config/runtime-storage/API/docs suites passed; `validate-configs`, `validate-architecture`, `validate-docs`, `generate-docs --check`, and `quick-check` passed. The PostgreSQL concurrency suite executed as an explicit skip because no disposable PostgreSQL maintenance URL was configured locally. | Report the completed implementation and the PostgreSQL-environment blocker clearly in the final handoff. |
+| 2026-07-29 | Began review remediation for merge-result CI coverage, migration-history fidelity, and complete debug-artifact correlation assertions. The required system-Python `doctor` check again reported the known missing `pytest`, `yaml`, and `pydantic` modules; validation will use the repository-managed environment. | Apply the three focused fixes, run targeted tests, then rerun repository validation. |
+| 2026-07-29 | Completed all three review fixes. Focused structured-output/runtime-storage/migration tests passed (`51 passed, 1 skipped`); config, architecture, docs, and generated-doc checks passed; canonical `quick-check` passed (`429 passed, 7 deselected`) with a fresh pytest base temp. Full GitHub publishing is paused because the required GitHub CLI is unavailable; the user separately authorized a local commit. | Commit the scoped remediation locally; install and authenticate `gh` before a later push. |

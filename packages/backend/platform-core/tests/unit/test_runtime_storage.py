@@ -678,13 +678,16 @@ def test_handoff_index_compatibility_revision_replaces_legacy_target_session_ind
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
             command.upgrade(alembic_config, "0009")
-            connection.execute(sa.text("DROP INDEX platform.ix_product_handoffs_status_expiry"))
-            connection.execute(
-                sa.text(
-                    "CREATE INDEX platform.ix_product_handoffs_target_session "
-                    "ON product_handoffs (target_scenario_session_id)"
+            historical_indexes = {
+                index["name"]
+                for index in sa.inspect(connection).get_indexes(
+                    "product_handoffs",
+                    schema="platform",
                 )
-            )
+            }
+
+        assert "ix_product_handoffs_target_session" in historical_indexes
+        assert "ix_product_handoffs_status_expiry" in historical_indexes
 
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
@@ -712,7 +715,7 @@ def test_handoff_index_compatibility_revision_replaces_legacy_target_session_ind
             }
 
         assert "ix_product_handoffs_target_session" in downgraded_indexes
-        assert "ix_product_handoffs_status_expiry" not in downgraded_indexes
+        assert "ix_product_handoffs_status_expiry" in downgraded_indexes
     finally:
         engine.dispose()
 
