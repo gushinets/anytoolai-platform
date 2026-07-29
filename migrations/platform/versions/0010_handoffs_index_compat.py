@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from alembic import op
+from alembic import context, op
 from migrations.platform._handoffs_table import (
     ensure_product_handoffs_indexes,
+    ensure_product_handoffs_indexes_offline,
     product_handoffs_table_exists,
     restore_legacy_product_handoffs_target_session_index,
+    restore_legacy_product_handoffs_target_session_index_offline,
 )
 
 revision = "0010"
@@ -18,6 +20,9 @@ PLATFORM_SCHEMA = "platform"
 
 
 def upgrade() -> None:
+    if context.is_offline_mode():
+        ensure_product_handoffs_indexes_offline(op, platform_schema=PLATFORM_SCHEMA)
+        return
     bind = op.get_bind()
     if not product_handoffs_table_exists(bind, platform_schema=PLATFORM_SCHEMA):
         return
@@ -25,6 +30,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if context.is_offline_mode():
+        restore_legacy_product_handoffs_target_session_index_offline(
+            op,
+            platform_schema=PLATFORM_SCHEMA,
+        )
+        return
     bind = op.get_bind()
     if not product_handoffs_table_exists(bind, platform_schema=PLATFORM_SCHEMA):
         return

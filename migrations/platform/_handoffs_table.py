@@ -53,6 +53,21 @@ def ensure_product_handoffs_indexes(
         )
 
 
+def ensure_product_handoffs_indexes_offline(
+    op_module: Any,
+    *,
+    platform_schema: str = PLATFORM_SCHEMA,
+) -> None:
+    op_module.execute(sa.text(f"DROP INDEX IF EXISTS {platform_schema}.{LEGACY_TARGET_SESSION_INDEX}"))
+    op_module.execute(
+        sa.text(
+            "CREATE INDEX IF NOT EXISTS "
+            f"{platform_schema}.{STATUS_EXPIRY_INDEX} "
+            f"ON {platform_schema}.product_handoffs (status, expires_at)"
+        )
+    )
+
+
 def restore_legacy_product_handoffs_target_session_index(
     op_module: Any,
     *,
@@ -67,3 +82,17 @@ def restore_legacy_product_handoffs_target_session_index(
             ["target_scenario_session_id"],
             schema=platform_schema,
         )
+
+
+def restore_legacy_product_handoffs_target_session_index_offline(
+    op_module: Any,
+    *,
+    platform_schema: str = PLATFORM_SCHEMA,
+) -> None:
+    op_module.execute(
+        sa.text(
+            "CREATE INDEX IF NOT EXISTS "
+            f"{platform_schema}.{LEGACY_TARGET_SESSION_INDEX} "
+            f"ON {platform_schema}.product_handoffs (target_scenario_session_id)"
+        )
+    )

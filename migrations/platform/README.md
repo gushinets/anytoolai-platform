@@ -29,3 +29,14 @@ has no `ALTER TABLE ... ADD CONSTRAINT`, so the constraint is applied via
 platform` test schema. `NULL` is distinct from itself in both dialects' unique-constraint semantics,
 so a start with `guest_id IS NULL` (pure `user_id` path) is not deduplicated by this constraint.
 This is a known, accepted gap, not a defect to fix in ANY-150.
+
+Migration `0010` repairs legacy handoff indexes for already-upgraded databases.
+
+`alembic.ini` in this directory is the checked-in CLI config for explicit Alembic invocations such
+as offline SQL generation:
+
+```powershell
+uv run alembic -c migrations/platform/alembic.ini upgrade head --sql
+```
+
+The offline config URL is a placeholder used only to select the PostgreSQL dialect for SQL output.

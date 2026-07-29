@@ -157,7 +157,15 @@ Responsibilities:
 - support downgrade for the same tables
 
 `migrations/platform/env.py` was also turned from a placeholder into a minimal working Alembic env
-so tests and future commands can execute migrations programmatically.
+so tests and future commands can execute migrations programmatically. The env bootstrap now adds the
+repository root before branching into offline vs. online mode, which keeps shared migration helper
+imports working even when Alembic runs from a different current working directory.
+
+The repo also keeps a checked-in `migrations/platform/alembic.ini` for explicit CLI invocations
+such as `uv run alembic -c migrations/platform/alembic.ini upgrade head --sql`. Compatibility
+revisions that inspect live schema state remain online-only in practice; during offline SQL
+generation they either no-op because the baseline revisions already own the final schema or emit the
+canonical handoff-index cleanup SQL needed for fresh-install `head` output.
 
 ### 2. Shared SQLAlchemy table layer
 

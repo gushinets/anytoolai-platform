@@ -52,8 +52,9 @@ def run_migrations_online() -> None:
             context.run_migrations()
 
 
+_ensure_repo_root_on_sys_path()
+
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    _ensure_repo_root_on_sys_path()
     run_migrations_online()

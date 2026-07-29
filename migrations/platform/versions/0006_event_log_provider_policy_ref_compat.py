@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 
 revision = "0006"
 down_revision = "0005"
@@ -33,6 +33,8 @@ def _rename_column(old_name: str, new_name: str) -> None:
 
 
 def upgrade() -> None:
+    if context.is_offline_mode():
+        return
     bind = op.get_bind()
     has_old_column = _has_column(
         bind,
@@ -50,6 +52,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if context.is_offline_mode():
+        return
     bind = op.get_bind()
     has_old_column = _has_column(
         bind,

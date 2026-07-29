@@ -69,3 +69,11 @@ Restoring one checkout block in a workflow with several identical checkout steps
 `apply_patch` context matched the first job instead of the intended PostgreSQL job. Including the
 unique job name in the patch context and verifying against the parent revision caught the mismatch
 before commit.
+
+## 2026-07-29 19:32 - Codex (GPT-5) - Windows
+
+Validating `uv run alembic -c ..\\..\\migrations\\platform\\alembic.ini upgrade head --sql` from
+`apps\\platform-api` -> `uv` tried to rebuild transitive dependency `litellm` and failed because
+`link.exe` was unavailable for the Rust-backed wheel build. Running the same Alembic CLI through the
+repo-root `.venv\\Scripts\\python.exe -m alembic` succeeded, so a documented repo-level Alembic
+entrypoint or a lighter nested-project dependency path would avoid this unrelated toolchain trap.

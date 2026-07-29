@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 from uuid import uuid4
@@ -20,6 +21,7 @@ POSTGRES_TEST_DATABASE_URL_ENV = "ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"
 def test_migrations_script_location_resolves_to_repo_migrations_dir() -> None:
     assert migrate.MIGRATIONS_SCRIPT_LOCATION.is_dir()
     assert (migrate.MIGRATIONS_SCRIPT_LOCATION / "env.py").is_file()
+    assert (migrate.MIGRATIONS_SCRIPT_LOCATION / "alembic.ini").is_file()
 
 
 def test_resolve_database_url_prefers_project_specific_env_var(monkeypatch) -> None:
@@ -172,3 +174,34 @@ def test_alembic_env_adds_repo_root_for_shared_migration_helpers(
         engine.dispose()
 
     assert version == _expected_head_revision()
+
+
+def test_alembic_offline_cli_generates_sql_from_non_repo_cwd(tmp_path: Path) -> None:
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "alembic",
+            "-c",
+            str(migrate.MIGRATIONS_SCRIPT_LOCATION / "alembic.ini"),
+            "upgrade",
+            "head",
+            "--sql",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+
+    combined_output = f"{result.stdout}\n{result.stderr}"
+
+    assert result.returncode == 0, combined_output
+    assert "CREATE TABLE platform.product_handoffs" in result.stdout
+    assert "DROP INDEX IF EXISTS platform.ix_product_handoffs_target_session" in result.stdout
+    assert "CREATE INDEX IF NOT EXISTS platform.ix_product_handoffs_status_expiry" in result.stdout
+    assert "ModuleNotFoundError" not in combined_output
+    assert "NoInspectionAvailable" not in combined_output
