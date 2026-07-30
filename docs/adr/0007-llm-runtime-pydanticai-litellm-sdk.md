@@ -86,7 +86,7 @@ Rules:
 - transport retries are owned by AnytoolAI ProviderGateway around LiteLLM SDK calls;
 - validation retries are owned by PydanticAI;
 - LiteLLM SDK hidden retries are disabled in MVP-A with `num_retries=0` per physical attempt;
-- AnytoolAI enforces `max_physical_provider_calls_per_action` before every physical call;
+- AnytoolAI enforces `max_physical_provider_calls_per_action` before every physical call, against one counter shared for the whole action across all PydanticAI validation retries (not reset per validation attempt);
 - PydanticAI fallback models are not used while LiteLLM owns the fallback/routing surface.
 
 This avoids retry multiplication such as `2 validation attempts * 2 hidden transport retries` becoming four untracked provider hits.

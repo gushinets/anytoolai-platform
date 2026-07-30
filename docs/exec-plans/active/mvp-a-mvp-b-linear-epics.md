@@ -387,7 +387,7 @@ the frontend.
 
 **Implementation notes for assignee:** e2e tests should assert not only API response, but DB rows, event_log entries, action_runs, provider_calls and artifacts. Use fake provider, isolated clean DB, deterministic fixture keys and the same command wired into quick_check; browser/extension automation remains outside this task.
 
-**LLM runtime alignment:** add E2E coverage for retry accounting, including validation retry plus transport retry not exceeding `max_physical_provider_calls_per_action`, LiteLLM SDK `num_retries=0` in MVP mode, one `provider_calls` row per physical attempt, raw plus normalized artifact behavior, and final AnytoolAI validation after PydanticAI output handling.
+**LLM runtime alignment:** add E2E coverage for retry accounting, including validation retry plus transport retry together (via one physical-call budget shared for the whole action, not reset per validation attempt) not exceeding `max_physical_provider_calls_per_action`, LiteLLM SDK `num_retries=0` in MVP mode, one `provider_calls` row per physical attempt, raw plus normalized artifact behavior, and final AnytoolAI validation after PydanticAI output handling.
 
 ### A21b. Handoff E2E Tests
 

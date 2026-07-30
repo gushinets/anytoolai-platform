@@ -53,7 +53,7 @@ ALLOWED_PYDANTIC_AI_MODULE_ROOT = (
 )
 FORBIDDEN_ADAPTER_IMPORT_PREFIX = "anytoolai_platform_core.providers.adapters"
 FORBIDDEN_PROVIDER_IMPORT_PARENT = "anytoolai_platform_core.providers"
-ALLOWED_GATEWAY_MODULE = (
+ALLOWED_GATEWAY_MODULE_ROOT = (
     ROOT
     / "packages"
     / "backend"
@@ -61,7 +61,7 @@ ALLOWED_GATEWAY_MODULE = (
     / "src"
     / "anytoolai_platform_core"
     / "providers"
-    / "gateway.py"
+    / "gateway"
 )
 
 
@@ -115,7 +115,7 @@ def test_no_direct_provider_adapter_imports_outside_provider_boundary() -> None:
     for path in _python_files():
         if path.is_relative_to(ALLOWED_ADAPTER_MODULE_ROOT):
             continue
-        if path == ALLOWED_GATEWAY_MODULE:
+        if path.is_relative_to(ALLOWED_GATEWAY_MODULE_ROOT):
             continue
         if "tests" in path.parts:
             continue

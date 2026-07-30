@@ -15,14 +15,26 @@ from sqlalchemy import event
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
+from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.providers.gateway import (
+    ProviderGateway,
+    ProviderGatewayExecutionError,
+)
 from anytoolai_platform_core.providers.models import ProviderCallRecord
 from anytoolai_platform_core.providers.models import ProviderCallStatus, ProviderResponse
 from anytoolai_platform_core.providers.models import ProviderRequest
-from anytoolai_platform_core.providers.models import ProviderValidationRetryPolicy
+from anytoolai_platform_core.providers.models import (
+    ProviderPolicy,
+    ProviderRetryHardLimits,
+    ProviderRetryPolicy,
+    ProviderTransportRetryPolicy,
+    ProviderValidationRetryPolicy,
+)
+from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
-from anytoolai_platform_core.storage.db import artifacts_table
+from anytoolai_platform_core.storage.db import artifacts_table, provider_calls_table
 from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
@@ -265,6 +277,9 @@ def test_structured_llm_executor_owns_validation_retries_through_gateway_dtos() 
         1,
         2,
     ]
+    assert {gateway_request.action_run_id for gateway_request in spy_gateway.requests} == {
+        "action_run_demo"
+    }
 
 
 def test_structured_llm_executor_finalizes_and_persists_structured_artifact(
@@ -471,6 +486,128 @@ def test_structured_llm_executor_raises_safe_error_and_persists_debug_artifact_a
     assert artifact_rows[0]["artifact_type"] == "structured_output_debug_raw"
     assert artifact_rows[0]["content_text"] == "not-json"
     assert artifact_rows[0]["metadata"]["error_code"] == STRUCTURED_OUTPUT_VALIDATION_ERROR_CODE
+
+
+class _AlwaysInvalidJsonAdapter:
+    """Forces PydanticAI semantic validation to retry on every physical call."""
+
+    def __init__(self) -> None:
+        self.call_count = 0
+
+    async def complete(self, request: Any) -> ProviderResponse:
+        self.call_count += 1
+        return ProviderResponse(
+            provider_policy_ref=request.provider_policy_ref,
+            provider=request.provider,
+            model=request.model,
+            output_text="not-json",
+            status=ProviderCallStatus.succeeded,
+        )
+
+
+def _build_provider_policy_resolver(policy: ProviderPolicy) -> ProviderPolicyResolver:
+    return ProviderPolicyResolver(
+        ConfigRegistry(
+            loaded_from=CONFIG_ROOT,
+            tenants={},
+            regions={},
+            provider_policies={policy.provider_policy_ref: policy},
+            action_definitions={},
+            action_configurations={},
+            workflows={},
+            scenarios={},
+            products={},
+            prompts={},
+            schemas={},
+            quotas={},
+            handoffs={},
+        )
+    )
+
+
+def test_structured_llm_executor_shares_physical_call_budget_across_validation_retries(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """E2E regression for ANY-149.
+
+    Wires a real ``ProviderGateway`` + real ``PydanticAIStructuredRunner`` exactly
+    the way ``StructuredLlmActionExecutor.execute()`` does in production, and forces
+    PydanticAI to keep retrying semantic validation (via ``ModelRetry``) on every
+    attempt. Before the fix, each semantic retry got its own fresh
+    ``max_physical_provider_calls_per_action`` budget; after the fix, the hard limit
+    must fire on the physical call that pushes the *action-wide* total past the
+    configured limit, regardless of how many semantic attempts are still allowed.
+    """
+
+    registry = build_config_registry(CONFIG_ROOT)
+    adapter = _AlwaysInvalidJsonAdapter()
+    gateway_policy = ProviderPolicy(
+        provider_policy_ref="default_fake_provider_v1",
+        provider="fake",
+        model="fake-json-v1",
+        retry_policy=ProviderRetryPolicy(
+            transport=ProviderTransportRetryPolicy(
+                owner="fake_adapter",
+                max_attempts=1,
+                litellm_num_retries_per_attempt=0,
+            ),
+            validation=ProviderValidationRetryPolicy(owner="pydanticai", max_attempts=5),
+            hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=2),
+        ),
+    )
+    gateway = ProviderGateway(
+        {"fake": adapter},
+        _build_provider_policy_resolver(gateway_policy),
+    )
+
+    base_policy = registry.get_provider_policy("default_fake_provider_v1")
+    assert base_policy is not None
+
+    with transaction_boundary(session_factory) as session:
+        executor = StructuredLlmActionExecutor(
+            config_registry=registry,
+            provider_gateway=gateway,
+        )
+        executor._require_provider_policy = lambda _provider_policy_ref: replace(
+            base_policy,
+            retry_policy=replace(
+                base_policy.retry_policy,
+                validation=ProviderValidationRetryPolicy(
+                    owner=base_policy.retry_policy.validation.owner,
+                    max_attempts=5,
+                ),
+            ),
+        )
+        request = StructuredLlmActionRequest(
+            tenant_id="tenant_demo",
+            region="eu-central",
+            product_id="kernel_demo",
+            frontend_id="kernel_demo_ce",
+            scenario_session_id="scenario_session_demo",
+            job_id="job_demo",
+            workflow_id="kernel_demo.single_action_extract_v1",
+            workflow_version=1,
+            step_id="extract",
+            action_run_id="action_run_demo",
+            action_config_id="kernel_demo.extract_structured_fields_v1",
+            input_payload={"source_text": "Budget and timeline details"},
+        )
+
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+            asyncio.run(executor.execute(request, session=session))
+        rows = list(
+            session.execute(
+                sa.select(provider_calls_table).order_by(
+                    provider_calls_table.c.physical_call_index
+                )
+            ).mappings()
+        )
+
+    assert exc_info.value.error_code == "provider_physical_call_limit_exceeded"
+    assert adapter.call_count == 2
+    assert len(rows) == 2
+    assert [row["physical_call_index"] for row in rows] == [1, 2]
+    assert [row["semantic_attempt_index"] for row in rows] == [1, 2]
 
 
 def test_pydanticai_runner_reraises_non_validation_unexpected_model_behavior(

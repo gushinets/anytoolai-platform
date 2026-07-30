@@ -28,7 +28,7 @@ from anytoolai_platform_core.events.replay import (
     sequence_existing_replay_event,
 )
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
-from anytoolai_platform_core.providers.gateway import _emit_recovered_provider_events
+from anytoolai_platform_core.providers.gateway.recovery import emit_recovered_provider_events
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.storage.transactions import (
     RollbackRecoveryPhase,
@@ -608,7 +608,7 @@ def _emit_recovered_action_events(
         )
 
     for provider_call in provider_call_repository.list_for_action_run(action_run.id):
-        _emit_recovered_provider_events(
+        emit_recovered_provider_events(
             event_log_repository,
             provider_call,
             timestamp_sequencer=timestamp_sequencer,
