@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import atexit
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -7,8 +8,6 @@ from typing import Any
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
@@ -43,11 +42,19 @@ from anytoolai_platform_core.storage.db import event_log_table, product_handoffs
 from anytoolai_platform_core.storage.transactions import build_session_factory, transaction_boundary
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
-from sqlalchemy import event
+from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 SHA256_HEX_LENGTH = 64
+pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
+_POSTGRES_TEST_CONTEXTS: list[Any] = []
+
+
+@atexit.register
+def _cleanup_postgres_test_contexts() -> None:
+    while _POSTGRES_TEST_CONTEXTS:
+        _POSTGRES_TEST_CONTEXTS.pop().__exit__(None, None, None)
 
 
 def test_handoff_token_service_enforces_256_bit_minimum() -> None:
@@ -210,22 +217,13 @@ def test_handoff_event_helper_preserves_canonical_correlation(tmp_path: Path) ->
         assert event_row["properties"]["target_job_id"] is None
 
 
-def _session_factory(tmp_path: Path):
-    main_db = tmp_path / "handoff-main.sqlite3"
-    platform_db = tmp_path / "handoff-platform.sqlite3"
-    engine = sa.create_engine(f"sqlite+pysqlite:///{main_db.as_posix()}", future=True)
-
-    @event.listens_for(engine, "connect")
-    def attach(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        dbapi_connection.execute(f"ATTACH DATABASE '{platform_db.as_posix()}' AS platform")
-
-    config = Config()
-    config.set_main_option("script_location", str(REPO_ROOT / "migrations" / "platform"))
-    config.set_main_option("sqlalchemy.url", f"sqlite+pysqlite:///{main_db.as_posix()}")
-    with engine.begin() as connection:
-        config.attributes["connection"] = connection
-        command.upgrade(config, "head")
+def _session_factory(_tmp_path: Path):
+    context = provision_database(
+        database_name_prefix="anytoolai_handoffs_unit_test",
+        skip_reason="PostgreSQL handoff unit coverage",
+    )
+    engine, _alembic_config, _database_url = context.__enter__()
+    _POSTGRES_TEST_CONTEXTS.append(context)
     return build_session_factory(engine)
 
 

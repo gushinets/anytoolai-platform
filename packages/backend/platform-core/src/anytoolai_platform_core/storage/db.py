@@ -6,7 +6,7 @@ from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.engine import Engine, URL
+from sqlalchemy.engine import Engine, URL, make_url
 
 from anytoolai_platform_core.actions.models import ActionRunStatus
 from anytoolai_platform_core.artifacts.models import ArtifactStatus
@@ -29,6 +29,13 @@ POSTGRES_INTERNAL_HOST_ENV = "ANYTOOLAI_POSTGRES_INTERNAL_HOST"
 POSTGRES_INTERNAL_PORT_ENV = "ANYTOOLAI_POSTGRES_INTERNAL_PORT"
 _DEFAULT_POSTGRES_INTERNAL_HOST = "postgres"
 _DEFAULT_POSTGRES_INTERNAL_PORT = 5432
+
+
+def require_postgresql_url(database_url: str | URL, *, context: str) -> URL:
+    url = database_url if isinstance(database_url, URL) else make_url(database_url)
+    if not url.drivername.startswith("postgresql"):
+        raise RuntimeError(f"{context} requires a PostgreSQL database URL")
+    return url
 
 
 def build_postgres_url_from_env() -> str | None:
@@ -81,6 +88,7 @@ class UtcDateTime(sa.TypeDecorator[datetime]):
 
 
 def create_sync_engine(database_url: str, **kwargs: Any) -> Engine:
+    require_postgresql_url(database_url, context="Runtime storage")
     return sa.create_engine(database_url, future=True, **kwargs)
 
 
@@ -105,6 +113,18 @@ def _enum_type(enum_type: type[Any], name: str) -> sa.Enum:
 runtime_metadata = sa.MetaData(schema=PLATFORM_SCHEMA)
 json_document = _json_document_type()
 utc_datetime = UtcDateTime()
+
+GUEST_QUOTA_USAGE_DIMENSION_CONSTRAINT_NAME = "uq_guest_quota_usage_dimension"
+GUEST_QUOTA_USAGE_DIMENSION_COLUMN_NAMES = (
+    "tenant_id",
+    "region",
+    "guest_id",
+    "product_id",
+    "quota_policy_id",
+    "quota_dimension",
+    "dimension_key",
+    "period_key",
+)
 
 scenario_sessions_table = sa.Table(
     "scenario_sessions",
@@ -328,15 +348,8 @@ guest_quota_usage_table = sa.Table(
         name="fk_guest_quota_usage_guest_id",
     ),
     sa.UniqueConstraint(
-        "tenant_id",
-        "region",
-        "guest_id",
-        "product_id",
-        "quota_policy_id",
-        "quota_dimension",
-        "dimension_key",
-        "period_key",
-        name="uq_guest_quota_usage_dimension",
+        *GUEST_QUOTA_USAGE_DIMENSION_COLUMN_NAMES,
+        name=GUEST_QUOTA_USAGE_DIMENSION_CONSTRAINT_NAME,
     ),
     sa.Index("ix_guest_quota_usage_guest_product", "guest_id", "product_id"),
     sa.Index("ix_guest_quota_usage_dimension", "quota_dimension", "dimension_key"),

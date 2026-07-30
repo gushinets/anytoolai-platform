@@ -4,12 +4,10 @@ import asyncio
 from dataclasses import asdict, replace
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.common.time import utc_now
@@ -47,42 +45,21 @@ from anytoolai_platform_worker.composition import build_worker
 from anytoolai_platform_worker.handlers.run_workflow import RunWorkflowHandler
 from anytoolai_platform_worker.queues import DatabaseJobQueue, WorkflowJobMessage
 from anytoolai_platform_worker.worker import Worker
-from sqlalchemy import event
+from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
-
-
-def _sqlite_url(database_path: Path) -> str:
-    return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
+pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
 
 @pytest.fixture
-def session_factory(tmp_path: Path) -> sa.orm.sessionmaker[sa.orm.Session]:
-    main_db = tmp_path / "worker-main.sqlite3"
-    platform_db = tmp_path / "worker-platform.sqlite3"
-    engine = sa.create_engine(_sqlite_url(main_db), future=True)
-
-    @event.listens_for(engine, "connect")
-    def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
-        )
-
-    alembic_config = Config()
-    alembic_config.set_main_option(
-        "script_location", str(REPO_ROOT / "migrations" / "platform")
-    )
-    alembic_config.set_main_option("sqlalchemy.url", _sqlite_url(main_db))
-    with engine.begin() as connection:
-        alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "head")
-
-    factory = build_session_factory(engine)
-    yield factory
-    engine.dispose()
+def session_factory() -> Iterator[sa.orm.sessionmaker[sa.orm.Session]]:
+    with provision_database(
+        database_name_prefix="anytoolai_worker_boot_test",
+        skip_reason="PostgreSQL worker boot coverage",
+    ) as (engine, _alembic_config, _database_url):
+        yield build_session_factory(engine)
 
 
 def _scenario(**metadata: Any) -> ScenarioSessionRecord:

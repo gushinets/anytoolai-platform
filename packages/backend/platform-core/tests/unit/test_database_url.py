@@ -8,6 +8,7 @@ from anytoolai_platform_core.storage.db import (
     POSTGRES_PASSWORD_ENV,
     POSTGRES_USER_ENV,
     build_postgres_url_from_env,
+    create_sync_engine,
 )
 
 
@@ -112,3 +113,8 @@ def test_build_postgres_url_from_env_supports_host_and_port_override(
     url = make_url(build_postgres_url_from_env())
     assert url.host == "postgres.svc.cluster.local"
     assert url.port == 6543
+
+
+def test_create_sync_engine_rejects_non_postgresql_urls() -> None:
+    with pytest.raises(RuntimeError, match="PostgreSQL"):
+        create_sync_engine("sqlite:///tmp.db")

@@ -20,21 +20,10 @@ idempotent compatibility revision for databases that were stamped through the fo
 `0004` before A17 landed; it creates `product_handoffs` only when missing and has a no-op downgrade.
 Email capture and paywall intent remain separate access-lite slices.
 
-Migration `0009` adds `scenario_sessions.idempotency_key` / `idempotency_request_hash` plus the
-`uq_scenario_sessions_idempotency_key` unique constraint (ANY-150). It is a genuine forward-only,
-reversible migration (real `downgrade()`, idempotent guards in both directions) -- `0001` itself is
-never edited retroactively. On PostgreSQL the constraint is added with a plain `ALTER TABLE`. SQLite
-has no `ALTER TABLE ... ADD CONSTRAINT`, so the constraint is applied via
-`op.batch_alter_table(recreate="always")`, validated against this repo's `ATTACH DATABASE ... AS
-platform` test schema. `NULL` is distinct from itself in both dialects' unique-constraint semantics,
-so a start with `guest_id IS NULL` (pure `user_id` path) is not deduplicated by this constraint.
-This is a known, accepted gap, not a defect to fix in ANY-150.
-
-Migration `0010` repairs legacy handoff indexes for already-upgraded databases.
-
-For handoff-specific migration helpers, treat `migrations/platform/_handoffs_table.py` as the
-canonical place for new shared table/index checks. Historical compatibility revision `0008` keeps
-its inline `has_table(...)` guard intentionally so that the revision remains self-contained.
+Historical handoff compatibility revisions keep their schema checks and index-repair logic inline so
+the recorded Alembic history does not depend on future edits to mutable helper modules. Revision
+`0008` intentionally keeps its inline `has_table(...)` guard for that reason, and later handoff
+compatibility logic follows the same self-contained pattern.
 
 `alembic.ini` in this directory is the checked-in CLI config for explicit Alembic invocations such
 as offline SQL generation:

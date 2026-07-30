@@ -2,13 +2,10 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
-from sqlalchemy import event
 
 from anytoolai_platform_core.artifacts.models import ArtifactRecord
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
@@ -20,41 +17,19 @@ from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
 )
+from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-
-
-def _sqlite_url(database_path: Path) -> str:
-    return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
+pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
 
 @pytest.fixture
-def session_factory(tmp_path: Path) -> sa.orm.sessionmaker[sa.orm.Session]:
-    main_db = tmp_path / "artifact-service-main.sqlite3"
-    platform_db = tmp_path / "artifact-service-platform.sqlite3"
-    engine = sa.create_engine(_sqlite_url(main_db), future=True)
-
-    @event.listens_for(engine, "connect")
-    def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
-        )
-
-    alembic_config = Config()
-    alembic_config.set_main_option(
-        "script_location", str(REPO_ROOT / "migrations" / "platform")
-    )
-    alembic_config.set_main_option("sqlalchemy.url", _sqlite_url(main_db))
-
-    with engine.begin() as connection:
-        alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "head")
-
-    try:
+def session_factory() -> Iterator[sa.orm.sessionmaker[sa.orm.Session]]:
+    with provision_database(
+        database_name_prefix="anytoolai_artifact_service_test",
+        skip_reason="PostgreSQL artifact service coverage",
+    ) as (engine, _alembic_config, _database_url):
         yield build_session_factory(engine)
-    finally:
-        engine.dispose()
 
 
 def _make_artifact(**overrides: Any) -> ArtifactRecord:

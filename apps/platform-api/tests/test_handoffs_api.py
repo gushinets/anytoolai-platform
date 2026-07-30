@@ -6,9 +6,10 @@ from datetime import UTC, datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Iterator
 
 import httpx
+import pytest
 import sqlalchemy as sa
 from anytoolai_platform_api.main import _safe_request_path
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
@@ -24,12 +25,14 @@ from anytoolai_platform_core.storage.db import (
     provider_calls_table,
     scenario_sessions_table,
 )
-from anytoolai_platform_core.storage.transactions import transaction_boundary
+from anytoolai_platform_core.storage.transactions import build_session_factory, transaction_boundary
+from anytoolai_platform_core.storage.transactions import SessionFactory
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
 from starlette.requests import Request
-from test_scenario_runtime_api import CONFIG_ROOT, _build_session_factory, _create_test_app
+from tests.db_support import provision_database
+from test_scenario_runtime_api import CONFIG_ROOT, _create_test_app
 
 FIXTURE_ROOT = (
     Path(__file__).resolve().parents[3]
@@ -38,6 +41,16 @@ FIXTURE_ROOT = (
     / "provider"
     / "fake_provider_outputs"
 )
+pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
+
+
+@pytest.fixture
+def session_factory() -> Iterator[SessionFactory]:
+    with provision_database(
+        database_name_prefix="anytoolai_handoffs_api_test",
+        skip_reason="PostgreSQL handoffs API coverage",
+    ) as (engine, _alembic_config, _database_url):
+        yield build_session_factory(engine)
 
 
 def _seed_source(session) -> tuple[str, str]:
@@ -156,8 +169,10 @@ def test_handoff_token_is_redacted_from_request_log_path() -> None:
     assert _safe_request_path(mixed_case_request) == "/V1/HANDOFFS/{handoff_token}/accept"
 
 
-def test_handoff_api_create_preview_accept_decline_and_expiry(tmp_path: Path) -> None:
-    factory = _build_session_factory(tmp_path)
+def test_handoff_api_create_preview_accept_decline_and_expiry(
+    session_factory: SessionFactory,
+) -> None:
+    factory = session_factory
     app = _create_test_app(factory)
     with transaction_boundary(factory) as session:
         source_id, artifact_id = _seed_source(session)
@@ -244,8 +259,10 @@ def test_handoff_api_create_preview_accept_decline_and_expiry(tmp_path: Path) ->
         assert "handoff.expired" in event_types
 
 
-def test_handoff_api_persists_failed_acceptance_and_openapi_contract(tmp_path: Path) -> None:
-    factory = _build_session_factory(tmp_path)
+def test_handoff_api_persists_failed_acceptance_and_openapi_contract(
+    session_factory: SessionFactory,
+) -> None:
+    factory = session_factory
     app = _create_test_app(factory)
     with transaction_boundary(factory) as session:
         source_id, artifact_id = _seed_source(session)
@@ -291,8 +308,10 @@ def test_handoff_api_persists_failed_acceptance_and_openapi_contract(tmp_path: P
     assert "/v1/handoffs/{handoff_token}/decline" in paths
 
 
-def test_immediate_handoff_quota_exhaustion_is_durable_and_safe(tmp_path: Path) -> None:
-    factory = _build_session_factory(tmp_path)
+def test_immediate_handoff_quota_exhaustion_is_durable_and_safe(
+    session_factory: SessionFactory,
+) -> None:
+    factory = session_factory
     app = _create_test_app(factory)
     registry = app.state.runtime.config_registry
     policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
@@ -378,8 +397,10 @@ def test_immediate_handoff_quota_exhaustion_is_durable_and_safe(tmp_path: Path) 
     assert handoff_event_types.count("handoff.failed") == 1
 
 
-def test_immediate_handoff_worker_keeps_target_runtime_lineage(tmp_path: Path) -> None:
-    factory = _build_session_factory(tmp_path)
+def test_immediate_handoff_worker_keeps_target_runtime_lineage(
+    session_factory: SessionFactory,
+) -> None:
+    factory = session_factory
     app = _create_test_app(factory)
     with transaction_boundary(factory) as session:
         source_id, artifact_id = _seed_source(session)

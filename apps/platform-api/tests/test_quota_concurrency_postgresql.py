@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-import os
+from contextlib import contextmanager
 from dataclasses import replace
 from http import HTTPStatus
-from uuid import uuid4
+from typing import Iterator
 
 import httpx
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from anytoolai_platform_api.routers.handoffs import _service as _handoff_service
 from anytoolai_platform_core.handoffs.models import AcceptHandoffCommand
 from anytoolai_platform_core.handoffs.service import HandoffAcceptanceExecutionError
@@ -23,20 +21,31 @@ from anytoolai_platform_core.storage.db import (
     scenario_sessions_table,
 )
 from anytoolai_platform_core.storage.transactions import (
+    SessionFactory,
     build_session_factory,
     transaction_boundary,
 )
-from sqlalchemy.engine import URL, make_url
+from tests.db_support import provision_database
 from test_handoffs_api import _create as _create_handoff
 from test_handoffs_api import _seed_source as _seed_handoff_source
 from test_scenario_runtime_api import (
-    REPO_ROOT,
     _create_test_app,
     _start_payload,
 )
 
-POSTGRES_TEST_DATABASE_URL_ENV = "ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"
 TEST_GUEST_QUOTA_LIMIT = 3
+
+
+@contextmanager
+def _provision_api_app(
+    database_name_prefix: str,
+) -> Iterator[tuple[SessionFactory, object]]:
+    with provision_database(
+        database_name_prefix=database_name_prefix,
+        skip_reason="PostgreSQL quota concurrency coverage",
+    ) as (engine, _alembic_config, _database_url):
+        session_factory = build_session_factory(engine)
+        yield session_factory, _create_test_app(session_factory)
 
 
 @pytest.mark.postgresql
@@ -47,16 +56,7 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
     Set ANYTOOLAI_POSTGRES_TEST_DATABASE_URL to a PostgreSQL maintenance database URL. The test
     creates and drops its own disposable database, then runs the real Alembic migration chain.
     """
-
-    maintenance_url = _require_postgres_test_url()
-    database_name = f"anytoolai_a13_quota_test_{uuid4().hex[:12]}"
-    test_url = maintenance_url.set(database=database_name)
-    _create_database(maintenance_url, database_name)
-    engine = sa.create_engine(test_url, future=True)
-    try:
-        _upgrade_database(engine, test_url)
-        session_factory = build_session_factory(engine)
-        app = _create_test_app(session_factory)
+    with _provision_api_app("anytoolai_a13_quota_test") as (session_factory, app):
         quota_limit = _scenario_start_quota_limit(app)
         request_count = max(quota_limit + 5, 8)
 
@@ -99,18 +99,19 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
             job_count = session.execute(
                 sa.select(sa.func.count()).select_from(jobs_table)
             ).scalar_one()
-            usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+            usages = list(session.execute(sa.select(guest_quota_usage_table)).mappings())
             event_types = list(session.execute(sa.select(event_log_table.c.event_type)).scalars())
 
         assert scenario_count == quota_limit
         assert job_count == quota_limit
+        assert len(usages) == 1
+        usage = usages[0]
         assert usage["used_count"] == quota_limit
         assert usage["limit_count"] == quota_limit
+        assert usage["quota_dimension"] == "product"
+        assert usage["dimension_key"] == "kernel_demo"
         assert event_types.count("quota.consumed") == quota_limit
         assert event_types.count("quota.exhausted") == request_count - quota_limit
-    finally:
-        engine.dispose()
-        _drop_database(maintenance_url, database_name)
 
 
 @pytest.mark.postgresql
@@ -206,15 +207,7 @@ def test_postgresql_concurrent_duplicate_submit_with_idempotency_key_consumes_qu
 def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_independent_counters() -> (
     None
 ):
-    maintenance_url = _require_postgres_test_url()
-    database_name = f"anytoolai_a13_scenario_quota_test_{uuid4().hex[:12]}"
-    test_url = maintenance_url.set(database=database_name)
-    _create_database(maintenance_url, database_name)
-    engine = sa.create_engine(test_url, future=True)
-    try:
-        _upgrade_database(engine, test_url)
-        session_factory = build_session_factory(engine)
-        app = _create_test_app(session_factory)
+    with _provision_api_app("anytoolai_a13_scenario_quota_test") as (session_factory, app):
         scenario_quota_limit = _force_scenario_guest_quota(app)
         scenario_ids = [
             "kernel_demo.single_action_smoke_v1",
@@ -316,23 +309,12 @@ def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_indepe
             assert usage["limit_count"] == scenario_quota_limit
         assert event_types.count("quota.consumed") == expected_ok
         assert event_types.count("quota.exhausted") == expected_rejected
-    finally:
-        engine.dispose()
-        _drop_database(maintenance_url, database_name)
 
 
 @pytest.mark.postgresql
 @pytest.mark.slow
 def test_postgresql_parallel_handoff_accept_creates_one_target() -> None:
-    maintenance_url = _require_postgres_test_url()
-    database_name = f"anytoolai_a17_handoff_test_{uuid4().hex[:12]}"
-    test_url = maintenance_url.set(database=database_name)
-    _create_database(maintenance_url, database_name)
-    engine = sa.create_engine(test_url, future=True)
-    try:
-        _upgrade_database(engine, test_url)
-        session_factory = build_session_factory(engine)
-        app = _create_test_app(session_factory)
+    with _provision_api_app("anytoolai_a17_handoff_test") as (session_factory, app):
         with transaction_boundary(session_factory) as session:
             source_session_id, artifact_id = _seed_handoff_source(session)
         created = _create_handoff(app, source_session_id, artifact_id).json()
@@ -382,23 +364,12 @@ def test_postgresql_parallel_handoff_accept_creates_one_target() -> None:
         assert target_session_count == 1
         assert target_job_count == 1
         assert accepted_events == 1
-    finally:
-        engine.dispose()
-        _drop_database(maintenance_url, database_name)
 
 
 @pytest.mark.postgresql
 @pytest.mark.slow
 def test_postgresql_parallel_exhausted_handoff_accept_recovers_quota_once() -> None:
-    maintenance_url = _require_postgres_test_url()
-    database_name = f"anytoolai_a17_handoff_exhausted_test_{uuid4().hex[:12]}"
-    test_url = maintenance_url.set(database=database_name)
-    _create_database(maintenance_url, database_name)
-    engine = sa.create_engine(test_url, future=True)
-    try:
-        _upgrade_database(engine, test_url)
-        session_factory = build_session_factory(engine)
-        app = _create_test_app(session_factory)
+    with _provision_api_app("anytoolai_a17_handoff_exhausted_test") as (session_factory, app):
         _force_zero_guest_quota(app)
         with transaction_boundary(session_factory) as session:
             source_session_id, artifact_id = _seed_handoff_source(session)
@@ -474,23 +445,12 @@ def test_postgresql_parallel_exhausted_handoff_accept_recovers_quota_once() -> N
         assert target_session_count == 0
         assert usage["limit_count"] == 0
         assert usage["used_count"] == 0
-    finally:
-        engine.dispose()
-        _drop_database(maintenance_url, database_name)
 
 
 @pytest.mark.postgresql
 @pytest.mark.slow
 def test_postgresql_quota_recovery_finalizes_without_router_transaction() -> None:
-    maintenance_url = _require_postgres_test_url()
-    database_name = f"anytoolai_a17_handoff_reservation_test_{uuid4().hex[:12]}"
-    test_url = maintenance_url.set(database=database_name)
-    _create_database(maintenance_url, database_name)
-    engine = sa.create_engine(test_url, future=True)
-    try:
-        _upgrade_database(engine, test_url)
-        session_factory = build_session_factory(engine)
-        app = _create_test_app(session_factory)
+    with _provision_api_app("anytoolai_a17_handoff_reservation_test") as (session_factory, app):
         _force_zero_guest_quota(app)
         with transaction_boundary(session_factory) as session:
             source_session_id, artifact_id = _seed_handoff_source(session)
@@ -557,80 +517,6 @@ def test_postgresql_quota_recovery_finalizes_without_router_transaction() -> Non
 
         assert repeated.status.value == "failed"
         assert handoff_failed_count == 1
-    finally:
-        engine.dispose()
-        _drop_database(maintenance_url, database_name)
-
-
-def _require_postgres_test_url() -> URL:
-    raw_url = os.getenv(POSTGRES_TEST_DATABASE_URL_ENV)
-    if not raw_url:
-        pytest.skip(
-            f"set {POSTGRES_TEST_DATABASE_URL_ENV} to run PostgreSQL quota concurrency coverage"
-        )
-    url = make_url(raw_url)
-    if not url.drivername.startswith("postgresql"):
-        pytest.fail(f"{POSTGRES_TEST_DATABASE_URL_ENV} must use a PostgreSQL dialect")
-    if not url.database:
-        pytest.fail(f"{POSTGRES_TEST_DATABASE_URL_ENV} must name a maintenance database")
-    return url
-
-
-def _upgrade_database(engine: sa.Engine, database_url: URL) -> None:
-    alembic_config = Config()
-    alembic_config.set_main_option(
-        "script_location",
-        str(REPO_ROOT / "migrations" / "platform"),
-    )
-    alembic_config.set_main_option(
-        "sqlalchemy.url",
-        database_url.render_as_string(hide_password=False),
-    )
-    with engine.begin() as connection:
-        alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "head")
-
-
-def _create_database(maintenance_url: URL, database_name: str) -> None:
-    engine = sa.create_engine(
-        maintenance_url,
-        future=True,
-        isolation_level="AUTOCOMMIT",
-    )
-    try:
-        with engine.connect() as connection:
-            connection.execute(sa.text(f"CREATE DATABASE {_quote_identifier(database_name)}"))
-    except sa.exc.OperationalError as exc:
-        pytest.fail(f"could not connect to PostgreSQL test database: {exc}")
-    finally:
-        engine.dispose()
-
-
-def _drop_database(maintenance_url: URL, database_name: str) -> None:
-    engine = sa.create_engine(
-        maintenance_url,
-        future=True,
-        isolation_level="AUTOCOMMIT",
-    )
-    try:
-        with engine.connect() as connection:
-            connection.execute(
-                sa.text(
-                    "SELECT pg_terminate_backend(pid) "
-                    "FROM pg_stat_activity "
-                    "WHERE datname = :database_name AND pid <> pg_backend_pid()"
-                ),
-                {"database_name": database_name},
-            )
-            connection.execute(
-                sa.text(f"DROP DATABASE IF EXISTS {_quote_identifier(database_name)}")
-            )
-    finally:
-        engine.dispose()
-
-
-def _quote_identifier(value: str) -> str:
-    return '"' + value.replace('"', '""') + '"'
 
 
 def _scenario_start_quota_limit(app) -> int:

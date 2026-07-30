@@ -4,20 +4,13 @@ import asyncio
 from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import httpx
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from anytoolai_platform_api.bootstrap import RuntimeStorageDependencies
 from anytoolai_platform_api.main import create_app
-from anytoolai_platform_api.routers.scenario_runtime import (
-    SAFE_IDEMPOTENCY_KEY_INVALID_422_EXAMPLE,
-    _runtime_service,
-    _status_code_for_platform_error,
-)
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.events.emitter import EventEmitter
@@ -25,19 +18,13 @@ from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.identity.models import GuestIdentityRecord
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
-from anytoolai_platform_core.quotas.models import QuotaDimension
-from anytoolai_platform_core.quotas.service import QuotaExhaustedError
 from anytoolai_platform_core.scenarios.checkpoints import (
     FAILED_CHECKPOINT_ID,
     PROCESSING_CHECKPOINT_ID,
     RESULT_READY_CHECKPOINT_ID,
 )
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
-from anytoolai_platform_core.scenarios.service import (
-    IdempotencyKeyConflictError,
-    IdempotencyKeyInvalidError,
-    ScenarioSessionService,
-)
+from anytoolai_platform_core.scenarios.service import ScenarioSessionService
 from anytoolai_platform_core.storage.db import (
     action_runs_table,
     artifacts_table,
@@ -48,39 +35,32 @@ from anytoolai_platform_core.storage.db import (
     scenario_sessions_table,
 )
 from anytoolai_platform_core.storage.transactions import (
+    SessionFactory,
     build_session_factory,
     transaction_boundary,
 )
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
-from sqlite_harness import build_sqlite_runtime_engine, sqlite_url
+from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
+pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
 
-def _build_session_factory(tmp_path: Path) -> sa.orm.sessionmaker[sa.orm.Session]:
-    main_db = tmp_path / "api-main.sqlite3"
-    platform_db = tmp_path / "api-platform.sqlite3"
-    engine = build_sqlite_runtime_engine(main_db, platform_db, concurrent_writes=True)
-
-    alembic_config = Config()
-    alembic_config.set_main_option(
-        "script_location", str(REPO_ROOT / "migrations" / "platform")
-    )
-    alembic_config.set_main_option("sqlalchemy.url", sqlite_url(main_db))
-
-    with engine.begin() as connection:
-        alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "head")
-
-    return build_session_factory(engine)
+@pytest.fixture
+def session_factory() -> Iterator[SessionFactory]:
+    with provision_database(
+        database_name_prefix="anytoolai_scenario_runtime_api_test",
+        skip_reason="PostgreSQL scenario runtime API coverage",
+    ) as (engine, _alembic_config, _database_url):
+        yield build_session_factory(engine)
 
 
 def _create_test_app(
-    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    session_factory: SessionFactory,
 ):
     with transaction_boundary(session_factory) as session:
         GuestIdentityRepository(session).create(
@@ -98,22 +78,6 @@ def _create_test_app(
     return app
 
 
-def _with_scenario_dimension(app, policy_id: str) -> None:
-    registry = app.state.runtime.config_registry
-    policy = registry.get_quota_policy(policy_id)
-    assert policy is not None
-    app.state.runtime = replace(
-        app.state.runtime,
-        config_registry=replace(
-            registry,
-            quotas={
-                **dict(registry.quotas),
-                policy.quota_policy_id: replace(policy, dimension=QuotaDimension.scenario),
-            },
-        ),
-    )
-
-
 async def _request(
     app,
     method: str,
@@ -121,7 +85,6 @@ async def _request(
     *,
     json: Any | None = None,
     request_id: str = "req_scenario_runtime_test",
-    headers: dict[str, str] | None = None,
 ) -> httpx.Response:
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -129,7 +92,7 @@ async def _request(
             method,
             path,
             json=json,
-            headers={"X-Request-ID": request_id, **(headers or {})},
+            headers={"X-Request-ID": request_id},
         )
 
 
@@ -144,7 +107,7 @@ def _start_payload(**overrides: Any) -> dict[str, Any]:
 
 
 def _mark_running(
-    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    session_factory: SessionFactory,
     *,
     scenario_session_id: str,
     job_id: str,
@@ -165,7 +128,7 @@ def _mark_running(
 
 
 def _mark_completed(
-    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    session_factory: SessionFactory,
     *,
     scenario_session_id: str,
     job_id: str,
@@ -223,7 +186,7 @@ def _mark_completed(
 
 
 def _mark_failed(
-    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    session_factory: SessionFactory,
     *,
     scenario_session_id: str,
     job_id: str,
@@ -269,8 +232,9 @@ def _mark_failed(
         )
 
 
-def test_start_scenario_creates_session_and_linked_job(tmp_path: Path) -> None:
-    session_factory = _build_session_factory(tmp_path)
+def test_start_scenario_creates_session_and_linked_job(
+    session_factory: SessionFactory,
+) -> None:
     app = _create_test_app(session_factory)
 
     response = asyncio.run(
@@ -310,9 +274,8 @@ def test_start_scenario_creates_session_and_linked_job(tmp_path: Path) -> None:
 
 
 def test_start_scenario_consumes_guest_quota_and_returns_exhausted_on_n_plus_one(
-    tmp_path: Path,
+    session_factory: SessionFactory,
 ) -> None:
-    session_factory = _build_session_factory(tmp_path)
     app = _create_test_app(session_factory)
 
     successes = [
@@ -370,9 +333,8 @@ def test_start_scenario_consumes_guest_quota_and_returns_exhausted_on_n_plus_one
 
 
 def test_start_scenario_product_quota_dimension_is_shared_across_scenarios(
-    tmp_path: Path,
+    session_factory: SessionFactory,
 ) -> None:
-    session_factory = _build_session_factory(tmp_path)
     app = _create_test_app(session_factory)
 
     first = asyncio.run(
@@ -419,9 +381,8 @@ def test_start_scenario_product_quota_dimension_is_shared_across_scenarios(
 
 
 def test_start_scenario_requires_valid_guest_identity_for_quota_product(
-    tmp_path: Path,
+    session_factory: SessionFactory,
 ) -> None:
-    session_factory = _build_session_factory(tmp_path)
     app = _create_test_app(session_factory)
 
     missing_guest = asyncio.run(
@@ -474,348 +435,9 @@ def test_start_scenario_requires_valid_guest_identity_for_quota_product(
     assert "quota.consumed" not in event_types
 
 
-def test_start_scenario_replays_via_idempotency_key_header(tmp_path: Path) -> None:
-    session_factory = _build_session_factory(tmp_path)
-    app = _create_test_app(session_factory)
-
-    first = asyncio.run(
-        _request(
-            app,
-            "POST",
-            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
-            json=_start_payload(),
-            request_id="req_idem_header_1",
-            headers={"Idempotency-Key": "idem-http-replay"},
-        )
-    )
-    second = asyncio.run(
-        _request(
-            app,
-            "POST",
-            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
-            json=_start_payload(),
-            request_id="req_idem_header_2",
-            headers={"Idempotency-Key": "idem-http-replay"},
-        )
-    )
-
-    assert first.status_code == HTTPStatus.OK
-    assert second.status_code == HTTPStatus.OK
-    assert first.json() == second.json()
-
-    with transaction_boundary(session_factory) as session:
-        scenario_count = session.execute(
-            sa.select(sa.func.count()).select_from(scenario_sessions_table)
-        ).scalar_one()
-        job_count = session.execute(
-            sa.select(sa.func.count()).select_from(jobs_table)
-        ).scalar_one()
-        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
-        consumed_count = session.execute(
-            sa.select(sa.func.count())
-            .select_from(event_log_table)
-            .where(event_log_table.c.event_type == "quota.consumed")
-        ).scalar_one()
-
-    assert scenario_count == 1
-    assert job_count == 1
-    assert usage["used_count"] == 1
-    assert consumed_count == 1
-
-
-def test_start_scenario_idempotency_key_conflict_returns_409_via_http(tmp_path: Path) -> None:
-    session_factory = _build_session_factory(tmp_path)
-    app = _create_test_app(session_factory)
-
-    first = asyncio.run(
-        _request(
-            app,
-            "POST",
-            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
-            json=_start_payload(),
-            request_id="req_idem_conflict_1",
-            headers={"Idempotency-Key": "idem-http-conflict"},
-        )
-    )
-    second = asyncio.run(
-        _request(
-            app,
-            "POST",
-            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
-            json=_start_payload(input={"source_text": "a completely different request"}),
-            request_id="req_idem_conflict_2",
-            headers={"Idempotency-Key": "idem-http-conflict"},
-        )
-    )
-
-    assert first.status_code == HTTPStatus.OK
-    assert second.status_code == HTTPStatus.CONFLICT
-    assert second.json()["error"]["code"] == "idempotency_key_conflict"
-
-    with transaction_boundary(session_factory) as session:
-        scenario_count = session.execute(
-            sa.select(sa.func.count()).select_from(scenario_sessions_table)
-        ).scalar_one()
-
-    assert scenario_count == 1
-
-
-def test_parallel_start_scenario_consumes_quota_exactly_to_limit(
-    tmp_path: Path,
-) -> None:
-    session_factory = _build_session_factory(tmp_path)
-    app = _create_test_app(session_factory)
-
-    async def start_parallel_requests() -> list[httpx.Response]:
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(
-            transport=transport,
-            base_url="http://testserver",
-        ) as client:
-            return await asyncio.gather(
-                *[
-                    client.post(
-                        "/v1/products/kernel_demo/scenarios/"
-                        "kernel_demo.single_action_smoke_v1/start",
-                        json=_start_payload(),
-                        headers={"X-Request-ID": f"req_parallel_start_{index}"},
-                    )
-                    for index in range(4)
-                ]
-            )
-
-    responses = asyncio.run(start_parallel_requests())
-    status_codes = [response.status_code for response in responses]
-
-    assert status_codes.count(HTTPStatus.OK) == 3
-    assert status_codes.count(HTTPStatus.TOO_MANY_REQUESTS) == 1
-    exhausted_response = next(
-        response for response in responses if response.status_code == HTTPStatus.TOO_MANY_REQUESTS
-    )
-    assert exhausted_response.json()["error"]["code"] == "quota_exhausted"
-
-    with transaction_boundary(session_factory) as session:
-        scenario_count = session.execute(
-            sa.select(sa.func.count()).select_from(scenario_sessions_table)
-        ).scalar_one()
-        job_count = session.execute(
-            sa.select(sa.func.count()).select_from(jobs_table)
-        ).scalar_one()
-        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
-        event_types = list(
-            session.execute(
-                sa.select(event_log_table.c.event_type).order_by(
-                    event_log_table.c.timestamp,
-                    event_log_table.c.event_id,
-                )
-            ).scalars()
-        )
-
-    assert scenario_count == 3
-    assert job_count == 3
-    assert usage["used_count"] == 3
-    assert usage["limit_count"] == 3
-    assert usage["quota_dimension"] == "product"
-    assert usage["dimension_key"] == "kernel_demo"
-    assert event_types.count("quota.consumed") == 3
-    assert event_types.count("quota.exhausted") == 1
-
-
-def _direct_start_session(
-    session: sa.orm.Session,
-    app,
-    *,
-    input_payload: dict[str, Any] | None = None,
-    **kwargs: Any,
-):
-    return _runtime_service(
-        session=session, registry=app.state.runtime.config_registry
-    ).start_session(
-        tenant_id="anytoolai",
-        region="default",
-        product_id="kernel_demo",
-        scenario_id="kernel_demo.single_action_smoke_v1",
-        frontend_id="kernel_demo_ce",
-        input_payload=input_payload or {"source_text": "deadline budget deliverables"},
-        guest_id="guest_demo",
-        **kwargs,
-    )
-
-
-def test_start_session_replays_same_idempotency_key_without_double_charge(
-    tmp_path: Path,
-) -> None:
-    session_factory = _build_session_factory(tmp_path)
-    app = _create_test_app(session_factory)
-
-    with transaction_boundary(session_factory) as session:
-        first = _direct_start_session(session, app, idempotency_key="idem-replay")
-    with transaction_boundary(session_factory) as session:
-        second = _direct_start_session(session, app, idempotency_key="idem-replay")
-
-    assert first.scenario_session_id == second.scenario_session_id
-    assert first.job_id == second.job_id
-
-    with transaction_boundary(session_factory) as session:
-        scenario_count = session.execute(
-            sa.select(sa.func.count()).select_from(scenario_sessions_table)
-        ).scalar_one()
-        job_count = session.execute(
-            sa.select(sa.func.count()).select_from(jobs_table)
-        ).scalar_one()
-        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
-        started_count = session.execute(
-            sa.select(sa.func.count())
-            .select_from(event_log_table)
-            .where(event_log_table.c.event_type == "scenario.started")
-        ).scalar_one()
-
-    assert scenario_count == 1
-    assert job_count == 1
-    assert usage["used_count"] == 1
-    assert started_count == 1
-
-
-def test_start_session_idempotency_key_conflict_on_hash_mismatch(
-    tmp_path: Path,
-) -> None:
-    session_factory = _build_session_factory(tmp_path)
-    app = _create_test_app(session_factory)
-
-    with transaction_boundary(session_factory) as session:
-        _direct_start_session(session, app, idempotency_key="idem-conflict")
-
-    with (
-        pytest.raises(IdempotencyKeyConflictError),
-        transaction_boundary(session_factory) as session,
-    ):
-        _direct_start_session(
-            session,
-            app,
-            idempotency_key="idem-conflict",
-            input_payload={"source_text": "a different request body"},
-        )
-
-    with transaction_boundary(session_factory) as session:
-        scenario_count = session.execute(
-            sa.select(sa.func.count()).select_from(scenario_sessions_table)
-        ).scalar_one()
-        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
-
-    assert scenario_count == 1
-    assert usage["used_count"] == 1
-
-
-def test_start_session_quota_exhausted_after_fresh_insert_leaves_no_orphan_row(
-    tmp_path: Path,
-) -> None:
-    session_factory = _build_session_factory(tmp_path)
-    app = _create_test_app(session_factory)
-
-    for index in range(3):
-        with transaction_boundary(session_factory) as session:
-            _direct_start_session(session, app, idempotency_key=f"idem-fill-{index}")
-
-    with (
-        pytest.raises(QuotaExhaustedError),
-        transaction_boundary(session_factory) as session,
-    ):
-        _direct_start_session(session, app, idempotency_key="idem-exhausted")
-
-    with transaction_boundary(session_factory) as session:
-        scenario_count = session.execute(
-            sa.select(sa.func.count()).select_from(scenario_sessions_table)
-        ).scalar_one()
-        job_count = session.execute(
-            sa.select(sa.func.count()).select_from(jobs_table)
-        ).scalar_one()
-        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
-        event_types = list(
-            session.execute(
-                sa.select(event_log_table.c.event_type).order_by(
-                    event_log_table.c.timestamp,
-                    event_log_table.c.event_id,
-                )
-            ).scalars()
-        )
-
-    assert scenario_count == 3
-    assert job_count == 3
-    assert usage["used_count"] == 3
-    assert usage["limit_count"] == 3
-    assert event_types.count("scenario.started") == 3
-    assert event_types.count("quota.consumed") == 3
-    assert event_types.count("quota.exhausted") == 1
-
-
-def test_parallel_start_scenario_consumes_quota_exactly_to_limit_for_scenario_dimension(
-    tmp_path: Path,
-) -> None:
-    session_factory = _build_session_factory(tmp_path)
-    app = _create_test_app(session_factory)
-    _with_scenario_dimension(app, "kernel_demo.guest_quota_v1")
-
-    scenario_id = "kernel_demo.single_action_smoke_v1"
-
-    async def start_parallel_requests() -> list[httpx.Response]:
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(
-            transport=transport,
-            base_url="http://testserver",
-        ) as client:
-            return await asyncio.gather(
-                *[
-                    client.post(
-                        f"/v1/products/kernel_demo/scenarios/{scenario_id}/start",
-                        json=_start_payload(),
-                        headers={"X-Request-ID": f"req_parallel_start_scenario_dim_{index}"},
-                    )
-                    for index in range(4)
-                ]
-            )
-
-    responses = asyncio.run(start_parallel_requests())
-    status_codes = [response.status_code for response in responses]
-
-    assert status_codes.count(HTTPStatus.OK) == 3
-    assert status_codes.count(HTTPStatus.TOO_MANY_REQUESTS) == 1
-    exhausted_response = next(
-        response for response in responses if response.status_code == HTTPStatus.TOO_MANY_REQUESTS
-    )
-    assert exhausted_response.json()["error"]["code"] == "quota_exhausted"
-
-    with transaction_boundary(session_factory) as session:
-        scenario_count = session.execute(
-            sa.select(sa.func.count()).select_from(scenario_sessions_table)
-        ).scalar_one()
-        job_count = session.execute(
-            sa.select(sa.func.count()).select_from(jobs_table)
-        ).scalar_one()
-        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
-        event_types = list(
-            session.execute(
-                sa.select(event_log_table.c.event_type).order_by(
-                    event_log_table.c.timestamp,
-                    event_log_table.c.event_id,
-                )
-            ).scalars()
-        )
-
-    assert scenario_count == 3
-    assert job_count == 3
-    assert usage["used_count"] == 3
-    assert usage["limit_count"] == 3
-    assert usage["quota_dimension"] == "scenario"
-    assert usage["dimension_key"] == scenario_id
-    assert usage["scenario_id"] == scenario_id
-    assert event_types.count("quota.consumed") == 3
-    assert event_types.count("quota.exhausted") == 1
-
-
 def test_start_scenario_returns_safe_404_for_unknown_or_unattached_scenario(
-    tmp_path: Path,
+    session_factory: SessionFactory,
 ) -> None:
-    session_factory = _build_session_factory(tmp_path)
     app = _create_test_app(session_factory)
 
     response = asyncio.run(
@@ -838,8 +460,9 @@ def test_start_scenario_returns_safe_404_for_unknown_or_unattached_scenario(
     assert "kernel_demo.missing_v1" not in response.text
 
 
-def test_start_scenario_rejects_invalid_frontend_and_input_shape(tmp_path: Path) -> None:
-    session_factory = _build_session_factory(tmp_path)
+def test_start_scenario_rejects_invalid_frontend_and_input_shape(
+    session_factory: SessionFactory,
+) -> None:
     app = _create_test_app(session_factory)
 
     invalid_frontend = asyncio.run(
@@ -872,8 +495,9 @@ def test_start_scenario_rejects_invalid_frontend_and_input_shape(tmp_path: Path)
     }
 
 
-def test_get_scenario_session_returns_started_and_running_snapshots(tmp_path: Path) -> None:
-    session_factory = _build_session_factory(tmp_path)
+def test_get_scenario_session_returns_started_and_running_snapshots(
+    session_factory: SessionFactory,
+) -> None:
     app = _create_test_app(session_factory)
 
     started_response = asyncio.run(
@@ -928,8 +552,9 @@ def test_get_scenario_session_returns_started_and_running_snapshots(tmp_path: Pa
     }
 
 
-def test_get_scenario_session_returns_completed_snapshot(tmp_path: Path) -> None:
-    session_factory = _build_session_factory(tmp_path)
+def test_get_scenario_session_returns_completed_snapshot(
+    session_factory: SessionFactory,
+) -> None:
     app = _create_test_app(session_factory)
 
     started = asyncio.run(
@@ -967,9 +592,8 @@ def test_get_scenario_session_returns_completed_snapshot(tmp_path: Path) -> None
 
 
 def test_start_then_real_worker_execution_preserves_a12_runtime_correlation(
-    tmp_path: Path,
+    session_factory: SessionFactory,
 ) -> None:
-    session_factory = _build_session_factory(tmp_path)
     app = _create_test_app(session_factory)
 
     started = asyncio.run(
@@ -1080,8 +704,9 @@ def test_start_then_real_worker_execution_preserves_a12_runtime_correlation(
             assert event_row["job_id"] == started["job_id"]
 
 
-def test_get_scenario_session_returns_failed_snapshot(tmp_path: Path) -> None:
-    session_factory = _build_session_factory(tmp_path)
+def test_get_scenario_session_returns_failed_snapshot(
+    session_factory: SessionFactory,
+) -> None:
     app = _create_test_app(session_factory)
 
     started = asyncio.run(
@@ -1119,9 +744,8 @@ def test_get_scenario_session_returns_failed_snapshot(tmp_path: Path) -> None:
 
 
 def test_get_scenario_session_returns_failed_checkpoint_for_preclaim_canceled_job(
-    tmp_path: Path,
+    session_factory: SessionFactory,
 ) -> None:
-    session_factory = _build_session_factory(tmp_path)
     app = _create_test_app(session_factory)
 
     started = asyncio.run(
@@ -1164,8 +788,9 @@ def test_get_scenario_session_returns_failed_checkpoint_for_preclaim_canceled_jo
     }
 
 
-def test_next_action_validates_checkpoint_and_emits_event(tmp_path: Path) -> None:
-    session_factory = _build_session_factory(tmp_path)
+def test_next_action_validates_checkpoint_and_emits_event(
+    session_factory: SessionFactory,
+) -> None:
     app = _create_test_app(session_factory)
 
     started = asyncio.run(
@@ -1238,8 +863,9 @@ def test_next_action_validates_checkpoint_and_emits_event(tmp_path: Path) -> Non
     }
 
 
-def test_get_scenario_session_returns_safe_404(tmp_path: Path) -> None:
-    session_factory = _build_session_factory(tmp_path)
+def test_get_scenario_session_returns_safe_404(
+    session_factory: SessionFactory,
+) -> None:
     app = _create_test_app(session_factory)
 
     response = asyncio.run(
@@ -1252,9 +878,8 @@ def test_get_scenario_session_returns_safe_404(tmp_path: Path) -> None:
 
 
 def test_get_scenario_session_returns_safe_404_for_persisted_scenario_version_mismatch(
-    tmp_path: Path,
+    session_factory: SessionFactory,
 ) -> None:
-    session_factory = _build_session_factory(tmp_path)
     app = _create_test_app(session_factory)
 
     started = asyncio.run(
@@ -1301,23 +926,6 @@ def test_get_scenario_session_returns_safe_404_for_persisted_scenario_version_mi
     assert "single_action_smoke_v1" not in response.text
 
 
-def test_status_code_for_platform_error_maps_idempotency_conflict_to_409() -> None:
-    status_code = _status_code_for_platform_error(IdempotencyKeyConflictError())
-
-    assert status_code == HTTPStatus.CONFLICT
-
-
-def test_idempotency_key_invalid_openapi_example_matches_real_error_message() -> None:
-    # The documented example message must never drift from the real error message --
-    # if MAX_IDEMPOTENCY_KEY_LENGTH ever changes, the real message updates
-    # automatically (it interpolates the constant) and this example must too, or the
-    # OpenAPI docs silently start lying about the actual limit.
-    assert (
-        SAFE_IDEMPOTENCY_KEY_INVALID_422_EXAMPLE["error"]["message"]
-        == str(IdempotencyKeyInvalidError())
-    )
-
-
 def test_openapi_contains_scenario_runtime_endpoints() -> None:
     app = create_app(config_root=CONFIG_ROOT)
     openapi = app.openapi()
@@ -1345,12 +953,6 @@ def test_openapi_contains_scenario_runtime_endpoints() -> None:
             "guest_required"
         ]["value"]["error"]["code"]
         == "guest_identity_required"
-    )
-    assert (
-        start_operation["responses"]["409"]["content"]["application/json"]["example"]["error"][
-            "code"
-        ]
-        == "idempotency_key_conflict"
     )
     assert (
         start_operation["responses"]["429"]["content"]["application/json"]["example"]["error"][

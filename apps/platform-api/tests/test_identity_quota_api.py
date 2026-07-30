@@ -3,57 +3,38 @@ from __future__ import annotations
 import asyncio
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import httpx
+import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from anytoolai_platform_api.bootstrap import RuntimeStorageDependencies
 from anytoolai_platform_api.main import create_app
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.storage.db import event_log_table, guest_quota_usage_table
 from anytoolai_platform_core.storage.transactions import (
+    SessionFactory,
     build_session_factory,
     transaction_boundary,
 )
-from sqlalchemy import event
+from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
+pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
 
-def _sqlite_url(database_path: Path) -> str:
-    return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
-
-
-def _build_session_factory(tmp_path: Path) -> sa.orm.sessionmaker[sa.orm.Session]:
-    main_db = tmp_path / "identity-quota-main.sqlite3"
-    platform_db = tmp_path / "identity-quota-platform.sqlite3"
-    engine = sa.create_engine(_sqlite_url(main_db), future=True)
-
-    @event.listens_for(engine, "connect")
-    def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
-        )
-
-    alembic_config = Config()
-    alembic_config.set_main_option(
-        "script_location", str(REPO_ROOT / "migrations" / "platform")
-    )
-    alembic_config.set_main_option("sqlalchemy.url", _sqlite_url(main_db))
-
-    with engine.begin() as connection:
-        alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "head")
-
-    return build_session_factory(engine)
+@pytest.fixture
+def session_factory() -> Iterator[SessionFactory]:
+    with provision_database(
+        database_name_prefix="anytoolai_identity_quota_api_test",
+        skip_reason="PostgreSQL identity and quota API coverage",
+    ) as (engine, _alembic_config, _database_url):
+        yield build_session_factory(engine)
 
 
 def _create_test_app(
-    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    session_factory: SessionFactory,
 ):
     app = create_app(config_root=CONFIG_ROOT)
     app.state.runtime = app.state.runtime.__class__(
@@ -82,8 +63,9 @@ async def _request(
         )
 
 
-def test_create_guest_identity_emits_event(tmp_path: Path) -> None:
-    session_factory = _build_session_factory(tmp_path)
+def test_create_guest_identity_emits_event(
+    session_factory: SessionFactory,
+) -> None:
     app = _create_test_app(session_factory)
 
     response = asyncio.run(_request(app, "POST", "/v1/identity/guest"))
@@ -109,8 +91,9 @@ def test_create_guest_identity_emits_event(tmp_path: Path) -> None:
     assert stored.guest_id == guest_id
 
 
-def test_quota_check_endpoint_returns_current_state(tmp_path: Path) -> None:
-    session_factory = _build_session_factory(tmp_path)
+def test_quota_check_endpoint_returns_current_state(
+    session_factory: SessionFactory,
+) -> None:
     app = _create_test_app(session_factory)
 
     guest_response = asyncio.run(_request(app, "POST", "/v1/identity/guest"))
@@ -158,8 +141,9 @@ def test_quota_check_endpoint_returns_current_state(tmp_path: Path) -> None:
     assert "quota.consumed" not in event_types
 
 
-def test_quota_check_endpoint_returns_safe_404_for_unknown_guest(tmp_path: Path) -> None:
-    session_factory = _build_session_factory(tmp_path)
+def test_quota_check_endpoint_returns_safe_404_for_unknown_guest(
+    session_factory: SessionFactory,
+) -> None:
     app = _create_test_app(session_factory)
 
     response = asyncio.run(

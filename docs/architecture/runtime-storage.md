@@ -167,10 +167,10 @@ revisions that inspect live schema state remain online-only in practice; during 
 generation they either no-op because the baseline revisions already own the final schema or emit the
 canonical handoff-index cleanup SQL needed for fresh-install `head` output.
 
-For `product_handoffs` migration helpers specifically, new shared table/index existence logic
-belongs in `migrations/platform/_handoffs_table.py`. Historical compatibility revision `0008`
-intentionally keeps its inline schema-qualified `has_table(...)` guard so the revision remains
-self-contained and does not gain a new dependency on mutable helper code after release.
+For `product_handoffs` compatibility work specifically, historical revisions keep their
+table/index checks inline so recorded Alembic behavior does not depend on mutable helper modules.
+`0008_handoffs_compat.py` intentionally keeps its schema-qualified `has_table(...)` guard
+self-contained, and later handoff compatibility logic follows the same revision-local pattern.
 
 ### 2. Shared SQLAlchemy table layer
 
@@ -690,8 +690,7 @@ The test approach is important:
 - it verifies CRUD against the migrated schema
 - it provisions a disposable PostgreSQL database from
   `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`
-- it exercises the real `platform` schema layout against the production dialect instead of a
-  SQLite compatibility harness
+- it exercises the real `platform` schema layout against the production PostgreSQL dialect
 
 Run the runtime-storage suite with a PostgreSQL maintenance database URL:
 
@@ -703,6 +702,10 @@ uv run python -m pytest packages/backend/platform-core/tests/unit/test_runtime_s
 The suite creates and drops disposable databases, applies the real Alembic migration chain, then
 verifies repository CRUD, schema constraints, compatibility upgrades, and explicit transaction
 behavior against PostgreSQL.
+
+The reusable disposable-database helpers live in `tests/db_support.py`. Root `conftest.py` remains
+pytest wiring only; tests import the helper module explicitly instead of treating `conftest.py` as a
+shared library.
 
 Quota concurrency remains a separate PostgreSQL production-semantics check in:
 
@@ -721,14 +724,11 @@ for later starts, and keep session/job/quota/event counts consistent.
 The backend GitHub Actions workflow also runs this PostgreSQL test in the dedicated
 `postgresql-quota-concurrency` job with a disposable PostgreSQL service. That job is the required
 production-dialect concurrency proof. Runtime-storage CRUD and migration coverage now also belongs
-to the PostgreSQL-backed path; `quick-check` remains intentionally DB-free and fast.
+to the PostgreSQL-backed path; `quick-check` remains intentionally DB-free and fast. Runtime and
+database-specific test infrastructure is PostgreSQL-only.
 
 `python scripts/agent/runner.py quick-check` excludes `slow` tests with `-m "not slow"` so the
-required fast path stays deterministic. Run the separate ASGI stress checks intentionally with:
-
-```powershell
-uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_stress.py -m slow -q
-```
+required fast path stays deterministic.
 
 What the tests cover:
 
