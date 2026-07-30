@@ -128,6 +128,8 @@ scenario_sessions_table = sa.Table(
     sa.Column("scenario_chain_id", sa.String(length=128)),
     sa.Column("parent_scenario_session_id", sa.String(length=128)),
     sa.Column("source_frontend_instance_id", sa.String(length=128)),
+    sa.Column("idempotency_key", sa.String(length=256)),
+    sa.Column("idempotency_request_hash", sa.String(length=64)),
     sa.Column("metadata", json_document, nullable=False),
     sa.Column("created_at", utc_datetime, nullable=False),
     sa.Column("started_at", utc_datetime, nullable=False),
@@ -137,6 +139,15 @@ scenario_sessions_table = sa.Table(
     sa.Index("ix_scenario_sessions_product_id", "product_id"),
     sa.Index("ix_scenario_sessions_created_at", "created_at"),
     sa.Index("ix_scenario_sessions_status", "status"),
+    sa.UniqueConstraint(
+        "tenant_id",
+        "region",
+        "product_id",
+        "scenario_id",
+        "guest_id",
+        "idempotency_key",
+        name="uq_scenario_sessions_idempotency_key",
+    ),
 )
 
 jobs_table = sa.Table(

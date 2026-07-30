@@ -109,6 +109,82 @@ PydanticAI run ids, or LiteLLM response ids.
 
 Without `scenario_session_id`, there is no user journey.
 
+## ANY-150 idempotent scenario start
+
+`POST /v1/products/{product_id}/scenarios/{scenario_id}/start` accepts an optional
+`Idempotency-Key` request header. A client that retries the same logical start (browser back-button
+resubmit, fetch-timeout retry, flaky mobile network) sends the same key on every attempt so the
+backend can collapse duplicates instead of creating a second `scenario_sessions` row and consuming a
+second guest quota unit for one user click.
+
+`scenario_sessions` stores two additional columns:
+
+- `idempotency_key` nullable `String(256)`;
+- `idempotency_request_hash` nullable `String(64)`, a `sha256` digest over `tenant_id`, `region`,
+  `product_id`, `scenario_id`, `frontend_id`, `guest_id` (or empty string), `user_id` (or empty
+  string), and the canonicalized (`sort_keys=True`, compact separators) `input` payload.
+  `source_frontend_instance_id` is deliberately excluded from the hash: it is request telemetry
+  (which tab/instance originated the call), not part of "the same logical request" -- including it
+  would make a retry from a second tab fail idempotency even though it is the same duplicate the
+  header exists to catch.
+
+`platform.scenario_sessions` carries a unique constraint on
+`(tenant_id, region, product_id, scenario_id, guest_id, idempotency_key)`
+(`uq_scenario_sessions_idempotency_key`, migration `0009`). When a start request carries an
+`Idempotency-Key`:
+
+- if an existing row matches that scope and its stored `idempotency_request_hash` equals the
+  hash computed for this request, the endpoint returns that row's snapshot (`200`) without
+  consuming quota or creating a new job -- a true replay;
+- if an existing row matches that scope but the stored hash differs, the endpoint returns
+  `409 idempotency_key_conflict` before touching quota -- the same key was reused for a different
+  request, which is a caller bug (mint a new key per logical request) rather than a duplicate;
+- otherwise the request is genuinely new and follows the ordinary accepted-start path.
+
+`ScenarioRuntimeService.start_session()` does its own `get_by_idempotency_key()` lookup on the raw,
+unvalidated request identifiers *before* running any product/scenario/frontend/quota validation, so a
+sequential replay of an already-accepted key returns immediately without re-validating config that
+only a genuinely new request needs. The row insert-or-select itself
+(`ScenarioSessionService.start_or_get_existing()`) has no pre-read of its own -- it goes straight to
+an insert guarded by `begin_nested()`/`IntegrityError` recovery on the unique constraint, since its
+only caller already ruled out a sequential match a moment earlier; a second, genuinely concurrent
+duplicate that missed that earlier lookup is still caught here via the real constraint violation. This
+insert-or-select runs **before** quota is consumed. That ordering is what makes concurrent duplicate
+submission safe: N requests racing with the same `Idempotency-Key` all attempt the atomic insert
+first, exactly one can win it, and only the winner proceeds to quota consumption -- the other N-1
+short-circuit to the replay path and never touch quota. Consuming quota before the atomic insert (the
+pre-ANY-150 order) cannot give this guarantee, because it cannot tell N concurrent instances of the
+same logical request apart from N distinct requests until after quota has already been spent. See
+`docs/architecture/quota-model.md` for what happens when quota is exhausted after this insert wins.
+
+A replay (sequential lookup match, or the losing side of a concurrent insert race) resolves the
+scenario definition from the persisted row's own `product_id`/`scenario_id`, **without** pinning to
+the row's stored `scenario_version`. This is deliberate: the config registry only ever holds the
+current definition per `scenario_id`, not a history, so pinning to the original version would 404
+(`ScenarioNotFoundError`) every replay whose scenario was bumped to a new version by an ordinary
+config deploy in between -- exactly the retry case `Idempotency-Key` exists for. The unpinned
+resolution only affects `allowed_next_actions` on an already-completed session (see
+`resolve_checkpoint_state`), which is a cosmetic drift risk, not a correctness one. Two known,
+accepted residual gaps from this: (1) if the scenario is removed from config entirely (not just
+version-bumped), the replay still 404s -- there is no definition left to resolve at all, matching the
+pre-existing limitation `GET /v1/scenario-sessions/{id}` already has; (2) under a rolling deploy where
+two API instances race on a brand-new key with different config snapshots, the losing instance's
+returned `allowed_next_actions` reflects *its own* (possibly newer) config, not necessarily the
+version the winning instance actually persisted -- closing this fully would require persisting a
+frozen scenario snapshot at accept time, which is out of scope here.
+
+Known, accepted gap: both SQLite and PostgreSQL treat `NULL` as distinct from itself in unique-index
+semantics, so a start with `guest_id IS NULL` (a pure `user_id` session, no guest) is not deduplicated
+by this constraint even when the same `Idempotency-Key` is reused. This is consistent with the rest
+of the guest-quota model -- `consume_for_accepted_start` already requires a non-empty `guest_id` (see
+`docs/architecture/quota-model.md`), so the double-charge this ticket fixes is specifically the guest
+quota path. Deduplicating the `guest_id IS NULL` path is not fixed here.
+
+Idempotency-Key is orthogonal to the request body: `ScenarioStartRequest`/`ScenarioStartResponse`
+are unchanged. CE-kit's `startScenario()` client is still a demo stub deferred to A16 (see
+`packages/frontend/ce-kit/src/scenarios/startScenario.ts`); the real client must send
+`Idempotency-Key` once it makes a real HTTP call.
+
 ## A17 linked handoff sessions
 
 Handoff acceptance always creates the target session immediately. It sets

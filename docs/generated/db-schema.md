@@ -239,6 +239,8 @@ Definitions remain in repository configuration; these tables store runtime state
 | scenario_chain_id | VARCHAR(128) | yes |
 | parent_scenario_session_id | VARCHAR(128) | yes |
 | source_frontend_instance_id | VARCHAR(128) | yes |
+| idempotency_key | VARCHAR(256) | yes |
+| idempotency_request_hash | VARCHAR(64) | yes |
 | metadata | JSON | no |
 | created_at | DATETIME | no |
 | started_at | DATETIME | no |

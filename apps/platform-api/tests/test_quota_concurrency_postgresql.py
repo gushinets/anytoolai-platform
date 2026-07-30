@@ -114,6 +114,94 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
 
 @pytest.mark.postgresql
 @pytest.mark.slow
+def test_postgresql_concurrent_duplicate_submit_with_idempotency_key_consumes_quota_once() -> None:
+    """ANY-150: N concurrent /start requests sharing one Idempotency-Key (differing
+    only by X-Request-ID) must consume exactly one quota unit and create exactly one
+    session/job.
+
+    This is the core correctness claim behind putting the atomic insert-or-select
+    before quota consumption in ScenarioRuntimeService.start_session: only the request
+    that actually wins the DB-level unique-constraint race may consume quota, so no
+    concurrent duplicate can be double-charged (or, symmetrically, none can be
+    incorrectly quota_exhausted for what is really the same logical request as one
+    that already succeeded). Deliberately run against PostgreSQL, not SQLite, and
+    through the real HTTP router: an equivalent test driven directly against the ASGI
+    app on this repo's SQLite harness reliably hits `sqlite3.OperationalError:
+    database is locked`, because concurrent begin_nested()/SAVEPOINT writers racing
+    across the two ATTACHed database files is a genuine SQLite limitation, not a code
+    defect -- see docs/architecture/runtime-storage.md's "SQLite-based verification"
+    compromise, which already documents that production-safe concurrency needs this
+    PostgreSQL integration path rather than the fast SQLite suite.
+    """
+    maintenance_url = _require_postgres_test_url()
+    database_name = f"anytoolai_a150_idem_concurrent_{uuid4().hex[:12]}"
+    test_url = maintenance_url.set(database=database_name)
+    _create_database(maintenance_url, database_name)
+    engine = sa.create_engine(test_url, future=True)
+    try:
+        _upgrade_database(engine, test_url)
+        session_factory = build_session_factory(engine)
+        app = _create_test_app(session_factory)
+        request_count = 8
+
+        async def start_parallel_requests() -> list[httpx.Response]:
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+            ) as client:
+                return await asyncio.gather(
+                    *[
+                        client.post(
+                            "/v1/products/kernel_demo/scenarios/"
+                            "kernel_demo.single_action_smoke_v1/start",
+                            json=_start_payload(),
+                            headers={
+                                "X-Request-ID": f"req_pg_idem_parallel_{index}",
+                                "Idempotency-Key": "idem-pg-parallel-same-key",
+                            },
+                        )
+                        for index in range(request_count)
+                    ]
+                )
+
+        responses = asyncio.run(start_parallel_requests())
+
+        assert all(response.status_code == HTTPStatus.OK for response in responses)
+        bodies = [response.json() for response in responses]
+        assert all(body == bodies[0] for body in bodies)
+
+        with transaction_boundary(session_factory) as session:
+            scenario_count = session.execute(
+                sa.select(sa.func.count()).select_from(scenario_sessions_table)
+            ).scalar_one()
+            job_count = session.execute(
+                sa.select(sa.func.count()).select_from(jobs_table)
+            ).scalar_one()
+            usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+            started_count = session.execute(
+                sa.select(sa.func.count())
+                .select_from(event_log_table)
+                .where(event_log_table.c.event_type == "scenario.started")
+            ).scalar_one()
+            consumed_count = session.execute(
+                sa.select(sa.func.count())
+                .select_from(event_log_table)
+                .where(event_log_table.c.event_type == "quota.consumed")
+            ).scalar_one()
+
+        assert scenario_count == 1
+        assert job_count == 1
+        assert usage["used_count"] == 1
+        assert started_count == 1
+        assert consumed_count == 1
+    finally:
+        engine.dispose()
+        _drop_database(maintenance_url, database_name)
+
+
+@pytest.mark.postgresql
+@pytest.mark.slow
 def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_independent_counters() -> (
     None
 ):

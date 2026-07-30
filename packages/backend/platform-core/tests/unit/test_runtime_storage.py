@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +24,11 @@ from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionRecord,
     ScenarioSessionStatus,
 )
-from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
+from anytoolai_platform_core.scenarios.repository import (
+    EXPECTED_IDEMPOTENCY_KEY_CONSTRAINT,
+    SQLITE_IDEMPOTENCY_KEY_COLUMNS,
+    ScenarioSessionRepository,
+)
 from anytoolai_platform_core.storage.db import (
     action_runs_table,
     artifacts_table,
@@ -39,8 +43,8 @@ from anytoolai_platform_core.storage.transactions import (
 )
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
-from sqlalchemy import event
 from sqlalchemy.exc import IntegrityError
+from sqlite_harness import build_sqlite_runtime_engine, sqlite_url
 
 PROVIDER_INPUT_TOKENS = 128
 PROVIDER_OUTPUT_TOKENS = 64
@@ -49,23 +53,6 @@ PROVIDER_LATENCY_MS = 950
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[5]
-
-
-def _sqlite_url(database_path: Path) -> str:
-    return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
-
-
-def _build_runtime_engine(main_db: Path, platform_db: Path) -> sa.Engine:
-    engine = sa.create_engine(_sqlite_url(main_db), future=True)
-
-    @event.listens_for(engine, "connect")
-    def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
-        )
-
-    return engine
 
 
 def _build_alembic_config(database_url: str) -> Config:
@@ -79,8 +66,8 @@ def _build_alembic_config(database_url: str) -> Config:
 def runtime_engine(tmp_path: Path) -> sa.Engine:
     main_db = tmp_path / "runtime-main.sqlite3"
     platform_db = tmp_path / "runtime-platform.sqlite3"
-    engine = _build_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(sqlite_url(main_db))
 
     with engine.begin() as connection:
         alembic_config.attributes["connection"] = connection
@@ -422,8 +409,8 @@ def test_quota_dimension_downgrade_to_0006_preserves_current_0003_schema(
 ) -> None:
     main_db = tmp_path / "runtime-downgrade-main.sqlite3"
     platform_db = tmp_path / "runtime-downgrade-platform.sqlite3"
-    engine = _build_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(sqlite_url(main_db))
 
     try:
         with engine.begin() as connection:
@@ -473,8 +460,8 @@ def test_runtime_migration_upgrade_from_0004_adds_provider_call_error_message_sa
 ) -> None:
     main_db = tmp_path / "runtime-upgrade-main.sqlite3"
     platform_db = tmp_path / "runtime-upgrade-platform.sqlite3"
-    engine = _build_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(sqlite_url(main_db))
 
     try:
         with engine.begin() as connection:
@@ -506,8 +493,8 @@ def test_handoff_compatibility_revision_repairs_database_stamped_at_0007(
 ) -> None:
     main_db = tmp_path / "handoff-compat-main.sqlite3"
     platform_db = tmp_path / "handoff-compat-platform.sqlite3"
-    engine = _build_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(sqlite_url(main_db))
 
     try:
         with engine.begin() as connection:
@@ -577,6 +564,108 @@ def test_handoff_compatibility_revision_repairs_database_stamped_at_0007(
         } == handoff_foreign_keys
     finally:
         engine.dispose()
+
+
+def test_scenario_session_idempotency_migration_0009_adds_column_and_constraint(
+    tmp_path: Path,
+) -> None:
+    main_db = tmp_path / "idempotency-migration-main.sqlite3"
+    platform_db = tmp_path / "idempotency-migration-platform.sqlite3"
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(sqlite_url(main_db))
+
+    try:
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "0008")
+            connection.execute(
+                sa.text(
+                    "INSERT INTO platform.scenario_sessions "
+                    "(id, tenant_id, region, product_id, frontend_id, scenario_id, "
+                    "scenario_version, guest_id, status, metadata, created_at, started_at, "
+                    "last_event_at) VALUES "
+                    "('sess_pre_0009', 'anytoolai', 'default', 'prod_demo', 'frontend_demo', "
+                    "'scenario_demo', 1, 'guest_demo', 'started', '{}', "
+                    "'2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00', "
+                    "'2026-01-01T00:00:00+00:00')"
+                )
+            )
+
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "head")
+            inspector = sa.inspect(connection)
+            columns = {
+                column["name"]: column
+                for column in inspector.get_columns("scenario_sessions", schema="platform")
+            }
+            constraint_names = {
+                constraint["name"]
+                for constraint in inspector.get_unique_constraints(
+                    "scenario_sessions", schema="platform"
+                )
+            }
+
+        assert "idempotency_key" in columns
+        assert columns["idempotency_key"]["nullable"] is True
+        assert "idempotency_request_hash" in columns
+        assert "uq_scenario_sessions_idempotency_key" in constraint_names
+
+        # The row inserted before 0009 ran must survive the SQLite batch-recreate.
+        with transaction_boundary(build_session_factory(engine)) as session:
+            preexisting = ScenarioSessionRepository(session).get(
+                "sess_pre_0009",
+                tenant_id="anytoolai",
+                region="default",
+                product_id="prod_demo",
+                frontend_id="frontend_demo",
+            )
+        assert preexisting is not None
+        assert preexisting.idempotency_key is None
+
+        with engine.begin() as connection:
+            connection.execute(
+                sa.insert(scenario_sessions_table).values(
+                    asdict(
+                        make_scenario_session(
+                            id="sess_a", guest_id="guest_demo", idempotency_key="idem-1"
+                        )
+                    )
+                )
+            )
+            with pytest.raises(IntegrityError):
+                connection.execute(
+                    sa.insert(scenario_sessions_table).values(
+                        asdict(
+                            make_scenario_session(
+                                id="sess_b", guest_id="guest_demo", idempotency_key="idem-1"
+                            )
+                        )
+                    )
+                )
+    finally:
+        engine.dispose()
+
+
+def test_scenario_session_idempotency_null_key_does_not_dedupe(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    # Documented, accepted gap: NULL is distinct from itself in unique-constraint
+    # semantics on both SQLite and PostgreSQL, so a start with no idempotency key
+    # (or with guest_id IS NULL) is not deduplicated by this constraint.
+    with transaction_boundary(session_factory) as session:
+        repository = ScenarioSessionRepository(session)
+        repository.create(make_scenario_session(id="sess_null_key_a"))
+        repository.create(make_scenario_session(id="sess_null_key_b"))
+
+    with transaction_boundary(session_factory) as session:
+        repository = ScenarioSessionRepository(session)
+        assert repository.get(
+            "sess_null_key_a", **scenario_session_scope(make_scenario_session())
+        ) is not None
+        assert repository.get(
+            "sess_null_key_b", **scenario_session_scope(make_scenario_session())
+        ) is not None
 
 
 def test_repositories_respect_explicit_transaction_boundary(
@@ -758,6 +847,97 @@ def test_scenario_session_repository_get_is_scope_bound(
             )
             is None
         )
+
+
+def test_sqlite_idempotency_key_columns_matches_real_unique_constraint() -> None:
+    # Derived from scenario_sessions_table's own UniqueConstraint (storage/db.py)
+    # instead of a third hardcoded copy -- assert it actually reflects the real
+    # constraint's column set (order-independent) rather than just trusting the
+    # derivation helper blindly.
+    constraint = next(
+        c
+        for c in scenario_sessions_table.constraints
+        if isinstance(c, sa.UniqueConstraint) and c.name == EXPECTED_IDEMPOTENCY_KEY_CONSTRAINT
+    )
+    assert set(SQLITE_IDEMPOTENCY_KEY_COLUMNS) == set(constraint.columns.keys())
+    # Guards against a duplicate entry that set-equality alone would hide.
+    assert len(SQLITE_IDEMPOTENCY_KEY_COLUMNS) == len(constraint.columns)
+
+
+def test_scenario_session_repository_get_by_idempotency_key(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        repository = ScenarioSessionRepository(session)
+        created = repository.create(
+            make_scenario_session(guest_id="guest_demo", idempotency_key="idem-1")
+        )
+
+        found = repository.get_by_idempotency_key(
+            tenant_id=created.tenant_id,
+            region=created.region,
+            product_id=created.product_id,
+            scenario_id=created.scenario_id,
+            guest_id=created.guest_id,
+            idempotency_key="idem-1",
+        )
+        assert found == created
+
+        assert (
+            repository.get_by_idempotency_key(
+                tenant_id=created.tenant_id,
+                region=created.region,
+                product_id=created.product_id,
+                scenario_id=created.scenario_id,
+                guest_id=created.guest_id,
+                idempotency_key="idem-other",
+            )
+            is None
+        )
+        assert (
+            repository.get_by_idempotency_key(
+                tenant_id="tenant_other",
+                region=created.region,
+                product_id=created.product_id,
+                scenario_id=created.scenario_id,
+                guest_id=created.guest_id,
+                idempotency_key="idem-1",
+            )
+            is None
+        )
+
+
+def test_scenario_session_repository_get_by_idempotency_key_tolerates_null_guest_id_duplicates(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    # Documented gap: the unique constraint does not dedupe guest_id IS NULL, so two
+    # rows can legitimately share the same (tenant, region, product, scenario,
+    # idempotency_key) scope when guest_id is None. The lookup must not crash with
+    # MultipleResultsFound in that case -- it must deterministically return one row.
+    with transaction_boundary(session_factory) as session:
+        repository = ScenarioSessionRepository(session)
+        first = repository.create(
+            make_scenario_session(
+                id="sess_null_guest_a", guest_id=None, idempotency_key="idem-null-guest"
+            )
+        )
+        repository.create(
+            make_scenario_session(
+                id="sess_null_guest_b", guest_id=None, idempotency_key="idem-null-guest"
+            )
+        )
+
+        found = repository.get_by_idempotency_key(
+            tenant_id=first.tenant_id,
+            region=first.region,
+            product_id=first.product_id,
+            scenario_id=first.scenario_id,
+            guest_id=None,
+            idempotency_key="idem-null-guest",
+        )
+
+    assert found is not None
+    assert found.id == first.id
 
 
 def test_scenario_session_repository_update_does_not_mutate_scope_columns(

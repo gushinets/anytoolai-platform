@@ -48,7 +48,7 @@ from anytoolai_platform_core.storage.transactions import (
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import WorkflowJobService
-from sqlalchemy import event
+from sqlite_harness import build_sqlite_runtime_engine, sqlite_url
 
 
 def _repo_root() -> Path:
@@ -56,23 +56,6 @@ def _repo_root() -> Path:
 
 
 CONFIG_ROOT = _repo_root() / "configs" / "kernel"
-
-
-def _sqlite_url(database_path: Path) -> str:
-    return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
-
-
-def _build_runtime_engine(main_db: Path, platform_db: Path) -> sa.Engine:
-    engine = sa.create_engine(_sqlite_url(main_db), future=True)
-
-    @event.listens_for(engine, "connect")
-    def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
-        )
-
-    return engine
 
 
 def _build_alembic_config(database_url: str) -> Config:
@@ -89,8 +72,8 @@ def _build_alembic_config(database_url: str) -> Config:
 def runtime_engine(tmp_path: Path) -> sa.Engine:
     main_db = tmp_path / "event-log-main.sqlite3"
     platform_db = tmp_path / "event-log-platform.sqlite3"
-    engine = _build_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(sqlite_url(main_db))
 
     with engine.begin() as connection:
         alembic_config.attributes["connection"] = connection
@@ -275,8 +258,8 @@ def _event_types(session: sa.orm.Session) -> list[str]:
 def test_event_log_migration_creates_table_at_0002(tmp_path: Path) -> None:
     main_db = tmp_path / "migration-main.sqlite3"
     platform_db = tmp_path / "migration-platform.sqlite3"
-    engine = _build_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(sqlite_url(main_db))
     try:
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
@@ -318,14 +301,14 @@ def test_event_log_migration_creates_table_at_0002(tmp_path: Path) -> None:
 
 def test_platform_migration_chain_is_single_head() -> None:
     script = ScriptDirectory.from_config(_build_alembic_config("sqlite+pysqlite://"))
-    assert script.get_heads() == ["0008"]
+    assert script.get_heads() == ["0009"]
 
 
 def test_event_log_upgrade_from_0005_renames_provider_policy_column(tmp_path: Path) -> None:
     main_db = tmp_path / "migration-upgrade-main.sqlite3"
     platform_db = tmp_path / "migration-upgrade-platform.sqlite3"
-    engine = _build_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(sqlite_url(main_db))
     try:
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection

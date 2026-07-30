@@ -45,6 +45,8 @@ class ScenarioSessionRecord:
     scenario_chain_id: str | None = None
     parent_scenario_session_id: str | None = None
     source_frontend_instance_id: str | None = None
+    idempotency_key: str | None = None
+    idempotency_request_hash: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=utc_now)
     started_at: datetime = field(default_factory=utc_now)

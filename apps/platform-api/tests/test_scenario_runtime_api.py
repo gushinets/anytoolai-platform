@@ -7,11 +7,17 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import pytest
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
 from anytoolai_platform_api.bootstrap import RuntimeStorageDependencies
 from anytoolai_platform_api.main import create_app
+from anytoolai_platform_api.routers.scenario_runtime import (
+    SAFE_IDEMPOTENCY_KEY_INVALID_422_EXAMPLE,
+    _runtime_service,
+    _status_code_for_platform_error,
+)
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.events.emitter import EventEmitter
@@ -20,13 +26,18 @@ from anytoolai_platform_core.identity.models import GuestIdentityRecord
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.quotas.models import QuotaDimension
+from anytoolai_platform_core.quotas.service import QuotaExhaustedError
 from anytoolai_platform_core.scenarios.checkpoints import (
     FAILED_CHECKPOINT_ID,
     PROCESSING_CHECKPOINT_ID,
     RESULT_READY_CHECKPOINT_ID,
 )
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
-from anytoolai_platform_core.scenarios.service import ScenarioSessionService
+from anytoolai_platform_core.scenarios.service import (
+    IdempotencyKeyConflictError,
+    IdempotencyKeyInvalidError,
+    ScenarioSessionService,
+)
 from anytoolai_platform_core.storage.db import (
     action_runs_table,
     artifacts_table,
@@ -43,39 +54,23 @@ from anytoolai_platform_core.storage.transactions import (
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
-from sqlalchemy import event
+from sqlite_harness import build_sqlite_runtime_engine, sqlite_url
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 
 
-def _sqlite_url(database_path: Path) -> str:
-    return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
-
-
 def _build_session_factory(tmp_path: Path) -> sa.orm.sessionmaker[sa.orm.Session]:
     main_db = tmp_path / "api-main.sqlite3"
     platform_db = tmp_path / "api-platform.sqlite3"
-    engine = sa.create_engine(
-        _sqlite_url(main_db),
-        future=True,
-        connect_args={"timeout": 30.0},
-    )
-
-    @event.listens_for(engine, "connect")
-    def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        dbapi_connection.execute("PRAGMA busy_timeout = 30000")
-        dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
-        )
+    engine = build_sqlite_runtime_engine(main_db, platform_db, concurrent_writes=True)
 
     alembic_config = Config()
     alembic_config.set_main_option(
         "script_location", str(REPO_ROOT / "migrations" / "platform")
     )
-    alembic_config.set_main_option("sqlalchemy.url", _sqlite_url(main_db))
+    alembic_config.set_main_option("sqlalchemy.url", sqlite_url(main_db))
 
     with engine.begin() as connection:
         alembic_config.attributes["connection"] = connection
@@ -126,6 +121,7 @@ async def _request(
     *,
     json: Any | None = None,
     request_id: str = "req_scenario_runtime_test",
+    headers: dict[str, str] | None = None,
 ) -> httpx.Response:
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -133,7 +129,7 @@ async def _request(
             method,
             path,
             json=json,
-            headers={"X-Request-ID": request_id},
+            headers={"X-Request-ID": request_id, **(headers or {})},
         )
 
 
@@ -478,6 +474,92 @@ def test_start_scenario_requires_valid_guest_identity_for_quota_product(
     assert "quota.consumed" not in event_types
 
 
+def test_start_scenario_replays_via_idempotency_key_header(tmp_path: Path) -> None:
+    session_factory = _build_session_factory(tmp_path)
+    app = _create_test_app(session_factory)
+
+    first = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
+            json=_start_payload(),
+            request_id="req_idem_header_1",
+            headers={"Idempotency-Key": "idem-http-replay"},
+        )
+    )
+    second = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
+            json=_start_payload(),
+            request_id="req_idem_header_2",
+            headers={"Idempotency-Key": "idem-http-replay"},
+        )
+    )
+
+    assert first.status_code == HTTPStatus.OK
+    assert second.status_code == HTTPStatus.OK
+    assert first.json() == second.json()
+
+    with transaction_boundary(session_factory) as session:
+        scenario_count = session.execute(
+            sa.select(sa.func.count()).select_from(scenario_sessions_table)
+        ).scalar_one()
+        job_count = session.execute(
+            sa.select(sa.func.count()).select_from(jobs_table)
+        ).scalar_one()
+        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+        consumed_count = session.execute(
+            sa.select(sa.func.count())
+            .select_from(event_log_table)
+            .where(event_log_table.c.event_type == "quota.consumed")
+        ).scalar_one()
+
+    assert scenario_count == 1
+    assert job_count == 1
+    assert usage["used_count"] == 1
+    assert consumed_count == 1
+
+
+def test_start_scenario_idempotency_key_conflict_returns_409_via_http(tmp_path: Path) -> None:
+    session_factory = _build_session_factory(tmp_path)
+    app = _create_test_app(session_factory)
+
+    first = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
+            json=_start_payload(),
+            request_id="req_idem_conflict_1",
+            headers={"Idempotency-Key": "idem-http-conflict"},
+        )
+    )
+    second = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start",
+            json=_start_payload(input={"source_text": "a completely different request"}),
+            request_id="req_idem_conflict_2",
+            headers={"Idempotency-Key": "idem-http-conflict"},
+        )
+    )
+
+    assert first.status_code == HTTPStatus.OK
+    assert second.status_code == HTTPStatus.CONFLICT
+    assert second.json()["error"]["code"] == "idempotency_key_conflict"
+
+    with transaction_boundary(session_factory) as session:
+        scenario_count = session.execute(
+            sa.select(sa.func.count()).select_from(scenario_sessions_table)
+        ).scalar_one()
+
+    assert scenario_count == 1
+
+
 def test_parallel_start_scenario_consumes_quota_exactly_to_limit(
     tmp_path: Path,
 ) -> None:
@@ -535,6 +617,133 @@ def test_parallel_start_scenario_consumes_quota_exactly_to_limit(
     assert usage["limit_count"] == 3
     assert usage["quota_dimension"] == "product"
     assert usage["dimension_key"] == "kernel_demo"
+    assert event_types.count("quota.consumed") == 3
+    assert event_types.count("quota.exhausted") == 1
+
+
+def _direct_start_session(
+    session: sa.orm.Session,
+    app,
+    *,
+    input_payload: dict[str, Any] | None = None,
+    **kwargs: Any,
+):
+    return _runtime_service(
+        session=session, registry=app.state.runtime.config_registry
+    ).start_session(
+        tenant_id="anytoolai",
+        region="default",
+        product_id="kernel_demo",
+        scenario_id="kernel_demo.single_action_smoke_v1",
+        frontend_id="kernel_demo_ce",
+        input_payload=input_payload or {"source_text": "deadline budget deliverables"},
+        guest_id="guest_demo",
+        **kwargs,
+    )
+
+
+def test_start_session_replays_same_idempotency_key_without_double_charge(
+    tmp_path: Path,
+) -> None:
+    session_factory = _build_session_factory(tmp_path)
+    app = _create_test_app(session_factory)
+
+    with transaction_boundary(session_factory) as session:
+        first = _direct_start_session(session, app, idempotency_key="idem-replay")
+    with transaction_boundary(session_factory) as session:
+        second = _direct_start_session(session, app, idempotency_key="idem-replay")
+
+    assert first.scenario_session_id == second.scenario_session_id
+    assert first.job_id == second.job_id
+
+    with transaction_boundary(session_factory) as session:
+        scenario_count = session.execute(
+            sa.select(sa.func.count()).select_from(scenario_sessions_table)
+        ).scalar_one()
+        job_count = session.execute(
+            sa.select(sa.func.count()).select_from(jobs_table)
+        ).scalar_one()
+        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+        started_count = session.execute(
+            sa.select(sa.func.count())
+            .select_from(event_log_table)
+            .where(event_log_table.c.event_type == "scenario.started")
+        ).scalar_one()
+
+    assert scenario_count == 1
+    assert job_count == 1
+    assert usage["used_count"] == 1
+    assert started_count == 1
+
+
+def test_start_session_idempotency_key_conflict_on_hash_mismatch(
+    tmp_path: Path,
+) -> None:
+    session_factory = _build_session_factory(tmp_path)
+    app = _create_test_app(session_factory)
+
+    with transaction_boundary(session_factory) as session:
+        _direct_start_session(session, app, idempotency_key="idem-conflict")
+
+    with (
+        pytest.raises(IdempotencyKeyConflictError),
+        transaction_boundary(session_factory) as session,
+    ):
+        _direct_start_session(
+            session,
+            app,
+            idempotency_key="idem-conflict",
+            input_payload={"source_text": "a different request body"},
+        )
+
+    with transaction_boundary(session_factory) as session:
+        scenario_count = session.execute(
+            sa.select(sa.func.count()).select_from(scenario_sessions_table)
+        ).scalar_one()
+        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+
+    assert scenario_count == 1
+    assert usage["used_count"] == 1
+
+
+def test_start_session_quota_exhausted_after_fresh_insert_leaves_no_orphan_row(
+    tmp_path: Path,
+) -> None:
+    session_factory = _build_session_factory(tmp_path)
+    app = _create_test_app(session_factory)
+
+    for index in range(3):
+        with transaction_boundary(session_factory) as session:
+            _direct_start_session(session, app, idempotency_key=f"idem-fill-{index}")
+
+    with (
+        pytest.raises(QuotaExhaustedError),
+        transaction_boundary(session_factory) as session,
+    ):
+        _direct_start_session(session, app, idempotency_key="idem-exhausted")
+
+    with transaction_boundary(session_factory) as session:
+        scenario_count = session.execute(
+            sa.select(sa.func.count()).select_from(scenario_sessions_table)
+        ).scalar_one()
+        job_count = session.execute(
+            sa.select(sa.func.count()).select_from(jobs_table)
+        ).scalar_one()
+        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+        event_types = list(
+            session.execute(
+                sa.select(event_log_table.c.event_type).order_by(
+                    event_log_table.c.timestamp,
+                    event_log_table.c.event_id,
+                )
+            ).scalars()
+        )
+
+    assert scenario_count == 3
+    assert job_count == 3
+    assert usage["used_count"] == 3
+    assert usage["limit_count"] == 3
+    assert event_types.count("scenario.started") == 3
     assert event_types.count("quota.consumed") == 3
     assert event_types.count("quota.exhausted") == 1
 
@@ -1092,6 +1301,23 @@ def test_get_scenario_session_returns_safe_404_for_persisted_scenario_version_mi
     assert "single_action_smoke_v1" not in response.text
 
 
+def test_status_code_for_platform_error_maps_idempotency_conflict_to_409() -> None:
+    status_code = _status_code_for_platform_error(IdempotencyKeyConflictError())
+
+    assert status_code == HTTPStatus.CONFLICT
+
+
+def test_idempotency_key_invalid_openapi_example_matches_real_error_message() -> None:
+    # The documented example message must never drift from the real error message --
+    # if MAX_IDEMPOTENCY_KEY_LENGTH ever changes, the real message updates
+    # automatically (it interpolates the constant) and this example must too, or the
+    # OpenAPI docs silently start lying about the actual limit.
+    assert (
+        SAFE_IDEMPOTENCY_KEY_INVALID_422_EXAMPLE["error"]["message"]
+        == str(IdempotencyKeyInvalidError())
+    )
+
+
 def test_openapi_contains_scenario_runtime_endpoints() -> None:
     app = create_app(config_root=CONFIG_ROOT)
     openapi = app.openapi()
@@ -1119,6 +1345,12 @@ def test_openapi_contains_scenario_runtime_endpoints() -> None:
             "guest_required"
         ]["value"]["error"]["code"]
         == "guest_identity_required"
+    )
+    assert (
+        start_operation["responses"]["409"]["content"]["application/json"]["example"]["error"][
+            "code"
+        ]
+        == "idempotency_key_conflict"
     )
     assert (
         start_operation["responses"]["429"]["content"]["application/json"]["example"]["error"][
