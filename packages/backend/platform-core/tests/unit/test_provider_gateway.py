@@ -21,6 +21,7 @@ from anytoolai_platform_core.providers.gateway import (
     ProviderGateway,
     ProviderGatewayExecutionError,
 )
+from anytoolai_platform_core.providers.gateway.metadata import sanitize_metadata
 from anytoolai_platform_core.providers.gateway.recovery import (
     recover_provider_call_events_after_rollback,
 )
@@ -345,6 +346,48 @@ def _provider_rows(session: sa.orm.Session) -> list[dict[str, Any]]:
             )
         ).mappings()
     )
+
+
+def test_sanitize_metadata_redacts_secret_keys_but_preserves_token_usage_fields() -> None:
+    sanitized = sanitize_metadata(
+        {
+            "api_key": "sk-live-abc123",
+            "user_api_key": "sk-live-def456",
+            "authorization": "Bearer abc123",
+            "cookie": "session=abc123",
+            "credential": "abc123",
+            "password": "hunter2",
+            "secret": "abc123",
+            "auth_token": "abc123",
+            "session_token": "abc123",
+            "total_tokens": 42,
+            "prompt_tokens": 10,
+            "completion_tokens": 32,
+            "input_tokens": 10,
+            "output_tokens": 32,
+            "usage": {"total_tokens": 42, "prompt_tokens": 10, "completion_tokens": 32},
+        }
+    )
+
+    assert sanitized["api_key"] == "[redacted]"
+    assert sanitized["user_api_key"] == "[redacted]"
+    assert sanitized["authorization"] == "[redacted]"
+    assert sanitized["cookie"] == "[redacted]"
+    assert sanitized["credential"] == "[redacted]"
+    assert sanitized["password"] == "[redacted]"
+    assert sanitized["secret"] == "[redacted]"
+    assert sanitized["auth_token"] == "[redacted]"
+    assert sanitized["session_token"] == "[redacted]"
+    assert sanitized["total_tokens"] == 42
+    assert sanitized["prompt_tokens"] == 10
+    assert sanitized["completion_tokens"] == 32
+    assert sanitized["input_tokens"] == 10
+    assert sanitized["output_tokens"] == 32
+    assert sanitized["usage"] == {
+        "total_tokens": 42,
+        "prompt_tokens": 10,
+        "completion_tokens": 32,
+    }
 
 
 def test_provider_policy_resolution_uses_nested_retry_policy(

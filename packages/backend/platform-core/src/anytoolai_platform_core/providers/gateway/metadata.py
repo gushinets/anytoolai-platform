@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -14,6 +15,14 @@ _SECRET_KEYS = {
     "secret",
     "token",
 }
+# Matches a secret key only as a whole, delimiter-bounded segment (e.g. "auth_token",
+# "user_api_key") so plain substring occurrences like "total_tokens" or
+# "prompt_tokens" are left untouched instead of being over-redacted.
+_SECRET_KEY_PATTERN = re.compile(
+    r"(?:^|[^a-z0-9])(?:"
+    + "|".join(re.escape(secret_key) for secret_key in _SECRET_KEYS)
+    + r")(?:[^a-z0-9]|$)"
+)
 _MAX_STRING_LENGTH = 500
 _MAX_COLLECTION_ITEMS = 20
 _MAX_NESTING_DEPTH = 4
@@ -99,7 +108,7 @@ def sanitize_metadata(value: Mapping[str, Any] | None) -> dict[str, Any]:
 
 
 def _sanitize_value(*, key: str, value: Any, depth: int) -> Any:
-    if any(secret_key in key.lower() for secret_key in _SECRET_KEYS):
+    if _SECRET_KEY_PATTERN.search(key.lower()):
         return "[redacted]"
     if depth >= _MAX_NESTING_DEPTH:
         return "[truncated]"
