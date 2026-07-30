@@ -135,15 +135,10 @@ def test_postgresql_concurrent_duplicate_submit_with_idempotency_key_consumes_qu
     compromise, which already documents that production-safe concurrency needs this
     PostgreSQL integration path rather than the fast SQLite suite.
     """
-    maintenance_url = _require_postgres_test_url()
-    database_name = f"anytoolai_a150_idem_concurrent_{uuid4().hex[:12]}"
-    test_url = maintenance_url.set(database=database_name)
-    _create_database(maintenance_url, database_name)
-    engine = sa.create_engine(test_url, future=True)
-    try:
-        _upgrade_database(engine, test_url)
-        session_factory = build_session_factory(engine)
-        app = _create_test_app(session_factory)
+    with _provision_api_app("anytoolai_a150_idem_concurrent") as (
+        session_factory,
+        app,
+    ):
         request_count = 8
 
         async def start_parallel_requests() -> list[httpx.Response]:
@@ -197,9 +192,6 @@ def test_postgresql_concurrent_duplicate_submit_with_idempotency_key_consumes_qu
         assert usage["used_count"] == 1
         assert started_count == 1
         assert consumed_count == 1
-    finally:
-        engine.dispose()
-        _drop_database(maintenance_url, database_name)
 
 
 @pytest.mark.postgresql

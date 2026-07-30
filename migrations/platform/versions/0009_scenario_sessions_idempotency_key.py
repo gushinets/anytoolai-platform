@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 
 revision = "0009"
 down_revision = "0008"
@@ -32,6 +32,25 @@ def _column_names() -> set[str]:
 
 
 def upgrade() -> None:
+    if context.is_offline_mode():
+        op.add_column(
+            TABLE_NAME,
+            sa.Column("idempotency_key", sa.String(length=256), nullable=True),
+            schema=PLATFORM_SCHEMA,
+        )
+        op.add_column(
+            TABLE_NAME,
+            sa.Column("idempotency_request_hash", sa.String(length=64), nullable=True),
+            schema=PLATFORM_SCHEMA,
+        )
+        op.create_unique_constraint(
+            CONSTRAINT_NAME,
+            TABLE_NAME,
+            CONSTRAINT_COLUMNS,
+            schema=PLATFORM_SCHEMA,
+        )
+        return
+
     if "idempotency_key" in _column_names():
         return
 
@@ -64,6 +83,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if context.is_offline_mode():
+        op.drop_constraint(
+            CONSTRAINT_NAME, TABLE_NAME, schema=PLATFORM_SCHEMA, type_="unique"
+        )
+        op.drop_column(TABLE_NAME, "idempotency_request_hash", schema=PLATFORM_SCHEMA)
+        op.drop_column(TABLE_NAME, "idempotency_key", schema=PLATFORM_SCHEMA)
+        return
+
     if "idempotency_key" not in _column_names():
         return
 
