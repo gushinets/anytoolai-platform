@@ -54,7 +54,8 @@ def build_sqlite_runtime_engine(
             dbapi_connection.isolation_level = None
             dbapi_connection.execute("PRAGMA busy_timeout = 30000")
         dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
+            "ATTACH DATABASE ? AS platform",
+            (platform_db.resolve().as_posix(),),
         )
 
     if concurrent_writes:
