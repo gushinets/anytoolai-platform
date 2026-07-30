@@ -84,8 +84,9 @@ API behavior:
 
 Concurrency proof:
 
-- the fast suite keeps SQLite/ASGI coverage for local regression speed;
 - PostgreSQL is the production source of truth for quota consume semantics;
+- PostgreSQL-backed tests are required for quota concurrency, `ON CONFLICT`, row-lock, and
+  transaction-isolation proof;
 - `apps/platform-api/tests/test_quota_concurrency_postgresql.py` is the PostgreSQL-backed
   integration check for concurrent accepted starts, `N+1` exhaustion behavior, and (ANY-150)
   concurrent duplicate submission under one `Idempotency-Key`.

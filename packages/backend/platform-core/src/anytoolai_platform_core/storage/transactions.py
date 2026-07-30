@@ -8,7 +8,8 @@ from enum import IntEnum
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-RollbackRecoveryCallback = Callable[[sessionmaker[Session]], None]
+SessionFactory = sessionmaker[Session]
+RollbackRecoveryCallback = Callable[[SessionFactory], None]
 _ROLLBACK_CALLBACKS_KEY = "rollback_recovery_callbacks"
 _ROLLBACK_CALLBACK_ORDER_KEY = "rollback_recovery_callback_order"
 
@@ -32,7 +33,7 @@ class RegisteredRollbackRecoveryCallback:
     callback: RollbackRecoveryCallback
 
 
-def build_session_factory(engine: Engine) -> sessionmaker[Session]:
+def build_session_factory(engine: Engine) -> SessionFactory:
     return sessionmaker(bind=engine, expire_on_commit=False, autoflush=False, future=True)
 
 
@@ -55,7 +56,7 @@ def register_rollback_recovery_callback(
 
 
 @contextmanager
-def transaction_boundary(session_factory: sessionmaker[Session]) -> Iterator[Session]:
+def transaction_boundary(session_factory: SessionFactory) -> Iterator[Session]:
     session = session_factory()
     try:
         try:
@@ -86,7 +87,7 @@ def _pop_rollback_recovery_callbacks(
     )
 
 
-def _independent_session_factory(session: Session) -> sessionmaker[Session]:
+def _independent_session_factory(session: Session) -> SessionFactory:
     bind = session.get_bind()
     engine = bind.engine if isinstance(bind, Connection) else bind
     return build_session_factory(engine)

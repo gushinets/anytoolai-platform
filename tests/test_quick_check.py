@@ -233,6 +233,31 @@ def test_runtime_env_exports_virtualenv_for_managed_quick_check(monkeypatch, tmp
     assert env["VIRTUAL_ENV"] == str(managed_venv)
 
 
+def test_pytest_command_uses_repo_managed_basetemp(monkeypatch, tmp_path) -> None:
+    quick_check = load_quick_check_module()
+    repo_root = tmp_path / "repo"
+    tmp_root = repo_root / ".quick-check-tmp"
+
+    monkeypatch.setattr(quick_check, "ROOT", repo_root)
+    monkeypatch.setattr(quick_check, "TMP_ROOT", tmp_root)
+    monkeypatch.setattr(quick_check, "PYTEST_BASETEMP_ROOT", tmp_root / "pytest-runs")
+    monkeypatch.setattr(quick_check.sys, "executable", "/tmp/.quick-check-venv/bin/python")
+    monkeypatch.setattr(quick_check.os, "getpid", lambda: 4321)
+
+    command = quick_check.pytest_command()
+
+    assert command == [
+        "/tmp/.quick-check-venv/bin/python",
+        "-m",
+        "pytest",
+        "-m",
+        "not slow",
+        "--basetemp",
+        str(tmp_root / "pytest-runs" / "run-4321"),
+        *quick_check.PYTEST_TARGETS,
+    ]
+
+
 def test_main_excludes_slow_tests_from_fast_pytest_path(monkeypatch) -> None:
     quick_check = load_quick_check_module()
     commands: list[list[str]] = []
@@ -242,6 +267,11 @@ def test_main_excludes_slow_tests_from_fast_pytest_path(monkeypatch) -> None:
     monkeypatch.setattr(quick_check.sys, "executable", "/tmp/.quick-check-venv/bin/python")
     monkeypatch.setattr(
         quick_check,
+        "pytest_basetemp",
+        lambda: Path("/tmp/repo/.quick-check-tmp/pytest-runs/run-1234"),
+    )
+    monkeypatch.setattr(
+        quick_check,
         "run_sequence",
         lambda sequence: commands.extend(list(command) for command in sequence) or 0,
     )
@@ -249,11 +279,13 @@ def test_main_excludes_slow_tests_from_fast_pytest_path(monkeypatch) -> None:
     assert quick_check.main() == 0
 
     pytest_command = commands[-1]
-    assert pytest_command[:5] == [
+    assert pytest_command[:7] == [
         "/tmp/.quick-check-venv/bin/python",
         "-m",
         "pytest",
         "-m",
         "not slow",
+        "--basetemp",
+        str(Path("/tmp/repo/.quick-check-tmp/pytest-runs/run-1234")),
     ]
-    assert pytest_command[5:] == quick_check.PYTEST_TARGETS
+    assert pytest_command[7:] == quick_check.PYTEST_TARGETS

@@ -29,8 +29,8 @@ real `createGuestIdentity()` local persistence in CE-kit.
 - Backend/API: quota service/repository, scenario runtime service/router, identity/quota router,
   transaction boundary, storage metadata and migrations, API bootstrap.
 - Frontend: CE-kit `createGuestIdentity()`, `startScenario()`, `getQuota()`, package exports.
-- Tests/tooling: SQLite Alembic/ASGI scenario runtime tests, slow SQLite stress test, runner
-  worktree Compose commands, PostgreSQL compose file.
+- Tests/tooling: legacy non-PostgreSQL scenario runtime coverage, runner worktree Compose
+  commands, PostgreSQL compose file.
 
 ## Complete Now
 
@@ -39,8 +39,8 @@ real `createGuestIdentity()` local persistence in CE-kit.
 - Make the test explicitly verify first `N` accepted starts, `N+1` `429 quota_exhausted`, no double
   consumption, and post-factum session/job/quota/event consistency under concurrent starts.
 - Guard the PostgreSQL test so it only runs against a clearly disposable test database.
-- Update docs/specs/plans to state that SQLite concurrency coverage is not production proof and the
-  PostgreSQL test is the production-semantics check.
+- Update docs/specs/plans to state that PostgreSQL tests are the only supported production-semantics
+  check.
 - Keep CE-kit start/quota helpers deferred and document only guest identity persistence as real in
   A13.
 
@@ -71,11 +71,7 @@ $env:ANYTOOLAI_POSTGRES_TEST_DATABASE_URL = "postgresql+psycopg://anytoolai:anyt
 uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q
 ```
 
-The SQLite/ASGI stress test remains available outside the quick-check fast path:
-
-```powershell
-uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_stress.py -m slow -q
-```
+Legacy non-PostgreSQL concurrency harnesses have been removed from the supported test path.
 
 ## Progress Log
 
