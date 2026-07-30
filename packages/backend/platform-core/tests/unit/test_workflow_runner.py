@@ -628,6 +628,120 @@ def test_workflow_runner_recovers_canceled_state_for_existing_claimed_job_after_
     assert workflow_canceled["result_status"] == JobStatus.canceled.value
 
 
+def test_workflow_runner_recovers_succeeded_state_for_existing_claimed_job_after_rollback(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    context = _base_context()
+    with transaction_boundary(session_factory) as session:
+        _seed_context_scenario(session, context)
+        repository = JobRepository(session)
+        claimed = WorkflowJobService(
+            repository,
+            EventEmitter(EventLogRepository(session)),
+        ).claim_created(
+            repository.create(
+                JobRecord(
+                    tenant_id="tenant_demo",
+                    region="eu-central",
+                    product_id="kernel_demo",
+                    frontend_id="kernel_demo_ce",
+                    scenario_session_id="scenario_session_demo",
+                    workflow_id="kernel_demo.single_action_extract_v1",
+                    workflow_version=1,
+                )
+            ).id
+        )
+        assert claimed is not None
+        claimed_job_id = claimed.id
+
+    with pytest.raises(RuntimeError, match="forced rollback after workflow success"):
+        with transaction_boundary(session_factory) as session:
+            runner = _build_structured_workflow_runner(session)
+            job = JobRepository(session).get(claimed_job_id)
+            assert job is not None
+            result = asyncio.run(
+                runner.run_claimed_job(
+                    job,
+                    {"source_text": "deadline budget deliverables"},
+                    context,
+                )
+            )
+            assert result.status is JobStatus.succeeded
+            # Simulates a downstream failure (e.g. ScenarioSessionService.mark_completed)
+            # raising after the workflow already succeeded but before the transaction commits.
+            raise RuntimeError("forced rollback after workflow success")
+
+    with transaction_boundary(session_factory) as session:
+        job = session.execute(
+            sa.select(jobs_table).where(jobs_table.c.id == claimed_job_id)
+        ).mappings().one()
+        artifacts = list(
+            session.execute(
+                sa.select(artifacts_table).where(artifacts_table.c.job_id == claimed_job_id)
+            ).mappings()
+        )
+        events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.job_id == claimed_job_id)
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert job["status"] is JobStatus.succeeded
+    assert job["result_artifact_id"] is not None
+    assert any(artifact["id"] == job["result_artifact_id"] for artifact in artifacts)
+    _assert_strictly_increasing_event_timestamps(events)
+    event_types = _event_types(events)
+    assert event_types[0] == "workflow.started"
+    assert event_types[-1] == "workflow.succeeded"
+    assert "workflow.step_succeeded" in event_types
+    workflow_succeeded = _event_by_type(events, "workflow.succeeded")[0]
+    assert workflow_succeeded["job_id"] == claimed_job_id
+    assert workflow_succeeded["result_status"] == JobStatus.succeeded.value
+    assert workflow_succeeded["properties"]["workflow_version"] == 1
+
+
+def test_workflow_runner_recovers_succeeded_state_for_newly_created_job_after_rollback(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    context = _base_context()
+    with transaction_boundary(session_factory) as session:
+        _seed_context_scenario(session, context)
+
+    with pytest.raises(RuntimeError, match="forced rollback after workflow success"):
+        with transaction_boundary(session_factory) as session:
+            runner = _build_structured_workflow_runner(session)
+            result = asyncio.run(
+                runner.run(
+                    "kernel_demo.single_action_extract_v1",
+                    {"source_text": "deadline budget deliverables"},
+                    context,
+                )
+            )
+            assert result.status is JobStatus.succeeded
+            # The job row itself was created inside this same transaction (via
+            # `run()`, not a pre-claimed job), so it was never committed either -
+            # the recovery must reconstruct it from scratch, not just reapply state.
+            raise RuntimeError("forced rollback after workflow success")
+
+    with transaction_boundary(session_factory) as session:
+        job = session.execute(sa.select(jobs_table)).mappings().one()
+        artifacts = list(session.execute(sa.select(artifacts_table)).mappings())
+        events = _event_rows(session)
+
+    assert job["status"] is JobStatus.succeeded
+    assert job["result_artifact_id"] is not None
+    assert any(artifact["id"] == job["result_artifact_id"] for artifact in artifacts)
+    _assert_strictly_increasing_event_timestamps(events)
+    event_types = _event_types(events)
+    assert event_types[0] == "workflow.started"
+    assert event_types[-1] == "workflow.succeeded"
+    workflow_succeeded = _event_by_type(events, "workflow.succeeded")[0]
+    assert workflow_succeeded["job_id"] == job["id"]
+    assert workflow_succeeded["result_status"] == JobStatus.succeeded.value
+
+
 def test_workflow_runner_rejects_claimed_job_context_with_mismatched_ownership_dimensions(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

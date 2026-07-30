@@ -366,6 +366,7 @@ class SequentialWorkflowRunner:
                     completed_at=job.completed_at or utc_now(),
                 )
             )
+            self._register_success_recovery(job)
             return WorkflowRunResult(
                 job_id=job.id,
                 workflow_id=job.workflow_id,
@@ -960,6 +961,24 @@ class SequentialWorkflowRunner:
             phase=RollbackRecoveryPhase.workflow_events,
         )
 
+    def _register_success_recovery(self, job: JobRecord) -> None:
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _recover_succeeded_workflow_row_after_rollback(
+                recovery_session_factory,
+                job,
+            ),
+            phase=RollbackRecoveryPhase.workflow_rows,
+        )
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _recover_succeeded_workflow_events_after_rollback(
+                recovery_session_factory,
+                job.id,
+            ),
+            phase=RollbackRecoveryPhase.workflow_events,
+        )
+
     @staticmethod
     def _remember_failed_step(
         state: _WorkflowExecutionState,
@@ -1151,6 +1170,39 @@ def _recover_canceled_workflow_row_after_rollback(
             stored = repository.update(recovered_record)
 
         del stored
+
+
+def _recover_succeeded_workflow_row_after_rollback(
+    recovery_session_factory: Any,
+    record: JobRecord,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        repository = JobRepository(recovery_session)
+
+        existing = repository.get(record.id)
+        if existing is None:
+            repository.create(record)
+        elif existing.status is JobStatus.running:
+            repository.mark_succeeded(record)
+        elif existing.status is JobStatus.succeeded:
+            repository.update(record)
+        else:
+            raise RuntimeError(
+                f"job {record.id} cannot recover succeeded workflow from {existing.status.value}"
+            )
+
+
+def _recover_succeeded_workflow_events_after_rollback(
+    recovery_session_factory: Any,
+    job_id: str,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        _emit_recovered_workflow_events(
+            recovery_session,
+            job_id=job_id,
+            terminal_event_type="workflow.succeeded",
+            terminal_error_code=None,
+        )
 
 
 def _recover_failed_workflow_events_after_rollback(
