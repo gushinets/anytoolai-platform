@@ -488,14 +488,20 @@ def test_structured_llm_executor_raises_safe_error_and_persists_debug_artifact_a
     assert artifact_rows[0]["metadata"]["error_code"] == STRUCTURED_OUTPUT_VALIDATION_ERROR_CODE
 
 
-class _AlwaysInvalidJsonAdapter:
-    """Forces PydanticAI semantic validation to retry on every physical call."""
+class _TransportFailureThenInvalidJsonAdapter:
+    """Fails the first physical call transport-level (retryable); the transport
+    retry that follows succeeds but returns invalid JSON, forcing PydanticAI to
+    issue a semantic retry - which must then be blocked by the shared
+    action-wide physical-call budget instead of getting a fresh one.
+    """
 
     def __init__(self) -> None:
         self.call_count = 0
 
     async def complete(self, request: Any) -> ProviderResponse:
         self.call_count += 1
+        if self.call_count == 1:
+            raise RuntimeError("transient provider error")
         return ProviderResponse(
             provider_policy_ref=request.provider_policy_ref,
             provider=request.provider,
@@ -531,16 +537,18 @@ def test_structured_llm_executor_shares_physical_call_budget_across_validation_r
     """E2E regression for ANY-149.
 
     Wires a real ``ProviderGateway`` + real ``PydanticAIStructuredRunner`` exactly
-    the way ``StructuredLlmActionExecutor.execute()`` does in production, and forces
-    PydanticAI to keep retrying semantic validation (via ``ModelRetry``) on every
-    attempt. Before the fix, each semantic retry got its own fresh
-    ``max_physical_provider_calls_per_action`` budget; after the fix, the hard limit
-    must fire on the physical call that pushes the *action-wide* total past the
-    configured limit, regardless of how many semantic attempts are still allowed.
+    the way ``StructuredLlmActionExecutor.execute()`` does in production, and
+    combines both retry axes in one action: the first physical call fails
+    transport-level and gets a transport retry (``_execute_transport_attempts``),
+    that retry succeeds but returns invalid JSON, so PydanticAI issues a semantic
+    retry (via ``ModelRetry``). Before the fix, that semantic retry would have
+    gotten its own fresh ``max_physical_provider_calls_per_action`` budget; after
+    the fix, the hard limit must fire on it immediately because the transport
+    retry already spent the whole action-wide budget.
     """
 
     registry = build_config_registry(CONFIG_ROOT)
-    adapter = _AlwaysInvalidJsonAdapter()
+    adapter = _TransportFailureThenInvalidJsonAdapter()
     gateway_policy = ProviderPolicy(
         provider_policy_ref="default_fake_provider_v1",
         provider="fake",
@@ -548,7 +556,7 @@ def test_structured_llm_executor_shares_physical_call_budget_across_validation_r
         retry_policy=ProviderRetryPolicy(
             transport=ProviderTransportRetryPolicy(
                 owner="fake_adapter",
-                max_attempts=1,
+                max_attempts=2,
                 litellm_num_retries_per_attempt=0,
             ),
             validation=ProviderValidationRetryPolicy(owner="pydanticai", max_attempts=5),
@@ -604,10 +612,21 @@ def test_structured_llm_executor_shares_physical_call_budget_across_validation_r
         )
 
     assert exc_info.value.error_code == "provider_physical_call_limit_exceeded"
+    # Adapter is invoked exactly twice: the failing transport attempt and the
+    # transport retry that succeeds with invalid JSON. The blocked semantic
+    # retry must never reach the adapter at all.
     assert adapter.call_count == 2
     assert len(rows) == 2
     assert [row["physical_call_index"] for row in rows] == [1, 2]
-    assert [row["semantic_attempt_index"] for row in rows] == [1, 2]
+    # Both persisted physical calls belong to the SAME semantic attempt (the
+    # transport retry happens inside it); the hard limit fires on the next
+    # semantic attempt before any physical call - and therefore any row - for
+    # it is created.
+    assert [row["semantic_attempt_index"] for row in rows] == [1, 1]
+    assert [row["transport_attempt_index"] for row in rows] == [1, 2]
+    assert rows[0]["status"] == ProviderCallStatus.failed
+    assert rows[1]["status"] == ProviderCallStatus.succeeded
+    assert rows[0]["error_code"] == "provider_request_failed"
 
 
 def test_pydanticai_runner_reraises_non_validation_unexpected_model_behavior(
