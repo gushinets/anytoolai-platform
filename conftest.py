@@ -25,3 +25,10 @@ for src_root in reversed(_iter_src_roots()):
     src_root_str = str(src_root)
     if src_root_str not in sys.path:
         sys.path.insert(0, src_root_str)
+
+# Shared test-only helpers (e.g. tests/support/sqlite_harness.py) used across
+# packages/backend/*/tests and apps/*/tests, which otherwise have no way to import
+# from each other's test trees.
+TEST_SUPPORT_ROOT = str(REPO_ROOT / "tests" / "support")
+if TEST_SUPPORT_ROOT not in sys.path:
+    sys.path.insert(0, TEST_SUPPORT_ROOT)

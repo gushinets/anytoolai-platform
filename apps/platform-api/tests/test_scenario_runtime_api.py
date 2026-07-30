@@ -54,58 +54,23 @@ from anytoolai_platform_core.storage.transactions import (
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
-from sqlalchemy import event
+from sqlite_harness import build_sqlite_runtime_engine, sqlite_url
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 
 
-def _sqlite_url(database_path: Path) -> str:
-    return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
-
-
 def _build_session_factory(tmp_path: Path) -> sa.orm.sessionmaker[sa.orm.Session]:
     main_db = tmp_path / "api-main.sqlite3"
     platform_db = tmp_path / "api-platform.sqlite3"
-    engine = sa.create_engine(
-        _sqlite_url(main_db),
-        future=True,
-        connect_args={"timeout": 30.0},
-    )
-
-    @event.listens_for(engine, "connect")
-    def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        # pysqlite's own implicit-transaction handling fights SQLAlchemy's SAVEPOINT
-        # (begin_nested()) support: without disabling it here and re-establishing
-        # explicit BEGIN below, a released SAVEPOINT can survive a later rollback of
-        # the outer transaction instead of being discarded with it. See
-        # https://docs.sqlalchemy.org/en/20/dialects/sqlite.html#serializable-isolation-savepoints-transactional-ddl
-        dbapi_connection.isolation_level = None
-        dbapi_connection.execute("PRAGMA busy_timeout = 30000")
-        dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
-        )
-
-    @event.listens_for(engine, "begin")
-    def _begin_transaction(connection: sa.Connection) -> None:
-        # IMMEDIATE (not deferred BEGIN) acquires the write-reservation lock at the
-        # start of the transaction instead of on first write. With plain BEGIN, two
-        # concurrent transactions that both read before they write (e.g. a quota
-        # validation SELECT before the scenario_sessions INSERT) can each hold a
-        # SHARED lock and then deadlock trying to upgrade to a write lock -- a
-        # reader-upgrade deadlock that PRAGMA busy_timeout cannot resolve, since
-        # neither side will release its shared lock before getting the one it's
-        # waiting on. IMMEDIATE makes whichever transaction starts first own the
-        # write intent immediately, so everyone else just queues on busy_timeout.
-        connection.exec_driver_sql("BEGIN IMMEDIATE")
+    engine = build_sqlite_runtime_engine(main_db, platform_db, concurrent_writes=True)
 
     alembic_config = Config()
     alembic_config.set_main_option(
         "script_location", str(REPO_ROOT / "migrations" / "platform")
     )
-    alembic_config.set_main_option("sqlalchemy.url", _sqlite_url(main_db))
+    alembic_config.set_main_option("sqlalchemy.url", sqlite_url(main_db))
 
     with engine.begin() as connection:
         alembic_config.attributes["connection"] = connection

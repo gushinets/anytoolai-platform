@@ -9,18 +9,17 @@ from sqlalchemy.orm import Session
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaUsageRecord
 from anytoolai_platform_core.storage.db import guest_quota_usage_table
-from anytoolai_platform_core.storage.db_errors import is_expected_unique_violation
+from anytoolai_platform_core.storage.db_errors import (
+    is_expected_unique_violation,
+    unique_constraint_columns,
+)
 
 EXPECTED_USAGE_DIMENSION_CONSTRAINT = "uq_guest_quota_usage_dimension"
-SQLITE_USAGE_DIMENSION_COLUMNS = (
-    "tenant_id",
-    "region",
-    "guest_id",
-    "product_id",
-    "quota_policy_id",
-    "quota_dimension",
-    "dimension_key",
-    "period_key",
+# Derived from the table's own constraint definition (storage/db.py) instead of a
+# hardcoded copy -- this can never silently drift out of sync with the real
+# constraint's column list.
+SQLITE_USAGE_DIMENSION_COLUMNS: tuple[str, ...] = unique_constraint_columns(
+    guest_quota_usage_table, EXPECTED_USAGE_DIMENSION_CONSTRAINT
 )
 
 

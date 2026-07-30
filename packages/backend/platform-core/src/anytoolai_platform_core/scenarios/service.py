@@ -167,21 +167,7 @@ class ScenarioRuntimeService:
         if existing is not None:
             if existing.idempotency_request_hash != idempotency_request_hash:
                 raise IdempotencyKeyConflictError()
-            # Deliberately unpinned: a replay must survive config drift, including the
-            # scenario's own configured version moving on since the original accepted
-            # start (an ordinary config deploy, not a code change). Pinning to
-            # existing.scenario_version here would 404 every replay of a session whose
-            # scenario was since bumped -- exactly the retry case Idempotency-Key
-            # exists for. scenario is only used below for allowed_next_actions on an
-            # already-completed session; a version-drifted value there is a much
-            # smaller, cosmetic risk than failing the replay outright.
-            scenario = self._require_product_scenario(existing.product_id, existing.scenario_id)
-            job = self._job_repository.get_latest_for_scenario_session(existing.id)
-            return self._snapshot_from_records(
-                session=existing,
-                scenario=scenario,
-                job=job,
-            )
+            return self._replay_snapshot(existing)
 
         scenario = self._require_product_scenario(product_id, scenario_id)
         self._require_enabled_frontend(product_id, frontend_id)
@@ -251,17 +237,8 @@ class ScenarioRuntimeService:
             # this (losing) request resolved a moment ago: under a rolling config
             # deploy that bumps the scenario version between the two concurrent
             # requests, the winner's stored_session.scenario_version can differ from
-            # this request's locally-resolved scenario.version. Unpinned for the same
-            # config-drift reason as the early-lookup replay branch above.
-            scenario = self._require_product_scenario(
-                stored_session.product_id, stored_session.scenario_id
-            )
-            job = self._job_repository.get_latest_for_scenario_session(stored_session.id)
-            return self._snapshot_from_records(
-                session=stored_session,
-                scenario=scenario,
-                job=job,
-            )
+            # this request's locally-resolved scenario.version.
+            return self._replay_snapshot(stored_session)
 
         if self._quota_service is not None and quota_validation is not None:
             assert guest_id is not None  # validate_accepted_start already required this
@@ -297,6 +274,23 @@ class ScenarioRuntimeService:
 
         return self._snapshot_from_records(
             session=stored_session,
+            scenario=scenario,
+            job=job,
+        )
+
+    def _replay_snapshot(self, session: ScenarioSessionRecord) -> ScenarioSessionSnapshot:
+        # Deliberately unpinned: a replay must survive config drift, including the
+        # scenario's own configured version moving on since the original accepted
+        # start (an ordinary config deploy, not a code change). Pinning to
+        # session.scenario_version here would 404 every replay of a session whose
+        # scenario was since bumped -- exactly the retry case Idempotency-Key exists
+        # for. scenario is only used below for allowed_next_actions on an
+        # already-completed session; a version-drifted value there is a much smaller,
+        # cosmetic risk than failing the replay outright.
+        scenario = self._require_product_scenario(session.product_id, session.scenario_id)
+        job = self._job_repository.get_latest_for_scenario_session(session.id)
+        return self._snapshot_from_records(
+            session=session,
             scenario=scenario,
             job=job,
         )

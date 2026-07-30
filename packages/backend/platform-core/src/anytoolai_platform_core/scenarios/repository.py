@@ -8,22 +8,17 @@ from sqlalchemy.orm import Session
 
 from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
 from anytoolai_platform_core.storage.db import scenario_sessions_table
-from anytoolai_platform_core.storage.db_errors import is_expected_unique_violation
-
-
-def _unique_constraint_columns(table: sa.Table, constraint_name: str) -> tuple[str, ...]:
-    for constraint in table.constraints:
-        if isinstance(constraint, sa.UniqueConstraint) and constraint.name == constraint_name:
-            return tuple(constraint.columns.keys())
-    raise LookupError(f"unique constraint not found on {table.name}: {constraint_name}")
-
+from anytoolai_platform_core.storage.db_errors import (
+    is_expected_unique_violation,
+    unique_constraint_columns,
+)
 
 EXPECTED_IDEMPOTENCY_KEY_CONSTRAINT = "uq_scenario_sessions_idempotency_key"
 # Derived from the table's own constraint definition (storage/db.py) instead of a
 # third hardcoded copy (the constraint itself and migration 0009's CONSTRAINT_COLUMNS
 # are the other two) -- this can never silently drift out of sync with the real
 # constraint's column list.
-SQLITE_IDEMPOTENCY_KEY_COLUMNS: tuple[str, ...] = _unique_constraint_columns(
+SQLITE_IDEMPOTENCY_KEY_COLUMNS: tuple[str, ...] = unique_constraint_columns(
     scenario_sessions_table, EXPECTED_IDEMPOTENCY_KEY_CONSTRAINT
 )
 # Read from the column itself so this can never drift from the actual VARCHAR(256)

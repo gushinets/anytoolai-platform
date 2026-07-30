@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -22,39 +21,22 @@ from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
 )
-from sqlalchemy import event
+from sqlite_harness import build_sqlite_runtime_engine, sqlite_url
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 
 
-def _sqlite_url(database_path: Path) -> str:
-    return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
-
-
-def _build_runtime_engine(main_db: Path, platform_db: Path) -> sa.Engine:
-    engine = sa.create_engine(_sqlite_url(main_db), future=True)
-
-    @event.listens_for(engine, "connect")
-    def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
-        )
-
-    return engine
-
-
 def _build_session_factory(tmp_path: Path) -> sa.orm.sessionmaker[sa.orm.Session]:
     main_db = tmp_path / "quota-main.sqlite3"
     platform_db = tmp_path / "quota-platform.sqlite3"
-    engine = _build_runtime_engine(main_db, platform_db)
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
     alembic_config = Config()
     alembic_config.set_main_option(
         "script_location",
         str(REPO_ROOT / "migrations" / "platform"),
     )
-    alembic_config.set_main_option("sqlalchemy.url", _sqlite_url(main_db))
+    alembic_config.set_main_option("sqlalchemy.url", sqlite_url(main_db))
 
     with engine.begin() as connection:
         alembic_config.attributes["connection"] = connection

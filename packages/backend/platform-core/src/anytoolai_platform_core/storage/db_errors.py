@@ -2,7 +2,22 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
+
+
+def unique_constraint_columns(table: sa.Table, constraint_name: str) -> tuple[str, ...]:
+    """Look up a named UniqueConstraint's column list from a table's own metadata.
+
+    Shared by every dialect-fallback race-classifier (quotas, scenarios) that needs a
+    SQLite-side column list to match against `IntegrityError` text: deriving it from
+    the live constraint means it can never silently drift out of sync with the actual
+    constraint definition in storage/db.py.
+    """
+    for constraint in table.constraints:
+        if isinstance(constraint, sa.UniqueConstraint) and constraint.name == constraint_name:
+            return tuple(constraint.columns.keys())
+    raise LookupError(f"unique constraint not found on {table.name}: {constraint_name}")
 
 
 def is_expected_unique_violation(

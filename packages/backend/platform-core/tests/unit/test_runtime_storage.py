@@ -43,8 +43,8 @@ from anytoolai_platform_core.storage.transactions import (
 )
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
-from sqlalchemy import event
 from sqlalchemy.exc import IntegrityError
+from sqlite_harness import build_sqlite_runtime_engine, sqlite_url
 
 PROVIDER_INPUT_TOKENS = 128
 PROVIDER_OUTPUT_TOKENS = 64
@@ -53,23 +53,6 @@ PROVIDER_LATENCY_MS = 950
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[5]
-
-
-def _sqlite_url(database_path: Path) -> str:
-    return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
-
-
-def _build_runtime_engine(main_db: Path, platform_db: Path) -> sa.Engine:
-    engine = sa.create_engine(_sqlite_url(main_db), future=True)
-
-    @event.listens_for(engine, "connect")
-    def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
-        )
-
-    return engine
 
 
 def _build_alembic_config(database_url: str) -> Config:
@@ -83,8 +66,8 @@ def _build_alembic_config(database_url: str) -> Config:
 def runtime_engine(tmp_path: Path) -> sa.Engine:
     main_db = tmp_path / "runtime-main.sqlite3"
     platform_db = tmp_path / "runtime-platform.sqlite3"
-    engine = _build_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(sqlite_url(main_db))
 
     with engine.begin() as connection:
         alembic_config.attributes["connection"] = connection
@@ -426,8 +409,8 @@ def test_quota_dimension_downgrade_to_0006_preserves_current_0003_schema(
 ) -> None:
     main_db = tmp_path / "runtime-downgrade-main.sqlite3"
     platform_db = tmp_path / "runtime-downgrade-platform.sqlite3"
-    engine = _build_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(sqlite_url(main_db))
 
     try:
         with engine.begin() as connection:
@@ -477,8 +460,8 @@ def test_runtime_migration_upgrade_from_0004_adds_provider_call_error_message_sa
 ) -> None:
     main_db = tmp_path / "runtime-upgrade-main.sqlite3"
     platform_db = tmp_path / "runtime-upgrade-platform.sqlite3"
-    engine = _build_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(sqlite_url(main_db))
 
     try:
         with engine.begin() as connection:
@@ -510,8 +493,8 @@ def test_handoff_compatibility_revision_repairs_database_stamped_at_0007(
 ) -> None:
     main_db = tmp_path / "handoff-compat-main.sqlite3"
     platform_db = tmp_path / "handoff-compat-platform.sqlite3"
-    engine = _build_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(sqlite_url(main_db))
 
     try:
         with engine.begin() as connection:
@@ -588,8 +571,8 @@ def test_scenario_session_idempotency_migration_0009_adds_column_and_constraint(
 ) -> None:
     main_db = tmp_path / "idempotency-migration-main.sqlite3"
     platform_db = tmp_path / "idempotency-migration-platform.sqlite3"
-    engine = _build_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(_sqlite_url(main_db))
+    engine = build_sqlite_runtime_engine(main_db, platform_db)
+    alembic_config = _build_alembic_config(sqlite_url(main_db))
 
     try:
         with engine.begin() as connection:
@@ -674,6 +657,15 @@ def test_scenario_session_idempotency_null_key_does_not_dedupe(
         repository = ScenarioSessionRepository(session)
         repository.create(make_scenario_session(id="sess_null_key_a"))
         repository.create(make_scenario_session(id="sess_null_key_b"))
+
+    with transaction_boundary(session_factory) as session:
+        repository = ScenarioSessionRepository(session)
+        assert repository.get(
+            "sess_null_key_a", **scenario_session_scope(make_scenario_session())
+        ) is not None
+        assert repository.get(
+            "sess_null_key_b", **scenario_session_scope(make_scenario_session())
+        ) is not None
 
 
 def test_repositories_respect_explicit_transaction_boundary(
