@@ -26,7 +26,7 @@ the migration service, the API, and the worker.
 - With explicit production-style Postgres env vars set, `prod-up` currently fails earlier than the
   reported migration-container exit: Docker BuildKit cannot read the repo build context because it
   includes `.pytest-tmp/a12-vertical-api`, which has restrictive Windows ACLs.
-- The Alembic graph is healthy: a single head (`0009`) with a valid linear chain back to `0001`.
+- The Alembic graph is healthy: a single head (`0010`) with a valid linear chain back to `0001`.
 - The real migration entrypoint succeeds against a clean PostgreSQL database when run directly from
   the repo with `python -m anytoolai_platform_api.migrate`, so the migration code path itself is
   not currently broken on a clean PostgreSQL upgrade.

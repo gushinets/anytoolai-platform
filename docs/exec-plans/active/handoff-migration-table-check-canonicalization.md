@@ -63,14 +63,14 @@ checks without letting historical compatibility revisions depend on mutable help
 | Date | Decision | Why |
 |---|---|---|
 | 2026-07-29 | Keep `0008_handoffs_compat.py` self-contained instead of rewriting it to call `_handoffs_table.product_handoffs_table_exists()`. | Prior repo decisions already treated `0008` as a historical compatibility revision that should not depend on mutable non-revision helpers. |
-| 2026-07-30 | Remove the shared mutable handoff helper module and keep `0009` self-contained too. | Historical revision behavior should remain predictable even if auxiliary migration Python changes later. |
+| 2026-07-30 | Remove the shared mutable handoff helper module and keep `0010` self-contained too. | Historical revision behavior should remain predictable even if auxiliary migration Python changes later. |
 
 ## Progress log
 
 | Date | Progress | Next |
 |---|---|---|
-| 2026-07-29 | Reviewed the handoff helper, revisions `0008`/`0009`, runtime-storage docs, and prior completed plans. Confirmed the repo already rejected rewriting `0008` to depend on mutable helpers and that `0009` is the only revision using the shared helper today. | Patch comments/docs/helper guidance, then add focused tests and rerun offline/online migration validation. |
-| 2026-07-30 | The repository-level SOLID cleanup narrowed the migration policy further: even `0009` now carries its own revision-local helper logic, and the shared `_handoffs_table.py` module is being removed. | Re-run migration validation and close the plan or restate any remaining gaps. |
+| 2026-07-29 | Reviewed the handoff helper, revisions `0008`/`0010`, runtime-storage docs, and prior completed plans. Confirmed the repo already rejected rewriting `0008` to depend on mutable helpers and that `0010` is the only handoff index revision using the shared helper pattern today. | Patch comments/docs/helper guidance, then add focused tests and rerun offline/online migration validation. |
+| 2026-07-30 | The repository-level SOLID cleanup narrowed the migration policy further: `0010` carries its own revision-local helper logic, and the shared `_handoffs_table.py` module is being removed. | Re-run migration validation and close the plan or restate any remaining gaps. |
 
 ## Open questions
 
