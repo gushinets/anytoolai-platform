@@ -20,7 +20,10 @@ from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.gateway import (
     ProviderGateway,
     ProviderGatewayExecutionError,
-    _recover_provider_call_events_after_rollback,
+)
+from anytoolai_platform_core.providers.gateway.metadata import sanitize_metadata
+from anytoolai_platform_core.providers.gateway.recovery import (
+    recover_provider_call_events_after_rollback,
 )
 from anytoolai_platform_core.providers.models import (
     ProviderCallStatus,
@@ -286,6 +289,17 @@ class AlwaysFailAdapter:
         raise RuntimeError(f"provider exploded for {request.model} with secret_token=abc123")
 
 
+class AlwaysSucceedAdapter:
+    async def complete(self, request: Any) -> ProviderResponse:
+        return ProviderResponse(
+            provider_policy_ref=request.provider_policy_ref,
+            provider=request.provider,
+            model=request.model,
+            output_text='{"ok": true}',
+            usage=ProviderUsage(input_tokens=6, output_tokens=2),
+        )
+
+
 class UnsafeRawTextAdapter:
     async def complete(self, request: Any) -> ProviderResponse:
         raise RuntimeError(
@@ -332,6 +346,48 @@ def _provider_rows(session: sa.orm.Session) -> list[dict[str, Any]]:
             )
         ).mappings()
     )
+
+
+def test_sanitize_metadata_redacts_secret_keys_but_preserves_token_usage_fields() -> None:
+    sanitized = sanitize_metadata(
+        {
+            "api_key": "sk-live-abc123",
+            "user_api_key": "sk-live-def456",
+            "authorization": "Bearer abc123",
+            "cookie": "session=abc123",
+            "credential": "abc123",
+            "password": "hunter2",
+            "secret": "abc123",
+            "auth_token": "abc123",
+            "session_token": "abc123",
+            "total_tokens": 42,
+            "prompt_tokens": 10,
+            "completion_tokens": 32,
+            "input_tokens": 10,
+            "output_tokens": 32,
+            "usage": {"total_tokens": 42, "prompt_tokens": 10, "completion_tokens": 32},
+        }
+    )
+
+    assert sanitized["api_key"] == "[redacted]"
+    assert sanitized["user_api_key"] == "[redacted]"
+    assert sanitized["authorization"] == "[redacted]"
+    assert sanitized["cookie"] == "[redacted]"
+    assert sanitized["credential"] == "[redacted]"
+    assert sanitized["password"] == "[redacted]"
+    assert sanitized["secret"] == "[redacted]"
+    assert sanitized["auth_token"] == "[redacted]"
+    assert sanitized["session_token"] == "[redacted]"
+    assert sanitized["total_tokens"] == 42
+    assert sanitized["prompt_tokens"] == 10
+    assert sanitized["completion_tokens"] == 32
+    assert sanitized["input_tokens"] == 10
+    assert sanitized["output_tokens"] == 32
+    assert sanitized["usage"] == {
+        "total_tokens": 42,
+        "prompt_tokens": 10,
+        "completion_tokens": 32,
+    }
 
 
 def test_provider_policy_resolution_uses_nested_retry_policy(
@@ -510,6 +566,133 @@ def test_gateway_enforces_hard_physical_call_limit(
     assert exc_info.value.error_code == "provider_physical_call_limit_exceeded"
     assert len(rows) == 2
     assert [row["physical_call_index"] for row in rows] == [1, 2]
+
+
+def test_gateway_shares_hard_physical_call_limit_across_requests_with_same_action_run_id(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """Simulates PydanticAI semantic validation retries: each retry calls
+    ``gateway.request()`` again for the same ``action_run_id``, but they must
+    all draw from one shared budget rather than each getting a fresh
+    ``max_physical_provider_calls_per_action``. The gateway ties the budget to
+    ``action_run_id`` internally - callers don't pass anything for this.
+    """
+
+    policy = ProviderPolicy(
+        provider_policy_ref="shared_budget_policy_v1",
+        provider="fake",
+        model="fake-json-v1",
+        retry_policy=ProviderRetryPolicy(
+            transport=ProviderTransportRetryPolicy(
+                owner="fake_adapter",
+                max_attempts=1,
+                litellm_num_retries_per_attempt=0,
+            ),
+            validation=ProviderValidationRetryPolicy(owner="pydanticai", max_attempts=2),
+            hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=1),
+        ),
+    )
+    gateway = ProviderGateway(
+        {"fake": AlwaysSucceedAdapter()},
+        build_policy_resolver(policy),
+    )
+
+    with transaction_boundary(session_factory) as session:
+        scenario_session, job, action_run = seed_runtime_chain(session)
+        first_response = asyncio.run(
+            gateway.request(
+                build_request(
+                    scenario_session,
+                    job,
+                    action_run,
+                    provider_policy_ref="shared_budget_policy_v1",
+                    semantic_attempt_index=1,
+                ),
+                session=session,
+            )
+        )
+        with pytest.raises(ProviderGatewayExecutionError) as exc_info:
+            asyncio.run(
+                gateway.request(
+                    build_request(
+                        scenario_session,
+                        job,
+                        action_run,
+                        provider_policy_ref="shared_budget_policy_v1",
+                        semantic_attempt_index=2,
+                    ),
+                    session=session,
+                )
+            )
+        rows = _provider_rows(session)
+
+    assert first_response.status == ProviderCallStatus.succeeded
+    assert exc_info.value.error_code == "provider_physical_call_limit_exceeded"
+    assert gateway._call_budgets[action_run.id].physical_call_count == 1
+    assert len(rows) == 1
+    assert rows[0]["semantic_attempt_index"] == 1
+    assert rows[0]["physical_call_index"] == 1
+
+
+def test_gateway_gives_each_action_run_id_its_own_physical_call_budget(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """Different actions (different action_run_id) must not share a physical-call
+    budget - only repeated requests for the SAME action_run_id (semantic retries
+    of one action) should draw from one shared counter.
+    """
+
+    policy = ProviderPolicy(
+        provider_policy_ref="isolated_budget_policy_v1",
+        provider="fake",
+        model="fake-json-v1",
+        retry_policy=ProviderRetryPolicy(
+            transport=ProviderTransportRetryPolicy(
+                owner="fake_adapter",
+                max_attempts=1,
+                litellm_num_retries_per_attempt=0,
+            ),
+            validation=ProviderValidationRetryPolicy(owner="pydanticai", max_attempts=1),
+            hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=1),
+        ),
+    )
+    gateway = ProviderGateway(
+        {"fake": AlwaysSucceedAdapter()},
+        build_policy_resolver(policy),
+    )
+
+    with transaction_boundary(session_factory) as session:
+        scenario_session, job, first_action_run = seed_runtime_chain(session)
+        second_action_run = ActionRunRepository(session).create(
+            make_action_run(scenario_session.id, job.id, step_id="extract_2")
+        )
+        first_response = asyncio.run(
+            gateway.request(
+                build_request(
+                    scenario_session,
+                    job,
+                    first_action_run,
+                    provider_policy_ref="isolated_budget_policy_v1",
+                ),
+                session=session,
+            )
+        )
+        second_response = asyncio.run(
+            gateway.request(
+                build_request(
+                    scenario_session,
+                    job,
+                    second_action_run,
+                    provider_policy_ref="isolated_budget_policy_v1",
+                ),
+                session=session,
+            )
+        )
+
+    assert first_response.status == ProviderCallStatus.succeeded
+    assert second_response.status == ProviderCallStatus.succeeded
+    assert gateway._call_budgets[first_action_run.id].physical_call_count == 1
+    assert gateway._call_budgets[second_action_run.id].physical_call_count == 1
 
 
 def test_gateway_uses_safe_platform_error_codes_on_failure(
@@ -796,8 +979,8 @@ def test_gateway_event_recovery_backfills_missing_failed_event_without_duplicate
             )
         )
 
-    _recover_provider_call_events_after_rollback(session_factory, provider_call_id)
-    _recover_provider_call_events_after_rollback(session_factory, provider_call_id)
+    recover_provider_call_events_after_rollback(session_factory, provider_call_id)
+    recover_provider_call_events_after_rollback(session_factory, provider_call_id)
 
     with transaction_boundary(session_factory) as session:
         events = list(
