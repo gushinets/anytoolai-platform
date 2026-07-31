@@ -86,7 +86,24 @@ def _pop_rollback_recovery_callbacks(
     )
 
 
+def _engine_from_bind(bind: Connection | Engine) -> Engine:
+    return bind.engine if isinstance(bind, Connection) else bind
+
+
+def engine_from_session_factory(session_factory: sessionmaker[Session]) -> Engine:
+    """Recover the bound `Engine` from a `sessionmaker`.
+
+    Composition code (and nearly every test) is only ever handed a
+    `session_factory`, never the underlying `Engine` directly -- but per-job
+    features like a dedicated advisory-lock connection need a raw `Engine` to
+    open their own connections outside the ORM's pool.
+    """
+    session = session_factory()
+    try:
+        return _engine_from_bind(session.get_bind())
+    finally:
+        session.close()
+
+
 def _independent_session_factory(session: Session) -> sessionmaker[Session]:
-    bind = session.get_bind()
-    engine = bind.engine if isinstance(bind, Connection) else bind
-    return build_session_factory(engine)
+    return build_session_factory(_engine_from_bind(session.get_bind()))
