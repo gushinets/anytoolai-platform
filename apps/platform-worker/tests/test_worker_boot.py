@@ -821,6 +821,228 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
             assert event_row["scenario_chain_id"] == "scenario_chain_demo", event_row["event_type"]
 
 
+def test_production_worker_recovers_scenario_completion_after_mark_completed_failure(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    job = _seed_job(
+        session_factory,
+        input_payload={"source_text": "deadline budget deliverables"},
+    )
+    worker = build_worker(
+        session_factory=session_factory,
+        config_root=CONFIG_ROOT,
+        provider_adapters={"fake": FakeProviderAdapter(FIXTURE_ROOT)},
+    )
+
+    original_mark_completed = ScenarioSessionService.mark_completed
+    call_count = {"count": 0}
+
+    def fail_first_mark_completed(
+        self: ScenarioSessionService,
+        record: ScenarioSessionRecord,
+        *,
+        context: Any = None,
+    ) -> ScenarioSessionRecord:
+        call_count["count"] += 1
+        if call_count["count"] == 1:
+            # Simulates a transient downstream failure (e.g. a concurrency race in
+            # ScenarioSessionRepository.update) that fires after the workflow itself
+            # already succeeded but before the outer handler transaction commits.
+            raise RuntimeError("forced mark_completed failure after workflow success")
+        return original_mark_completed(self, record, context=context)
+
+    monkeypatch.setattr(ScenarioSessionService, "mark_completed", fail_first_mark_completed)
+
+    result = asyncio.run(worker.process_next_job())
+
+    assert result is not None
+    assert result.id == job.id
+    assert result.status is JobStatus.succeeded
+    assert result.result_artifact_id is not None
+    assert call_count["count"] == 2
+
+    with transaction_boundary(session_factory) as session:
+        scenario = ScenarioSessionRepository(session).get(
+            job.scenario_session_id,
+            tenant_id=job.tenant_id,
+            region=job.region,
+            product_id=job.product_id,
+            frontend_id=job.frontend_id,
+        )
+        scenario_completed = session.execute(
+            sa.select(event_log_table).where(
+                event_log_table.c.scenario_session_id == job.scenario_session_id,
+                event_log_table.c.event_type == "scenario.completed",
+            )
+        ).mappings().one()
+
+    assert scenario is not None
+    assert scenario.status is ScenarioSessionStatus.completed
+    assert scenario.current_checkpoint_id == RESULT_READY_CHECKPOINT_ID
+    assert scenario_completed["job_id"] == job.id
+
+
+def test_worker_reconciliation_does_not_clobber_independently_expired_scenario(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_job(
+        session_factory, input_payload={"source_text": "deadline budget deliverables"}
+    )
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=RecordingRunner,
+        )
+    )
+
+    with transaction_boundary(session_factory) as session:
+        repository = JobRepository(session)
+        emitter = EventEmitter(EventLogRepository(session))
+        claimed = WorkflowJobService(repository, emitter).claim_created(job.id)
+        assert claimed is not None
+        scenario_repository = ScenarioSessionRepository(session)
+        scenario = scenario_repository.get(
+            job.scenario_session_id,
+            tenant_id=job.tenant_id,
+            region=job.region,
+            product_id=job.product_id,
+            frontend_id=job.frontend_id,
+        )
+        assert scenario is not None
+        scenario = ScenarioSessionService(scenario_repository, emitter).mark_running(scenario)
+        artifact = ArtifactRepository(session).create(
+            ArtifactRecord(
+                id="artifact_result",
+                tenant_id=job.tenant_id,
+                region=job.region,
+                product_id=job.product_id,
+                frontend_id=job.frontend_id,
+                scenario_session_id=job.scenario_session_id,
+                job_id=job.id,
+                artifact_type="structured_output",
+                status=ArtifactStatus.stored,
+                content_json={"ok": True},
+            )
+        )
+        WorkflowJobService(repository, emitter).mark_succeeded(
+            replace(
+                claimed,
+                status=JobStatus.succeeded,
+                result_artifact_id=artifact.id,
+                completed_at=utc_now(),
+            )
+        )
+        # Simulates an independent expiry sweep racing with this job's completion --
+        # it moves the scenario on to `expired` before reconciliation gets to run.
+        # Built from the post-mark_running snapshot so current_checkpoint_id/
+        # last_event_at match what a real sweep would see, not the pre-running values.
+        scenario_repository.update(
+            replace(scenario, status=ScenarioSessionStatus.expired),
+            tenant_id=scenario.tenant_id,
+            region=scenario.region,
+            product_id=scenario.product_id,
+            frontend_id=scenario.frontend_id,
+        )
+
+    # Exercises the public job-processing entrypoint (not the private reconciliation
+    # method directly): job is already succeeded, so _claim() returns None and
+    # handle() falls into its claimed-is-None retry path.
+    reconciled = asyncio.run(worker.process_job(job.id))
+    assert reconciled is not None
+    assert reconciled.status is JobStatus.succeeded
+
+    with transaction_boundary(session_factory) as session:
+        scenario = ScenarioSessionRepository(session).get(
+            job.scenario_session_id,
+            tenant_id=job.tenant_id,
+            region=job.region,
+            product_id=job.product_id,
+            frontend_id=job.frontend_id,
+        )
+        completed_events = list(
+            session.execute(
+                sa.select(event_log_table).where(
+                    event_log_table.c.scenario_session_id == job.scenario_session_id,
+                    event_log_table.c.event_type == "scenario.completed",
+                )
+            ).mappings()
+        )
+
+    assert scenario is not None
+    assert scenario.status is ScenarioSessionStatus.expired
+    assert completed_events == []
+
+
+def test_production_worker_retries_scenario_reconciliation_on_subsequent_handle_call(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    job = _seed_job(
+        session_factory,
+        input_payload={"source_text": "deadline budget deliverables"},
+    )
+    worker = build_worker(
+        session_factory=session_factory,
+        config_root=CONFIG_ROOT,
+        provider_adapters={"fake": FakeProviderAdapter(FIXTURE_ROOT)},
+    )
+
+    original_mark_completed = ScenarioSessionService.mark_completed
+    call_count = {"count": 0}
+
+    def fail_first_two_mark_completed(
+        self: ScenarioSessionService,
+        record: ScenarioSessionRecord,
+        *,
+        context: Any = None,
+    ) -> ScenarioSessionRecord:
+        call_count["count"] += 1
+        if call_count["count"] <= 2:
+            # Simulates a persistent (not one-off) downstream failure: both the
+            # happy-path completion and the first reconciliation attempt fail, so
+            # handle() must not crash and the scenario must still be fixable later.
+            raise RuntimeError("forced mark_completed failure after workflow success")
+        return original_mark_completed(self, record, context=context)
+
+    monkeypatch.setattr(ScenarioSessionService, "mark_completed", fail_first_two_mark_completed)
+
+    first_result = asyncio.run(worker.process_next_job())
+
+    assert first_result is not None
+    assert first_result.status is JobStatus.succeeded
+    assert call_count["count"] == 2
+
+    with transaction_boundary(session_factory) as session:
+        scenario = ScenarioSessionRepository(session).get(
+            job.scenario_session_id,
+            tenant_id=job.tenant_id,
+            region=job.region,
+            product_id=job.product_id,
+            frontend_id=job.frontend_id,
+        )
+    assert scenario is not None
+    assert scenario.status is ScenarioSessionStatus.running
+
+    second_result = asyncio.run(worker.process_job(job.id))
+
+    assert second_result is not None
+    assert second_result.status is JobStatus.succeeded
+    assert call_count["count"] == 3
+
+    with transaction_boundary(session_factory) as session:
+        scenario = ScenarioSessionRepository(session).get(
+            job.scenario_session_id,
+            tenant_id=job.tenant_id,
+            region=job.region,
+            product_id=job.product_id,
+            frontend_id=job.frontend_id,
+        )
+    assert scenario is not None
+    assert scenario.status is ScenarioSessionStatus.completed
+    assert scenario.current_checkpoint_id == RESULT_READY_CHECKPOINT_ID
+
+
 def test_production_worker_cancellation_recovers_inflight_action_and_provider_ledger(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

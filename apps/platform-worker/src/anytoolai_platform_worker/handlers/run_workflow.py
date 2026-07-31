@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from collections.abc import Callable, Mapping
 from dataclasses import replace
@@ -28,6 +29,8 @@ from anytoolai_platform_core.workflows.runner import (
     WorkflowJobService,
 )
 from sqlalchemy.orm import Session, sessionmaker
+
+logger = logging.getLogger(__name__)
 
 
 class ScenarioInputMissingError(PlatformError):
@@ -72,6 +75,12 @@ class RunWorkflowHandler:
             self._persist_created_job_failure(job_id, exc)
             return self._get(job_id)
         if claimed is None:
+            # The job is already past `created` (a prior call already claimed/ran it, or
+            # it doesn't exist). If a prior run left the job succeeded but its scenario
+            # un-reconciled (e.g. mark_completed failed both on the happy path and on
+            # the recovery attempt below), this is the only remaining path that ever
+            # revisits it -- without this, that scenario would stay `running` forever.
+            self._try_reconcile_succeeded_job_scenario(job_id)
             return self._get(job_id)
 
         try:
@@ -92,15 +101,8 @@ class RunWorkflowHandler:
                     raise LookupError(f"job not found after execution: {job_id}")
                 if updated_job.status is JobStatus.succeeded:
                     refreshed_scenario = self._load_scenario(session, updated_job)
-                    ScenarioSessionService(
-                        ScenarioSessionRepository(session),
-                        EventEmitter(EventLogRepository(session)),
-                    ).mark_completed(
-                        replace(
-                            refreshed_scenario,
-                            completed_at=updated_job.completed_at or utc_now(),
-                        ),
-                        context=self._execution_context(updated_job, refreshed_scenario),
+                    self._complete_scenario_if_still_running(
+                        session, updated_job, refreshed_scenario
                     )
         except asyncio.CancelledError:
             self._persist_handler_cancellation(job_id)
@@ -195,6 +197,14 @@ class RunWorkflowHandler:
     def _persist_handler_failure(self, job_id: str, exc: Exception) -> None:
         error_code = _safe_error_code(exc)
         error_message_safe = _safe_error_message(exc)
+        # The runner's own rollback-recovery callback may already have restored the job
+        # to succeeded in an independent transaction (e.g. mark_completed itself raised
+        # after the workflow succeeded). Reconciling the scenario for that case needs its
+        # own isolated transaction/try-except (see _try_reconcile_succeeded_job_scenario)
+        # so a repeat failure there can't escape this method mid-transaction and leave
+        # the session in a broken state -- so it's deferred to after this transaction
+        # exits cleanly, rather than being called from inside it.
+        reconcile_succeeded_job = False
         with transaction_boundary(self._session_factory) as session:
             repository = JobRepository(session)
             job = repository.get(job_id)
@@ -213,29 +223,97 @@ class RunWorkflowHandler:
                     error_code=error_code,
                 )
                 scenario_error_code = error_code
+            elif job.status is JobStatus.succeeded:
+                reconcile_succeeded_job = True
             elif job.status is not JobStatus.failed:
                 return
             else:
                 scenario_error_code = job.error_code or error_code
-            scenario = ScenarioSessionRepository(session).get(
-                job.scenario_session_id,
-                tenant_id=job.tenant_id,
-                region=job.region,
-                product_id=job.product_id,
-                frontend_id=job.frontend_id,
-            )
-            if scenario is not None and scenario.status is not ScenarioSessionStatus.failed:
-                ScenarioSessionService(
-                    ScenarioSessionRepository(session),
-                    emitter,
-                ).mark_failed(
-                    replace(
-                        scenario,
-                        completed_at=job.completed_at or utc_now(),
-                    ),
-                    error_code=scenario_error_code,
-                    context=self._execution_context(job, scenario),
+
+            if not reconcile_succeeded_job:
+                scenario = ScenarioSessionRepository(session).get(
+                    job.scenario_session_id,
+                    tenant_id=job.tenant_id,
+                    region=job.region,
+                    product_id=job.product_id,
+                    frontend_id=job.frontend_id,
                 )
+                if scenario is not None and scenario.status is not ScenarioSessionStatus.failed:
+                    ScenarioSessionService(
+                        ScenarioSessionRepository(session),
+                        emitter,
+                    ).mark_failed(
+                        replace(
+                            scenario,
+                            completed_at=job.completed_at or utc_now(),
+                        ),
+                        error_code=scenario_error_code,
+                        context=self._execution_context(job, scenario),
+                    )
+
+        if reconcile_succeeded_job:
+            self._try_reconcile_succeeded_job_scenario(job_id)
+
+    def _complete_scenario_if_still_running(
+        self,
+        session: Session,
+        job: JobRecord,
+        scenario: ScenarioSessionRecord,
+    ) -> None:
+        # Only the scenario's own `running` state (set by `_claim()`'s mark_running
+        # right before this job started) is safe to advance to `completed` here. Any
+        # other status means something else -- an independent expiry sweep, a prior
+        # completion/failure -- already moved the scenario on, and blindly overwriting
+        # it back to `completed` would clobber that and emit a stale scenario.completed
+        # event. Shared by both the happy path and the rollback-recovery reconciliation
+        # path below so a future change to this guard only has to be made once.
+        if scenario.status is not ScenarioSessionStatus.running:
+            return
+        ScenarioSessionService(
+            ScenarioSessionRepository(session),
+            EventEmitter(EventLogRepository(session)),
+        ).mark_completed(
+            replace(scenario, completed_at=job.completed_at or utc_now()),
+            context=self._execution_context(job, scenario),
+        )
+
+    def _reconcile_succeeded_job_scenario(self, session: Session, job: JobRecord) -> None:
+        scenario = ScenarioSessionRepository(session).get(
+            job.scenario_session_id,
+            tenant_id=job.tenant_id,
+            region=job.region,
+            product_id=job.product_id,
+            frontend_id=job.frontend_id,
+        )
+        if scenario is None:
+            return
+        self._complete_scenario_if_still_running(session, job, scenario)
+
+    def _try_reconcile_succeeded_job_scenario(self, job_id: str) -> None:
+        """Best-effort, safe to call repeatedly (e.g. from a later `handle()` call).
+
+        Never lets a failure here escape to the caller: a job that already succeeded
+        must not be reported as a fresh handler failure just because its scenario
+        reconciliation is still stuck, and swallowing it here is what keeps this
+        retryable from _persist_handler_failure and handle()'s claimed-is-None path
+        instead of a repeat failure permanently wedging the scenario in `running`.
+        """
+        try:
+            with transaction_boundary(self._session_factory) as session:
+                job = JobRepository(session).get(job_id)
+                if job is None or job.status is not JobStatus.succeeded:
+                    return
+                self._reconcile_succeeded_job_scenario(session, job)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception(
+                "run_workflow.scenario_reconciliation_failed",
+                extra={
+                    "event": "run_workflow.scenario_reconciliation_failed",
+                    "fields": {"job_id": job_id},
+                },
+            )
 
     def _persist_created_job_failure(self, job_id: str, exc: Exception) -> None:
         error_code = _safe_error_code(exc)
