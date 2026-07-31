@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from typing import Any
@@ -28,6 +27,8 @@ from anytoolai_platform_core.workflows.runner import (
     WorkflowJobService,
 )
 from sqlalchemy.orm import Session, sessionmaker
+
+from anytoolai_platform_worker.lease import JobLease, NullJobLease
 
 
 class ScenarioInputMissingError(PlatformError):
@@ -59,9 +60,11 @@ class RunWorkflowHandler:
         *,
         session_factory: sessionmaker[Session],
         runner_factory: RunnerFactory,
+        lease: JobLease | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._runner_factory = runner_factory
+        self._lease = lease if lease is not None else NullJobLease()
 
     async def handle(self, job_id: str) -> JobRecord | None:
         try:
@@ -75,38 +78,41 @@ class RunWorkflowHandler:
             return self._get(job_id)
 
         try:
-            with transaction_boundary(self._session_factory) as session:
-                job = JobRepository(session).get(job_id)
-                if job is None:
-                    raise LookupError(f"job not found after claim: {job_id}")
-                if job.status is not JobStatus.running:
-                    return job
+            try:
+                with transaction_boundary(self._session_factory) as session:
+                    job = JobRepository(session).get(job_id)
+                    if job is None:
+                        raise LookupError(f"job not found after claim: {job_id}")
+                    if job.status is not JobStatus.running:
+                        return job
 
-                scenario = self._load_scenario(session, job)
-                input_payload = self._scenario_input(scenario)
-                context = self._execution_context(job, scenario)
-                runner = self._runner_factory(session)
-                await runner.run_claimed_job(job, input_payload, context)
-                updated_job = JobRepository(session).get(job_id)
-                if updated_job is None:
-                    raise LookupError(f"job not found after execution: {job_id}")
-                if updated_job.status is JobStatus.succeeded:
-                    refreshed_scenario = self._load_scenario(session, updated_job)
-                    ScenarioSessionService(
-                        ScenarioSessionRepository(session),
-                        EventEmitter(EventLogRepository(session)),
-                    ).mark_completed(
-                        replace(
-                            refreshed_scenario,
-                            completed_at=updated_job.completed_at or utc_now(),
-                        ),
-                        context=self._execution_context(updated_job, refreshed_scenario),
-                    )
-        except asyncio.CancelledError:
-            self._persist_handler_cancellation(job_id)
-            raise
-        except Exception as exc:
-            self._persist_handler_failure(job_id, exc)
+                    scenario = self._load_scenario(session, job)
+                    input_payload = self._scenario_input(scenario)
+                    context = self._execution_context(job, scenario)
+                    runner = self._runner_factory(session)
+                    await runner.run_claimed_job(job, input_payload, context)
+                    updated_job = JobRepository(session).get(job_id)
+                    if updated_job is None:
+                        raise LookupError(f"job not found after execution: {job_id}")
+                    if updated_job.status is JobStatus.succeeded:
+                        refreshed_scenario = self._load_scenario(session, updated_job)
+                        ScenarioSessionService(
+                            ScenarioSessionRepository(session),
+                            EventEmitter(EventLogRepository(session)),
+                        ).mark_completed(
+                            replace(
+                                refreshed_scenario,
+                                completed_at=updated_job.completed_at or utc_now(),
+                            ),
+                            context=self._execution_context(updated_job, refreshed_scenario),
+                        )
+            except asyncio.CancelledError:
+                self._persist_handler_cancellation(job_id)
+                raise
+            except Exception as exc:
+                self._persist_handler_failure(job_id, exc)
+        finally:
+            self._lease.release(job_id)
 
         return self._get(job_id)
 
@@ -131,21 +137,32 @@ class RunWorkflowHandler:
             if job is None or job.status is not JobStatus.created:
                 return None
 
-            scenario = self._load_scenario(session, job)
-            metadata = {
-                **job.metadata,
-                "guest_id": scenario.guest_id,
-                "user_id": scenario.user_id,
-                "scenario_chain_id": scenario.scenario_chain_id,
-            }
-            claimed = WorkflowJobService(repository, emitter).claim_created(
-                job_id,
-                metadata=metadata,
-            )
-            if claimed is None:
+            # Held until handle()'s finally releases it after the terminal-state commit.
+            # A failed acquire means another worker already owns this job -- not an
+            # error, just skip it.
+            if not self._lease.acquire(job_id):
                 return None
-            scenario_service.mark_running(scenario)
-            return claimed
+
+            try:
+                scenario = self._load_scenario(session, job)
+                metadata = {
+                    **job.metadata,
+                    "guest_id": scenario.guest_id,
+                    "user_id": scenario.user_id,
+                    "scenario_chain_id": scenario.scenario_chain_id,
+                }
+                claimed = WorkflowJobService(repository, emitter).claim_created(
+                    job_id,
+                    metadata=metadata,
+                )
+                if claimed is None:
+                    self._lease.release(job_id)
+                    return None
+                scenario_service.mark_running(scenario)
+                return claimed
+            except BaseException:
+                self._lease.release(job_id)
+                raise
 
     def _get(self, job_id: str) -> JobRecord | None:
         with transaction_boundary(self._session_factory) as session:
