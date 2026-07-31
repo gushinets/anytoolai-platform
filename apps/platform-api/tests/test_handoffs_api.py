@@ -25,14 +25,18 @@ from anytoolai_platform_core.storage.db import (
     provider_calls_table,
     scenario_sessions_table,
 )
-from anytoolai_platform_core.storage.transactions import build_session_factory, transaction_boundary
-from anytoolai_platform_core.storage.transactions import SessionFactory
+from anytoolai_platform_core.storage.transactions import (
+    SessionFactory,
+    build_session_factory,
+    transaction_boundary,
+)
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
 from starlette.requests import Request
-from tests.db_support import provision_database
 from test_scenario_runtime_api import CONFIG_ROOT, _create_test_app
+
+from tests.db_support import provision_database
 
 FIXTURE_ROOT = (
     Path(__file__).resolve().parents[3]

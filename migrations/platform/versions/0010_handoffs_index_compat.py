@@ -19,35 +19,7 @@ def _product_handoffs_table_exists(bind: sa.Connection) -> bool:
     return sa.inspect(bind).has_table("product_handoffs", schema=PLATFORM_SCHEMA)
 
 
-def _product_handoffs_index_names(bind: sa.Connection) -> set[str]:
-    return {
-        index["name"]
-        for index in sa.inspect(bind).get_indexes(
-            "product_handoffs",
-            schema=PLATFORM_SCHEMA,
-        )
-    }
-
-
 def _ensure_product_handoffs_indexes() -> None:
-    bind = op.get_bind()
-    index_names = _product_handoffs_index_names(bind)
-    if LEGACY_TARGET_SESSION_INDEX in index_names:
-        op.drop_index(
-            LEGACY_TARGET_SESSION_INDEX,
-            table_name="product_handoffs",
-            schema=PLATFORM_SCHEMA,
-        )
-    if STATUS_EXPIRY_INDEX not in index_names:
-        op.create_index(
-            STATUS_EXPIRY_INDEX,
-            "product_handoffs",
-            ["status", "expires_at"],
-            schema=PLATFORM_SCHEMA,
-        )
-
-
-def _ensure_product_handoffs_indexes_offline() -> None:
     op.execute(sa.text(f"DROP INDEX IF EXISTS {PLATFORM_SCHEMA}.{LEGACY_TARGET_SESSION_INDEX}"))
     op.execute(
         sa.text(
@@ -59,18 +31,6 @@ def _ensure_product_handoffs_indexes_offline() -> None:
 
 
 def _restore_legacy_product_handoffs_target_session_index() -> None:
-    bind = op.get_bind()
-    index_names = _product_handoffs_index_names(bind)
-    if LEGACY_TARGET_SESSION_INDEX not in index_names:
-        op.create_index(
-            LEGACY_TARGET_SESSION_INDEX,
-            "product_handoffs",
-            ["target_scenario_session_id"],
-            schema=PLATFORM_SCHEMA,
-        )
-
-
-def _restore_legacy_product_handoffs_target_session_index_offline() -> None:
     op.execute(
         sa.text(
             "CREATE INDEX IF NOT EXISTS "
@@ -82,7 +42,7 @@ def _restore_legacy_product_handoffs_target_session_index_offline() -> None:
 
 def upgrade() -> None:
     if context.is_offline_mode():
-        _ensure_product_handoffs_indexes_offline()
+        _ensure_product_handoffs_indexes()
         return
     bind = op.get_bind()
     if not _product_handoffs_table_exists(bind):
@@ -92,7 +52,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     if context.is_offline_mode():
-        _restore_legacy_product_handoffs_target_session_index_offline()
+        _restore_legacy_product_handoffs_target_session_index()
         return
     bind = op.get_bind()
     if not _product_handoffs_table_exists(bind):

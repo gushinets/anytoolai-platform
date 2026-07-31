@@ -112,6 +112,8 @@ class ArtifactService:
                 metadata={} if metadata is None else dict(metadata),
             )
         )
+
+
 def _recover_artifact_row_after_rollback(
     recovery_session_factory: Any,
     record: ArtifactRecord,

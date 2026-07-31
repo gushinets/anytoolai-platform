@@ -58,6 +58,8 @@ from anytoolai_platform_core.workflows.models import (
     WorkflowDefinition,
     WorkflowStepDefinition,
 )
+from jsonschema import SchemaError
+from jsonschema.validators import validator_for
 
 VERSION_SUFFIX_PATTERN = re.compile(r"(?P<separator>[._])v(?P<version>\d+)$")
 PROMPT_FRONT_MATTER_PATTERN = re.compile(
@@ -1876,16 +1878,27 @@ class ConfigLoader:
                     )
 
                 asset_path = base_dir / file_path_value
-                self.schemas[schema_ref] = SchemaDefinition(
-                    schema_ref=schema_ref,
-                    version=version,
-                    schema=self._require_json_file(
+                schema = self._require_json_file(
+                    asset_path,
+                    reason=f"Schema asset referenced from {manifest_path} was not found",
+                    config_id=schema_ref,
+                    ref_type="schema_asset",
+                    ref_value=file_path_value,
+                )
+                try:
+                    validator_for(schema).check_schema(schema)
+                except SchemaError as exc:
+                    raise InvalidConfigShapeError(
                         asset_path,
-                        reason=f"Schema asset referenced from {manifest_path} was not found",
+                        "JSON Schema is invalid",
                         config_id=schema_ref,
                         ref_type="schema_asset",
                         ref_value=file_path_value,
-                    ),
+                    ) from exc
+                self.schemas[schema_ref] = SchemaDefinition(
+                    schema_ref=schema_ref,
+                    version=version,
+                    schema=schema,
                     metadata={
                         "_file_path": str(asset_path),
                         "_manifest_path": str(manifest_path),

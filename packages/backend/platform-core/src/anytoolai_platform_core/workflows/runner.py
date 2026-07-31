@@ -17,10 +17,10 @@ from anytoolai_platform_core.actions.runner import ActionRunner, _emit_recovered
 from anytoolai_platform_core.artifacts.correlation import (
     build_artifact_correlation_metadata,
 )
-from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.common.errors import PlatformError
+from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
@@ -1186,6 +1186,8 @@ def _recover_canceled_workflow_events_after_rollback(
             terminal_event_type="workflow.canceled",
             terminal_error_code=None,
         )
+
+
 @dataclass(frozen=True)
 class _WorkflowFailedStepRecovery:
     step_id: str

@@ -300,7 +300,6 @@ class GuestQuotaService:
             self._quota_repository.session,
             lambda recovery_session_factory: _recover_quota_exhaustion(
                 recovery_session_factory,
-                config_registry=self._config_registry,
                 recovery=recovery,
             ),
             phase=RollbackRecoveryPhase.quota_exhaustion,
@@ -419,7 +418,6 @@ class GuestQuotaService:
 def _recover_quota_exhaustion(
     recovery_session_factory: sessionmaker[Session],
     *,
-    config_registry: ConfigRegistry,
     recovery: QuotaExhaustionRecovery,
 ) -> None:
     with transaction_boundary(recovery_session_factory) as session:

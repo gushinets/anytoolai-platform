@@ -42,6 +42,7 @@ from anytoolai_platform_core.storage.transactions import (
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
+
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -85,14 +86,18 @@ async def _request(
     *,
     json: Any | None = None,
     request_id: str = "req_scenario_runtime_test",
+    idempotency_key: str | None = None,
 ) -> httpx.Response:
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        headers = {"X-Request-ID": request_id}
+        if idempotency_key is not None:
+            headers["Idempotency-Key"] = idempotency_key
         return await client.request(
             method,
             path,
             json=json,
-            headers={"X-Request-ID": request_id},
+            headers=headers,
         )
 
 
@@ -271,6 +276,37 @@ def test_start_scenario_creates_session_and_linked_job(
     assert job.scenario_session_id == data["scenario_session_id"]
     assert job.product_id == scenario.product_id
     assert job.frontend_id == scenario.frontend_id
+
+
+def test_start_scenario_idempotency_key_conflict_returns_409_via_http(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+    path = "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_smoke_v1/start"
+
+    first = asyncio.run(
+        _request(app, "POST", path, json=_start_payload(), idempotency_key="idem-conflict")
+    )
+    conflicting = asyncio.run(
+        _request(
+            app,
+            "POST",
+            path,
+            json=_start_payload(input={"source_text": "different input"}),
+            idempotency_key="idem-conflict",
+            request_id="req_idempotency_conflict",
+        )
+    )
+
+    assert first.status_code == HTTPStatus.OK
+    assert conflicting.status_code == HTTPStatus.CONFLICT
+    assert conflicting.json() == {
+        "error": {
+            "code": "idempotency_key_conflict",
+            "message": "Idempotency-Key was already used with a different request.",
+            "request_id": "req_idempotency_conflict",
+        }
+    }
 
 
 def test_start_scenario_consumes_guest_quota_and_returns_exhausted_on_n_plus_one(

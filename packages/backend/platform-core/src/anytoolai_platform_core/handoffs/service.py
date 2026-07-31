@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from datetime import datetime, timedelta
-import re
 
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.ids import new_id
@@ -20,7 +20,11 @@ from anytoolai_platform_core.handoffs.models import (
     HandoffStartPolicy,
     HandoffStatus,
 )
-from anytoolai_platform_core.handoffs.payloads import HandoffPayloadBuilder, HandoffPayloadError
+from anytoolai_platform_core.handoffs.payloads import (
+    HandoffPayloadBuilder,
+    HandoffPayloadError,
+    HandoffTargetSchemaError,
+)
 from anytoolai_platform_core.handoffs.repository import HandoffRepository
 from anytoolai_platform_core.handoffs.tokens import HandoffTokenService
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
@@ -39,6 +43,14 @@ class HandoffNotFoundError(PlatformError):
 class HandoffSourceInvalidError(PlatformError):
     def __init__(self) -> None:
         super().__init__("handoff_source_invalid", "Handoff source is not available.")
+
+
+class HandoffTargetSchemaInvalidError(PlatformError):
+    def __init__(self) -> None:
+        super().__init__(
+            "handoff_target_schema_invalid",
+            "Handoff target configuration is unavailable.",
+        )
 
 
 class HandoffExpiredError(PlatformError):
@@ -102,6 +114,8 @@ class HandoffService:
                 source_scenario_session_id=command.source_scenario_session_id,
                 source_artifact_id=command.source_artifact_id,
             )
+        except HandoffTargetSchemaError as exc:
+            raise HandoffTargetSchemaInvalidError() from exc
         except HandoffPayloadError as exc:
             raise HandoffSourceInvalidError() from exc
         now = self._clock()

@@ -14,7 +14,7 @@ def emit_handoff_event(
     job_id: str | None = None,
     properties: dict[str, object] | None = None,
 ) -> None:
-    is_target_event = scenario_session_id is not None
+    is_target_event = bool(scenario_session_id)
     target_scenario_session_id = scenario_session_id or record.target_scenario_session_id
     event_properties = {
         **(properties or {}),

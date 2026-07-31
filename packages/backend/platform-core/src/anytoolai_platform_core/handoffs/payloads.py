@@ -35,6 +35,10 @@ class HandoffPayloadError(ValueError):
     pass
 
 
+class HandoffTargetSchemaError(HandoffPayloadError):
+    pass
+
+
 @dataclass(frozen=True)
 class BuiltHandoffPayload:
     source_session: Any
@@ -141,9 +145,13 @@ class HandoffPayloadBuilder:
             normalized_schema = normalize_schema_mapping(target_schema.schema)
             assert normalized_schema is not None
             validate_json_schema(instance=context_payload, schema=normalized_schema)
-        except (JsonSchemaValidationError, SchemaError) as exc:
+        except JsonSchemaValidationError as exc:
             raise HandoffPayloadError(
                 "mapped handoff context is invalid for target workflow"
+            ) from exc
+        except SchemaError as exc:
+            raise HandoffTargetSchemaError(
+                "target workflow input schema is invalid"
             ) from exc
         return BuiltHandoffPayload(
             source_session=source_session,

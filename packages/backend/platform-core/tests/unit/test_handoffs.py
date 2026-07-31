@@ -28,6 +28,7 @@ from anytoolai_platform_core.handoffs.service import (
     HandoffNotActionableError,
     HandoffService,
     HandoffSourceInvalidError,
+    HandoffTargetSchemaInvalidError,
     _safe_error_code,
 )
 from anytoolai_platform_core.handoffs.tokens import HandoffTokenService
@@ -46,6 +47,7 @@ from anytoolai_platform_core.storage.transactions import (
 )
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
+
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -193,6 +195,7 @@ def test_handoff_event_helper_preserves_canonical_correlation(
             EventEmitter(EventLogRepository(session)),
             "handoff.viewed",
             record,
+            scenario_session_id="",
             properties={
                 "handoff_id": "caller_handoff",
                 "source_scenario_session_id": "caller_source_session",
@@ -547,8 +550,11 @@ def test_handoff_rejects_malformed_target_input_schema(
     with transaction_boundary(factory) as session:
         source_id, artifact_id = _seed_source(session)
 
-        with pytest.raises(HandoffSourceInvalidError):
+        with pytest.raises(HandoffTargetSchemaInvalidError) as exc_info:
             _create(_service(session, malformed_registry), source_id, artifact_id)
+
+    assert isinstance(exc_info.value.__cause__, Exception)
+    assert "target workflow input schema is invalid" in str(exc_info.value.__cause__)
 
 
 def test_handoff_preview_is_allowlisted_and_bounded(

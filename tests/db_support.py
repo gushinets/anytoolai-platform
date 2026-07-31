@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
 from uuid import uuid4
 
 import pytest
@@ -11,7 +11,6 @@ import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
 from sqlalchemy.engine import URL, make_url
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 POSTGRES_TEST_DATABASE_URL_ENV = "ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"
@@ -49,7 +48,7 @@ def create_database(maintenance_url: URL, database_name: str) -> None:
         with engine.connect() as connection:
             connection.execute(sa.text(f"CREATE DATABASE {quote_identifier(database_name)}"))
     except sa.exc.OperationalError as exc:
-        pytest.fail(f"could not connect to PostgreSQL test database: {exc}")
+        raise RuntimeError(f"could not create PostgreSQL test database: {exc}") from exc
     finally:
         engine.dispose()
 
@@ -60,14 +59,8 @@ def drop_database(maintenance_url: URL, database_name: str) -> None:
         with engine.connect() as connection:
             connection.execute(
                 sa.text(
-                    "SELECT pg_terminate_backend(pid) "
-                    "FROM pg_stat_activity "
-                    "WHERE datname = :database_name AND pid <> pg_backend_pid()"
-                ),
-                {"database_name": database_name},
-            )
-            connection.execute(
-                sa.text(f"DROP DATABASE IF EXISTS {quote_identifier(database_name)}")
+                    f"DROP DATABASE IF EXISTS {quote_identifier(database_name)} WITH (FORCE)"
+                )
             )
     finally:
         engine.dispose()
@@ -83,18 +76,27 @@ def provision_database(
     maintenance_url = require_postgres_test_url(skip_reason)
     database_name = f"{database_name_prefix}_{uuid4().hex[:12]}"
     test_url = maintenance_url.set(database=database_name)
-    create_database(maintenance_url, database_name)
-    engine = sa.create_engine(test_url, future=True)
-    alembic_config = build_alembic_config(
-        test_url.render_as_string(hide_password=False)
-    )
-
+    engine: sa.Engine | None = None
+    setup_error: BaseException | None = None
     try:
+        create_database(maintenance_url, database_name)
+        engine = sa.create_engine(test_url, future=True)
+        alembic_config = build_alembic_config(
+            test_url.render_as_string(hide_password=False)
+        )
         if upgrade_target is not None:
             with engine.begin() as connection:
                 alembic_config.attributes["connection"] = connection
                 command.upgrade(alembic_config, upgrade_target)
         yield engine, alembic_config, test_url
+    except BaseException as exc:
+        setup_error = exc
+        raise
     finally:
-        engine.dispose()
-        drop_database(maintenance_url, database_name)
+        if engine is not None:
+            engine.dispose()
+        try:
+            drop_database(maintenance_url, database_name)
+        except Exception:
+            if setup_error is None:
+                raise

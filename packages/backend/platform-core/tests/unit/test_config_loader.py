@@ -466,6 +466,17 @@ def test_loader_fails_on_missing_schema_reference(tmp_path: Path) -> None:
     )
 
 
+def test_loader_fails_on_malformed_json_schema(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "schemas" / "extract_input.schema.json"
+    path.write_text('{"type": 123}', encoding="utf-8")
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(error.code == "config_invalid_shape" for error in exc_info.value.errors)
+
+
 def test_loader_fails_on_missing_provider_policy_fallback_reference(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "provider_policies.yaml"
