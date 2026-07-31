@@ -11,6 +11,7 @@ from anytoolai_platform_core.actions.models import ActionRunRecord
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.common.errors import PlatformError
+from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
@@ -18,6 +19,9 @@ from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.gateway import (
     ProviderGateway,
     ProviderGatewayExecutionError,
+)
+from anytoolai_platform_core.providers.gateway.events import (
+    event_context_from_resolved_request,
 )
 from anytoolai_platform_core.providers.gateway.metadata import sanitize_metadata
 from anytoolai_platform_core.providers.gateway.recovery import (
@@ -48,6 +52,7 @@ from anytoolai_platform_core.storage.transactions import (
 )
 from anytoolai_platform_core.workflows.models import JobRecord
 from anytoolai_platform_core.workflows.repository import JobRepository
+
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -241,6 +246,26 @@ def build_resolved_request(**overrides: Any) -> ResolvedProviderRequest:
     }
     values.update(overrides)
     return ResolvedProviderRequest(**values)
+
+
+def test_provider_event_context_uses_canonical_metadata_helper() -> None:
+    metadata = {
+        "guest_id": "guest-demo",
+        "user_id": "",
+        "scenario_chain_id": 42,
+        "handoff_id": "handoff-demo",
+        "acquisition_source": "kernel_demo_ce",
+    }
+
+    context = event_context_from_resolved_request(
+        build_resolved_request(metadata=metadata)
+    )
+
+    assert context.guest_id == metadata_str(metadata, "guest_id")
+    assert context.user_id == metadata_str(metadata, "user_id")
+    assert context.scenario_chain_id == metadata_str(metadata, "scenario_chain_id")
+    assert context.handoff_id == metadata_str(metadata, "handoff_id")
+    assert context.acquisition_source == metadata_str(metadata, "acquisition_source")
 
 
 class TransportRetryAdapter:
@@ -927,6 +952,14 @@ def test_gateway_event_recovery_backfills_missing_failed_event_without_duplicate
         model="fake-json-v1",
     )
 
+    metadata = {
+        "guest_id": "guest-recovery",
+        "user_id": "user-recovery",
+        "scenario_chain_id": "chain-recovery",
+        "handoff_id": "handoff-recovery",
+        "acquisition_source": "kernel_demo_ce",
+    }
+
     with transaction_boundary(session_factory) as session:
         gateway = ProviderGateway(
             {"fake": AlwaysFailAdapter()},
@@ -943,6 +976,7 @@ def test_gateway_event_recovery_backfills_missing_failed_event_without_duplicate
                         job,
                         action_run,
                         provider_policy_ref="missing_failed_event_policy_v1",
+                        metadata=metadata,
                     ),
                     session=session,
                 )
@@ -971,6 +1005,16 @@ def test_gateway_event_recovery_backfills_missing_failed_event_without_duplicate
         "provider.request_started",
         "provider.request_failed",
     ]
+    for event_row in events:
+        assert event_row["guest_id"] == metadata_str(metadata, "guest_id")
+        assert event_row["user_id"] == metadata_str(metadata, "user_id")
+        assert event_row["scenario_chain_id"] == metadata_str(
+            metadata, "scenario_chain_id"
+        )
+        assert event_row["handoff_id"] == metadata_str(metadata, "handoff_id")
+        assert event_row["acquisition_source"] == metadata_str(
+            metadata, "acquisition_source"
+        )
 
 
 def test_gateway_skips_persistence_when_required_dimensions_are_invalid(

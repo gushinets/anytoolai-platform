@@ -77,7 +77,7 @@ docs, and validation-hardening debt that still affects this replacement PR surfa
 - [x] Verify each listed finding against the current branch and classify it.
 - [x] Add the shared artifact metadata helper module and route artifact replay through it.
 - [x] Expand structured-output persistence context and unify success/debug artifact metadata construction.
-- [x] Remove duplicated `_metadata_str` implementations and switch remaining callers to the shared helper.
+- [x] Remove duplicated `_metadata_str` implementations and switch remaining callers to the shared helper, including the provider-gateway event and rollback-recovery paths identified in review.
 - [x] Apply handoff/config/runtime hardening updates that remain valid.
 - [x] Deduplicate handoff migration DDL and remove the redundant target-session index.
 - [x] Update runtime-storage/docs/PAPERCUTS/OpenAPI/exec-plan follow-up accuracy.
@@ -100,6 +100,8 @@ docs, and validation-hardening debt that still affects this replacement PR surfa
 - [x] `python scripts/agent/runner.py validate-docs`
 - [x] `python scripts/agent/runner.py generate-docs --check`
 - [x] `python scripts/agent/runner.py quick-check` (passed after rerunning with `PYTEST_ADDOPTS=--basetemp=.quick-check-tmp\\pytest-any90-final` to avoid a locked stale temp directory)
+- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_provider_gateway.py -k "canonical_metadata_helper or event_recovery_backfills" -q` (one non-DB regression passed; the PostgreSQL recovery case skipped because no test database URL is configured)
+- [x] `python scripts/agent/runner.py validate-architecture`
 
 ## Progress Log
 
@@ -112,3 +114,5 @@ docs, and validation-hardening debt that still affects this replacement PR surfa
 | 2026-07-29 | Began review remediation for merge-result CI coverage, migration-history fidelity, and complete debug-artifact correlation assertions. The required system-Python `doctor` check again reported the known missing `pytest`, `yaml`, and `pydantic` modules; validation will use the repository-managed environment. | Apply the three focused fixes, run targeted tests, then rerun repository validation. |
 | 2026-07-29 | Completed all three review fixes. Focused structured-output/runtime-storage/migration tests passed (`51 passed, 1 skipped`); config, architecture, docs, and generated-doc checks passed; canonical `quick-check` passed (`429 passed, 7 deselected`) with a fresh pytest base temp. Full GitHub publishing is paused because the required GitHub CLI is unavailable; the user separately authorized a local commit. | Commit the scoped remediation locally; install and authenticate `gh` before a later push. |
 | 2026-07-29 | Restored the PostgreSQL CI job's head-SHA checkout and checkout diagnostics exactly as requested by the user; no runtime workflow code was changed. | Commit the explicit workflow restoration separately; do not push without a new request. |
+| 2026-07-31 | Corrected the missed provider-gateway `_metadata_str` copies in normal event construction and rollback recovery so both now use `common.metadata.metadata_str`. | Run focused provider-gateway coverage and architecture validation. |
+| 2026-07-31 | Focused canonical-metadata coverage passed for normal provider events; the PostgreSQL-backed replay case remained an explicit skip without a configured test database. Architecture validation and import-order checks passed. | Hand off the scoped review fix. |
