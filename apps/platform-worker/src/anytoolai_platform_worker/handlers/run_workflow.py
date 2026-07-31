@@ -225,7 +225,6 @@ class RunWorkflowHandler:
                 scenario_error_code = error_code
             elif job.status is JobStatus.succeeded:
                 reconcile_succeeded_job = True
-                scenario_error_code = None
             elif job.status is not JobStatus.failed:
                 return
             else:

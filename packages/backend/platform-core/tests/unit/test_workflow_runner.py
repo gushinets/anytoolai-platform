@@ -691,12 +691,23 @@ def test_workflow_runner_recovers_succeeded_state_for_existing_claimed_job_after
     assert job["status"] is JobStatus.succeeded
     assert job["result_artifact_id"] is not None
     assert any(artifact["id"] == job["result_artifact_id"] for artifact in artifacts)
-    # The final result artifact (action_run_id=None) is replayed independently by
-    # ArtifactService's own recovery callback (phase artifact_events, unsequenced
-    # raw created_at) rather than through _emit_recovered_workflow_events' shared
-    # sequencer, so its timestamp has no ordering guarantee relative to the
-    # workflow/action/provider events - excluded here, not part of this fix.
-    workflow_events = [row for row in events if row["event_type"] != "artifact.created"]
+    artifact_created_events = _event_by_type(events, "artifact.created")
+    # Two artifact.created events: one for the action's own structured-output
+    # artifact (action_run_id set, replayed through the shared sequencer along with
+    # the rest of the step's events) and one for the final workflow-result artifact
+    # (action_run_id=None).
+    assert len(artifact_created_events) == 2
+    final_artifact_created = [
+        row for row in artifact_created_events if row["action_run_id"] is None
+    ]
+    assert len(final_artifact_created) == 1
+    assert final_artifact_created[0]["artifact_id"] == job["result_artifact_id"]
+    # Only the final result artifact (action_run_id=None) is replayed independently by
+    # ArtifactService's own recovery callback (phase artifact_events, unsequenced raw
+    # created_at) rather than through _emit_recovered_workflow_events' shared
+    # sequencer, so its timestamp has no ordering guarantee relative to the other
+    # events - excluded from the ordering check below, not part of this fix.
+    workflow_events = [row for row in events if row is not final_artifact_created[0]]
     _assert_strictly_increasing_event_timestamps(workflow_events)
     event_types = _event_types(workflow_events)
     assert event_types[0] == "workflow.started"
@@ -739,10 +750,17 @@ def test_workflow_runner_recovers_succeeded_state_for_newly_created_job_after_ro
     assert job["status"] is JobStatus.succeeded
     assert job["result_artifact_id"] is not None
     assert any(artifact["id"] == job["result_artifact_id"] for artifact in artifacts)
-    # See the analogous comment in the existing-claimed-job recovery test: the
-    # final result artifact's recovery event is unsequenced relative to the
-    # workflow/action/provider events, so it is excluded from the ordering check.
-    workflow_events = [row for row in events if row["event_type"] != "artifact.created"]
+    artifact_created_events = _event_by_type(events, "artifact.created")
+    # See the analogous comment in the existing-claimed-job recovery test: two
+    # artifact.created events (the action's own and the final workflow result), only
+    # the final one (action_run_id=None) is unsequenced relative to the rest.
+    assert len(artifact_created_events) == 2
+    final_artifact_created = [
+        row for row in artifact_created_events if row["action_run_id"] is None
+    ]
+    assert len(final_artifact_created) == 1
+    assert final_artifact_created[0]["artifact_id"] == job["result_artifact_id"]
+    workflow_events = [row for row in events if row is not final_artifact_created[0]]
     _assert_strictly_increasing_event_timestamps(workflow_events)
     event_types = _event_types(workflow_events)
     assert event_types[0] == "workflow.started"

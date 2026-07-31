@@ -889,9 +889,11 @@ def test_worker_reconciliation_does_not_clobber_independently_expired_scenario(
     job = _seed_job(
         session_factory, input_payload={"source_text": "deadline budget deliverables"}
     )
-    handler = RunWorkflowHandler(
-        session_factory=session_factory,
-        runner_factory=RecordingRunner,
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=RecordingRunner,
+        )
     )
 
     with transaction_boundary(session_factory) as session:
@@ -908,7 +910,7 @@ def test_worker_reconciliation_does_not_clobber_independently_expired_scenario(
             frontend_id=job.frontend_id,
         )
         assert scenario is not None
-        ScenarioSessionService(scenario_repository, emitter).mark_running(scenario)
+        scenario = ScenarioSessionService(scenario_repository, emitter).mark_running(scenario)
         artifact = ArtifactRepository(session).create(
             ArtifactRecord(
                 id="artifact_result",
@@ -933,6 +935,8 @@ def test_worker_reconciliation_does_not_clobber_independently_expired_scenario(
         )
         # Simulates an independent expiry sweep racing with this job's completion --
         # it moves the scenario on to `expired` before reconciliation gets to run.
+        # Built from the post-mark_running snapshot so current_checkpoint_id/
+        # last_event_at match what a real sweep would see, not the pre-running values.
         scenario_repository.update(
             replace(scenario, status=ScenarioSessionStatus.expired),
             tenant_id=scenario.tenant_id,
@@ -941,7 +945,12 @@ def test_worker_reconciliation_does_not_clobber_independently_expired_scenario(
             frontend_id=scenario.frontend_id,
         )
 
-    handler._try_reconcile_succeeded_job_scenario(job.id)
+    # Exercises the public job-processing entrypoint (not the private reconciliation
+    # method directly): job is already succeeded, so _claim() returns None and
+    # handle() falls into its claimed-is-None retry path.
+    reconciled = asyncio.run(worker.process_job(job.id))
+    assert reconciled is not None
+    assert reconciled.status is JobStatus.succeeded
 
     with transaction_boundary(session_factory) as session:
         scenario = ScenarioSessionRepository(session).get(
