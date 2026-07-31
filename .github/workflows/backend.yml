@@ -156,6 +156,22 @@ jobs:
           -e packages/backend/platform-core
           -e packages/backend/platform-actions
           -e apps/platform-api
-      - run: uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q
+          -e apps/platform-worker
+      - name: Run artifact correlation acceptance tests
+        run: >-
+          uv run python -m pytest
+          packages/backend/platform-core/tests/unit/test_artifact_service.py
+          packages/backend/platform-core/tests/unit/test_structured_output.py
+          packages/backend/platform-core/tests/unit/test_action_runner.py
+          packages/backend/platform-core/tests/unit/test_workflow_runner.py
+          packages/backend/platform-actions/tests/test_structured_llm_executor.py
+          apps/platform-api/tests/test_scenario_runtime_api.py::test_start_then_real_worker_execution_preserves_a12_runtime_correlation
+          apps/platform-api/tests/test_handoffs_api.py::test_immediate_handoff_worker_keeps_target_runtime_lineage
+          -m "slow and postgresql"
+          -q
+        env:
+          ANYTOOLAI_POSTGRES_TEST_DATABASE_URL: postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres
+      - name: Run quota concurrency tests
+        run: uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q
         env:
           ANYTOOLAI_POSTGRES_TEST_DATABASE_URL: postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres

@@ -56,9 +56,15 @@ def _make_artifact(**overrides: Any) -> ArtifactRecord:
             "action_config_id": "kernel_demo.extract_structured_fields_v1",
             "provider_call_id": "provider_call_demo",
             "provider_policy_ref": "default_fake_provider_v1",
+            "provider": "fake",
+            "model": "fake-json-v1",
             "physical_call_index": 2,
             "pydantic_run_id": "pydantic_run_demo",
+            "litellm_response_id": "litellm_response_demo",
             "prompt_text": "must not leak",
+            "credentials": {"api_key": "must not leak"},
+            "access_token": "must not leak",
+            "large_provider_payload": {"raw": "x" * 10_000},
         },
     }
     values.update(overrides)
@@ -97,7 +103,13 @@ def test_artifact_service_persists_created_artifact_once_after_transaction_rollb
     assert event["action_config_id"] == "kernel_demo.extract_structured_fields_v1"
     assert event["provider_call_id"] == "provider_call_demo"
     assert event["provider_policy_ref"] == "default_fake_provider_v1"
+    assert event["provider"] == "fake"
+    assert event["model"] == "fake-json-v1"
     assert event["physical_call_index"] == 2
     assert event["pydantic_run_id"] == "pydantic_run_demo"
+    assert event["litellm_response_id"] == "litellm_response_demo"
     assert event["properties"] == {"artifact_type": "structured_output"}
     assert "prompt_text" not in event["properties"]
+    assert "credentials" not in event["properties"]
+    assert "access_token" not in event["properties"]
+    assert "large_provider_payload" not in event["properties"]

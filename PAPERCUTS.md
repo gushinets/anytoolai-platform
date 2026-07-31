@@ -77,3 +77,24 @@ Validating `uv run alembic -c ..\\..\\migrations\\platform\\alembic.ini upgrade 
 `link.exe` was unavailable for the Rust-backed wheel build. Running the same Alembic CLI through the
 repo-root `.venv\\Scripts\\python.exe -m alembic` succeeded, so a documented repo-level Alembic
 entrypoint or a lighter nested-project dependency path would avoid this unrelated toolchain trap.
+
+## 2026-07-31 00:14 - Codex (GPT-5) - Windows
+
+Creating an execution plan from `docs/exec-plans/template.md` and running `quick-check` -> DOC005
+rejected the plan because the validator requires `Review date`, `Next action`, and `Blocker`, while
+the template does not include those fields. Keep the template aligned with the documentation
+validator so new plans pass on their first check.
+
+## 2026-07-31 00:14 - Codex (GPT-5) - Windows
+
+Running PostgreSQL acceptance tests locally -> the installed cluster was reachable but its test
+credentials were unavailable, while sandboxed `pg_ctl` could not create its restricted token.
+An isolated repo-local cluster on a separate port worked after allowing `pg_ctl`; a canonical helper
+for disposable local PostgreSQL clusters would make production-dialect validation more direct.
+
+## 2026-07-31 00:52 - Codex (GPT-5) - Windows
+
+Running canonical `full-check` with the pinned pnpm available through Corepack -> the runner invoked
+bare `pnpm` with `subprocess(..., shell=False)`, which cannot resolve Corepack's `pnpm.CMD` on
+Windows and reported `Command not found: None`. A temporary executable shim proved the full check
+passes; the runner should resolve the executable with `shutil.which()` before invoking it.
