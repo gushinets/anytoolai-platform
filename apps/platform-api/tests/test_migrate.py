@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from alembic import command
 from alembic.script import ScriptDirectory
 from anytoolai_platform_api import migrate
+
 from tests.db_support import (
     PLACEHOLDER_POSTGRESQL_URL,
     build_alembic_config,
@@ -161,6 +162,7 @@ def test_alembic_offline_cli_generates_sql_from_non_repo_cwd(tmp_path: Path) -> 
     assert result.returncode == 0, combined_output
     assert "CREATE TABLE platform.product_handoffs" in result.stdout
     assert "DROP INDEX IF EXISTS platform.ix_product_handoffs_target_session" in result.stdout
-    assert "CREATE INDEX IF NOT EXISTS platform.ix_product_handoffs_status_expiry" in result.stdout
+    assert "CREATE INDEX IF NOT EXISTS ix_product_handoffs_status_expiry" in result.stdout
+    assert "CREATE INDEX IF NOT EXISTS platform." not in result.stdout
     assert "ModuleNotFoundError" not in combined_output
     assert "NoInspectionAvailable" not in combined_output

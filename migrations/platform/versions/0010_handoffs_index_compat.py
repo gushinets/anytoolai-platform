@@ -24,7 +24,7 @@ def _ensure_product_handoffs_indexes() -> None:
     op.execute(
         sa.text(
             "CREATE INDEX IF NOT EXISTS "
-            f"{PLATFORM_SCHEMA}.{STATUS_EXPIRY_INDEX} "
+            f"{STATUS_EXPIRY_INDEX} "
             f"ON {PLATFORM_SCHEMA}.product_handoffs (status, expires_at)"
         )
     )
@@ -34,7 +34,7 @@ def _restore_legacy_product_handoffs_target_session_index() -> None:
     op.execute(
         sa.text(
             "CREATE INDEX IF NOT EXISTS "
-            f"{PLATFORM_SCHEMA}.{LEGACY_TARGET_SESSION_INDEX} "
+            f"{LEGACY_TARGET_SESSION_INDEX} "
             f"ON {PLATFORM_SCHEMA}.product_handoffs (target_scenario_session_id)"
         )
     )
