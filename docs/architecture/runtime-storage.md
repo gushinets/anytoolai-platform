@@ -722,11 +722,13 @@ conditional quota update allow exactly the first `N` accepted starts, return `42
 for later starts, and keep session/job/quota/event counts consistent.
 
 The backend GitHub Actions workflow uses the required `postgresql-quota-concurrency` job with a
-disposable PostgreSQL service for both production-dialect quota concurrency and artifact-correlation
-acceptance coverage. The artifact slice runs the artifact service, structured-output finalizer,
-action runner, workflow runner, structured LLM executor, and real worker paths. Runtime-storage CRUD
-and migration coverage also belongs to the PostgreSQL-backed path; `quick-check` remains
-intentionally DB-free and fast. Runtime and database-specific test infrastructure is PostgreSQL-only.
+disposable PostgreSQL service for all production-dialect tests. It runs the canonical
+`python scripts/agent/runner.py postgresql-check` command, which selects every `postgresql`-marked
+test under platform core/actions, platform API, and platform worker roots. Marker-driven root
+selection automatically includes new PostgreSQL tests without maintaining file or node-ID lists.
+Runtime-storage CRUD, migrations, quota/handoff concurrency, artifact/event recovery, API behavior,
+and worker execution therefore share one PostgreSQL-backed gate; `quick-check` remains intentionally
+DB-free and fast. Runtime and database-specific test infrastructure is PostgreSQL-only.
 
 `python scripts/agent/runner.py quick-check` excludes `slow` tests with `-m "not slow"` so the
 required fast path stays deterministic.

@@ -44,6 +44,14 @@ def resolve_postgres_db() -> str:
     return os.environ.get("ANYTOOLAI_POSTGRES_DB", DEV_DEFAULT_POSTGRES_DB)
 
 FREELANCER_SUITE_ROOT = ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite"
+POSTGRESQL_PYTEST_MARK_EXPRESSION = "postgresql"
+POSTGRESQL_TEST_DATABASE_URL_ENV = "ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"
+POSTGRESQL_PYTEST_TARGETS = [
+    "packages/backend/platform-core/tests",
+    "packages/backend/platform-actions/tests",
+    "apps/platform-api/tests",
+    "apps/platform-worker/tests",
+]
 REQUIRED_MODULES = ["pytest", "yaml", "pydantic"]
 REQUIRED_TOOLS = ["uv"]
 OPTIONAL_TOOLS = ["node", "pnpm", "docker"]
@@ -287,6 +295,29 @@ def validate_docs() -> int:
 
 def quick_check() -> int:
     return run_with_env([sys.executable, "scripts/agent/quick_check.py"], baseline_env())
+
+
+def postgresql_pytest_command() -> list[str]:
+    return [
+        sys.executable,
+        "-m",
+        "pytest",
+        "-m",
+        POSTGRESQL_PYTEST_MARK_EXPRESSION,
+        *POSTGRESQL_PYTEST_TARGETS,
+        "-q",
+    ]
+
+
+def postgresql_check() -> int:
+    if not os.environ.get(POSTGRESQL_TEST_DATABASE_URL_ENV, "").strip():
+        print(
+            "PGTEST001: postgresql-check requires "
+            f"{POSTGRESQL_TEST_DATABASE_URL_ENV} to point to a PostgreSQL maintenance database.",
+            file=sys.stderr,
+        )
+        return 2
+    return run(postgresql_pytest_command())
 
 
 def frontend_check() -> int:
@@ -703,6 +734,7 @@ COMMANDS = {
     "validate-architecture": validate_architecture,
     "validate-docs": validate_docs,
     "quick-check": quick_check,
+    "postgresql-check": postgresql_check,
     "frontend-check": frontend_check,
     "full-check": full_check,
     "collect-context": collect_context,
