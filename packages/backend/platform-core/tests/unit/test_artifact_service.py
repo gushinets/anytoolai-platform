@@ -2,13 +2,10 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
-from sqlalchemy import event
 
 from anytoolai_platform_core.artifacts.models import ArtifactRecord
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
@@ -20,41 +17,19 @@ from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
 )
+from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-
-
-def _sqlite_url(database_path: Path) -> str:
-    return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
+pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
 
 @pytest.fixture
-def session_factory(tmp_path: Path) -> sa.orm.sessionmaker[sa.orm.Session]:
-    main_db = tmp_path / "artifact-service-main.sqlite3"
-    platform_db = tmp_path / "artifact-service-platform.sqlite3"
-    engine = sa.create_engine(_sqlite_url(main_db), future=True)
-
-    @event.listens_for(engine, "connect")
-    def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
-        )
-
-    alembic_config = Config()
-    alembic_config.set_main_option(
-        "script_location", str(REPO_ROOT / "migrations" / "platform")
-    )
-    alembic_config.set_main_option("sqlalchemy.url", _sqlite_url(main_db))
-
-    with engine.begin() as connection:
-        alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "head")
-
-    try:
+def session_factory() -> Iterator[sa.orm.sessionmaker[sa.orm.Session]]:
+    with provision_database(
+        database_name_prefix="anytoolai_artifact_service_test",
+        skip_reason="PostgreSQL artifact service coverage",
+    ) as (engine, _alembic_config, _database_url):
         yield build_session_factory(engine)
-    finally:
-        engine.dispose()
 
 
 def _make_artifact(**overrides: Any) -> ArtifactRecord:
@@ -68,7 +43,29 @@ def _make_artifact(**overrides: Any) -> ArtifactRecord:
         "action_run_id": "action_run_demo",
         "artifact_type": "structured_output",
         "content_json": {"title": "Kernel Demo Source Summary"},
-        "metadata": {"schema_ref": "kernel.schemas.extract_output_v1"},
+        "metadata": {
+            "schema_ref": "kernel.schemas.extract_output_v1",
+            "workflow_id": "kernel_demo.single_action_extract_v1",
+            "workflow_version": 1,
+            "guest_id": "guest_demo",
+            "user_id": "user_demo",
+            "scenario_chain_id": "scenario_chain_demo",
+            "handoff_id": "handoff_demo",
+            "acquisition_source": "kernel_demo_ce",
+            "action_type": "text.extract_structured_fields",
+            "action_config_id": "kernel_demo.extract_structured_fields_v1",
+            "provider_call_id": "provider_call_demo",
+            "provider_policy_ref": "default_fake_provider_v1",
+            "provider": "fake",
+            "model": "fake-json-v1",
+            "physical_call_index": 2,
+            "pydantic_run_id": "pydantic_run_demo",
+            "litellm_response_id": "litellm_response_demo",
+            "prompt_text": "must not leak",
+            "credentials": {"api_key": "must not leak"},
+            "access_token": "must not leak",
+            "large_provider_payload": {"raw": "x" * 10_000},
+        },
     }
     values.update(overrides)
     return ArtifactRecord(**values)
@@ -94,3 +91,25 @@ def test_artifact_service_persists_created_artifact_once_after_transaction_rollb
     assert Counter(str(row["event_type"]) for row in events) == Counter(
         {"artifact.created": 1}
     )
+    event = events[0]
+    assert event["workflow_id"] == "kernel_demo.single_action_extract_v1"
+    assert event["workflow_version"] == 1
+    assert event["guest_id"] == "guest_demo"
+    assert event["user_id"] == "user_demo"
+    assert event["scenario_chain_id"] == "scenario_chain_demo"
+    assert event["handoff_id"] == "handoff_demo"
+    assert event["acquisition_source"] == "kernel_demo_ce"
+    assert event["action_type"] == "text.extract_structured_fields"
+    assert event["action_config_id"] == "kernel_demo.extract_structured_fields_v1"
+    assert event["provider_call_id"] == "provider_call_demo"
+    assert event["provider_policy_ref"] == "default_fake_provider_v1"
+    assert event["provider"] == "fake"
+    assert event["model"] == "fake-json-v1"
+    assert event["physical_call_index"] == 2
+    assert event["pydantic_run_id"] == "pydantic_run_demo"
+    assert event["litellm_response_id"] == "litellm_response_demo"
+    assert event["properties"] == {"artifact_type": "structured_output"}
+    assert "prompt_text" not in event["properties"]
+    assert "credentials" not in event["properties"]
+    assert "access_token" not in event["properties"]
+    assert "large_provider_payload" not in event["properties"]

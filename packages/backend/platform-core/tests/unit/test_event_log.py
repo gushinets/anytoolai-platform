@@ -4,12 +4,11 @@ import asyncio
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
 from alembic import command
-from alembic.config import Config
 from alembic.script import ScriptDirectory
 from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
 from anytoolai_platform_core.actions.runner import ActionRunService
@@ -48,7 +47,11 @@ from anytoolai_platform_core.storage.transactions import (
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import WorkflowJobService
-from sqlite_harness import build_sqlite_runtime_engine, sqlite_url
+from tests.db_support import (
+    PLACEHOLDER_POSTGRESQL_URL,
+    build_alembic_config,
+    provision_database,
+)
 
 
 def _repo_root() -> Path:
@@ -56,31 +59,16 @@ def _repo_root() -> Path:
 
 
 CONFIG_ROOT = _repo_root() / "configs" / "kernel"
-
-
-def _build_alembic_config(database_url: str) -> Config:
-    alembic_config = Config()
-    alembic_config.set_main_option(
-        "script_location",
-        str(_repo_root() / "migrations" / "platform"),
-    )
-    alembic_config.set_main_option("sqlalchemy.url", database_url)
-    return alembic_config
+pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
 
 @pytest.fixture
-def runtime_engine(tmp_path: Path) -> sa.Engine:
-    main_db = tmp_path / "event-log-main.sqlite3"
-    platform_db = tmp_path / "event-log-platform.sqlite3"
-    engine = build_sqlite_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(sqlite_url(main_db))
-
-    with engine.begin() as connection:
-        alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "head")
-
-    yield engine
-    engine.dispose()
+def runtime_engine() -> Iterator[sa.Engine]:
+    with provision_database(
+        database_name_prefix="anytoolai_event_log_test",
+        skip_reason="PostgreSQL event log coverage",
+    ) as (engine, _alembic_config, _database_url):
+        yield engine
 
 
 @pytest.fixture
@@ -255,28 +243,24 @@ def _event_types(session: sa.orm.Session) -> list[str]:
     )
 
 
-def test_event_log_migration_creates_table_at_0002(tmp_path: Path) -> None:
-    main_db = tmp_path / "migration-main.sqlite3"
-    platform_db = tmp_path / "migration-platform.sqlite3"
-    engine = build_sqlite_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(sqlite_url(main_db))
-    try:
+def test_event_log_migration_creates_table_at_0002() -> None:
+    with provision_database(
+        database_name_prefix="anytoolai_event_log_0002_test",
+        upgrade_target=None,
+        skip_reason="PostgreSQL event log migration coverage",
+    ) as (engine, alembic_config, _database_url):
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
             command.upgrade(alembic_config, "0002")
-            table_names = set(
-                connection.execute(
-                    sa.text("SELECT name FROM platform.sqlite_master WHERE type = 'table'")
-                ).scalars()
-            )
-            index_names = set(
-                connection.execute(
-                    sa.text("SELECT name FROM platform.sqlite_master WHERE type = 'index'")
-                ).scalars()
-            )
+            inspector = sa.inspect(connection)
+            table_names = set(inspector.get_table_names(schema="platform"))
+            index_names = {
+                index["name"]
+                for index in inspector.get_indexes("event_log", schema="platform")
+            }
             event_log_columns = {
                 column["name"]
-                for column in sa.inspect(connection).get_columns(
+                for column in inspector.get_columns(
                     "event_log",
                     schema="platform",
                 )
@@ -295,21 +279,19 @@ def test_event_log_migration_creates_table_at_0002(tmp_path: Path) -> None:
             "ix_event_log_provider_call_id",
             "ix_event_log_handoff_id",
         }.issubset(index_names)
-    finally:
-        engine.dispose()
 
 
 def test_platform_migration_chain_is_single_head() -> None:
-    script = ScriptDirectory.from_config(_build_alembic_config("sqlite+pysqlite://"))
-    assert script.get_heads() == ["0009"]
+    script = ScriptDirectory.from_config(build_alembic_config(PLACEHOLDER_POSTGRESQL_URL))
+    assert script.get_heads() == ["0010"]
 
 
-def test_event_log_upgrade_from_0005_renames_provider_policy_column(tmp_path: Path) -> None:
-    main_db = tmp_path / "migration-upgrade-main.sqlite3"
-    platform_db = tmp_path / "migration-upgrade-platform.sqlite3"
-    engine = build_sqlite_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(sqlite_url(main_db))
-    try:
+def test_event_log_upgrade_from_0005_renames_provider_policy_column() -> None:
+    with provision_database(
+        database_name_prefix="anytoolai_event_log_0005_upgrade_test",
+        upgrade_target=None,
+        skip_reason="PostgreSQL event log upgrade coverage",
+    ) as (engine, alembic_config, _database_url):
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
             command.upgrade(alembic_config, "0005")
@@ -333,8 +315,6 @@ def test_event_log_upgrade_from_0005_renames_provider_policy_column(tmp_path: Pa
 
         assert "provider_policy_ref" in event_log_columns
         assert "provider_policy_id" not in event_log_columns
-    finally:
-        engine.dispose()
 
 
 def test_event_emitter_persists_round_trip_and_maps_dimensions(

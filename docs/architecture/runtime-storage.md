@@ -26,6 +26,7 @@ The runtime storage slice lives in these files:
 - `migrations/platform/versions/0005_provider_calls_error_message_safe.py`
 - `migrations/platform/versions/0007_guest_quota_dimension.py`
 - `migrations/platform/versions/0008_handoffs_compat.py`
+- `migrations/platform/versions/0010_handoffs_index_compat.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/db.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/transactions.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/scenarios/repository.py`
@@ -70,6 +71,9 @@ For the Provider Gateway ADR-0007 realignment:
 - `0008_handoffs_compat.py` creates that table only when absent, repairing databases stamped past
   the historical placeholder `0004`; its downgrade is intentionally a no-op so downgrading a
   compatibility marker never destroys backend-owned handoff history
+- `0010_handoffs_index_compat.py` repairs already-upgraded handoff tables by dropping the obsolete
+  target-session index and ensuring the canonical `status + expires_at` index exists; its downgrade
+  restores the legacy target-session index for the historical revision boundary
 
 This keeps fresh installs and already-upgraded databases on the same final schema.
 
@@ -78,8 +82,7 @@ This keeps fresh installs and already-upgraded databases on the same final schem
 `platform.product_handoffs` stores the hashed token, source and target dimensions, explicit policy,
 mapped context and preview JSON, safe failure code/metadata, and timestamps for every lifecycle
 state. It has a unique token hash, unique nullable target-session linkage, foreign keys to runtime
-sessions/jobs/artifacts, and indexes for definition, source session, target session, and
-status/expiry lookups.
+sessions/jobs/artifacts, and indexes for definition, source session, and status/expiry lookups.
 
 `HandoffRepository` follows the caller-owned transaction rule but deliberately does not expose a
 generic status-changing update. `mark_viewed`, `claim_accept`, `decline`, `expire_if_due`,
@@ -142,19 +145,32 @@ The implementation is split into four layers.
 
 ### 1. Migration layer
 
-`migrations/platform/versions/0001_runtime_tables.py` defines the durable schema for the runtime
-tables.
+`migrations/platform/versions/0001_runtime_tables.py` defines the durable schema for the initial
+runtime tables, and later revisions extend that shared storage slice with quota and handoff state.
 
 Responsibilities:
 
 - create the `platform` schema when the backend dialect supports schemas
-- create the original five execution runtime tables
+- create the original execution runtime tables
 - create indexes for common runtime lookups
 - define the initial enum constraints at the database level
 - support downgrade for the same tables
 
 `migrations/platform/env.py` was also turned from a placeholder into a minimal working Alembic env
-so tests and future commands can execute migrations programmatically.
+so tests and future commands can execute migrations programmatically. The env bootstrap now adds the
+repository root before branching into offline vs. online mode, which keeps shared migration helper
+imports working even when Alembic runs from a different current working directory.
+
+The repo also keeps a checked-in `migrations/platform/alembic.ini` for explicit CLI invocations
+such as `uv run alembic -c migrations/platform/alembic.ini upgrade head --sql`. Compatibility
+revisions that inspect live schema state remain online-only in practice; during offline SQL
+generation they either no-op because the baseline revisions already own the final schema or emit the
+canonical handoff-index cleanup SQL needed for fresh-install `head` output.
+
+For `product_handoffs` compatibility work specifically, historical revisions keep their
+table/index checks inline so recorded Alembic behavior does not depend on mutable helper modules.
+`0008_handoffs_compat.py` intentionally keeps its schema-qualified `has_table(...)` guard
+self-contained, and later handoff compatibility logic follows the same revision-local pattern.
 
 ### 2. Shared SQLAlchemy table layer
 
@@ -165,7 +181,7 @@ Responsibilities:
 
 - define `PLATFORM_SCHEMA`
 - define a shared `MetaData`
-- define all five `Table(...)` objects
+- define the shared runtime `Table(...)` objects, including guest identity, quota, and handoff state
 - define reusable SQLAlchemy types
 - expose a small engine factory
 
@@ -190,6 +206,9 @@ Each runtime entity has a small repository class:
 - `ActionRunRepository`
 - `ProviderCallRepository`
 - `ArtifactRepository`
+- `GuestIdentityRepository`
+- `QuotaUsageRepository`
+- `HandoffRepository`
 
 Repository responsibilities:
 
@@ -216,6 +235,8 @@ These records live next to the rest of the domain models:
 - `actions/models.py` -> `ActionRunRecord`
 - `providers/models.py` -> `ProviderCallRecord`
 - `artifacts/models.py` -> `ArtifactRecord`
+- `identity/models.py` -> `GuestIdentityRecord`
+- `handoffs/models.py` -> `HandoffRecord`
 
 This keeps the runtime storage surface aligned with the repo's existing model style.
 
@@ -667,16 +688,28 @@ The test approach is important:
 
 - it runs the real Alembic migration chain through `head`
 - it verifies CRUD against the migrated schema
-- it uses SQLite for lightweight CI compatibility
-- it attaches a second SQLite database as the `platform` schema so schema-qualified table names are
-  still exercised
+- it provisions a disposable PostgreSQL database from
+  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`
+- it exercises the real `platform` schema layout against the production PostgreSQL dialect
 
-For quota concurrency, SQLite coverage is not treated as production proof. PostgreSQL is the real
-runtime database, so the production-semantics check lives in:
+Run the runtime-storage suite with a PostgreSQL maintenance database URL:
+
+```powershell
+$env:ANYTOOLAI_POSTGRES_TEST_DATABASE_URL = "postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres"
+uv run python -m pytest packages/backend/platform-core/tests/unit/test_runtime_storage.py -m "slow and postgresql" -q
+```
+
+The suite creates and drops disposable databases, applies the real Alembic migration chain, then
+verifies repository CRUD, schema constraints, compatibility upgrades, and explicit transaction
+behavior against PostgreSQL.
+
+The reusable disposable-database helpers live in `tests/db_support.py`. Root `conftest.py` remains
+pytest wiring only; tests import the helper module explicitly instead of treating `conftest.py` as a
+shared library.
+
+Quota concurrency remains a separate PostgreSQL production-semantics check in:
 
 - `apps/platform-api/tests/test_quota_concurrency_postgresql.py`
-
-Run it with a PostgreSQL maintenance database URL:
 
 ```powershell
 $env:ANYTOOLAI_POSTGRES_TEST_DATABASE_URL = "postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres"
@@ -688,49 +721,49 @@ scenario starts through the API transaction path. It verifies that PostgreSQL ro
 conditional quota update allow exactly the first `N` accepted starts, return `429 quota_exhausted`
 for later starts, and keep session/job/quota/event counts consistent.
 
-The backend GitHub Actions workflow also runs this PostgreSQL test in the dedicated
-`postgresql-quota-concurrency` job with a disposable PostgreSQL service. That job is the required
-production-dialect proof; quick-check remains intentionally DB-free and fast.
+The backend GitHub Actions workflow uses the required `postgresql-quota-concurrency` job with a
+disposable PostgreSQL service for all production-dialect tests. It runs the canonical
+`python scripts/agent/runner.py postgresql-check` command, which selects every `postgresql`-marked
+test under platform core/actions, platform API, and platform worker roots. Marker-driven root
+selection automatically includes new PostgreSQL tests without maintaining file or node-ID lists.
+Runtime-storage CRUD, migrations, quota/handoff concurrency, artifact/event recovery, API behavior,
+and worker execution therefore share one PostgreSQL-backed gate; `quick-check` remains intentionally
+DB-free and fast. Runtime and database-specific test infrastructure is PostgreSQL-only.
 
 `python scripts/agent/runner.py quick-check` excludes `slow` tests with `-m "not slow"` so the
-required fast path stays deterministic. Run SQLite/ASGI stress checks intentionally with:
-
-```powershell
-uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_stress.py -m slow -q
-```
+required fast path stays deterministic.
 
 What the tests cover:
 
 - migration applies on a clean database
 - required fields fail at the DB layer
-- create/read/update for all seven repositories
+- create/read/update for all runtime repositories
 - status transitions
 - artifact text storage
 - artifact JSON storage
 - explicit transaction-boundary behavior
 
-SQLite tests give strong fast-path coverage of the implemented SQLAlchemy layer while keeping the
-repo's current baseline checks fast and local. They do not replace the PostgreSQL integration test
-for concurrency semantics.
+These checks now validate the implemented SQLAlchemy layer on the same PostgreSQL dialect used by
+runtime state in production.
 
 ## Known Compromises
 
 The current design intentionally accepts a few compromises:
 
-### SQLite-based verification
+### PostgreSQL verification is opt-in locally
 
-The migration was validated through real Alembic execution on SQLite with an attached schema, not on
-a live PostgreSQL server.
+The migration and repository suite now validates against disposable PostgreSQL databases, but local
+execution still depends on `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`.
 
 Why:
 
-- the current repo baseline is DB-light
-- the task still needed real schema and repository verification
+- the current repo baseline remains DB-free for fast checks
+- PostgreSQL-backed validation needs an explicit disposable maintenance database URL
 
 Consequence:
 
-- PostgreSQL-specific behavior is represented through SQLAlchemy variants in the fast suite;
-- production-safe quota concurrency requires the PostgreSQL integration test above.
+- local quick checks do not execute the storage migration/repository suite by default
+- full runtime-storage validation now requires the PostgreSQL commands above
 
 ### Manual sync between tables and record dataclasses
 

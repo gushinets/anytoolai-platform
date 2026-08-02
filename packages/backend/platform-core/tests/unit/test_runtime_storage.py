@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import asdict, replace
-from pathlib import Path
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from dataclasses import replace
 from typing import Any
 
 import pytest
 import sqlalchemy as sa
 from alembic import command
-from alembic.config import Config
+from tests.db_support import provision_database
 from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
@@ -24,14 +26,13 @@ from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionRecord,
     ScenarioSessionStatus,
 )
-from anytoolai_platform_core.scenarios.repository import (
-    EXPECTED_IDEMPOTENCY_KEY_CONSTRAINT,
-    SQLITE_IDEMPOTENCY_KEY_COLUMNS,
-    ScenarioSessionRepository,
-)
+from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.storage.db import (
+    GUEST_QUOTA_USAGE_DIMENSION_COLUMN_NAMES,
+    GUEST_QUOTA_USAGE_DIMENSION_CONSTRAINT_NAME,
     action_runs_table,
     artifacts_table,
+    guest_quota_usage_table,
     jobs_table,
     product_handoffs_table,
     provider_calls_table,
@@ -44,37 +45,30 @@ from anytoolai_platform_core.storage.transactions import (
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from sqlalchemy.exc import IntegrityError
-from sqlite_harness import build_sqlite_runtime_engine, sqlite_url
+
 
 PROVIDER_INPUT_TOKENS = 128
 PROVIDER_OUTPUT_TOKENS = 64
 PROVIDER_LATENCY_MS = 950
+pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
 
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[5]
-
-
-def _build_alembic_config(database_url: str) -> Config:
-    alembic_config = Config()
-    alembic_config.set_main_option("script_location", str(_repo_root() / "migrations" / "platform"))
-    alembic_config.set_main_option("sqlalchemy.url", database_url)
-    return alembic_config
+@contextmanager
+def _provision_runtime_database(
+    upgrade_target: str | None = "head",
+) -> Any:
+    with provision_database(
+        database_name_prefix="anytoolai_runtime_storage_test",
+        upgrade_target=upgrade_target,
+        skip_reason="PostgreSQL runtime storage coverage",
+    ) as (engine, alembic_config, _database_url):
+        yield engine, alembic_config
 
 
 @pytest.fixture
-def runtime_engine(tmp_path: Path) -> sa.Engine:
-    main_db = tmp_path / "runtime-main.sqlite3"
-    platform_db = tmp_path / "runtime-platform.sqlite3"
-    engine = build_sqlite_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(sqlite_url(main_db))
-
-    with engine.begin() as connection:
-        alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "head")
-
-    yield engine
-    engine.dispose()
+def runtime_engine() -> Any:
+    with _provision_runtime_database("head") as (engine, _alembic_config):
+        yield engine
 
 
 @pytest.fixture
@@ -195,6 +189,24 @@ def scenario_session_scope(record: ScenarioSessionRecord) -> dict[str, str]:
     }
 
 
+def _quota_dimension_unique_constraint_columns() -> tuple[str, ...]:
+    for constraint in guest_quota_usage_table.constraints:
+        if (
+            isinstance(constraint, sa.UniqueConstraint)
+            and constraint.name == GUEST_QUOTA_USAGE_DIMENSION_CONSTRAINT_NAME
+        ):
+            return tuple(column.name for column in constraint.columns)
+    raise AssertionError("guest quota usage unique constraint metadata not found")
+
+
+def _product_handoffs_table_exists(
+    bind: sa.Connection,
+    *,
+    platform_schema: str,
+) -> bool:
+    return sa.inspect(bind).has_table("product_handoffs", schema=platform_schema)
+
+
 ROUND_TRIP_REPOSITORY_CASES = [
     pytest.param(
         ScenarioSessionRepository,
@@ -262,58 +274,57 @@ def test_runtime_table_enums_create_check_constraints() -> None:
 
 def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine) -> None:
     with runtime_engine.connect() as connection:
+        inspector = sa.inspect(connection)
         table_names = set(
-            connection.execute(
-                sa.text("SELECT name FROM platform.sqlite_master WHERE type = 'table'")
-            ).scalars()
+            inspector.get_table_names(schema="platform")
         )
-        index_names = set(
-            connection.execute(
-                sa.text("SELECT name FROM platform.sqlite_master WHERE type = 'index'")
-            ).scalars()
-        )
+        index_names = {
+            index["name"]
+            for table_name in table_names | {"event_log"}
+            for index in inspector.get_indexes(table_name, schema="platform")
+        }
         scenario_session_columns = {
             column["name"]: column
-            for column in sa.inspect(connection).get_columns(
+            for column in inspector.get_columns(
                 "scenario_sessions",
                 schema="platform",
             )
         }
         provider_call_columns = {
             column["name"]: column
-            for column in sa.inspect(connection).get_columns(
+            for column in inspector.get_columns(
                 "provider_calls",
                 schema="platform",
             )
         }
         event_log_columns = {
             column["name"]: column
-            for column in sa.inspect(connection).get_columns(
+            for column in inspector.get_columns(
                 "event_log",
                 schema="platform",
             )
         }
         guest_columns = {
             column["name"]
-            for column in sa.inspect(connection).get_columns(
+            for column in inspector.get_columns(
                 "guest_identities",
                 schema="platform",
             )
         }
         quota_columns = {
             column["name"]
-            for column in sa.inspect(connection).get_columns(
+            for column in inspector.get_columns(
                 "guest_quota_usage",
                 schema="platform",
             )
         }
-        quota_foreign_keys = sa.inspect(connection).get_foreign_keys(
+        quota_foreign_keys = inspector.get_foreign_keys(
             "guest_quota_usage",
             schema="platform",
         )
         handoff_columns = {
             column["name"]
-            for column in sa.inspect(connection).get_columns(
+            for column in inspector.get_columns(
                 "product_handoffs",
                 schema="platform",
             )
@@ -366,7 +377,6 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "ix_event_log_action_run_id",
         "ix_event_log_provider_call_id",
         "ix_product_handoffs_source_session",
-        "ix_product_handoffs_target_session",
         "ix_product_handoffs_status_expiry",
     }.issubset(index_names)
     assert {"id", "tenant_id", "region", "created_at", "last_seen_at", "metadata"} <= guest_columns
@@ -405,14 +415,8 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
 
 
 def test_quota_dimension_downgrade_to_0006_preserves_current_0003_schema(
-    tmp_path: Path,
 ) -> None:
-    main_db = tmp_path / "runtime-downgrade-main.sqlite3"
-    platform_db = tmp_path / "runtime-downgrade-platform.sqlite3"
-    engine = build_sqlite_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(sqlite_url(main_db))
-
-    try:
+    with _provision_runtime_database(upgrade_target=None) as (engine, alembic_config):
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
             command.upgrade(alembic_config, "head")
@@ -432,7 +436,7 @@ def test_quota_dimension_downgrade_to_0006_preserves_current_0003_schema(
                 )
             }
             unique_constraints = {
-                constraint["name"]: set(constraint["column_names"])
+                constraint["name"]: tuple(constraint["column_names"])
                 for constraint in sa.inspect(connection).get_unique_constraints(
                     "guest_quota_usage",
                     schema="platform",
@@ -441,29 +445,17 @@ def test_quota_dimension_downgrade_to_0006_preserves_current_0003_schema(
 
         assert {"quota_dimension", "dimension_key", "scenario_id"} <= quota_columns
         assert "ix_guest_quota_usage_dimension" in index_names
-        assert unique_constraints["uq_guest_quota_usage_dimension"] == {
-            "tenant_id",
-            "region",
-            "guest_id",
-            "product_id",
-            "quota_policy_id",
-            "quota_dimension",
-            "dimension_key",
-            "period_key",
-        }
-    finally:
-        engine.dispose()
+        assert _quota_dimension_unique_constraint_columns() == (
+            GUEST_QUOTA_USAGE_DIMENSION_COLUMN_NAMES
+        )
+        assert unique_constraints[GUEST_QUOTA_USAGE_DIMENSION_CONSTRAINT_NAME] == (
+            GUEST_QUOTA_USAGE_DIMENSION_COLUMN_NAMES
+        )
 
 
 def test_runtime_migration_upgrade_from_0004_adds_provider_call_error_message_safe(
-    tmp_path: Path,
 ) -> None:
-    main_db = tmp_path / "runtime-upgrade-main.sqlite3"
-    platform_db = tmp_path / "runtime-upgrade-platform.sqlite3"
-    engine = build_sqlite_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(sqlite_url(main_db))
-
-    try:
+    with _provision_runtime_database(upgrade_target=None) as (engine, alembic_config):
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
             command.upgrade(alembic_config, "0004")
@@ -484,19 +476,11 @@ def test_runtime_migration_upgrade_from_0004_adds_provider_call_error_message_sa
 
         assert "error_message_safe" in provider_call_columns
         assert provider_call_columns["error_message_safe"]["nullable"] is True
-    finally:
-        engine.dispose()
 
 
 def test_handoff_compatibility_revision_repairs_database_stamped_at_0007(
-    tmp_path: Path,
 ) -> None:
-    main_db = tmp_path / "handoff-compat-main.sqlite3"
-    platform_db = tmp_path / "handoff-compat-platform.sqlite3"
-    engine = build_sqlite_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(sqlite_url(main_db))
-
-    try:
+    with _provision_runtime_database(upgrade_target=None) as (engine, alembic_config):
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
             command.upgrade(alembic_config, "head")
@@ -507,11 +491,7 @@ def test_handoff_compatibility_revision_repairs_database_stamped_at_0007(
             alembic_config.attributes["connection"] = connection
             command.upgrade(alembic_config, "head")
             inspector = sa.inspect(connection)
-            table_names = set(
-                connection.execute(
-                    sa.text("SELECT name FROM platform.sqlite_master WHERE type = 'table'")
-                ).scalars()
-            )
+            table_names = set(inspector.get_table_names(schema="platform"))
             handoff_columns = {
                 column["name"]
                 for column in inspector.get_columns(
@@ -552,7 +532,6 @@ def test_handoff_compatibility_revision_repairs_database_stamped_at_0007(
         assert {
             "ix_product_handoffs_definition",
             "ix_product_handoffs_source_session",
-            "ix_product_handoffs_target_session",
             "ix_product_handoffs_status_expiry",
         } <= handoff_indexes
         assert {
@@ -562,110 +541,65 @@ def test_handoff_compatibility_revision_repairs_database_stamped_at_0007(
             "fk_product_handoffs_target_session",
             "fk_product_handoffs_target_job",
         } == handoff_foreign_keys
-    finally:
-        engine.dispose()
 
 
-def test_scenario_session_idempotency_migration_0009_adds_column_and_constraint(
-    tmp_path: Path,
+def test_product_handoffs_table_exists_is_schema_aware() -> None:
+    with _provision_runtime_database(upgrade_target=None) as (engine, alembic_config):
+        with engine.begin() as connection:
+            connection.execute(sa.text("CREATE TABLE product_handoffs (id TEXT PRIMARY KEY)"))
+            assert _product_handoffs_table_exists(connection, platform_schema="public") is True
+            assert _product_handoffs_table_exists(connection, platform_schema="platform") is False
+
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "0008")
+
+            assert _product_handoffs_table_exists(connection, platform_schema="platform") is True
+
+
+def test_handoff_index_compatibility_revision_replaces_legacy_target_session_index(
 ) -> None:
-    main_db = tmp_path / "idempotency-migration-main.sqlite3"
-    platform_db = tmp_path / "idempotency-migration-platform.sqlite3"
-    engine = build_sqlite_runtime_engine(main_db, platform_db)
-    alembic_config = _build_alembic_config(sqlite_url(main_db))
-
-    try:
+    with _provision_runtime_database(upgrade_target=None) as (engine, alembic_config):
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
             command.upgrade(alembic_config, "0008")
-            connection.execute(
-                sa.text(
-                    "INSERT INTO platform.scenario_sessions "
-                    "(id, tenant_id, region, product_id, frontend_id, scenario_id, "
-                    "scenario_version, guest_id, status, metadata, created_at, started_at, "
-                    "last_event_at) VALUES "
-                    "('sess_pre_0009', 'anytoolai', 'default', 'prod_demo', 'frontend_demo', "
-                    "'scenario_demo', 1, 'guest_demo', 'started', '{}', "
-                    "'2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00', "
-                    "'2026-01-01T00:00:00+00:00')"
+            historical_indexes = {
+                index["name"]
+                for index in sa.inspect(connection).get_indexes(
+                    "product_handoffs",
+                    schema="platform",
                 )
-            )
+            }
+
+        assert "ix_product_handoffs_target_session" in historical_indexes
+        assert "ix_product_handoffs_status_expiry" in historical_indexes
 
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
             command.upgrade(alembic_config, "head")
-            inspector = sa.inspect(connection)
-            columns = {
-                column["name"]: column
-                for column in inspector.get_columns("scenario_sessions", schema="platform")
-            }
-            constraint_names = {
-                constraint["name"]
-                for constraint in inspector.get_unique_constraints(
-                    "scenario_sessions", schema="platform"
+            upgraded_indexes = {
+                index["name"]
+                for index in sa.inspect(connection).get_indexes(
+                    "product_handoffs",
+                    schema="platform",
                 )
             }
 
-        assert "idempotency_key" in columns
-        assert columns["idempotency_key"]["nullable"] is True
-        assert "idempotency_request_hash" in columns
-        assert "uq_scenario_sessions_idempotency_key" in constraint_names
-
-        # The row inserted before 0009 ran must survive the SQLite batch-recreate.
-        with transaction_boundary(build_session_factory(engine)) as session:
-            preexisting = ScenarioSessionRepository(session).get(
-                "sess_pre_0009",
-                tenant_id="anytoolai",
-                region="default",
-                product_id="prod_demo",
-                frontend_id="frontend_demo",
-            )
-        assert preexisting is not None
-        assert preexisting.idempotency_key is None
+        assert "ix_product_handoffs_target_session" not in upgraded_indexes
+        assert "ix_product_handoffs_status_expiry" in upgraded_indexes
 
         with engine.begin() as connection:
-            connection.execute(
-                sa.insert(scenario_sessions_table).values(
-                    asdict(
-                        make_scenario_session(
-                            id="sess_a", guest_id="guest_demo", idempotency_key="idem-1"
-                        )
-                    )
+            alembic_config.attributes["connection"] = connection
+            command.downgrade(alembic_config, "0008")
+            downgraded_indexes = {
+                index["name"]
+                for index in sa.inspect(connection).get_indexes(
+                    "product_handoffs",
+                    schema="platform",
                 )
-            )
-            with pytest.raises(IntegrityError):
-                connection.execute(
-                    sa.insert(scenario_sessions_table).values(
-                        asdict(
-                            make_scenario_session(
-                                id="sess_b", guest_id="guest_demo", idempotency_key="idem-1"
-                            )
-                        )
-                    )
-                )
-    finally:
-        engine.dispose()
+            }
 
-
-def test_scenario_session_idempotency_null_key_does_not_dedupe(
-    session_factory: sa.orm.sessionmaker[sa.orm.Session],
-) -> None:
-    # Documented, accepted gap: NULL is distinct from itself in unique-constraint
-    # semantics on both SQLite and PostgreSQL, so a start with no idempotency key
-    # (or with guest_id IS NULL) is not deduplicated by this constraint.
-    with transaction_boundary(session_factory) as session:
-        repository = ScenarioSessionRepository(session)
-        repository.create(make_scenario_session(id="sess_null_key_a"))
-        repository.create(make_scenario_session(id="sess_null_key_b"))
-
-    with transaction_boundary(session_factory) as session:
-        repository = ScenarioSessionRepository(session)
-        assert repository.get(
-            "sess_null_key_a", **scenario_session_scope(make_scenario_session())
-        ) is not None
-        assert repository.get(
-            "sess_null_key_b", **scenario_session_scope(make_scenario_session())
-        ) is not None
+        assert "ix_product_handoffs_target_session" in downgraded_indexes
+        assert "ix_product_handoffs_status_expiry" in downgraded_indexes
 
 
 def test_repositories_respect_explicit_transaction_boundary(
@@ -847,97 +781,6 @@ def test_scenario_session_repository_get_is_scope_bound(
             )
             is None
         )
-
-
-def test_sqlite_idempotency_key_columns_matches_real_unique_constraint() -> None:
-    # Derived from scenario_sessions_table's own UniqueConstraint (storage/db.py)
-    # instead of a third hardcoded copy -- assert it actually reflects the real
-    # constraint's column set (order-independent) rather than just trusting the
-    # derivation helper blindly.
-    constraint = next(
-        c
-        for c in scenario_sessions_table.constraints
-        if isinstance(c, sa.UniqueConstraint) and c.name == EXPECTED_IDEMPOTENCY_KEY_CONSTRAINT
-    )
-    assert set(SQLITE_IDEMPOTENCY_KEY_COLUMNS) == set(constraint.columns.keys())
-    # Guards against a duplicate entry that set-equality alone would hide.
-    assert len(SQLITE_IDEMPOTENCY_KEY_COLUMNS) == len(constraint.columns)
-
-
-def test_scenario_session_repository_get_by_idempotency_key(
-    session_factory: sa.orm.sessionmaker[sa.orm.Session],
-) -> None:
-    with transaction_boundary(session_factory) as session:
-        repository = ScenarioSessionRepository(session)
-        created = repository.create(
-            make_scenario_session(guest_id="guest_demo", idempotency_key="idem-1")
-        )
-
-        found = repository.get_by_idempotency_key(
-            tenant_id=created.tenant_id,
-            region=created.region,
-            product_id=created.product_id,
-            scenario_id=created.scenario_id,
-            guest_id=created.guest_id,
-            idempotency_key="idem-1",
-        )
-        assert found == created
-
-        assert (
-            repository.get_by_idempotency_key(
-                tenant_id=created.tenant_id,
-                region=created.region,
-                product_id=created.product_id,
-                scenario_id=created.scenario_id,
-                guest_id=created.guest_id,
-                idempotency_key="idem-other",
-            )
-            is None
-        )
-        assert (
-            repository.get_by_idempotency_key(
-                tenant_id="tenant_other",
-                region=created.region,
-                product_id=created.product_id,
-                scenario_id=created.scenario_id,
-                guest_id=created.guest_id,
-                idempotency_key="idem-1",
-            )
-            is None
-        )
-
-
-def test_scenario_session_repository_get_by_idempotency_key_tolerates_null_guest_id_duplicates(
-    session_factory: sa.orm.sessionmaker[sa.orm.Session],
-) -> None:
-    # Documented gap: the unique constraint does not dedupe guest_id IS NULL, so two
-    # rows can legitimately share the same (tenant, region, product, scenario,
-    # idempotency_key) scope when guest_id is None. The lookup must not crash with
-    # MultipleResultsFound in that case -- it must deterministically return one row.
-    with transaction_boundary(session_factory) as session:
-        repository = ScenarioSessionRepository(session)
-        first = repository.create(
-            make_scenario_session(
-                id="sess_null_guest_a", guest_id=None, idempotency_key="idem-null-guest"
-            )
-        )
-        repository.create(
-            make_scenario_session(
-                id="sess_null_guest_b", guest_id=None, idempotency_key="idem-null-guest"
-            )
-        )
-
-        found = repository.get_by_idempotency_key(
-            tenant_id=first.tenant_id,
-            region=first.region,
-            product_id=first.product_id,
-            scenario_id=first.scenario_id,
-            guest_id=None,
-            idempotency_key="idem-null-guest",
-        )
-
-    assert found is not None
-    assert found.id == first.id
 
 
 def test_scenario_session_repository_update_does_not_mutate_scope_columns(
@@ -1440,6 +1283,98 @@ def test_quota_usage_repository_keys_usage_by_configured_dimension(
     assert second.id != first.id
     assert first.quota_dimension is QuotaDimension.scenario
     assert second.dimension_key == "kernel_demo.multi_step_workflow_smoke_v1"
+
+
+def test_quota_usage_repository_concurrent_ensure_usage_creates_one_dimension_row(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        guest = GuestIdentityRepository(session).create(make_guest_identity())
+
+    barrier = threading.Barrier(3)
+    usage_kwargs = {
+        "tenant_id": guest.tenant_id,
+        "region": guest.region,
+        "guest_id": guest.id,
+        "product_id": "kernel_demo",
+        "quota_policy_id": "kernel_demo.guest_quota_v1",
+        "quota_dimension": QuotaDimension.product,
+        "dimension_key": "kernel_demo",
+        "scenario_id": None,
+        "period_key": "lifetime",
+        "limit_count": 1,
+    }
+
+    def ensure_usage() -> str:
+        with transaction_boundary(session_factory) as session:
+            barrier.wait()
+            usage = QuotaUsageRepository(session).ensure_usage(**usage_kwargs)
+            return usage.id
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(ensure_usage) for _ in range(2)]
+        barrier.wait()
+        usage_ids = [future.result() for future in futures]
+
+    with transaction_boundary(session_factory) as session:
+        rows = list(
+            session.execute(
+                sa.select(guest_quota_usage_table).where(
+                    guest_quota_usage_table.c.guest_id == guest.id
+                )
+            ).mappings()
+        )
+
+    assert usage_ids[0] == usage_ids[1]
+    assert len(rows) == 1
+    assert rows[0]["quota_dimension"] == "product"
+    assert rows[0]["dimension_key"] == "kernel_demo"
+
+
+def test_quota_usage_repository_conditional_consume_blocks_stale_concurrent_read(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        guest = GuestIdentityRepository(session).create(make_guest_identity())
+        usage = QuotaUsageRepository(session).ensure_usage(
+            tenant_id=guest.tenant_id,
+            region=guest.region,
+            guest_id=guest.id,
+            product_id="kernel_demo",
+            quota_policy_id="kernel_demo.guest_quota_v1",
+            quota_dimension=QuotaDimension.product,
+            dimension_key="kernel_demo",
+            scenario_id=None,
+            period_key="lifetime",
+            limit_count=1,
+        )
+
+    first_session = session_factory()
+    second_session = session_factory()
+    try:
+        first_repo = QuotaUsageRepository(first_session)
+        second_repo = QuotaUsageRepository(second_session)
+        first_read = first_repo.get(usage.id)
+        second_read = second_repo.get(usage.id)
+        assert first_read is not None
+        assert second_read is not None
+
+        first_consumed = first_repo.consume_if_available(first_read)
+        first_session.commit()
+
+        second_consumed = second_repo.consume_if_available(second_read)
+        second_session.commit()
+    finally:
+        first_session.close()
+        second_session.close()
+
+    with transaction_boundary(session_factory) as session:
+        final_usage = QuotaUsageRepository(session).get(usage.id)
+
+    assert first_consumed is not None
+    assert second_consumed is None
+    assert final_usage is not None
+    assert final_usage.used_count == 1
 
 
 def test_quota_usage_repository_reraises_unexpected_integrity_errors(

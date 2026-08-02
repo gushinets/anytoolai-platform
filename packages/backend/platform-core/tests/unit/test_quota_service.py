@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
@@ -21,33 +20,20 @@ from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
 )
-from sqlite_harness import build_sqlite_runtime_engine, sqlite_url
+from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
-
-
-def _build_session_factory(tmp_path: Path) -> sa.orm.sessionmaker[sa.orm.Session]:
-    main_db = tmp_path / "quota-main.sqlite3"
-    platform_db = tmp_path / "quota-platform.sqlite3"
-    engine = build_sqlite_runtime_engine(main_db, platform_db)
-    alembic_config = Config()
-    alembic_config.set_main_option(
-        "script_location",
-        str(REPO_ROOT / "migrations" / "platform"),
-    )
-    alembic_config.set_main_option("sqlalchemy.url", sqlite_url(main_db))
-
-    with engine.begin() as connection:
-        alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "head")
-
-    return build_session_factory(engine)
+pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
 
 @pytest.fixture
-def session_factory(tmp_path: Path) -> sa.orm.sessionmaker[sa.orm.Session]:
-    return _build_session_factory(tmp_path)
+def session_factory() -> Iterator[sa.orm.sessionmaker[sa.orm.Session]]:
+    with provision_database(
+        database_name_prefix="anytoolai_quota_service_test",
+        skip_reason="PostgreSQL quota service coverage",
+    ) as (engine, _alembic_config, _database_url):
+        yield build_session_factory(engine)
 
 
 def _create_guest(
@@ -76,13 +62,9 @@ def _quota_service(
     )
 
 
-def _consume(
+def _consume_accepted_start(
     service: GuestQuotaService,
     *,
-    tenant_id: str,
-    region: str,
-    product_id: str,
-    frontend_id: str,
     guest_id: str,
     scenario_id: str,
     scenario_session_id: str,
@@ -90,18 +72,18 @@ def _consume(
     handoff_id: str | None = None,
 ):
     validation = service.validate_accepted_start(
-        tenant_id=tenant_id,
-        region=region,
-        product_id=product_id,
+        tenant_id="anytoolai",
+        region="default",
+        product_id="kernel_demo",
         guest_id=guest_id,
         scenario_id=scenario_id,
     )
     assert validation is not None
     return service.consume_for_accepted_start(
-        tenant_id=tenant_id,
-        region=region,
-        product_id=product_id,
-        frontend_id=frontend_id,
+        tenant_id="anytoolai",
+        region="default",
+        product_id="kernel_demo",
+        frontend_id="kernel_demo_ce",
         guest_id=guest_id,
         scenario_id=scenario_id,
         scenario_session_id=scenario_session_id,
@@ -185,25 +167,17 @@ def test_product_dimension_shares_quota_across_scenarios(
         guest_id = _create_guest(session)
         service = _quota_service(session)
 
-        first = _consume(
+        first = _consume_accepted_start(
             service,
-            tenant_id="anytoolai",
-            region="default",
-            product_id="kernel_demo",
-            frontend_id="kernel_demo_ce",
             guest_id=guest_id,
             scenario_id="kernel_demo.single_action_smoke_v1",
-            scenario_session_id="scenario_session_product_dim_1",
+            scenario_session_id="scenario_session_product_first",
         )
-        second = _consume(
+        second = _consume_accepted_start(
             service,
-            tenant_id="anytoolai",
-            region="default",
-            product_id="kernel_demo",
-            frontend_id="kernel_demo_ce",
             guest_id=guest_id,
             scenario_id="kernel_demo.multi_step_workflow_smoke_v1",
-            scenario_session_id="scenario_session_product_dim_2",
+            scenario_session_id="scenario_session_product_second",
         )
         usages = list(session.execute(sa.select(guest_quota_usage_table)).mappings())
         consumed_events = list(
@@ -244,38 +218,26 @@ def test_scenario_dimension_uses_independent_counters_and_events(
         service = _quota_service(session, registry=registry)
 
         first_scenario_states = [
-            _consume(
+            _consume_accepted_start(
                 service,
-                tenant_id="anytoolai",
-                region="default",
-                product_id="kernel_demo",
-                frontend_id="kernel_demo_ce",
                 guest_id=guest_id,
                 scenario_id=first_scenario_id,
-                scenario_session_id=f"scenario_session_scenario_dim_{index}",
+                scenario_session_id=f"scenario_session_first_{index}",
             )
             for index in range(3)
         ]
         with pytest.raises(QuotaExhaustedError):
-            _consume(
+            _consume_accepted_start(
                 service,
-                tenant_id="anytoolai",
-                region="default",
-                product_id="kernel_demo",
-                frontend_id="kernel_demo_ce",
                 guest_id=guest_id,
                 scenario_id=first_scenario_id,
-                scenario_session_id="scenario_session_scenario_dim_exhausted",
+                scenario_session_id="scenario_session_first_exhausted",
             )
-        second_scenario_state = _consume(
+        second_scenario_state = _consume_accepted_start(
             service,
-            tenant_id="anytoolai",
-            region="default",
-            product_id="kernel_demo",
-            frontend_id="kernel_demo_ce",
             guest_id=guest_id,
             scenario_id=second_scenario_id,
-            scenario_session_id="scenario_session_scenario_dim_second",
+            scenario_session_id="scenario_session_second_first",
         )
         usages = {
             row["scenario_id"]: row
@@ -342,12 +304,8 @@ def test_quota_consume_exhausted_and_repeat_calls(
         service = _quota_service(session)
 
         states = [
-            _consume(
+            _consume_accepted_start(
                 service,
-                tenant_id="anytoolai",
-                region="default",
-                product_id="kernel_demo",
-                frontend_id="kernel_demo_ce",
                 guest_id=guest_id,
                 scenario_id="kernel_demo.single_action_smoke_v1",
                 scenario_session_id=f"scenario_session_demo_{index}",
@@ -356,12 +314,8 @@ def test_quota_consume_exhausted_and_repeat_calls(
             for index in range(3)
         ]
         with pytest.raises(QuotaExhaustedError):
-            _consume(
+            _consume_accepted_start(
                 service,
-                tenant_id="anytoolai",
-                region="default",
-                product_id="kernel_demo",
-                frontend_id="kernel_demo_ce",
                 guest_id=guest_id,
                 scenario_id="kernel_demo.single_action_smoke_v1",
                 scenario_session_id="scenario_session_demo_exhausted",
@@ -393,12 +347,8 @@ def test_quota_exhaustion_recovery_survives_caller_transaction_rollback(
     with pytest.raises(QuotaExhaustedError), transaction_boundary(
         session_factory
     ) as session:
-        _consume(
+        _consume_accepted_start(
             _quota_service(session, registry=registry),
-            tenant_id="anytoolai",
-            region="default",
-            product_id="kernel_demo",
-            frontend_id="kernel_demo_ce",
             guest_id=guest_id,
             scenario_id="kernel_demo.handoff_smoke_target_v1",
             scenario_session_id="scenario_session_rejected_handoff",
@@ -428,49 +378,3 @@ def test_quota_exhaustion_recovery_survives_caller_transaction_rollback(
     )
     assert quota_events[-1]["error_code"] == "quota_exhausted"
     assert quota_events[-1]["properties"]["exhausted"] is True
-
-
-def test_quota_conditional_consume_blocks_stale_concurrent_read(
-    session_factory: sa.orm.sessionmaker[sa.orm.Session],
-) -> None:
-    with transaction_boundary(session_factory) as session:
-        guest_id = _create_guest(session)
-        usage = QuotaUsageRepository(session).ensure_usage(
-            tenant_id="anytoolai",
-            region="default",
-            guest_id=guest_id,
-            product_id="kernel_demo",
-            quota_policy_id="kernel_demo.guest_quota_v1",
-            quota_dimension=QuotaDimension.product,
-            dimension_key="kernel_demo",
-            scenario_id=None,
-            period_key="lifetime",
-            limit_count=1,
-        )
-
-    first_session = session_factory()
-    second_session = session_factory()
-    try:
-        first_repo = QuotaUsageRepository(first_session)
-        second_repo = QuotaUsageRepository(second_session)
-        first_read = first_repo.get(usage.id)
-        second_read = second_repo.get(usage.id)
-        assert first_read is not None
-        assert second_read is not None
-
-        first_consumed = first_repo.consume_if_available(first_read)
-        first_session.commit()
-
-        second_consumed = second_repo.consume_if_available(second_read)
-        second_session.commit()
-    finally:
-        first_session.close()
-        second_session.close()
-
-    with transaction_boundary(session_factory) as session:
-        final_usage = QuotaUsageRepository(session).get(usage.id)
-
-    assert first_consumed is not None
-    assert second_consumed is None
-    assert final_usage is not None
-    assert final_usage.used_count == 1

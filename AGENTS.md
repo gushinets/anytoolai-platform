@@ -108,6 +108,20 @@ Use full check or dedicated smoke commands for broader validation outside the ba
 `full-check` runs the baseline, locked frontend checks, and implemented product-suite tests. Smoke
 checks become required only after a feature issue supplies a real vertical slice.
 
+PostgreSQL production-semantics check:
+
+```bash
+python scripts/agent/runner.py postgresql-check
+```
+
+`postgresql-check` fails before collecting tests unless
+`ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` is set. This prevents fixture-level skips from creating a
+false-green PostgreSQL gate.
+
+Set `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` to a PostgreSQL maintenance database URL. This command
+selects every `postgresql`-marked test across platform core/actions, platform API, and platform
+worker roots. The required backend PostgreSQL CI job runs the same command.
+
 Config validation:
 
 ```bash

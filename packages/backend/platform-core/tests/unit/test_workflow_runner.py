@@ -5,12 +5,10 @@ from collections import Counter
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.executor import ActionExecutorResponse
 from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
@@ -57,42 +55,21 @@ from anytoolai_platform_core.workflows.runner import (
     WorkflowJobService,
     _emit_recovered_workflow_events,
 )
-from sqlalchemy import event
+from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
-
-
-def _sqlite_url(database_path: Path) -> str:
-    return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
+pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
 
 @pytest.fixture
-def runtime_engine(tmp_path: Path) -> sa.Engine:
-    main_db = tmp_path / "workflow-main.sqlite3"
-    platform_db = tmp_path / "workflow-platform.sqlite3"
-    engine = sa.create_engine(_sqlite_url(main_db), future=True)
-
-    @event.listens_for(engine, "connect")
-    def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
-        )
-
-    alembic_config = Config()
-    alembic_config.set_main_option(
-        "script_location", str(REPO_ROOT / "migrations" / "platform")
-    )
-    alembic_config.set_main_option("sqlalchemy.url", _sqlite_url(main_db))
-
-    with engine.begin() as connection:
-        alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "head")
-
-    yield engine
-    engine.dispose()
+def runtime_engine() -> Iterator[sa.Engine]:
+    with provision_database(
+        database_name_prefix="anytoolai_workflow_runner_test",
+        skip_reason="PostgreSQL workflow runner coverage",
+    ) as (engine, _alembic_config, _database_url):
+        yield engine
 
 
 @pytest.fixture
@@ -390,6 +367,7 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
     workflow_step_started = _event_by_type(events, "workflow.step_started")[0]
     action_started = _event_by_type(events, "action.started")[0]
     provider_started = _event_by_type(events, "provider.request_started")[0]
+    artifact_created = _event_by_type(events, "artifact.created")
     workflow_step_succeeded = _event_by_type(events, "workflow.step_succeeded")[0]
     workflow_succeeded = _event_by_type(events, "workflow.succeeded")[0]
     assert workflow_started["guest_id"] == "guest_demo"
@@ -409,6 +387,28 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
     assert provider_started["scenario_chain_id"] == "scenario_chain_demo"
     assert provider_started["handoff_id"] == "handoff_demo"
     assert provider_started["acquisition_source"] == "kernel_demo_ce"
+    action_artifact_event = next(
+        event for event in artifact_created if event["action_run_id"] == action_run["id"]
+    )
+    final_artifact_event = next(
+        event for event in artifact_created if event["artifact_id"] == result.result_artifact_id
+    )
+    assert action_artifact_event["workflow_id"] == "kernel_demo.single_action_extract_v1"
+    assert action_artifact_event["workflow_version"] == 1
+    assert action_artifact_event["guest_id"] == "guest_demo"
+    assert action_artifact_event["user_id"] == "user_demo"
+    assert action_artifact_event["scenario_chain_id"] == "scenario_chain_demo"
+    assert action_artifact_event["handoff_id"] == "handoff_demo"
+    assert action_artifact_event["acquisition_source"] == "kernel_demo_ce"
+    assert action_artifact_event["action_run_id"] == action_run["id"]
+    assert final_artifact_event["workflow_id"] == "kernel_demo.single_action_extract_v1"
+    assert final_artifact_event["workflow_version"] == 1
+    assert final_artifact_event["guest_id"] == "guest_demo"
+    assert final_artifact_event["user_id"] == "user_demo"
+    assert final_artifact_event["scenario_chain_id"] == "scenario_chain_demo"
+    assert final_artifact_event["handoff_id"] == "handoff_demo"
+    assert final_artifact_event["acquisition_source"] == "kernel_demo_ce"
+    assert final_artifact_event["action_run_id"] is None
     assert workflow_succeeded["guest_id"] == "guest_demo"
     assert workflow_succeeded["user_id"] == "user_demo"
     assert workflow_succeeded["scenario_chain_id"] == "scenario_chain_demo"

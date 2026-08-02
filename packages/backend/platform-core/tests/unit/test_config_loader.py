@@ -255,10 +255,53 @@ def test_loader_rejects_duplicate_handoff_mapping_target_with_identity(
     _assert_invalid_shape(
         exc_info.value.errors,
         file_path=handoff_path,
-        config_id="kernel_demo_source_to_target_v1",
-        ref_type=field_name,
+        config_id=None,
+        ref_type="duplicate_key",
         ref_value="summary.title",
-        message_part="target path is duplicated: summary.title",
+        message_part="Duplicate YAML key",
+    )
+
+
+def test_loader_validates_required_handoff_fields_before_mapping_normalization(
+    tmp_path: Path,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    data = _load_yaml(handoff_path)
+    del data["handoffs"][0]["handoff_id"]
+    data["handoffs"][0]["context_mapping"] = []
+    _write_yaml(handoff_path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, InvalidConfigShapeError)
+        and error.file_path == handoff_path
+        and "Handoff missing required fields" in error.message
+        for error in exc_info.value.errors
+    )
+
+
+def test_loader_reports_structured_target_frontend_enablement_error(
+    tmp_path: Path,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    data = _load_yaml(handoff_path)
+    data["handoffs"][0]["target_frontend_id"] = "missing_frontend"
+    _write_yaml(handoff_path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=handoff_path,
+        config_id="kernel_demo_source_to_target_v1",
+        ref_type="target_frontend_id",
+        ref_value="missing_frontend",
+        message_part="target frontend is not enabled",
     )
 
 
@@ -421,6 +464,17 @@ def test_loader_fails_on_missing_schema_reference(tmp_path: Path) -> None:
         ref_type="input_schema_ref",
         ref_value="kernel_demo.missing_schema_v1",
     )
+
+
+def test_loader_fails_on_malformed_json_schema(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "schemas" / "extract_input.schema.json"
+    path.write_text('{"type": 123}', encoding="utf-8")
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(error.code == "config_invalid_shape" for error in exc_info.value.errors)
 
 
 def test_loader_fails_on_missing_provider_policy_fallback_reference(tmp_path: Path) -> None:

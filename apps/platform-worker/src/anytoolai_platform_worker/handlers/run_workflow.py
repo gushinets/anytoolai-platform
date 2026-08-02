@@ -10,6 +10,7 @@ from dataclasses import replace
 from typing import Any
 
 from anytoolai_platform_core.common.errors import PlatformError
+from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
@@ -190,8 +191,8 @@ class RunWorkflowHandler:
             guest_id=scenario.guest_id,
             user_id=scenario.user_id,
             scenario_chain_id=scenario.scenario_chain_id,
-            handoff_id=_metadata_str(job.metadata, "handoff_id"),
-            acquisition_source=_metadata_str(job.metadata, "acquisition_source"),
+            handoff_id=metadata_str(job.metadata, "handoff_id"),
+            acquisition_source=metadata_str(job.metadata, "acquisition_source"),
         )
 
     def _persist_handler_failure(self, job_id: str, exc: Exception) -> None:
@@ -365,11 +366,6 @@ class RunWorkflowHandler:
                     error_code="workflow_execution_cancelled",
                     context=self._execution_context(job, scenario),
                 )
-
-
-def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
-    value = metadata.get(key)
-    return value if isinstance(value, str) and value else None
 
 
 def _safe_error_code(exc: Exception) -> str:

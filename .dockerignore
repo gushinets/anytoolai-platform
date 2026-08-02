@@ -1,0 +1,49 @@
+# Git metadata
+.git
+.gitignore
+
+# Python caches and environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+.uv-cache/
+.quick-check-venv/
+.quick-check-tmp/
+venv/
+*.egg-info/
+**/.venv/
+**/.uv-cache/
+**/__pycache__/
+**/*.egg-info/
+
+# Local runtime/test temp data
+.pytest-tmp/
+.tmp/
+tmp/
+temp/
+logs/
+*.log
+
+# Node/build output
+node_modules/
+.pnpm-store/
+.next/
+dist/
+build/
+coverage/
+
+# Local editor/OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local env files and secrets
+.env
+.env.*
+!.env.example

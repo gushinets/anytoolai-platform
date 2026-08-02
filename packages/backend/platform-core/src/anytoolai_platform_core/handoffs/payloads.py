@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from jsonschema import SchemaError
 from jsonschema import ValidationError as JsonSchemaValidationError
 from jsonschema import validate as validate_json_schema
 
@@ -31,6 +32,10 @@ TRUNCATED = "[TRUNCATED]"
 
 
 class HandoffPayloadError(ValueError):
+    pass
+
+
+class HandoffTargetSchemaError(HandoffPayloadError):
     pass
 
 
@@ -143,6 +148,10 @@ class HandoffPayloadBuilder:
         except JsonSchemaValidationError as exc:
             raise HandoffPayloadError(
                 "mapped handoff context is invalid for target workflow"
+            ) from exc
+        except SchemaError as exc:
+            raise HandoffTargetSchemaError(
+                "target workflow input schema is invalid"
             ) from exc
         return BuiltHandoffPayload(
             source_session=source_session,

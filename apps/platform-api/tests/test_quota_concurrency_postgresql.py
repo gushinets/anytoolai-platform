@@ -1,19 +1,18 @@
 from __future__ import annotations
 
 import asyncio
-import os
+from contextlib import contextmanager
 from dataclasses import replace
 from http import HTTPStatus
-from uuid import uuid4
+from typing import Iterator
 
 import httpx
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from anytoolai_platform_api.routers.handoffs import _service as _handoff_service
 from anytoolai_platform_core.handoffs.models import AcceptHandoffCommand
 from anytoolai_platform_core.handoffs.service import HandoffAcceptanceExecutionError
+from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaPolicy
 from anytoolai_platform_core.storage.db import (
     event_log_table,
     guest_quota_usage_table,
@@ -22,21 +21,31 @@ from anytoolai_platform_core.storage.db import (
     scenario_sessions_table,
 )
 from anytoolai_platform_core.storage.transactions import (
+    SessionFactory,
     build_session_factory,
     transaction_boundary,
 )
-from sqlalchemy.engine import URL, make_url
+from tests.db_support import provision_database
 from test_handoffs_api import _create as _create_handoff
 from test_handoffs_api import _seed_source as _seed_handoff_source
 from test_scenario_runtime_api import (
-    REPO_ROOT,
     _create_test_app,
     _start_payload,
-    _with_scenario_dimension,
 )
 
-POSTGRES_TEST_DATABASE_URL_ENV = "ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"
-SCENARIO_START_QUOTA_LIMIT = 3
+TEST_GUEST_QUOTA_LIMIT = 3
+
+
+@contextmanager
+def _provision_api_app(
+    database_name_prefix: str,
+) -> Iterator[tuple[SessionFactory, object]]:
+    with provision_database(
+        database_name_prefix=database_name_prefix,
+        skip_reason="PostgreSQL quota concurrency coverage",
+    ) as (engine, _alembic_config, _database_url):
+        session_factory = build_session_factory(engine)
+        yield session_factory, _create_test_app(session_factory)
 
 
 @pytest.mark.postgresql
@@ -47,17 +56,9 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
     Set ANYTOOLAI_POSTGRES_TEST_DATABASE_URL to a PostgreSQL maintenance database URL. The test
     creates and drops its own disposable database, then runs the real Alembic migration chain.
     """
-
-    maintenance_url = _require_postgres_test_url()
-    database_name = f"anytoolai_a13_quota_test_{uuid4().hex[:12]}"
-    test_url = maintenance_url.set(database=database_name)
-    _create_database(maintenance_url, database_name)
-    engine = sa.create_engine(test_url, future=True)
-    try:
-        _upgrade_database(engine, test_url)
-        session_factory = build_session_factory(engine)
-        app = _create_test_app(session_factory)
-        request_count = 16
+    with _provision_api_app("anytoolai_a13_quota_test") as (session_factory, app):
+        quota_limit = _scenario_start_quota_limit(app)
+        request_count = max(quota_limit + 5, 8)
 
         async def start_many() -> list[httpx.Response]:
             transport = httpx.ASGITransport(app=app)
@@ -80,10 +81,10 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
         responses = asyncio.run(start_many())
         status_codes = [response.status_code for response in responses]
 
-        assert status_codes.count(HTTPStatus.OK) == SCENARIO_START_QUOTA_LIMIT
+        assert status_codes.count(HTTPStatus.OK) == quota_limit
         assert (
             status_codes.count(HTTPStatus.TOO_MANY_REQUESTS)
-            == request_count - SCENARIO_START_QUOTA_LIMIT
+            == request_count - quota_limit
         )
         assert all(
             response.json()["error"]["code"] == "quota_exhausted"
@@ -98,18 +99,19 @@ def test_postgresql_parallel_scenario_starts_consume_quota_exactly_once() -> Non
             job_count = session.execute(
                 sa.select(sa.func.count()).select_from(jobs_table)
             ).scalar_one()
-            usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+            usages = list(session.execute(sa.select(guest_quota_usage_table)).mappings())
             event_types = list(session.execute(sa.select(event_log_table.c.event_type)).scalars())
 
-        assert scenario_count == SCENARIO_START_QUOTA_LIMIT
-        assert job_count == SCENARIO_START_QUOTA_LIMIT
-        assert usage["used_count"] == SCENARIO_START_QUOTA_LIMIT
-        assert usage["limit_count"] == SCENARIO_START_QUOTA_LIMIT
-        assert event_types.count("quota.consumed") == SCENARIO_START_QUOTA_LIMIT
-        assert event_types.count("quota.exhausted") == request_count - SCENARIO_START_QUOTA_LIMIT
-    finally:
-        engine.dispose()
-        _drop_database(maintenance_url, database_name)
+        assert scenario_count == quota_limit
+        assert job_count == quota_limit
+        assert len(usages) == 1
+        usage = usages[0]
+        assert usage["used_count"] == quota_limit
+        assert usage["limit_count"] == quota_limit
+        assert usage["quota_dimension"] == "product"
+        assert usage["dimension_key"] == "kernel_demo"
+        assert event_types.count("quota.consumed") == quota_limit
+        assert event_types.count("quota.exhausted") == request_count - quota_limit
 
 
 @pytest.mark.postgresql
@@ -133,15 +135,10 @@ def test_postgresql_concurrent_duplicate_submit_with_idempotency_key_consumes_qu
     compromise, which already documents that production-safe concurrency needs this
     PostgreSQL integration path rather than the fast SQLite suite.
     """
-    maintenance_url = _require_postgres_test_url()
-    database_name = f"anytoolai_a150_idem_concurrent_{uuid4().hex[:12]}"
-    test_url = maintenance_url.set(database=database_name)
-    _create_database(maintenance_url, database_name)
-    engine = sa.create_engine(test_url, future=True)
-    try:
-        _upgrade_database(engine, test_url)
-        session_factory = build_session_factory(engine)
-        app = _create_test_app(session_factory)
+    with _provision_api_app("anytoolai_a150_idem_concurrent") as (
+        session_factory,
+        app,
+    ):
         request_count = 8
 
         async def start_parallel_requests() -> list[httpx.Response]:
@@ -195,9 +192,6 @@ def test_postgresql_concurrent_duplicate_submit_with_idempotency_key_consumes_qu
         assert usage["used_count"] == 1
         assert started_count == 1
         assert consumed_count == 1
-    finally:
-        engine.dispose()
-        _drop_database(maintenance_url, database_name)
 
 
 @pytest.mark.postgresql
@@ -205,63 +199,77 @@ def test_postgresql_concurrent_duplicate_submit_with_idempotency_key_consumes_qu
 def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_independent_counters() -> (
     None
 ):
-    """Production-semantics quota check for the `scenario` dimension under PostgreSQL row locks.
-
-    Mutates the quota policy to dimension=scenario and fires concurrent starts against two
-    different scenario_ids in the same batch. A single disposable database/migration run proves
-    both invariants at once: each scenario_id races on its own (quota_dimension=scenario,
-    dimension_key=scenario_id) row exactly like the product-dimension test races on the shared
-    product row (begin_nested/IntegrityError recovery + the atomic conditional UPDATE both get
-    exercised per-scenario_id here), and different scenario_ids never contend with or leak into
-    each other's counter.
-    """
-
-    maintenance_url = _require_postgres_test_url()
-    database_name = f"anytoolai_a152_quota_scenario_indep_test_{uuid4().hex[:12]}"
-    test_url = maintenance_url.set(database=database_name)
-    _create_database(maintenance_url, database_name)
-    engine = sa.create_engine(test_url, future=True)
-    try:
-        _upgrade_database(engine, test_url)
-        session_factory = build_session_factory(engine)
-        app = _create_test_app(session_factory)
-        _with_scenario_dimension(app, "kernel_demo.guest_quota_v1")
-        requests_per_scenario = 8
-        scenario_ids = (
+    with _provision_api_app("anytoolai_a13_scenario_quota_test") as (session_factory, app):
+        scenario_quota_limit = _force_scenario_guest_quota(app)
+        scenario_ids = [
             "kernel_demo.single_action_smoke_v1",
             "kernel_demo.multi_step_workflow_smoke_v1",
-        )
+        ]
+        assert len(set(scenario_ids)) == 2
+        requests_per_scenario = max(scenario_quota_limit + 5, 8)
+        requests: list[tuple[str, int]] = [
+            (scenario_id, index)
+            for scenario_id in scenario_ids
+            for index in range(requests_per_scenario)
+        ]
 
-        async def start_many() -> list[httpx.Response]:
+        async def start_many() -> list[tuple[str, httpx.Response]]:
             transport = httpx.ASGITransport(app=app)
             async with httpx.AsyncClient(
                 transport=transport,
                 base_url="http://testserver",
             ) as client:
-                calls = [
-                    client.post(
-                        f"/v1/products/kernel_demo/scenarios/{scenario_id}/start",
-                        json=_start_payload(),
-                        headers={"X-Request-ID": f"req_pg_quota_indep_{scenario_id}_{index}"},
-                    )
-                    for scenario_id in scenario_ids
-                    for index in range(requests_per_scenario)
-                ]
-                return await asyncio.gather(*calls)
+                responses = await asyncio.gather(
+                    *[
+                        client.post(
+                            f"/v1/products/kernel_demo/scenarios/{scenario_id}/start",
+                            json=_start_payload(),
+                            headers={
+                                "X-Request-ID": (
+                                    f"req_pg_quota_indep_{scenario_id}_{index}"
+                                )
+                            },
+                        )
+                        for scenario_id, index in requests
+                    ]
+                )
+            return [
+                (scenario_id, response)
+                for (scenario_id, _index), response in zip(requests, responses, strict=True)
+            ]
 
-        responses = asyncio.run(start_many())
-        assert len(responses) == requests_per_scenario * len(scenario_ids)
-        status_codes = [response.status_code for response in responses]
-
-        assert status_codes.count(HTTPStatus.OK) == SCENARIO_START_QUOTA_LIMIT * len(scenario_ids)
-        assert status_codes.count(HTTPStatus.TOO_MANY_REQUESTS) == (
-            requests_per_scenario - SCENARIO_START_QUOTA_LIMIT
+        scenario_responses = asyncio.run(start_many())
+        expected_ok = scenario_quota_limit * len(scenario_ids)
+        expected_rejected = (
+            requests_per_scenario - scenario_quota_limit
         ) * len(scenario_ids)
+        status_codes = [
+            response.status_code for _scenario_id, response in scenario_responses
+        ]
+
+        assert status_codes.count(HTTPStatus.OK) == expected_ok
+        assert status_codes.count(HTTPStatus.TOO_MANY_REQUESTS) == expected_rejected
+        assert all(
+            status_code in {HTTPStatus.OK, HTTPStatus.TOO_MANY_REQUESTS}
+            for status_code in status_codes
+        )
         assert all(
             response.json()["error"]["code"] == "quota_exhausted"
-            for response in responses
+            for _scenario_id, response in scenario_responses
             if response.status_code == HTTPStatus.TOO_MANY_REQUESTS
         )
+
+        for scenario_id in scenario_ids:
+            scenario_status_codes = [
+                response.status_code
+                for response_scenario_id, response in scenario_responses
+                if response_scenario_id == scenario_id
+            ]
+            assert scenario_status_codes.count(HTTPStatus.OK) == scenario_quota_limit
+            assert (
+                scenario_status_codes.count(HTTPStatus.TOO_MANY_REQUESTS)
+                == requests_per_scenario - scenario_quota_limit
+            )
 
         with transaction_boundary(session_factory) as session:
             scenario_count = session.execute(
@@ -270,45 +278,35 @@ def test_postgresql_parallel_starts_consume_scenario_dimension_quota_with_indepe
             job_count = session.execute(
                 sa.select(sa.func.count()).select_from(jobs_table)
             ).scalar_one()
-            usage_rows = list(
+            usages = list(
                 session.execute(
                     sa.select(guest_quota_usage_table).order_by(
-                        guest_quota_usage_table.c.dimension_key
+                        guest_quota_usage_table.c.scenario_id
                     )
                 ).mappings()
             )
             event_types = list(session.execute(sa.select(event_log_table.c.event_type)).scalars())
 
-        assert scenario_count == SCENARIO_START_QUOTA_LIMIT * len(scenario_ids)
-        assert job_count == SCENARIO_START_QUOTA_LIMIT * len(scenario_ids)
-        assert len(usage_rows) == len(scenario_ids)
-        assert {row["dimension_key"] for row in usage_rows} == set(scenario_ids)
-        for row in usage_rows:
-            assert row["quota_dimension"] == "scenario"
-            assert row["scenario_id"] == row["dimension_key"]
-            assert row["used_count"] == SCENARIO_START_QUOTA_LIMIT
-            assert row["limit_count"] == SCENARIO_START_QUOTA_LIMIT
-        assert event_types.count("quota.consumed") == SCENARIO_START_QUOTA_LIMIT * len(scenario_ids)
-        assert event_types.count("quota.exhausted") == (
-            requests_per_scenario - SCENARIO_START_QUOTA_LIMIT
-        ) * len(scenario_ids)
-    finally:
-        engine.dispose()
-        _drop_database(maintenance_url, database_name)
+        assert scenario_count == expected_ok
+        assert job_count == expected_ok
+        assert len(usages) == len(scenario_ids)
+        usage_by_scenario = {row["scenario_id"]: row for row in usages}
+        assert set(usage_by_scenario) == set(scenario_ids)
+        for scenario_id in scenario_ids:
+            usage = usage_by_scenario[scenario_id]
+            assert usage["quota_dimension"] == "scenario"
+            assert usage["dimension_key"] == scenario_id
+            assert usage["scenario_id"] == scenario_id
+            assert usage["used_count"] == scenario_quota_limit
+            assert usage["limit_count"] == scenario_quota_limit
+        assert event_types.count("quota.consumed") == expected_ok
+        assert event_types.count("quota.exhausted") == expected_rejected
 
 
 @pytest.mark.postgresql
 @pytest.mark.slow
 def test_postgresql_parallel_handoff_accept_creates_one_target() -> None:
-    maintenance_url = _require_postgres_test_url()
-    database_name = f"anytoolai_a17_handoff_test_{uuid4().hex[:12]}"
-    test_url = maintenance_url.set(database=database_name)
-    _create_database(maintenance_url, database_name)
-    engine = sa.create_engine(test_url, future=True)
-    try:
-        _upgrade_database(engine, test_url)
-        session_factory = build_session_factory(engine)
-        app = _create_test_app(session_factory)
+    with _provision_api_app("anytoolai_a17_handoff_test") as (session_factory, app):
         with transaction_boundary(session_factory) as session:
             source_session_id, artifact_id = _seed_handoff_source(session)
         created = _create_handoff(app, source_session_id, artifact_id).json()
@@ -358,36 +356,13 @@ def test_postgresql_parallel_handoff_accept_creates_one_target() -> None:
         assert target_session_count == 1
         assert target_job_count == 1
         assert accepted_events == 1
-    finally:
-        engine.dispose()
-        _drop_database(maintenance_url, database_name)
 
 
 @pytest.mark.postgresql
 @pytest.mark.slow
 def test_postgresql_parallel_exhausted_handoff_accept_recovers_quota_once() -> None:
-    maintenance_url = _require_postgres_test_url()
-    database_name = f"anytoolai_a17_handoff_exhausted_test_{uuid4().hex[:12]}"
-    test_url = maintenance_url.set(database=database_name)
-    _create_database(maintenance_url, database_name)
-    engine = sa.create_engine(test_url, future=True)
-    try:
-        _upgrade_database(engine, test_url)
-        session_factory = build_session_factory(engine)
-        app = _create_test_app(session_factory)
-        registry = app.state.runtime.config_registry
-        policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
-        assert policy is not None
-        app.state.runtime = replace(
-            app.state.runtime,
-            config_registry=replace(
-                registry,
-                quotas={
-                    **dict(registry.quotas),
-                    policy.quota_policy_id: replace(policy, limit_count=0),
-                },
-            ),
-        )
+    with _provision_api_app("anytoolai_a17_handoff_exhausted_test") as (session_factory, app):
+        _force_zero_guest_quota(app)
         with transaction_boundary(session_factory) as session:
             source_session_id, artifact_id = _seed_handoff_source(session)
         created = _create_handoff(app, source_session_id, artifact_id).json()
@@ -462,36 +437,13 @@ def test_postgresql_parallel_exhausted_handoff_accept_recovers_quota_once() -> N
         assert target_session_count == 0
         assert usage["limit_count"] == 0
         assert usage["used_count"] == 0
-    finally:
-        engine.dispose()
-        _drop_database(maintenance_url, database_name)
 
 
 @pytest.mark.postgresql
 @pytest.mark.slow
 def test_postgresql_quota_recovery_finalizes_without_router_transaction() -> None:
-    maintenance_url = _require_postgres_test_url()
-    database_name = f"anytoolai_a17_handoff_reservation_test_{uuid4().hex[:12]}"
-    test_url = maintenance_url.set(database=database_name)
-    _create_database(maintenance_url, database_name)
-    engine = sa.create_engine(test_url, future=True)
-    try:
-        _upgrade_database(engine, test_url)
-        session_factory = build_session_factory(engine)
-        app = _create_test_app(session_factory)
-        registry = app.state.runtime.config_registry
-        policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
-        assert policy is not None
-        app.state.runtime = replace(
-            app.state.runtime,
-            config_registry=replace(
-                registry,
-                quotas={
-                    **dict(registry.quotas),
-                    policy.quota_policy_id: replace(policy, limit_count=0),
-                },
-            ),
-        )
+    with _provision_api_app("anytoolai_a17_handoff_reservation_test") as (session_factory, app):
+        _force_zero_guest_quota(app)
         with transaction_boundary(session_factory) as session:
             source_session_id, artifact_id = _seed_handoff_source(session)
         created = _create_handoff(app, source_session_id, artifact_id).json()
@@ -557,77 +509,47 @@ def test_postgresql_quota_recovery_finalizes_without_router_transaction() -> Non
 
         assert repeated.status.value == "failed"
         assert handoff_failed_count == 1
-    finally:
-        engine.dispose()
-        _drop_database(maintenance_url, database_name)
 
 
-def _require_postgres_test_url() -> URL:
-    raw_url = os.getenv(POSTGRES_TEST_DATABASE_URL_ENV)
-    if not raw_url:
-        pytest.skip(
-            f"set {POSTGRES_TEST_DATABASE_URL_ENV} to run PostgreSQL quota concurrency coverage"
-        )
-    url = make_url(raw_url)
-    if not url.drivername.startswith("postgresql"):
-        pytest.fail(f"{POSTGRES_TEST_DATABASE_URL_ENV} must use a PostgreSQL dialect")
-    if not url.database:
-        pytest.fail(f"{POSTGRES_TEST_DATABASE_URL_ENV} must name a maintenance database")
-    return url
-
-
-def _upgrade_database(engine: sa.Engine, database_url: URL) -> None:
-    alembic_config = Config()
-    alembic_config.set_main_option(
-        "script_location",
-        str(REPO_ROOT / "migrations" / "platform"),
+def _scenario_start_quota_limit(app) -> int:
+    policy = _override_guest_quota_policy(
+        app,
+        limit_count=TEST_GUEST_QUOTA_LIMIT,
     )
-    alembic_config.set_main_option(
-        "sqlalchemy.url",
-        database_url.render_as_string(hide_password=False),
+    return policy.limit_count
+
+
+def _force_scenario_guest_quota(app) -> int:
+    policy = _override_guest_quota_policy(
+        app,
+        dimension=QuotaDimension.scenario,
+        limit_count=TEST_GUEST_QUOTA_LIMIT,
     )
-    with engine.begin() as connection:
-        alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "head")
+    return policy.limit_count
 
 
-def _create_database(maintenance_url: URL, database_name: str) -> None:
-    engine = sa.create_engine(
-        maintenance_url,
-        future=True,
-        isolation_level="AUTOCOMMIT",
+def _force_zero_guest_quota(app) -> None:
+    _override_guest_quota_policy(app, limit_count=0)
+
+
+def _override_guest_quota_policy(
+    app,
+    *,
+    quota_policy_id: str = "kernel_demo.guest_quota_v1",
+    **policy_changes: object,
+) -> QuotaPolicy:
+    registry = app.state.runtime.config_registry
+    policy = registry.get_quota_policy(quota_policy_id)
+    assert policy is not None
+    updated_policy = replace(policy, **policy_changes)
+    app.state.runtime = replace(
+        app.state.runtime,
+        config_registry=replace(
+            registry,
+            quotas={
+                **dict(registry.quotas),
+                policy.quota_policy_id: updated_policy,
+            },
+        ),
     )
-    try:
-        with engine.connect() as connection:
-            connection.execute(sa.text(f"CREATE DATABASE {_quote_identifier(database_name)}"))
-    except sa.exc.OperationalError as exc:
-        pytest.fail(f"could not connect to PostgreSQL test database: {exc}")
-    finally:
-        engine.dispose()
-
-
-def _drop_database(maintenance_url: URL, database_name: str) -> None:
-    engine = sa.create_engine(
-        maintenance_url,
-        future=True,
-        isolation_level="AUTOCOMMIT",
-    )
-    try:
-        with engine.connect() as connection:
-            connection.execute(
-                sa.text(
-                    "SELECT pg_terminate_backend(pid) "
-                    "FROM pg_stat_activity "
-                    "WHERE datname = :database_name AND pid <> pg_backend_pid()"
-                ),
-                {"database_name": database_name},
-            )
-            connection.execute(
-                sa.text(f"DROP DATABASE IF EXISTS {_quote_identifier(database_name)}")
-            )
-    finally:
-        engine.dispose()
-
-
-def _quote_identifier(value: str) -> str:
-    return '"' + value.replace('"', '""') + '"'
+    return updated_policy

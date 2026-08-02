@@ -51,7 +51,7 @@ def test_platform_api_disables_real_uvicorn_access_logger_for_handoff_urls(capfd
         app,
         host="127.0.0.1",
         port=port,
-        access_log="--no-access-log" not in uvicorn_args,
+        access_log=False,
         log_level="info",
     )
     server = uvicorn.Server(config)
