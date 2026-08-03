@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
 from dataclasses import asdict, replace
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -44,7 +45,9 @@ from anytoolai_platform_core.workflows.runner import WorkflowJobService
 from anytoolai_platform_worker.composition import build_worker
 from anytoolai_platform_worker.handlers.run_workflow import RunWorkflowHandler
 from anytoolai_platform_worker.queues import DatabaseJobQueue, WorkflowJobMessage
+from anytoolai_platform_worker.reconciliation import OrphanedRunningJobReconciler
 from anytoolai_platform_worker.worker import Worker
+
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -97,6 +100,7 @@ def test_production_composition_accepts_configured_psycopg_database_url() -> Non
     )
 
     assert isinstance(worker, Worker)
+    worker.dispose()
 
 
 class RecordingRunner:
@@ -167,8 +171,7 @@ class CancelledRunner:
 class UnsafeRawTextProviderAdapter:
     async def complete(self, request: Any) -> Any:
         raise RuntimeError(
-            "provider echoed prompt="
-            f"{request.prompt}; user_text=deadline budget deliverables"
+            f"provider echoed prompt={request.prompt}; user_text=deadline budget deliverables"
         )
 
 
@@ -181,8 +184,7 @@ class FailOnSecondCallProviderAdapter:
         self.call_count += 1
         if self.call_count == 2:
             raise RuntimeError(
-                "provider echoed prompt="
-                f"{request.prompt}; user_text=deadline budget deliverables"
+                f"provider echoed prompt={request.prompt}; user_text=deadline budget deliverables"
             )
         return await self._delegate.complete(request)
 
@@ -219,6 +221,34 @@ def _seed_raw_job(
     return record
 
 
+def _seed_running_job(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> JobRecord:
+    """Move a freshly-seeded job to `running` via the real claim path, without going
+    through a lease -- for reconciler tests that only care about job status, not
+    who (if anyone) holds the advisory lock."""
+    job = _seed_job(
+        session_factory,
+        input_payload={"source_text": "deadline budget deliverables"},
+    )
+    with transaction_boundary(session_factory) as session:
+        repository = JobRepository(session)
+        emitter = EventEmitter(EventLogRepository(session))
+        claimed = WorkflowJobService(repository, emitter).claim_created(job.id)
+        assert claimed is not None
+        scenario_repository = ScenarioSessionRepository(session)
+        scenario = scenario_repository.get(
+            job.scenario_session_id,
+            tenant_id=job.tenant_id,
+            region=job.region,
+            product_id=job.product_id,
+            frontend_id=job.frontend_id,
+        )
+        assert scenario is not None
+        ScenarioSessionService(scenario_repository, emitter).mark_running(scenario)
+        return claimed
+
+
 def test_worker_boot_processes_a_claimed_job_from_scenario_session_input(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
@@ -252,10 +282,7 @@ def test_worker_boot_processes_a_claimed_job_from_scenario_session_input(
     assert context.scenario_session_id == job.scenario_session_id
     assert context.job_id == job.id
     assert runners[0].observed_scenarios[0].status is ScenarioSessionStatus.running
-    assert (
-        runners[0].observed_scenarios[0].current_checkpoint_id
-        == PROCESSING_CHECKPOINT_ID
-    )
+    assert runners[0].observed_scenarios[0].current_checkpoint_id == PROCESSING_CHECKPOINT_ID
 
     with transaction_boundary(session_factory) as session:
         scenario = ScenarioSessionRepository(session).get(
@@ -265,12 +292,16 @@ def test_worker_boot_processes_a_claimed_job_from_scenario_session_input(
             product_id=job.product_id,
             frontend_id=job.frontend_id,
         )
-        scenario_completed = session.execute(
-            sa.select(event_log_table).where(
-                event_log_table.c.scenario_session_id == job.scenario_session_id,
-                event_log_table.c.event_type == "scenario.completed",
+        scenario_completed = (
+            session.execute(
+                sa.select(event_log_table).where(
+                    event_log_table.c.scenario_session_id == job.scenario_session_id,
+                    event_log_table.c.event_type == "scenario.completed",
+                )
             )
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
     assert scenario is not None
     assert scenario.status is ScenarioSessionStatus.completed
     assert scenario.current_checkpoint_id == RESULT_READY_CHECKPOINT_ID
@@ -300,15 +331,23 @@ def test_worker_failure_is_safe_and_emits_correlated_workflow_failed_event(
     assert "secret_token" not in (result.error_message_safe or "")
 
     with transaction_boundary(session_factory) as session:
-        event_row = session.execute(
-            sa.select(event_log_table).where(event_log_table.c.event_type == "workflow.failed")
-        ).mappings().one()
-        scenario_failed = session.execute(
-            sa.select(event_log_table).where(
-                event_log_table.c.scenario_session_id == job.scenario_session_id,
-                event_log_table.c.event_type == "scenario.failed",
+        event_row = (
+            session.execute(
+                sa.select(event_log_table).where(event_log_table.c.event_type == "workflow.failed")
             )
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
+        scenario_failed = (
+            session.execute(
+                sa.select(event_log_table).where(
+                    event_log_table.c.scenario_session_id == job.scenario_session_id,
+                    event_log_table.c.event_type == "scenario.failed",
+                )
+            )
+            .mappings()
+            .one()
+        )
         scenario = ScenarioSessionRepository(session).get(
             job.scenario_session_id,
             tenant_id=job.tenant_id,
@@ -380,14 +419,18 @@ def test_worker_failure_uses_persisted_job_error_code_for_scenario_failure(
             product_id=job.product_id,
             frontend_id=job.frontend_id,
         )
-        scenario_failed = session.execute(
-            sa.select(event_log_table)
-            .where(
-                event_log_table.c.scenario_session_id == job.scenario_session_id,
-                event_log_table.c.event_type == "scenario.failed",
+        scenario_failed = (
+            session.execute(
+                sa.select(event_log_table)
+                .where(
+                    event_log_table.c.scenario_session_id == job.scenario_session_id,
+                    event_log_table.c.event_type == "scenario.failed",
+                )
+                .order_by(event_log_table.c.timestamp.desc(), event_log_table.c.event_id.desc())
             )
-            .order_by(event_log_table.c.timestamp.desc(), event_log_table.c.event_id.desc())
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
 
     assert scenario is not None
     assert scenario.status is ScenarioSessionStatus.failed
@@ -568,11 +611,15 @@ def test_worker_claim_is_idempotent_and_cancel_is_preclaim_only(
     assert asyncio.run(worker.process_job(cancelable.id)).status is JobStatus.canceled
 
     with transaction_boundary(session_factory) as session:
-        canceled_event = session.execute(
-            sa.select(event_log_table).where(
-                event_log_table.c.event_type == "workflow.canceled"
+        canceled_event = (
+            session.execute(
+                sa.select(event_log_table).where(
+                    event_log_table.c.event_type == "workflow.canceled"
+                )
             )
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
         completed_scenario = ScenarioSessionRepository(session).get(
             job.scenario_session_id,
             tenant_id=job.tenant_id,
@@ -685,7 +732,9 @@ def test_worker_run_forever_continues_after_unexpected_iteration_exception(
 
         def cancel(self, job_id: str) -> None:
             del job_id
-            return None
+
+        def dispose(self) -> None:
+            pass
 
     class StubQueue:
         def __init__(self) -> None:
@@ -701,8 +750,8 @@ def test_worker_run_forever_continues_after_unexpected_iteration_exception(
 
     handler = StubHandler()
     worker = Worker(
-        handler,  # type: ignore[arg-type]
-        job_queue=StubQueue(),  # type: ignore[arg-type]
+        handler,
+        job_queue=StubQueue(),
         poll_interval_seconds=0,
     )
 
@@ -727,6 +776,7 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
     )
 
     result = asyncio.run(worker.process_next_job())
+    worker.dispose()
 
     assert result is not None
     assert result.id == job.id
@@ -735,9 +785,9 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
     assert result.result_artifact_id is not None
 
     with transaction_boundary(session_factory) as session:
-        stored_job = session.execute(
-            sa.select(jobs_table).where(jobs_table.c.id == job.id)
-        ).mappings().one()
+        stored_job = (
+            session.execute(sa.select(jobs_table).where(jobs_table.c.id == job.id)).mappings().one()
+        )
         scenario = ScenarioSessionRepository(session).get(
             job.scenario_session_id,
             tenant_id=job.tenant_id,
@@ -745,12 +795,20 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
             product_id=job.product_id,
             frontend_id=job.frontend_id,
         )
-        action_run = session.execute(
-            sa.select(action_runs_table).where(action_runs_table.c.job_id == job.id)
-        ).mappings().one()
-        provider_call = session.execute(
-            sa.select(provider_calls_table).where(provider_calls_table.c.job_id == job.id)
-        ).mappings().one()
+        action_run = (
+            session.execute(
+                sa.select(action_runs_table).where(action_runs_table.c.job_id == job.id)
+            )
+            .mappings()
+            .one()
+        )
+        provider_call = (
+            session.execute(
+                sa.select(provider_calls_table).where(provider_calls_table.c.job_id == job.id)
+            )
+            .mappings()
+            .one()
+        )
         artifacts = list(
             session.execute(
                 sa.select(artifacts_table).where(artifacts_table.c.job_id == job.id)
@@ -832,6 +890,7 @@ def test_production_worker_recovers_scenario_completion_after_mark_completed_fai
     monkeypatch.setattr(ScenarioSessionService, "mark_completed", fail_first_mark_completed)
 
     result = asyncio.run(worker.process_next_job())
+    worker.dispose()
 
     assert result is not None
     assert result.id == job.id
@@ -847,12 +906,16 @@ def test_production_worker_recovers_scenario_completion_after_mark_completed_fai
             product_id=job.product_id,
             frontend_id=job.frontend_id,
         )
-        scenario_completed = session.execute(
-            sa.select(event_log_table).where(
-                event_log_table.c.scenario_session_id == job.scenario_session_id,
-                event_log_table.c.event_type == "scenario.completed",
+        scenario_completed = (
+            session.execute(
+                sa.select(event_log_table).where(
+                    event_log_table.c.scenario_session_id == job.scenario_session_id,
+                    event_log_table.c.event_type == "scenario.completed",
+                )
             )
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
 
     assert scenario is not None
     assert scenario.status is ScenarioSessionStatus.completed
@@ -863,9 +926,7 @@ def test_production_worker_recovers_scenario_completion_after_mark_completed_fai
 def test_worker_reconciliation_does_not_clobber_independently_expired_scenario(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
-    job = _seed_job(
-        session_factory, input_payload={"source_text": "deadline budget deliverables"}
-    )
+    job = _seed_job(session_factory, input_payload={"source_text": "deadline budget deliverables"})
     worker = Worker(
         RunWorkflowHandler(
             session_factory=session_factory,
@@ -1002,6 +1063,7 @@ def test_production_worker_retries_scenario_reconciliation_on_subsequent_handle_
     assert scenario.status is ScenarioSessionStatus.running
 
     second_result = asyncio.run(worker.process_job(job.id))
+    worker.dispose()
 
     assert second_result is not None
     assert second_result.status is JobStatus.succeeded
@@ -1035,11 +1097,12 @@ def test_production_worker_cancellation_recovers_inflight_action_and_provider_le
 
     with pytest.raises(asyncio.CancelledError):
         asyncio.run(worker.process_next_job())
+    worker.dispose()
 
     with transaction_boundary(session_factory) as session:
-        stored_job = session.execute(
-            sa.select(jobs_table).where(jobs_table.c.id == job.id)
-        ).mappings().one()
+        stored_job = (
+            session.execute(sa.select(jobs_table).where(jobs_table.c.id == job.id)).mappings().one()
+        )
         scenario = ScenarioSessionRepository(session).get(
             job.scenario_session_id,
             tenant_id=job.tenant_id,
@@ -1047,12 +1110,20 @@ def test_production_worker_cancellation_recovers_inflight_action_and_provider_le
             product_id=job.product_id,
             frontend_id=job.frontend_id,
         )
-        action_run = session.execute(
-            sa.select(action_runs_table).where(action_runs_table.c.job_id == job.id)
-        ).mappings().one()
-        provider_call = session.execute(
-            sa.select(provider_calls_table).where(provider_calls_table.c.job_id == job.id)
-        ).mappings().one()
+        action_run = (
+            session.execute(
+                sa.select(action_runs_table).where(action_runs_table.c.job_id == job.id)
+            )
+            .mappings()
+            .one()
+        )
+        provider_call = (
+            session.execute(
+                sa.select(provider_calls_table).where(provider_calls_table.c.job_id == job.id)
+            )
+            .mappings()
+            .one()
+        )
         events = list(
             session.execute(
                 sa.select(event_log_table)
@@ -1128,6 +1199,7 @@ def test_production_worker_provider_failure_uses_generic_safe_message(
     )
 
     result = asyncio.run(worker.process_next_job())
+    worker.dispose()
 
     assert result is not None
     assert result.id == job.id
@@ -1136,9 +1208,9 @@ def test_production_worker_provider_failure_uses_generic_safe_message(
     assert result.error_message_safe == "Provider request failed."
 
     with transaction_boundary(session_factory) as session:
-        stored_job = session.execute(
-            sa.select(jobs_table).where(jobs_table.c.id == job.id)
-        ).mappings().one()
+        stored_job = (
+            session.execute(sa.select(jobs_table).where(jobs_table.c.id == job.id)).mappings().one()
+        )
         scenario = ScenarioSessionRepository(session).get(
             job.scenario_session_id,
             tenant_id=job.tenant_id,
@@ -1146,9 +1218,13 @@ def test_production_worker_provider_failure_uses_generic_safe_message(
             product_id=job.product_id,
             frontend_id=job.frontend_id,
         )
-        provider_call = session.execute(
-            sa.select(provider_calls_table).where(provider_calls_table.c.job_id == job.id)
-        ).mappings().one()
+        provider_call = (
+            session.execute(
+                sa.select(provider_calls_table).where(provider_calls_table.c.job_id == job.id)
+            )
+            .mappings()
+            .one()
+        )
 
     assert stored_job["error_message_safe"] == "Provider request failed."
     assert provider_call["error_message_safe"] == "Provider request failed."
@@ -1177,6 +1253,7 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
     )
 
     result = asyncio.run(worker.process_next_job())
+    worker.dispose()
 
     assert result is not None
     assert result.id == job.id
@@ -1184,9 +1261,9 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
     assert result.error_code == "provider_request_failed"
 
     with transaction_boundary(session_factory) as session:
-        stored_job = session.execute(
-            sa.select(jobs_table).where(jobs_table.c.id == job.id)
-        ).mappings().one()
+        stored_job = (
+            session.execute(sa.select(jobs_table).where(jobs_table.c.id == job.id)).mappings().one()
+        )
         scenario = ScenarioSessionRepository(session).get(
             job.scenario_session_id,
             tenant_id=job.tenant_id,
@@ -1291,3 +1368,362 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
     assert workflow_failed["properties"]["error_code"] == "provider_request_failed"
     assert scenario_failed["job_id"] == job.id
     assert scenario_failed["workflow_id"] == job.workflow_id
+
+
+class FakeJobLease:
+    """Records acquire/release calls; `probe_orphaned` always reports alive."""
+
+    def __init__(self, *, acquire_result: bool = True) -> None:
+        self.calls: list[tuple[str, str]] = []
+        self._acquire_result = acquire_result
+
+    def acquire(self, job_id: str) -> bool:
+        self.calls.append(("acquire", job_id))
+        return self._acquire_result
+
+    def release(self, job_id: str) -> None:
+        self.calls.append(("release", job_id))
+
+    def probe_orphaned(self, job_id: str) -> bool:
+        del job_id
+        return False
+
+    def probe_orphaned_batch(self, job_ids: list[str]) -> set[str]:
+        del job_ids
+        return set()
+
+
+def test_lease_is_acquired_before_claim_and_released_after_success(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_job(
+        session_factory,
+        input_payload={"source_text": "deadline budget deliverables"},
+    )
+    lease = FakeJobLease()
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=RecordingRunner,
+            lease=lease,
+        )
+    )
+
+    result = asyncio.run(worker.process_job(job.id))
+
+    assert result is not None
+    assert result.status is JobStatus.succeeded
+    assert lease.calls == [("acquire", job.id), ("release", job.id)]
+
+
+def test_lease_is_released_after_handler_failure(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_job(session_factory, input_payload={"source_text": "failure"})
+    lease = FakeJobLease()
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=lambda session: RecordingRunner(session, fail=True),
+            lease=lease,
+        )
+    )
+
+    result = asyncio.run(worker.process_job(job.id))
+
+    assert result is not None
+    assert result.status is JobStatus.failed
+    assert lease.calls == [("acquire", job.id), ("release", job.id)]
+
+
+def test_lease_is_released_after_cancellation(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_job(session_factory, input_payload={"source_text": "cancel"})
+    lease = FakeJobLease()
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=CancelledRunner,
+            lease=lease,
+        )
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(worker.process_job(job.id))
+
+    assert lease.calls == [("acquire", job.id), ("release", job.id)]
+
+
+def test_claim_is_skipped_without_error_when_lease_acquire_fails(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """A failed acquire means another worker already owns this job -- not an error,
+    just a job left untouched (still `created`) for its actual owner to run."""
+    job = _seed_job(
+        session_factory,
+        input_payload={"source_text": "deadline budget deliverables"},
+    )
+    lease = FakeJobLease(acquire_result=False)
+    runners: list[RecordingRunner] = []
+
+    def runner_factory(session: sa.orm.Session) -> RecordingRunner:
+        runner = RecordingRunner(session)
+        runners.append(runner)
+        return runner
+
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=runner_factory,
+            lease=lease,
+        )
+    )
+
+    result = asyncio.run(worker.process_job(job.id))
+
+    assert result is not None
+    assert result.status is JobStatus.created
+    assert lease.calls == [("acquire", job.id)]
+    assert runners == []
+
+
+def test_persist_handler_failure_logs_known_residual_race_after_lease_lost(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Known residual race (see docs/exec-plans/active/any-147-worker-lease-recovery.md): a
+    sweep can terminate a job as
+    `worker_lease_lost` while its original process is still alive and running --
+    that process's own eventual outcome then collides with the already-committed
+    `failed` state. Not auto-fixed; must at least be observable in the logs."""
+    job = _seed_running_job(session_factory)
+    handler = RunWorkflowHandler(session_factory=session_factory, runner_factory=RecordingRunner)
+
+    # Simulates the sweep beating this job's own process to a terminal state.
+    handler.terminate_orphaned_job(job.id)
+
+    with caplog.at_level("WARNING"):
+        handler._persist_handler_failure(job.id, RuntimeError("late outcome after lease loss"))
+
+    assert "worker.job_completed_after_lease_lost" in caplog.text
+    result = handler._get(job.id)
+    assert result is not None
+    assert result.status is JobStatus.failed
+    assert result.error_code == "worker_lease_lost"
+
+
+class FakeReconcilerLease:
+    def __init__(self, orphaned_ids: set[str]) -> None:
+        self._orphaned_ids = orphaned_ids
+        self.probed: list[str] = []
+
+    def probe_orphaned_batch(self, job_ids: list[str]) -> set[str]:
+        self.probed.extend(job_ids)
+        return set(job_ids) & self._orphaned_ids
+
+
+class FakeTerminator:
+    def __init__(self) -> None:
+        self.terminated: list[str] = []
+
+    def terminate_orphaned_job(self, job_id: str) -> None:
+        self.terminated.append(job_id)
+
+
+def test_reconciler_terminates_only_orphaned_running_jobs(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    running_jobs = [_seed_running_job(session_factory) for _ in range(3)]
+    created_job = _seed_job(session_factory, input_payload={"source_text": "not running"})
+
+    orphaned_ids = {running_jobs[0].id, running_jobs[2].id}
+    lease = FakeReconcilerLease(orphaned_ids)
+    terminator = FakeTerminator()
+    reconciler = OrphanedRunningJobReconciler(
+        session_factory=session_factory,
+        lease=lease,
+        terminator=terminator,
+        limit=10,
+    )
+
+    terminated = reconciler.reconcile_once()
+
+    assert terminated == 2
+    assert set(terminator.terminated) == orphaned_ids
+    assert set(lease.probed) == {job.id for job in running_jobs}
+    assert created_job.id not in lease.probed
+
+
+def test_reconciler_respects_sweep_limit(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    running_jobs = [_seed_running_job(session_factory) for _ in range(3)]
+    lease = FakeReconcilerLease({job.id for job in running_jobs})
+    terminator = FakeTerminator()
+    reconciler = OrphanedRunningJobReconciler(
+        session_factory=session_factory,
+        lease=lease,
+        terminator=terminator,
+        limit=2,
+    )
+
+    terminated = reconciler.reconcile_once()
+
+    assert terminated == 2
+    assert len(terminator.terminated) == 2
+
+
+def test_run_forever_finishes_inflight_job_then_drains_on_request_shutdown() -> None:
+    worker_holder: dict[str, Worker] = {}
+
+    class ShutdownDuringFirstJobHandler:
+        def __init__(self) -> None:
+            self.handled: list[str] = []
+
+        async def handle(self, job_id: str) -> Any:
+            self.handled.append(job_id)
+            # Simulates a SIGTERM arriving while this job is still in flight: the
+            # flag is only consulted between iterations, so this job must still be
+            # allowed to finish -- and no further job may be taken after it.
+            worker_holder["worker"].request_shutdown()
+            return None
+
+        def cancel(self, job_id: str) -> None:
+            del job_id
+
+        def dispose(self) -> None:
+            pass
+
+    class TwoJobQueue:
+        def __init__(self) -> None:
+            self._messages = [
+                WorkflowJobMessage(job_id="job_a"),
+                WorkflowJobMessage(job_id="job_b"),
+            ]
+
+        def next_message(self) -> WorkflowJobMessage | None:
+            if not self._messages:
+                return None
+            return self._messages.pop(0)
+
+    handler = ShutdownDuringFirstJobHandler()
+    worker = Worker(
+        handler,
+        job_queue=TwoJobQueue(),
+        poll_interval_seconds=0,
+    )
+    worker_holder["worker"] = worker
+
+    asyncio.run(worker.run_forever())
+
+    assert handler.handled == ["job_a"]
+
+
+def test_run_forever_sweeps_before_loop_and_on_idle_iteration() -> None:
+    worker_holder: dict[str, Worker] = {}
+    calls = {"count": 0}
+
+    class StoppingReconciler:
+        def reconcile_once(self) -> int:
+            calls["count"] += 1
+            # Stop after the pre-loop sweep and exactly one idle-iteration sweep --
+            # deterministic, unlike racing against wall-clock sleeps.
+            if calls["count"] >= 2:
+                worker_holder["worker"].request_shutdown()
+            return 0
+
+    class EmptyQueue:
+        def next_message(self) -> WorkflowJobMessage | None:
+            return None
+
+    class NoopHandler:
+        async def handle(self, job_id: str) -> Any:
+            del job_id
+            return None
+
+        def cancel(self, job_id: str) -> None:
+            del job_id
+
+        def dispose(self) -> None:
+            pass
+
+    worker = Worker(
+        NoopHandler(),
+        job_queue=EmptyQueue(),
+        poll_interval_seconds=0,
+        reconciler=StoppingReconciler(),
+    )
+    worker_holder["worker"] = worker
+
+    asyncio.run(worker.run_forever())
+
+    assert calls["count"] == 2
+
+
+def test_run_forever_backs_off_when_claim_race_is_lost_instead_of_hot_looping() -> None:
+    """`_claim()` losing a race for a `created` job (another worker's advisory-lock
+    `acquire()` won first) returns that job's still-`created` `JobRecord`, not `None` --
+    `next_message()` has no `FOR UPDATE`, so both workers can pick the same candidate.
+    Before this fix, `run_forever()` only treated a `None` result as "idle" (sweep +
+    sleep); a non-`None`-but-still-`created` result took the "made progress" branch
+    instead, so a lost claim race re-polled the same losing candidate immediately, with
+    no backoff at all, spinning the loop hot."""
+    worker_holder: dict[str, Worker] = {}
+    calls = {"count": 0}
+    lost_race_job = _job("scenario_lost_race")
+
+    class StoppingReconciler:
+        def reconcile_once(self) -> int:
+            calls["count"] += 1
+            # Stop after the pre-loop sweep and exactly one idle-iteration sweep --
+            # deterministic, unlike racing against wall-clock sleeps. If the backoff
+            # branch were skipped (the bug), this reconciler would never be called a
+            # second time and the loop would spin until this test's own timeout.
+            if calls["count"] >= 2:
+                worker_holder["worker"].request_shutdown()
+            return 0
+
+    class AlwaysSameCandidateQueue:
+        def next_message(self) -> WorkflowJobMessage | None:
+            return WorkflowJobMessage(job_id=lost_race_job.id)
+
+    class LostRaceHandler:
+        async def handle(self, job_id: str) -> Any:
+            del job_id
+            return lost_race_job
+
+        def cancel(self, job_id: str) -> None:
+            del job_id
+
+        def dispose(self) -> None:
+            pass
+
+    worker = Worker(
+        LostRaceHandler(),
+        job_queue=AlwaysSameCandidateQueue(),
+        poll_interval_seconds=0,
+        reconciler=StoppingReconciler(),
+    )
+    worker_holder["worker"] = worker
+
+    asyncio.run(asyncio.wait_for(worker.run_forever(), timeout=5))
+
+    assert calls["count"] == 2
+
+
+def test_sweep_orphaned_jobs_survives_reconciler_exception(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class ExplodingReconciler:
+        def reconcile_once(self) -> int:
+            raise RuntimeError("boom")
+
+    worker = Worker(
+        None,  # type: ignore[arg-type]  # _sweep_orphaned_jobs() never touches this
+        reconciler=ExplodingReconciler(),
+    )
+
+    worker._sweep_orphaned_jobs()
+
+    assert "worker.reconciliation_sweep_failed" in caplog.text

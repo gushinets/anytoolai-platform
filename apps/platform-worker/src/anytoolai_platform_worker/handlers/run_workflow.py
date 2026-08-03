@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from typing import Any
@@ -30,6 +29,8 @@ from anytoolai_platform_core.workflows.runner import (
     WorkflowJobService,
 )
 from sqlalchemy.orm import Session, sessionmaker
+
+from anytoolai_platform_worker.lease import JobLease, NullJobLease
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +64,11 @@ class RunWorkflowHandler:
         *,
         session_factory: sessionmaker[Session],
         runner_factory: RunnerFactory,
+        lease: JobLease | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._runner_factory = runner_factory
+        self._lease = lease if lease is not None else NullJobLease()
 
     async def handle(self, job_id: str) -> JobRecord | None:
         try:
@@ -110,45 +113,96 @@ class RunWorkflowHandler:
             raise
         except Exception as exc:
             self._persist_handler_failure(job_id, exc)
+        finally:
+            self._lease.release(job_id)
 
         return self._get(job_id)
+
+    def terminate_orphaned_job(self, job_id: str) -> None:
+        """Fail a `running` job whose lease-holder is gone (see `reconciliation.py`).
+
+        Never raises: called from a sweep over multiple candidate jobs, and one
+        failure here must not abort the rest of the pass.
+        """
+        try:
+            self._persist_running_failure(
+                job_id,
+                error_code="worker_lease_lost",
+                error_message_safe=("Worker holding this job's lease was lost (crash or restart)."),
+            )
+        except Exception:
+            logger.exception(
+                "run_workflow.terminate_orphaned_job_failed",
+                extra={
+                    "event": "run_workflow.terminate_orphaned_job_failed",
+                    "fields": {"job_id": job_id},
+                },
+            )
 
     def cancel(self, job_id: str) -> JobRecord | None:
         with transaction_boundary(self._session_factory) as session:
             repository = JobRepository(session)
             emitter = EventEmitter(EventLogRepository(session))
-            return (
-                WorkflowJobService(repository, emitter).cancel_created(job_id)
-                or repository.get(job_id)
+            return WorkflowJobService(repository, emitter).cancel_created(job_id) or repository.get(
+                job_id
             )
+
+    def dispose(self) -> None:
+        """Release resources owned by this handler's lease. Call once at shutdown."""
+        self._lease.dispose()
 
     def _claim(self, job_id: str) -> JobRecord | None:
-        with transaction_boundary(self._session_factory) as session:
-            repository = JobRepository(session)
-            emitter = EventEmitter(EventLogRepository(session))
-            scenario_service = ScenarioSessionService(
-                ScenarioSessionRepository(session),
-                emitter,
-            )
-            job = repository.get(job_id)
-            if job is None or job.status is not JobStatus.created:
-                return None
+        # `lease_acquired` is tracked outside the transaction below so the except
+        # clause can also cover failures in transaction_boundary's own commit/
+        # rollback-recovery machinery, not just the body -- a failure there would
+        # otherwise leak the lease forever, since it's already past the code that
+        # would normally release it.
+        lease_acquired = False
 
-            scenario = self._load_scenario(session, job)
-            metadata = {
-                **job.metadata,
-                "guest_id": scenario.guest_id,
-                "user_id": scenario.user_id,
-                "scenario_chain_id": scenario.scenario_chain_id,
-            }
-            claimed = WorkflowJobService(repository, emitter).claim_created(
-                job_id,
-                metadata=metadata,
-            )
-            if claimed is None:
-                return None
-            scenario_service.mark_running(scenario)
-            return claimed
+        def _claim_in_transaction() -> JobRecord | None:
+            nonlocal lease_acquired
+            with transaction_boundary(self._session_factory) as session:
+                repository = JobRepository(session)
+                emitter = EventEmitter(EventLogRepository(session))
+                scenario_service = ScenarioSessionService(
+                    ScenarioSessionRepository(session),
+                    emitter,
+                )
+                job = repository.get(job_id)
+                if job is None or job.status is not JobStatus.created:
+                    return None
+
+                # Held until handle()'s finally releases it after the terminal-state
+                # commit. A failed acquire means another worker already owns this
+                # job -- not an error, just skip it.
+                if not self._lease.acquire(job_id):
+                    return None
+                lease_acquired = True
+
+                scenario = self._load_scenario(session, job)
+                metadata = {
+                    **job.metadata,
+                    "guest_id": scenario.guest_id,
+                    "user_id": scenario.user_id,
+                    "scenario_chain_id": scenario.scenario_chain_id,
+                }
+                claimed = WorkflowJobService(repository, emitter).claim_created(
+                    job_id,
+                    metadata=metadata,
+                )
+                if claimed is None:
+                    self._lease.release(job_id)
+                    lease_acquired = False
+                    return None
+                scenario_service.mark_running(scenario)
+                return claimed
+
+        try:
+            return _claim_in_transaction()
+        except BaseException:
+            if lease_acquired:
+                self._lease.release(job_id)
+            raise
 
     def _get(self, job_id: str) -> JobRecord | None:
         with transaction_boundary(self._session_factory) as session:
@@ -196,8 +250,19 @@ class RunWorkflowHandler:
         )
 
     def _persist_handler_failure(self, job_id: str, exc: Exception) -> None:
-        error_code = _safe_error_code(exc)
-        error_message_safe = _safe_error_message(exc)
+        self._persist_running_failure(
+            job_id,
+            error_code=_safe_error_code(exc),
+            error_message_safe=_safe_error_message(exc),
+        )
+
+    def _persist_running_failure(
+        self,
+        job_id: str,
+        *,
+        error_code: str,
+        error_message_safe: str,
+    ) -> None:
         # The runner's own rollback-recovery callback may already have restored the job
         # to succeeded in an independent transaction (e.g. mark_completed itself raised
         # after the workflow succeeded). Reconciling the scenario for that case needs its
@@ -229,6 +294,21 @@ class RunWorkflowHandler:
             elif job.status is not JobStatus.failed:
                 return
             else:
+                # A different error_code than what's already stored means this call
+                # didn't come from a repeat `terminate_orphaned_job` on the same
+                # orphan -- execution kept running past its lease being reclaimed and
+                # only now reached a terminal outcome of its own, colliding with the
+                # sweep's already-committed `failed`/worker_lease_lost. Known residual
+                # race (see docs/exec-plans/active/any-147-worker-lease-recovery.md); not
+                # auto-fixed, just made observable.
+                if job.error_code == "worker_lease_lost" and error_code != "worker_lease_lost":
+                    logger.warning(
+                        "worker.job_completed_after_lease_lost",
+                        extra={
+                            "event": "worker.job_completed_after_lease_lost",
+                            "fields": {"job_id": job_id, "late_error_code": error_code},
+                        },
+                    )
                 scenario_error_code = job.error_code or error_code
 
             if not reconcile_succeeded_job:
