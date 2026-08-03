@@ -9,7 +9,7 @@ caller; it is meant to be run at worker startup and between jobs, not on a sched
 from __future__ import annotations
 
 import logging
-from typing import Protocol
+from typing import Any, Protocol
 
 import sqlalchemy as sa
 from anytoolai_platform_core.storage.db import jobs_table
@@ -23,6 +23,7 @@ from anytoolai_platform_worker.lease import JobLease, NullJobLease
 logger = logging.getLogger(__name__)
 
 _DEFAULT_SWEEP_LIMIT = 100
+_Cursor = tuple[Any, str]
 
 
 class OrphanTerminator(Protocol):
@@ -46,36 +47,59 @@ class OrphanedRunningJobReconciler:
         self._lease = lease
         self._terminator = terminator
         self._limit = limit
+        # Keyset cursor into the `running` set, kept across calls so a fleet with
+        # more than `limit` concurrently-running jobs still gets every job probed
+        # eventually, instead of every pass re-selecting the same oldest `limit`
+        # rows forever and starving anything sitting behind them.
+        self._cursor: _Cursor | None = None
 
     def reconcile_once(self) -> int:
         """Terminate orphaned `running` jobs found in one bounded pass.
 
         Returns the number terminated. Two workers sweeping the same orphan
-        concurrently is safe: `probe_orphaned` is backed by an exclusive Postgres
-        advisory lock, and a second `terminate_orphaned_job` call on an
+        concurrently is safe: `probe_orphaned_batch` is backed by an exclusive
+        Postgres advisory lock, and a second `terminate_orphaned_job` call on an
         already-terminal job is an idempotent no-op.
         """
-        terminated = 0
-        for job_id in self._running_job_ids():
-            if self._lease.probe_orphaned(job_id):
-                logger.warning(
-                    "reconciliation.orphan_detected",
-                    extra={"event": "reconciliation.orphan_detected", "fields": {"job_id": job_id}},
-                )
-                self._terminator.terminate_orphaned_job(job_id)
-                terminated += 1
-        return terminated
+        job_ids = self._running_job_ids()
+        orphaned_ids = self._lease.probe_orphaned_batch(job_ids)
+        for job_id in orphaned_ids:
+            logger.warning(
+                "reconciliation.orphan_detected",
+                extra={"event": "reconciliation.orphan_detected", "fields": {"job_id": job_id}},
+            )
+            self._terminator.terminate_orphaned_job(job_id)
+        return len(orphaned_ids)
 
     def _running_job_ids(self) -> list[str]:
         with transaction_boundary(self._session_factory) as session:
-            return list(
-                session.execute(
-                    sa.select(jobs_table.c.id)
-                    .where(jobs_table.c.status == JobStatus.running)
-                    .order_by(jobs_table.c.started_at, jobs_table.c.id)
-                    .limit(self._limit)
-                ).scalars()
-            )
+            rows = self._select_running_page(session, after=self._cursor)
+            if not rows and self._cursor is not None:
+                # The cursor ran off the end of the running set -- wrap back to the
+                # start in the same pass, so a fleet at or under `limit` still gets
+                # swept every call instead of alternating with an empty one.
+                rows = self._select_running_page(session, after=None)
+            if rows:
+                self._cursor = (rows[-1].started_at, rows[-1].id)
+            else:
+                self._cursor = None
+            return [row.id for row in rows]
+
+    def _select_running_page(
+        self,
+        session: Session,
+        *,
+        after: _Cursor | None,
+    ) -> list[Any]:
+        query = (
+            sa.select(jobs_table.c.id, jobs_table.c.started_at)
+            .where(jobs_table.c.status == JobStatus.running)
+            .order_by(jobs_table.c.started_at, jobs_table.c.id)
+            .limit(self._limit)
+        )
+        if after is not None:
+            query = query.where(sa.tuple_(jobs_table.c.started_at, jobs_table.c.id) > after)
+        return list(session.execute(query))
 
 
 def build_job_lease_reconciler(

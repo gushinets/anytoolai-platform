@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import struct
+from collections.abc import Iterable
 from typing import Protocol
 
 import sqlalchemy as sa
@@ -53,6 +54,15 @@ class JobLease(Protocol):
         """Return True if nobody currently holds the lease for job_id."""
         ...
 
+    def probe_orphaned_batch(self, job_ids: Iterable[str]) -> set[str]:
+        """Like `probe_orphaned`, but for many jobs at once.
+
+        A sweep checking `job_ids` one at a time via `probe_orphaned` pays a full
+        connection checkout/checkin per job, every idle poll -- almost all of which
+        turn out to be alive. Batching does the whole page on one connection.
+        """
+        ...
+
 
 class NullJobLease:
     """No-op lease for backends without advisory locks (e.g. SQLite in tests)."""
@@ -67,6 +77,10 @@ class NullJobLease:
     def probe_orphaned(self, job_id: str) -> bool:
         del job_id
         return False
+
+    def probe_orphaned_batch(self, job_ids: Iterable[str]) -> set[str]:
+        del job_ids
+        return set()
 
 
 class AdvisoryJobLease:
@@ -105,25 +119,38 @@ class AdvisoryJobLease:
         connection.close()
 
     def probe_orphaned(self, job_id: str) -> bool:
-        key = _advisory_lock_key(job_id)
+        return job_id in self.probe_orphaned_batch([job_id])
+
+    def probe_orphaned_batch(self, job_ids: Iterable[str]) -> set[str]:
+        orphaned: set[str] = set()
         connection = self._engine.connect()
         try:
-            acquired = connection.execute(
-                sa.text("SELECT pg_try_advisory_lock(:key)"), {"key": key}
-            ).scalar_one()
-            if not acquired:
-                return False
-            try:
-                connection.execute(sa.text("SELECT pg_advisory_unlock(:key)"), {"key": key})
-            except Exception:
-                logger.exception(
-                    "lease.probe_unlock_failed",
-                    extra={"event": "lease.probe_unlock_failed", "fields": {"job_id": job_id}},
-                )
-                connection.invalidate()
-            return True
+            for job_id in job_ids:
+                key = _advisory_lock_key(job_id)
+                acquired = connection.execute(
+                    sa.text("SELECT pg_try_advisory_lock(:key)"), {"key": key}
+                ).scalar_one()
+                if not acquired:
+                    continue
+                orphaned.add(job_id)
+                try:
+                    connection.execute(sa.text("SELECT pg_advisory_unlock(:key)"), {"key": key})
+                except Exception:
+                    logger.exception(
+                        "lease.probe_unlock_failed",
+                        extra={
+                            "event": "lease.probe_unlock_failed",
+                            "fields": {"job_id": job_id},
+                        },
+                    )
+                    # The connection may now be holding a lock it can never release --
+                    # discard it and open a fresh one so the rest of the batch isn't
+                    # stuck behind a poisoned session.
+                    connection.invalidate()
+                    connection = self._engine.connect()
         finally:
             connection.close()
+        return orphaned
 
 
 def build_job_lease(engine: Engine) -> JobLease:
