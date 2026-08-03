@@ -325,7 +325,7 @@ def frontend_check() -> int:
         [
             ["pnpm", "install", "--frozen-lockfile"],
             ["pnpm", "-r", "typecheck"],
-            ["pnpm", "-r", "--if-present", "test"],
+            ["pnpm", "-r", "test"],
             ["pnpm", "-r", "--if-present", "generate-api-types:check"],
             ["pnpm", "-r", "build"],
         ]

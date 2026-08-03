@@ -94,7 +94,12 @@ function _sameIds(ids: string[], entryIds: string[]): boolean {
     return false;
   }
   const idSet = new Set(ids);
-  return idSet.size === ids.length && entryIds.every((entryId) => idSet.has(entryId));
+  const entrySet = new Set(entryIds);
+  return (
+    idSet.size === ids.length &&
+    entrySet.size === entryIds.length &&
+    entryIds.every((entryId) => idSet.has(entryId))
+  );
 }
 
 function _parseRendererHint(value: unknown): RuntimeRendererHint | null {

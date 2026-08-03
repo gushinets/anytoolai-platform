@@ -15,7 +15,7 @@ export async function toResult<T>(response: Response): Promise<PlatformApiResult
       : { ok: false, error: invalidResponseError(response.status) };
   }
 
-  if (payload === INVALID_JSON) {
+  if (payload === INVALID_JSON || payload === undefined) {
     return {
       ok: false,
       error: invalidResponseError(response.status, "Response body was not valid JSON."),

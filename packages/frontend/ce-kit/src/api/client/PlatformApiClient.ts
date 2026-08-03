@@ -16,7 +16,7 @@ export class PlatformApiClient {
 
   constructor(options: PlatformApiClientOptions) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
-    this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
+    this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.defaultHeaders = options.defaultHeaders ?? {};
   }
@@ -50,7 +50,11 @@ export class PlatformApiClient {
     const controller = new AbortController();
     const externalSignal = options.signal;
     const onExternalAbort = () => controller.abort();
-    externalSignal?.addEventListener("abort", onExternalAbort);
+    if (externalSignal?.aborted) {
+      controller.abort();
+    } else {
+      externalSignal?.addEventListener("abort", onExternalAbort);
+    }
     const timeoutHandle = setTimeout(() => controller.abort(), options.timeoutMs ?? this.timeoutMs);
 
     try {

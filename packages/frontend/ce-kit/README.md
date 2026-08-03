@@ -125,10 +125,11 @@ if (!result.ok) {
 
 ## Storage
 
-`AsyncStorage` is a minimal `get`/`set`/`remove` contract shaped to match the promise-based
-`chrome.storage.local` API, without depending on `@types/chrome`. Extensions inject an adapter over
-`chrome.storage.local`; everything else (including tests) can use the bundled in-memory
-implementation.
+`AsyncStorage` is a minimal, single-key `get`/`set`/`remove` contract -- narrower than
+`chrome.storage.local`'s own multi-key, untyped-value API, so extensions provide a thin per-key
+adapter over `chrome.storage.local` rather than passing it in directly. That adapter is what
+depends on `chrome.storage.local`, not this contract, so CE-kit itself needs no `@types/chrome`
+dependency. Everything else (including tests) can use the bundled in-memory implementation.
 
 ```ts
 import { createInMemoryAsyncStorage } from "@anytoolai/ce-kit";

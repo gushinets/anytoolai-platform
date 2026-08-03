@@ -57,6 +57,18 @@ describe("parseRuntimeConfig", () => {
     expect(parseRuntimeConfig(payload)).toBeNull();
   });
 
+  it("returns null when frontends has a duplicate frontend_id not covered by unique frontend_ids", () => {
+    const payload = {
+      ...VALID_PAYLOAD,
+      frontend_ids: ["a", "b"],
+      frontends: [
+        { frontend_id: "a", type: "web", enabled: true },
+        { frontend_id: "a", type: "web", enabled: true },
+      ],
+    };
+    expect(parseRuntimeConfig(payload)).toBeNull();
+  });
+
   it("returns null when scenario_ids and scenarios desync", () => {
     const payload = {
       ...VALID_PAYLOAD,

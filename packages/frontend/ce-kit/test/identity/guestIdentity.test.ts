@@ -114,4 +114,23 @@ describe("createGuestIdentity", () => {
       "Guest identity creation failed: backend_error",
     );
   });
+
+  it("attaches the original PlatformApiError as the thrown error's cause", async () => {
+    const storage = createInMemoryAsyncStorage();
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(500, { error: { code: "internal_error", message: "boom", request_id: "req_1" } }),
+    );
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const error = await createGuestIdentity({ client, storage }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).cause).toEqual({
+      type: "backend_error",
+      status: 500,
+      code: "internal_error",
+      message: "boom",
+      requestId: "req_1",
+    });
+  });
 });

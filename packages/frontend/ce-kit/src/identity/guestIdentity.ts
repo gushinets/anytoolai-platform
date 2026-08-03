@@ -60,7 +60,7 @@ async function _requestGuestIdentity(
     path: "/v1/identity/guest",
   });
   if (!result.ok) {
-    throw new Error(`Guest identity creation failed: ${result.error.type}`);
+    throw new Error(`Guest identity creation failed: ${result.error.type}`, { cause: result.error });
   }
 
   const guestId = _guestIdFromPayload(result.value);

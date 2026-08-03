@@ -52,6 +52,20 @@ describe("PlatformApiClient", () => {
     expect(result).toEqual({ ok: true, value: { product_id: "demo" }, status: 200 });
   });
 
+  it("returns invalid_response for a 2xx response with an empty body", async () => {
+    const fetchImpl = vi.fn(
+      async () => new Response("", { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    const client = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    const result = await client.request({ path: "/v1/x" });
+
+    expect(result).toEqual({
+      ok: false,
+      error: { type: "invalid_response", status: 200, message: "Response body was not valid JSON." },
+    });
+  });
+
   it("returns a backend_error for a well-formed error envelope", async () => {
     const fetchImpl = vi.fn(async () =>
       jsonResponse(404, {
@@ -139,6 +153,61 @@ describe("PlatformApiClient", () => {
 
     const pending = client.request({ path: "/v1/x", signal: controller.signal });
     controller.abort();
+
+    await expect(pending).resolves.toEqual({ ok: false, error: { type: "aborted" } });
+  });
+
+  function fetchImplRespectingAbort() {
+    return vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.signal?.aborted) {
+        return Promise.reject(new DOMException("Aborted", "AbortError"));
+      }
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      });
+    });
+  }
+
+  it("reports aborted immediately when the caller's signal is already aborted before the request starts", async () => {
+    const fetchImpl = fetchImplRespectingAbort();
+    const client = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl, timeoutMs: 10_000 });
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await client.request({ path: "/v1/x", signal: controller.signal });
+
+    expect(result).toEqual({ ok: false, error: { type: "aborted" } });
+  });
+
+  it("aborts a retried attempt whose external signal aborted during the inter-attempt delay", async () => {
+    let callCount = 0;
+    const fetchImpl = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+      callCount += 1;
+      if (callCount === 1) {
+        return Promise.reject(new TypeError("Failed to fetch"));
+      }
+      if (init?.signal?.aborted) {
+        return Promise.reject(new DOMException("Aborted", "AbortError"));
+      }
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      });
+    });
+    const client = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl, timeoutMs: 10_000 });
+    const controller = new AbortController();
+
+    const pending = client.request({
+      path: "/v1/x",
+      signal: controller.signal,
+      retry: { attempts: 2, delayMs: 50 },
+    });
+
+    // Let the first attempt's network_error settle and the retry loop reach `await delay(50)`
+    // before aborting, so this exercises the second performOnce() call seeing an
+    // already-aborted signal at its start, not the first attempt's own listener.
+    await vi.advanceTimersByTimeAsync(0);
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(50);
 
     await expect(pending).resolves.toEqual({ ok: false, error: { type: "aborted" } });
   });
