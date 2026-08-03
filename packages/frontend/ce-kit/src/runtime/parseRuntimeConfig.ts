@@ -12,7 +12,7 @@ import type {
  * so callers fall back to `invalid_response` instead of trusting arbitrary payload content.
  */
 export function parseRuntimeConfig(payload: unknown): RuntimeConfig | null {
-  if (typeof payload !== "object" || payload === null) {
+  if (!_isRecord(payload)) {
     return null;
   }
 
@@ -24,7 +24,7 @@ export function parseRuntimeConfig(payload: unknown): RuntimeConfig | null {
     scenarios,
     quota_summary: quotaSummary,
     allowed_ui_capabilities: allowedUiCapabilities,
-  } = payload as Record<string, unknown>;
+  } = payload;
 
   if (
     typeof productId !== "string" ||
@@ -45,6 +45,9 @@ export function parseRuntimeConfig(payload: unknown): RuntimeConfig | null {
     }
     parsedFrontends.push(parsed);
   }
+  if (!_sameIds(frontendIds, parsedFrontends.map((frontend) => frontend.frontendId))) {
+    return null;
+  }
 
   const parsedScenarios: RuntimeScenario[] = [];
   for (const scenario of scenarios) {
@@ -53,6 +56,9 @@ export function parseRuntimeConfig(payload: unknown): RuntimeConfig | null {
       return null;
     }
     parsedScenarios.push(parsed);
+  }
+  if (!_sameIds(scenarioIds, parsedScenarios.map((scenario) => scenario.scenarioId))) {
+    return null;
   }
 
   let parsedQuotaSummary: RuntimeQuotaSummary | null = null;
@@ -74,16 +80,28 @@ export function parseRuntimeConfig(payload: unknown): RuntimeConfig | null {
   };
 }
 
+function _isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function _isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
+/** Guards against the id list and the entry list (e.g. frontend_ids vs. frontends) desyncing. */
+function _sameIds(ids: string[], entryIds: string[]): boolean {
+  if (ids.length !== entryIds.length) {
+    return false;
+  }
+  const idSet = new Set(ids);
+  return idSet.size === ids.length && entryIds.every((entryId) => idSet.has(entryId));
+}
+
 function _parseRendererHint(value: unknown): RuntimeRendererHint | null {
-  if (typeof value !== "object" || value === null) {
+  if (!_isRecord(value)) {
     return null;
   }
-  const { renderer, schema_ref: schemaRef, schema_version: schemaVersion } =
-    value as Record<string, unknown>;
+  const { renderer, schema_ref: schemaRef, schema_version: schemaVersion } = value;
   if (renderer !== "json_schema" || typeof schemaRef !== "string") {
     return null;
   }
@@ -98,10 +116,10 @@ function _parseRendererHint(value: unknown): RuntimeRendererHint | null {
 }
 
 function _parseFrontend(value: unknown): RuntimeFrontend | null {
-  if (typeof value !== "object" || value === null) {
+  if (!_isRecord(value)) {
     return null;
   }
-  const { frontend_id: frontendId, type, enabled } = value as Record<string, unknown>;
+  const { frontend_id: frontendId, type, enabled } = value;
   if (typeof frontendId !== "string" || typeof type !== "string" || typeof enabled !== "boolean") {
     return null;
   }
@@ -109,7 +127,7 @@ function _parseFrontend(value: unknown): RuntimeFrontend | null {
 }
 
 function _parseScenario(value: unknown): RuntimeScenario | null {
-  if (typeof value !== "object" || value === null) {
+  if (!_isRecord(value)) {
     return null;
   }
   const {
@@ -118,7 +136,7 @@ function _parseScenario(value: unknown): RuntimeScenario | null {
     allowed_next_actions: allowedNextActions,
     input_renderer_hint: inputRendererHint,
     output_renderer_hint: outputRendererHint,
-  } = value as Record<string, unknown>;
+  } = value;
   if (
     typeof scenarioId !== "string" ||
     typeof version !== "number" ||
@@ -143,7 +161,7 @@ function _parseScenario(value: unknown): RuntimeScenario | null {
 }
 
 function _parseQuotaSummary(value: unknown): RuntimeQuotaSummary | null {
-  if (typeof value !== "object" || value === null) {
+  if (!_isRecord(value)) {
     return null;
   }
   const {
@@ -152,7 +170,7 @@ function _parseQuotaSummary(value: unknown): RuntimeQuotaSummary | null {
     limit_count: limitCount,
     period,
     dimension,
-  } = value as Record<string, unknown>;
+  } = value;
   if (
     typeof quotaPolicyId !== "string" ||
     typeof unit !== "string" ||

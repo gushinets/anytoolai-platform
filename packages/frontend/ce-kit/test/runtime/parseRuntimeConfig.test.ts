@@ -48,6 +48,32 @@ describe("parseRuntimeConfig", () => {
     expect(parseRuntimeConfig(payload)).toBeNull();
   });
 
+  it("returns null when frontend_ids lists an id frontends doesn't have", () => {
+    const payload = {
+      ...VALID_PAYLOAD,
+      frontend_ids: ["f1", "f2"],
+      frontends: [{ frontend_id: "f1", type: "web", enabled: true }],
+    };
+    expect(parseRuntimeConfig(payload)).toBeNull();
+  });
+
+  it("returns null when scenario_ids and scenarios desync", () => {
+    const payload = {
+      ...VALID_PAYLOAD,
+      scenario_ids: ["s1"],
+      scenarios: [
+        {
+          scenario_id: "s2",
+          version: 1,
+          allowed_next_actions: [],
+          input_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+          output_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+        },
+      ],
+    };
+    expect(parseRuntimeConfig(payload)).toBeNull();
+  });
+
   it("accepts a valid minimal payload with a null quota summary", () => {
     expect(parseRuntimeConfig(VALID_PAYLOAD)).toEqual({
       productId: "kernel_demo",

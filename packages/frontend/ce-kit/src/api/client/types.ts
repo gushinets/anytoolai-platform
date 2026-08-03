@@ -3,7 +3,7 @@ import type { PlatformApiMethod } from "./http";
 import type { PlatformApiRetryPolicy } from "./retry";
 
 export type PlatformApiResult<T> =
-  | { ok: true; value: T }
+  | { ok: true; value: T; status: number }
   | { ok: false; error: PlatformApiError };
 
 export type PlatformApiRequestOptions = {

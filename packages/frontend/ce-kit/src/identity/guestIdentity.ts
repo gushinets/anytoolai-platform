@@ -13,8 +13,14 @@ export type GuestIdentityOptions = {
 
 const DEFAULT_STORAGE_KEY = "anytoolai.guest_id";
 
-/** Keyed by client instance so concurrent calls sharing a client share one in-flight request. */
-const inFlightRequests = new WeakMap<PlatformApiClient, Promise<GuestIdentity>>();
+/**
+ * Keyed by client instance, then by storageKey, so concurrent calls only collapse into one
+ * in-flight request when they'd also persist to the same storage slot.
+ */
+const inFlightRequestsByClient = new WeakMap<
+  PlatformApiClient,
+  Map<string, Promise<GuestIdentity>>
+>();
 
 export async function createGuestIdentity(
   options: GuestIdentityOptions,
@@ -27,15 +33,20 @@ export async function createGuestIdentity(
     return { guestId: storedGuestId };
   }
 
-  const inFlight = inFlightRequests.get(client);
+  const inFlightByKey = inFlightRequestsByClient.get(client);
+  const inFlight = inFlightByKey?.get(storageKey);
   if (inFlight) {
     return inFlight;
   }
 
   const request = _requestGuestIdentity(client, storage, storageKey).finally(() => {
-    inFlightRequests.delete(client);
+    inFlightRequestsByClient.get(client)?.delete(storageKey);
   });
-  inFlightRequests.set(client, request);
+  if (inFlightByKey) {
+    inFlightByKey.set(storageKey, request);
+  } else {
+    inFlightRequestsByClient.set(client, new Map([[storageKey, request]]));
+  }
   return request;
 }
 
@@ -53,7 +64,13 @@ async function _requestGuestIdentity(
   }
 
   const guestId = _guestIdFromPayload(result.value);
-  await storage.set(storageKey, guestId);
+  try {
+    await storage.set(storageKey, guestId);
+  } catch {
+    // The backend already created this identity; a storage failure must not discard it --
+    // that would orphan it on the backend and cause the next call to create a duplicate.
+    // Persistence is best-effort here, the identity itself is still valid.
+  }
   return { guestId };
 }
 

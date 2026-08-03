@@ -105,8 +105,9 @@ python scripts/agent/runner.py full-check
 ```
 
 Use full check or dedicated smoke commands for broader validation outside the baseline gate.
-`full-check` runs the baseline, locked frontend checks, and implemented product-suite tests. Smoke
-checks become required only after a feature issue supplies a real vertical slice.
+`full-check` runs the baseline, locked frontend checks (typecheck, unit tests, generated
+OpenAPI-contract drift check, build), and implemented product-suite tests. Smoke checks become
+required only after a feature issue supplies a real vertical slice.
 
 PostgreSQL production-semantics check:
 

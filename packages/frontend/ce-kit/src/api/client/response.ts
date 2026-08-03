@@ -22,7 +22,7 @@ export async function toResult<T>(response: Response): Promise<PlatformApiResult
     };
   }
 
-  return { ok: true, value: payload as T };
+  return { ok: true, value: payload as T, status: response.status };
 }
 
 async function safeParseJson(response: Response): Promise<unknown> {

@@ -18,5 +18,7 @@ def build_openapi_schema() -> dict[str, Any]:
     return create_app().openapi()
 
 
-def render_openapi_json() -> str:
-    return json.dumps(build_openapi_schema(), indent=2, sort_keys=True) + "\n"
+def render_openapi_json(schema: dict[str, Any] | None = None) -> str:
+    if schema is None:
+        schema = build_openapi_schema()
+    return json.dumps(schema, indent=2, sort_keys=True) + "\n"

@@ -49,7 +49,7 @@ describe("PlatformApiClient", () => {
 
     const result = await client.request<{ product_id: string }>({ path: "/v1/x" });
 
-    expect(result).toEqual({ ok: true, value: { product_id: "demo" } });
+    expect(result).toEqual({ ok: true, value: { product_id: "demo" }, status: 200 });
   });
 
   it("returns a backend_error for a well-formed error envelope", async () => {
@@ -153,7 +153,7 @@ describe("PlatformApiClient", () => {
     const result = await client.request({ path: "/v1/x", retry: { attempts: 2 } });
 
     expect(fetchImpl).toHaveBeenCalledTimes(2);
-    expect(result).toEqual({ ok: true, value: { ok: true } });
+    expect(result).toEqual({ ok: true, value: { ok: true }, status: 200 });
   });
 
   it("does not retry backend_error even when a retry policy is set", async () => {

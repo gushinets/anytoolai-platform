@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { PlatformApiClient } from "../../src/api/client";
 import { createGuestIdentity } from "../../src/identity/guestIdentity";
+import type { AsyncStorage } from "../../src/storage/asyncStorage";
 import { createInMemoryAsyncStorage } from "../../src/storage/inMemoryAsyncStorage";
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -63,6 +64,43 @@ describe("createGuestIdentity", () => {
     await expect(createGuestIdentity({ client, storage })).rejects.toThrow(
       "Guest identity response was invalid.",
     );
+  });
+
+  it("still resolves with the identity if persisting it to storage fails", async () => {
+    const storage: AsyncStorage = {
+      get: vi.fn(async () => undefined),
+      set: vi.fn(async () => {
+        throw new Error("storage full");
+      }),
+      remove: vi.fn(async () => {}),
+    };
+    const fetchImpl = vi.fn(async () => jsonResponse(200, { guest_id: "guest_orphan_risk" }));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const identity = await createGuestIdentity({ client, storage });
+
+    expect(identity).toEqual({ guestId: "guest_orphan_risk" });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not collapse concurrent calls for different storage keys on the same client", async () => {
+    const storage = createInMemoryAsyncStorage();
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { guest_id: "guest_a" }))
+      .mockResolvedValueOnce(jsonResponse(200, { guest_id: "guest_b" }));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const [a, b] = await Promise.all([
+      createGuestIdentity({ client, storage, storageKey: "product_a.guest_id" }),
+      createGuestIdentity({ client, storage, storageKey: "product_b.guest_id" }),
+    ]);
+
+    expect(a).toEqual({ guestId: "guest_a" });
+    expect(b).toEqual({ guestId: "guest_b" });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(await storage.get("product_a.guest_id")).toBe("guest_a");
+    expect(await storage.get("product_b.guest_id")).toBe("guest_b");
   });
 
   it("throws when the backend rejects guest creation", async () => {

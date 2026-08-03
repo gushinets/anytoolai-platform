@@ -87,6 +87,7 @@ describe("getRuntimeConfig", () => {
         },
         allowedUiCapabilities: ["copy_result"],
       },
+      status: 200,
     });
     expect(fetchImpl).toHaveBeenCalledWith(
       "https://api.example.com/v1/products/kernel_demo/runtime-config",
@@ -142,5 +143,35 @@ describe("getRuntimeConfig", () => {
         message: "Runtime config response was invalid.",
       },
     });
+  });
+
+  it("reports the response's real status in invalid_response, not a hardcoded 200", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(202, { product_id: "kernel_demo" }));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const result = await getRuntimeConfig(client, "kernel_demo");
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: "invalid_response",
+        status: 202,
+        message: "Runtime config response was invalid.",
+      },
+    });
+  });
+
+  it("rejects a payload whose frontend_ids/scenario_ids desync from frontends/scenarios", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(200, {
+        ...RUNTIME_CONFIG_PAYLOAD,
+        frontend_ids: ["kernel_demo_ce", "web_mirror"], // frontends only lists kernel_demo_ce
+      }),
+    );
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const result = await getRuntimeConfig(client, "kernel_demo");
+
+    expect(result.ok).toBe(false);
   });
 });

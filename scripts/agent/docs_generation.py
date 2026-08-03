@@ -115,7 +115,10 @@ def render_event_catalog() -> str:
 def render_openapi() -> str:
     from anytoolai_platform_api.openapi.generate import build_openapi_schema
 
-    schema = build_openapi_schema()
+    return _render_openapi_markdown(build_openapi_schema())
+
+
+def _render_openapi_markdown(schema: dict[str, Any]) -> str:
     lines = _header("OpenAPI", GENERATED_SOURCES["openapi.md"])
     lines.extend(
         [
@@ -152,13 +155,16 @@ def render_openapi_json() -> str:
 
 
 def render_documents() -> dict[str, str]:
+    from anytoolai_platform_api.openapi.generate import build_openapi_schema, render_openapi_json
+
+    schema = build_openapi_schema()
     return {
         "action-registry.md": render_action_registry(),
         "config-registry.md": render_config_registry(),
         "db-schema.md": render_db_schema(),
         "event-catalog.md": render_event_catalog(),
-        "openapi.md": render_openapi(),
-        "openapi.json": render_openapi_json(),
+        "openapi.md": _render_openapi_markdown(schema),
+        "openapi.json": render_openapi_json(schema),
     }
 
 

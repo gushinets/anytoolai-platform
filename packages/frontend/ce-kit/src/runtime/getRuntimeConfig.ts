@@ -17,8 +17,11 @@ export async function getRuntimeConfig(
 
   const runtimeConfig = parseRuntimeConfig(result.value);
   if (!runtimeConfig) {
-    return { ok: false, error: invalidResponseError(200, "Runtime config response was invalid.") };
+    return {
+      ok: false,
+      error: invalidResponseError(result.status, "Runtime config response was invalid."),
+    };
   }
 
-  return { ok: true, value: runtimeConfig };
+  return { ok: true, value: runtimeConfig, status: result.status };
 }
