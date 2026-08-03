@@ -15,6 +15,9 @@ from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
+from anytoolai_platform_core.scenarios.correlation import (
+    build_scenario_identity_metadata,
+)
 from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionRecord,
     ScenarioSessionStatus,
@@ -143,9 +146,19 @@ class RunWorkflowHandler:
         with transaction_boundary(self._session_factory) as session:
             repository = JobRepository(session)
             emitter = EventEmitter(EventLogRepository(session))
-            return WorkflowJobService(repository, emitter).cancel_created(job_id) or repository.get(
-                job_id
-            )
+            job = repository.get(job_id)
+            if job is None or job.status is not JobStatus.created:
+                return job
+
+            scenario = self._load_scenario(session, job)
+            metadata = {
+                **job.metadata,
+                **build_scenario_identity_metadata(scenario),
+            }
+            return WorkflowJobService(repository, emitter).cancel_created(
+                job_id,
+                metadata=metadata,
+            ) or repository.get(job_id)
 
     def dispose(self) -> None:
         """Release resources owned by this handler's lease. Call once at shutdown."""
@@ -182,9 +195,7 @@ class RunWorkflowHandler:
                 scenario = self._load_scenario(session, job)
                 metadata = {
                     **job.metadata,
-                    "guest_id": scenario.guest_id,
-                    "user_id": scenario.user_id,
-                    "scenario_chain_id": scenario.scenario_chain_id,
+                    **build_scenario_identity_metadata(scenario),
                 }
                 claimed = WorkflowJobService(repository, emitter).claim_created(
                     job_id,
@@ -209,6 +220,8 @@ class RunWorkflowHandler:
             return JobRepository(session).get(job_id)
 
     def _load_scenario(self, session: Session, job: JobRecord) -> ScenarioSessionRecord:
+        if not isinstance(job.scenario_session_id, str) or not job.scenario_session_id:
+            raise JobScenarioSessionInvalidError()
         scenario = ScenarioSessionRepository(session).get(
             job.scenario_session_id,
             tenant_id=job.tenant_id,
