@@ -22,7 +22,10 @@ from anytoolai_platform_core.providers.gateway import (
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.storage.db import create_sync_engine
-from anytoolai_platform_core.storage.transactions import build_session_factory
+from anytoolai_platform_core.storage.transactions import (
+    build_session_factory,
+    engine_from_session_factory,
+)
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import (
     SequentialWorkflowRunner,
@@ -31,7 +34,9 @@ from anytoolai_platform_core.workflows.runner import (
 from sqlalchemy.orm import Session, sessionmaker
 
 from anytoolai_platform_worker.handlers.run_workflow import RunWorkflowHandler
+from anytoolai_platform_worker.lease import build_job_lease
 from anytoolai_platform_worker.queues import DatabaseJobQueue
+from anytoolai_platform_worker.reconciliation import build_job_lease_reconciler
 from anytoolai_platform_worker.worker import Worker
 
 
@@ -88,12 +93,23 @@ def build_worker(
             event_emitter=event_emitter,
         )
 
+    engine = engine_from_session_factory(session_factory)
+    lease = build_job_lease(engine)
+
     handler = RunWorkflowHandler(
         session_factory=session_factory,
         runner_factory=runner_factory,
+        lease=lease,
+    )
+    reconciler = build_job_lease_reconciler(
+        engine,
+        session_factory=session_factory,
+        lease=lease,
+        terminator=handler,
     )
     return Worker(
         handler,
         job_queue=DatabaseJobQueue(session_factory),
         poll_interval_seconds=poll_interval_seconds,
+        reconciler=reconciler,
     )

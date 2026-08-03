@@ -68,3 +68,9 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    # SIGTERM triggers graceful drain (finish the in-flight job, take no more) -- see
+    # docs/exec-plans/active/any-147-worker-lease-recovery.md. Compose's 10s default grace
+    # window is too short for anything but trivial jobs; a job still running when this expires
+    # gets SIGKILLed and is instead recovered by the advisory-lock reconciliation sweep
+    # (correct either way, just less graceful). Raise this if expected job durations grow.
+    stop_grace_period: 60s

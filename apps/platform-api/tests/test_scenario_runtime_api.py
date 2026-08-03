@@ -647,6 +647,7 @@ def test_start_then_real_worker_execution_preserves_a12_runtime_correlation(
         provider_adapters={"fake": FakeProviderAdapter(FIXTURE_ROOT)},
     )
     processed = asyncio.run(worker.process_next_job())
+    worker.dispose()
     assert processed is not None
     assert processed.id == started["job_id"]
     assert processed.status is JobStatus.succeeded
