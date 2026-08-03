@@ -4,6 +4,7 @@ import importlib.util
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 def load_runner_module():
@@ -196,6 +197,70 @@ def test_quick_check_strips_pythonpath_from_subprocess_env(monkeypatch) -> None:
 
     assert exit_code == 0
     assert "PYTHONPATH" not in recorded
+
+
+def test_postgresql_check_uses_marker_driven_backend_roots(monkeypatch) -> None:
+    runner = load_runner_module()
+    commands: list[list[str]] = []
+    monkeypatch.setenv(
+        runner.POSTGRESQL_TEST_DATABASE_URL_ENV,
+        "postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres",
+    )
+    monkeypatch.setattr(runner.sys, "executable", "/tmp/repo/.venv/bin/python")
+    monkeypatch.setattr(
+        runner,
+        "run",
+        lambda command: commands.append(list(command)) or 0,
+    )
+
+    assert runner.postgresql_check() == 0
+    assert commands == [
+        [
+            "/tmp/repo/.venv/bin/python",
+            "-m",
+            "pytest",
+            "-m",
+            "postgresql",
+            "packages/backend/platform-core/tests",
+            "packages/backend/platform-actions/tests",
+            "apps/platform-api/tests",
+            "apps/platform-worker/tests",
+            "-q",
+        ]
+    ]
+
+
+def test_postgresql_check_fails_without_maintenance_database_url(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    monkeypatch.delenv(runner.POSTGRESQL_TEST_DATABASE_URL_ENV, raising=False)
+    monkeypatch.setattr(
+        runner,
+        "run",
+        lambda command: pytest.fail(f"pytest must not run without the database URL: {command}"),
+    )
+
+    assert runner.postgresql_check() == 2
+    assert runner.POSTGRESQL_TEST_DATABASE_URL_ENV in capsys.readouterr().err
+
+
+def test_required_backend_workflow_runs_canonical_postgresql_check() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load(
+        (repo_root / ".github" / "workflows" / "backend.yml").read_text(encoding="utf-8")
+    )
+    triggers = workflow.get("on", workflow.get(True))
+    assert "pull_request" in triggers
+
+    job = workflow["jobs"]["postgresql-quota-concurrency"]
+    assert job.get("continue-on-error") is not True
+    steps_by_name = {step.get("name"): step for step in job["steps"]}
+    postgresql_step = steps_by_name["Run all PostgreSQL production-semantics tests"]
+    assert postgresql_step["run"] == (
+        "uv run python scripts/agent/runner.py postgresql-check"
+    )
+    assert postgresql_step["env"]["ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"] == (
+        "postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres"
+    )
 
 
 def test_resolve_postgres_db_falls_back_to_dev_default(monkeypatch) -> None:

@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlalchemy.engine import Connection
 
 config = context.config
 target_metadata = None
+
+
+def _ensure_repo_root_on_sys_path() -> None:
+    repo_root = str(Path(__file__).resolve().parents[2])
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
 
 
 def run_migrations_offline() -> None:
@@ -42,6 +51,8 @@ def run_migrations_online() -> None:
         with context.begin_transaction():
             context.run_migrations()
 
+
+_ensure_repo_root_on_sys_path()
 
 if context.is_offline_mode():
     run_migrations_offline()

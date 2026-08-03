@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 
 revision = "0007"
 down_revision = "0006"
@@ -23,6 +23,8 @@ def _column_names() -> set[str]:
 
 
 def upgrade() -> None:
+    if context.is_offline_mode():
+        return
     existing_columns = _column_names()
     if "quota_dimension" in existing_columns:
         return

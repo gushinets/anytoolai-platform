@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Any
 
+from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter, enrich_event_context
 from anytoolai_platform_core.providers.gateway.errors import ProviderGatewayExecutionError
@@ -26,15 +26,15 @@ def event_context_from_resolved_request(
         job_id=request.job_id,
         workflow_id=request.workflow_id,
         workflow_version=request.workflow_version,
-        guest_id=_metadata_str(request.metadata, "guest_id"),
-        user_id=_metadata_str(request.metadata, "user_id"),
-        scenario_chain_id=_metadata_str(request.metadata, "scenario_chain_id"),
+        guest_id=metadata_str(request.metadata, "guest_id"),
+        user_id=metadata_str(request.metadata, "user_id"),
+        scenario_chain_id=metadata_str(request.metadata, "scenario_chain_id"),
         action_type=request.action_type,
         action_config_id=request.action_config_id,
-        handoff_id=_metadata_str(request.metadata, "handoff_id"),
+        handoff_id=metadata_str(request.metadata, "handoff_id"),
         provider=request.provider,
         model=request.model,
-        acquisition_source=_metadata_str(request.metadata, "acquisition_source"),
+        acquisition_source=metadata_str(request.metadata, "acquisition_source"),
         action_run_id=request.action_run_id,
         provider_policy_ref=request.provider_policy_ref,
     )
@@ -159,8 +159,3 @@ def _provider_event_properties(
         "failure_kind": failure_kind,
         "error_code": error_code,
     }
-
-
-def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
-    value = metadata.get(key)
-    return value if isinstance(value, str) and value else None

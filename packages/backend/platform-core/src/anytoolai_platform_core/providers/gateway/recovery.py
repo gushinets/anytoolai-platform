@@ -3,13 +3,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
-from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.events.replay import (
     ReplayTimestampSequencer,
     sequence_existing_replay_event,
 )
+from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.models import ProviderCallRecord, ProviderCallStatus
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.storage.transactions import transaction_boundary
@@ -168,9 +169,9 @@ def _provider_event_context_from_record(
         job_id=record.job_id,
         workflow_id=record.workflow_id,
         workflow_version=record.workflow_version,
-        guest_id=_metadata_str(request_metadata, "guest_id"),
-        user_id=_metadata_str(request_metadata, "user_id"),
-        scenario_chain_id=_metadata_str(request_metadata, "scenario_chain_id"),
+        guest_id=metadata_str(request_metadata, "guest_id"),
+        user_id=metadata_str(request_metadata, "user_id"),
+        scenario_chain_id=metadata_str(request_metadata, "scenario_chain_id"),
         action_run_id=record.action_run_id,
         action_type=record.action_type,
         action_config_id=record.action_config_id,
@@ -181,8 +182,8 @@ def _provider_event_context_from_record(
         physical_call_index=record.physical_call_index,
         pydantic_run_id=pydantic_run_id,
         litellm_response_id=litellm_response_id,
-        handoff_id=_metadata_str(request_metadata, "handoff_id"),
-        acquisition_source=_metadata_str(request_metadata, "acquisition_source"),
+        handoff_id=metadata_str(request_metadata, "handoff_id"),
+        acquisition_source=metadata_str(request_metadata, "acquisition_source"),
     )
 
 
@@ -210,8 +211,3 @@ def _provider_event_properties_from_record(
         "failure_kind": failure_kind,
         "error_code": error_code,
     }
-
-
-def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
-    value = metadata.get(key)
-    return value if isinstance(value, str) and value else None

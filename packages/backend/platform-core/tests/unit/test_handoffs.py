@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -7,8 +8,6 @@ from typing import Any
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
@@ -29,6 +28,8 @@ from anytoolai_platform_core.handoffs.service import (
     HandoffNotActionableError,
     HandoffService,
     HandoffSourceInvalidError,
+    HandoffTargetSchemaInvalidError,
+    _safe_error_code,
 )
 from anytoolai_platform_core.handoffs.tokens import HandoffTokenService
 from anytoolai_platform_core.identity.models import GuestIdentityRecord
@@ -39,14 +40,29 @@ from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord, Scen
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.scenarios.service import ScenarioRuntimeService, ScenarioSessionService
 from anytoolai_platform_core.storage.db import event_log_table, product_handoffs_table
-from anytoolai_platform_core.storage.transactions import build_session_factory, transaction_boundary
+from anytoolai_platform_core.storage.transactions import (
+    SessionFactory,
+    build_session_factory,
+    transaction_boundary,
+)
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
-from sqlalchemy import event
+
+from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 SHA256_HEX_LENGTH = 64
+pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
+
+
+@pytest.fixture
+def session_factory() -> Iterator[SessionFactory]:
+    with provision_database(
+        database_name_prefix="anytoolai_handoffs_unit_test",
+        skip_reason="PostgreSQL handoff unit coverage",
+    ) as (engine, _alembic_config, _database_url):
+        yield build_session_factory(engine)
 
 
 def test_handoff_token_service_enforces_256_bit_minimum() -> None:
@@ -58,7 +74,7 @@ def test_handoff_token_service_enforces_256_bit_minimum() -> None:
 
 
 def test_handoff_preview_mapping_executes_non_conflicting_nested_siblings(
-    tmp_path: Path,
+    session_factory: SessionFactory,
 ) -> None:
     registry = build_config_registry(CONFIG_ROOT)
     definition = registry.get_handoff("kernel_demo_source_to_target_v1")
@@ -76,7 +92,7 @@ def test_handoff_preview_mapping_executes_non_conflicting_nested_siblings(
             ),
         },
     )
-    factory = _session_factory(tmp_path)
+    factory = session_factory
 
     with transaction_boundary(factory) as session:
         source_session_id, artifact_id = _seed_source(session)
@@ -91,7 +107,7 @@ def test_handoff_preview_mapping_executes_non_conflicting_nested_siblings(
 
 
 def test_handoff_context_mapping_executes_non_conflicting_nested_siblings(
-    tmp_path: Path,
+    session_factory: SessionFactory,
 ) -> None:
     registry = build_config_registry(CONFIG_ROOT)
     definition = registry.get_handoff("kernel_demo_source_to_target_v1")
@@ -140,7 +156,7 @@ def test_handoff_context_mapping_executes_non_conflicting_nested_siblings(
             ),
         },
     )
-    factory = _session_factory(tmp_path)
+    factory = session_factory
 
     with transaction_boundary(factory) as session:
         source_session_id, artifact_id = _seed_source(session)
@@ -160,8 +176,10 @@ def test_handoff_context_mapping_executes_non_conflicting_nested_siblings(
     }
 
 
-def test_handoff_event_helper_preserves_canonical_correlation(tmp_path: Path) -> None:
-    factory = _session_factory(tmp_path)
+def test_handoff_event_helper_preserves_canonical_correlation(
+    session_factory: SessionFactory,
+) -> None:
+    factory = session_factory
     registry = build_config_registry(CONFIG_ROOT)
     with transaction_boundary(factory) as session:
         source_session_id, artifact_id = _seed_source(session)
@@ -177,6 +195,7 @@ def test_handoff_event_helper_preserves_canonical_correlation(tmp_path: Path) ->
             EventEmitter(EventLogRepository(session)),
             "handoff.viewed",
             record,
+            scenario_session_id="",
             properties={
                 "handoff_id": "caller_handoff",
                 "source_scenario_session_id": "caller_source_session",
@@ -207,25 +226,6 @@ def test_handoff_event_helper_preserves_canonical_correlation(tmp_path: Path) ->
         assert event_row["properties"]["source_job_id"] == record.source_job_id
         assert event_row["properties"]["source_artifact_id"] == record.source_artifact_id
         assert event_row["properties"]["target_job_id"] is None
-
-
-def _session_factory(tmp_path: Path):
-    main_db = tmp_path / "handoff-main.sqlite3"
-    platform_db = tmp_path / "handoff-platform.sqlite3"
-    engine = sa.create_engine(f"sqlite+pysqlite:///{main_db.as_posix()}", future=True)
-
-    @event.listens_for(engine, "connect")
-    def attach(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        dbapi_connection.execute(f"ATTACH DATABASE '{platform_db.as_posix()}' AS platform")
-
-    config = Config()
-    config.set_main_option("script_location", str(REPO_ROOT / "migrations" / "platform"))
-    config.set_main_option("sqlalchemy.url", f"sqlite+pysqlite:///{main_db.as_posix()}")
-    with engine.begin() as connection:
-        config.attributes["connection"] = connection
-        command.upgrade(config, "head")
-    return build_session_factory(engine)
 
 
 def _seed_source(session, *, guest_id: str = "guest_handoff") -> tuple[str, str]:
@@ -376,8 +376,10 @@ def _assert_handoff_event_chain_lineage(session, handoff_id: str) -> None:
     assert consumed_event["properties"]["target_job_id"] == record.target_job_id
 
 
-def test_handoff_create_view_accept_and_double_accept(tmp_path: Path) -> None:
-    factory = _session_factory(tmp_path)
+def test_handoff_create_view_accept_and_double_accept(
+    session_factory: SessionFactory,
+) -> None:
+    factory = session_factory
     registry = build_config_registry(CONFIG_ROOT)
     with transaction_boundary(factory) as session:
         source_session_id, artifact_id = _seed_source(session)
@@ -433,10 +435,10 @@ def test_handoff_create_view_accept_and_double_accept(tmp_path: Path) -> None:
     ],
 )
 def test_handoff_rejects_noncanonical_or_schema_invalid_artifacts(
-    tmp_path: Path,
+    session_factory: SessionFactory,
     artifact_changes: dict[str, Any],
 ) -> None:
-    factory = _session_factory(tmp_path)
+    factory = session_factory
     registry = build_config_registry(CONFIG_ROOT)
     with transaction_boundary(factory) as session:
         source_id, artifact_id = _seed_source(session)
@@ -449,8 +451,10 @@ def test_handoff_rejects_noncanonical_or_schema_invalid_artifacts(
             _create(_service(session, registry), source_id, artifact_id)
 
 
-def test_handoff_context_must_pass_target_workflow_input_schema(tmp_path: Path) -> None:
-    factory = _session_factory(tmp_path)
+def test_handoff_context_must_pass_target_workflow_input_schema(
+    session_factory: SessionFactory,
+) -> None:
+    factory = session_factory
     registry = build_config_registry(CONFIG_ROOT)
     target_workflow = registry.get_workflow("kernel_demo.single_action_extract_v1")
     assert target_workflow is not None
@@ -475,8 +479,10 @@ def test_handoff_context_must_pass_target_workflow_input_schema(tmp_path: Path) 
             _create(_service(session, strict_registry), source_id, artifact_id)
 
 
-def test_handoff_revalidates_full_source_artifact_before_mapping(tmp_path: Path) -> None:
-    factory = _session_factory(tmp_path)
+def test_handoff_revalidates_full_source_artifact_before_mapping(
+    session_factory: SessionFactory,
+) -> None:
+    factory = session_factory
     registry = build_config_registry(CONFIG_ROOT)
     source_schema = registry.get_schema("kernel_demo.extract_output_v1")
     assert source_schema is not None
@@ -518,8 +524,43 @@ def test_handoff_revalidates_full_source_artifact_before_mapping(tmp_path: Path)
             _create(_service(session, strict_registry), source_id, artifact_id)
 
 
-def test_handoff_preview_is_allowlisted_and_bounded(tmp_path: Path) -> None:
-    factory = _session_factory(tmp_path)
+def test_handoff_rejects_malformed_target_input_schema(
+    session_factory: SessionFactory,
+) -> None:
+    factory = session_factory
+    registry = build_config_registry(CONFIG_ROOT)
+    definition = registry.get_handoff("kernel_demo_source_to_target_v1")
+    assert definition is not None
+    target_scenario = registry.get_scenario(definition.target_scenario_id)
+    assert target_scenario is not None
+    target_workflow = registry.get_workflow(target_scenario.workflow_id)
+    assert target_workflow is not None
+    target_schema = registry.get_schema(target_workflow.input_schema_ref)
+    assert target_schema is not None
+    malformed_registry = replace(
+        registry,
+        schemas={
+            **registry.schemas,
+            target_schema.schema_ref: replace(
+                target_schema,
+                schema={"type": 123},
+            ),
+        },
+    )
+    with transaction_boundary(factory) as session:
+        source_id, artifact_id = _seed_source(session)
+
+        with pytest.raises(HandoffTargetSchemaInvalidError) as exc_info:
+            _create(_service(session, malformed_registry), source_id, artifact_id)
+
+    assert isinstance(exc_info.value.__cause__, Exception)
+    assert "target workflow input schema is invalid" in str(exc_info.value.__cause__)
+
+
+def test_handoff_preview_is_allowlisted_and_bounded(
+    session_factory: SessionFactory,
+) -> None:
+    factory = session_factory
     registry = build_config_registry(CONFIG_ROOT)
     with transaction_boundary(factory) as session:
         source_id, artifact_id = _seed_source(session)
@@ -545,8 +586,10 @@ def test_handoff_preview_is_allowlisted_and_bounded(tmp_path: Path) -> None:
         assert "debug_metadata" not in serialized
 
 
-def test_handoff_decline_expiry_and_deferred_target(tmp_path: Path) -> None:
-    factory = _session_factory(tmp_path)
+def test_handoff_decline_expiry_and_deferred_target(
+    session_factory: SessionFactory,
+) -> None:
+    factory = session_factory
     registry = build_config_registry(CONFIG_ROOT)
     current = [datetime(2026, 7, 22, 12, 0, tzinfo=UTC)]
     with transaction_boundary(factory) as session:
@@ -566,13 +609,18 @@ def test_handoff_decline_expiry_and_deferred_target(tmp_path: Path) -> None:
                 AcceptHandoffCommand(tenant_id="anytoolai", region="default"),
             )
 
+    definition = registry.get_handoff("kernel_demo_source_to_target_v1")
+    assert definition is not None
     deferred_definition = replace(
-        registry.get_handoff("kernel_demo_source_to_target_v1"),
+        definition,
         target_start_policy=HandoffStartPolicy.deferred,
     )
     deferred_registry = replace(
         registry,
-        handoffs={deferred_definition.handoff_id: deferred_definition},
+        handoffs={
+            **dict(registry.handoffs),
+            deferred_definition.handoff_id: deferred_definition,
+        },
     )
     with transaction_boundary(factory) as session:
         source_id, artifact_id = _seed_source(session, guest_id="guest_deferred")
@@ -595,10 +643,10 @@ def test_handoff_decline_expiry_and_deferred_target(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("operation", ["preview", "decline", "accept"])
 def test_handoff_transition_cannot_cross_expiry_boundary(
-    tmp_path: Path,
+    session_factory: SessionFactory,
     operation: str,
 ) -> None:
-    factory = _session_factory(tmp_path)
+    factory = session_factory
     registry = build_config_registry(CONFIG_ROOT)
     created_at = datetime(2026, 7, 22, 12, 0, tzinfo=UTC)
     with transaction_boundary(factory) as session:
@@ -661,8 +709,10 @@ def test_handoff_transition_cannot_cross_expiry_boundary(
         assert "handoff.accepted" not in event_types
 
 
-def test_quota_recovery_finalizes_failure_without_router_transaction(tmp_path: Path) -> None:
-    factory = _session_factory(tmp_path)
+def test_quota_recovery_finalizes_failure_without_router_transaction(
+    session_factory: SessionFactory,
+) -> None:
+    factory = session_factory
     registry = build_config_registry(CONFIG_ROOT)
     policy = registry.get_quota_policy("kernel_demo.guest_quota_v1")
     assert policy is not None
@@ -737,6 +787,238 @@ def test_quota_recovery_finalizes_failure_without_router_transaction(tmp_path: P
         assert repeated_event_types.count("handoff.failed") == 1
 
 
+def _create_target_runtime_for_handoff(
+    session,
+    handoff,
+) -> tuple[ScenarioSessionRecord, JobRecord]:
+    target_session = ScenarioSessionRepository(session).create(
+        ScenarioSessionRecord(
+            tenant_id=handoff.tenant_id,
+            region=handoff.region,
+            product_id=handoff.target_product_id,
+            frontend_id=handoff.target_frontend_id,
+            scenario_id=handoff.target_scenario_id,
+            scenario_version=1,
+            status=ScenarioSessionStatus.started,
+            parent_scenario_session_id=handoff.source_scenario_session_id,
+        )
+    )
+    target_job = JobRepository(session).create(
+        JobRecord(
+            tenant_id=handoff.tenant_id,
+            region=handoff.region,
+            product_id=handoff.target_product_id,
+            frontend_id=handoff.target_frontend_id,
+            scenario_session_id=target_session.id,
+            workflow_id="kernel_demo.single_action_extract_v1",
+            workflow_version=1,
+        )
+    )
+    return target_session, target_job
+
+
+def _prepare_scoped_mutation_case(
+    session,
+    repository: HandoffRepository,
+    handoff_id: str,
+    operation: str,
+) -> tuple[object, dict[str, object]]:
+    now = datetime.now(UTC)
+    stored = repository.get_by_id(handoff_id, tenant_id="anytoolai", region="default")
+    assert stored is not None
+    if operation == "mark_viewed":
+        return stored, {"now": now}
+    if operation == "claim_accept":
+        return stored, {
+            "now": now,
+            "accepted_by_guest_id": "guest_accept",
+            "accepted_from_frontend_instance_id": "frontend_instance_accept",
+        }
+    if operation == "attach_target":
+        accepted = repository.claim_accept(
+            handoff_id,
+            now,
+            tenant_id="anytoolai",
+            region="default",
+            accepted_by_guest_id="guest_accept",
+            accepted_from_frontend_instance_id="frontend_instance_accept",
+        )
+        assert accepted is not None
+        target_session, target_job = _create_target_runtime_for_handoff(session, accepted)
+        return accepted, {
+            "now": now,
+            "target_scenario_session_id": target_session.id,
+            "target_job_id": target_job.id,
+        }
+    if operation == "decline":
+        return stored, {"now": now}
+    if operation == "expire_if_due":
+        return stored, {"now": stored.expires_at + timedelta(seconds=1)}
+    if operation == "consume":
+        accepted = repository.claim_accept(
+            handoff_id,
+            now,
+            tenant_id="anytoolai",
+            region="default",
+            accepted_by_guest_id="guest_accept",
+            accepted_from_frontend_instance_id="frontend_instance_accept",
+        )
+        assert accepted is not None
+        target_session, target_job = _create_target_runtime_for_handoff(session, accepted)
+        repository.attach_target(
+            handoff_id,
+            tenant_id="anytoolai",
+            region="default",
+            target_scenario_session_id=target_session.id,
+            target_job_id=target_job.id,
+            now=now,
+        )
+        expected = repository.get_by_id(handoff_id, tenant_id="anytoolai", region="default")
+        assert expected is not None
+        return expected, {
+            "now": now,
+            "target_job_id": target_job.id,
+        }
+    if operation == "mark_failed":
+        return stored, {"now": now, "error_code": "handoff_acceptance_failed"}
+    if operation == "finalize_quota_failure_recovery":
+        return stored, {"now": now, "error_code": "quota_exhausted"}
+    raise AssertionError(f"unexpected operation: {operation}")
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        "mark_viewed",
+        "claim_accept",
+        "attach_target",
+        "decline",
+        "expire_if_due",
+        "consume",
+        "mark_failed",
+        "finalize_quota_failure_recovery",
+    ],
+)
+@pytest.mark.parametrize(
+    ("tenant_id", "region"),
+    [
+        ("tenant_other", "default"),
+        ("anytoolai", "region_other"),
+    ],
+    ids=["wrong-tenant", "wrong-region"],
+)
+def test_handoff_repository_mutations_are_tenant_region_scoped(
+    session_factory: SessionFactory,
+    operation: str,
+    tenant_id: str,
+    region: str,
+) -> None:
+    factory = session_factory
+    registry = build_config_registry(CONFIG_ROOT)
+    with transaction_boundary(factory) as session:
+        source_id, artifact_id = _seed_source(session)
+        created = _create(_service(session, registry), source_id, artifact_id)
+        repository = HandoffRepository(session)
+        expected_record, mutation_kwargs = _prepare_scoped_mutation_case(
+            session,
+            repository,
+            created.preview.handoff_id,
+            operation,
+        )
+
+        if operation == "mark_viewed":
+            with pytest.raises(LookupError):
+                repository.mark_viewed(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+        elif operation == "claim_accept":
+            assert (
+                repository.claim_accept(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+                is None
+            )
+        elif operation == "attach_target":
+            with pytest.raises(LookupError):
+                repository.attach_target(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+        elif operation == "decline":
+            with pytest.raises(LookupError):
+                repository.decline(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+        elif operation == "expire_if_due":
+            with pytest.raises(LookupError):
+                repository.expire_if_due(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+        elif operation == "consume":
+            with pytest.raises(LookupError):
+                repository.consume(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+        elif operation == "mark_failed":
+            with pytest.raises(LookupError):
+                repository.mark_failed(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+        else:
+            with pytest.raises(LookupError):
+                repository.finalize_quota_failure_recovery(
+                    created.preview.handoff_id,
+                    tenant_id=tenant_id,
+                    region=region,
+                    **mutation_kwargs,
+                )
+
+        stored = repository.get_by_id(
+            created.preview.handoff_id,
+            tenant_id="anytoolai",
+            region="default",
+        )
+        assert stored is not None
+        assert stored == expected_record
+
+
+@pytest.mark.parametrize(
+    ("raw_error_code", "expected"),
+    [
+        ("quota_exhausted", "quota_exhausted"),
+        ("Quota_Exhausted", "handoff_acceptance_failed"),
+        ("quota-exhausted", "handoff_acceptance_failed"),
+        ("quota exhausted", "handoff_acceptance_failed"),
+        ("квота_исчерпана", "handoff_acceptance_failed"),
+    ],
+)
+def test_safe_handoff_error_code_allows_only_ascii_lowercase_identifier(
+    raw_error_code: str,
+    expected: str,
+) -> None:
+    assert _safe_error_code(raw_error_code) == expected
+
+
 @pytest.mark.parametrize(
     "terminal_status",
     [
@@ -747,21 +1029,21 @@ def test_quota_recovery_finalizes_failure_without_router_transaction(tmp_path: P
     ],
 )
 def test_expired_terminal_handoff_token_is_redacted_without_mutating_state(
-    tmp_path: Path,
+    session_factory: SessionFactory,
     terminal_status: HandoffStatus,
 ) -> None:
-    factory = _session_factory(tmp_path)
+    factory = session_factory
     registry = build_config_registry(CONFIG_ROOT)
     if terminal_status is HandoffStatus.accepted:
         definition = registry.get_handoff("kernel_demo_source_to_target_v1")
         assert definition is not None
-        deferred_definition = replace(
-            definition,
-            target_start_policy=HandoffStartPolicy.deferred,
-        )
+        deferred_definition = replace(definition, target_start_policy=HandoffStartPolicy.deferred)
         registry = replace(
             registry,
-            handoffs={deferred_definition.handoff_id: deferred_definition},
+            handoffs={
+                **dict(registry.handoffs),
+                deferred_definition.handoff_id: deferred_definition,
+            },
         )
 
     current = [datetime(2026, 7, 23, 12, 0, tzinfo=UTC)]

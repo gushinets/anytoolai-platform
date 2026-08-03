@@ -2,13 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
-from sqlalchemy import event
 
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
@@ -16,7 +13,7 @@ from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.models import ProviderCallRecord
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
-from anytoolai_platform_core.storage.db import artifacts_table
+from anytoolai_platform_core.storage.db import artifacts_table, event_log_table
 from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
@@ -30,39 +27,19 @@ from anytoolai_platform_core.structured_output.service import (
     StructuredOutputPersistenceContext,
 )
 from anytoolai_platform_core.structured_output.validator import validate_structured_output
+from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-
-
-def _sqlite_url(database_path: Path) -> str:
-    return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
+pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
 
 @pytest.fixture
-def runtime_engine(tmp_path: Path) -> sa.Engine:
-    main_db = tmp_path / "structured-output-main.sqlite3"
-    platform_db = tmp_path / "structured-output-platform.sqlite3"
-    engine = sa.create_engine(_sqlite_url(main_db), future=True)
-
-    @event.listens_for(engine, "connect")
-    def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
-        )
-
-    alembic_config = Config()
-    alembic_config.set_main_option(
-        "script_location", str(REPO_ROOT / "migrations" / "platform")
-    )
-    alembic_config.set_main_option("sqlalchemy.url", _sqlite_url(main_db))
-
-    with engine.begin() as connection:
-        alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "head")
-
-    yield engine
-    engine.dispose()
+def runtime_engine() -> Iterator[sa.Engine]:
+    with provision_database(
+        database_name_prefix="anytoolai_structured_output_test",
+        skip_reason="PostgreSQL structured output coverage",
+    ) as (engine, _alembic_config, _database_url):
+        yield engine
 
 
 @pytest.fixture
@@ -83,6 +60,15 @@ def _context() -> StructuredOutputPersistenceContext:
         scenario_session_id="scenario_session_demo",
         job_id="job_demo",
         action_run_id="action_run_demo",
+        workflow_id="wf_demo",
+        workflow_version=1,
+        guest_id="guest_demo",
+        user_id="user_demo",
+        handoff_id="handoff_demo",
+        scenario_chain_id="scenario_chain_demo",
+        acquisition_source="kernel_demo_ce",
+        action_type="text.extract_structured_fields",
+        action_config_id="kernel_demo.extract_structured_fields_v1",
     )
 
 
@@ -108,6 +94,8 @@ def _provider_call(action_run_id: str = "action_run_demo") -> ProviderCallRecord
         semantic_attempt_index=2,
         transport_attempt_index=1,
         physical_call_index=2,
+        pydantic_run_id="pydantic_run_demo",
+        litellm_response_id="litellm_response_demo",
     )
 
 
@@ -115,6 +103,14 @@ def _artifacts(session: sa.orm.Session) -> list[dict[str, Any]]:
     return list(
         session.execute(
             sa.select(artifacts_table).order_by(artifacts_table.c.created_at, artifacts_table.c.id)
+        ).mappings()
+    )
+
+
+def _artifact_created_events(session: sa.orm.Session) -> list[dict[str, Any]]:
+    return list(
+        session.execute(
+            sa.select(event_log_table).where(event_log_table.c.event_type == "artifact.created")
         ).mappings()
     )
 
@@ -174,9 +170,11 @@ def test_structured_output_finalizer_persists_success_artifact(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
+        provider_repository = ProviderCallRepository(session)
+        provider_call = provider_repository.create(_provider_call())
         finalizer = StructuredOutputFinalizer(
             artifact_service=_artifact_service(session),
-            provider_call_repository=ProviderCallRepository(session),
+            provider_call_repository=provider_repository,
         )
 
         result = finalizer.finalize(
@@ -195,6 +193,7 @@ def test_structured_output_finalizer_persists_success_artifact(
             schema_version=1,
         )
         artifacts = _artifacts(session)
+        events = _artifact_created_events(session)
 
     assert result.validation_result.normalized_output == {"summary": "ok", "score": 1}
     assert result.artifact.artifact_type == "structured_output"
@@ -202,6 +201,46 @@ def test_structured_output_finalizer_persists_success_artifact(
     assert artifacts[0]["artifact_type"] == "structured_output"
     assert artifacts[0]["content_json"] == {"summary": "ok", "score": 1}
     assert artifacts[0]["action_run_id"] == "action_run_demo"
+    assert artifacts[0]["metadata"]["workflow_id"] == "wf_demo"
+    assert artifacts[0]["metadata"]["workflow_version"] == 1
+    assert artifacts[0]["metadata"]["guest_id"] == "guest_demo"
+    assert artifacts[0]["metadata"]["user_id"] == "user_demo"
+    assert artifacts[0]["metadata"]["scenario_chain_id"] == "scenario_chain_demo"
+    assert artifacts[0]["metadata"]["handoff_id"] == "handoff_demo"
+    assert artifacts[0]["metadata"]["acquisition_source"] == "kernel_demo_ce"
+    assert artifacts[0]["metadata"]["action_type"] == "text.extract_structured_fields"
+    assert (
+        artifacts[0]["metadata"]["action_config_id"]
+        == "kernel_demo.extract_structured_fields_v1"
+    )
+    assert artifacts[0]["metadata"]["provider_call_id"] == provider_call.id
+    assert artifacts[0]["metadata"]["provider_policy_ref"] == "default_fake_provider_v1"
+    assert artifacts[0]["metadata"]["provider"] == "fake"
+    assert artifacts[0]["metadata"]["model"] == "fake-json-v1"
+    assert artifacts[0]["metadata"]["physical_call_index"] == 2
+    assert artifacts[0]["metadata"]["pydantic_run_id"] == "pydantic_run_demo"
+    assert artifacts[0]["metadata"]["litellm_response_id"] == "litellm_response_demo"
+    assert "prompt" not in artifacts[0]["metadata"]
+    assert "credentials" not in artifacts[0]["metadata"]
+    assert "provider_request" not in artifacts[0]["metadata"]
+    assert "provider_response" not in artifacts[0]["metadata"]
+    assert events[0]["workflow_id"] == "wf_demo"
+    assert events[0]["workflow_version"] == 1
+    assert events[0]["guest_id"] == "guest_demo"
+    assert events[0]["user_id"] == "user_demo"
+    assert events[0]["scenario_chain_id"] == "scenario_chain_demo"
+    assert events[0]["handoff_id"] == "handoff_demo"
+    assert events[0]["acquisition_source"] == "kernel_demo_ce"
+    assert events[0]["action_type"] == "text.extract_structured_fields"
+    assert events[0]["action_config_id"] == "kernel_demo.extract_structured_fields_v1"
+    assert events[0]["provider_call_id"] == provider_call.id
+    assert events[0]["provider_policy_ref"] == "default_fake_provider_v1"
+    assert events[0]["provider"] == "fake"
+    assert events[0]["model"] == "fake-json-v1"
+    assert events[0]["physical_call_index"] == 2
+    assert events[0]["pydantic_run_id"] == "pydantic_run_demo"
+    assert events[0]["litellm_response_id"] == "litellm_response_demo"
+    assert events[0]["properties"] == {"artifact_type": "structured_output"}
 
 
 @pytest.mark.parametrize(
@@ -239,6 +278,7 @@ def test_structured_output_finalizer_persists_debug_artifact_for_validation_fail
                 schema_version=1,
             )
         artifacts = _artifacts(session)
+        events = _artifact_created_events(session)
 
     assert exc_info.value.code == STRUCTURED_OUTPUT_VALIDATION_ERROR_CODE
     assert exc_info.value.reason == reason
@@ -249,4 +289,26 @@ def test_structured_output_finalizer_persists_debug_artifact_for_validation_fail
     assert artifacts[0]["action_run_id"] == "action_run_demo"
     assert artifacts[0]["metadata"]["reason"] == reason
     assert artifacts[0]["metadata"]["provider_call_id"].startswith("provider_call_")
+    assert artifacts[0]["metadata"]["provider_policy_ref"] == "default_fake_provider_v1"
+    assert artifacts[0]["metadata"]["provider"] == "fake"
+    assert artifacts[0]["metadata"]["model"] == "fake-json-v1"
     assert artifacts[0]["metadata"]["physical_call_index"] == 2
+    assert artifacts[0]["metadata"]["pydantic_run_id"] == "pydantic_run_demo"
+    assert artifacts[0]["metadata"]["litellm_response_id"] == "litellm_response_demo"
+    assert events[0]["provider_call_id"].startswith("provider_call_")
+    assert events[0]["provider_policy_ref"] == "default_fake_provider_v1"
+    assert events[0]["provider"] == "fake"
+    assert events[0]["model"] == "fake-json-v1"
+    assert events[0]["physical_call_index"] == 2
+    assert events[0]["pydantic_run_id"] == "pydantic_run_demo"
+    assert events[0]["litellm_response_id"] == "litellm_response_demo"
+    assert events[0]["workflow_id"] == "wf_demo"
+    assert events[0]["workflow_version"] == 1
+    assert events[0]["guest_id"] == "guest_demo"
+    assert events[0]["user_id"] == "user_demo"
+    assert events[0]["scenario_chain_id"] == "scenario_chain_demo"
+    assert events[0]["handoff_id"] == "handoff_demo"
+    assert events[0]["acquisition_source"] == "kernel_demo_ce"
+    assert events[0]["action_type"] == "text.extract_structured_fields"
+    assert events[0]["action_config_id"] == "kernel_demo.extract_structured_fields_v1"
+    assert events[0]["properties"] == {"artifact_type": "structured_output_debug_raw"}

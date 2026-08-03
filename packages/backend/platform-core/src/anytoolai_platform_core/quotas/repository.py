@@ -3,23 +3,14 @@ from __future__ import annotations
 from dataclasses import asdict, replace
 
 import sqlalchemy as sa
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Session
 
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaUsageRecord
-from anytoolai_platform_core.storage.db import guest_quota_usage_table
-from anytoolai_platform_core.storage.db_errors import (
-    is_expected_unique_violation,
-    unique_constraint_columns,
-)
-
-EXPECTED_USAGE_DIMENSION_CONSTRAINT = "uq_guest_quota_usage_dimension"
-# Derived from the table's own constraint definition (storage/db.py) instead of a
-# hardcoded copy -- this can never silently drift out of sync with the real
-# constraint's column list.
-SQLITE_USAGE_DIMENSION_COLUMNS: tuple[str, ...] = unique_constraint_columns(
-    guest_quota_usage_table, EXPECTED_USAGE_DIMENSION_CONSTRAINT
+from anytoolai_platform_core.storage.db import (
+    GUEST_QUOTA_USAGE_DIMENSION_CONSTRAINT_NAME,
+    guest_quota_usage_table,
 )
 
 
@@ -60,15 +51,6 @@ def _record_from_row(row: sa.RowMapping) -> QuotaUsageRecord:
     data = dict(row)
     data["quota_dimension"] = QuotaDimension(data["quota_dimension"])
     return QuotaUsageRecord(**data)
-
-
-def _is_expected_usage_dimension_race(error: IntegrityError) -> bool:
-    return is_expected_unique_violation(
-        error,
-        constraint_name=EXPECTED_USAGE_DIMENSION_CONSTRAINT,
-        table_name="guest_quota_usage",
-        columns=SQLITE_USAGE_DIMENSION_COLUMNS,
-    )
 
 
 class QuotaUsageRepository:
@@ -164,14 +146,7 @@ class QuotaUsageRepository:
             limit_count=limit_count,
             metadata=dict(metadata or {}),
         )
-        try:
-            with self._session.begin_nested():
-                self._session.execute(
-                    sa.insert(guest_quota_usage_table).values(asdict(record))
-                )
-        except IntegrityError as exc:
-            if not _is_expected_usage_dimension_race(exc):
-                raise
+        self._execute_usage_insert(record)
         self._session.flush()
 
         stored = self.get_by_dimension(
@@ -185,6 +160,16 @@ class QuotaUsageRepository:
             period_key=period_key,
         )
         return _require_stored_usage(stored, record.id, "ensure")
+
+    def _execute_usage_insert(self, record: QuotaUsageRecord) -> None:
+        values = asdict(record)
+        self._session.execute(
+            postgresql.insert(guest_quota_usage_table)
+            .values(values)
+            .on_conflict_do_nothing(
+                constraint=GUEST_QUOTA_USAGE_DIMENSION_CONSTRAINT_NAME
+            )
+        )
 
     def consume_if_available(self, record: QuotaUsageRecord) -> QuotaUsageRecord | None:
         result = self._session.execute(

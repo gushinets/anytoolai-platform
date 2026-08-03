@@ -14,9 +14,13 @@ from sqlalchemy.orm import Session
 from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.actions.runner import ActionRunner, _emit_recovered_action_events
+from anytoolai_platform_core.artifacts.correlation import (
+    build_artifact_correlation_metadata,
+)
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.common.errors import PlatformError
+from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
@@ -366,6 +370,7 @@ class SequentialWorkflowRunner:
                     completed_at=job.completed_at or utc_now(),
                 )
             )
+            self._register_success_recovery(job)
             return WorkflowRunResult(
                 job_id=job.id,
                 workflow_id=job.workflow_id,
@@ -461,6 +466,7 @@ class SequentialWorkflowRunner:
                     user_id=job.metadata.get("user_id"),
                     skip_reason=skip_reason,
                 )
+                self._register_skipped_action_run_recovery(skipped_action_run)
                 state.step_state[step.step_id] = self._build_step_state(
                     step=step,
                     action_type=action_config.action_type,
@@ -697,15 +703,18 @@ class SequentialWorkflowRunner:
             job_id=job.id,
             action_run_id=None,
             content_json=payload,
-            metadata={
-                "schema_ref": workflow.output_schema_ref,
-                "schema_version": self._schema_version(workflow.output_schema_ref),
-                "workflow_id": workflow.workflow_id,
-                "workflow_version": workflow.version,
-                "artifact_role": "workflow_result",
-                "handoff_id": _metadata_str(job.metadata, "handoff_id"),
-                "scenario_chain_id": _metadata_str(job.metadata, "scenario_chain_id"),
-            },
+            metadata=build_artifact_correlation_metadata(
+                workflow_id=workflow.workflow_id,
+                workflow_version=workflow.version,
+                guest_id=metadata_str(job.metadata, "guest_id"),
+                user_id=metadata_str(job.metadata, "user_id"),
+                scenario_chain_id=metadata_str(job.metadata, "scenario_chain_id"),
+                handoff_id=metadata_str(job.metadata, "handoff_id"),
+                acquisition_source=metadata_str(job.metadata, "acquisition_source"),
+                schema_ref=workflow.output_schema_ref,
+                schema_version=self._schema_version(workflow.output_schema_ref),
+                artifact_role="workflow_result",
+            ),
         )
 
     def _select_final_output(
@@ -960,6 +969,39 @@ class SequentialWorkflowRunner:
             phase=RollbackRecoveryPhase.workflow_events,
         )
 
+    def _register_success_recovery(self, job: JobRecord) -> None:
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _recover_succeeded_workflow_row_after_rollback(
+                recovery_session_factory,
+                job,
+            ),
+            phase=RollbackRecoveryPhase.workflow_rows,
+        )
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _recover_succeeded_workflow_events_after_rollback(
+                recovery_session_factory,
+                job.id,
+            ),
+            phase=RollbackRecoveryPhase.workflow_events,
+        )
+
+    def _register_skipped_action_run_recovery(self, action_run: ActionRunRecord) -> None:
+        # Unlike ActionRunner, which registers row recovery unconditionally on both its
+        # success and failure paths, skipped steps are persisted directly here and never
+        # go through ActionRunner -- without this, a rollback after workflow success
+        # drops the skipped row while the recovered job metadata and replayed
+        # workflow.step_skipped event still reference its action_run_id.
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _recover_skipped_action_run_row_after_rollback(
+                recovery_session_factory,
+                action_run,
+            ),
+            phase=RollbackRecoveryPhase.action_rows,
+        )
+
     @staticmethod
     def _remember_failed_step(
         state: _WorkflowExecutionState,
@@ -1064,11 +1106,11 @@ def _context_from_record(record: JobRecord) -> ExecutionContext:
         job_id=record.id,
         workflow_id=record.workflow_id,
         workflow_version=record.workflow_version,
-        guest_id=_metadata_str(record.metadata, "guest_id"),
-        user_id=_metadata_str(record.metadata, "user_id"),
-        scenario_chain_id=_metadata_str(record.metadata, "scenario_chain_id"),
-        handoff_id=_metadata_str(record.metadata, "handoff_id"),
-        acquisition_source=_metadata_str(record.metadata, "acquisition_source"),
+        guest_id=metadata_str(record.metadata, "guest_id"),
+        user_id=metadata_str(record.metadata, "user_id"),
+        scenario_chain_id=metadata_str(record.metadata, "scenario_chain_id"),
+        handoff_id=metadata_str(record.metadata, "handoff_id"),
+        acquisition_source=metadata_str(record.metadata, "acquisition_source"),
     )
 
 
@@ -1153,6 +1195,80 @@ def _recover_canceled_workflow_row_after_rollback(
         del stored
 
 
+def _recover_skipped_action_run_row_after_rollback(
+    recovery_session_factory: Any,
+    record: ActionRunRecord,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        action_run_repository = ActionRunRepository(recovery_session)
+        if action_run_repository.get(record.id) is None:
+            action_run_repository.create(record)
+
+
+def _recover_succeeded_workflow_row_after_rollback(
+    recovery_session_factory: Any,
+    record: JobRecord,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        repository = JobRepository(recovery_session)
+        artifact_repository = ArtifactRepository(recovery_session)
+
+        # jobs.result_artifact_id has no DB-level FK constraint, and unlike
+        # mark_succeeded(), the create()/update() branches below don't validate it on
+        # their own. If the artifact's own recovery callback (phase artifact_rows) fails
+        # or is skipped, this callback still runs afterward (recovery callbacks keep
+        # going after a sibling failure) and would otherwise silently persist a
+        # succeeded job with a result_artifact_id that points nowhere.
+        _require_recoverable_result_artifact(record, artifact_repository)
+
+        existing = repository.get(record.id)
+        if existing is None:
+            repository.create(record)
+        elif existing.status is JobStatus.running:
+            repository.mark_succeeded(record)
+        elif existing.status is JobStatus.succeeded:
+            repository.update(record)
+        else:
+            raise RuntimeError(
+                f"job {record.id} cannot recover succeeded workflow from {existing.status.value}"
+            )
+
+
+def _require_recoverable_result_artifact(
+    record: JobRecord,
+    artifact_repository: ArtifactRepository,
+) -> None:
+    artifact_id = record.result_artifact_id
+    if not isinstance(artifact_id, str) or not artifact_id:
+        raise RuntimeError(
+            f"job {record.id} cannot recover succeeded workflow without a result_artifact_id"
+        )
+    artifact = artifact_repository.get(artifact_id)
+    if artifact is None:
+        raise RuntimeError(
+            f"job {record.id} cannot recover succeeded workflow: "
+            f"result artifact {artifact_id} was not recovered"
+        )
+    if artifact.job_id != record.id or artifact.scenario_session_id != record.scenario_session_id:
+        raise RuntimeError(
+            f"job {record.id} cannot recover succeeded workflow: "
+            f"result artifact {artifact_id} does not belong to this job"
+        )
+
+
+def _recover_succeeded_workflow_events_after_rollback(
+    recovery_session_factory: Any,
+    job_id: str,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        _emit_recovered_workflow_events(
+            recovery_session,
+            job_id=job_id,
+            terminal_event_type="workflow.succeeded",
+            terminal_error_code=None,
+        )
+
+
 def _recover_failed_workflow_events_after_rollback(
     recovery_session_factory: Any,
     job_id: str,
@@ -1179,11 +1295,6 @@ def _recover_canceled_workflow_events_after_rollback(
             terminal_event_type="workflow.canceled",
             terminal_error_code=None,
         )
-
-
-def _metadata_str(metadata: Mapping[str, Any], key: str) -> str | None:
-    value = metadata.get(key)
-    return value if isinstance(value, str) and value else None
 
 
 @dataclass(frozen=True)

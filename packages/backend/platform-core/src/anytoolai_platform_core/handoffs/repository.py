@@ -62,9 +62,18 @@ class HandoffRepository:
             product_handoffs_table.c.region == region,
         )
 
-    def mark_viewed(self, handoff_id: str, now: datetime) -> HandoffTransitionResult:
+    def mark_viewed(
+        self,
+        handoff_id: str,
+        now: datetime,
+        *,
+        tenant_id: str,
+        region: str,
+    ) -> HandoffTransitionResult:
         changed = self._transition(
             handoff_id,
+            tenant_id=tenant_id,
+            region=region,
             from_statuses=(HandoffStatus.created,),
             to_status=HandoffStatus.viewed,
             values={"viewed_at": now, "updated_at": now},
@@ -73,13 +82,18 @@ class HandoffRepository:
                 _failure_not_reserved(),
             ),
         )
-        return HandoffTransitionResult(self._require(handoff_id), changed)
+        return HandoffTransitionResult(
+            self._require(handoff_id, tenant_id=tenant_id, region=region),
+            changed,
+        )
 
     def claim_accept(
         self,
         handoff_id: str,
         now: datetime,
         *,
+        tenant_id: str,
+        region: str,
         accepted_by_guest_id: str | None,
         accepted_from_frontend_instance_id: str | None,
     ) -> HandoffRecord | None:
@@ -87,6 +101,8 @@ class HandoffRepository:
             sa.update(product_handoffs_table)
             .where(
                 product_handoffs_table.c.id == handoff_id,
+                product_handoffs_table.c.tenant_id == tenant_id,
+                product_handoffs_table.c.region == region,
                 product_handoffs_table.c.status.in_([HandoffStatus.created, HandoffStatus.viewed]),
                 product_handoffs_table.c.expires_at > now,
                 _failure_not_reserved(),
@@ -102,18 +118,22 @@ class HandoffRepository:
         if result.rowcount == 0:
             return None
         self._session.flush()
-        return self._require(handoff_id)
+        return self._require(handoff_id, tenant_id=tenant_id, region=region)
 
     def finalize_quota_failure_recovery(
         self,
         handoff_id: str,
         *,
+        tenant_id: str,
+        region: str,
         error_code: str,
         now: datetime,
     ) -> HandoffTransitionResult:
         """Atomically claim and finalize quota rollback recovery."""
         changed = self._transition(
             handoff_id,
+            tenant_id=tenant_id,
+            region=region,
             from_statuses=(HandoffStatus.created, HandoffStatus.viewed),
             to_status=HandoffStatus.failed,
             values={
@@ -123,21 +143,34 @@ class HandoffRepository:
             },
             extra_conditions=(_failure_not_reserved(),),
         )
-        return HandoffTransitionResult(self._require(handoff_id), changed)
+        return HandoffTransitionResult(
+            self._require(handoff_id, tenant_id=tenant_id, region=region),
+            changed,
+        )
 
     def attach_target(
         self,
         handoff_id: str,
         *,
+        tenant_id: str,
+        region: str,
         target_scenario_session_id: str,
         target_job_id: str | None,
         now: datetime,
     ) -> HandoffRecord:
-        self._require_target_rows(handoff_id, target_scenario_session_id, target_job_id)
+        self._require_target_rows(
+            handoff_id,
+            tenant_id=tenant_id,
+            region=region,
+            target_scenario_session_id=target_scenario_session_id,
+            target_job_id=target_job_id,
+        )
         result = self._session.execute(
             sa.update(product_handoffs_table)
             .where(
                 product_handoffs_table.c.id == handoff_id,
+                product_handoffs_table.c.tenant_id == tenant_id,
+                product_handoffs_table.c.region == region,
                 product_handoffs_table.c.status == HandoffStatus.accepted,
                 product_handoffs_table.c.target_scenario_session_id.is_(None),
             )
@@ -150,11 +183,20 @@ class HandoffRepository:
         if result.rowcount == 0:
             raise RuntimeError(f"handoff target cannot be attached: {handoff_id}")
         self._session.flush()
-        return self._require(handoff_id)
+        return self._require(handoff_id, tenant_id=tenant_id, region=region)
 
-    def decline(self, handoff_id: str, now: datetime) -> HandoffTransitionResult:
+    def decline(
+        self,
+        handoff_id: str,
+        now: datetime,
+        *,
+        tenant_id: str,
+        region: str,
+    ) -> HandoffTransitionResult:
         changed = self._transition(
             handoff_id,
+            tenant_id=tenant_id,
+            region=region,
             from_statuses=(HandoffStatus.created, HandoffStatus.viewed),
             to_status=HandoffStatus.declined,
             values={"declined_at": now, "updated_at": now},
@@ -163,13 +205,25 @@ class HandoffRepository:
                 _failure_not_reserved(),
             ),
         )
-        return HandoffTransitionResult(self._require(handoff_id), changed)
+        return HandoffTransitionResult(
+            self._require(handoff_id, tenant_id=tenant_id, region=region),
+            changed,
+        )
 
-    def expire_if_due(self, handoff_id: str, now: datetime) -> HandoffTransitionResult:
+    def expire_if_due(
+        self,
+        handoff_id: str,
+        now: datetime,
+        *,
+        tenant_id: str,
+        region: str,
+    ) -> HandoffTransitionResult:
         result = self._session.execute(
             sa.update(product_handoffs_table)
             .where(
                 product_handoffs_table.c.id == handoff_id,
+                product_handoffs_table.c.tenant_id == tenant_id,
+                product_handoffs_table.c.region == region,
                 product_handoffs_table.c.status.in_([HandoffStatus.created, HandoffStatus.viewed]),
                 product_handoffs_table.c.expires_at <= now,
                 _failure_not_reserved(),
@@ -183,45 +237,64 @@ class HandoffRepository:
         changed = result.rowcount > 0
         if changed:
             self._session.flush()
-        return HandoffTransitionResult(self._require(handoff_id), changed)
+        return HandoffTransitionResult(
+            self._require(handoff_id, tenant_id=tenant_id, region=region),
+            changed,
+        )
 
     def consume(
         self,
         handoff_id: str,
         *,
+        tenant_id: str,
+        region: str,
         target_job_id: str,
         now: datetime,
     ) -> HandoffTransitionResult:
-        record = self._require(handoff_id)
+        record = self._require(handoff_id, tenant_id=tenant_id, region=region)
         if record.target_job_id != target_job_id:
             raise ValueError("handoff consume requires its linked target job")
         changed = self._transition(
             handoff_id,
+            tenant_id=tenant_id,
+            region=region,
             from_statuses=(HandoffStatus.accepted,),
             to_status=HandoffStatus.consumed,
             values={"consumed_at": now, "updated_at": now},
         )
-        return HandoffTransitionResult(self._require(handoff_id), changed)
+        return HandoffTransitionResult(
+            self._require(handoff_id, tenant_id=tenant_id, region=region),
+            changed,
+        )
 
     def mark_failed(
         self,
         handoff_id: str,
         *,
+        tenant_id: str,
+        region: str,
         error_code: str,
         now: datetime,
     ) -> HandoffTransitionResult:
         changed = self._transition(
             handoff_id,
+            tenant_id=tenant_id,
+            region=region,
             from_statuses=(HandoffStatus.created, HandoffStatus.viewed),
             to_status=HandoffStatus.failed,
             values={"failed_at": now, "error_code": error_code, "updated_at": now},
         )
-        return HandoffTransitionResult(self._require(handoff_id), changed)
+        return HandoffTransitionResult(
+            self._require(handoff_id, tenant_id=tenant_id, region=region),
+            changed,
+        )
 
     def _transition(
         self,
         handoff_id: str,
         *,
+        tenant_id: str,
+        region: str,
         from_statuses: tuple[HandoffStatus, ...],
         to_status: HandoffStatus,
         values: dict[str, object],
@@ -231,6 +304,8 @@ class HandoffRepository:
             sa.update(product_handoffs_table)
             .where(
                 product_handoffs_table.c.id == handoff_id,
+                product_handoffs_table.c.tenant_id == tenant_id,
+                product_handoffs_table.c.region == region,
                 product_handoffs_table.c.status.in_(from_statuses),
                 *extra_conditions,
             )
@@ -244,10 +319,13 @@ class HandoffRepository:
     def _require_target_rows(
         self,
         handoff_id: str,
+        *,
+        tenant_id: str,
+        region: str,
         target_scenario_session_id: str,
         target_job_id: str | None,
     ) -> None:
-        handoff = self._require(handoff_id)
+        handoff = self._require(handoff_id, tenant_id=tenant_id, region=region)
         target_session = (
             self._session.execute(
                 sa.select(scenario_sessions_table).where(
@@ -284,8 +362,12 @@ class HandoffRepository:
         ):
             raise ValueError("target job must belong to target scenario session")
 
-    def _require(self, handoff_id: str) -> HandoffRecord:
-        row = self._one(product_handoffs_table.c.id == handoff_id)
+    def _require(self, handoff_id: str, *, tenant_id: str, region: str) -> HandoffRecord:
+        row = self._one(
+            product_handoffs_table.c.id == handoff_id,
+            product_handoffs_table.c.tenant_id == tenant_id,
+            product_handoffs_table.c.region == region,
+        )
         if row is None:
             raise LookupError(f"handoff not found: {handoff_id}")
         return row

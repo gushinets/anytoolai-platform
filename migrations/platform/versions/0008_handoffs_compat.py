@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 from sqlalchemy.dialects import postgresql
 
 revision = "0008"
@@ -26,7 +26,11 @@ def _enum_type(name: str, *values: str) -> sa.Enum:
 
 
 def upgrade() -> None:
+    if context.is_offline_mode():
+        return
     bind = op.get_bind()
+    # Keep this historical inline guard self-contained so the recorded revision behavior does not
+    # depend on mutable helper modules added or edited later.
     if sa.inspect(bind).has_table("product_handoffs", schema=PLATFORM_SCHEMA):
         return
     json_document = _json_document_type()

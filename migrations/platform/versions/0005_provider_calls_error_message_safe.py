@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 
 revision = "0005"
 down_revision = "0004"
@@ -22,6 +22,8 @@ def _has_column(bind: sa.Connection, *, table_name: str, column_name: str) -> bo
 
 
 def upgrade() -> None:
+    if context.is_offline_mode():
+        return
     bind = op.get_bind()
     if _has_column(bind, table_name=TABLE_NAME, column_name=COLUMN_NAME):
         return
@@ -33,6 +35,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if context.is_offline_mode():
+        return
     bind = op.get_bind()
     if not _has_column(bind, table_name=TABLE_NAME, column_name=COLUMN_NAME):
         return

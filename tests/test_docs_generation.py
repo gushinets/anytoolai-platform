@@ -25,7 +25,7 @@ def test_generated_documents_are_deterministic_and_source_marked() -> None:
         assert module.GENERATED_SOURCES[name] in content
 
 
-def test_openapi_contains_only_implemented_routes() -> None:
+def test_openapi_includes_handoff_and_runtime_routes() -> None:
     module = load_module()
     openapi = module.render_openapi()
 

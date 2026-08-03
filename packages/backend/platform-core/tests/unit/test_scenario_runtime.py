@@ -3,12 +3,10 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
@@ -52,41 +50,20 @@ from anytoolai_platform_core.storage.transactions import (
 )
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
-from sqlalchemy import event
+from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
-
-
-def _sqlite_url(database_path: Path) -> str:
-    return f"sqlite+pysqlite:///{database_path.resolve().as_posix()}"
+pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
 
 @pytest.fixture
-def runtime_engine(tmp_path: Path) -> sa.Engine:
-    main_db = tmp_path / "scenario-runtime-main.sqlite3"
-    platform_db = tmp_path / "scenario-runtime-platform.sqlite3"
-    engine = sa.create_engine(_sqlite_url(main_db), future=True)
-
-    @event.listens_for(engine, "connect")
-    def attach_platform_schema(dbapi_connection: Any, connection_record: Any) -> None:
-        del connection_record
-        dbapi_connection.execute(
-            f"ATTACH DATABASE '{platform_db.resolve().as_posix()}' AS platform"
-        )
-
-    alembic_config = Config()
-    alembic_config.set_main_option(
-        "script_location", str(REPO_ROOT / "migrations" / "platform")
-    )
-    alembic_config.set_main_option("sqlalchemy.url", _sqlite_url(main_db))
-
-    with engine.begin() as connection:
-        alembic_config.attributes["connection"] = connection
-        command.upgrade(alembic_config, "head")
-
-    yield engine
-    engine.dispose()
+def runtime_engine() -> Iterator[sa.Engine]:
+    with provision_database(
+        database_name_prefix="anytoolai_scenario_runtime_test",
+        skip_reason="PostgreSQL scenario runtime coverage",
+    ) as (engine, _alembic_config, _database_url):
+        yield engine
 
 
 @pytest.fixture
@@ -921,6 +898,38 @@ def test_record_next_action_rejects_non_actionable_processing_checkpoint(
                 region="default",
                 next_action_id="copy_result",
                 checkpoint_id=PROCESSING_CHECKPOINT_ID,
+            )
+
+
+def test_record_next_action_returns_safe_error_when_result_ready_job_is_missing(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        service = _runtime_service(session, config_registry=config_registry)
+        session_repository = ScenarioSessionRepository(session)
+        scenario = config_registry.get_scenario("kernel_demo.single_action_smoke_v1")
+        assert scenario is not None
+        started = session_repository.create(
+            ScenarioSessionRecord(
+                tenant_id="anytoolai",
+                region="default",
+                product_id="kernel_demo",
+                frontend_id="kernel_demo_ce",
+                scenario_id=scenario.scenario_id,
+                scenario_version=scenario.version,
+                status=ScenarioSessionStatus.completed,
+                current_checkpoint_id=RESULT_READY_CHECKPOINT_ID,
+            )
+        )
+
+        with pytest.raises(ScenarioCheckpointNotActionableError):
+            service.record_next_action(
+                started.id,
+                tenant_id="anytoolai",
+                region="default",
+                next_action_id="copy_result",
+                checkpoint_id=RESULT_READY_CHECKPOINT_ID,
             )
 
 

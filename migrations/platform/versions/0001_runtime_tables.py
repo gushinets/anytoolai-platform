@@ -26,9 +26,7 @@ def _enum_type(name: str, *values: str) -> sa.Enum:
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    if bind.dialect.name != "sqlite":
-        op.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {PLATFORM_SCHEMA}"))
+    op.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {PLATFORM_SCHEMA}"))
 
     json_document = _json_document_type()
 
@@ -348,7 +346,4 @@ def downgrade() -> None:
     op.drop_table("action_runs", schema=PLATFORM_SCHEMA)
     op.drop_table("jobs", schema=PLATFORM_SCHEMA)
     op.drop_table("scenario_sessions", schema=PLATFORM_SCHEMA)
-
-    bind = op.get_bind()
-    if bind.dialect.name != "sqlite":
-        op.execute(sa.text(f"DROP SCHEMA IF EXISTS {PLATFORM_SCHEMA}"))
+    op.execute(sa.text(f"DROP SCHEMA IF EXISTS {PLATFORM_SCHEMA}"))

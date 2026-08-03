@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 VENV_DIR = ROOT / ".quick-check-venv"
 LEGACY_VENV_DIR = ROOT / ".venv" / "quick-check"
 TMP_ROOT = ROOT / ".quick-check-tmp"
+PYTEST_BASETEMP_ROOT = TMP_ROOT / "pytest-runs"
 MINIMUM_PYTHON = (3, 12)
 EDITABLE_PROJECTS = [
     ROOT / "packages" / "backend" / "platform-sdk",
@@ -52,7 +53,7 @@ def runtime_env(base: dict[str, str] | None = None) -> dict[str, str]:
     uv_cache_dir = TMP_ROOT / "uv-cache"
     pip_cache_dir = TMP_ROOT / "pip-cache"
     pytest_tmp_dir = TMP_ROOT / "pytest"
-    for path in (tmp_dir, uv_cache_dir, pip_cache_dir, pytest_tmp_dir):
+    for path in (tmp_dir, uv_cache_dir, pip_cache_dir, pytest_tmp_dir, PYTEST_BASETEMP_ROOT):
         path.mkdir(parents=True, exist_ok=True)
     env["TMPDIR"] = str(tmp_dir)
     env["TMP"] = str(tmp_dir)
@@ -63,6 +64,23 @@ def runtime_env(base: dict[str, str] | None = None) -> dict[str, str]:
     if sys.prefix != getattr(sys, "base_prefix", sys.prefix):
         env["VIRTUAL_ENV"] = str(environment_root())
     return env
+
+
+def pytest_basetemp() -> Path:
+    return PYTEST_BASETEMP_ROOT / f"run-{os.getpid()}"
+
+
+def pytest_command() -> list[str]:
+    return [
+        sys.executable,
+        "-m",
+        "pytest",
+        "-m",
+        FAST_PYTEST_MARK_EXPRESSION,
+        "--basetemp",
+        str(pytest_basetemp()),
+        *PYTEST_TARGETS,
+    ]
 
 
 def run(command: Sequence[str]) -> int:
@@ -284,14 +302,7 @@ def main() -> int:
             [sys.executable, "scripts/agent/validate_architecture.py"],
             [sys.executable, "scripts/agent/validate_docs.py"],
             [sys.executable, "scripts/agent/runner.py", "generate-docs", "--check"],
-            [
-                sys.executable,
-                "-m",
-                "pytest",
-                "-m",
-                FAST_PYTEST_MARK_EXPRESSION,
-                *PYTEST_TARGETS,
-            ],
+            pytest_command(),
         ]
     )
 

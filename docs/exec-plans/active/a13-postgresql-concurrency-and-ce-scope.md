@@ -29,8 +29,8 @@ real `createGuestIdentity()` local persistence in CE-kit.
 - Backend/API: quota service/repository, scenario runtime service/router, identity/quota router,
   transaction boundary, storage metadata and migrations, API bootstrap.
 - Frontend: CE-kit `createGuestIdentity()`, `startScenario()`, `getQuota()`, package exports.
-- Tests/tooling: SQLite Alembic/ASGI scenario runtime tests, slow SQLite stress test, runner
-  worktree Compose commands, PostgreSQL compose file.
+- Tests/tooling: legacy non-PostgreSQL scenario runtime coverage, runner worktree Compose
+  commands, PostgreSQL compose file.
 
 ## Complete Now
 
@@ -39,8 +39,8 @@ real `createGuestIdentity()` local persistence in CE-kit.
 - Make the test explicitly verify first `N` accepted starts, `N+1` `429 quota_exhausted`, no double
   consumption, and post-factum session/job/quota/event consistency under concurrent starts.
 - Guard the PostgreSQL test so it only runs against a clearly disposable test database.
-- Update docs/specs/plans to state that SQLite concurrency coverage is not production proof and the
-  PostgreSQL test is the production-semantics check.
+- Update docs/specs/plans to state that PostgreSQL tests are the only supported production-semantics
+  check.
 - Keep CE-kit start/quota helpers deferred and document only guest identity persistence as real in
   A13.
 
@@ -62,6 +62,7 @@ real `createGuestIdentity()` local persistence in CE-kit.
 - [x] Docs validation and generated-docs check.
 - [x] Frontend typecheck/build because CE-kit scope files remain in play.
 - [x] Canonical quick-check.
+- [ ] Scenario-dimension PostgreSQL quota test revalidated after the July 28, 2026 policy-limit assertion cleanup.
 
 ## PostgreSQL Test Command
 
@@ -70,11 +71,7 @@ $env:ANYTOOLAI_POSTGRES_TEST_DATABASE_URL = "postgresql+psycopg://anytoolai:anyt
 uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q
 ```
 
-The SQLite/ASGI stress test remains available outside the quick-check fast path:
-
-```powershell
-uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_stress.py -m slow -q
-```
+Legacy non-PostgreSQL concurrency harnesses have been removed from the supported test path.
 
 ## Progress Log
 
@@ -82,3 +79,5 @@ uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_stress.py
 |---|---|---|
 | 2026-07-20 | Added the PostgreSQL-backed API quota concurrency test, clarified that CE-kit quota/start remain deferred, documented PostgreSQL as the production concurrency proof, and validated the runnable fast suite. Docker Compose startup failed locally because the Docker daemon was unavailable. | Run the PostgreSQL test on a Docker-enabled host or with `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` pointing at a disposable PostgreSQL maintenance DB. |
 | 2026-07-22 | Added a dedicated backend CI job with a PostgreSQL service that runs `apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql"` against a disposable database URL. | Confirm the new workflow job is configured as a required check for PRs. |
+| 2026-07-28 | Tightened the scenario-dimension PostgreSQL quota test so it explicitly reads `kernel_demo.guest_quota_v1`, asserts the policy exists, derives `scenario_quota_limit` from `policy.limit_count`, and still drives the scenario-scoped override through the existing registry mutation helper. | Re-run the PostgreSQL slow test plus `quick-check` and record whether local validation can execute or skips for missing PostgreSQL configuration. |
+| 2026-07-28 | Ran the requested PostgreSQL pytest command locally with a repo-local `UV_CACHE_DIR`; the test module skipped because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was unset. `python scripts/agent/runner.py quick-check` passed. | Re-run the PostgreSQL slow test against a disposable PostgreSQL maintenance database URL to complete live-dialect validation. |

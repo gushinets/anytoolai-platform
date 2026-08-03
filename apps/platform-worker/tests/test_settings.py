@@ -32,7 +32,10 @@ def test_worker_settings_reject_non_finite_or_non_positive_poll_intervals(
     monkeypatch: pytest.MonkeyPatch,
     interval: str,
 ) -> None:
-    monkeypatch.setenv(GENERIC_DATABASE_URL_ENV, "sqlite://")
+    monkeypatch.setenv(
+        GENERIC_DATABASE_URL_ENV,
+        "postgresql+psycopg://worker:worker@postgres:5432/anytoolai",
+    )
     monkeypatch.setenv(POLL_INTERVAL_ENV, interval)
 
     with pytest.raises(ValueError, match=f"{POLL_INTERVAL_ENV} must be greater than zero"):
@@ -42,7 +45,10 @@ def test_worker_settings_reject_non_finite_or_non_positive_poll_intervals(
 def test_worker_settings_accepts_positive_finite_poll_interval(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv(GENERIC_DATABASE_URL_ENV, "sqlite://")
+    monkeypatch.setenv(
+        GENERIC_DATABASE_URL_ENV,
+        "postgresql+psycopg://worker:worker@postgres:5432/anytoolai",
+    )
     monkeypatch.setenv(POLL_INTERVAL_ENV, str(POLL_INTERVAL_SECONDS))
 
     settings = WorkerSettings.from_env()
