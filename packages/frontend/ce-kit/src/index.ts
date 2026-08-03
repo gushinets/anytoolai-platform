@@ -1,3 +1,15 @@
+export { PlatformApiClient } from "./api/client";
+export type {
+  PlatformApiClientOptions,
+  PlatformApiMethod,
+  PlatformApiRequestOptions,
+  PlatformApiResult,
+  PlatformApiRetryPolicy,
+} from "./api/client";
+export type { PlatformApiError } from "./api/errors";
+export { createInMemoryAsyncStorage } from "./storage/inMemoryAsyncStorage";
+export type { AsyncStorage } from "./storage/asyncStorage";
+
 export { createGuestIdentity } from "./identity/guestIdentity";
 export type { GuestIdentity, GuestIdentityOptions } from "./identity/guestIdentity";
 export { getQuota } from "./quota/getQuota";

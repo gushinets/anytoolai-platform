@@ -178,6 +178,7 @@ def test_frontend_check_uses_frozen_install_and_real_checks(monkeypatch) -> None
     assert commands == [
         ["pnpm", "install", "--frozen-lockfile"],
         ["pnpm", "-r", "typecheck"],
+        ["pnpm", "-r", "--if-present", "test"],
         ["pnpm", "-r", "build"],
     ]
 

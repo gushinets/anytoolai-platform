@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createGuestIdentity } from "./guestIdentity";
+import { createGuestIdentity } from "../../src/identity/guestIdentity";
 
 function fakeStorage(initial: Record<string, string> = {}): Storage {
   const store = new Map(Object.entries(initial));
