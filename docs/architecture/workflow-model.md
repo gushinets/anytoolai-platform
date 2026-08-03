@@ -116,10 +116,12 @@ persisted and linked through `jobs.result_artifact_id`.
 
 ## Worker-owned execution
 
-The worker claims a `created` job before invoking the runner. The claimed-job runner entrypoint
-accepts that existing `running` job and never creates a second job row. Its input comes from the
-linked scenario session's `metadata["input"]`; the session and job identifiers remain in the
-execution context for every action, provider call, artifact, and event.
+The worker acquires the PostgreSQL advisory job lease, then conditionally claims a `created` job
+before invoking the runner. Lease losers return before the repository claim and never invoke the
+workflow runner. The claimed-job runner entrypoint accepts the existing `running` job and never
+creates a second job row. Its input comes from the linked scenario session's `metadata["input"]`;
+the session and job identifiers remain in the execution context for every action, provider call,
+artifact, and event.
 
 For A12, the public runtime API is queue-and-return:
 

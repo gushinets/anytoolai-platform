@@ -10,8 +10,10 @@
 
 The A11 worker lifecycle had DB-backed claim and idempotency coverage, but the production
 concurrency contract is PostgreSQL. SQLite tests do not prove PostgreSQL transaction behavior,
-independent connections, row visibility, or conditional updates under contention. Multiple
-`platform-worker` processes are not preassigned jobs; they compete through the database claim.
+independent connections, row visibility, advisory lease behavior, or conditional updates under
+contention. Multiple `platform-worker` processes are not preassigned jobs; they coordinate first
+through the PostgreSQL advisory job lease, then the lease winner attempts the guarded database
+claim.
 
 ## Implementation summary
 
@@ -20,11 +22,13 @@ independent connections, row visibility, or conditional updates under contention
 - The smoke provisions a unique disposable PostgreSQL database through `provision_database(...)`,
   applies real Alembic migrations to `head`, and verifies the migrated runtime tables exist.
 - Each worker uses its own SQLAlchemy engine and session factory against the same database.
-- A test-only barrier wraps the real `JobRepository.claim_created(...)` method so both workers reach
-  the production claim boundary before the real conditional update runs.
-- The success case proves exactly one claim, runner invocation, provider call, action run, final
-  result artifact chain, and `succeeded` terminal state.
-- The failure case proves exactly one claim and runner/provider invocation, safe
+- A test-only barrier wraps `JobLease.acquire(...)` so both workers synchronize before delegating to
+  the real PostgreSQL advisory lease.
+- Only the lease winner reaches the real `JobRepository.claim_created(...)` method; the conditional
+  update still protects lifecycle correctness if the row is no longer `created`.
+- The success case proves exactly one lease winner, claim, runner invocation, provider call, action
+  run, final result artifact chain, and `succeeded` terminal state.
+- The failure case proves exactly one lease winner, claim, and runner/provider invocation, safe
   `provider_request_failed` fields, no unsafe provider text in durable safe fields, and `failed`
   terminal state.
 
@@ -35,7 +39,7 @@ independent connections, row visibility, or conditional updates under contention
 
 Both tests reload final state from a fresh session and assert no duplicate workflow/action/provider
 terminal event chain was emitted. Worker attribution is established separately through the claim,
-runner, and provider invocation records; event-log rows do not carry worker identity.
+lease, runner, and provider invocation records; event-log rows do not carry worker identity.
 
 ## CI wiring
 

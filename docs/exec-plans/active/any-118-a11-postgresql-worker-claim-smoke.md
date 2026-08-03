@@ -7,17 +7,16 @@
 - Created: 2026-08-03
 - Last updated: 2026-08-03
 - Review date: 2026-08-03
-- Next action: run the repeated focused PostgreSQL smoke and required PostgreSQL gate with
-  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` configured, or let the required CI PostgreSQL gate execute
-  them.
-- Blocker: the focused smoke has passed against a configured PostgreSQL maintenance URL; only the
-  repeated focused loop and full `postgresql-check` gate remain outstanding.
+- Next action: push the lease-first follow-up commit to the PR branch.
+- Blocker: none. The focused smoke, repeated smoke loop, worker PostgreSQL suite,
+  `postgresql-check`, and repository quick-check have passed against the configured local
+  PostgreSQL maintenance URL.
 
 ## Goal
 
 Prove with a real PostgreSQL database that two independent `platform-worker` instances can contend
-for one persisted `created` job, but exactly one worker claims and executes it. Cover both successful
-terminalization and safe failure terminalization.
+for one persisted `created` job, but exactly one worker acquires the advisory lease, claims the job,
+and executes it. Cover both successful terminalization and safe failure terminalization.
 
 ## Scope
 
@@ -25,14 +24,14 @@ terminalization and safe failure terminalization.
 
 - PostgreSQL-only worker integration smoke using disposable databases and Alembic `head`.
 - Two independent engines/session factories for the same temporary database.
-- Real `worker.process_next_job()` poll, claim, handler, runner, provider gateway, and terminal
-  persistence paths.
-- Documentation of the PostgreSQL worker claim concurrency contract.
+- Real `worker.process_next_job()` poll, advisory lease, claim, handler, runner, provider gateway,
+  and terminal persistence paths.
+- Documentation of the PostgreSQL lease-first worker coordination contract.
 
 ### Out of scope
 
 - Changes to the production claim algorithm unless the smoke exposes a bug.
-- Leases, heartbeats, external queues, scheduler changes, or worker assignment.
+- New lease mechanisms, heartbeats, external queues, scheduler changes, or worker assignment.
 - SQLite evidence for worker claim concurrency.
 
 ## Relevant docs
@@ -66,14 +65,21 @@ terminalization and safe failure terminalization.
 - [x] Harden `postgresql-check` to use a unique workspace-owned pytest basetemp on Windows.
 - [x] Address still-valid review comments on schema-qualified Alembic lookup, docs wording,
   success event symmetry, and unsafe-text durability assertions.
+- [x] Rebase the smoke against the current lease-first worker contract.
+- [x] Move deterministic contention synchronization from repository claim to pre-advisory-lease
+  acquisition.
+- [x] Update assertions so exactly one lease acquisition and exactly one downstream claim/execution
+  are required.
+- [x] Update architecture/runtime docs for lease-first coordination.
 
 ## Validation
 
-- [ ] Repeated focused smoke:
-  `uv run python -m pytest apps/platform-worker/tests/test_worker_claim_postgresql.py -m "slow and postgresql" -q`
+- [x] Repeated focused smoke with real PostgreSQL maintenance URL:
+  `for ($i=1; $i -le 5; $i++) { uv run python -m pytest apps/platform-worker/tests/test_worker_claim_postgresql.py -m "slow and postgresql" -q; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }`
+  -> 5 consecutive successful runs; each run reported `2 passed`.
 - [x] Focused smoke with real PostgreSQL maintenance URL:
   `uv run python -m pytest apps/platform-worker/tests/test_worker_claim_postgresql.py -m "slow and postgresql" -q`
-  -> user-reported `2 passed` (`.. [100%]`), with only the existing pytest-cache warning.
+  -> `2 passed`, with only the existing pytest-cache warning.
 - [x] Focused smoke collection:
   `uv run python -m pytest apps/platform-worker/tests/test_worker_claim_postgresql.py -m "slow and postgresql" -q`
   -> `2 skipped` because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` is unset.
@@ -81,18 +87,33 @@ terminalization and safe failure terminalization.
   `uv run python -m pytest apps/platform-worker/tests -m "postgresql" -q`
   -> selected the worker PostgreSQL tests; live-DB cases skipped because the maintenance URL is
   unset.
-- [ ] Required PostgreSQL gate:
+- [x] Worker lease/claim/concurrent selection with real PostgreSQL maintenance URL:
+  `uv run python -m pytest apps/platform-worker/tests -k "lease or claim or concurrent" -q`
+  -> passed with `16 passed, 2 skipped`.
+- [x] Worker PostgreSQL suite with real PostgreSQL maintenance URL:
+  `uv run python -m pytest apps/platform-worker/tests -m "postgresql" -q`
+  -> passed with `34 passed, 2 skipped`.
+- [x] Required PostgreSQL gate:
   `uv run python scripts/agent/runner.py postgresql-check`
-  -> local result `PGTEST001` because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` is unset.
+  -> passed after increasing the local command timeout; selected PostgreSQL-marked tests across
+  platform core/actions, platform API, and platform worker roots, with 2 skips.
 - [x] `uv run python scripts/agent/runner.py validate-configs` -> passed.
-- [x] `uv run python scripts/agent/runner.py validate-architecture` -> passed.
-- [x] `uv run python scripts/agent/runner.py validate-docs` -> passed.
-- [x] `uv run python scripts/agent/runner.py generate-docs --check` -> passed.
+- [x] `uv run python scripts/agent/runner.py validate-architecture` -> passed after the lease-first
+  documentation update.
+- [x] `uv run python scripts/agent/runner.py validate-docs` -> passed after the lease-first
+  documentation update.
+- [x] `uv run python scripts/agent/runner.py generate-docs --check` -> `Generated documentation is current`.
+- [x] `uv run python -m pytest tests/architecture/test_no_direct_provider_calls_outside_gateway.py -q`
+  -> `4 passed` after excluding workspace temp/cache directories from source scanning.
 - [x] `uv run python -m pytest tests/test_runner.py::test_postgresql_check_uses_marker_driven_backend_roots -q`
   -> passed.
 - [x] `python scripts/agent/runner.py quick-check` with workspace `TEMP`/`TMP` -> 215 passed,
   268 deselected, 1 pytest-cache warning. Rerun after review fixes also passed with the same
   counts.
+- [x] `uv run python scripts/agent/runner.py quick-check` with workspace `TEMP`/`TMP` -> first
+  5-minute local command timed out before output; rerun exposed architecture scanner failures from
+  `.tmp/uv-cache` files; after adding those skip parts, rerun passed with `219 passed, 284
+  deselected, 1 warning`.
 
 ## Decision log
 
@@ -101,6 +122,7 @@ terminalization and safe failure terminalization.
 | 2026-08-03 | Instrument `JobRepository.claim_created()` with a test wrapper instead of replacing it. | The smoke must synchronize the contention while still exercising the real conditional update. |
 | 2026-08-03 | Use separate SQLAlchemy engines and session factories per worker. | Independent PostgreSQL connections are the production concurrency contract. |
 | 2026-08-03 | Keep CI wiring marker-driven. | `postgresql-check` already selects all `postgresql` tests under worker roots and quick-check excludes `slow`. |
+| 2026-08-03 | Synchronize current contention before `JobLease.acquire(...)`, not inside `JobRepository.claim_created(...)`. | The rebased production handler is lease-first; only the advisory lease winner reaches the repository claim, so a two-party post-lease barrier can wait forever. |
 
 ## Progress log
 
@@ -111,6 +133,7 @@ terminalization and safe failure terminalization.
 | 2026-08-03 | User reported the focused PostgreSQL smoke passing with a real maintenance URL. | Run the 5x focused loop and the full `postgresql-check` gate. |
 | 2026-08-03 | Added a unique `--basetemp` to `postgresql-check` after a Windows pytest temp-root collision. | Retry `postgresql-check` with the configured PostgreSQL maintenance URL. |
 | 2026-08-03 | Addressed still-valid inline review comments and skipped the invalid public-loser-returns-None request because current handler reloads the job after a lost claim. | Push the follow-up commit to the PR branch. |
+| 2026-08-03 | Reproduced `BrokenBarrierError` after rebasing onto the lease-first implementation, then moved the smoke barrier to a test-only `JobLease` wrapper before real advisory acquisition. | Run focused and marker-selected PostgreSQL tests. |
 
 ## Open questions
 

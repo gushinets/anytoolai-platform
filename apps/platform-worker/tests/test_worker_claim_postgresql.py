@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import threading
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -47,6 +47,7 @@ from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import SequentialWorkflowRunner
 from anytoolai_platform_worker.composition import build_worker
+from anytoolai_platform_worker.lease import JobLease
 from anytoolai_platform_worker.queues import DatabaseJobQueue
 from anytoolai_platform_worker.worker import Worker
 from sqlalchemy.engine import URL
@@ -73,6 +74,13 @@ class ClaimAttempt:
     backend_pid: int
     claimed: bool
     returned_status: JobStatus | None
+
+
+@dataclass(frozen=True)
+class LeaseAttempt:
+    worker_name: str
+    job_id: str
+    acquired: bool
 
 
 @dataclass(frozen=True)
@@ -131,6 +139,52 @@ class FailingProviderAdapter:
             error_message_safe=_UNSAFE_PROVIDER_TEXT,
             failure_kind="response_failure",
         )
+
+
+class BarrierJobLease:
+    """Test-only lease wrapper that synchronizes workers before the real lease."""
+
+    def __init__(
+        self,
+        delegate: JobLease,
+        *,
+        job_id: str,
+        barrier: threading.Barrier,
+        attempts: list[LeaseAttempt],
+        lock: threading.Lock,
+    ) -> None:
+        self._delegate = delegate
+        self._job_id = job_id
+        self._barrier = barrier
+        self._attempts = attempts
+        self._lock = lock
+
+    def acquire(self, job_id: str) -> bool:
+        if job_id == self._job_id:
+            self._barrier.wait()
+        acquired = self._delegate.acquire(job_id)
+        if job_id == self._job_id:
+            with self._lock:
+                self._attempts.append(
+                    LeaseAttempt(
+                        worker_name=threading.current_thread().name,
+                        job_id=job_id,
+                        acquired=acquired,
+                    )
+                )
+        return acquired
+
+    def release(self, job_id: str) -> None:
+        self._delegate.release(job_id)
+
+    def probe_orphaned(self, job_id: str) -> bool:
+        return self._delegate.probe_orphaned(job_id)
+
+    def probe_orphaned_batch(self, job_ids: Iterable[str]) -> set[str]:
+        return self._delegate.probe_orphaned_batch(job_ids)
+
+    def dispose(self) -> None:
+        self._delegate.dispose()
 
 
 def _scenario(**metadata: Any) -> ScenarioSessionRecord:
@@ -198,10 +252,18 @@ def _install_contention_spies(
     monkeypatch: pytest.MonkeyPatch,
     *,
     job_id: str,
-) -> tuple[list[PollAttempt], list[ClaimAttempt], list[RunnerInvocation]]:
+) -> tuple[
+    list[PollAttempt],
+    list[LeaseAttempt],
+    list[ClaimAttempt],
+    list[RunnerInvocation],
+    threading.Barrier,
+    threading.Lock,
+]:
     lock = threading.Lock()
-    barrier = threading.Barrier(2, timeout=20)
+    lease_barrier = threading.Barrier(2, timeout=20)
     poll_attempts: list[PollAttempt] = []
+    lease_attempts: list[LeaseAttempt] = []
     claim_attempts: list[ClaimAttempt] = []
     runner_invocations: list[RunnerInvocation] = []
 
@@ -220,7 +282,7 @@ def _install_contention_spies(
             )
         return message
 
-    def claim_created_with_barrier(
+    def claim_created_with_recording(
         self: JobRepository,
         claimed_job_id: str,
         *,
@@ -230,7 +292,6 @@ def _install_contention_spies(
             return original_claim_created(self, claimed_job_id, metadata=metadata)
 
         backend_pid = self._session.execute(sa.text("SELECT pg_backend_pid()")).scalar_one()
-        barrier.wait()
         claimed = original_claim_created(self, claimed_job_id, metadata=metadata)
         with lock:
             claim_attempts.append(
@@ -259,13 +320,32 @@ def _install_contention_spies(
         return await original_run_claimed_job(self, job, input_payload, context)
 
     monkeypatch.setattr(DatabaseJobQueue, "next_message", next_message_with_recording)
-    monkeypatch.setattr(JobRepository, "claim_created", claim_created_with_barrier)
+    monkeypatch.setattr(JobRepository, "claim_created", claim_created_with_recording)
     monkeypatch.setattr(
         SequentialWorkflowRunner,
         "run_claimed_job",
         run_claimed_job_with_recording,
     )
-    return poll_attempts, claim_attempts, runner_invocations
+    return poll_attempts, lease_attempts, claim_attempts, runner_invocations, lease_barrier, lock
+
+
+def _wrap_worker_lease(
+    worker: Worker,
+    *,
+    job_id: str,
+    barrier: threading.Barrier,
+    attempts: list[LeaseAttempt],
+    lock: threading.Lock,
+) -> None:
+    handler = worker._workflow_handler
+    delegate = handler._lease
+    handler._lease = BarrierJobLease(
+        delegate,
+        job_id=job_id,
+        barrier=barrier,
+        attempts=attempts,
+        lock=lock,
+    )
 
 
 def _build_independent_workers(
@@ -401,26 +481,34 @@ def _assert_text_absent(value: Any, *forbidden_fragments: str) -> None:
 def _assert_single_claim_execution(
     *,
     job: JobRecord,
+    expected_terminal_status: JobStatus,
+    process_results: Mapping[str, JobRecord | None],
     poll_attempts: list[PollAttempt],
+    lease_attempts: list[LeaseAttempt],
     claim_attempts: list[ClaimAttempt],
     runner_invocations: list[RunnerInvocation],
     provider_calls: list[ProviderInvocation],
 ) -> str:
+    assert set(process_results) == {"worker-a", "worker-b"}
     assert len(poll_attempts) == 2
     assert {attempt.worker_name for attempt in poll_attempts} == {"worker-a", "worker-b"}
     assert [attempt.job_id for attempt in poll_attempts].count(job.id) == 2
 
-    assert len(claim_attempts) == 2
-    assert {attempt.worker_name for attempt in claim_attempts} == {"worker-a", "worker-b"}
-    assert len({attempt.backend_pid for attempt in claim_attempts}) == 2
-    assert sum(1 for attempt in claim_attempts if attempt.claimed) == 1
-    assert sum(1 for attempt in claim_attempts if not attempt.claimed) == 1
+    assert len(lease_attempts) == 2
+    assert {attempt.worker_name for attempt in lease_attempts} == {"worker-a", "worker-b"}
+    assert {attempt.job_id for attempt in lease_attempts} == {job.id}
+    assert sum(1 for attempt in lease_attempts if attempt.acquired) == 1
+    assert sum(1 for attempt in lease_attempts if not attempt.acquired) == 1
 
-    winner = next(attempt.worker_name for attempt in claim_attempts if attempt.claimed)
-    loser = next(attempt.worker_name for attempt in claim_attempts if not attempt.claimed)
-    claimed_attempt = next(attempt for attempt in claim_attempts if attempt.claimed)
+    winner = next(attempt.worker_name for attempt in lease_attempts if attempt.acquired)
+    loser = next(attempt.worker_name for attempt in lease_attempts if not attempt.acquired)
+
+    assert len(claim_attempts) == 1
+    assert sum(1 for attempt in claim_attempts if attempt.claimed) == 1
+    claimed_attempt = claim_attempts[0]
+    assert claimed_attempt.worker_name == winner
+    assert claimed_attempt.backend_pid > 0
     assert claimed_attempt.returned_status is JobStatus.running
-    assert next(attempt for attempt in claim_attempts if not attempt.claimed).returned_status is None
 
     assert len(runner_invocations) == 1
     assert runner_invocations[0].worker_name == winner
@@ -430,6 +518,19 @@ def _assert_single_claim_execution(
     assert len(provider_calls) == 1
     assert provider_calls[0].worker_name == winner
     assert provider_calls[0].job_id == job.id
+
+    winner_result = process_results[winner]
+    loser_result = process_results[loser]
+    assert winner_result is not None
+    assert winner_result.id == job.id
+    assert winner_result.status is expected_terminal_status
+    assert loser_result is not None
+    assert loser_result.id == job.id
+    assert loser_result.status in {
+        JobStatus.created,
+        JobStatus.running,
+        expected_terminal_status,
+    }
     return winner
 
 
@@ -446,7 +547,14 @@ def test_two_postgresql_workers_claim_one_job_success_once(
             seed_factory,
             input_payload={"source_text": "deadline budget deliverables"},
         )
-        poll_attempts, claim_attempts, runner_invocations = _install_contention_spies(
+        (
+            poll_attempts,
+            lease_attempts,
+            claim_attempts,
+            runner_invocations,
+            lease_barrier,
+            spy_lock,
+        ) = _install_contention_spies(
             monkeypatch,
             job_id=job.id,
         )
@@ -455,18 +563,37 @@ def test_two_postgresql_workers_claim_one_job_success_once(
             database_url,
             adapter,
         )
+        _wrap_worker_lease(
+            worker_a,
+            job_id=job.id,
+            barrier=lease_barrier,
+            attempts=lease_attempts,
+            lock=spy_lock,
+        )
+        _wrap_worker_lease(
+            worker_b,
+            job_id=job.id,
+            barrier=lease_barrier,
+            attempts=lease_attempts,
+            lock=spy_lock,
+        )
 
         try:
-            _process_workers_concurrently(worker_a, worker_b)
+            process_results = _process_workers_concurrently(worker_a, worker_b)
             winner = _assert_single_claim_execution(
                 job=job,
+                expected_terminal_status=JobStatus.succeeded,
+                process_results=process_results,
                 poll_attempts=poll_attempts,
+                lease_attempts=lease_attempts,
                 claim_attempts=claim_attempts,
                 runner_invocations=runner_invocations,
                 provider_calls=adapter.calls,
             )
             rows = _runtime_rows(seed_factory, job_id=job.id)
         finally:
+            worker_a.dispose()
+            worker_b.dispose()
             engine_a.dispose()
             engine_b.dispose()
 
@@ -538,7 +665,14 @@ def test_two_postgresql_workers_claim_one_job_failure_once(
             seed_factory,
             input_payload={"source_text": "deadline budget deliverables"},
         )
-        poll_attempts, claim_attempts, runner_invocations = _install_contention_spies(
+        (
+            poll_attempts,
+            lease_attempts,
+            claim_attempts,
+            runner_invocations,
+            lease_barrier,
+            spy_lock,
+        ) = _install_contention_spies(
             monkeypatch,
             job_id=job.id,
         )
@@ -547,18 +681,37 @@ def test_two_postgresql_workers_claim_one_job_failure_once(
             database_url,
             adapter,
         )
+        _wrap_worker_lease(
+            worker_a,
+            job_id=job.id,
+            barrier=lease_barrier,
+            attempts=lease_attempts,
+            lock=spy_lock,
+        )
+        _wrap_worker_lease(
+            worker_b,
+            job_id=job.id,
+            barrier=lease_barrier,
+            attempts=lease_attempts,
+            lock=spy_lock,
+        )
 
         try:
-            _process_workers_concurrently(worker_a, worker_b)
+            process_results = _process_workers_concurrently(worker_a, worker_b)
             winner = _assert_single_claim_execution(
                 job=job,
+                expected_terminal_status=JobStatus.failed,
+                process_results=process_results,
                 poll_attempts=poll_attempts,
+                lease_attempts=lease_attempts,
                 claim_attempts=claim_attempts,
                 runner_invocations=runner_invocations,
                 provider_calls=adapter.calls,
             )
             rows = _runtime_rows(seed_factory, job_id=job.id)
         finally:
+            worker_a.dispose()
+            worker_b.dispose()
             engine_a.dispose()
             engine_b.dispose()
 
