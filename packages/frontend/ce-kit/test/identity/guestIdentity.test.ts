@@ -1,46 +1,79 @@
 import { describe, expect, it, vi } from "vitest";
+import { PlatformApiClient } from "../../src/api/client";
 import { createGuestIdentity } from "../../src/identity/guestIdentity";
+import { createInMemoryAsyncStorage } from "../../src/storage/inMemoryAsyncStorage";
 
-function fakeStorage(initial: Record<string, string> = {}): Storage {
-  const store = new Map(Object.entries(initial));
-  return {
-    getItem: (key: string) => store.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      store.set(key, value);
-    },
-    removeItem: (key: string) => {
-      store.delete(key);
-    },
-    clear: () => store.clear(),
-    key: (index: number) => Array.from(store.keys())[index] ?? null,
-    get length() {
-      return store.size;
-    },
-  };
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function makeClient(fetchImpl: typeof fetch): PlatformApiClient {
+  return new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl });
 }
 
 describe("createGuestIdentity", () => {
-  it("reuses a stored guest id without calling fetch", async () => {
-    const storage = fakeStorage({ "anytoolai.guest_id": "guest_existing" });
+  it("reuses a stored guest id without calling the client", async () => {
+    const storage = createInMemoryAsyncStorage({ "anytoolai.guest_id": "guest_existing" });
     const fetchImpl = vi.fn();
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
 
-    const identity = await createGuestIdentity({ storage, fetchImpl });
+    const identity = await createGuestIdentity({ client, storage });
 
     expect(identity).toEqual({ guestId: "guest_existing" });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("requests and persists a new guest id when none is stored", async () => {
-    const storage = fakeStorage();
-    const fetchImpl = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ guest_id: "guest_new" }),
-    })) as unknown as typeof fetch;
+    const storage = createInMemoryAsyncStorage();
+    const fetchImpl = vi.fn(async () => jsonResponse(200, { guest_id: "guest_new" }));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
 
-    const identity = await createGuestIdentity({ storage, fetchImpl });
+    const identity = await createGuestIdentity({ client, storage });
 
     expect(identity).toEqual({ guestId: "guest_new" });
-    expect(storage.getItem("anytoolai.guest_id")).toBe("guest_new");
+    expect(await storage.get("anytoolai.guest_id")).toBe("guest_new");
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes at most one backend request for concurrent calls on the same client", async () => {
+    const storage = createInMemoryAsyncStorage();
+    const fetchImpl = vi.fn(async () => jsonResponse(200, { guest_id: "guest_concurrent" }));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const [first, second, third] = await Promise.all([
+      createGuestIdentity({ client, storage }),
+      createGuestIdentity({ client, storage }),
+      createGuestIdentity({ client, storage }),
+    ]);
+
+    expect(first).toEqual({ guestId: "guest_concurrent" });
+    expect(second).toEqual({ guestId: "guest_concurrent" });
+    expect(third).toEqual({ guestId: "guest_concurrent" });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws when the response payload has no guest id", async () => {
+    const storage = createInMemoryAsyncStorage();
+    const fetchImpl = vi.fn(async () => jsonResponse(200, {}));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    await expect(createGuestIdentity({ client, storage })).rejects.toThrow(
+      "Guest identity response was invalid.",
+    );
+  });
+
+  it("throws when the backend rejects guest creation", async () => {
+    const storage = createInMemoryAsyncStorage();
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(500, { error: { code: "internal_error", message: "boom", request_id: "req_1" } }),
+    );
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    await expect(createGuestIdentity({ client, storage })).rejects.toThrow(
+      "Guest identity creation failed: backend_error",
+    );
   });
 });

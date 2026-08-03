@@ -20,9 +20,14 @@ export type {
   ScenarioStartRequest,
 } from "./scenarios/startScenario";
 
-export async function getRuntimeConfig(productId: string): Promise<{ productId: string }> {
-  return { productId };
-}
+export { getRuntimeConfig } from "./runtime";
+export type {
+  RuntimeConfig,
+  RuntimeFrontend,
+  RuntimeQuotaSummary,
+  RuntimeRendererHint,
+  RuntimeScenario,
+} from "./runtime";
 
 export async function pollJob(jobId: string): Promise<{ jobId: string; status: string }> {
   return { jobId, status: "succeeded" };

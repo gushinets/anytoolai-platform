@@ -1,45 +1,60 @@
+import type { PlatformApiClient } from "../api/client";
+import type { AsyncStorage } from "../storage/asyncStorage";
+
 export type GuestIdentity = {
   guestId: string;
 };
 
 export type GuestIdentityOptions = {
-  apiBaseUrl?: string;
-  storage?: Storage;
+  client: PlatformApiClient;
+  storage: AsyncStorage;
   storageKey?: string;
-  fetchImpl?: typeof fetch;
 };
 
 const DEFAULT_STORAGE_KEY = "anytoolai.guest_id";
 
+/** Keyed by client instance so concurrent calls sharing a client share one in-flight request. */
+const inFlightRequests = new WeakMap<PlatformApiClient, Promise<GuestIdentity>>();
+
 export async function createGuestIdentity(
-  options: GuestIdentityOptions = {},
+  options: GuestIdentityOptions,
 ): Promise<GuestIdentity> {
-  const storage = options.storage ?? _defaultStorage();
+  const { client, storage } = options;
   const storageKey = options.storageKey ?? DEFAULT_STORAGE_KEY;
-  const storedGuestId = storage?.getItem(storageKey);
+
+  const storedGuestId = await storage.get(storageKey);
   if (storedGuestId) {
     return { guestId: storedGuestId };
   }
 
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
-  const response = await fetchImpl(`${options.apiBaseUrl ?? ""}/v1/identity/guest`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!response.ok) {
-    throw new Error("Guest identity creation failed.");
+  const inFlight = inFlightRequests.get(client);
+  if (inFlight) {
+    return inFlight;
   }
 
-  const payload: unknown = await response.json();
-  const guestId = _guestIdFromPayload(payload);
-  storage?.setItem(storageKey, guestId);
-  return { guestId };
+  const request = _requestGuestIdentity(client, storage, storageKey).finally(() => {
+    inFlightRequests.delete(client);
+  });
+  inFlightRequests.set(client, request);
+  return request;
 }
 
-function _defaultStorage(): Storage | undefined {
-  return typeof globalThis.localStorage === "undefined"
-    ? undefined
-    : globalThis.localStorage;
+async function _requestGuestIdentity(
+  client: PlatformApiClient,
+  storage: AsyncStorage,
+  storageKey: string,
+): Promise<GuestIdentity> {
+  const result = await client.request<unknown>({
+    method: "POST",
+    path: "/v1/identity/guest",
+  });
+  if (!result.ok) {
+    throw new Error(`Guest identity creation failed: ${result.error.type}`);
+  }
+
+  const guestId = _guestIdFromPayload(result.value);
+  await storage.set(storageKey, guestId);
+  return { guestId };
 }
 
 function _guestIdFromPayload(payload: unknown): string {
