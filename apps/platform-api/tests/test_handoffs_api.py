@@ -418,6 +418,7 @@ def test_immediate_handoff_worker_keeps_target_runtime_lineage(
         provider_adapters={"fake": FakeProviderAdapter(FIXTURE_ROOT)},
     )
     processed = asyncio.run(worker.process_next_job())
+    worker.dispose()
     assert processed is not None
     assert processed.id == accepted["target_job_id"]
     assert processed.scenario_session_id == accepted["target_scenario_session_id"]

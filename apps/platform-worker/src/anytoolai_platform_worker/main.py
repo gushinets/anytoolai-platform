@@ -1,12 +1,35 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import signal
+from collections.abc import Callable
 
 from anytoolai_platform_core.common.logging import configure_json_logging
 
 from anytoolai_platform_worker.composition import build_worker
 from anytoolai_platform_worker.settings import WorkerSettings
+
+logger = logging.getLogger(__name__)
+
+
+def _register_sigterm_handler(
+    loop: asyncio.AbstractEventLoop, callback: Callable[[], None]
+) -> None:
+    """Best-effort hookup for the SIGTERM graceful-drain path.
+
+    `loop.add_signal_handler` is POSIX-only -- Windows' `ProactorEventLoop` raises
+    `NotImplementedError` unconditionally. On Windows the worker still runs and still
+    exits via `KeyboardInterrupt` (SIGINT) as before; it just does not get the
+    finish-in-flight-job SIGTERM drain.
+    """
+    try:
+        loop.add_signal_handler(signal.SIGTERM, callback)
+    except NotImplementedError:
+        logger.warning(
+            "worker.sigterm_drain_unavailable",
+            extra={"event": "worker.sigterm_drain_unavailable"},
+        )
 
 
 async def run() -> None:
@@ -15,11 +38,8 @@ async def run() -> None:
         database_url=settings.database_url,
         poll_interval_seconds=settings.poll_interval_seconds,
     )
-    # SIGTERM (docker stop / compose down / k8s eviction) drains: finish the
-    # in-flight job, take no more. SIGINT stays the existing instant-exit path
-    # below, for interactive Ctrl-C during local development.
-    asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, worker.request_shutdown)
     try:
+        _register_sigterm_handler(asyncio.get_running_loop(), worker.request_shutdown)
         await worker.run_forever()
     finally:
         worker.dispose()

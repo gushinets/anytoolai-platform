@@ -9,6 +9,7 @@ caller; it is meant to be run at worker startup and between jobs, not on a sched
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from typing import Any, Protocol
 
 import sqlalchemy as sa
@@ -32,6 +33,18 @@ class OrphanTerminator(Protocol):
         ...
 
 
+class OrphanProbe(Protocol):
+    """What the reconciler needs from a lease -- just batch probing, never acquire/release.
+
+    Narrower than the full `JobLease` protocol on purpose: a fake standing in for this
+    collaborator in tests only has to implement the one method actually called here.
+    """
+
+    def probe_orphaned_batch(self, job_ids: Iterable[str]) -> set[str]:
+        """Return the subset of `job_ids` nobody currently holds the lease for."""
+        ...
+
+
 class OrphanedRunningJobReconciler:
     """Sweeps `running` jobs, terminating any whose lease-holder is gone."""
 
@@ -39,7 +52,7 @@ class OrphanedRunningJobReconciler:
         self,
         *,
         session_factory: sessionmaker[Session],
-        lease: JobLease,
+        lease: OrphanProbe,
         terminator: OrphanTerminator,
         limit: int = _DEFAULT_SWEEP_LIMIT,
     ) -> None:

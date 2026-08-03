@@ -4,29 +4,53 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Protocol
 
 from anytoolai_platform_core.common.logging import (
     bind_log_context,
     log_event,
     reset_log_context,
 )
-from anytoolai_platform_core.workflows.models import JobRecord
+from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 
-from anytoolai_platform_worker.handlers.run_workflow import RunWorkflowHandler
-from anytoolai_platform_worker.queues import DatabaseJobQueue
-from anytoolai_platform_worker.reconciliation import OrphanedRunningJobReconciler
+from anytoolai_platform_worker.queues import WorkflowJobMessage
 
 logger = logging.getLogger(__name__)
+
+
+class WorkflowHandler(Protocol):
+    """What `Worker` needs from a job handler -- see `RunWorkflowHandler` for the real one.
+
+    Narrowed to exactly the methods `Worker` calls (rather than typing against the
+    concrete class) so tests can hand it a small fake without either a fragile
+    subclass or a `# type: ignore` papering over the mismatch.
+    """
+
+    async def handle(self, job_id: str) -> JobRecord | None: ...
+    def cancel(self, job_id: str) -> JobRecord | None: ...
+    def dispose(self) -> None: ...
+
+
+class JobQueue(Protocol):
+    """What `Worker` needs from a job queue -- see `DatabaseJobQueue` for the real one."""
+
+    def next_message(self) -> WorkflowJobMessage | None: ...
+
+
+class OrphanReconciler(Protocol):
+    """What `Worker` needs from a reconciler -- see `OrphanedRunningJobReconciler`."""
+
+    def reconcile_once(self) -> int: ...
 
 
 class Worker:
     def __init__(
         self,
-        workflow_handler: RunWorkflowHandler,
+        workflow_handler: WorkflowHandler,
         *,
-        job_queue: DatabaseJobQueue | None = None,
+        job_queue: JobQueue | None = None,
         poll_interval_seconds: float = 1.0,
-        reconciler: OrphanedRunningJobReconciler | None = None,
+        reconciler: OrphanReconciler | None = None,
     ) -> None:
         self._workflow_handler = workflow_handler
         self._job_queue = job_queue
@@ -99,7 +123,13 @@ class Worker:
                 logger.exception("worker loop iteration failed")
                 await asyncio.sleep(self._poll_interval_seconds)
                 continue
-            if result is None:
+            # `result.status is JobStatus.created` means `_claim()` lost a race for this
+            # job (another worker's `pg_try_advisory_lock` won first) and handed back the
+            # still-`created` row untouched -- `next_message()` has no `FOR UPDATE`, so two
+            # workers can pick the same candidate. Without treating that the same as "no
+            # job available", this loop would spin hot on the same losing candidate with
+            # no backoff until the winner's transaction commits.
+            if result is None or result.status is JobStatus.created:
                 self._sweep_orphaned_jobs()
                 await asyncio.sleep(self._poll_interval_seconds)
 

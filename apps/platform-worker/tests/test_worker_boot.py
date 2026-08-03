@@ -100,6 +100,7 @@ def test_production_composition_accepts_configured_psycopg_database_url() -> Non
     )
 
     assert isinstance(worker, Worker)
+    worker.dispose()
 
 
 class RecordingRunner:
@@ -732,6 +733,9 @@ def test_worker_run_forever_continues_after_unexpected_iteration_exception(
         def cancel(self, job_id: str) -> None:
             del job_id
 
+        def dispose(self) -> None:
+            pass
+
     class StubQueue:
         def __init__(self) -> None:
             self.messages = [
@@ -746,8 +750,8 @@ def test_worker_run_forever_continues_after_unexpected_iteration_exception(
 
     handler = StubHandler()
     worker = Worker(
-        handler,  # type: ignore[arg-type]
-        job_queue=StubQueue(),  # type: ignore[arg-type]
+        handler,
+        job_queue=StubQueue(),
         poll_interval_seconds=0,
     )
 
@@ -772,6 +776,7 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
     )
 
     result = asyncio.run(worker.process_next_job())
+    worker.dispose()
 
     assert result is not None
     assert result.id == job.id
@@ -885,6 +890,7 @@ def test_production_worker_recovers_scenario_completion_after_mark_completed_fai
     monkeypatch.setattr(ScenarioSessionService, "mark_completed", fail_first_mark_completed)
 
     result = asyncio.run(worker.process_next_job())
+    worker.dispose()
 
     assert result is not None
     assert result.id == job.id
@@ -1057,6 +1063,7 @@ def test_production_worker_retries_scenario_reconciliation_on_subsequent_handle_
     assert scenario.status is ScenarioSessionStatus.running
 
     second_result = asyncio.run(worker.process_job(job.id))
+    worker.dispose()
 
     assert second_result is not None
     assert second_result.status is JobStatus.succeeded
@@ -1090,6 +1097,7 @@ def test_production_worker_cancellation_recovers_inflight_action_and_provider_le
 
     with pytest.raises(asyncio.CancelledError):
         asyncio.run(worker.process_next_job())
+    worker.dispose()
 
     with transaction_boundary(session_factory) as session:
         stored_job = (
@@ -1191,6 +1199,7 @@ def test_production_worker_provider_failure_uses_generic_safe_message(
     )
 
     result = asyncio.run(worker.process_next_job())
+    worker.dispose()
 
     assert result is not None
     assert result.id == job.id
@@ -1244,6 +1253,7 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
     )
 
     result = asyncio.run(worker.process_next_job())
+    worker.dispose()
 
     assert result is not None
     assert result.id == job.id
@@ -1482,7 +1492,8 @@ def test_persist_handler_failure_logs_known_residual_race_after_lease_lost(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Known residual race (see plans/ANY-147.md): a sweep can terminate a job as
+    """Known residual race (see docs/exec-plans/active/any-147-worker-lease-recovery.md): a
+    sweep can terminate a job as
     `worker_lease_lost` while its original process is still alive and running --
     that process's own eventual outcome then collides with the already-committed
     `failed` state. Not auto-fixed; must at least be observable in the logs."""
@@ -1531,7 +1542,7 @@ def test_reconciler_terminates_only_orphaned_running_jobs(
     terminator = FakeTerminator()
     reconciler = OrphanedRunningJobReconciler(
         session_factory=session_factory,
-        lease=lease,  # type: ignore[arg-type]
+        lease=lease,
         terminator=terminator,
         limit=10,
     )
@@ -1552,7 +1563,7 @@ def test_reconciler_respects_sweep_limit(
     terminator = FakeTerminator()
     reconciler = OrphanedRunningJobReconciler(
         session_factory=session_factory,
-        lease=lease,  # type: ignore[arg-type]
+        lease=lease,
         terminator=terminator,
         limit=2,
     )
@@ -1581,6 +1592,9 @@ def test_run_forever_finishes_inflight_job_then_drains_on_request_shutdown() -> 
         def cancel(self, job_id: str) -> None:
             del job_id
 
+        def dispose(self) -> None:
+            pass
+
     class TwoJobQueue:
         def __init__(self) -> None:
             self._messages = [
@@ -1595,8 +1609,8 @@ def test_run_forever_finishes_inflight_job_then_drains_on_request_shutdown() -> 
 
     handler = ShutdownDuringFirstJobHandler()
     worker = Worker(
-        handler,  # type: ignore[arg-type]
-        job_queue=TwoJobQueue(),  # type: ignore[arg-type]
+        handler,
+        job_queue=TwoJobQueue(),
         poll_interval_seconds=0,
     )
     worker_holder["worker"] = worker
@@ -1631,15 +1645,69 @@ def test_run_forever_sweeps_before_loop_and_on_idle_iteration() -> None:
         def cancel(self, job_id: str) -> None:
             del job_id
 
+        def dispose(self) -> None:
+            pass
+
     worker = Worker(
-        NoopHandler(),  # type: ignore[arg-type]
-        job_queue=EmptyQueue(),  # type: ignore[arg-type]
+        NoopHandler(),
+        job_queue=EmptyQueue(),
         poll_interval_seconds=0,
-        reconciler=StoppingReconciler(),  # type: ignore[arg-type]
+        reconciler=StoppingReconciler(),
     )
     worker_holder["worker"] = worker
 
     asyncio.run(worker.run_forever())
+
+    assert calls["count"] == 2
+
+
+def test_run_forever_backs_off_when_claim_race_is_lost_instead_of_hot_looping() -> None:
+    """`_claim()` losing a race for a `created` job (another worker's advisory-lock
+    `acquire()` won first) returns that job's still-`created` `JobRecord`, not `None` --
+    `next_message()` has no `FOR UPDATE`, so both workers can pick the same candidate.
+    Before this fix, `run_forever()` only treated a `None` result as "idle" (sweep +
+    sleep); a non-`None`-but-still-`created` result took the "made progress" branch
+    instead, so a lost claim race re-polled the same losing candidate immediately, with
+    no backoff at all, spinning the loop hot."""
+    worker_holder: dict[str, Worker] = {}
+    calls = {"count": 0}
+    lost_race_job = _job("scenario_lost_race")
+
+    class StoppingReconciler:
+        def reconcile_once(self) -> int:
+            calls["count"] += 1
+            # Stop after the pre-loop sweep and exactly one idle-iteration sweep --
+            # deterministic, unlike racing against wall-clock sleeps. If the backoff
+            # branch were skipped (the bug), this reconciler would never be called a
+            # second time and the loop would spin until this test's own timeout.
+            if calls["count"] >= 2:
+                worker_holder["worker"].request_shutdown()
+            return 0
+
+    class AlwaysSameCandidateQueue:
+        def next_message(self) -> WorkflowJobMessage | None:
+            return WorkflowJobMessage(job_id=lost_race_job.id)
+
+    class LostRaceHandler:
+        async def handle(self, job_id: str) -> Any:
+            del job_id
+            return lost_race_job
+
+        def cancel(self, job_id: str) -> None:
+            del job_id
+
+        def dispose(self) -> None:
+            pass
+
+    worker = Worker(
+        LostRaceHandler(),
+        job_queue=AlwaysSameCandidateQueue(),
+        poll_interval_seconds=0,
+        reconciler=StoppingReconciler(),
+    )
+    worker_holder["worker"] = worker
+
+    asyncio.run(asyncio.wait_for(worker.run_forever(), timeout=5))
 
     assert calls["count"] == 2
 
@@ -1652,8 +1720,8 @@ def test_sweep_orphaned_jobs_survives_reconciler_exception(
             raise RuntimeError("boom")
 
     worker = Worker(
-        None,  # type: ignore[arg-type]
-        reconciler=ExplodingReconciler(),  # type: ignore[arg-type]
+        None,  # type: ignore[arg-type]  # _sweep_orphaned_jobs() never touches this
+        reconciler=ExplodingReconciler(),
     )
 
     worker._sweep_orphaned_jobs()

@@ -99,6 +99,13 @@ class AdvisoryJobLease:
         self._connections: dict[str, Connection] = {}
 
     def acquire(self, job_id: str) -> bool:
+        if job_id in self._connections:
+            # Not reachable via any current call path (`_claim()` acquires at most once
+            # per job, and `handle()`'s `finally` always releases) -- but silently
+            # overwriting the dict entry would leak the first connection's pooled slot
+            # and its still-held lock forever, so fail loudly instead if that ever
+            # changes.
+            raise RuntimeError(f"lease already held for job_id={job_id!r}")
         connection = self._engine.connect()
         try:
             key = _advisory_lock_key(job_id)

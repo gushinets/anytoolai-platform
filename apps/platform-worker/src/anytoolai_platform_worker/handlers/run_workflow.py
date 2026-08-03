@@ -299,7 +299,8 @@ class RunWorkflowHandler:
                 # orphan -- execution kept running past its lease being reclaimed and
                 # only now reached a terminal outcome of its own, colliding with the
                 # sweep's already-committed `failed`/worker_lease_lost. Known residual
-                # race (see plans/ANY-147.md); not auto-fixed, just made observable.
+                # race (see docs/exec-plans/active/any-147-worker-lease-recovery.md); not
+                # auto-fixed, just made observable.
                 if job.error_code == "worker_lease_lost" and error_code != "worker_lease_lost":
                     logger.warning(
                         "worker.job_completed_after_lease_lost",

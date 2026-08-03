@@ -27,7 +27,7 @@ from anytoolai_platform_core.storage.transactions import (
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
-from anytoolai_platform_worker.lease import _advisory_lock_key
+from anytoolai_platform_worker.lease import AdvisoryJobLease, _advisory_lock_key
 from test_worker_boot import CONFIG_ROOT, FIXTURE_ROOT, _seed_job, _seed_running_job
 
 from tests.db_support import provision_database
@@ -110,6 +110,25 @@ def test_orphaned_job_is_recovered_after_lease_connection_dies(
         probe_connection.execute(sa.text("SELECT pg_advisory_unlock(:key)"), {"key": key})
     finally:
         probe_connection.close()
+
+
+def test_advisory_job_lease_acquire_raises_instead_of_silently_leaking_on_double_acquire(
+    db: tuple[sa.engine.Engine, sa.orm.sessionmaker[sa.orm.Session], str],
+) -> None:
+    """Not reachable via any current worker call path -- `_claim()` acquires at most once
+    per job and `handle()`'s `finally` always releases -- but a silent second `acquire()`
+    for the same job_id would leak the first connection's pooled slot and its still-held
+    lock forever. This is the loud, fail-fast alternative."""
+    engine, _session_factory, _database_url = db
+    lease = AdvisoryJobLease(engine)
+    job_id = "job_double_acquire"
+    assert lease.acquire(job_id) is True
+    try:
+        with pytest.raises(RuntimeError):
+            lease.acquire(job_id)
+    finally:
+        lease.release(job_id)
+        lease.dispose()
 
 
 def test_running_job_with_live_lease_is_never_touched_by_sweep(
@@ -211,6 +230,53 @@ def test_real_sigterm_drains_inflight_job_before_exiting(
         stored = JobRepository(session).get(job.id)
     assert stored is not None
     assert stored.status is JobStatus.succeeded
+
+
+@pytest.mark.skipif(os.name != "posix", reason="SIGTERM drain is POSIX-only")
+def test_real_console_entrypoint_under_uv_run_exits_cleanly_on_sigterm(
+    db: tuple[sa.engine.Engine, sa.orm.sessionmaker[sa.orm.Session], str],
+) -> None:
+    """`test_real_sigterm_drains_inflight_job_before_exiting` above proves the drain logic
+    itself works, but it launches a raw `python -c <script>` subprocess, bypassing `uv run`
+    entirely. In production (`infra/docker/platform-worker.Dockerfile`'s CMD), `docker stop`
+    sends SIGTERM to `uv run --project apps/platform-worker --no-sync anytoolai-platform-worker`
+    (PID 1), not directly to the Python process -- so nothing else here actually proves `uv`
+    forwards the signal down to where `main.py`'s handler can see it. This launches the exact
+    same command and confirms it exits cleanly (code 0) on SIGTERM."""
+    _engine, _session_factory, database_url = db
+    env = {**os.environ, "ANYTOOLAI_DATABASE_URL": database_url}
+    process = subprocess.Popen(
+        [
+            "uv",
+            "run",
+            "--project",
+            str(REPO_ROOT / "apps" / "platform-worker"),
+            "--no-sync",
+            "anytoolai-platform-worker",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    try:
+        # `main.py`'s `_register_sigterm_handler()` call only happens after
+        # `WorkerSettings.from_env()` and `build_worker()` -- config-registry loading and
+        # engine construction -- have both completed. A SIGTERM that arrives before that
+        # registration hits Python's default disposition (immediate termination, exit code
+        # 143) instead of the graceful handler; empirically this needs several seconds of
+        # headroom, not the ~2s a bare `python -c` boots in.
+        time.sleep(6.0)
+        process.send_signal(signal.SIGTERM)
+        returncode = process.wait(timeout=20)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)
+
+    output = process.stdout.read() if process.stdout is not None else ""
+    assert returncode == 0, output
 
 
 def _wait_for_job_status(
