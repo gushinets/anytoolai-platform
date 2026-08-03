@@ -42,6 +42,11 @@ class Worker:
         """
         self._stopping.set()
 
+    def dispose(self) -> None:
+        """Release resources (the lease's dedicated connection pool) after
+        `run_forever()` has returned. Call once during shutdown."""
+        self._workflow_handler.dispose()
+
     async def process_job(self, job_id: str) -> JobRecord | None:
         token = bind_log_context(job_id=job_id)
         log_event(logger, "worker.job_started", job_id=job_id)

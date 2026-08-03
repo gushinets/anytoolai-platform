@@ -79,8 +79,10 @@ def test_orphaned_job_is_recovered_after_lease_connection_dies(
     # "Worker B": a fresh, fully-composed production worker against the same database.
     worker = build_worker(session_factory=session_factory, config_root=CONFIG_ROOT)
     assert worker._reconciler is not None
-
-    terminated = worker._reconciler.reconcile_once()
+    try:
+        terminated = worker._reconciler.reconcile_once()
+    finally:
+        worker.dispose()
 
     assert terminated == 1
     with transaction_boundary(session_factory) as session:
@@ -129,8 +131,10 @@ def test_running_job_with_live_lease_is_never_touched_by_sweep(
 
         worker = build_worker(session_factory=session_factory, config_root=CONFIG_ROOT)
         assert worker._reconciler is not None
-
-        terminated = worker._reconciler.reconcile_once()
+        try:
+            terminated = worker._reconciler.reconcile_once()
+        finally:
+            worker.dispose()
 
         assert terminated == 0
         with transaction_boundary(session_factory) as session:
@@ -177,7 +181,7 @@ asyncio.run(run())
 def test_real_sigterm_drains_inflight_job_before_exiting(
     db: tuple[sa.engine.Engine, sa.orm.sessionmaker[sa.orm.Session], str],
 ) -> None:
-    engine, session_factory, database_url = db
+    _engine, session_factory, database_url = db
     job = _seed_job(
         session_factory,
         input_payload={"source_text": "deadline budget deliverables"},

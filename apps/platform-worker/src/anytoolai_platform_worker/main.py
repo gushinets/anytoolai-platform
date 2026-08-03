@@ -19,7 +19,10 @@ async def run() -> None:
     # in-flight job, take no more. SIGINT stays the existing instant-exit path
     # below, for interactive Ctrl-C during local development.
     asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, worker.request_shutdown)
-    await worker.run_forever()
+    try:
+        await worker.run_forever()
+    finally:
+        worker.dispose()
 
 
 def main() -> None:

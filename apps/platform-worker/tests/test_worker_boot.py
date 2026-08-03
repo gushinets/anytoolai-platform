@@ -1378,6 +1378,10 @@ class FakeJobLease:
         del job_id
         return False
 
+    def probe_orphaned_batch(self, job_ids: list[str]) -> set[str]:
+        del job_ids
+        return set()
+
 
 def test_lease_is_acquired_before_claim_and_released_after_success(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],

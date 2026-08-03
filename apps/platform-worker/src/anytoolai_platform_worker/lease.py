@@ -63,6 +63,11 @@ class JobLease(Protocol):
         """
         ...
 
+    def dispose(self) -> None:
+        """Release any pooled connections owned by this lease. Safe to call once
+        at shutdown; not required for correctness while the process is running."""
+        ...
+
 
 class NullJobLease:
     """No-op lease for backends without advisory locks (e.g. SQLite in tests)."""
@@ -82,6 +87,9 @@ class NullJobLease:
         del job_ids
         return set()
 
+    def dispose(self) -> None:
+        pass
+
 
 class AdvisoryJobLease:
     """Job liveness backed by Postgres session-scoped advisory locks."""
@@ -92,10 +100,14 @@ class AdvisoryJobLease:
 
     def acquire(self, job_id: str) -> bool:
         connection = self._engine.connect()
-        key = _advisory_lock_key(job_id)
-        acquired = connection.execute(
-            sa.text("SELECT pg_try_advisory_lock(:key)"), {"key": key}
-        ).scalar_one()
+        try:
+            key = _advisory_lock_key(job_id)
+            acquired = connection.execute(
+                sa.text("SELECT pg_try_advisory_lock(:key)"), {"key": key}
+            ).scalar_one()
+        except BaseException:
+            connection.close()
+            raise
         if not acquired:
             connection.close()
             return False
@@ -151,6 +163,9 @@ class AdvisoryJobLease:
         finally:
             connection.close()
         return orphaned
+
+    def dispose(self) -> None:
+        self._engine.dispose()
 
 
 def build_job_lease(engine: Engine) -> JobLease:

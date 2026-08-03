@@ -147,25 +147,38 @@ class RunWorkflowHandler:
                 job_id
             )
 
+    def dispose(self) -> None:
+        """Release resources owned by this handler's lease. Call once at shutdown."""
+        self._lease.dispose()
+
     def _claim(self, job_id: str) -> JobRecord | None:
-        with transaction_boundary(self._session_factory) as session:
-            repository = JobRepository(session)
-            emitter = EventEmitter(EventLogRepository(session))
-            scenario_service = ScenarioSessionService(
-                ScenarioSessionRepository(session),
-                emitter,
-            )
-            job = repository.get(job_id)
-            if job is None or job.status is not JobStatus.created:
-                return None
+        # `lease_acquired` is tracked outside the transaction below so the except
+        # clause can also cover failures in transaction_boundary's own commit/
+        # rollback-recovery machinery, not just the body -- a failure there would
+        # otherwise leak the lease forever, since it's already past the code that
+        # would normally release it.
+        lease_acquired = False
 
-            # Held until handle()'s finally releases it after the terminal-state commit.
-            # A failed acquire means another worker already owns this job -- not an
-            # error, just skip it.
-            if not self._lease.acquire(job_id):
-                return None
+        def _claim_in_transaction() -> JobRecord | None:
+            nonlocal lease_acquired
+            with transaction_boundary(self._session_factory) as session:
+                repository = JobRepository(session)
+                emitter = EventEmitter(EventLogRepository(session))
+                scenario_service = ScenarioSessionService(
+                    ScenarioSessionRepository(session),
+                    emitter,
+                )
+                job = repository.get(job_id)
+                if job is None or job.status is not JobStatus.created:
+                    return None
 
-            try:
+                # Held until handle()'s finally releases it after the terminal-state
+                # commit. A failed acquire means another worker already owns this
+                # job -- not an error, just skip it.
+                if not self._lease.acquire(job_id):
+                    return None
+                lease_acquired = True
+
                 scenario = self._load_scenario(session, job)
                 metadata = {
                     **job.metadata,
@@ -179,12 +192,17 @@ class RunWorkflowHandler:
                 )
                 if claimed is None:
                     self._lease.release(job_id)
+                    lease_acquired = False
                     return None
                 scenario_service.mark_running(scenario)
                 return claimed
-            except BaseException:
+
+        try:
+            return _claim_in_transaction()
+        except BaseException:
+            if lease_acquired:
                 self._lease.release(job_id)
-                raise
+            raise
 
     def _get(self, job_id: str) -> JobRecord | None:
         with transaction_boundary(self._session_factory) as session:
