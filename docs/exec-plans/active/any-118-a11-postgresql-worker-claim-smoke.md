@@ -10,8 +10,8 @@
 - Next action: run the repeated focused PostgreSQL smoke and required PostgreSQL gate with
   `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` configured, or let the required CI PostgreSQL gate execute
   them.
-- Blocker: no local PostgreSQL maintenance URL is configured, so the new smoke can currently only
-  be collected as an explicit skip.
+- Blocker: the focused smoke has passed against a configured PostgreSQL maintenance URL; only the
+  repeated focused loop and full `postgresql-check` gate remain outstanding.
 
 ## Goal
 
@@ -64,6 +64,8 @@ terminalization and safe failure terminalization.
   truthfully.
 - [x] Run repository validation commands that do not require a PostgreSQL maintenance database.
 - [x] Harden `postgresql-check` to use a unique workspace-owned pytest basetemp on Windows.
+- [x] Address still-valid review comments on schema-qualified Alembic lookup, docs wording,
+  success event symmetry, and unsafe-text durability assertions.
 
 ## Validation
 
@@ -89,7 +91,8 @@ terminalization and safe failure terminalization.
 - [x] `uv run python -m pytest tests/test_runner.py::test_postgresql_check_uses_marker_driven_backend_roots -q`
   -> passed.
 - [x] `python scripts/agent/runner.py quick-check` with workspace `TEMP`/`TMP` -> 215 passed,
-  268 deselected, 1 pytest-cache warning.
+  268 deselected, 1 pytest-cache warning. Rerun after review fixes also passed with the same
+  counts.
 
 ## Decision log
 
@@ -107,6 +110,7 @@ terminalization and safe failure terminalization.
 | 2026-08-03 | Added the PostgreSQL contention smoke, runtime docs, index entry, and task doc; non-DB validations pass. | Run the real PostgreSQL smoke with a configured maintenance database or rely on the required CI gate. |
 | 2026-08-03 | User reported the focused PostgreSQL smoke passing with a real maintenance URL. | Run the 5x focused loop and the full `postgresql-check` gate. |
 | 2026-08-03 | Added a unique `--basetemp` to `postgresql-check` after a Windows pytest temp-root collision. | Retry `postgresql-check` with the configured PostgreSQL maintenance URL. |
+| 2026-08-03 | Addressed still-valid inline review comments and skipped the invalid public-loser-returns-None request because current handler reloads the job after a lost claim. | Push the follow-up commit to the PR branch. |
 
 ## Open questions
 

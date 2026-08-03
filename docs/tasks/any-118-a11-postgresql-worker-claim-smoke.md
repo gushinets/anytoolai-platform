@@ -34,7 +34,8 @@ independent connections, row visibility, or conditional updates under contention
 - `test_two_postgresql_workers_claim_one_job_failure_once`
 
 Both tests reload final state from a fresh session and assert no duplicate workflow/action/provider
-terminal event chain was emitted by the losing worker.
+terminal event chain was emitted. Worker attribution is established separately through the claim,
+runner, and provider invocation records; event-log rows do not carry worker identity.
 
 ## CI wiring
 

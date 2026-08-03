@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import threading
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -185,7 +185,7 @@ def _assert_migrations_applied(engine: sa.Engine, alembic_config: Config) -> Non
 
     with engine.connect() as connection:
         version = connection.execute(
-            sa.text("SELECT version_num FROM alembic_version")
+            sa.text("SELECT version_num FROM public.alembic_version")
         ).scalar_one()
         table_names = set(sa.inspect(connection).get_table_names(schema=PLATFORM_SCHEMA))
 
@@ -383,6 +383,21 @@ def _runtime_rows(
     }
 
 
+def _assert_text_absent(value: Any, *forbidden_fragments: str) -> None:
+    if isinstance(value, str):
+        for fragment in forbidden_fragments:
+            assert fragment not in value
+        return
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            _assert_text_absent(key, *forbidden_fragments)
+            _assert_text_absent(item, *forbidden_fragments)
+        return
+    if isinstance(value, Sequence) and not isinstance(value, bytes):
+        for item in value:
+            _assert_text_absent(item, *forbidden_fragments)
+
+
 def _assert_single_claim_execution(
     *,
     job: JobRecord,
@@ -494,6 +509,8 @@ def test_two_postgresql_workers_claim_one_job_success_once(
     assert len(action_artifacts) == 1
 
     assert event_counts["workflow.started"] == 1
+    assert event_counts["workflow.step_started"] == 1
+    assert event_counts["workflow.step_failed"] == 0
     assert event_counts["workflow.succeeded"] == 1
     assert event_counts["workflow.failed"] == 0
     assert event_counts["action.started"] == 1
@@ -559,6 +576,11 @@ def test_two_postgresql_workers_claim_one_job_failure_once(
     assert stored_job["error_message_safe"] == "Provider request failed."
     assert _UNSAFE_PROVIDER_TEXT not in stored_job["error_message_safe"]
     assert "secret_token" not in stored_job["error_message_safe"]
+    _assert_text_absent(
+        stored_job["metadata"],
+        _UNSAFE_PROVIDER_TEXT,
+        "secret_token",
+    )
     assert scenario.status is ScenarioSessionStatus.failed
     assert scenario.current_checkpoint_id == FAILED_CHECKPOINT_ID
 
@@ -574,6 +596,12 @@ def test_two_postgresql_workers_claim_one_job_failure_once(
     assert provider_calls[0]["action_run_id"] == action_runs[0]["id"]
     assert provider_calls[0]["scenario_session_id"] == job.scenario_session_id
     assert _UNSAFE_PROVIDER_TEXT not in provider_calls[0]["error_message_safe"]
+    assert "output_text" not in provider_calls[0]
+    _assert_text_absent(
+        provider_calls[0]["metadata"],
+        _UNSAFE_PROVIDER_TEXT,
+        "secret_token",
+    )
     assert len(artifacts) == 0
 
     workflow_state = stored_job["metadata"]["workflow_state"]
@@ -594,5 +622,10 @@ def test_two_postgresql_workers_claim_one_job_failure_once(
     assert event_counts["provider.request_succeeded"] == 0
     assert event_counts["artifact.created"] == 0
     assert event_counts["scenario.failed"] == 1
+    _assert_text_absent(
+        rows["events"],
+        _UNSAFE_PROVIDER_TEXT,
+        "secret_token",
+    )
 
     assert adapter.calls[0].worker_name == winner
