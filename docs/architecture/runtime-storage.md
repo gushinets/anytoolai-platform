@@ -721,6 +721,22 @@ scenario starts through the API transaction path. It verifies that PostgreSQL ro
 conditional quota update allow exactly the first `N` accepted starts, return `429 quota_exhausted`
 for later starts, and keep session/job/quota/event counts consistent.
 
+Worker claim concurrency has its own PostgreSQL production-semantics smoke in:
+
+- `apps/platform-worker/tests/test_worker_claim_postgresql.py`
+
+```powershell
+$env:ANYTOOLAI_POSTGRES_TEST_DATABASE_URL = "postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres"
+uv run python -m pytest apps/platform-worker/tests/test_worker_claim_postgresql.py -m "slow and postgresql" -q
+```
+
+The smoke creates and drops a disposable database, applies Alembic migrations once during test setup,
+seeds one runnable `created` job, then runs two composed workers with independent engines and
+session factories against the same database. Both workers poll the real queue and reach the real
+claim method, but PostgreSQL allows exactly one conditional claim to commit; the losing worker
+receives the normal no-claim result and never invokes the workflow runner. The smoke verifies both
+the successful `succeeded` terminal path and the safe `failed` terminal path from a fresh session.
+
 The backend GitHub Actions workflow uses the required `postgresql-quota-concurrency` job with a
 disposable PostgreSQL service for all production-dialect tests. It runs the canonical
 `python scripts/agent/runner.py postgresql-check` command, which selects every `postgresql`-marked

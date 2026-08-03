@@ -68,6 +68,7 @@ This directory is the system of record for agents. Keep it current. If a decisio
 ## Task handoffs
 
 - `tasks/a11-job-lifecycle-and-worker-integration.md`
+- `tasks/any-118-a11-postgresql-worker-claim-smoke.md`
 - `handoffs/a11-job-lifecycle-worker-review-remediation.md`
 
 ## Generated docs

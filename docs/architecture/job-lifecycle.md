@@ -23,6 +23,11 @@ repeated claim returns no claim for running or terminal jobs, so it cannot creat
 execution. This is the MVP coordination mechanism; it is not a lease, distributed lock, or queue
 engine.
 
+PostgreSQL is the production concurrency contract for this lifecycle. Independent worker processes
+are not preassigned jobs; they may all observe the same `created` row, but only the worker whose
+transaction wins the conditional PostgreSQL update may execute the workflow. Losing workers receive
+the normal no-claim repository result and must not invoke the workflow runner.
+
 ## Worker flow
 
 The worker application polls PostgreSQL for the oldest `created` job id. Polling is discovery only;
@@ -38,6 +43,10 @@ duplicate execution. For each discovered id, the worker handler:
 6. Returns the durable final job snapshot.
 
 The runner's claimed-job entrypoint never creates another job row.
+
+Worker instances do not run Alembic migrations as part of polling, claim, or execution. Deployment
+and test database setup apply the migration graph before workers start, then workers use the
+migrated `platform` schema.
 
 ## A12 scenario runtime start flow
 
