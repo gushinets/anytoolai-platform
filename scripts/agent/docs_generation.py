@@ -17,7 +17,8 @@ GENERATED_SOURCES = {
     "config-registry.md": "configs/kernel via ConfigLoader",
     "db-schema.md": "anytoolai_platform_core.storage.db.runtime_metadata",
     "event-catalog.md": "configs/kernel/platform_events.yaml",
-    "openapi.md": "anytoolai_platform_api.main.create_app().openapi()",
+    "openapi.md": "anytoolai_platform_api.openapi.generate.build_openapi_schema()",
+    "openapi.json": "anytoolai_platform_api.openapi.generate.build_openapi_schema()",
 }
 
 
@@ -112,9 +113,9 @@ def render_event_catalog() -> str:
 
 
 def render_openapi() -> str:
-    from anytoolai_platform_api.main import create_app
+    from anytoolai_platform_api.openapi.generate import build_openapi_schema
 
-    schema = create_app().openapi()
+    schema = build_openapi_schema()
     lines = _header("OpenAPI", GENERATED_SOURCES["openapi.md"])
     lines.extend(
         [
@@ -144,6 +145,12 @@ def render_openapi() -> str:
     return "\n".join(lines)
 
 
+def render_openapi_json() -> str:
+    from anytoolai_platform_api.openapi.generate import render_openapi_json as render
+
+    return render()
+
+
 def render_documents() -> dict[str, str]:
     return {
         "action-registry.md": render_action_registry(),
@@ -151,6 +158,7 @@ def render_documents() -> dict[str, str]:
         "db-schema.md": render_db_schema(),
         "event-catalog.md": render_event_catalog(),
         "openapi.md": render_openapi(),
+        "openapi.json": render_openapi_json(),
     }
 
 

@@ -179,6 +179,7 @@ def test_frontend_check_uses_frozen_install_and_real_checks(monkeypatch) -> None
         ["pnpm", "install", "--frozen-lockfile"],
         ["pnpm", "-r", "typecheck"],
         ["pnpm", "-r", "--if-present", "test"],
+        ["pnpm", "-r", "--if-present", "generate-api-types:check"],
         ["pnpm", "-r", "build"],
     ]
 
