@@ -92,8 +92,20 @@ class JobRepository:
         self._session.flush()
         return _require_stored_job(self.get(job_id), job_id, "claim")
 
-    def cancel_created(self, job_id: str) -> JobRecord | None:
+    def cancel_created(
+        self,
+        job_id: str,
+        *,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> JobRecord | None:
         """Cancel a job before claim without interrupting running work."""
+
+        values: dict[str, Any] = {
+            "status": JobStatus.canceled,
+            "completed_at": utc_now(),
+        }
+        if metadata is not None:
+            values["metadata"] = dict(metadata)
 
         result = self._session.execute(
             sa.update(jobs_table)
@@ -101,10 +113,7 @@ class JobRepository:
                 jobs_table.c.id == job_id,
                 jobs_table.c.status == JobStatus.created,
             )
-            .values(
-                status=JobStatus.canceled,
-                completed_at=utc_now(),
-            )
+            .values(values)
         )
         if result.rowcount == 0:
             return None
