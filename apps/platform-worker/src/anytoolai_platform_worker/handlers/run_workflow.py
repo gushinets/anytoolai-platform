@@ -17,6 +17,7 @@ from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
 from anytoolai_platform_core.scenarios.correlation import (
     build_scenario_identity_metadata,
+    enrich_job_metadata_with_scenario_identity,
 )
 from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionRecord,
@@ -151,10 +152,7 @@ class RunWorkflowHandler:
                 return job
 
             scenario = self._load_scenario(session, job)
-            metadata = {
-                **job.metadata,
-                **build_scenario_identity_metadata(scenario),
-            }
+            metadata = enrich_job_metadata_with_scenario_identity(job.metadata, scenario)
             return WorkflowJobService(repository, emitter).cancel_created(
                 job_id,
                 metadata=metadata,
@@ -193,10 +191,10 @@ class RunWorkflowHandler:
                 lease_acquired = True
 
                 scenario = self._load_scenario(session, job)
-                metadata = {
-                    **job.metadata,
-                    **build_scenario_identity_metadata(scenario),
-                }
+                metadata = enrich_job_metadata_with_scenario_identity(
+                    job.metadata,
+                    scenario,
+                )
                 claimed = WorkflowJobService(repository, emitter).claim_created(
                     job_id,
                     metadata=metadata,
@@ -246,6 +244,7 @@ class RunWorkflowHandler:
         job: JobRecord,
         scenario: ScenarioSessionRecord,
     ) -> ExecutionContext:
+        identity = build_scenario_identity_metadata(scenario)
         return ExecutionContext(
             tenant_id=job.tenant_id,
             region=job.region,
@@ -255,9 +254,9 @@ class RunWorkflowHandler:
             job_id=job.id,
             workflow_id=job.workflow_id,
             workflow_version=job.workflow_version,
-            guest_id=scenario.guest_id,
-            user_id=scenario.user_id,
-            scenario_chain_id=scenario.scenario_chain_id,
+            guest_id=identity["guest_id"],
+            user_id=identity["user_id"],
+            scenario_chain_id=identity["scenario_chain_id"],
             handoff_id=metadata_str(job.metadata, "handoff_id"),
             acquisition_source=metadata_str(job.metadata, "acquisition_source"),
         )
