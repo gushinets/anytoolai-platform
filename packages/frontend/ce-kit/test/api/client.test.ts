@@ -179,6 +179,29 @@ describe("PlatformApiClient", () => {
     expect(result).toEqual({ ok: false, error: { type: "aborted" } });
   });
 
+  it("reports timeout, not aborted, when the timeout fires first but the caller's signal also aborts before the fetch rejection settles", async () => {
+    const fetchImpl = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        // Defers the actual rejection by a macrotask so the test can abort the caller's signal
+        // in the gap between the internal timeout firing and the fetch rejection settling --
+        // exactly the window where the buggy `externalSignal.aborted` check (evaluated only once
+        // the rejection lands) would misattribute the failure to the caller instead of the timeout.
+        init?.signal?.addEventListener("abort", () => {
+          setTimeout(() => reject(new DOMException("Aborted", "AbortError")), 1);
+        });
+      });
+    });
+    const client = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl, timeoutMs: 50 });
+    const controller = new AbortController();
+
+    const pending = client.request({ path: "/v1/x", signal: controller.signal });
+    await vi.advanceTimersByTimeAsync(50);
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(pending).resolves.toEqual({ ok: false, error: { type: "timeout" } });
+  });
+
   it("aborts a retried attempt whose external signal aborted during the inter-attempt delay", async () => {
     let callCount = 0;
     const fetchImpl = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
