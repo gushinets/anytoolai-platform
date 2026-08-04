@@ -133,7 +133,7 @@ and executes it. Cover both successful terminalization and safe failure terminal
 | 2026-08-03 | User reported the focused PostgreSQL smoke passing with a real maintenance URL. | Run the 5x focused loop and the full `postgresql-check` gate. |
 | 2026-08-03 | Added a unique `--basetemp` to `postgresql-check` after a Windows pytest temp-root collision. | Retry `postgresql-check` with the configured PostgreSQL maintenance URL. |
 | 2026-08-03 | Addressed still-valid inline review comments and skipped the invalid public-loser-returns-None request because current handler reloads the job after a lost claim. | Push the follow-up commit to the PR branch. |
-| 2026-08-03 | Reproduced `BrokenBarrierError` after rebasing onto the lease-first implementation, then moved the smoke barrier to a test-only `JobLease` wrapper before real advisory acquisition. | Run focused and marker-selected PostgreSQL tests. |
+| 2026-08-03 | Reproduced `BrokenBarrierError` after rebasing onto the lease-first implementation, then moved the smoke barrier to a test-only `JobLease` wrapper before real advisory acquisition. | Push the lease-first follow-up commit to the PR branch. |
 
 ## Open questions
 
