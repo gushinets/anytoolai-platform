@@ -325,6 +325,8 @@ def frontend_check() -> int:
         [
             ["pnpm", "install", "--frozen-lockfile"],
             ["pnpm", "-r", "typecheck"],
+            ["pnpm", "-r", "test"],
+            ["pnpm", "-r", "--if-present", "generate-api-types:check"],
             ["pnpm", "-r", "build"],
         ]
     )
@@ -398,7 +400,7 @@ def generate_docs(*, check: bool = False) -> int:
     script_dir = str(Path(__file__).resolve().parent)
     if script_dir not in sys.path:
         sys.path.insert(0, script_dir)
-    from docs_generation import render_documents, write_documents
+    from docs_generation import GENERATED_SOURCES, write_documents
 
     generated_dir = ROOT / "docs" / "generated"
     if not check:
@@ -410,7 +412,7 @@ def generate_docs(*, check: bool = False) -> int:
         temporary_dir = Path(temporary)
         write_documents(temporary_dir)
         drift: list[str] = []
-        for name in sorted(render_documents()):
+        for name in sorted(GENERATED_SOURCES):
             tracked = generated_dir / name
             candidate = temporary_dir / name
             if not tracked.exists() or tracked.read_bytes() != candidate.read_bytes():

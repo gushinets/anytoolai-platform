@@ -1,0 +1,1681 @@
+{
+  "components": {
+    "schemas": {
+      "ErrorDetailResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "request_id"
+        ],
+        "title": "ErrorDetailResponse",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetailResponse"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "GuestIdentityResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "guest_id": {
+            "title": "Guest Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "guest_id"
+        ],
+        "title": "GuestIdentityResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HandoffAcceptRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "guest_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guest Id"
+          },
+          "source_frontend_instance_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Frontend Instance Id"
+          }
+        },
+        "title": "HandoffAcceptRequest",
+        "type": "object"
+      },
+      "HandoffCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "handoff_definition_id": {
+            "title": "Handoff Definition Id",
+            "type": "string"
+          },
+          "source_artifact_id": {
+            "title": "Source Artifact Id",
+            "type": "string"
+          },
+          "source_scenario_session_id": {
+            "title": "Source Scenario Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "handoff_definition_id",
+          "source_scenario_session_id",
+          "source_artifact_id"
+        ],
+        "title": "HandoffCreateRequest",
+        "type": "object"
+      },
+      "HandoffCreateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "handoff_id": {
+            "title": "Handoff Id",
+            "type": "string"
+          },
+          "handoff_token": {
+            "title": "Handoff Token",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "handoff_id",
+          "handoff_token",
+          "status",
+          "expires_at"
+        ],
+        "title": "HandoffCreateResponse",
+        "type": "object"
+      },
+      "HandoffPreviewResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "handoff_id": {
+            "title": "Handoff Id",
+            "type": "string"
+          },
+          "preview": {
+            "additionalProperties": true,
+            "title": "Preview",
+            "type": "object"
+          },
+          "source_product_display_name": {
+            "title": "Source Product Display Name",
+            "type": "string"
+          },
+          "source_product_id": {
+            "title": "Source Product Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target_job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Job Id"
+          },
+          "target_product_display_name": {
+            "title": "Target Product Display Name",
+            "type": "string"
+          },
+          "target_product_id": {
+            "title": "Target Product Id",
+            "type": "string"
+          },
+          "target_scenario_id": {
+            "title": "Target Scenario Id",
+            "type": "string"
+          },
+          "target_scenario_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Scenario Session Id"
+          }
+        },
+        "required": [
+          "handoff_id",
+          "status",
+          "source_product_id",
+          "source_product_display_name",
+          "target_product_id",
+          "target_product_display_name",
+          "target_scenario_id",
+          "preview",
+          "expires_at"
+        ],
+        "title": "HandoffPreviewResponse",
+        "type": "object"
+      },
+      "QuotaStateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "dimension_key": {
+            "title": "Dimension Key",
+            "type": "string"
+          },
+          "exhausted": {
+            "title": "Exhausted",
+            "type": "boolean"
+          },
+          "guest_id": {
+            "title": "Guest Id",
+            "type": "string"
+          },
+          "limit_count": {
+            "title": "Limit Count",
+            "type": "integer"
+          },
+          "period": {
+            "title": "Period",
+            "type": "string"
+          },
+          "product_id": {
+            "title": "Product Id",
+            "type": "string"
+          },
+          "quota_dimension": {
+            "title": "Quota Dimension",
+            "type": "string"
+          },
+          "quota_policy_id": {
+            "title": "Quota Policy Id",
+            "type": "string"
+          },
+          "remaining_count": {
+            "title": "Remaining Count",
+            "type": "integer"
+          },
+          "scenario_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Id"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "used_count": {
+            "title": "Used Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "guest_id",
+          "product_id",
+          "quota_policy_id",
+          "quota_dimension",
+          "dimension_key",
+          "unit",
+          "period",
+          "limit_count",
+          "used_count",
+          "remaining_count",
+          "exhausted"
+        ],
+        "title": "QuotaStateResponse",
+        "type": "object"
+      },
+      "RuntimeConfigResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_ui_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Ui Capabilities",
+            "type": "array"
+          },
+          "frontend_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Frontend Ids",
+            "type": "array"
+          },
+          "frontends": {
+            "items": {
+              "$ref": "#/components/schemas/RuntimeFrontendResponse"
+            },
+            "title": "Frontends",
+            "type": "array"
+          },
+          "product_id": {
+            "title": "Product Id",
+            "type": "string"
+          },
+          "quota_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuntimeQuotaSummaryResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scenario_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scenario Ids",
+            "type": "array"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/RuntimeScenarioResponse"
+            },
+            "title": "Scenarios",
+            "type": "array"
+          }
+        },
+        "required": [
+          "product_id",
+          "frontend_ids",
+          "frontends",
+          "scenario_ids",
+          "scenarios",
+          "quota_summary",
+          "allowed_ui_capabilities"
+        ],
+        "title": "RuntimeConfigResponse",
+        "type": "object"
+      },
+      "RuntimeFrontendResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "frontend_id": {
+            "title": "Frontend Id",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "frontend_id",
+          "type",
+          "enabled"
+        ],
+        "title": "RuntimeFrontendResponse",
+        "type": "object"
+      },
+      "RuntimeQuotaSummaryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "dimension": {
+            "title": "Dimension",
+            "type": "string"
+          },
+          "limit_count": {
+            "title": "Limit Count",
+            "type": "integer"
+          },
+          "period": {
+            "title": "Period",
+            "type": "string"
+          },
+          "quota_policy_id": {
+            "title": "Quota Policy Id",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "quota_policy_id",
+          "unit",
+          "limit_count",
+          "period",
+          "dimension"
+        ],
+        "title": "RuntimeQuotaSummaryResponse",
+        "type": "object"
+      },
+      "RuntimeRendererHintResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "renderer": {
+            "const": "json_schema",
+            "default": "json_schema",
+            "title": "Renderer",
+            "type": "string"
+          },
+          "schema_ref": {
+            "title": "Schema Ref",
+            "type": "string"
+          },
+          "schema_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Version"
+          }
+        },
+        "required": [
+          "schema_ref"
+        ],
+        "title": "RuntimeRendererHintResponse",
+        "type": "object"
+      },
+      "RuntimeScenarioResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_next_actions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Next Actions",
+            "type": "array"
+          },
+          "input_renderer_hint": {
+            "$ref": "#/components/schemas/RuntimeRendererHintResponse"
+          },
+          "output_renderer_hint": {
+            "$ref": "#/components/schemas/RuntimeRendererHintResponse"
+          },
+          "scenario_id": {
+            "title": "Scenario Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scenario_id",
+          "version",
+          "input_renderer_hint",
+          "output_renderer_hint"
+        ],
+        "title": "RuntimeScenarioResponse",
+        "type": "object"
+      },
+      "ScenarioNextActionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "checkpoint_id": {
+            "title": "Checkpoint Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkpoint_id"
+        ],
+        "title": "ScenarioNextActionRequest",
+        "type": "object"
+      },
+      "ScenarioSessionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_next_actions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Next Actions",
+            "type": "array"
+          },
+          "current_checkpoint_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Checkpoint Id"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "result_artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Artifact Id"
+          },
+          "scenario_session_id": {
+            "title": "Scenario Session Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scenario_session_id",
+          "job_id",
+          "status"
+        ],
+        "title": "ScenarioSessionResponse",
+        "type": "object"
+      },
+      "ScenarioStartRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "frontend_id": {
+            "title": "Frontend Id",
+            "type": "string"
+          },
+          "guest_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guest Id"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "source_frontend_instance_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Frontend Instance Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "required": [
+          "frontend_id",
+          "input"
+        ],
+        "title": "ScenarioStartRequest",
+        "type": "object"
+      },
+      "ScenarioStartResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_next_actions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Next Actions",
+            "type": "array"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "result_artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Artifact Id"
+          },
+          "scenario_session_id": {
+            "title": "Scenario Session Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scenario_session_id",
+          "job_id",
+          "status"
+        ],
+        "title": "ScenarioStartResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "AnytoolAI Platform API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/v1/handoffs": {
+      "post": {
+        "operationId": "create_handoff_v1_handoffs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoffCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffCreateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Handoff",
+        "tags": [
+          "handoffs"
+        ]
+      }
+    },
+    "/v1/handoffs/{handoff_token}": {
+      "get": {
+        "operationId": "get_handoff_v1_handoffs__handoff_token__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "handoff_token",
+            "required": true,
+            "schema": {
+              "title": "Handoff Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Handoff",
+        "tags": [
+          "handoffs"
+        ]
+      }
+    },
+    "/v1/handoffs/{handoff_token}/accept": {
+      "post": {
+        "operationId": "accept_handoff_v1_handoffs__handoff_token__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "handoff_token",
+            "required": true,
+            "schema": {
+              "title": "Handoff Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/HandoffAcceptRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "summary": "Accept Handoff",
+        "tags": [
+          "handoffs"
+        ]
+      }
+    },
+    "/v1/handoffs/{handoff_token}/decline": {
+      "post": {
+        "operationId": "decline_handoff_v1_handoffs__handoff_token__decline_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "handoff_token",
+            "required": true,
+            "schema": {
+              "title": "Handoff Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decline Handoff",
+        "tags": [
+          "handoffs"
+        ]
+      }
+    },
+    "/v1/identity/guest": {
+      "post": {
+        "operationId": "create_guest_identity_v1_identity_guest_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "guest_id": "guest_123"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/GuestIdentityResponse"
+                }
+              }
+            },
+            "description": "Frontend-safe opaque guest identifier."
+          }
+        },
+        "summary": "Create an opaque guest identity",
+        "tags": [
+          "access-lite"
+        ]
+      }
+    },
+    "/v1/products/{product_id}/quota": {
+      "get": {
+        "operationId": "get_product_quota_v1_products__product_id__quota_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "title": "Product Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "guest_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Guest Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scenario_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "dimension_key": "kernel_demo",
+                  "exhausted": false,
+                  "guest_id": "guest_123",
+                  "limit_count": 3,
+                  "period": "lifetime",
+                  "product_id": "kernel_demo",
+                  "quota_dimension": "product",
+                  "quota_policy_id": "kernel_demo.guest_quota_v1",
+                  "remaining_count": 2,
+                  "unit": "scenario_run",
+                  "used_count": 1
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaStateResponse"
+                }
+              }
+            },
+            "description": "Current backend-owned guest quota state."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Safe response when product or guest identity is unknown."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get frontend-safe guest quota state",
+        "tags": [
+          "access-lite"
+        ]
+      }
+    },
+    "/v1/products/{product_id}/runtime-config": {
+      "get": {
+        "operationId": "get_runtime_config_v1_products__product_id__runtime_config_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "title": "Product Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "allowed_ui_capabilities": [
+                    "capture_email",
+                    "continue_to_target",
+                    "copy_result",
+                    "create_handoff",
+                    "render_input",
+                    "render_output",
+                    "view_paywall"
+                  ],
+                  "frontend_ids": [
+                    "kernel_demo_ce",
+                    "web_mirror"
+                  ],
+                  "frontends": [
+                    {
+                      "enabled": true,
+                      "frontend_id": "kernel_demo_ce",
+                      "type": "chrome_extension"
+                    },
+                    {
+                      "enabled": true,
+                      "frontend_id": "web_mirror",
+                      "type": "web"
+                    }
+                  ],
+                  "product_id": "kernel_demo",
+                  "quota_summary": {
+                    "dimension": "product",
+                    "limit_count": 3,
+                    "period": "lifetime",
+                    "quota_policy_id": "kernel_demo.guest_quota_v1",
+                    "unit": "scenario_run"
+                  },
+                  "scenario_ids": [
+                    "kernel_demo.single_action_smoke_v1",
+                    "kernel_demo.multi_step_workflow_smoke_v1",
+                    "kernel_demo.quota_exhausted_smoke_v1",
+                    "kernel_demo.handoff_smoke_source_v1",
+                    "kernel_demo.handoff_smoke_target_v1"
+                  ],
+                  "scenarios": [
+                    {
+                      "allowed_next_actions": [
+                        "copy_result",
+                        "create_handoff"
+                      ],
+                      "input_renderer_hint": {
+                        "renderer": "json_schema",
+                        "schema_ref": "kernel_demo.generic_text_input_v1",
+                        "schema_version": 1
+                      },
+                      "output_renderer_hint": {
+                        "renderer": "json_schema",
+                        "schema_ref": "kernel_demo.extract_output_v1",
+                        "schema_version": 1
+                      },
+                      "scenario_id": "kernel_demo.single_action_smoke_v1",
+                      "version": 1
+                    },
+                    {
+                      "allowed_next_actions": [
+                        "copy_result",
+                        "create_handoff"
+                      ],
+                      "input_renderer_hint": {
+                        "renderer": "json_schema",
+                        "schema_ref": "kernel_demo.generic_text_input_v1",
+                        "schema_version": 1
+                      },
+                      "output_renderer_hint": {
+                        "renderer": "json_schema",
+                        "schema_ref": "kernel_demo.report_output_v1",
+                        "schema_version": 1
+                      },
+                      "scenario_id": "kernel_demo.multi_step_workflow_smoke_v1",
+                      "version": 1
+                    },
+                    {
+                      "allowed_next_actions": [
+                        "capture_email",
+                        "view_paywall"
+                      ],
+                      "input_renderer_hint": {
+                        "renderer": "json_schema",
+                        "schema_ref": "kernel_demo.generic_text_input_v1",
+                        "schema_version": 1
+                      },
+                      "output_renderer_hint": {
+                        "renderer": "json_schema",
+                        "schema_ref": "kernel_demo.extract_output_v1",
+                        "schema_version": 1
+                      },
+                      "scenario_id": "kernel_demo.quota_exhausted_smoke_v1",
+                      "version": 1
+                    },
+                    {
+                      "allowed_next_actions": [
+                        "continue_to_target"
+                      ],
+                      "input_renderer_hint": {
+                        "renderer": "json_schema",
+                        "schema_ref": "kernel_demo.generic_text_input_v1",
+                        "schema_version": 1
+                      },
+                      "output_renderer_hint": {
+                        "renderer": "json_schema",
+                        "schema_ref": "kernel_demo.extract_output_v1",
+                        "schema_version": 1
+                      },
+                      "scenario_id": "kernel_demo.handoff_smoke_source_v1",
+                      "version": 1
+                    },
+                    {
+                      "allowed_next_actions": [
+                        "copy_result"
+                      ],
+                      "input_renderer_hint": {
+                        "renderer": "json_schema",
+                        "schema_ref": "kernel_demo.generic_text_input_v1",
+                        "schema_version": 1
+                      },
+                      "output_renderer_hint": {
+                        "renderer": "json_schema",
+                        "schema_ref": "kernel_demo.extract_output_v1",
+                        "schema_version": 1
+                      },
+                      "scenario_id": "kernel_demo.handoff_smoke_target_v1",
+                      "version": 1
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeConfigResponse"
+                }
+              }
+            },
+            "description": "Frontend-safe runtime metadata for a configured product."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "product_not_found",
+                    "message": "Product not found",
+                    "request_id": "req_123"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Safe not-found response when the product is unknown."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get frontend-safe product runtime config",
+        "tags": [
+          "runtime-config"
+        ]
+      }
+    },
+    "/v1/products/{product_id}/scenarios/{scenario_id}/start": {
+      "post": {
+        "operationId": "start_scenario_v1_products__product_id__scenarios__scenario_id__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "title": "Product Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "scenario_id",
+            "required": true,
+            "schema": {
+              "title": "Scenario Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "allowed_next_actions": [],
+                  "job_id": "job_123",
+                  "scenario_session_id": "scenario_session_123",
+                  "status": "started"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ScenarioStartResponse"
+                }
+              }
+            },
+            "description": "Stable queue-and-return response for CE polling."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "guest_not_found": {
+                    "summary": "Supplied guest identity is unknown.",
+                    "value": {
+                      "error": {
+                        "code": "guest_identity_not_found",
+                        "message": "Guest identity not found.",
+                        "request_id": "req_123"
+                      }
+                    }
+                  },
+                  "scenario_not_found": {
+                    "summary": "Scenario is unknown for the product.",
+                    "value": {
+                      "error": {
+                        "code": "scenario_not_found",
+                        "message": "Scenario not found.",
+                        "request_id": "req_123"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Safe response when the scenario is unknown for the product or the supplied guest identity is unknown."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "idempotency_key_conflict",
+                    "message": "Idempotency-Key was already used with a different request.",
+                    "request_id": "req_123"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Idempotency-Key was reused with a request whose scope or input does not match the original request. No new scenario session is created and quota is not consumed; retry with a new Idempotency-Key or the original request."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "guest_required": {
+                    "summary": "Quota-protected product requires guest_id.",
+                    "value": {
+                      "error": {
+                        "code": "guest_identity_required",
+                        "message": "Guest identity is required for this product.",
+                        "request_id": "req_123"
+                      }
+                    }
+                  },
+                  "idempotency_key_invalid": {
+                    "summary": "Idempotency-Key exceeds the maximum length.",
+                    "value": {
+                      "error": {
+                        "code": "idempotency_key_invalid",
+                        "message": "Idempotency-Key must be at most 256 characters.",
+                        "request_id": "req_123"
+                      }
+                    }
+                  },
+                  "invalid_input": {
+                    "summary": "Scenario input is not a JSON object.",
+                    "value": {
+                      "error": {
+                        "code": "scenario_input_invalid",
+                        "message": "Scenario input must be a JSON object.",
+                        "request_id": "req_123"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Safe validation response for unsupported frontend, invalid input, missing guest identity, or an oversized Idempotency-Key."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "quota_exhausted",
+                    "message": "Guest quota exhausted.",
+                    "request_id": "req_123"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Quota exhausted. The backend rejects the scenario start before creating any scenario session or linked job."
+          }
+        },
+        "summary": "Create a scenario session and queue workflow execution",
+        "tags": [
+          "scenario-runtime"
+        ]
+      }
+    },
+    "/v1/scenario-sessions/{scenario_session_id}": {
+      "get": {
+        "operationId": "get_scenario_session_v1_scenario_sessions__scenario_session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scenario_session_id",
+            "required": true,
+            "schema": {
+              "title": "Scenario Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "allowed_next_actions": [
+                    "copy_result",
+                    "create_handoff"
+                  ],
+                  "current_checkpoint_id": "result_ready",
+                  "job_id": "job_123",
+                  "result_artifact_id": "artifact_123",
+                  "scenario_session_id": "scenario_session_123",
+                  "status": "completed"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ScenarioSessionResponse"
+                }
+              }
+            },
+            "description": "Frontend-safe session snapshot for polling."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "scenario_session_not_found",
+                    "message": "Scenario session not found.",
+                    "request_id": "req_123"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Safe response when the scenario session is unknown."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get frontend-safe scenario session state",
+        "tags": [
+          "scenario-runtime"
+        ]
+      }
+    },
+    "/v1/scenario-sessions/{scenario_session_id}/next-actions/{next_action_id}": {
+      "post": {
+        "operationId": "post_next_action_v1_scenario_sessions__scenario_session_id__next_actions__next_action_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scenario_session_id",
+            "required": true,
+            "schema": {
+              "title": "Scenario Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "next_action_id",
+            "required": true,
+            "schema": {
+              "title": "Next Action Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioNextActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "allowed_next_actions": [
+                    "copy_result",
+                    "create_handoff"
+                  ],
+                  "current_checkpoint_id": "result_ready",
+                  "job_id": "job_123",
+                  "result_artifact_id": "artifact_123",
+                  "scenario_session_id": "scenario_session_123",
+                  "status": "completed"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ScenarioSessionResponse"
+                }
+              }
+            },
+            "description": "Validated next action with the current safe session snapshot."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "scenario_session_not_found",
+                    "message": "Scenario session not found.",
+                    "request_id": "req_123"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Safe response when the scenario session is unknown."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "scenario_checkpoint_conflict",
+                    "message": "Scenario checkpoint no longer matches the requested action.",
+                    "request_id": "req_123"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Safe response for stale checkpoint or disallowed action."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate and record a frontend next-action click",
+        "tags": [
+          "scenario-runtime"
+        ]
+      }
+    }
+  }
+}

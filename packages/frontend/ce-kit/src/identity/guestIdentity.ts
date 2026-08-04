@@ -1,48 +1,23 @@
+import type { AssertExactSchemaKeys } from "../api/driftAssertions";
+import type { PlatformApiError } from "../api/errors";
+import type { components } from "../api/generated/platformApi";
+import type { AsyncStorage } from "../storage/asyncStorage";
+
 export type GuestIdentity = {
   guestId: string;
 };
 
 export type GuestIdentityOptions = {
-  apiBaseUrl?: string;
-  storage?: Storage;
+  storage: AsyncStorage;
   storageKey?: string;
-  fetchImpl?: typeof fetch;
 };
 
-const DEFAULT_STORAGE_KEY = "anytoolai.guest_id";
+export type GuestIdentityResult = { ok: true; value: GuestIdentity } | { ok: false; error: PlatformApiError };
 
-export async function createGuestIdentity(
-  options: GuestIdentityOptions = {},
-): Promise<GuestIdentity> {
-  const storage = options.storage ?? _defaultStorage();
-  const storageKey = options.storageKey ?? DEFAULT_STORAGE_KEY;
-  const storedGuestId = storage?.getItem(storageKey);
-  if (storedGuestId) {
-    return { guestId: storedGuestId };
-  }
+export const DEFAULT_GUEST_STORAGE_KEY = "anytoolai.guest_id";
 
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
-  const response = await fetchImpl(`${options.apiBaseUrl ?? ""}/v1/identity/guest`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!response.ok) {
-    throw new Error("Guest identity creation failed.");
-  }
-
-  const payload: unknown = await response.json();
-  const guestId = _guestIdFromPayload(payload);
-  storage?.setItem(storageKey, guestId);
-  return { guestId };
-}
-
-function _defaultStorage(): Storage | undefined {
-  return typeof globalThis.localStorage === "undefined"
-    ? undefined
-    : globalThis.localStorage;
-}
-
-function _guestIdFromPayload(payload: unknown): string {
+/** Extracts `guest_id` from the backend's GuestIdentityResponse payload, or null if malformed. */
+export function parseGuestIdentityPayload(payload: unknown): string | null {
   if (
     typeof payload === "object" &&
     payload !== null &&
@@ -52,5 +27,15 @@ function _guestIdFromPayload(payload: unknown): string {
   ) {
     return payload.guest_id;
   }
-  throw new Error("Guest identity response was invalid.");
+  return null;
 }
+
+// Compile-time drift check: fails typecheck if the backend's GuestIdentityResponse schema grows a
+// field that parseGuestIdentityPayload() above doesn't know about.
+const _guestIdentityResponseKeys = ["guest_id"] as const;
+type _GuestIdentityResponseKeysCheck = AssertExactSchemaKeys<
+  components["schemas"]["GuestIdentityResponse"],
+  typeof _guestIdentityResponseKeys
+>;
+const _assertGuestIdentityResponseKeysMatchGenerated: _GuestIdentityResponseKeysCheck = true;
+void _assertGuestIdentityResponseKeysMatchGenerated;

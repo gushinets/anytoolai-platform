@@ -48,9 +48,9 @@ When blocked, `collect-context` writes a privacy-sanitized JSON bundle under the
 `.agent/context/` directory. API and worker runtime logs are structured JSON and use the same
 redaction rules.
 
-`full-check` runs the baseline, locked frontend compile checks, and the implemented Freelancer suite
-tests. Kernel and browser smoke commands will be added only when feature issues deliver real vertical
-slices.
+`full-check` runs the baseline, locked frontend checks (typecheck, unit tests, generated
+OpenAPI-contract drift check, build), and the implemented Freelancer suite tests. Kernel and browser
+smoke commands will be added only when feature issues deliver real vertical slices.
 
 ## MVPs
 
