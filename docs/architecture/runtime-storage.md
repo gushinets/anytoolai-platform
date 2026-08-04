@@ -87,12 +87,19 @@ sessions/jobs/artifacts, and indexes for definition, source session, and status/
 `HandoffRepository` follows the caller-owned transaction rule but deliberately does not expose a
 generic status-changing update. `mark_viewed`, `claim_accept`, `decline`, `expire_if_due`,
 `consume`, and `mark_failed` use conditional SQL updates. The acceptance compare-and-swap is the
-storage-level double-accept guard. `finalize_quota_failure_recovery` conditionally changes an
-unclaimed `created`/`viewed` row directly to `failed`; the same recovery transaction persists safe
-`quota_exhausted`, quota audit state, and all recovery events. It never commits an intermediate
-`created/viewed + error_code` reservation. `attach_target` validates that the record is accepted and
-the target rows belong to the same tenant/region and expected target session. State, linkage,
-quota, and events therefore commit or roll back together.
+storage-level double-accept guard. Token-driven lifecycle operations also acquire a PostgreSQL
+session-level advisory lock keyed by `handoff_id`; `transaction_boundary()` releases it with a
+cleanup callback only after commit or rollback recovery completes. This lets immediate accept roll
+back its temporary `accepted` claim while still serializing decline/expiry until quota recovery has
+committed the terminal outcome.
+
+`finalize_quota_failure_recovery` conditionally changes an unclaimed `created`/`viewed` row directly
+to `failed`; the same critical recovery transaction persists safe `quota_exhausted`, quota audit
+state, and all recovery events. It never commits an intermediate `created/viewed + error_code`
+reservation. If recovery cannot persist this state and the `quota.checked` / `quota.exhausted` pair,
+the accept path must not return `429 quota_exhausted`. `attach_target` validates that the record is
+accepted and the target rows belong to the same tenant/region and expected target session. State,
+linkage, quota, and events therefore commit or roll back together.
 
 ### Provider Policy Ref Compatibility
 
@@ -296,6 +303,12 @@ This lets the runtime rebuild durable history after a rollback without introduci
 workflow engine. Recovered rows become the source for replayed timestamps and correlation values,
 while event-level existence checks prevent duplicate event-log rows when recovery runs against
 partial durable state.
+
+Rollback recovery callbacks can be marked critical when the caller must not return its normal
+domain error unless recovery succeeds. Handoff quota exhaustion uses this path: a returned
+`429 quota_exhausted` proves the `failed` handoff and quota audit pair are already durable.
+Non-critical workflow/action/provider/artifact recovery keeps the older best-effort behavior where
+callback failures are attached as notes to the original exception.
 
 ## Common Runtime Dimensions
 

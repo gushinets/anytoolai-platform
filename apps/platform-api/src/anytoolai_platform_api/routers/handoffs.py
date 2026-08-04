@@ -18,6 +18,7 @@ from anytoolai_platform_api.schemas import (
 from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.common.errors import PlatformError
+from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
@@ -187,7 +188,12 @@ def decline_handoff(
     return _preview_response(preview)
 
 
-def _service(session: Any, registry: ConfigRegistry) -> HandoffService:
+def _service(
+    session: Any,
+    registry: ConfigRegistry,
+    *,
+    clock: Any | None = None,
+) -> HandoffService:
     emitter = EventEmitter(EventLogRepository(session))
     sessions = ScenarioSessionRepository(session)
     jobs = JobRepository(session)
@@ -219,7 +225,12 @@ def _service(session: Any, registry: ConfigRegistry) -> HandoffService:
         scenario_repository=sessions,
         guest_repository=guests,
         event_emitter=emitter,
+        clock=_handoff_service_clock(clock),
     )
+
+
+def _handoff_service_clock(clock: Any | None) -> Any:
+    return utc_now if clock is None else clock
 
 
 def _preview_response(preview: HandoffPreview) -> HandoffPreviewResponse:

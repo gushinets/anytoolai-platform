@@ -41,21 +41,27 @@ specific call inserted (an ANY-150 keyed insert-or-select can insert before quot
 with it, and the API returns `quota_exhausted`. No scenario session or job is ever left committed for
 a rejected start.
 
-Immediate handoff acceptance and the ordinary `/start` router now share the same rollback-and-recover
-contract for quota exhaustion. A rejected start must leave the quota usage dimension and the
+Immediate handoff acceptance and the ordinary `/start` router share the same rollback-and-recover
+shape for quota exhaustion. A rejected start must leave the quota usage dimension and the
 `quota.checked` / `quota.exhausted` audit pair durable, return safe HTTP 429, and leave no target
 session or job committed. Neither router commits its transaction on `quota_exhausted` -- both let the
 error propagate out of `transaction_boundary`, which rolls the transaction back. The quota service
 therefore registers an exhaustion-only rollback recovery callback before raising: after rollback it
 re-ensures the same usage dimension and re-emits the same checked/exhausted pair in an independent
-transaction (`storage/transactions.py`'s `register_rollback_recovery_callback`). For handoffs, that
-independent transaction also uses one conditional update to claim recovery and finalize `failed` with
-safe `quota_exhausted`, then emits the quota pair and `handoff.failed` before commit; for an ordinary
-scenario start there is no handoff row to finalize, so the callback only re-ensures the usage
-dimension and re-emits the checked/exhausted pair. A losing concurrent recovery performs no writes.
-There is no committed pre-terminal reservation window, so neither process interruption nor a
-competing transition can leave a stuck or mixed state. Recovery never consumes quota. The router's
-later failure call remains idempotent and does not duplicate the handoff event.
+transaction (`storage/transactions.py`'s `register_rollback_recovery_callback`).
+
+For handoffs, the accepted claim establishes quota-rejection ownership when target quota evaluation
+discovers exhaustion under the handoff lifecycle advisory lock. That PostgreSQL session-level lock
+survives the accepting transaction rollback and is released only after recovery callbacks complete.
+The handoff quota callback is critical: the owning accept request cannot return
+`429 quota_exhausted` if recovery fails to persist the durable `failed` state and audit chain. One
+conditional update claims recovery and finalizes `failed` with safe `quota_exhausted`, then emits the
+quota pair and `handoff.failed` before commit. A repeated recovery that finds an existing audit pair
+returns without duplicating it; a lost terminal CAS without the audit pair is treated as recovery
+failure, not a valid 429. Decline and expiry can win only before this ownership point; afterward they
+wait and observe `failed`. Recovery never consumes quota, creates a target session/job, runs a
+workflow, creates a target artifact, or makes a provider call. The router's later failure call
+remains idempotent and does not duplicate the handoff event.
 
 The fast SQLite test suite has a known ceiling here: many concurrent losing requests each spawn an
 independent recovery transaction against the same usage row, and SQLite's ATTACH-schema harness can
