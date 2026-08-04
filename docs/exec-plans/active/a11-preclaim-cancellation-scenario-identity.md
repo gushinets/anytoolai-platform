@@ -42,9 +42,9 @@ References:
 ## Validation
 
 - [x] `uv run python scripts/agent/runner.py doctor` passed.
-- [x] `uv run python -m pytest apps/platform-worker/tests/test_worker_boot.py -k "cancel or cancellation or claim" -q` exited 0; PostgreSQL-marked cases skipped without a local maintenance database URL, and the selected non-PostgreSQL case passed.
-- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_runtime_storage.py -k "cancel or claim" -q` exited 0; the selected PostgreSQL storage case skipped without a local maintenance database URL.
-- [x] `uv run python -m pytest -m "postgresql" packages/backend/platform-core/tests apps/platform-api/tests apps/platform-worker/tests -k "cancel or cancellation or claim" -q` exited 0; PostgreSQL-marked cases collected but skipped without a local maintenance database URL.
+- [x] Approved targeted pytest exception: `uv run python -m pytest apps/platform-worker/tests/test_worker_boot.py -k "cancel or cancellation or claim" -q` exited 0; PostgreSQL-marked cases skipped without a local maintenance database URL, and the selected non-PostgreSQL case passed.
+- [x] Approved targeted pytest exception: `uv run python -m pytest packages/backend/platform-core/tests/unit/test_runtime_storage.py -k "cancel or claim" -q` exited 0; the selected PostgreSQL storage case skipped without a local maintenance database URL.
+- [x] Approved targeted pytest exception: `uv run python -m pytest -m "postgresql" packages/backend/platform-core/tests apps/platform-api/tests apps/platform-worker/tests -k "cancel or cancellation or claim" -q` exited 0; PostgreSQL-marked cases collected but skipped without a local maintenance database URL.
 - [x] `uv run python scripts/agent/runner.py validate-configs` passed.
 - [x] `uv run python scripts/agent/runner.py validate-architecture` passed.
 - [x] `uv run python scripts/agent/runner.py validate-docs` passed.
