@@ -898,10 +898,17 @@ def test_job_repository_claims_created_jobs_once_and_supports_preclaim_cancel(
         assert repository.claim_created(created.id) is None
 
         cancelable = repository.create(make_job(scenario_session.id))
-        canceled = repository.cancel_created(cancelable.id)
+        canceled = repository.cancel_created(
+            cancelable.id,
+            metadata={"cancel_reason": "user_request", "preexisting": "kept"},
+        )
         assert canceled is not None
         assert canceled.status is JobStatus.canceled
         assert canceled.completed_at is not None
+        assert canceled.metadata == {
+            "cancel_reason": "user_request",
+            "preexisting": "kept",
+        }
         assert repository.claim_created(cancelable.id) is None
 
 

@@ -100,10 +100,15 @@ class WorkflowJobService:
         )
         return stored
 
-    def cancel_created(self, job_id: str) -> JobRecord | None:
+    def cancel_created(
+        self,
+        job_id: str,
+        *,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> JobRecord | None:
         """Cancel and emit the terminal event inside the caller's transaction."""
 
-        stored = self._repository.cancel_created(job_id)
+        stored = self._repository.cancel_created(job_id, metadata=metadata)
         if stored is None:
             return None
         self._event_emitter.emit(
