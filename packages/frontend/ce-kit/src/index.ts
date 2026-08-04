@@ -9,9 +9,10 @@ export type {
 export type { PlatformApiError } from "./api/errors";
 export { createInMemoryAsyncStorage } from "./storage/inMemoryAsyncStorage";
 export type { AsyncStorage } from "./storage/asyncStorage";
+export { createChromeStorageAdapter } from "./storage/chromeStorageAdapter";
+export type { ChromeStorageArea } from "./storage/chromeStorageAdapter";
 
-export { createGuestIdentity } from "./identity/guestIdentity";
-export type { GuestIdentity, GuestIdentityOptions } from "./identity/guestIdentity";
+export type { GuestIdentity, GuestIdentityOptions, GuestIdentityResult } from "./identity/guestIdentity";
 export { getQuota } from "./quota/getQuota";
 export type { QuotaRequest } from "./quota/getQuota";
 export { startScenario } from "./scenarios/startScenario";

@@ -1,3 +1,5 @@
+import type { AssertExactSchemaKeys } from "../api/driftAssertions";
+import type { components } from "../api/generated/platformApi";
 import type {
   RuntimeConfig,
   RuntimeFrontend,
@@ -187,3 +189,59 @@ function _parseQuotaSummary(value: unknown): RuntimeQuotaSummary | null {
   }
   return { quotaPolicyId, unit, limitCount, period, dimension };
 }
+
+// Compile-time drift check: fails typecheck if any of these backend response schemas grows a
+// field the parsers above don't know about.
+const _runtimeConfigKeys = [
+  "product_id",
+  "frontend_ids",
+  "frontends",
+  "scenario_ids",
+  "scenarios",
+  "quota_summary",
+  "allowed_ui_capabilities",
+] as const;
+type _RuntimeConfigKeysCheck = AssertExactSchemaKeys<
+  components["schemas"]["RuntimeConfigResponse"],
+  typeof _runtimeConfigKeys
+>;
+const _assertRuntimeConfigKeysMatchGenerated: _RuntimeConfigKeysCheck = true;
+void _assertRuntimeConfigKeysMatchGenerated;
+
+const _runtimeFrontendKeys = ["frontend_id", "type", "enabled"] as const;
+type _RuntimeFrontendKeysCheck = AssertExactSchemaKeys<
+  components["schemas"]["RuntimeFrontendResponse"],
+  typeof _runtimeFrontendKeys
+>;
+const _assertRuntimeFrontendKeysMatchGenerated: _RuntimeFrontendKeysCheck = true;
+void _assertRuntimeFrontendKeysMatchGenerated;
+
+const _runtimeScenarioKeys = [
+  "scenario_id",
+  "version",
+  "allowed_next_actions",
+  "input_renderer_hint",
+  "output_renderer_hint",
+] as const;
+type _RuntimeScenarioKeysCheck = AssertExactSchemaKeys<
+  components["schemas"]["RuntimeScenarioResponse"],
+  typeof _runtimeScenarioKeys
+>;
+const _assertRuntimeScenarioKeysMatchGenerated: _RuntimeScenarioKeysCheck = true;
+void _assertRuntimeScenarioKeysMatchGenerated;
+
+const _runtimeRendererHintKeys = ["renderer", "schema_ref", "schema_version"] as const;
+type _RuntimeRendererHintKeysCheck = AssertExactSchemaKeys<
+  components["schemas"]["RuntimeRendererHintResponse"],
+  typeof _runtimeRendererHintKeys
+>;
+const _assertRuntimeRendererHintKeysMatchGenerated: _RuntimeRendererHintKeysCheck = true;
+void _assertRuntimeRendererHintKeysMatchGenerated;
+
+const _runtimeQuotaSummaryKeys = ["quota_policy_id", "unit", "limit_count", "period", "dimension"] as const;
+type _RuntimeQuotaSummaryKeysCheck = AssertExactSchemaKeys<
+  components["schemas"]["RuntimeQuotaSummaryResponse"],
+  typeof _runtimeQuotaSummaryKeys
+>;
+const _assertRuntimeQuotaSummaryKeysMatchGenerated: _RuntimeQuotaSummaryKeysCheck = true;
+void _assertRuntimeQuotaSummaryKeysMatchGenerated;

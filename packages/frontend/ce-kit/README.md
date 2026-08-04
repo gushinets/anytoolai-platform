@@ -126,33 +126,40 @@ if (!result.ok) {
 ## Storage
 
 `AsyncStorage` is a minimal, single-key `get`/`set`/`remove` contract -- narrower than
-`chrome.storage.local`'s own multi-key, untyped-value API, so extensions provide a thin per-key
-adapter over `chrome.storage.local` rather than passing it in directly. That adapter is what
-depends on `chrome.storage.local`, not this contract, so CE-kit itself needs no `@types/chrome`
-dependency. Everything else (including tests) can use the bundled in-memory implementation.
+`chrome.storage.local`'s own multi-key, untyped-value API. CE-kit ships and tests
+`createChromeStorageAdapter()`, which wraps `chrome.storage.local` (or any object matching its
+promise-based `get`/`set`/`remove` shape) into this contract, so extensions can pass
+`chrome.storage.local` straight in without writing their own adapter. The adapter only depends on
+the `ChromeStorageArea` structural type CE-kit declares itself, not `@types/chrome`, so the
+dependency stays optional. Everything else (including tests) can use the bundled in-memory
+implementation.
 
 ```ts
-import { createInMemoryAsyncStorage } from "@anytoolai/ce-kit";
+import { createChromeStorageAdapter, createInMemoryAsyncStorage } from "@anytoolai/ce-kit";
 
-const storage = createInMemoryAsyncStorage(); // or your own AsyncStorage-shaped adapter
+const storage = createInMemoryAsyncStorage(); // for tests / non-extension hosts
+const chromeStorage = createChromeStorageAdapter(chrome.storage.local); // inside an extension
 ```
 
 ## Guest identity
 
-`createGuestIdentity({ client, storage, storageKey? })` reuses a persisted guest id if one exists,
-and otherwise requests a new one and persists it. Concurrent calls sharing the same
-`PlatformApiClient` instance are single-flight -- at most one backend request is made no matter how
-many callers ask at once.
+`client.createGuestIdentity({ storage, storageKey? })` reuses a persisted guest id if one exists,
+and otherwise requests a new one and persists it. It's owned by `PlatformApiClient` (not a free
+function) so single-flight dedup can be scoped to the client instance itself: concurrent calls on
+one client make at most one backend request, regardless of which `storageKey` each call passes --
+only the call that actually performs the request persists to its own `storageKey`.
 
 ```ts
-import { createGuestIdentity } from "@anytoolai/ce-kit";
-
-const { guestId } = await createGuestIdentity({ client, storage });
+const result = await client.createGuestIdentity({ storage });
+if (result.ok) {
+  const { guestId } = result.value;
+}
 ```
 
-Unlike `getRuntimeConfig()` below, this throws rather than returning a `PlatformApiResult` -- it's
-bootstrap plumbing most callers can't meaningfully proceed without. The thrown `Error`'s message
-still names the underlying failure type (e.g. `"Guest identity creation failed: backend_error"`).
+Like `getRuntimeConfig()` below, this returns a result object (`{ ok: true, value }` or
+`{ ok: false, error }`) rather than throwing, so callers can distinguish backend, network, timeout,
+cancellation, and malformed-response failures through the same stable `PlatformApiError` union
+everywhere else in CE-kit.
 
 ## Runtime config
 
@@ -181,10 +188,20 @@ path string; it does not require a `PlatformApiClient` change.
 
 `src/api/generated/platformApi.ts` holds TypeScript types generated from the backend's live
 OpenAPI schema via [`openapi-typescript`](https://openapi-ts.dev/) -- not hand-maintained DTOs, so
-the frontend's view of the contract can't silently drift from the backend or from prod. Nothing in
-this package consumes those generated types yet (`PlatformApiClient` and the hand-written response
-shapes above stay as they are); this is the codegen + drift-check plumbing for future callers to
-build on.
+the frontend's view of the contract can't silently drift from the backend or from prod.
+
+`PlatformApiClient` and the hand-written response parsers (`parseGuestIdentityPayload()`,
+`parseRuntimeConfig()`) don't consume the generated types directly at runtime -- the backend's
+snake_case wire format still needs runtime validation and mapping to CE-kit's camelCase DTOs, which
+`openapi-typescript`'s static types alone can't provide. Instead, `src/api/driftAssertions.ts`'s
+`AssertExactSchemaKeys<T, Keys>` ties each parser to the generated schema at the type level: every
+parser file lists the exact snake_case keys it reads (e.g. `guestIdentity.ts`'s
+`_guestIdentityResponseKeys`, `parseRuntimeConfig.ts`'s per-schema key lists) and asserts that list
+against `keyof components["schemas"][...]`. If the backend schema grows a field the parser doesn't
+know about, regenerating `platformApi.ts` makes that assertion fail typecheck instead of silently
+leaving the parser stale. Beyond these drift assertions, nothing in this package consumes the
+generated types directly yet -- `PlatformApiClient` and the hand-written response shapes stay as
+they are; this is the codegen + drift-check plumbing for future callers to build on.
 
 The pipeline:
 
