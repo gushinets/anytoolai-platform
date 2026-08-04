@@ -7,18 +7,39 @@ export type {
   PlatformApiRetryPolicy,
 } from "./api/client";
 export type { PlatformApiError } from "./api/errors";
+export {
+  isIdempotencyKeyConflict,
+  isQuotaExhausted,
+  isScenarioActionConflict,
+} from "./api/errors";
 export { createInMemoryAsyncStorage } from "./storage/inMemoryAsyncStorage";
 export type { AsyncStorage } from "./storage/asyncStorage";
 
 export { createGuestIdentity } from "./identity/guestIdentity";
 export type { GuestIdentity, GuestIdentityOptions } from "./identity/guestIdentity";
 export { getQuota } from "./quota/getQuota";
-export type { QuotaRequest } from "./quota/getQuota";
+export type { QuotaRequest, QuotaState } from "./quota/types";
 export { startScenario } from "./scenarios/startScenario";
+export { prepareScenarioStart } from "./scenarios/prepareScenarioStart";
 export type {
-  ScenarioStartDemoResponse,
+  PreparedScenarioStart,
+  PreparedScenarioStartExecuteOptions,
+} from "./scenarios/prepareScenarioStart";
+export { getScenarioSession } from "./scenarios/getScenarioSession";
+export type { GetScenarioSessionOptions } from "./scenarios/getScenarioSession";
+export { pollScenarioSession } from "./scenarios/pollScenarioSession";
+export type {
+  PollScenarioSessionOptions,
+  PollScenarioSessionResult,
+  PollScenarioSessionStopReason,
+} from "./scenarios/pollScenarioSession";
+export { nextAction } from "./scenarios/nextAction";
+export type { NextActionOptions, NextActionRequest } from "./scenarios/nextAction";
+export type {
+  ScenarioSession,
+  ScenarioSessionSnapshot,
   ScenarioStartRequest,
-} from "./scenarios/startScenario";
+} from "./scenarios/types";
 
 export { getRuntimeConfig } from "./runtime";
 export type {
@@ -31,12 +52,6 @@ export type {
 
 export async function pollJob(jobId: string): Promise<{ jobId: string; status: string }> {
   return { jobId, status: "succeeded" };
-}
-
-export async function getScenarioSession(
-  scenarioSessionId: string,
-): Promise<{ scenarioSessionId: string; status: string }> {
-  return { scenarioSessionId, status: "completed" };
 }
 
 export async function getArtifact(artifactId: string): Promise<{ artifactId: string }> {

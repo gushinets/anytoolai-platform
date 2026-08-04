@@ -8,8 +8,8 @@
 - Created: 2026-07-20
 - Last updated: 2026-07-20
 - Review date: 2026-07-20
-- Next action: A16 must complete the shared CE-kit Platform API client and full frontend quota
-  integration.
+- Next action: none; A15 (ANY-8, ANY-170/ANY-171) completed the shared CE-kit Platform API client
+  and full frontend quota integration.
 - Blocker: none
 
 ## Goal
@@ -17,7 +17,7 @@
 Implement backend-enforced access-lite quota for guest identities.
 
 A13 scope is backend storage, policy resolution, API behavior, event emission, and local CE guest-id
-persistence. Full CE-kit quota/start integration is intentionally deferred to A16.
+persistence. Full CE-kit quota/start integration is A15 (ANY-8, ANY-170/ANY-171) scope.
 
 ## Research Summary
 
@@ -64,9 +64,9 @@ persistence. Full CE-kit quota/start integration is intentionally deferred to A1
 - [x] Add tests for guest create, quota check, consume, exhausted, repeat calls, concurrency, and
   scenario-start integration.
 - [x] Update architecture/product/generated docs and refresh generated DB/OpenAPI docs.
-- [ ] A16 follow-up: replace CE-kit demo/deferred helpers with real `getQuota()` and
-  `startScenario()` HTTP clients, guest-id propagation, typed error handling, and CE integration
-  tests.
+- [x] A15 (ANY-8, ANY-170/ANY-171) follow-up: replace CE-kit demo/deferred helpers with real
+  `getQuota()` and `startScenario()` HTTP clients, guest-id propagation, typed error handling, and
+  CE integration tests.
 
 ## Validation
 

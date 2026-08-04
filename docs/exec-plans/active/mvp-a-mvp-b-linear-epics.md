@@ -222,8 +222,8 @@ LLM runtime decisions from `docs/architecture/llm-runtime.md` and ADR 0007 apply
 
 **Priority:** P1  
 **Depends on:** A04, A12  
-**Status:** backend-complete, integration pending; real CE-kit quota/start integration is deferred
-to the A16 follow-up scope in this thread and to the local A15 CE client roadmap item.  
+**Status:** backend-complete; real CE-kit quota/start integration was completed by A15
+(ANY-8, ANY-170/ANY-171).  
 **Goal:** реализовать backend-enforced access-lite quota для guests.  
 **Implementation details:** Alembic `0003` guest/quota tables. API creates opaque guest id; CE stores it locally. Quota consumed server-side on accepted scenario start, not frontend click.  
 **Acceptance criteria:** guest can run N times; N+1 returns standardized `quota_exhausted`; quota events emitted; quota check endpoint returns current state.  

@@ -78,10 +78,9 @@ ids locally, and quota is consumed only when the backend accepts a scenario star
 started scenario session and linked created job. Quota is not tied to frontend clicks, provider-call
 count, retries, or LLM telemetry.
 
-A13 delivers this access-lite behavior as backend-complete with integration pending. The current
-CE-kit can create and locally persist the opaque guest id, but the real shared CE-kit `getQuota()`
-and `startScenario()` API clients, guest-id propagation, and typed frontend handling for
-`429 quota_exhausted` are deferred to A16.
+A13 delivers this access-lite behavior as backend-complete, and A15 (ANY-8, ANY-170/ANY-171)
+delivers the CE-kit integration: real shared `getQuota()` and `startScenario()` API clients,
+guest-id propagation, and typed frontend handling for `429 quota_exhausted`.
 
 ### Continuity And Handoff
 

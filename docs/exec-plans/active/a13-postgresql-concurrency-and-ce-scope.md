@@ -15,10 +15,11 @@
 
 ## Decision
 
-**A13 remains backend-complete; CE-kit quota/start HTTP integration remains deferred to A16.**
+**A13 remains backend-complete; CE-kit quota/start HTTP integration was, at the time of this patch,
+deferred to A15 (ANY-8, ANY-170/ANY-171) and has since been completed there.**
 
 The current patch will not implement the central CE-kit Platform API client because that would widen
-scope into the explicitly deferred A16 frontend/runtime-client work. A13 will continue to expose only
+scope into the explicitly deferred A15 frontend/runtime-client work. A13 will continue to expose only
 real `createGuestIdentity()` local persistence in CE-kit.
 
 ## Reviewed
@@ -44,7 +45,7 @@ real `createGuestIdentity()` local persistence in CE-kit.
 - Keep CE-kit start/quota helpers deferred and document only guest identity persistence as real in
   A13.
 
-## Deferred To A16
+## Deferred To A15 (ANY-8, ANY-170/ANY-171) -- since completed
 
 - Real CE-kit `getQuota()` and `startScenario()` HTTP clients.
 - Guest-id propagation from local CE storage into scenario-start calls.
