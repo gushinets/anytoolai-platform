@@ -72,25 +72,13 @@ class JobRepository:
         make the job visible as ``created`` again.
         """
 
-        values: dict[str, Any] = {
-            "status": JobStatus.running,
-            "started_at": utc_now(),
-        }
-        if metadata is not None:
-            values["metadata"] = dict(metadata)
-
-        result = self._session.execute(
-            sa.update(jobs_table)
-            .where(
-                jobs_table.c.id == job_id,
-                jobs_table.c.status == JobStatus.created,
-            )
-            .values(values)
+        return self._conditional_transition_from_created(
+            job_id,
+            status=JobStatus.running,
+            timestamp_field="started_at",
+            metadata=metadata,
+            operation="claim",
         )
-        if result.rowcount == 0:
-            return None
-        self._session.flush()
-        return _require_stored_job(self.get(job_id), job_id, "claim")
 
     def cancel_created(
         self,
@@ -100,9 +88,26 @@ class JobRepository:
     ) -> JobRecord | None:
         """Cancel a job before claim without interrupting running work."""
 
+        return self._conditional_transition_from_created(
+            job_id,
+            status=JobStatus.canceled,
+            timestamp_field="completed_at",
+            metadata=metadata,
+            operation="cancel",
+        )
+
+    def _conditional_transition_from_created(
+        self,
+        job_id: str,
+        *,
+        status: JobStatus,
+        timestamp_field: str,
+        metadata: Mapping[str, Any] | None,
+        operation: str,
+    ) -> JobRecord | None:
         values: dict[str, Any] = {
-            "status": JobStatus.canceled,
-            "completed_at": utc_now(),
+            "status": status,
+            timestamp_field: utc_now(),
         }
         if metadata is not None:
             values["metadata"] = dict(metadata)
@@ -118,7 +123,7 @@ class JobRepository:
         if result.rowcount == 0:
             return None
         self._session.flush()
-        return _require_stored_job(self.get(job_id), job_id, "cancel")
+        return _require_stored_job(self.get(job_id), job_id, operation)
 
     def mark_succeeded(self, record: JobRecord) -> JobRecord:
         self._require_valid_success_record(record)

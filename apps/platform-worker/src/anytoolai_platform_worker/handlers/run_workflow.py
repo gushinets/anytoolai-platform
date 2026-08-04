@@ -144,19 +144,27 @@ class RunWorkflowHandler:
             )
 
     def cancel(self, job_id: str) -> JobRecord | None:
-        with transaction_boundary(self._session_factory) as session:
-            repository = JobRepository(session)
-            emitter = EventEmitter(EventLogRepository(session))
-            job = repository.get(job_id)
-            if job is None or job.status is not JobStatus.created:
-                return job
+        try:
+            with transaction_boundary(self._session_factory) as session:
+                repository = JobRepository(session)
+                emitter = EventEmitter(EventLogRepository(session))
+                job = repository.get(job_id)
+                if job is None or job.status is not JobStatus.created:
+                    return job
 
-            scenario = self._load_scenario(session, job)
-            metadata = enrich_job_metadata_with_scenario_identity(job.metadata, scenario)
-            return WorkflowJobService(repository, emitter).cancel_created(
-                job_id,
-                metadata=metadata,
-            ) or repository.get(job_id)
+                scenario = self._load_scenario(session, job)
+                metadata = enrich_job_metadata_with_scenario_identity(job.metadata, scenario)
+                return WorkflowJobService(repository, emitter).cancel_created(
+                    job_id,
+                    metadata=metadata,
+                ) or repository.get(job_id)
+        except JobScenarioSessionInvalidError as exc:
+            # Same poison-job handling as handle()/_claim(): a job whose scenario
+            # linkage is missing/mismatched can't be cancelled cleanly either, so it
+            # gets terminalized as failed instead of leaking the exception to the
+            # caller (Worker.cancel_job() has no try/except of its own).
+            self._persist_created_job_failure(job_id, exc)
+            return self._get(job_id)
 
     def dispose(self) -> None:
         """Release resources owned by this handler's lease. Call once at shutdown."""

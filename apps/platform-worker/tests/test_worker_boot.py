@@ -45,10 +45,7 @@ from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import WorkflowJobService
 from anytoolai_platform_worker.composition import build_worker
-from anytoolai_platform_worker.handlers.run_workflow import (
-    JobScenarioSessionInvalidError,
-    RunWorkflowHandler,
-)
+from anytoolai_platform_worker.handlers.run_workflow import RunWorkflowHandler
 from anytoolai_platform_worker.queues import DatabaseJobQueue, WorkflowJobMessage
 from anytoolai_platform_worker.reconciliation import OrphanedRunningJobReconciler
 from anytoolai_platform_worker.worker import Worker
@@ -740,7 +737,7 @@ def test_cancel_created_job_preserves_authenticated_scenario_identity(
     _assert_cancel_event_dimensions(events[0], job=job, scenario=scenario)
 
 
-def test_cancel_created_job_rejects_missing_scenario_session_without_event(
+def test_cancel_created_job_terminalizes_missing_scenario_session_as_failed(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     job = _seed_raw_job(
@@ -757,21 +754,25 @@ def test_cancel_created_job_rejects_missing_scenario_session_without_event(
         )
     )
 
-    with pytest.raises(JobScenarioSessionInvalidError):
-        worker.cancel_job(job.id)
+    result = worker.cancel_job(job.id)
+
+    assert result is not None
+    assert result.status is JobStatus.failed
+    assert result.error_code == "job_scenario_session_invalid"
 
     with transaction_boundary(session_factory) as session:
         stored = JobRepository(session).get(job.id)
         events = _event_rows_for_job(session, job.id)
 
     assert stored is not None
-    assert stored.status is JobStatus.created
-    assert stored.completed_at is None
+    assert stored.status is JobStatus.failed
+    assert stored.completed_at is not None
     assert stored.metadata == {"preexisting": "kept"}
-    assert events == []
+    assert [event["event_type"] for event in events] == ["workflow.failed"]
+    assert events[0]["error_code"] == "job_scenario_session_invalid"
 
 
-def test_cancel_created_job_rejects_missing_scenario_session_linkage(
+def test_cancel_created_job_terminalizes_missing_scenario_session_linkage_as_failed(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     job = _seed_raw_job(
@@ -788,21 +789,25 @@ def test_cancel_created_job_rejects_missing_scenario_session_linkage(
         )
     )
 
-    with pytest.raises(JobScenarioSessionInvalidError):
-        worker.cancel_job(job.id)
+    result = worker.cancel_job(job.id)
+
+    assert result is not None
+    assert result.status is JobStatus.failed
+    assert result.error_code == "job_scenario_session_invalid"
 
     with transaction_boundary(session_factory) as session:
         stored = JobRepository(session).get(job.id)
         events = _event_rows_for_job(session, job.id)
 
     assert stored is not None
-    assert stored.status is JobStatus.created
-    assert stored.completed_at is None
+    assert stored.status is JobStatus.failed
+    assert stored.completed_at is not None
     assert stored.metadata == {"preexisting": "kept"}
-    assert events == []
+    assert [event["event_type"] for event in events] == ["workflow.failed"]
+    assert events[0]["error_code"] == "job_scenario_session_invalid"
 
 
-def test_cancel_created_job_rejects_mismatched_scenario_session(
+def test_cancel_created_job_terminalizes_mismatched_scenario_session_as_failed(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     with transaction_boundary(session_factory) as session:
@@ -822,18 +827,22 @@ def test_cancel_created_job_rejects_mismatched_scenario_session(
         )
     )
 
-    with pytest.raises(JobScenarioSessionInvalidError):
-        worker.cancel_job(job.id)
+    result = worker.cancel_job(job.id)
+
+    assert result is not None
+    assert result.status is JobStatus.failed
+    assert result.error_code == "job_scenario_session_invalid"
 
     with transaction_boundary(session_factory) as session:
         stored = JobRepository(session).get(job.id)
         events = _event_rows_for_job(session, job.id)
 
     assert stored is not None
-    assert stored.status is JobStatus.created
-    assert stored.completed_at is None
+    assert stored.status is JobStatus.failed
+    assert stored.completed_at is not None
     assert stored.metadata == {"preexisting": "kept"}
-    assert events == []
+    assert [event["event_type"] for event in events] == ["workflow.failed"]
+    assert events[0]["error_code"] == "job_scenario_session_invalid"
 
 
 @pytest.mark.parametrize(

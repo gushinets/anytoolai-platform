@@ -32,6 +32,7 @@ from anytoolai_platform_core.events.replay import (
 from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
+from anytoolai_platform_core.scenarios.correlation import build_scenario_identity_metadata
 from anytoolai_platform_core.storage.db import action_runs_table
 from anytoolai_platform_core.storage.transactions import (
     RollbackRecoveryPhase,
@@ -225,9 +226,7 @@ class SequentialWorkflowRunner:
                 status=JobStatus.running,
                 started_at=now,
                 metadata={
-                    "guest_id": context.guest_id,
-                    "user_id": context.user_id,
-                    "scenario_chain_id": context.scenario_chain_id,
+                    **build_scenario_identity_metadata(context),
                     "handoff_id": context.handoff_id,
                     "acquisition_source": context.acquisition_source,
                     "input_schema_ref": workflow.input_schema_ref,
@@ -291,9 +290,7 @@ class SequentialWorkflowRunner:
 
         metadata = {
             **dict(job.metadata),
-            "guest_id": context.guest_id,
-            "user_id": context.user_id,
-            "scenario_chain_id": context.scenario_chain_id,
+            **build_scenario_identity_metadata(context),
             "handoff_id": context.handoff_id,
             "acquisition_source": context.acquisition_source,
             "input_schema_ref": workflow.input_schema_ref,

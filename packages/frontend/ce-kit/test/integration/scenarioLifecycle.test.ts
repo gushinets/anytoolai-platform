@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { PlatformApiClient } from "../../src/api/client";
-import { createGuestIdentity } from "../../src/identity/guestIdentity";
 import { getQuota } from "../../src/quota/getQuota";
 import { getScenarioSession } from "../../src/scenarios/getScenarioSession";
 import { pollScenarioSession } from "../../src/scenarios/pollScenarioSession";
@@ -14,7 +13,9 @@ describe("scenario lifecycle integration (create guest -> quota -> keyed start -
     const client = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl: server.fetchImpl });
     const storage = createInMemoryAsyncStorage();
 
-    const identity = await createGuestIdentity({ client, storage });
+    const identityResult = await client.createGuestIdentity({ storage });
+    if (!identityResult.ok) throw new Error("expected guest identity creation to succeed");
+    const identity = identityResult.value;
     expect(identity.guestId).toBe("guest_1");
 
     const initialQuota = await getQuota(client, { productId: "kernel_demo", guestId: identity.guestId });
@@ -89,7 +90,9 @@ describe("scenario lifecycle integration (create guest -> quota -> keyed start -
     const server = createFakePlatformServer({ quotaLimit: 1 });
     const client = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl: server.fetchImpl });
     const storage = createInMemoryAsyncStorage();
-    const identity = await createGuestIdentity({ client, storage });
+    const identityResult = await client.createGuestIdentity({ storage });
+    if (!identityResult.ok) throw new Error("expected guest identity creation to succeed");
+    const identity = identityResult.value;
 
     const request = {
       productId: "kernel_demo",

@@ -37,9 +37,10 @@ idempotently: no status change, metadata rewrite, or duplicate cancellation even
 ## Validation results
 
 - `uv run python scripts/agent/runner.py doctor` passed.
-- Approved targeted pytest exception: `uv run python -m pytest apps/platform-worker/tests/test_worker_boot.py -k "cancel or cancellation or claim" -q` exited 0; PostgreSQL-marked cases skipped because no local maintenance database URL was configured, and the selected non-PostgreSQL case passed.
-- Approved targeted pytest exception: `uv run python -m pytest packages/backend/platform-core/tests/unit/test_runtime_storage.py -k "cancel or claim" -q` exited 0; the selected PostgreSQL storage case skipped for the same local database reason.
-- Approved targeted pytest exception: `uv run python -m pytest -m "postgresql" packages/backend/platform-core/tests apps/platform-api/tests apps/platform-worker/tests -k "cancel or cancellation or claim" -q` exited 0; PostgreSQL-marked coverage collected but skipped without `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`.
+- `uv run python -m pytest apps/platform-worker/tests/test_worker_boot.py -k "cancel or cancellation or claim" -q` run against a real `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`: 21 passed, 0 skipped.
+- `uv run python -m pytest packages/backend/platform-core/tests/unit/test_runtime_storage.py -k "cancel or claim" -q` run against a real `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`: 1 passed, 0 skipped.
+- `uv run python -m pytest -m "postgresql" packages/backend/platform-core/tests apps/platform-api/tests apps/platform-worker/tests -k "cancel or cancellation or claim" -q` run against a real `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`: 33 passed, 0 skipped.
+- `uv run python scripts/agent/runner.py postgresql-check` run against a real `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`: 293 passed, 0 skipped, 0 failed (the full `postgresql`-marked suite, not just the cancel/claim slice above). The entries above previously ran the same `-m "postgresql"` selections with no database URL configured, so every PostgreSQL-marked case collected but silently skipped -- `postgresql-check` exists specifically to fail loudly on that gap instead of passing green on a no-op. This run is the first genuine execution of PostgreSQL production semantics for this change; the guest/authenticated identity, race, and rollback behavior described above is now actually verified, not just asserted.
 - `uv run python scripts/agent/runner.py validate-configs` passed.
 - `uv run python scripts/agent/runner.py validate-architecture` passed.
 - `uv run python scripts/agent/runner.py validate-docs` passed.

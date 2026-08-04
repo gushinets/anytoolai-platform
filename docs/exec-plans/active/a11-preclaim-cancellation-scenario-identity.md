@@ -5,12 +5,11 @@
 - State: active
 - Owner: agent
 - Created: 2026-08-03
-- Last updated: 2026-08-03
-- Review date: 2026-08-03
-- Next action: rerun PostgreSQL-marked lifecycle coverage with
-  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` if local production-semantics proof is required.
-- Blocker: no `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was configured in this shell, so
-  PostgreSQL-marked cancellation and claim selections collected but skipped locally.
+- Last updated: 2026-08-05
+- Review date: 2026-08-05
+- Next action: none; PostgreSQL-marked lifecycle coverage has been run against a real
+  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`, not just collected.
+- Blocker: none.
 
 ## Task
 
@@ -42,9 +41,10 @@ References:
 ## Validation
 
 - [x] `uv run python scripts/agent/runner.py doctor` passed.
-- [x] Approved targeted pytest exception: `uv run python -m pytest apps/platform-worker/tests/test_worker_boot.py -k "cancel or cancellation or claim" -q` exited 0; PostgreSQL-marked cases skipped without a local maintenance database URL, and the selected non-PostgreSQL case passed.
-- [x] Approved targeted pytest exception: `uv run python -m pytest packages/backend/platform-core/tests/unit/test_runtime_storage.py -k "cancel or claim" -q` exited 0; the selected PostgreSQL storage case skipped without a local maintenance database URL.
-- [x] Approved targeted pytest exception: `uv run python -m pytest -m "postgresql" packages/backend/platform-core/tests apps/platform-api/tests apps/platform-worker/tests -k "cancel or cancellation or claim" -q` exited 0; PostgreSQL-marked cases collected but skipped without a local maintenance database URL.
+- [x] `uv run python -m pytest apps/platform-worker/tests/test_worker_boot.py -k "cancel or cancellation or claim" -q` run against a real `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`: 21 passed, 0 skipped.
+- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_runtime_storage.py -k "cancel or claim" -q` run against a real `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`: 1 passed, 0 skipped.
+- [x] `uv run python -m pytest -m "postgresql" packages/backend/platform-core/tests apps/platform-api/tests apps/platform-worker/tests -k "cancel or cancellation or claim" -q` run against a real `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`: 33 passed, 0 skipped.
+- [x] `uv run python scripts/agent/runner.py postgresql-check` run against a real `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`: 293 passed, 0 skipped, 0 failed (the full `postgresql`-marked suite across platform-core/actions, platform API, and platform worker -- not just the cancel/claim slice above). Earlier entries in this section only ever ran the `-m "postgresql"` selections without a database URL configured, so every PostgreSQL-marked case silently skipped instead of executing; that gap is what `postgresql-check` exists to prevent (see `docs/tasks/a11-preclaim-cancellation-scenario-identity.md` for the same correction on the task doc). This run is the first genuine execution of that coverage for this change.
 - [x] `uv run python scripts/agent/runner.py validate-configs` passed.
 - [x] `uv run python scripts/agent/runner.py validate-architecture` passed.
 - [x] `uv run python scripts/agent/runner.py validate-docs` passed.
