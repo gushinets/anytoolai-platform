@@ -4,7 +4,6 @@ import {
   type GuestIdentityOptions,
   type GuestIdentityResult,
 } from "../../identity/guestIdentity";
-import type { AsyncStorage } from "../../storage/asyncStorage";
 import { abortedError, invalidResponseError, networkError, timeoutError } from "../errors";
 import { buildHeaders } from "./headers";
 import type { PlatformApiMethod } from "./http";
@@ -101,8 +100,9 @@ export class PlatformApiClient {
   /**
    * Reuses a persisted guest id if present, otherwise requests one from the backend and persists
    * it. Concurrent calls on this client instance are single-flight -- at most one backend request
-   * is made no matter how many callers ask at once or which `storageKey` each passes; only the
-   * call that actually performs the request persists to its own `storageKey`.
+   * is made no matter how many callers ask at once or which `storageKey` each passes. Every
+   * successful caller persists the (shared) result to its own `storage`/`storageKey`, not just
+   * whichever call happened to trigger the backend request.
    */
   async createGuestIdentity(options: GuestIdentityOptions): Promise<GuestIdentityResult> {
     const storageKey = options.storageKey ?? DEFAULT_GUEST_STORAGE_KEY;
@@ -111,21 +111,29 @@ export class PlatformApiClient {
       return { ok: true, value: { guestId: storedGuestId } };
     }
 
-    if (this.inFlightGuestIdentity) {
-      return this.inFlightGuestIdentity;
+    const result = await this.shareGuestIdentityRequest();
+    if (result.ok) {
+      try {
+        await options.storage.set(storageKey, result.value.guestId);
+      } catch {
+        // The backend already created this identity; a storage failure must not discard it --
+        // that would orphan it on the backend and cause the next call to create a duplicate.
+        // Persistence is best-effort here, the identity itself is still valid.
+      }
     }
-
-    const request = this.requestGuestIdentity(options.storage, storageKey).finally(() => {
-      this.inFlightGuestIdentity = null;
-    });
-    this.inFlightGuestIdentity = request;
-    return request;
+    return result;
   }
 
-  private async requestGuestIdentity(
-    storage: AsyncStorage,
-    storageKey: string,
-  ): Promise<GuestIdentityResult> {
+  private shareGuestIdentityRequest(): Promise<GuestIdentityResult> {
+    if (!this.inFlightGuestIdentity) {
+      this.inFlightGuestIdentity = this.requestGuestIdentity().finally(() => {
+        this.inFlightGuestIdentity = null;
+      });
+    }
+    return this.inFlightGuestIdentity;
+  }
+
+  private async requestGuestIdentity(): Promise<GuestIdentityResult> {
     const result = await this.request<unknown>({ method: "POST", path: "/v1/identity/guest" });
     if (!result.ok) {
       return result;
@@ -139,13 +147,6 @@ export class PlatformApiClient {
       };
     }
 
-    try {
-      await storage.set(storageKey, guestId);
-    } catch {
-      // The backend already created this identity; a storage failure must not discard it --
-      // that would orphan it on the backend and cause the next call to create a duplicate.
-      // Persistence is best-effort here, the identity itself is still valid.
-    }
     return { ok: true, value: { guestId } };
   }
 }

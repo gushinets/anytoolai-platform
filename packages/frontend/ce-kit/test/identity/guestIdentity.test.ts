@@ -55,11 +55,12 @@ describe("PlatformApiClient.createGuestIdentity", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("still makes at most one backend request when concurrent calls pass different storage keys", async () => {
+  it("still makes at most one backend request when concurrent calls pass different storage keys, and each caller persists to its own key", async () => {
     // The acceptance criterion is "at most one backend request per client instance," full stop --
-    // single-flight is not scoped by storageKey. Only the call that actually performs the request
-    // persists to its own storageKey; a racing call with a different key gets that call's result
-    // but does not get its own key populated.
+    // single-flight is not scoped by storageKey. But every successful caller must still persist
+    // the shared result to its own storageKey, not just whichever call happened to trigger the
+    // backend request -- otherwise a later call with that same key would miss the cache and make
+    // a redundant request.
     const storage = createInMemoryAsyncStorage();
     const fetchImpl = vi.fn(async () => jsonResponse(200, { guest_id: "guest_a" }));
     const client = makeClient(fetchImpl as unknown as typeof fetch);
@@ -72,6 +73,26 @@ describe("PlatformApiClient.createGuestIdentity", () => {
     expect(a).toEqual({ ok: true, value: { guestId: "guest_a" } });
     expect(b).toEqual({ ok: true, value: { guestId: "guest_a" } });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(await storage.get("product_a.guest_id")).toBe("guest_a");
+    expect(await storage.get("product_b.guest_id")).toBe("guest_a");
+  });
+
+  it("persists the shared result to each caller's own storage instance, not just the triggering call's", async () => {
+    const storageA = createInMemoryAsyncStorage();
+    const storageB = createInMemoryAsyncStorage();
+    const fetchImpl = vi.fn(async () => jsonResponse(200, { guest_id: "guest_shared" }));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const [a, b] = await Promise.all([
+      client.createGuestIdentity({ storage: storageA }),
+      client.createGuestIdentity({ storage: storageB }),
+    ]);
+
+    expect(a).toEqual({ ok: true, value: { guestId: "guest_shared" } });
+    expect(b).toEqual({ ok: true, value: { guestId: "guest_shared" } });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(await storageA.get("anytoolai.guest_id")).toBe("guest_shared");
+    expect(await storageB.get("anytoolai.guest_id")).toBe("guest_shared");
   });
 
   it("allows a later, separate call to make its own request once the first has settled", async () => {

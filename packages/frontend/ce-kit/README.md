@@ -134,6 +134,14 @@ the `ChromeStorageArea` structural type CE-kit declares itself, not `@types/chro
 dependency stays optional. Everything else (including tests) can use the bundled in-memory
 implementation.
 
+This is a deliberate reading of "compatible with `chrome.storage.local`": `AsyncStorage` itself is
+*not* structurally assignable to `chrome.storage.local` (it's single-key/typed-value where Chrome's
+API is multi-key/untyped-value) -- compatibility is provided via the adapter, not by widening the
+contract to match Chrome's own shape. Widening `AsyncStorage` itself would force every non-Chrome
+caller (tests, web frontends, the in-memory implementation) to deal with a multi-key, untyped-value
+API for no benefit to them. If a future ticket needs direct structural assignability instead, that's
+a breaking change to `AsyncStorage`, not an extension of this adapter.
+
 ```ts
 import { createChromeStorageAdapter, createInMemoryAsyncStorage } from "@anytoolai/ce-kit";
 
@@ -146,8 +154,9 @@ const chromeStorage = createChromeStorageAdapter(chrome.storage.local); // insid
 `client.createGuestIdentity({ storage, storageKey? })` reuses a persisted guest id if one exists,
 and otherwise requests a new one and persists it. It's owned by `PlatformApiClient` (not a free
 function) so single-flight dedup can be scoped to the client instance itself: concurrent calls on
-one client make at most one backend request, regardless of which `storageKey` each call passes --
-only the call that actually performs the request persists to its own `storageKey`.
+one client make at most one backend request, regardless of which `storageKey` each call passes.
+Every successful caller persists the (shared) result to its own `storage`/`storageKey`, not just
+whichever call happened to trigger the backend request.
 
 ```ts
 const result = await client.createGuestIdentity({ storage });

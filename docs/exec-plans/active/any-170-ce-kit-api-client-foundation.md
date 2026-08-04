@@ -7,8 +7,9 @@
 - Created: 2026-08-03
 - Last updated: 2026-08-04
 - Review date: 2026-08-04
-- Next action: replace the PR description's `docs/exec-plans/active/...` placeholder with a link
-  to this file (PR-description edit, not a repo file).
+- Next action: none outstanding. PR #49's description placeholder now reads
+  `Link: \`docs/exec-plans/active/any-170-ce-kit-api-client-foundation.md\`` -- confirmed via
+  `gh pr view 49 --json body`, not assumed. Await further review.
 - Blocker: none
 
 ## Goal
@@ -91,14 +92,20 @@ backend.
 - [x] `README.md`: base URL, DI, storage (including the Chrome adapter), timeout, errors,
   versioning, generated-contract drift-check workflow.
 - [x] `frontend-check` and `full-check` green.
-- [x] Replace the PR description's `docs/exec-plans/active/...` placeholder with a link to this
-  file (PR-description edit, not a repo file — done at PR-open/update time; no `gh` CLI available
-  in this environment to do it directly).
+- [x] Replace PR #49's description placeholder with a link to this file. Confirmed via
+  `gh pr view 49 --json body` (after `gh` auth was set up in this environment) that the body now
+  reads `Link: \`docs/exec-plans/active/any-170-ce-kit-api-client-foundation.md\``. This item was
+  wrongly marked done, then wrongly marked not-done, before this final direct-`gh` check --
+  see decision log for both corrections.
+- [x] Every successful `createGuestIdentity()` caller persists the shared result to its own
+  `storage`/`storageKey`, not just whichever call happened to trigger the backend request.
+- [x] Documented the `AsyncStorage`-vs-`chrome.storage.local` adapter decision explicitly in the
+  README, closing the ambiguity in the ticket's "compatible with `chrome.storage.local`" wording.
 
 ## Validation
 
 - [x] `pnpm --filter @anytoolai/ce-kit typecheck`
-- [x] `pnpm --filter @anytoolai/ce-kit test` (84/84)
+- [x] `pnpm --filter @anytoolai/ce-kit test` (85/85)
 - [x] `python scripts/agent/runner.py frontend-check`
 - [x] `python scripts/agent/runner.py full-check`
 
@@ -114,6 +121,11 @@ backend.
 | 2026-08-03 | Timeout-vs-caller-abort classification is decided by recording which trigger fires first (`abortReason`, set inside the abort callback itself), not by re-reading `externalSignal.aborted` after the fetch rejection settles. | Team-lead review: a timeout that fires first but is followed by a caller abort before the rejection lands was misclassified as `aborted` under the old re-check-in-catch approach. |
 | 2026-08-04 | Declined to add a second `AssertExactSchemaKeys` layer for the hand-maintained *output* DTOs (`RuntimeConfig`, `GuestIdentity`). | Verified empirically (temporarily adding a bogus extra field to a parser's return literal) that TypeScript's own excess-property checking on directly-returned, explicitly-typed object literals already rejects both added and removed output fields with no gap -- a manual key-list would duplicate protection TypeScript already provides for free. The existing `AssertExactSchemaKeys` checks stay scoped to the wire format, where no such automatic protection exists because the payload starts as `unknown`. |
 | 2026-08-04 | This plan was created under `docs/exec-plans/active/` after review pointed out ANY-170's working plan (`plans/ANY-170.md`) is untracked/gitignored, matching the same repo-policy gap already fixed for ANY-147. | `AGENTS.md` requires a tracked execution plan under `docs/exec-plans/active/` for non-trivial work; `plans/` is a personal, gitignored scratch directory, not the canonical location. |
+| 2026-08-04 | `createGuestIdentity()`'s single-flight network request and per-caller storage persistence are decoupled: the shared in-flight promise (`shareGuestIdentityRequest()`/`requestGuestIdentity()`) now only performs the backend call, and every caller of `createGuestIdentity()` -- whether it triggered the request or just awaited the shared result -- persists to its own `storage`/`storageKey` afterward. | Second team-lead review round: the previous instance-scoped single-flight fix (2026-08-03 entry above) correctly stopped over-collapsing concurrent calls, but only the triggering call's `storage.set()` ran, so a racing caller with a different `storage`/`storageKey` got the right in-memory result but never got its own key populated -- its next lookup would miss and re-request. |
+| 2026-08-04 | Documented the `AsyncStorage`-vs-`chrome.storage.local` design decision explicitly in the README (not just in this plan's decision log), stating in the "Storage" section itself that `AsyncStorage` is deliberately *not* structurally assignable to `chrome.storage.local` and that compatibility is provided via `createChromeStorageAdapter()`. | Second team-lead review round: asked for the narrow-contract-plus-adapter interpretation of the ticket's "compatible with `chrome.storage.local`" wording to be stated explicitly in requirements-facing documentation, not only implied by the adapter's existence, so the open question can be closed with a citable rationale. |
+| 2026-08-04 | Declined to extend `AssertExactSchemaKeys` (or add a companion check) to validate field *types*, nullability, optionality, or enum values, not just key names. | Third team-lead review's additional observation is correct that key-name-only checks miss e.g. a field's type widening/narrowing or an enum growing a new literal. But every wire-format parser already re-validates each field's runtime shape (`typeof x === "string"`, `renderer !== "json_schema"`, etc.) and fails closed to `null`/`invalid_response` rather than trusting the generated type -- so an undetected type-level schema change degrades safely (a legitimate response starts being rejected, loudly, in production) rather than silently misbehaving. Building real type-level structural validation would mean hand-declaring an expected type shape per field as a second, parallel source of truth next to the runtime checks -- itself a drift risk of the same kind this mechanism exists to prevent -- for a category of backend change (field type/enum narrowing without a key rename) that's rare relative to key add/remove. Accepted as a documented limitation rather than implemented. |
+| 2026-08-04 | Corrected a false "done" claim about the PR-description placeholder. | This file's "Implementation steps" checkbox for the placeholder was earlier marked `[x]` on the assumption that an externally-modified version of this file (attributed to "the user") reflected a real fix. The user then asked how to verify that claim, which prompted an actual check: `curl https://api.github.com/repos/gushinets/anytoolai-platform/pulls/49` (PR #49, head `9bd85e4` -- matches this branch's current HEAD) shows the body still contains the literal `Link: \`docs/exec-plans/active/...\``. The checkbox was wrong; corrected back to unchecked with the verification method recorded so it doesn't happen again. Lesson: a checked box or an externally-edited file is not evidence by itself -- verify state that lives outside the repo (like a PR description) against its actual source before reporting it as done. |
+| 2026-08-04 | Re-confirmed the PR-description placeholder as actually fixed, this time via `gh pr view 49 --json body` after the user set up `gh` auth in this environment. | The user asked to re-check with `gh` now available. Body now reads `Link: \`docs/exec-plans/active/any-170-ce-kit-api-client-foundation.md\`` -- the user had fixed it on GitHub between the previous (unauthenticated-`curl`) check and this one. Checkbox restored to `[x]`, this time on direct tool-verified evidence rather than an inference from a locally-edited file. |
 
 ## Progress log
 
@@ -123,6 +135,7 @@ backend.
 | 2026-08-03 | Two further internal review rounds fixed: unbound `fetchImpl` ("Illegal invocation"), already-aborted external signal not propagating into a fresh internal controller, empty-2xx-body handling, `_sameIds` not rejecting duplicate entry ids, and missing `cause` on the guest-identity failure `Error`. | Await external review. |
 | 2026-08-04 | Team-lead review (against PR head `bda5544c`) found 3 must-address AC gaps (Chrome storage compatibility, single-flight scoping, error union escape) and 2 recommended items (OpenAPI drift check not covering hand-maintained DTOs, timeout/abort race). Fixed all 5: added and tested `createChromeStorageAdapter()`; moved `createGuestIdentity()` onto `PlatformApiClient` with instance-only single-flight; switched it to return `GuestIdentityResult` instead of throwing; added `AssertExactSchemaKeys` type-level drift assertions for every hand-parsed wire schema; fixed the timeout-vs-abort race by recording `abortReason` at trigger time. Also moved this review's text out of `plans/ANY-147.md` (where it had been pasted by mistake) into `plans/ANY-170.md`. `frontend-check`/`full-check` green, 84/84 tests. | Address any follow-up review. |
 | 2026-08-04 | Second-pass review re-verified the same 3 must-address items against current code and found them already fixed (review had run against the last-pushed commit, before the round above) -- confirmed via direct inspection, no further code change needed there. Confirmed the `docs/exec-plans/active/...` PR-description placeholder is real (no exec plan existed for ANY-170, same gap already fixed for ANY-147) and created this file. Evaluated the nitpick asking to extend `AssertExactSchemaKeys` to the parser *output* DTOs; verified empirically that TypeScript's own excess-property checking already fully covers that case, so declined as redundant. | Update the PR description's placeholder link once a PR exists to update. |
+| 2026-08-04 | Third team-lead review round (against head `9bd85e4`, cross-referencing CodeRabbit feedback) found the guest-identity single-flight fix was incomplete (only the triggering caller persisted its result -- see decision log), asked for the Chrome-storage adapter decision to be stated explicitly rather than left implicit, and flagged that the PR description's placeholder was still unresolved as of that review. Fixed the persistence gap with a regression test covering both a different-`storageKey`-same-`storage` race and a different-`storage`-instance race; added the explicit design-decision paragraph to the README. The PR description placeholder was resolved directly by the user on GitHub (not a repo-file change). Also evaluated the review's additional observation that `AssertExactSchemaKeys` only checks key names, not field types/nullability/enum values -- see decision log entry below for the reasoning to accept this as a documented limitation rather than build a heavier type-level validator. | Await any further review. |
 
 ## Open questions
 
