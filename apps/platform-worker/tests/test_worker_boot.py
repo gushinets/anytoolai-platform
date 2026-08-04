@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, replace
 from datetime import timedelta
 from pathlib import Path
+from threading import Barrier
 from typing import Any
 
 import pytest
@@ -43,7 +45,10 @@ from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import WorkflowJobService
 from anytoolai_platform_worker.composition import build_worker
-from anytoolai_platform_worker.handlers.run_workflow import RunWorkflowHandler
+from anytoolai_platform_worker.handlers.run_workflow import (
+    JobScenarioSessionInvalidError,
+    RunWorkflowHandler,
+)
 from anytoolai_platform_worker.queues import DatabaseJobQueue, WorkflowJobMessage
 from anytoolai_platform_worker.reconciliation import OrphanedRunningJobReconciler
 from anytoolai_platform_worker.worker import Worker
@@ -65,7 +70,13 @@ def session_factory() -> Iterator[sa.orm.sessionmaker[sa.orm.Session]]:
         yield build_session_factory(engine)
 
 
-def _scenario(**metadata: Any) -> ScenarioSessionRecord:
+def _scenario(
+    *,
+    guest_id: str | None = "guest_demo",
+    user_id: str | None = "user_demo",
+    scenario_chain_id: str | None = "scenario_chain_demo",
+    **metadata: Any,
+) -> ScenarioSessionRecord:
     return ScenarioSessionRecord(
         tenant_id="tenant_demo",
         region="eu-central",
@@ -73,9 +84,9 @@ def _scenario(**metadata: Any) -> ScenarioSessionRecord:
         frontend_id="kernel_demo_ce",
         scenario_id="kernel_demo.single_action_smoke_v1",
         scenario_version=1,
-        guest_id="guest_demo",
-        user_id="user_demo",
-        scenario_chain_id="scenario_chain_demo",
+        guest_id=guest_id,
+        user_id=user_id,
+        scenario_chain_id=scenario_chain_id,
         metadata=metadata,
     )
 
@@ -201,11 +212,26 @@ def _seed_job(
     input_payload: Any = None,
     created_at: Any = None,
     workflow_id: str = "kernel_demo.single_action_extract_v1",
+    guest_id: str | None = "guest_demo",
+    user_id: str | None = "user_demo",
+    scenario_chain_id: str | None = "scenario_chain_demo",
+    job_metadata: dict[str, Any] | None = None,
 ) -> JobRecord:
     metadata = {} if input_payload is None else {"input": input_payload}
     with transaction_boundary(session_factory) as session:
-        scenario = ScenarioSessionRepository(session).create(_scenario(**metadata))
-        job = replace(_job(scenario.id), workflow_id=workflow_id)
+        scenario = ScenarioSessionRepository(session).create(
+            _scenario(
+                guest_id=guest_id,
+                user_id=user_id,
+                scenario_chain_id=scenario_chain_id,
+                **metadata,
+            )
+        )
+        job = replace(
+            _job(scenario.id),
+            workflow_id=workflow_id,
+            metadata=dict(job_metadata or {}),
+        )
         if created_at is not None:
             job = replace(job, created_at=created_at)
         return JobRepository(session).create(job)
@@ -219,6 +245,38 @@ def _seed_raw_job(
         session.execute(sa.insert(jobs_table).values(asdict(record)))
         session.flush()
     return record
+
+
+def _event_rows_for_job(session: sa.orm.Session, job_id: str) -> list[dict[str, Any]]:
+    return list(
+        session.execute(
+            sa.select(event_log_table)
+            .where(event_log_table.c.job_id == job_id)
+            .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+        ).mappings()
+    )
+
+
+def _assert_cancel_event_dimensions(
+    event_row: dict[str, Any],
+    *,
+    job: JobRecord,
+    scenario: ScenarioSessionRecord,
+) -> None:
+    assert event_row["event_type"] == "workflow.canceled"
+    assert event_row["tenant_id"] == job.tenant_id
+    assert event_row["region"] == job.region
+    assert event_row["product_id"] == job.product_id
+    assert event_row["frontend_id"] == job.frontend_id
+    assert event_row["scenario_session_id"] == scenario.id
+    assert event_row["scenario_chain_id"] == scenario.scenario_chain_id
+    assert event_row["guest_id"] == scenario.guest_id
+    assert event_row["user_id"] == scenario.user_id
+    assert event_row["job_id"] == job.id
+    assert event_row["workflow_id"] == job.workflow_id
+    assert event_row["workflow_version"] == job.workflow_version
+    assert event_row["result_status"] == JobStatus.canceled.value
+    assert event_row["properties"]["workflow_version"] == job.workflow_version
 
 
 def _seed_running_job(
@@ -577,6 +635,365 @@ def test_claim_and_workflow_started_roll_back_together_when_event_persistence_fa
     assert scenario is not None
     assert scenario.status is ScenarioSessionStatus.started
     assert scenario.current_checkpoint_id is None
+
+
+def test_cancel_created_job_preserves_guest_scenario_identity(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_job(
+        session_factory,
+        input_payload={"source_text": "cancel guest"},
+        guest_id="guest_cancel",
+        user_id=None,
+        scenario_chain_id="scenario_chain_cancel_guest",
+        job_metadata={"preexisting": "kept"},
+    )
+    runners: list[RecordingRunner] = []
+
+    def runner_factory(session: sa.orm.Session) -> RecordingRunner:
+        runner = RecordingRunner(session)
+        runners.append(runner)
+        return runner
+
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=runner_factory,
+        )
+    )
+
+    canceled = worker.cancel_job(job.id)
+
+    assert canceled is not None
+    assert canceled.status is JobStatus.canceled
+    assert runners == []
+    with transaction_boundary(session_factory) as session:
+        stored = JobRepository(session).get(job.id)
+        scenario = ScenarioSessionRepository(session).get(
+            job.scenario_session_id,
+            tenant_id=job.tenant_id,
+            region=job.region,
+            product_id=job.product_id,
+            frontend_id=job.frontend_id,
+        )
+        events = _event_rows_for_job(session, job.id)
+
+    assert stored is not None
+    assert scenario is not None
+    assert stored.status is JobStatus.canceled
+    assert stored.metadata["preexisting"] == "kept"
+    assert stored.metadata["guest_id"] == "guest_cancel"
+    assert stored.metadata["scenario_chain_id"] == "scenario_chain_cancel_guest"
+    assert stored.metadata["user_id"] is None
+    assert len(events) == 1
+    _assert_cancel_event_dimensions(events[0], job=job, scenario=scenario)
+
+
+def test_cancel_created_job_preserves_authenticated_scenario_identity(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_job(
+        session_factory,
+        input_payload={"source_text": "cancel authenticated"},
+        guest_id=None,
+        user_id="user_cancel",
+        scenario_chain_id="scenario_chain_cancel_user",
+        job_metadata={"preexisting": "kept"},
+    )
+    runners: list[RecordingRunner] = []
+
+    def runner_factory(session: sa.orm.Session) -> RecordingRunner:
+        runner = RecordingRunner(session)
+        runners.append(runner)
+        return runner
+
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=runner_factory,
+        )
+    )
+
+    canceled = worker.cancel_job(job.id)
+
+    assert canceled is not None
+    assert canceled.status is JobStatus.canceled
+    assert runners == []
+    with transaction_boundary(session_factory) as session:
+        stored = JobRepository(session).get(job.id)
+        scenario = ScenarioSessionRepository(session).get(
+            job.scenario_session_id,
+            tenant_id=job.tenant_id,
+            region=job.region,
+            product_id=job.product_id,
+            frontend_id=job.frontend_id,
+        )
+        events = _event_rows_for_job(session, job.id)
+
+    assert stored is not None
+    assert scenario is not None
+    assert stored.metadata["preexisting"] == "kept"
+    assert stored.metadata["user_id"] == "user_cancel"
+    assert stored.metadata["scenario_chain_id"] == "scenario_chain_cancel_user"
+    assert stored.metadata["guest_id"] is None
+    assert len(events) == 1
+    _assert_cancel_event_dimensions(events[0], job=job, scenario=scenario)
+
+
+def test_cancel_created_job_rejects_missing_scenario_session_without_event(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_raw_job(
+        session_factory,
+        replace(
+            _job("scenario_session_missing"),
+            metadata={"preexisting": "kept"},
+        ),
+    )
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=RecordingRunner,
+        )
+    )
+
+    with pytest.raises(JobScenarioSessionInvalidError):
+        worker.cancel_job(job.id)
+
+    with transaction_boundary(session_factory) as session:
+        stored = JobRepository(session).get(job.id)
+        events = _event_rows_for_job(session, job.id)
+
+    assert stored is not None
+    assert stored.status is JobStatus.created
+    assert stored.completed_at is None
+    assert stored.metadata == {"preexisting": "kept"}
+    assert events == []
+
+
+def test_cancel_created_job_rejects_missing_scenario_session_linkage(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_raw_job(
+        session_factory,
+        replace(
+            _job(""),
+            metadata={"preexisting": "kept"},
+        ),
+    )
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=RecordingRunner,
+        )
+    )
+
+    with pytest.raises(JobScenarioSessionInvalidError):
+        worker.cancel_job(job.id)
+
+    with transaction_boundary(session_factory) as session:
+        stored = JobRepository(session).get(job.id)
+        events = _event_rows_for_job(session, job.id)
+
+    assert stored is not None
+    assert stored.status is JobStatus.created
+    assert stored.completed_at is None
+    assert stored.metadata == {"preexisting": "kept"}
+    assert events == []
+
+
+def test_cancel_created_job_rejects_mismatched_scenario_session(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        scenario = ScenarioSessionRepository(session).create(_scenario(input={"source_text": "x"}))
+    job = _seed_raw_job(
+        session_factory,
+        replace(
+            _job(scenario.id),
+            product_id="kernel_demo_other",
+            metadata={"preexisting": "kept"},
+        ),
+    )
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=RecordingRunner,
+        )
+    )
+
+    with pytest.raises(JobScenarioSessionInvalidError):
+        worker.cancel_job(job.id)
+
+    with transaction_boundary(session_factory) as session:
+        stored = JobRepository(session).get(job.id)
+        events = _event_rows_for_job(session, job.id)
+
+    assert stored is not None
+    assert stored.status is JobStatus.created
+    assert stored.completed_at is None
+    assert stored.metadata == {"preexisting": "kept"}
+    assert events == []
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        JobStatus.running,
+        JobStatus.succeeded,
+        JobStatus.failed,
+        JobStatus.canceled,
+    ],
+)
+def test_cancel_job_rejects_non_created_status_idempotently(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    status: JobStatus,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        scenario = ScenarioSessionRepository(session).create(_scenario(input={"source_text": "x"}))
+    timestamp = utc_now()
+    job = _seed_raw_job(
+        session_factory,
+        replace(
+            _job(scenario.id),
+            status=status,
+            started_at=timestamp if status is not JobStatus.created else None,
+            completed_at=(
+                timestamp
+                if status in {JobStatus.succeeded, JobStatus.failed, JobStatus.canceled}
+                else None
+            ),
+            metadata={"preexisting": status.value},
+        ),
+    )
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=RecordingRunner,
+        )
+    )
+
+    result = worker.cancel_job(job.id)
+
+    assert result is not None
+    assert result.status is status
+    with transaction_boundary(session_factory) as session:
+        stored = JobRepository(session).get(job.id)
+        events = _event_rows_for_job(session, job.id)
+
+    assert stored is not None
+    assert stored.status is status
+    assert stored.metadata == {"preexisting": status.value}
+    assert events == []
+
+
+def test_cancel_created_job_rolls_back_when_event_persistence_fails(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    job = _seed_job(
+        session_factory,
+        input_payload={"source_text": "atomic cancel"},
+        guest_id="guest_cancel",
+        user_id=None,
+        scenario_chain_id="scenario_chain_cancel",
+        job_metadata={"preexisting": "kept"},
+    )
+    original_create = EventLogRepository.create
+
+    def fail_workflow_canceled(
+        repository: EventLogRepository,
+        envelope: Any,
+    ) -> Any:
+        if envelope.event_type == "workflow.canceled":
+            raise RuntimeError("event persistence failed")
+        return original_create(repository, envelope)
+
+    monkeypatch.setattr(EventLogRepository, "create", fail_workflow_canceled)
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=RecordingRunner,
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="event persistence failed"):
+        worker.cancel_job(job.id)
+
+    with transaction_boundary(session_factory) as session:
+        stored = JobRepository(session).get(job.id)
+        events = _event_rows_for_job(session, job.id)
+
+    assert stored is not None
+    assert stored.status is JobStatus.created
+    assert stored.completed_at is None
+    assert stored.metadata == {"preexisting": "kept"}
+    assert events == []
+
+
+def test_cancel_and_claim_race_allows_only_one_created_transition(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    job = _seed_job(
+        session_factory,
+        input_payload={"source_text": "deadline budget deliverables"},
+        guest_id="guest_race",
+        user_id=None,
+        scenario_chain_id="scenario_chain_race",
+        job_metadata={"preexisting": "race"},
+    )
+    runners: list[RecordingRunner] = []
+
+    def runner_factory(session: sa.orm.Session) -> RecordingRunner:
+        runner = RecordingRunner(session)
+        runners.append(runner)
+        return runner
+
+    worker = Worker(
+        RunWorkflowHandler(
+            session_factory=session_factory,
+            runner_factory=runner_factory,
+        )
+    )
+    barrier = Barrier(2)
+
+    def process_job() -> JobRecord | None:
+        barrier.wait()
+        return asyncio.run(worker.process_job(job.id))
+
+    def cancel_job() -> JobRecord | None:
+        barrier.wait()
+        return worker.cancel_job(job.id)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        process_future = executor.submit(process_job)
+        cancel_future = executor.submit(cancel_job)
+        results = [process_future.result(), cancel_future.result()]
+
+    assert all(result is not None for result in results)
+    with transaction_boundary(session_factory) as session:
+        stored = JobRepository(session).get(job.id)
+        events = _event_rows_for_job(session, job.id)
+
+    assert stored is not None
+    assert stored.status in {JobStatus.succeeded, JobStatus.canceled}
+    workflow_event_types = [
+        event["event_type"]
+        for event in events
+        if event["event_type"].startswith("workflow.")
+    ]
+    assert workflow_event_types.count("workflow.canceled") <= 1
+    assert workflow_event_types.count("workflow.started") <= 1
+    assert not {"workflow.started", "workflow.canceled"}.issubset(
+        workflow_event_types
+    )
+    if stored.status is JobStatus.canceled:
+        assert runners == []
+        assert workflow_event_types == ["workflow.canceled"]
+    else:
+        assert stored.status is JobStatus.succeeded
+        assert len(runners) == 1
+        assert workflow_event_types == ["workflow.started", "workflow.succeeded"]
 
 
 def test_worker_claim_is_idempotent_and_cancel_is_preclaim_only(

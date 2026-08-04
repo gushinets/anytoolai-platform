@@ -100,11 +100,18 @@ of leaving it `created`. This prevents one broken row from blocking the queue fo
 - Workflow failure writes `failed`, `completed_at`, `error_code`, and `error_message_safe`, and
   emits `workflow.failed`.
 - Poison pre-claim integrity failures may write `created -> failed` with a safe integrity error when
-  the worker proves the job cannot be executed because its scenario-session linkage is invalid.
-- A user cancellation is limited to `created -> canceled`. A canceled job is not claimable; running
-  work is not interrupted by that API path. If the worker task itself is canceled after claim, the
-  handler persists `running -> canceled` and `workflow.canceled` in a recovery transaction, then
-  re-raises `asyncio.CancelledError` so cooperative shutdown behavior is preserved.
+  the worker execution path proves the job cannot be executed because its scenario-session linkage
+  is invalid.
+- A user cancellation is limited to `created -> canceled`. Before the terminal transition is
+  attempted, the cancellation transaction loads the linked scenario session using the job's
+  tenant, region, product, frontend, and `scenario_session_id` dimensions. Invalid or missing
+  linkage aborts the transaction, leaves the job `created`, and emits no cancellation event.
+  Valid cancellation enriches job metadata with the session's `guest_id`, `user_id`, and
+  `scenario_chain_id`, then emits `workflow.canceled` through the standard job event context in the
+  same transaction. A canceled job is not claimable; running work is not interrupted by that API
+  path. If the worker task itself is canceled after claim, the handler persists
+  `running -> canceled` and `workflow.canceled` in a recovery transaction, then re-raises
+  `asyncio.CancelledError` so cooperative shutdown behavior is preserved.
 
 ## Session updates during job execution
 
