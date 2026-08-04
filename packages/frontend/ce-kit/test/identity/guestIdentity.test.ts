@@ -14,6 +14,33 @@ function makeClient(fetchImpl: typeof fetch): PlatformApiClient {
   return new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl });
 }
 
+/** AsyncStorage whose first get() call stays pending until resolveFirstGet() is called explicitly. */
+function createDeferredFirstGetStorage(): AsyncStorage & { resolveFirstGet(value: string | undefined): void } {
+  const store = new Map<string, string>();
+  let firstCallPending = true;
+  let resolveFirstGet!: (value: string | undefined) => void;
+  const deferred = new Promise<string | undefined>((resolve) => {
+    resolveFirstGet = resolve;
+  });
+
+  return {
+    async get(key) {
+      if (firstCallPending) {
+        firstCallPending = false;
+        return deferred;
+      }
+      return store.get(key);
+    },
+    async set(key, value) {
+      store.set(key, value);
+    },
+    async remove(key) {
+      store.delete(key);
+    },
+    resolveFirstGet,
+  };
+}
+
 describe("PlatformApiClient.createGuestIdentity", () => {
   it("reuses a stored guest id without calling the backend", async () => {
     const storage = createInMemoryAsyncStorage({ "anytoolai.guest_id": "guest_existing" });
@@ -55,11 +82,12 @@ describe("PlatformApiClient.createGuestIdentity", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("still makes at most one backend request when concurrent calls pass different storage keys", async () => {
+  it("still makes at most one backend request when concurrent calls pass different storage keys, and each caller persists to its own key", async () => {
     // The acceptance criterion is "at most one backend request per client instance," full stop --
-    // single-flight is not scoped by storageKey. Only the call that actually performs the request
-    // persists to its own storageKey; a racing call with a different key gets that call's result
-    // but does not get its own key populated.
+    // single-flight is not scoped by storageKey. But every successful caller must still persist
+    // the shared result to its own storageKey, not just whichever call happened to trigger the
+    // backend request -- otherwise a later call with that same key would miss the cache and make
+    // a redundant request.
     const storage = createInMemoryAsyncStorage();
     const fetchImpl = vi.fn(async () => jsonResponse(200, { guest_id: "guest_a" }));
     const client = makeClient(fetchImpl as unknown as typeof fetch);
@@ -72,6 +100,54 @@ describe("PlatformApiClient.createGuestIdentity", () => {
     expect(a).toEqual({ ok: true, value: { guestId: "guest_a" } });
     expect(b).toEqual({ ok: true, value: { guestId: "guest_a" } });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(await storage.get("product_a.guest_id")).toBe("guest_a");
+    expect(await storage.get("product_b.guest_id")).toBe("guest_a");
+  });
+
+  it("persists the shared result to each caller's own storage instance, not just the triggering call's", async () => {
+    const storageA = createInMemoryAsyncStorage();
+    const storageB = createInMemoryAsyncStorage();
+    const fetchImpl = vi.fn(async () => jsonResponse(200, { guest_id: "guest_shared" }));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const [a, b] = await Promise.all([
+      client.createGuestIdentity({ storage: storageA }),
+      client.createGuestIdentity({ storage: storageB }),
+    ]);
+
+    expect(a).toEqual({ ok: true, value: { guestId: "guest_shared" } });
+    expect(b).toEqual({ ok: true, value: { guestId: "guest_shared" } });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(await storageA.get("anytoolai.guest_id")).toBe("guest_shared");
+    expect(await storageB.get("anytoolai.guest_id")).toBe("guest_shared");
+  });
+
+  it("does not start a second backend request when a slow storage lookup only resolves after another caller's request has already finished", async () => {
+    // Reproduces: caller A's storage.get() is still pending when caller B (fast lookup) joins
+    // no in-flight request, performs the backend call, persists, and fully finishes -- clearing
+    // the single-flight state. If A only joins the in-flight promise *after* its own storage.get()
+    // resolves, A now sees no in-flight request and wrongly starts a second one.
+    const storageA = createDeferredFirstGetStorage();
+    const storageB = createInMemoryAsyncStorage();
+    const fetchImpl = vi.fn(async () => jsonResponse(200, { guest_id: "guest_shared" }));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const pendingA = client.createGuestIdentity({ storage: storageA, storageKey: "a_key" });
+
+    // Caller B's fast lookup + full request/persist cycle completes first, while A's
+    // storage.get() is still pending.
+    const resultB = await client.createGuestIdentity({ storage: storageB, storageKey: "b_key" });
+    expect(resultB).toEqual({ ok: true, value: { guestId: "guest_shared" } });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+    // Now let A's deferred storage.get() resolve (empty -- no id was cached for A's key).
+    storageA.resolveFirstGet(undefined);
+    const resultA = await pendingA;
+
+    expect(resultA).toEqual({ ok: true, value: { guestId: "guest_shared" } });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(await storageA.get("a_key")).toBe("guest_shared");
+    expect(await storageB.get("b_key")).toBe("guest_shared");
   });
 
   it("allows a later, separate call to make its own request once the first has settled", async () => {

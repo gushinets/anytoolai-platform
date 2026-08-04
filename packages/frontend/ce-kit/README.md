@@ -2,14 +2,13 @@
 
 Shared Platform API client foundation for AnytoolAI Chrome Extensions and web frontends.
 
-This package covers **A15 — CE Kit MVP API Client** (ANY-8): both **A15a — Foundation** (ANY-170)
-and **A15b — Scenario, Quota, and Polling Client** (ANY-171). The transport layer, the stable error
-union, injectable storage, guest identity, runtime config, quota, idempotent scenario start,
-session polling, and next-action are all real. Several other exports (`pollJob`, `getArtifact`,
-`createHandoff`, `openHandoffConsent`, `captureEmail`, `trackClientEvent`, the `render*` helpers)
-remain fake-success placeholders deferred to later tickets (public job polling, artifact fetching,
-handoff, email capture, client-event ingestion). Do not treat their presence in `src/index.ts` as a
-working contract.
+This package currently covers **A15a — CE Kit API Client Foundation** (ANY-170): the transport
+layer, the stable error union, injectable storage, guest identity, and runtime config. It does
+**not** yet cover quota, scenario start, or polling (A15b / ANY-171) — `getQuota()` and
+`startScenario()` are still demo stubs, and several other exports (`pollJob`, `getScenarioSession`,
+`getArtifact`, `createHandoff`, `openHandoffConsent`, `captureEmail`, `trackClientEvent`, the
+`render*` helpers) are fake-success placeholders deferred to later tickets. Do not treat their
+presence in `src/index.ts` as a working contract.
 
 ## PlatformApiClient
 
@@ -135,6 +134,14 @@ the `ChromeStorageArea` structural type CE-kit declares itself, not `@types/chro
 dependency stays optional. Everything else (including tests) can use the bundled in-memory
 implementation.
 
+This is a deliberate reading of "compatible with `chrome.storage.local`": `AsyncStorage` itself is
+*not* structurally assignable to `chrome.storage.local` (it's single-key/typed-value where Chrome's
+API is multi-key/untyped-value) -- compatibility is provided via the adapter, not by widening the
+contract to match Chrome's own shape. Widening `AsyncStorage` itself would force every non-Chrome
+caller (tests, web frontends, the in-memory implementation) to deal with a multi-key, untyped-value
+API for no benefit to them. If a future ticket needs direct structural assignability instead, that's
+a breaking change to `AsyncStorage`, not an extension of this adapter.
+
 ```ts
 import { createChromeStorageAdapter, createInMemoryAsyncStorage } from "@anytoolai/ce-kit";
 
@@ -147,8 +154,9 @@ const chromeStorage = createChromeStorageAdapter(chrome.storage.local); // insid
 `client.createGuestIdentity({ storage, storageKey? })` reuses a persisted guest id if one exists,
 and otherwise requests a new one and persists it. It's owned by `PlatformApiClient` (not a free
 function) so single-flight dedup can be scoped to the client instance itself: concurrent calls on
-one client make at most one backend request, regardless of which `storageKey` each call passes --
-only the call that actually performs the request persists to its own `storageKey`.
+one client make at most one backend request, regardless of which `storageKey` each call passes.
+Every successful caller persists the (shared) result to its own `storage`/`storageKey`, not just
+whichever call happened to trigger the backend request.
 
 ```ts
 const result = await client.createGuestIdentity({ storage });
@@ -175,131 +183,6 @@ import { getRuntimeConfig } from "@anytoolai/ce-kit";
 const result = await getRuntimeConfig(client, "kernel_demo");
 if (result.ok) {
   const { scenarios, quotaSummary, allowedUiCapabilities } = result.value;
-}
-```
-
-## Quota
-
-`getQuota(client, { productId, guestId, scenarioId? })` reads backend-owned guest quota state.
-`scenarioId` is only needed for scenario-dimension quota policies; product-dimension queries omit
-it. Quota is never enforced client-side -- this is read-only visibility into state the backend
-already checks on scenario start.
-
-```ts
-import { getQuota } from "@anytoolai/ce-kit";
-
-const result = await getQuota(client, { productId: "kernel_demo", guestId });
-if (result.ok) {
-  const { usedCount, remainingCount, exhausted } = result.value;
-}
-```
-
-## Scenario start and idempotent retry (ANY-150)
-
-`prepareScenarioStart(request)` returns an opaque, retryable handle: it generates one
-`Idempotency-Key` when prepared, and every `.execute(client)` call on that same handle -- including
-an explicit retry of an ambiguous failure -- reuses that key, so the backend collapses duplicate
-submits into the original session/job instead of double-charging quota. A genuinely new submission
-means calling `prepareScenarioStart()` again for a fresh key. Callers never see or manage the key or
-its header directly.
-
-```ts
-import { prepareScenarioStart } from "@anytoolai/ce-kit";
-
-const prepared = prepareScenarioStart({
-  productId: "kernel_demo",
-  scenarioId: "kernel_demo.single_action_smoke_v1",
-  frontendId: "kernel_demo_ce",
-  input: { text: "hello" },
-  guestId,
-});
-
-let result = await prepared.execute(client);
-if (!result.ok && result.error.type !== "backend_error") {
-  // Ambiguous failure (network_error/timeout/aborted) -- explicit retry, same Idempotency-Key.
-  result = await prepared.execute(client);
-}
-```
-
-`startScenario(client, request)` is a one-shot convenience wrapper -- `prepareScenarioStart(request).execute(client)`
--- for callers that don't need to retry:
-
-```ts
-import { startScenario } from "@anytoolai/ce-kit";
-
-const result = await startScenario(client, {
-  productId: "kernel_demo",
-  scenarioId: "kernel_demo.single_action_smoke_v1",
-  frontendId: "kernel_demo_ce",
-  input: { text: "hello" },
-  guestId,
-});
-```
-
-Both surface `404` (unknown scenario/guest), `409 idempotency_key_conflict` (retry with a new key
-or the original request), `422` (invalid input/guest requirement), and `429 quota_exhausted` (no
-session/job/quota state is created in CE-kit on this path) through the standard `PlatformApiResult`.
-
-## Scenario session and polling
-
-`getScenarioSession(client, scenarioSessionId, { signal?, timeoutMs? })` is a single typed
-`GET /v1/scenario-sessions/{id}` read.
-
-`pollScenarioSession(client, scenarioSessionId, { intervalMs?, maxDurationMs?, signal? })` polls it
-on a bounded interval and stops on `completed`, `failed`, `expired`, or `waiting_for_user` (the last
-one stops polling too, since only `nextAction()` can move it forward -- continuing to poll would
-just idle until `maxDurationMs`), on a backend error, on cancellation, or once `maxDurationMs`
-elapses. It never starts, replays, or configures workflow/LLM execution -- it only reads
-backend-owned session state.
-
-```ts
-import { pollScenarioSession } from "@anytoolai/ce-kit";
-
-const controller = new AbortController();
-const outcome = await pollScenarioSession(client, scenarioSessionId, {
-  intervalMs: 2_000,
-  maxDurationMs: 60_000,
-  signal: controller.signal, // e.g. tied to a popup closing
-});
-
-switch (outcome.reason) {
-  case "session_status": // outcome.result.value.status is a stop status
-  case "error": // outcome.result is the backend_error/invalid_response that stopped polling
-  case "timeout": // maxDurationMs elapsed; outcome.result is the last successful read
-  case "aborted": // signal fired mid-poll
-}
-```
-
-## Next action
-
-`nextAction(client, { scenarioSessionId, nextActionId, checkpointId })` sends the checkpoint the
-frontend is currently acting on; the backend is authoritative on whether it's stale, returning
-`409` if the session moved on. That `409` is a **different** conflict than scenario-start's
-`409 idempotency_key_conflict` even though both are HTTP 409 -- see `isScenarioActionConflict()` /
-`isIdempotencyKeyConflict()` below.
-
-```ts
-import { nextAction } from "@anytoolai/ce-kit";
-
-const result = await nextAction(client, {
-  scenarioSessionId,
-  nextActionId: "copy_result",
-  checkpointId: currentCheckpointId,
-});
-```
-
-## Classifying backend errors
-
-`isIdempotencyKeyConflict()`, `isScenarioActionConflict()`, and `isQuotaExhausted()` are typed
-guards over `PlatformApiError` for the ambiguous cases above -- prefer them over comparing
-`error.code` strings directly, since they're the tested, reusable source of truth for which codes
-mean what:
-
-```ts
-import { isIdempotencyKeyConflict, isQuotaExhausted } from "@anytoolai/ce-kit";
-
-if (!result.ok && isQuotaExhausted(result.error)) {
-  // no session/job was created; show the paywall/upsell path
 }
 ```
 

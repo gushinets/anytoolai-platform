@@ -68,6 +68,8 @@ This directory is the system of record for agents. Keep it current. If a decisio
 ## Task handoffs
 
 - `tasks/a11-job-lifecycle-and-worker-integration.md`
+- `tasks/a11-preclaim-cancellation-scenario-identity.md`
+- `tasks/a11-scenario-identity-metadata-deduplication.md`
 - `handoffs/a11-job-lifecycle-worker-review-remediation.md`
 
 ## Generated docs

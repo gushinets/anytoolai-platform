@@ -656,12 +656,16 @@ Job lifecycle operations add the worker coordination boundary without changing t
 caller-owned transaction rule:
 
 - `claim_created(job_id)` conditionally changes only `created` to `running` and sets `started_at`;
-- `cancel_created(job_id)` conditionally changes only `created` to `canceled`;
+- `cancel_created(job_id, metadata=...)` conditionally changes only `created` to `canceled`, sets
+  `completed_at`, and may persist caller-supplied metadata in that same update;
 - `mark_failed_from_created(...)` exists for poison-job terminalization when runtime integrity
   checks prove a `created` job cannot be executed safely;
 - `mark_succeeded(...)` and `mark_failed(...)` conditionally transition only `running` jobs;
 - the job service persists `workflow.started` in the claim transaction and `workflow.canceled` in
   the cancellation transaction;
+- the worker-owned pre-claim cancellation path validates the linked scenario session before calling
+  `cancel_created`, merges available `guest_id`, `user_id`, and `scenario_chain_id` into job
+  metadata, and relies on the standard job-derived event context for cancellation dimensions;
 - failed transitions always fill `completed_at`, `error_code`, and `error_message_safe`;
 - the worker commits claim/start before opening the workflow execution transaction.
 
