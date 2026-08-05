@@ -3,16 +3,15 @@
 ## Status
 
 - State: active
- - Scope status: implementation complete, live-postgresql execution partially skipped
+- Scope status: regression found during 2026-08-05 gardening; implementation is not complete
 - Owner: agent
 - Created: 2026-07-30
-- Last updated: 2026-07-30
+- Last updated: 2026-08-05
 - Review date: 2026-07-30
-- Next action: rerun the PostgreSQL-marked suites against a live disposable maintenance database URL
-  when available to replace local skips with live execution evidence.
-- Blocker: `python scripts/agent/runner.py doctor` still fails under the system Python because
-  `pytest`, `yaml`, and `pydantic` are missing there. This is an existing repo papercut, not a new
-  SQLite-specific blocker.
+- Next action: decide whether the current SQLite fast-test and worker fallback paths are accepted
+  test-only compatibility or must be removed to satisfy this plan's original zero-SQLite goal.
+- Blocker: current code and docs intentionally use SQLite in fast tests and non-PostgreSQL worker
+  fallbacks, which conflicts with this plan's stated goal and needs an explicit scope decision.
 
 ## Goal
 
@@ -134,3 +133,4 @@ SQLite-based test infrastructure, or current docs/plans that present SQLite as s
 | 2026-07-30 | Added `repo_test_support.postgresql`, migrated the tracked DB-backed test harnesses to disposable PostgreSQL patterns, removed the remaining SQLite migration branch, deleted the obsolete SQLite stress test, and scrubbed current docs/plans so PostgreSQL is the only supported DB path. | Re-run PostgreSQL-marked suites against a live disposable maintenance database URL when available. |
 | 2026-07-30 | Local validation passed on the supported fast path: targeted migration/event-log suites collected cleanly, `validate-architecture` passed, `validate-docs` passed, and `quick-check` passed with `207 passed, 230 deselected`. | None in-repo; only live PostgreSQL execution remains environment-dependent. |
 | 2026-07-30 | A later `quick-check` surfaced a pytest collection bug: several tests imported shared DB helpers via `from conftest import ...`, which resolved to the wrong `conftest.py`. The follow-up cleanup moved those reusable helpers into an explicit test-only module under `tests/` so `conftest.py` returned to pure pytest wiring. | Re-run the affected pytest slice and `quick-check` to confirm collection is stable again. |
+| 2026-08-05 | Gardening found tracked SQLite branches/harnesses again in migration `0009`, scenario conflict handling, worker lease fallbacks, and `tests/support/sqlite_harness.py`; current architecture docs also describe the fast SQLite suite. | Keep the plan active and obtain an explicit contract decision before claiming eradication. |

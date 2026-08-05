@@ -5,9 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-07-08
-- Last updated: 2026-07-16
-- Review date: 2026-07-15
-- Last run: 2026-07-15
+- Last updated: 2026-08-05
+- Review date: 2026-08-05
+- Last run: 2026-08-05
 - Next action: repeat the inventory and discrepancy review after the next MVP feature merge.
 - Blocker: none
 
@@ -52,3 +52,25 @@ Keep repository knowledge aligned with code behavior.
   gateway paths.
 - Recorded truthful-CI, worktree isolation, structured diagnostics, and placeholder-smoke gaps in
   the quality and debt trackers.
+
+## 2026-08-05 Run Notes
+
+- Inventoried active/completed plans against current code, tests, and merged history; archived 17
+  verified completed plans covering A10/A11 recovery and identity follow-ups, A13 quota work,
+  artifact correlation, CE client foundations, migrations, test alignment, and papercut removal.
+- Kept genuinely unfinished migration, quota-conflict, handoff, worker external-follow-up,
+  production Compose, delivery-map, SQLite-eradication, and recurring gardening plans active.
+- Corrected stale kernel-smoke, CE-kit, provider retry, quality-score, and debt-tracker claims.
+- Reopened the SQLite-eradication discrepancy in its existing plan after finding current SQLite
+  harnesses, migration branches, and worker fallbacks that conflict with its zero-SQLite goal.
+- Extended architecture scan exclusions for `.tmp/` review snapshots after quick-check proved they
+  could create false import-boundary failures.
+
+## 2026-08-05 Validation
+
+- [x] `python scripts/agent/runner.py doctor`
+- [x] `python scripts/agent/runner.py validate-configs`
+- [x] `python scripts/agent/runner.py validate-architecture`
+- [x] `python scripts/agent/runner.py validate-docs`
+- [x] `python scripts/agent/runner.py generate-docs --check`
+- [x] `python scripts/agent/runner.py quick-check`

@@ -2,16 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-07-20
-- Last updated: 2026-07-22
+- Last updated: 2026-08-05
 - Review date: 2026-07-20
-- Next action: confirm the dedicated GitHub Actions PostgreSQL quota-concurrency job is required in
-  branch protection.
-- Blocker: Docker daemon is unavailable in this environment and no
-  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was provided, so PostgreSQL-specific execution could not
-  be completed locally. CI now provisions PostgreSQL for the required production-dialect proof.
+- Next action: none repo-side; canonical `postgresql-check` runs in the backend PostgreSQL CI job.
+- Blocker: none
 
 ## Decision
 
