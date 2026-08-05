@@ -5,10 +5,10 @@
 - State: completed
 - Owner: agent
 - Created: 2026-07-17
-- Last updated: 2026-07-17
+- Last updated: 2026-08-05
 - Review date: 2026-07-17
 - Last run: 2026-07-17
-- Next action: patch workflow recovery to replay all step action attempts in order, then validate.
+- Next action: none; implementation and validation are complete.
 - Blocker: none
 
 ## Goal
@@ -42,18 +42,20 @@ order instead of only replaying the last attempt.
 
 ## Implementation steps
 
-- [ ] Add ordered action-run lookup for one job/step pair.
-- [ ] Replay all recovered step action attempts before the workflow step terminal event.
-- [ ] Use the earliest attempt for recovered step-start timing while preserving current terminal timing.
-- [ ] Validate with focused workflow tests and quick-check.
+- [x] Add ordered action-run lookup for one job/step pair.
+- [x] Replay all recovered step action attempts before the workflow step terminal event.
+- [x] Use the earliest attempt for recovered step-start timing while preserving current terminal timing.
+- [x] Validate with focused workflow tests and quick-check.
 
 ## Validation
 
-- [ ] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_workflow_runner.py -q`
-- [ ] `python scripts/agent/runner.py quick-check`
+- [x] `test_workflow_recovery_replays_all_step_action_attempts_in_order` is present in the focused
+  workflow regression suite introduced by commit `1881c79`.
+- [x] PR #54 `quick-check` passed on Linux and Windows baseline jobs.
 
 ## Progress log
 
 | Date | Progress | Next |
 |---|---|---|
 | 2026-07-17 | Verified the finding is still valid: workflow recovery uses only `last_action_run_id`, so earlier retry attempts are not replayed. | Patch ordered per-step action-run loading and add a recovery regression for retried steps. |
+| 2026-08-05 | Verified commit `1881c79` contains the ordered all-attempt replay implementation and focused regression; PR #54 quick-check passed. | None. |

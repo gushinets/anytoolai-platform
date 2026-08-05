@@ -83,10 +83,10 @@ SQLite-based test infrastructure, or current docs/plans that present SQLite as s
 - Current docs:
   - `docs/architecture/runtime-storage.md`
   - `docs/architecture/quota-model.md`
-- Active plans:
-  - `docs/exec-plans/active/a13-guest-identity-and-quota.md`
-  - `docs/exec-plans/active/a13-postgresql-concurrency-and-ce-scope.md`
-  - `docs/exec-plans/active/runtime-storage-postgresql-test-alignment.md`
+- Completed plans retained as historical evidence:
+  - `docs/exec-plans/completed/a13-guest-identity-and-quota.md`
+  - `docs/exec-plans/completed/a13-postgresql-concurrency-and-ce-scope.md`
+  - `docs/exec-plans/completed/runtime-storage-postgresql-test-alignment.md`
 - Completed plans with historical references:
   - `docs/exec-plans/completed/a04-runtime-storage-and-repositories.md`
   - `docs/exec-plans/completed/a13-configurable-quota-dimension.md`
@@ -97,25 +97,34 @@ SQLite-based test infrastructure, or current docs/plans that present SQLite as s
 ## Implementation steps
 
 - [x] Add a shared disposable-PostgreSQL test helper for tracked DB-backed tests.
-- [x] Convert all attached-SQLite DB-backed tests to the PostgreSQL helper pattern.
-- [x] Remove SQLite-specific migration branches from runtime migrations.
-- [x] Update docs and active plans so SQLite is no longer presented as a supported or tolerated path.
-- [x] Re-run targeted DB-backed suites and the canonical validation commands.
+- [ ] Convert all attached-SQLite DB-backed tests to the PostgreSQL helper pattern; later work
+  reintroduced `tests/support/sqlite_harness.py` and SQLite-backed fast tests.
+- [ ] Remove SQLite-specific migration branches from runtime migrations; revision `0009` currently
+  contains SQLite branches.
+- [ ] Update docs and active plans so SQLite is no longer presented as supported; current runtime
+  docs intentionally describe the fast SQLite suite and worker fallback.
+- [ ] Re-run the final PostgreSQL-only validation ladder after the zero-SQLite contract is restored
+  or explicitly narrowed.
 
 ## Validation
 
-- [x] `uv run python -m pytest apps/platform-api/tests/test_migrate.py -q`
-  - `6 passed, 2 skipped`
-- [x] `uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q`
-  - `5 skipped` locally because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was unset
-- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_event_log.py -m "slow and postgresql" -q`
-  - `2 passed, 18 skipped`
+- Historical local migration selection passed six cases and skipped two PostgreSQL cases; the
+  skips are not counted as successful production-dialect validation.
+- Local attempt, not completion evidence: `uv run python -m pytest
+  apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q`
+  collected and skipped 5 tests because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was unset.
+- Local attempt, not completion evidence: `uv run python -m pytest
+  packages/backend/platform-core/tests/unit/test_event_log.py -m "slow and postgresql" -q`
+  reported 2 non-PostgreSQL passes and 18 skipped PostgreSQL tests.
+- [x] PR #54 required CI ran `python scripts/agent/runner.py postgresql-check` against PostgreSQL
+  successfully; this is production-dialect evidence, but it does not close the reintroduced SQLite
+  scope regression above.
 - [x] `python -m compileall ...` across the converted helper and DB-backed test modules
 - [x] `uv run python scripts/agent/runner.py validate-architecture`
 - [x] `uv run python scripts/agent/runner.py validate-docs`
 - [x] `uv run python scripts/agent/runner.py quick-check`
-- [ ] `uv run python scripts/agent/runner.py quick-check` after moving shared DB helpers out of
-  ambiguous `conftest` imports
+- [x] PR #54 required CI ran canonical `python scripts/agent/runner.py quick-check` successfully
+  on Linux and Windows after the shared-helper import cleanup.
 
 ## Decision log
 

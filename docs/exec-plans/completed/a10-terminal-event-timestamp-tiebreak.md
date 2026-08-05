@@ -5,10 +5,10 @@
 - State: completed
 - Owner: agent
 - Created: 2026-07-17
-- Last updated: 2026-07-17
+- Last updated: 2026-08-05
 - Review date: 2026-07-17
 - Last run: 2026-07-17
-- Next action: patch the no-action-run failed-step replay timestamp tie-break and validate.
+- Next action: none; implementation and validation are complete.
 - Blocker: none
 
 ## Goal
@@ -39,17 +39,19 @@ would otherwise share `record.completed_at`.
 
 ## Implementation steps
 
-- [ ] Add a completion-side tie-break for recovered failed steps without action runs.
-- [ ] Update the workflow recovery regression to assert timestamp ordering directly.
-- [ ] Run focused validation plus quick-check.
+- [x] Add a completion-side tie-break for recovered failed steps without action runs.
+- [x] Update the workflow recovery regression to assert timestamp ordering directly.
+- [x] Run focused validation plus quick-check.
 
 ## Validation
 
-- [ ] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_workflow_runner.py -q`
-- [ ] `python scripts/agent/runner.py quick-check`
+- [x] The workflow regression directly asserts `workflow.step_failed.timestamp <
+  workflow.failed.timestamp` for the no-action-run path.
+- [x] PR #54 `quick-check` passed on Linux and Windows baseline jobs.
 
 ## Progress log
 
 | Date | Progress | Next |
 |---|---|---|
 | 2026-07-17 | Verified the finding is still valid: no-action-run failed-step replay still shares `record.completed_at` with `workflow.failed`, so ordering depends on replay ID tie-breaks. | Patch the timestamp helper and assert direct timestamp causality in the regression. |
+| 2026-08-05 | Verified commit `1881c79` contains the timestamp tie-break and direct-order regression; PR #54 quick-check passed. | None. |

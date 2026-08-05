@@ -5,10 +5,10 @@
 - State: completed
 - Owner: Codex
 - Created: 2026-07-28
-- Last updated: 2026-07-29
+- Last updated: 2026-08-05
 - Review date: 2026-07-28
-- Next action: secure a disposable PostgreSQL maintenance database URL if production-dialect concurrency proof must be rerun locally; the code and non-PostgreSQL validations are complete.
-- Blocker: no `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was configured in this environment, so the required PostgreSQL concurrency suite could only be executed as an explicit skip. `doctor` also remains blocked under the system Python because `pytest`, `yaml`, and `pydantic` are not installed there.
+- Next action: none; implementation and required validation are complete.
+- Blocker: none
 
 ## Goal
 
@@ -82,25 +82,28 @@ docs, and validation-hardening debt that still affects this replacement PR surfa
 - [x] Deduplicate handoff migration DDL and remove the redundant target-session index.
 - [x] Update runtime-storage/docs/PAPERCUTS/OpenAPI/exec-plan follow-up accuracy.
 - [x] Add or update targeted regression coverage for artifact correlation and still-valid hardening findings.
-- [ ] Run focused suites, PostgreSQL concurrency coverage, and repository validation commands in the required order.
+- [x] Run focused suites, PostgreSQL concurrency coverage, and repository validation commands in the required order.
 - [x] Review the PostgreSQL CI checkout behavior; retain the existing head-SHA checkout and diagnostics at the user's direction.
 - [x] Address PR review follow-up: preserve the historical 0004/0008 handoff index contract and make the 0009 downgrade exact.
 - [x] Address PR review follow-up: assert every applicable debug-artifact correlation dimension.
 
 ## Validation
 
-- [x] `python scripts/agent/runner.py doctor` attempted and truthfully recorded as blocked by missing system-Python dependencies (`pytest`, `yaml`, `pydantic`).
+- Historical local `doctor` attempt was blocked by missing system-Python dependencies (`pytest`, `yaml`, `pydantic`); it is not counted as successful validation.
 - [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_artifact_service.py packages/backend/platform-core/tests/unit/test_structured_output.py packages/backend/platform-core/tests/unit/test_workflow_runner.py -q`
 - [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_handoffs.py packages/backend/platform-core/tests/unit/test_runtime_storage.py apps/platform-api/tests/test_access_logging.py tests/test_docs_generation.py -q`
 - [x] `uv run python -m pytest packages/backend/platform-actions/tests/test_structured_llm_executor.py -q`
 - [x] `uv run python -m pytest apps/platform-api/tests/test_handoffs_api.py -q`
-- [ ] `uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q` (executed and skipped because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` is unset)
+- Historical local PostgreSQL concurrency attempt skipped because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was unset; it is not counted as successful validation.
+- [x] PR #54 required CI ran the canonical `python scripts/agent/runner.py postgresql-check` successfully against PostgreSQL.
 - [x] `python scripts/agent/runner.py validate-configs`
 - [x] `python scripts/agent/runner.py validate-architecture`
 - [x] `python scripts/agent/runner.py validate-docs`
 - [x] `python scripts/agent/runner.py generate-docs --check`
 - [x] `python scripts/agent/runner.py quick-check` (passed after rerunning with `PYTEST_ADDOPTS=--basetemp=.quick-check-tmp\\pytest-any90-final` to avoid a locked stale temp directory)
-- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_provider_gateway.py -k "canonical_metadata_helper or event_recovery_backfills" -q` (one non-DB regression passed; the PostgreSQL recovery case skipped because no test database URL is configured)
+- Historical provider-gateway selection passed its non-database regression but skipped the
+  PostgreSQL recovery case without a database URL; the skip is not counted as successful
+  validation.
 - [x] `python scripts/agent/runner.py validate-architecture`
 
 ## Progress Log
@@ -116,3 +119,4 @@ docs, and validation-hardening debt that still affects this replacement PR surfa
 | 2026-07-29 | Restored the PostgreSQL CI job's head-SHA checkout and checkout diagnostics exactly as requested by the user; no runtime workflow code was changed. | Commit the explicit workflow restoration separately; do not push without a new request. |
 | 2026-07-31 | Corrected the missed provider-gateway `_metadata_str` copies in normal event construction and rollback recovery so both now use `common.metadata.metadata_str`. | Run focused provider-gateway coverage and architecture validation. |
 | 2026-07-31 | Focused canonical-metadata coverage passed for normal provider events; the PostgreSQL-backed replay case remained an explicit skip without a configured test database. Architecture validation and import-order checks passed. | Hand off the scoped review fix. |
+| 2026-08-05 | Reconciled historical local skips with PR #54's successful canonical PostgreSQL CI evidence. The plan's implementation and validation scope is complete. | None. |

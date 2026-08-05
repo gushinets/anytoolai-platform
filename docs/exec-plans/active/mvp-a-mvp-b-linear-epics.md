@@ -222,8 +222,8 @@ LLM runtime decisions from `docs/architecture/llm-runtime.md` and ADR 0007 apply
 
 **Priority:** P1  
 **Depends on:** A04, A12  
-**Status:** backend-complete; ANY-170 delivered the CE client foundation and ANY-171 retains real
-quota/start/polling integration.
+**Status:** backend-complete; ANY-170 delivered the CE client foundation and ANY-171 owns the
+deferred real quota/start/polling integration.
 **Goal:** реализовать backend-enforced access-lite quota для guests.  
 **Implementation details:** Alembic `0003` guest/quota tables. API creates opaque guest id; CE stores it locally. Quota consumed server-side on accepted scenario start, not frontend click.  
 **Acceptance criteria:** guest can run N times; N+1 returns standardized `quota_exhausted`; quota events emitted; quota check endpoint returns current state.  

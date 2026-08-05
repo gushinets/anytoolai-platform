@@ -5,10 +5,10 @@
 - State: completed
 - Owner: Codex
 - Created: 2026-07-20
-- Last updated: 2026-07-20
+- Last updated: 2026-08-05
 - Review date: 2026-07-20
 - Next action: none; implementation and focused validation are complete.
-- Blocker: `python scripts/agent/runner.py quick-check` reaches pytest but is blocked by the known Windows `.quick-check-tmp/pytest` PermissionError on this machine.
+- Blocker: none
 
 ## Goal
 
@@ -48,7 +48,7 @@ Preserve normal workflow step-start semantics during escaped rollback recovery b
 
 - [x] `$env:TEMP='D:\Devpy\anytoolai-platform\.tmp'; $env:TMP=$env:TEMP; uv run python -m pytest packages/backend/platform-core/tests/unit/test_workflow_runner.py -q`
 - [x] `$env:TEMP='D:\Devpy\anytoolai-platform\.tmp'; $env:TMP=$env:TEMP; uv run python -m pytest packages/backend/platform-core/tests -q`
-- [ ] `$env:TEMP='D:\Devpy\anytoolai-platform\.tmp'; $env:TMP=$env:TEMP; python scripts/agent/runner.py quick-check`
+- [x] PR #54 required CI ran canonical `python scripts/agent/runner.py quick-check` successfully on Linux and Windows.
 
 ## Progress Log
 
@@ -56,3 +56,4 @@ Preserve normal workflow step-start semantics during escaped rollback recovery b
 |---|---|---|
 | 2026-07-20 | Confirmed the runner already carries `started_event_emitted` and gates recovery replay on it. | Add missing regression coverage and update stale docs wording. |
 | 2026-07-20 | Added caught condition-failure and escaped input-mapping-failure tests, updated workflow recovery docs, and passed workflow/core tests. | None; quick-check is blocked by the known local pytest temp-root ACL issue after docs/config/architecture/generated-doc phases pass. |
+| 2026-08-05 | Verified the implementation remains covered by current regressions and PR #54's successful Linux and Windows quick-check jobs. | None. |
