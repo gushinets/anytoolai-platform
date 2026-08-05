@@ -5,12 +5,10 @@
 - State: completed
 - Owner: agent
 - Created: 2026-07-29
-- Last updated: 2026-07-29
+- Last updated: 2026-08-05
 - Review date: 2026-07-29
-- Next action: keep runtime-storage validation aligned with the repo's PostgreSQL-only test path.
-- Blocker: a live PostgreSQL-backed runtime-storage run still needs valid
-  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` credentials; the documented localhost URL reaches a server
-  on this machine, but authentication for user `anytoolai` failed.
+- Next action: none; implementation and required production-dialect validation are complete.
+- Blocker: none
 
 ## Goal
 
@@ -54,10 +52,11 @@ runtime database contract.
 
 ## Validation
 
-- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_runtime_storage.py -m "slow and postgresql" -q`
-  - With no env var set, the suite collected cleanly and skipped the PostgreSQL-backed cases.
-  - With `postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres`, the suite reached the
-    new PostgreSQL harness and failed fast on maintenance-DB authentication.
+- Historical local runtime-storage run collected but skipped without a database URL; a second
+  local attempt reached PostgreSQL but failed maintenance-database authentication. Neither attempt
+  is counted as successful validation.
+- [x] PR #54 required CI ran canonical `python scripts/agent/runner.py postgresql-check`
+  successfully against PostgreSQL, including runtime-storage coverage.
 - [x] `uv run python -m pytest apps/platform-api/tests/test_migrate.py -q`
 - [x] `uv run alembic -c migrations/platform/alembic.ini upgrade head --sql`
 - [x] `uv run python scripts/agent/runner.py quick-check`
@@ -74,3 +73,4 @@ runtime database contract.
 |---|---|---|
 | 2026-07-29 | Confirmed that `test_runtime_storage.py` still used a legacy attached-temp schema harness and that `docs/architecture/runtime-storage.md` still documented that choice as intentional. Found reusable disposable PostgreSQL helper patterns in `apps/platform-api/tests/test_quota_concurrency_postgresql.py` and `apps/platform-api/tests/test_migrate.py`. | Patch the runtime-storage suite and storage docs, then run the available validation commands. |
 | 2026-07-29 | Replaced the legacy harness in `test_runtime_storage.py` with a disposable PostgreSQL harness, marked the suite `slow`/`postgresql`, updated the storage docs, and reran the validation ladder with a repo-local `UV_CACHE_DIR` workaround for local `uv` cache ACL issues. The live PostgreSQL attempt reached a server on `127.0.0.1:5432` but failed authentication for the documented `anytoolai` user. | Re-run the PostgreSQL-backed runtime-storage suite with valid maintenance-DB credentials when available. |
+| 2026-08-05 | Reconciled the historical local skip/authentication failure with PR #54's successful canonical PostgreSQL CI evidence. | None. |

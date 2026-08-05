@@ -5,11 +5,11 @@
 - State: completed
 - Owner: agent
 - Created: 2026-08-03
-- Last updated: 2026-08-04
+- Last updated: 2026-08-05
 - Review date: 2026-08-04
-- Next action: none outstanding. PR #49's description placeholder now reads
-  `Link: \`docs/exec-plans/active/any-170-ce-kit-api-client-foundation.md\`` -- confirmed via
-  `gh pr view 49 --json body`, not assumed. Await further review.
+- Next action: none outstanding. PR #49's description now links to
+  `docs/exec-plans/completed/any-170-ce-kit-api-client-foundation.md`, verified via
+  `gh pr view 49 --json body` on 2026-08-05.
 - Blocker: none
 
 ## Goal
@@ -96,9 +96,7 @@ backend.
 - [x] `frontend-check` and `full-check` green.
 - [x] Replace PR #49's description placeholder with a link to this file. Confirmed via
   `gh pr view 49 --json body` (after `gh` auth was set up in this environment) that the body now
-  reads `Link: \`docs/exec-plans/active/any-170-ce-kit-api-client-foundation.md\``. This item was
-  wrongly marked done, then wrongly marked not-done, before this final direct-`gh` check --
-  see decision log for both corrections.
+  reads `Link: \`docs/exec-plans/completed/any-170-ce-kit-api-client-foundation.md\``.
 - [x] Every successful `createGuestIdentity()` caller persists the shared result to its own
   `storage`/`storageKey`, not just whichever call happened to trigger the backend request.
 - [x] Documented the `AsyncStorage`-vs-`chrome.storage.local` adapter decision explicitly in the
@@ -143,10 +141,11 @@ backend.
 | 2026-08-04 | Second-pass review re-verified the same 3 must-address items against current code and found them already fixed (review had run against the last-pushed commit, before the round above) -- confirmed via direct inspection, no further code change needed there. Confirmed the `docs/exec-plans/active/...` PR-description placeholder is real (no exec plan existed for ANY-170, same gap already fixed for ANY-147) and created this file. Evaluated the nitpick asking to extend `AssertExactSchemaKeys` to the parser *output* DTOs; verified empirically that TypeScript's own excess-property checking already fully covers that case, so declined as redundant. | Update the PR description's placeholder link once a PR exists to update. |
 | 2026-08-04 | Third team-lead review round (against head `9bd85e4`, cross-referencing CodeRabbit feedback) found the guest-identity single-flight fix was incomplete (only the triggering caller persisted its result -- see decision log), asked for the Chrome-storage adapter decision to be stated explicitly rather than left implicit, and flagged that the PR description's placeholder was still unresolved as of that review. Fixed the persistence gap with a regression test covering both a different-`storageKey`-same-`storage` race and a different-`storage`-instance race; added the explicit design-decision paragraph to the README. The PR description placeholder was resolved directly by the user on GitHub (not a repo-file change). Also evaluated the review's additional observation that `AssertExactSchemaKeys` only checks key names, not field types/nullability/enum values -- see decision log entry below for the reasoning to accept this as a documented limitation rather than build a heavier type-level validator. | Await any further review. |
 | 2026-08-04 | Fourth team-lead review round (P1, head `cbe0ebe`) found a remaining single-flight race: since `createGuestIdentity()` only joined `inFlightGuestIdentity` after awaiting its own `storage.get()`, a caller with a slow lookup could miss a request that another, faster caller started and fully finished (clearing the in-flight state) while the slow lookup was still pending -- yielding two backend requests for what was still one overlapping initialization window. Fixed by moving coordination to the whole call: an `activeGuestIdentityCalls` counter increments at method entry and decrements in `finally`, and `inFlightGuestIdentity` only clears at zero. Added the exact regression test requested (deferred/slow `storage.get()` for one caller, fast backend response for the other), and manually confirmed it fails against the pre-fix code (2 fetches) before confirming it passes with the fix (1 fetch, both callers' storage populated). Also fixed three doc-only findings in this same exec plan from an earlier inline-comment round (Contracts-touched section wrongly called `POST /v1/identity/guest` read-only; a decision-log entry imprecisely described TypeScript's excess-property-vs-assignability protection for output DTOs; a stale 2026-08-03 decision-log entry about per-caller persistence needed marking superseded). | Await any further review. |
+| 2026-08-05 | Updated merged PR #49's external description to the archived `docs/exec-plans/completed/any-170-ce-kit-api-client-foundation.md` path and verified the result directly with `gh`. | None. |
 
 ## Open questions
 
-None repo-side. The PR description placeholder is a non-repo follow-up tracked above.
+None.
 
 ## Follow-up debt
 
