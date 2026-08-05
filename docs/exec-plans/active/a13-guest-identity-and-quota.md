@@ -3,7 +3,7 @@
 ## Status
 
 - State: active
-- Scope status: backend-complete, integration pending
+- Scope status: complete; backend plus full CE-kit quota/start integration (A15, ANY-8, ANY-170/ANY-171)
 - Owner: agent
 - Created: 2026-07-20
 - Last updated: 2026-07-20
@@ -88,6 +88,6 @@ persistence. Full CE-kit quota/start integration is A15 (ANY-8, ANY-170/ANY-171)
 |---|---|---|
 | 2026-07-20 | Completed mandatory docs/code research, identified the A12 accepted-start boundary, and confirmed `uv run python scripts/agent/runner.py doctor` passes. | Implement storage/domain/API wiring. |
 | 2026-07-20 | Implemented guest identity, quota persistence/services, API endpoints, CE guest-id storage helper, scenario-start enforcement, tests, and docs. Canonical quick-check passed with a fresh basetemp override for the known stale pytest temp root; frontend typecheck/build passed through Corepack pnpm. | None. |
-| 2026-07-20 | Follow-up clarified A13 as backend-complete with integration pending, added explicit scenario-start `429` OpenAPI metadata, guest `422` API tests, real parallel HTTP start coverage, a slow stress test, and CE-kit deferred-helper comments. | A16 must replace CE-kit demo/deferred start/quota helpers with the real Platform API client and integration tests. |
+| 2026-07-20 | Follow-up clarified A13 as backend-complete with integration pending, added explicit scenario-start `429` OpenAPI metadata, guest `422` API tests, real parallel HTTP start coverage, a slow stress test, and CE-kit deferred-helper comments. | A15 (ANY-8, ANY-170/ANY-171) replaced the CE-kit demo/deferred start/quota helpers with the real Platform API client and integration tests -- since completed. |
 | 2026-07-20 | Added PostgreSQL-backed quota concurrency integration coverage gated by `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` and clarified that only PostgreSQL-backed tests count as production concurrency proof. Docker CLI was present locally, but the daemon was unavailable during this pass. | Run the PostgreSQL test on a Docker-enabled host or against a disposable PostgreSQL test database. |
 | 2026-07-22 | Added explicit quota policy dimensions for product-wide and scenario-specific quota counters, persisted resolved dimension keys, and aligned tests/docs with configurable scope. | Run focused validation and refresh generated docs. |

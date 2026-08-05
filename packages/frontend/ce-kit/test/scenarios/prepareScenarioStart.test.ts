@@ -36,6 +36,11 @@ function idempotencyHeader(call: unknown[]): string | null {
   return new Headers(init.headers).get("Idempotency-Key");
 }
 
+function parsedBody(call: unknown[]): unknown {
+  const init = call[1] as RequestInit;
+  return JSON.parse(init.body as string) as unknown;
+}
+
 describe("prepareScenarioStart", () => {
   it("sends the same Idempotency-Key on every execute() of one prepared operation", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse(200, START_PAYLOAD));
@@ -49,6 +54,30 @@ describe("prepareScenarioStart", () => {
     const [firstKey, secondKey] = fetchImpl.mock.calls.map((call) => idempotencyHeader(call));
     expect(firstKey).toBeTruthy();
     expect(firstKey).toBe(secondKey);
+  });
+
+  it("keeps every execute() call on the same identical payload even if the caller mutates the request afterward", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(200, START_PAYLOAD));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+    const mutableRequest: ScenarioStartRequest = {
+      productId: "kernel_demo",
+      scenarioId: "kernel_demo.single_action_smoke_v1",
+      frontendId: "kernel_demo_ce",
+      input: { text: "hello" },
+      guestId: "guest_123",
+    };
+    const prepared = prepareScenarioStart(mutableRequest);
+
+    await prepared.execute(client);
+    // Simulates a caller reusing a form-bound request object across a retry: this must not
+    // change what the retry sends, since it reuses the same Idempotency-Key as the original.
+    mutableRequest.guestId = "guest_456";
+    (mutableRequest.input as { text: string }).text = "mutated";
+    await prepared.execute(client);
+
+    const [firstBody, secondBody] = fetchImpl.mock.calls.map((call) => parsedBody(call));
+    expect(secondBody).toEqual(firstBody);
+    expect(firstBody).toMatchObject({ guest_id: "guest_123", input: { text: "hello" } });
   });
 
   it("gives a separate prepared operation a different Idempotency-Key", async () => {

@@ -262,10 +262,10 @@ LLM runtime decisions from `docs/architecture/llm-runtime.md` and ADR 0007 apply
 **Non-goals:** product-specific UX, direct provider calls.
 
 **Implementation notes for assignee:** ce-kit должен быть shared integration layer для всех CE, поэтому helpers возвращают typed results/errors и скрывают HTTP plumbing. Описать base URL configuration, timeout/retry/polling behavior, guest id persistence expectations, API versioning path и stable error union; не включать prompts, provider/model selection или product-specific UI decisions.
-A15 must replace the A13 demo/deferred `startScenario()` and `getQuota()` helpers with real
-Platform API calls, propagate the opaque guest id created by `createGuestIdentity()`, and handle
-`429 quota_exhausted`, `422`, normal start success, and polling without moving quota enforcement into
-the frontend.
+A15 (ANY-8, ANY-170/ANY-171) has replaced the A13 demo/deferred `startScenario()` and `getQuota()`
+helpers with real Platform API calls, propagates the opaque guest id created by
+`createGuestIdentity()`, and handles `429 quota_exhausted`, `422`, normal start success, and polling
+without moving quota enforcement into the frontend.
 
 **LLM runtime alignment:** `ce-kit` must never expose provider/model selection, `provider_policy_ref`, prompt text, retry controls, PydanticAI settings, LiteLLM settings, or provider-call internals. Browser retry/polling behavior is API-level only and must not attempt to replay LLM actions directly.
 

@@ -19,17 +19,19 @@ transaction as the terminal job update and event persistence. Valid cancellation
 session's identity and scenario-chain values into job metadata, preserves existing metadata keys,
 then emits `workflow.canceled` through the canonical event emitter and job-derived context.
 
-Invalid or missing linkage raises the established safe domain error, leaves the job `created`,
-preserves metadata, and emits no cancellation event. Non-created jobs remain rejected
-idempotently: no status change, metadata rewrite, or duplicate cancellation event.
+Invalid or missing linkage is caught and terminalizes the job as `failed` with
+`error_code="job_scenario_session_invalid"`, emitting `workflow.failed` instead of leaking the
+domain error to the caller (mirroring the same poison-job handling already used by claim). Non-created
+jobs remain rejected idempotently: no status change, metadata rewrite, or duplicate cancellation
+event.
 
 ## Test cases added
 
 - `test_cancel_created_job_preserves_guest_scenario_identity`
 - `test_cancel_created_job_preserves_authenticated_scenario_identity`
-- `test_cancel_created_job_rejects_missing_scenario_session_without_event`
-- `test_cancel_created_job_rejects_missing_scenario_session_linkage`
-- `test_cancel_created_job_rejects_mismatched_scenario_session`
+- `test_cancel_created_job_terminalizes_missing_scenario_session_as_failed`
+- `test_cancel_created_job_terminalizes_missing_scenario_session_linkage_as_failed`
+- `test_cancel_created_job_terminalizes_mismatched_scenario_session_as_failed`
 - `test_cancel_job_rejects_non_created_status_idempotently`
 - `test_cancel_created_job_rolls_back_when_event_persistence_fails`
 - `test_cancel_and_claim_race_allows_only_one_created_transition`

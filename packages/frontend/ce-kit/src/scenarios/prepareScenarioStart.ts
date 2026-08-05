@@ -28,6 +28,18 @@ export type PreparedScenarioStart = {
 
 export function prepareScenarioStart(request: ScenarioStartRequest): PreparedScenarioStart {
   const idempotencyKey = generateIdempotencyKey();
+  // Snapshotted once, here, rather than read from `request` inside `execute()`: a retry must
+  // resend exactly the same payload as the original submission even if the caller mutates (or
+  // reuses a form-bound) `request` object between two `execute()` calls on this handle --
+  // otherwise the same `Idempotency-Key` would go out attached to two different bodies.
+  const path = `/v1/products/${encodeURIComponent(request.productId)}/scenarios/${encodeURIComponent(request.scenarioId)}/start`;
+  const body = {
+    frontend_id: request.frontendId,
+    input: structuredClone(request.input),
+    guest_id: request.guestId ?? null,
+    user_id: request.userId ?? null,
+    source_frontend_instance_id: request.sourceFrontendInstanceId ?? null,
+  };
 
   return {
     execute(client, options) {
@@ -35,14 +47,8 @@ export function prepareScenarioStart(request: ScenarioStartRequest): PreparedSce
         client,
         {
           method: "POST",
-          path: `/v1/products/${encodeURIComponent(request.productId)}/scenarios/${encodeURIComponent(request.scenarioId)}/start`,
-          body: {
-            frontend_id: request.frontendId,
-            input: request.input,
-            guest_id: request.guestId ?? null,
-            user_id: request.userId ?? null,
-            source_frontend_instance_id: request.sourceFrontendInstanceId ?? null,
-          },
+          path,
+          body,
           headers: { "Idempotency-Key": idempotencyKey },
           signal: options?.signal,
           timeoutMs: options?.timeoutMs,
