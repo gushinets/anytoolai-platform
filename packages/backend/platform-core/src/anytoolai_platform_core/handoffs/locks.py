@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
+from time import monotonic, sleep
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -11,6 +12,8 @@ from anytoolai_platform_core.storage.transactions import (
 
 _LOCKED_HANDOFF_KEYS = "handoff_lifecycle_advisory_lock_keys"
 _LOCK_NAMESPACE = "anytoolai.handoff.lifecycle.v1"
+_LOCK_ACQUIRE_TIMEOUT_SECONDS = 5.0
+_LOCK_ACQUIRE_RETRY_DELAY_SECONDS = 0.05
 
 
 def acquire_handoff_lifecycle_lock(session: Session, handoff_id: str) -> None:
@@ -27,7 +30,7 @@ def acquire_handoff_lifecycle_lock(session: Session, handoff_id: str) -> None:
     if lock_key in locked_keys:
         return
 
-    session.execute(sa.text("SELECT pg_advisory_lock(:lock_key)"), {"lock_key": lock_key})
+    _acquire_postgresql_advisory_lock(session, lock_key)
     locked_keys.add(lock_key)
     register_transaction_cleanup_callback(
         session,
@@ -55,6 +58,20 @@ def _release_handoff_lifecycle_lock(session: Session, lock_key: int) -> None:
         raise RuntimeError(
             "handoff lifecycle advisory unlock failed: connection does not own lock"
         )
+
+
+def _acquire_postgresql_advisory_lock(session: Session, lock_key: int) -> None:
+    deadline = monotonic() + _LOCK_ACQUIRE_TIMEOUT_SECONDS
+    while True:
+        acquired = session.execute(
+            sa.text("SELECT pg_try_advisory_lock(:lock_key)"),
+            {"lock_key": lock_key},
+        ).scalar_one()
+        if acquired is True:
+            return
+        if monotonic() >= deadline:
+            raise TimeoutError("timed out acquiring handoff lifecycle advisory lock")
+        sleep(_LOCK_ACQUIRE_RETRY_DELAY_SECONDS)
 
 
 def _handoff_lock_key(handoff_id: str) -> int:

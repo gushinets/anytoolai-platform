@@ -88,7 +88,7 @@ class HandoffService:
         scenario_repository: ScenarioSessionRepository,
         guest_repository: GuestIdentityRepository,
         event_emitter: EventEmitter,
-        clock: Callable[[], datetime] = utc_now,
+        clock: Callable[[], datetime] | None = None,
         token_ttl: timedelta = DEFAULT_TOKEN_TTL,
         token_service: HandoffTokenService | None = None,
     ) -> None:
@@ -99,7 +99,7 @@ class HandoffService:
         self._scenarios = scenario_repository
         self._guests = guest_repository
         self._events = event_emitter
-        self._clock = clock
+        self._clock = clock or utc_now
         self._token_ttl = token_ttl
         self._token_service = token_service or HandoffTokenService()
 

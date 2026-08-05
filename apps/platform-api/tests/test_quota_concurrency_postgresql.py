@@ -493,7 +493,7 @@ def test_quota_exhausted_accept_racing_with_decline_preserves_exactly_once_audit
                     "req_pg_handoff_decline_race_decline",
                 )
                 assert decline_attempting_lock.wait(10)
-                assert not decline_acquired_lock.is_set()
+                assert not decline_acquired_lock.wait(0.5)
             finally:
                 release_recovery.set()
             accepted = accept_future.result(timeout=10)
@@ -560,7 +560,7 @@ def test_quota_exhausted_accept_racing_with_expiry_preserves_exactly_once_audit(
                     created["expires_at"],
                 )
                 assert expiry_attempting_lock.wait(10)
-                assert not expiry_acquired_lock.is_set()
+                assert not expiry_acquired_lock.wait(0.5)
             finally:
                 release_recovery.set()
             accepted = accept_future.result(timeout=10)
@@ -692,11 +692,13 @@ def test_parallel_quota_exhausted_accept_recovery_is_idempotent() -> None:
                 )
 
         responses = asyncio.run(accept_many())
-        assert any(
-            response.status_code == HTTPStatus.TOO_MANY_REQUESTS
-            and response.json()["error"]["code"] == "quota_exhausted"
+        quota_exhausted_responses = [
+            response
             for response in responses
-        )
+            if response.status_code == HTTPStatus.TOO_MANY_REQUESTS
+            and response.json()["error"]["code"] == "quota_exhausted"
+        ]
+        assert len(quota_exhausted_responses) == 1
         assert all(
             response.status_code in {HTTPStatus.CONFLICT, HTTPStatus.TOO_MANY_REQUESTS}
             for response in responses

@@ -63,14 +63,14 @@ wait and observe `failed`. Recovery never consumes quota, creates a target sessi
 workflow, creates a target artifact, or makes a provider call. The router's later failure call
 remains idempotent and does not duplicate the handoff event.
 
-The fast SQLite test suite has a known ceiling here: many concurrent losing requests each spawn an
-independent recovery transaction against the same usage row, and SQLite's ATTACH-schema harness can
-drop some of those under write contention (`sqlite3.OperationalError: database is locked`) even
-though the recovery callback's own failure-handling is designed to tolerate exactly this (a failing
-callback never masks the real response -- see `transaction_boundary`). The financial invariant (exact
-consumed-quota count, exact session/job row count) is never affected, only the secondary
-`quota.exhausted` audit-event count under heavy concurrency; `test_quota_concurrency_stress.py`
-documents this bound. Production-safe concurrency evidence for this comes from
+The fast SQLite test suite has a known ceiling here: many concurrent ordinary `/start` losing
+requests each spawn an independent non-critical recovery transaction against the same usage row, and
+SQLite's ATTACH-schema harness can drop some of those under write contention
+(`sqlite3.OperationalError: database is locked`) without changing the primary response path. That
+best-effort tolerance applies only to non-critical ordinary `/start` recovery. Immediate handoff
+quota recovery is critical: recovery failure prevents returning `429 quota_exhausted`. SQLite does
+not provide valid handoff race behavior for advisory-lock ownership, decline/expiry serialization,
+or recovery ordering. Production-safe concurrency evidence for handoff quota rejection comes from
 `test_quota_concurrency_postgresql.py`, not the SQLite suite.
 
 API behavior:

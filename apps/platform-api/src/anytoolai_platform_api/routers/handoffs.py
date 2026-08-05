@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from datetime import datetime
 from typing import Annotated, Any
 
 from anytoolai_platform_api.dependencies import (
@@ -18,7 +20,6 @@ from anytoolai_platform_api.schemas import (
 from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.common.errors import PlatformError
-from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
@@ -192,7 +193,7 @@ def _service(
     session: Any,
     registry: ConfigRegistry,
     *,
-    clock: Any | None = None,
+    clock: Callable[[], datetime] | None = None,
 ) -> HandoffService:
     emitter = EventEmitter(EventLogRepository(session))
     sessions = ScenarioSessionRepository(session)
@@ -225,12 +226,8 @@ def _service(
         scenario_repository=sessions,
         guest_repository=guests,
         event_emitter=emitter,
-        clock=_handoff_service_clock(clock),
+        clock=clock,
     )
-
-
-def _handoff_service_clock(clock: Any | None) -> Any:
-    return utc_now if clock is None else clock
 
 
 def _preview_response(preview: HandoffPreview) -> HandoffPreviewResponse:

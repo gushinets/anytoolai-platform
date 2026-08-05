@@ -502,38 +502,38 @@ def _quota_recovery_audit_pair_exists(
     session: Session,
     recovery: QuotaExhaustionRecovery,
 ) -> bool:
-    checked_count = session.execute(
-        sa.select(sa.func.count())
-        .select_from(event_log_table)
-        .where(
-            event_log_table.c.event_type == "quota.checked",
-            event_log_table.c.tenant_id == recovery.tenant_id,
-            event_log_table.c.region == recovery.region,
-            event_log_table.c.product_id == recovery.product_id,
-            event_log_table.c.frontend_id == recovery.frontend_id,
-            event_log_table.c.guest_id == recovery.guest_id,
-            event_log_table.c.scenario_session_id == recovery.scenario_session_id,
-            event_log_table.c.scenario_chain_id == recovery.scenario_chain_id,
-            event_log_table.c.handoff_id == recovery.handoff_id,
+    checked_exists = session.execute(
+        sa.select(
+            sa.exists().where(
+                event_log_table.c.event_type == "quota.checked",
+                event_log_table.c.tenant_id == recovery.tenant_id,
+                event_log_table.c.region == recovery.region,
+                event_log_table.c.product_id == recovery.product_id,
+                event_log_table.c.frontend_id == recovery.frontend_id,
+                event_log_table.c.guest_id == recovery.guest_id,
+                event_log_table.c.scenario_session_id == recovery.scenario_session_id,
+                event_log_table.c.scenario_chain_id == recovery.scenario_chain_id,
+                event_log_table.c.handoff_id == recovery.handoff_id,
+            )
         )
     ).scalar_one()
-    exhausted_count = session.execute(
-        sa.select(sa.func.count())
-        .select_from(event_log_table)
-        .where(
-            event_log_table.c.event_type == "quota.exhausted",
-            event_log_table.c.tenant_id == recovery.tenant_id,
-            event_log_table.c.region == recovery.region,
-            event_log_table.c.product_id == recovery.product_id,
-            event_log_table.c.frontend_id == recovery.frontend_id,
-            event_log_table.c.guest_id == recovery.guest_id,
-            event_log_table.c.scenario_session_id == recovery.scenario_session_id,
-            event_log_table.c.scenario_chain_id == recovery.scenario_chain_id,
-            event_log_table.c.handoff_id == recovery.handoff_id,
-            event_log_table.c.error_code == "quota_exhausted",
+    exhausted_exists = session.execute(
+        sa.select(
+            sa.exists().where(
+                event_log_table.c.event_type == "quota.exhausted",
+                event_log_table.c.tenant_id == recovery.tenant_id,
+                event_log_table.c.region == recovery.region,
+                event_log_table.c.product_id == recovery.product_id,
+                event_log_table.c.frontend_id == recovery.frontend_id,
+                event_log_table.c.guest_id == recovery.guest_id,
+                event_log_table.c.scenario_session_id == recovery.scenario_session_id,
+                event_log_table.c.scenario_chain_id == recovery.scenario_chain_id,
+                event_log_table.c.handoff_id == recovery.handoff_id,
+                event_log_table.c.error_code == "quota_exhausted",
+            )
         )
     ).scalar_one()
-    return checked_count > 0 and exhausted_count > 0
+    return checked_exists and exhausted_exists
 
 
 def _state_from_usage(record: QuotaUsageRecord, policy: QuotaPolicy) -> QuotaState:

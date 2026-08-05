@@ -1,21 +1,32 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
+from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.handoffs.models import (
+    HandoffRecord,
+    HandoffStartPolicy,
+    HandoffStatus,
+)
+from anytoolai_platform_core.handoffs.repository import HandoffRepository
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.identity.service import GuestIdentityService
 from anytoolai_platform_core.quotas.models import QuotaDimension
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
 from anytoolai_platform_core.quotas.service import GuestQuotaService, QuotaExhaustedError
-from anytoolai_platform_core.storage.db import event_log_table, guest_quota_usage_table
+from anytoolai_platform_core.storage.db import (
+    event_log_table,
+    guest_quota_usage_table,
+)
 from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
@@ -59,6 +70,40 @@ def _quota_service(
         quota_repository=QuotaUsageRepository(session),
         guest_repository=GuestIdentityRepository(session),
         event_emitter=EventEmitter(EventLogRepository(session)),
+    )
+
+
+def _create_recoverable_handoff(
+    session: sa.orm.Session,
+    *,
+    guest_id: str,
+) -> HandoffRecord:
+    now = utc_now()
+    return HandoffRepository(session).create(
+        HandoffRecord(
+            handoff_definition_id="kernel_demo.summary_to_action_v1",
+            tenant_id="anytoolai",
+            region="default",
+            token_hash="test_handoff_quota_recovery_token_hash",
+            source_product_id="kernel_demo",
+            source_frontend_id="kernel_demo_ce",
+            source_scenario_id="kernel_demo.single_action_smoke_v1",
+            source_scenario_session_id="scenario_session_source_handoff",
+            source_job_id="job_source_handoff",
+            source_artifact_id="artifact_source_handoff",
+            target_product_id="kernel_demo",
+            target_frontend_id="kernel_demo_ce",
+            target_scenario_id="kernel_demo.handoff_smoke_target_v1",
+            scenario_chain_id="scenario_chain_handoff",
+            created_by_guest_id=guest_id,
+            consent_required=False,
+            target_start_policy=HandoffStartPolicy.immediate,
+            context_payload={},
+            preview_payload={},
+            created_at=now,
+            updated_at=now,
+            expires_at=now + timedelta(minutes=30),
+        )
     )
 
 
@@ -350,9 +395,9 @@ def test_quota_exhaustion_recovery_survives_caller_transaction_rollback(
         _consume_accepted_start(
             _quota_service(session, registry=registry),
             guest_id=guest_id,
-            scenario_id="kernel_demo.handoff_smoke_target_v1",
-            scenario_session_id="scenario_session_rejected_handoff",
-            scenario_chain_id="scenario_chain_handoff",
+            scenario_id="kernel_demo.single_action_smoke_v1",
+            scenario_session_id="scenario_session_rejected_non_handoff",
+            scenario_chain_id="scenario_chain_non_handoff",
         )
 
     with transaction_boundary(session_factory) as session:
@@ -362,7 +407,7 @@ def test_quota_exhaustion_recovery_survives_caller_transaction_rollback(
                 sa.select(event_log_table)
                 .where(
                     event_log_table.c.scenario_session_id
-                    == "scenario_session_rejected_handoff"
+                    == "scenario_session_rejected_non_handoff"
                 )
                 .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
             ).mappings()
@@ -375,9 +420,58 @@ def test_quota_exhaustion_recovery_survives_caller_transaction_rollback(
         "quota.exhausted",
     ]
     assert all(
-        event["scenario_session_id"] == "scenario_session_rejected_handoff"
+        event["scenario_session_id"] == "scenario_session_rejected_non_handoff"
         for event in quota_events
     )
     assert all(event["handoff_id"] is None for event in quota_events)
     assert quota_events[-1]["error_code"] == "quota_exhausted"
     assert quota_events[-1]["properties"]["exhausted"] is True
+
+
+def test_handoff_quota_exhaustion_recovery_survives_caller_transaction_rollback(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    registry = _registry_with_quota_limit(0)
+    with transaction_boundary(session_factory) as session:
+        guest_id = _create_guest(session)
+        handoff = _create_recoverable_handoff(session, guest_id=guest_id)
+
+    with pytest.raises(QuotaExhaustedError), transaction_boundary(
+        session_factory
+    ) as session:
+        _consume_accepted_start(
+            _quota_service(session, registry=registry),
+            guest_id=guest_id,
+            scenario_id="kernel_demo.handoff_smoke_target_v1",
+            scenario_session_id="scenario_session_rejected_handoff",
+            scenario_chain_id="scenario_chain_handoff",
+            handoff_id=handoff.id,
+        )
+
+    with transaction_boundary(session_factory) as session:
+        recovered = HandoffRepository(session).get_by_id(
+            handoff.id,
+            tenant_id="anytoolai",
+            region="default",
+        )
+        assert recovered is not None
+        quota_events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.handoff_id == handoff.id)
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    assert recovered.status is HandoffStatus.failed
+    assert recovered.error_code == "quota_exhausted"
+    assert [event["event_type"] for event in quota_events] == [
+        "quota.checked",
+        "quota.exhausted",
+        "handoff.failed",
+    ]
+    assert quota_events[0]["scenario_session_id"] == "scenario_session_rejected_handoff"
+    assert quota_events[1]["scenario_session_id"] == "scenario_session_rejected_handoff"
+    assert quota_events[1]["error_code"] == "quota_exhausted"
+    assert quota_events[2]["error_code"] == "quota_exhausted"
+    assert quota_events[2]["properties"]["error_code"] == "quota_exhausted"
