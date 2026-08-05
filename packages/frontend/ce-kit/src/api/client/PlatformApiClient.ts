@@ -130,32 +130,30 @@ export class PlatformApiClient {
     try {
       const storageKey = options.storageKey ?? DEFAULT_GUEST_STORAGE_KEY;
       let storedGuestId: string | undefined;
-      let storageReadFailed = false;
       try {
         storedGuestId = await options.storage.get(storageKey);
       } catch {
         // A failed cache read is treated as a cache miss -- it must not surface as an arbitrary
         // exception from createGuestIdentity(), and the backend fallback below still produces a
         // valid GuestIdentityResult.
-        storageReadFailed = true;
       }
       if (storedGuestId) {
         return { ok: true, value: { guestId: storedGuestId } };
       }
 
       const result = await this.shareGuestIdentityRequest();
-      // Skip persisting when this caller's own read failed: a concurrent caller under the same
-      // `storageKey` may have read a genuinely cached id successfully (and already returned it
-      // above, without joining this shared request) while this call's read merely errored --
-      // blindly writing here would clobber that still-valid cached id with a second, different
-      // guest id from the same backend response, orphaning the one the other caller already used.
-      if (result.ok && !storageReadFailed) {
+      // Always re-read (and attempt to persist) after the backend call, even when this call's
+      // own initial read above failed: a `storage.get()` rejection is often transient (e.g. a
+      // momentarily locked Chrome storage backend), and permanently skipping persistence
+      // whenever the first read errored would silently lose the guest id forever, forcing every
+      // later call to create (and pay quota for) a brand new one. This second read doubles as
+      // the check for a value written concurrently by another caller/tab/process since this
+      // call's own miss above -- `AsyncStorage` has no atomic set-if-absent, so preferring
+      // whatever's already there over this call's own fetched id is a best-effort narrowing of
+      // that race, not a full fix. Only a failure of *this* read/write is treated as
+      // non-recoverable and left unpersisted.
+      if (result.ok) {
         try {
-          // `AsyncStorage` has no atomic set-if-absent, so this is a best-effort narrowing of the
-          // same race, not a full fix: re-read right before writing to catch a value that was
-          // cached (by another caller, tab, or process) in the window between this call's own
-          // miss-read above and this point, and prefer that existing value over clobbering it with
-          // a second, different guest id from this call's own backend response.
           const existingGuestId = await options.storage.get(storageKey);
           if (!existingGuestId) {
             await options.storage.set(storageKey, result.value.guestId);

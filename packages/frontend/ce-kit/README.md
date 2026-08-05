@@ -185,12 +185,14 @@ id from the backend exactly as it would if nothing were cached. As with the pers
 `storage.set()` failure already documented above, guest creation still returns its documented
 `GuestIdentityResult`.
 
-If the read fails, the fresh id from that fallback request is *not* persisted back to
-`storage`/`storageKey`, unlike the ordinary cache-miss path. A failed read is indistinguishable
-from "another concurrent call already has the real cached value and is about to return it without
-persisting anything new" -- persisting anyway risks overwriting that already-in-use cached id with
-a different one from the same backend response. The returned identity is still valid and usable by
-the caller; only the write-back is skipped.
+Persisting the fresh id from that fallback request re-reads `storage`/`storageKey` immediately
+before writing, regardless of whether the *initial* read above failed or genuinely missed --
+skipping persistence just because the first read errored would risk losing the id forever on a
+transient failure, forcing every later call to create (and pay quota for) a new one. The write is
+skipped only if that second read already finds a value there (another concurrent call already has
+the real cached value; persisting anyway would overwrite it with a different id from the same
+backend response) or if the second read/write itself fails. The returned identity is always valid
+and usable by the caller either way; only the write-back is ever skipped.
 
 ## Runtime config
 

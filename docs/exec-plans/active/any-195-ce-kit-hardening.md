@@ -226,3 +226,26 @@ exec plan itself are addressed by this section and the updated Goal above.
 3. VALID (docs) -- Status/Verification still said `full-check` and PR-opening were pending,
    stale now that the PR is open and CI is green on this head. Fixed by updating both to reflect
    current state (see Status and Verification above).
+
+## Code review (2026-08-06, fifth pass -- P2 persistence-after-transient-failure)
+
+1. VALID `PlatformApiClient.createGuestIdentity()` -- `storageReadFailed` (set when this call's
+   *initial* `storage.get()` threw) gated the entire persist-time re-read-and-write block, not
+   just the decision of what to prefer once re-read. If the initial read failure was transient
+   (a momentarily locked storage backend, not a permanent one), the backend-created guest id was
+   still returned to the caller but never cached -- permanently, since nothing re-attempts
+   persistence later. The next `createGuestIdentity()` call would find nothing cached and create
+   a second, different identity, splitting guest-based quota across two ids for what should be
+   one guest and violating the "reuses a persisted guest id if present" contract documented on
+   the method itself. Fixed by removing the `storageReadFailed` gate: the persist-time re-read
+   (added in the third pass to narrow the concurrent-write race) now always runs after a
+   successful backend response, regardless of whether the initial read failed. It still prefers
+   an existing value found on that re-read (unchanged), and still skips the write if the re-read
+   or the write itself fails -- only *that* second failure is now treated as non-recoverable,
+   not the first one. The now-unused `storageReadFailed` flag was removed. Regression test:
+   `test/identity/guestIdentity.test.ts` > "persists the fetched guest id when the initial
+   storage read failed but a later read succeeds (transient failure recovery)" -- first read
+   throws, backend succeeds, second read succeeds and is empty (persists), and a subsequent
+   `createGuestIdentity()` call reuses the persisted id without calling the backend again.
+   README's guest-identity section updated to match (previously said a failed initial read
+   always skips the write-back, which is no longer true).

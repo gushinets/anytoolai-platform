@@ -318,10 +318,46 @@ describe("PlatformApiClient.createGuestIdentity", () => {
 
     expect(result).toEqual({ ok: true, value: { guestId: "guest_after_read_failure" } });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    // Persistence is intentionally skipped when this call's own read failed -- a concurrent caller
-    // on the same key may have read a genuinely cached id successfully and already returned it, and
-    // this call has no reliable way to tell that apart from a real cache miss. See "does not
-    // clobber a concurrently cached guest id..." above for the race this avoids.
+    // This mock's `get()` always throws, so the persist-time re-read (which runs unconditionally,
+    // regardless of whether the *initial* read above failed) fails too, and persistence is
+    // skipped as a best-effort fallback -- not because the initial read failed. See "persists the
+    // fetched guest id when the initial storage read failed but a later read succeeds" below for
+    // the case where storage recovers between the two reads.
     expect(storage.set).not.toHaveBeenCalled();
+  });
+
+  it("persists the fetched guest id when the initial storage read failed but a later read succeeds (transient failure recovery)", async () => {
+    // The initial read fails once (simulating a transient storage error), but the persist-time
+    // re-read after the backend call succeeds and finds nothing cached. Persistence must not be
+    // permanently skipped just because the *first* read errored -- otherwise the fetched guest id
+    // is returned but never cached, and the next call creates a second, different identity,
+    // splitting guest-based quota across two ids for what should be the same guest.
+    const store = new Map<string, string>();
+    let getCallCount = 0;
+    const storage: AsyncStorage = {
+      get: vi.fn(async (key) => {
+        getCallCount += 1;
+        if (getCallCount === 1) {
+          throw new Error("transient storage read failure");
+        }
+        return store.get(key);
+      }),
+      set: vi.fn(async (key, value) => {
+        store.set(key, value);
+      }),
+      remove: vi.fn(async (key) => {
+        store.delete(key);
+      }),
+    };
+    const fetchImpl = vi.fn(async () => jsonResponse(200, { guest_id: "guest_after_transient_failure" }));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const firstResult = await client.createGuestIdentity({ storage });
+    expect(firstResult).toEqual({ ok: true, value: { guestId: "guest_after_transient_failure" } });
+    expect(store.get("anytoolai.guest_id")).toBe("guest_after_transient_failure");
+
+    const secondResult = await client.createGuestIdentity({ storage });
+    expect(secondResult).toEqual({ ok: true, value: { guestId: "guest_after_transient_failure" } });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
