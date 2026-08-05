@@ -1,7 +1,7 @@
 import { requestAndParse } from "../api/client";
 import type { PlatformApiClient, PlatformApiRequestOptions, PlatformApiResult } from "../api/client";
 import { generateIdempotencyKey } from "./idempotencyKey";
-import { parseScenarioSessionSnapshot } from "./parseScenarioSessionSnapshot";
+import { parseScenarioStartResponse } from "./parseScenarioSessionSnapshot";
 import type { ScenarioSessionSnapshot, ScenarioStartRequest } from "./types";
 
 /** Independent of the client's own timeout; cancels this attempt only. */
@@ -53,7 +53,7 @@ export function prepareScenarioStart(request: ScenarioStartRequest): PreparedSce
           signal: options?.signal,
           timeoutMs: options?.timeoutMs,
         },
-        parseScenarioSessionSnapshot,
+        parseScenarioStartResponse,
         "Scenario start response was invalid.",
       );
     },

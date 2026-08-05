@@ -109,6 +109,27 @@ describe("pollScenarioSession", () => {
     expect(result.result.ok && result.result.value.status).toBe("running");
   });
 
+  it("stops with reason 'timeout', not 'error', when an in-flight request runs past the polling deadline", async () => {
+    // Hangs until its AbortSignal fires, instead of resolving -- simulates a slow/unresponsive
+    // backend so the request can only ever settle via the `timeoutMs` bound this poll must put on
+    // it. The client's own default per-request timeout (10s) is far longer than `maxDurationMs`
+    // below, so without that bound this would run to ~10s instead of stopping at ~3s.
+    const fetchImpl = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      });
+    });
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const promise = pollScenarioSession(client, "scenario_session_123", { maxDurationMs: 3_000 });
+    await advance(3_500);
+    const result = await promise;
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result.reason).toBe("timeout");
+    expect(result.result).toEqual({ ok: false, error: { type: "timeout" } });
+  });
+
   it("stops with reason 'aborted' when the caller cancels mid-poll", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse(200, sessionPayload("running")));
     const client = makeClient(fetchImpl as unknown as typeof fetch);

@@ -46,6 +46,21 @@ export function parseScenarioSessionSnapshot(payload: unknown): ScenarioSessionS
 }
 
 /**
+ * Validates and maps the backend's `ScenarioStartResponse` payload (snake_case) into the client's
+ * `ScenarioSessionSnapshot` shape. Stricter than `parseScenarioSessionSnapshot()` above: unlike
+ * `ScenarioSessionResponse.job_id` (nullable), the backend's `ScenarioStartResponse.job_id` is
+ * required -- a start response always creates a job. A missing/null `job_id` here falls back to
+ * `invalid_response` instead of silently returning `{ ok: true, value: { jobId: null, ... } }`.
+ */
+export function parseScenarioStartResponse(payload: unknown): ScenarioSessionSnapshot | null {
+  const snapshot = parseScenarioSessionSnapshot(payload);
+  if (!snapshot || snapshot.jobId === null) {
+    return null;
+  }
+  return snapshot;
+}
+
+/**
  * Validates and maps the backend's `ScenarioSessionResponse` payload (snake_case) into the
  * client's `ScenarioSession` shape (camelCase) -- the session snapshot plus the checkpoint id
  * `nextAction()` must echo back.

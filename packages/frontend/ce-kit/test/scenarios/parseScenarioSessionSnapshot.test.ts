@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseScenarioSession,
   parseScenarioSessionSnapshot,
+  parseScenarioStartResponse,
 } from "../../src/scenarios/parseScenarioSessionSnapshot";
 
 const VALID_PAYLOAD = {
@@ -87,5 +88,29 @@ describe("parseScenarioSession", () => {
 
   it("treats a missing current_checkpoint_id as null", () => {
     expect(parseScenarioSession(VALID_PAYLOAD)?.currentCheckpointId).toBeNull();
+  });
+});
+
+describe("parseScenarioStartResponse", () => {
+  it("maps a valid payload the same way parseScenarioSessionSnapshot does", () => {
+    expect(parseScenarioStartResponse(VALID_PAYLOAD)).toEqual(
+      parseScenarioSessionSnapshot(VALID_PAYLOAD),
+    );
+  });
+
+  it("returns null for a null job_id, unlike parseScenarioSessionSnapshot", () => {
+    const payload = { ...VALID_PAYLOAD, job_id: null };
+    expect(parseScenarioSessionSnapshot(payload)?.jobId).toBeNull();
+    expect(parseScenarioStartResponse(payload)).toBeNull();
+  });
+
+  it("returns null for a missing job_id", () => {
+    const { job_id: _jobId, ...rest } = VALID_PAYLOAD;
+    expect(parseScenarioStartResponse(rest)).toBeNull();
+  });
+
+  it("still returns null for anything parseScenarioSessionSnapshot itself already rejects", () => {
+    expect(parseScenarioStartResponse({ ...VALID_PAYLOAD, allowed_next_actions: "x" })).toBeNull();
+    expect(parseScenarioStartResponse(null)).toBeNull();
   });
 });

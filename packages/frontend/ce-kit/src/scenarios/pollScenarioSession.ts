@@ -1,5 +1,5 @@
 import type { PlatformApiClient, PlatformApiResult } from "../api/client";
-import { abortedError } from "../api/errors";
+import { abortedError, timeoutError } from "../api/errors";
 import { getScenarioSession } from "./getScenarioSession";
 import type { ScenarioSession } from "./types";
 
@@ -45,16 +45,38 @@ export async function pollScenarioSession(
   const maxDurationMs = options?.maxDurationMs ?? DEFAULT_MAX_DURATION_MS;
   const signal = options?.signal;
   const startedAt = Date.now();
+  let lastResult: PlatformApiResult<ScenarioSession> | null = null;
 
   for (;;) {
     if (signal?.aborted) {
       return { reason: "aborted", result: { ok: false, error: abortedError() } };
     }
 
-    const result = await getScenarioSession(client, scenarioSessionId, { signal });
+    // Checked *before* issuing another GET, not just after one finishes -- otherwise a request
+    // started right at the deadline (e.g. right after the interval sleep) would still be allowed
+    // to run.
+    const remainingBeforeRequestMs = maxDurationMs - (Date.now() - startedAt);
+    if (remainingBeforeRequestMs <= 0) {
+      return { reason: "timeout", result: lastResult ?? { ok: false, error: timeoutError() } };
+    }
+
+    // Bounded by whatever's left of `maxDurationMs`, not the client's own (larger) default
+    // per-request timeout -- otherwise a slow/hanging request can run right past the polling
+    // deadline before this loop ever gets a chance to notice.
+    const result = await getScenarioSession(client, scenarioSessionId, {
+      signal,
+      timeoutMs: remainingBeforeRequestMs,
+    });
+    lastResult = result;
 
     if (!result.ok) {
-      return { reason: result.error.type === "aborted" ? "aborted" : "error", result };
+      if (result.error.type === "aborted") {
+        return { reason: "aborted", result };
+      }
+      // A request timeout here can only mean it was cut off by the `timeoutMs` bound above,
+      // i.e. it ran into the polling deadline -- report it as a polling timeout, not a generic
+      // API error.
+      return { reason: result.error.type === "timeout" ? "timeout" : "error", result };
     }
     if (POLL_STOP_STATUSES.has(result.value.status)) {
       return { reason: "session_status", result };

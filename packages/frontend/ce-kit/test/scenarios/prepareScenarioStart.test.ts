@@ -213,6 +213,33 @@ describe("prepareScenarioStart", () => {
     });
   });
 
+  it("returns invalid_response, not a null jobId, for a 200 payload with a missing or null job_id", async () => {
+    // Unlike ScenarioSessionResponse.job_id (nullable), the backend's ScenarioStartResponse.job_id
+    // is required -- a start response always creates a job. A malformed response missing it must
+    // not silently succeed with `jobId: null`.
+    for (const malformedPayload of [
+      { ...START_PAYLOAD, job_id: null },
+      (() => {
+        const { job_id: _jobId, ...rest } = START_PAYLOAD;
+        return rest;
+      })(),
+    ]) {
+      const fetchImpl = vi.fn(async () => jsonResponse(200, malformedPayload));
+      const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+      const result = await prepareScenarioStart(START_REQUEST).execute(client);
+
+      expect(result).toEqual({
+        ok: false,
+        error: {
+          type: "invalid_response",
+          status: 200,
+          message: "Scenario start response was invalid.",
+        },
+      });
+    }
+  });
+
   it("passes an execute-scoped AbortSignal through to the request", async () => {
     const controller = new AbortController();
     const fetchImpl = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
