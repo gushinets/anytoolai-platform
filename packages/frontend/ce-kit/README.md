@@ -274,7 +274,9 @@ const outcome = await pollScenarioSession(client, scenarioSessionId, {
 switch (outcome.reason) {
   case "session_status": // outcome.result.value.status is a stop status
   case "error": // outcome.result is the backend_error/invalid_response that stopped polling
-  case "timeout": // maxDurationMs elapsed; outcome.result is the last successful read
+  case "timeout": // maxDurationMs elapsed, or a single poll ran into the deadline and had to be
+                  // cut short; outcome.result is the last successful read if one happened before
+                  // the deadline, otherwise a failed (timeout-type) result
   case "aborted": // signal fired mid-poll
 }
 ```

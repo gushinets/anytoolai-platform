@@ -60,12 +60,14 @@ export async function pollScenarioSession(
       return { reason: "timeout", result: lastResult ?? { ok: false, error: timeoutError() } };
     }
 
-    // Bounded by whatever's left of `maxDurationMs`, not the client's own (larger) default
-    // per-request timeout -- otherwise a slow/hanging request can run right past the polling
-    // deadline before this loop ever gets a chance to notice.
+    // The tighter of the two bounds, not just `remainingBeforeRequestMs` on its own -- passing
+    // that alone would *replace* the client's own configured `timeoutMs` rather than cap it
+    // (PlatformApiClient.performOnce() does `options.timeoutMs ?? this.timeoutMs`, so a caller
+    // option always wins outright), which could silently loosen a deliberately short client
+    // timeout on every poll request whenever the remaining poll budget is larger.
     const result = await getScenarioSession(client, scenarioSessionId, {
       signal,
-      timeoutMs: remainingBeforeRequestMs,
+      timeoutMs: Math.min(client.timeoutMs, remainingBeforeRequestMs),
     });
     lastResult = result;
 

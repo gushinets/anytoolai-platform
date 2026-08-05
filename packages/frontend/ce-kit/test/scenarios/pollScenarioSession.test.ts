@@ -130,6 +130,32 @@ describe("pollScenarioSession", () => {
     expect(result.result).toEqual({ ok: false, error: { type: "timeout" } });
   });
 
+  it("caps a request at the polling deadline without loosening a shorter client timeout", async () => {
+    // The client is configured with a deliberately short per-request timeout (1s), far shorter
+    // than maxDurationMs (60s). Passing the (much larger) remaining poll budget as `timeoutMs`
+    // would replace, not cap, the client's own bound (PlatformApiClient.performOnce() does
+    // `options.timeoutMs ?? this.timeoutMs`) -- so a hung request must still be cut off at ~1s,
+    // not run until the 60s poll deadline.
+    const fetchImpl = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      });
+    });
+    const client = new PlatformApiClient({
+      baseUrl: "https://api.example.com",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      timeoutMs: 1_000,
+    });
+
+    const promise = pollScenarioSession(client, "scenario_session_123", { maxDurationMs: 60_000 });
+    await advance(1_500);
+    const result = await promise;
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result.reason).toBe("timeout");
+    expect(result.result).toEqual({ ok: false, error: { type: "timeout" } });
+  });
+
   it("stops with reason 'aborted' when the caller cancels mid-poll", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse(200, sessionPayload("running")));
     const client = makeClient(fetchImpl as unknown as typeof fetch);
