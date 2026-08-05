@@ -21,6 +21,7 @@ from typing import NamedTuple
 ROOT = Path(__file__).resolve().parents[2]
 QUICK_CHECK_VENV = ROOT / ".quick-check-venv"
 TMP_ROOT = ROOT / ".quick-check-tmp"
+PYTEST_BASETEMP_ROOT = TMP_ROOT / "pytest-runs"
 COMPOSE_FILE = ROOT / "infra" / "compose" / "docker-compose.yml"
 COMPOSE_OVERRIDE_FILE = ROOT / "infra" / "compose" / "docker-compose.override.yml"
 COMPOSE_PROD_FILE = ROOT / "infra" / "compose" / "docker-compose.prod.yml"
@@ -109,7 +110,7 @@ def runner_env() -> dict[str, str]:
     uv_cache_dir = TMP_ROOT / "uv-cache"
     pip_cache_dir = TMP_ROOT / "pip-cache"
     pytest_tmp_dir = TMP_ROOT / "pytest"
-    for path in (tmp_dir, uv_cache_dir, pip_cache_dir, pytest_tmp_dir):
+    for path in (tmp_dir, uv_cache_dir, pip_cache_dir, pytest_tmp_dir, PYTEST_BASETEMP_ROOT):
         path.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     env["PYTHONPATH"] = build_pythonpath()
@@ -304,6 +305,8 @@ def postgresql_pytest_command() -> list[str]:
         "pytest",
         "-m",
         POSTGRESQL_PYTEST_MARK_EXPRESSION,
+        "--basetemp",
+        str(PYTEST_BASETEMP_ROOT / f"postgresql-{os.getpid()}"),
         *POSTGRESQL_PYTEST_TARGETS,
         "-q",
     ]

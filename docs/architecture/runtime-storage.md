@@ -682,6 +682,12 @@ caller-owned transaction rule:
 - failed transitions always fill `completed_at`, `error_code`, and `error_message_safe`;
 - the worker commits claim/start before opening the workflow execution transaction.
 
+In the production PostgreSQL worker path, job coordination is lease-first. Multiple independent
+workers can discover the same `created` job id, but each handler attempts the PostgreSQL advisory job
+lease before it calls `claim_created(job_id)`. Only the lease winner proceeds to the conditional
+repository transition. Lease losers return before the repository claim and never invoke the workflow
+runner.
+
 Critical job invariants are repository-enforced, not just conventional:
 
 - job creation requires a real scenario-session row with matching tenant/region/product/frontend
@@ -691,9 +697,13 @@ Critical job invariants are repository-enforced, not just conventional:
 - unrestricted `update(...)` is limited to same-status mutations so lifecycle status changes must go
   through explicit repository transition methods.
 
-Repeated claims and claims of terminal jobs are no-ops. No lease, distributed lock, or queue engine
-is part of this MVP slice. The runnable worker performs minimal PostgreSQL polling to discover a
-created job id; the conditional update, not the discovery query, owns claim idempotency.
+Repeated claims and claims of terminal jobs are no-ops. The advisory lease is not permanent job
+ownership, queue assignment, or an external queue engine; it is a session-scoped PostgreSQL
+coordination primitive held while the worker processes the job. The conditional repository update
+remains necessary because a lease winner may still find that the job is no longer `created` after
+cancellation, terminalization, or a stale retry. The runnable worker performs minimal PostgreSQL
+polling to discover a created job id; the lease plus conditional update, not the discovery query,
+own execution idempotency.
 
 ## Testing Strategy
 
@@ -737,6 +747,23 @@ The test creates and drops a disposable database, applies Alembic migrations, th
 scenario starts through the API transaction path. It verifies that PostgreSQL row locking and the
 conditional quota update allow exactly the first `N` accepted starts, return `429 quota_exhausted`
 for later starts, and keep session/job/quota/event counts consistent.
+
+Worker claim concurrency has its own PostgreSQL production-semantics smoke in:
+
+- `apps/platform-worker/tests/test_worker_claim_postgresql.py`
+
+```powershell
+$env:ANYTOOLAI_POSTGRES_TEST_DATABASE_URL = "postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres"
+uv run python -m pytest apps/platform-worker/tests/test_worker_claim_postgresql.py -m "slow and postgresql" -q
+```
+
+The smoke creates and drops a disposable database, applies Alembic migrations once during test setup,
+seeds one runnable `created` job, then runs two composed workers with independent engines and
+session factories against the same database. Both workers poll the real queue and reach a test-only
+pre-lease synchronization point before delegating to the real PostgreSQL advisory lease. Exactly one
+worker acquires the lease, only that worker reaches the real conditional claim, and the loser returns
+without invoking the workflow runner. The smoke verifies both the successful `succeeded` terminal
+path and the safe `failed` terminal path from a fresh session.
 
 The backend GitHub Actions workflow uses the required `postgresql-quota-concurrency` job with a
 disposable PostgreSQL service for all production-dialect tests. It runs the canonical
