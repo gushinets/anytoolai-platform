@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
+from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
+from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
@@ -23,6 +25,11 @@ from anytoolai_platform_core.identity.service import GuestIdentityService
 from anytoolai_platform_core.quotas.models import QuotaDimension
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
 from anytoolai_platform_core.quotas.service import GuestQuotaService, QuotaExhaustedError
+from anytoolai_platform_core.scenarios.models import (
+    ScenarioSessionRecord,
+    ScenarioSessionStatus,
+)
+from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.storage.db import (
     event_log_table,
     guest_quota_usage_table,
@@ -31,6 +38,8 @@ from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
     transaction_boundary,
 )
+from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
+from anytoolai_platform_core.workflows.repository import JobRepository
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -79,22 +88,26 @@ def _create_recoverable_handoff(
     guest_id: str,
 ) -> HandoffRecord:
     now = utc_now()
+    source_session, source_job, source_artifact = _seed_handoff_source_graph(
+        session,
+        guest_id=guest_id,
+    )
     return HandoffRepository(session).create(
         HandoffRecord(
             handoff_definition_id="kernel_demo.summary_to_action_v1",
             tenant_id="anytoolai",
             region="default",
             token_hash="test_handoff_quota_recovery_token_hash",
-            source_product_id="kernel_demo",
-            source_frontend_id="kernel_demo_ce",
-            source_scenario_id="kernel_demo.single_action_smoke_v1",
-            source_scenario_session_id="scenario_session_source_handoff",
-            source_job_id="job_source_handoff",
-            source_artifact_id="artifact_source_handoff",
+            source_product_id=source_session.product_id,
+            source_frontend_id=source_session.frontend_id,
+            source_scenario_id=source_session.scenario_id,
+            source_scenario_session_id=source_session.id,
+            source_job_id=source_job.id,
+            source_artifact_id=source_artifact.id,
             target_product_id="kernel_demo",
             target_frontend_id="kernel_demo_ce",
             target_scenario_id="kernel_demo.handoff_smoke_target_v1",
-            scenario_chain_id="scenario_chain_handoff",
+            scenario_chain_id=source_session.scenario_chain_id or source_session.id,
             created_by_guest_id=guest_id,
             consent_required=False,
             target_start_policy=HandoffStartPolicy.immediate,
@@ -105,6 +118,71 @@ def _create_recoverable_handoff(
             expires_at=now + timedelta(minutes=30),
         )
     )
+
+
+def _seed_handoff_source_graph(
+    session: sa.orm.Session,
+    *,
+    guest_id: str,
+) -> tuple[ScenarioSessionRecord, JobRecord, ArtifactRecord]:
+    scenario = ScenarioSessionRepository(session).create(
+        ScenarioSessionRecord(
+            tenant_id="anytoolai",
+            region="default",
+            product_id="kernel_demo",
+            frontend_id="kernel_demo_ce",
+            scenario_id="kernel_demo.handoff_smoke_source_v1",
+            scenario_version=1,
+            guest_id=guest_id,
+            status=ScenarioSessionStatus.completed,
+            current_checkpoint_id="result_ready",
+            scenario_chain_id="scenario_chain_handoff",
+            completed_at=datetime.now(UTC),
+        )
+    )
+    jobs = JobRepository(session)
+    created_job = jobs.create(
+        JobRecord(
+            tenant_id=scenario.tenant_id,
+            region=scenario.region,
+            product_id=scenario.product_id,
+            frontend_id=scenario.frontend_id,
+            scenario_session_id=scenario.id,
+            workflow_id="kernel_demo.single_action_extract_v1",
+            workflow_version=1,
+        )
+    )
+    job = jobs.claim_created(created_job.id)
+    assert job is not None
+    artifact = ArtifactRepository(session).create(
+        ArtifactRecord(
+            tenant_id=scenario.tenant_id,
+            region=scenario.region,
+            product_id=scenario.product_id,
+            frontend_id=scenario.frontend_id,
+            scenario_session_id=scenario.id,
+            job_id=job.id,
+            artifact_type="structured_output",
+            status=ArtifactStatus.stored,
+            content_json={"title": "Safe summary", "fields": ["deadline", "budget"]},
+            metadata={
+                "artifact_role": "workflow_result",
+                "schema_ref": "kernel_demo.extract_output_v1",
+                "schema_version": 1,
+                "workflow_id": job.workflow_id,
+                "workflow_version": job.workflow_version,
+            },
+        )
+    )
+    succeeded_job = jobs.mark_succeeded(
+        replace(
+            job,
+            status=JobStatus.succeeded,
+            result_artifact_id=artifact.id,
+            completed_at=datetime.now(UTC),
+        )
+    )
+    return scenario, succeeded_job, artifact
 
 
 def _consume_accepted_start(
