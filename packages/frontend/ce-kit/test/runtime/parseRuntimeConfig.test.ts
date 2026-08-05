@@ -159,6 +159,23 @@ describe("parseRuntimeConfig", () => {
     expect(parseRuntimeConfig(payload)).toBeNull();
   });
 
+  it("returns null when allowed_next_actions contains a non-string element", () => {
+    const payload = {
+      ...VALID_PAYLOAD,
+      scenario_ids: ["s1"],
+      scenarios: [
+        {
+          scenario_id: "s1",
+          version: 1,
+          allowed_next_actions: ["continue", 1],
+          input_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+          output_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+        },
+      ],
+    };
+    expect(parseRuntimeConfig(payload)).toBeNull();
+  });
+
   it("accepts a valid minimal payload with a null quota summary", () => {
     expect(parseRuntimeConfig(VALID_PAYLOAD)).toEqual({
       productId: "kernel_demo",
