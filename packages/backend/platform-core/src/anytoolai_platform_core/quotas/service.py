@@ -23,12 +23,12 @@ from anytoolai_platform_core.quotas.models import (
     QuotaUsageRecord,
 )
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
+from anytoolai_platform_core.storage.db import event_log_table
 from anytoolai_platform_core.storage.transactions import (
     RollbackRecoveryPhase,
     register_rollback_recovery_callback,
     transaction_boundary,
 )
-from anytoolai_platform_core.storage.db import event_log_table
 
 
 class ProductNotFoundError(PlatformError):
