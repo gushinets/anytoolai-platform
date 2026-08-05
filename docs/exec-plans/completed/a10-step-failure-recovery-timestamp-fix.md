@@ -2,14 +2,14 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-07-17
-- Last updated: 2026-07-17
+- Last updated: 2026-08-05
 - Review date: 2026-07-17
 - Last run: 2026-07-17
-- Next action: none; implementation is complete, with direct `quick_check.py` still subject to the known Windows pytest temp-root PermissionError.
-- Blocker: `python scripts/agent/quick_check.py` still intermittently fails on this machine when pytest enumerates `.quick-check-tmp/pytest/pytest-of-jackd`, although `python scripts/agent/runner.py quick-check` passes.
+- Next action: none; implementation and canonical validation are complete.
+- Blocker: none
 
 ## Goal
 
@@ -49,7 +49,7 @@ any `action_run` exists.
 ## Validation
 
 - [x] `python -m pytest packages/backend/platform-core/tests -q`
-- [ ] `python scripts/agent/quick_check.py`
+- Historical direct `python scripts/agent/quick_check.py` attempt hit a Windows pytest temp-root PermissionError; this non-canonical command is not counted as successful validation.
 - [x] `python scripts/agent/runner.py quick-check`
 
 ## Progress log
@@ -58,3 +58,4 @@ any `action_run` exists.
 |---|---|---|
 | 2026-07-17 | Reviewed the workflow recovery timestamp path, found the no-action-run fallback, and identified the existing pre-start failure regression to extend. | Patch the fallback and verify recovered `workflow.step_failed` order stays causal. |
 | 2026-07-17 | Patched failure-specific step replay timestamps, extended the pre-action failure regression, passed `packages/backend/platform-core/tests`, and passed `python scripts/agent/runner.py quick-check`. | None; direct `python scripts/agent/quick_check.py` remains affected by the known Windows pytest temp-root PermissionError on this machine. |
+| 2026-08-05 | Verified the implementation remains covered by current regressions and PR #54's successful canonical quick-check. | None. |

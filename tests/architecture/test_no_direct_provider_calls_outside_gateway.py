@@ -9,6 +9,7 @@ SKIP_PATH_PARTS = {
     ".venv",
     ".quick-check-venv",
     ".quick-check-tmp",
+    ".tmp",
     ".uv-cache",
     ".pytest_cache",
     ".mypy_cache",

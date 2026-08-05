@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: Codex
 - Created: 2026-07-20
 - Last updated: 2026-07-22

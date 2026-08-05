@@ -2,23 +2,21 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-07-20
-- Last updated: 2026-07-22
+- Last updated: 2026-08-05
 - Review date: 2026-07-20
-- Next action: confirm the dedicated GitHub Actions PostgreSQL quota-concurrency job is required in
-  branch protection.
-- Blocker: Docker daemon is unavailable in this environment and no
-  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was provided, so PostgreSQL-specific execution could not
-  be completed locally. CI now provisions PostgreSQL for the required production-dialect proof.
+- Next action: none repo-side; canonical `postgresql-check` runs in the backend PostgreSQL CI job.
+- Blocker: none
 
 ## Decision
 
-**A13 remains backend-complete; CE-kit quota/start HTTP integration remains deferred to A16.**
+**A13 remains backend-complete; ANY-170 delivered the CE client foundation, and ANY-171 owns the
+deferred real quota/start/polling integration.**
 
 The current patch will not implement the central CE-kit Platform API client because that would widen
-scope into the explicitly deferred A16 frontend/runtime-client work. A13 will continue to expose only
+scope into the explicitly deferred ANY-171 frontend/runtime-client work. A13 will continue to expose only
 real `createGuestIdentity()` local persistence in CE-kit.
 
 ## Reviewed
@@ -44,7 +42,7 @@ real `createGuestIdentity()` local persistence in CE-kit.
 - Keep CE-kit start/quota helpers deferred and document only guest identity persistence as real in
   A13.
 
-## Deferred To A16
+## Follow-up Debt Owned By ANY-171
 
 - Real CE-kit `getQuota()` and `startScenario()` HTTP clients.
 - Guest-id propagation from local CE storage into scenario-start calls.
@@ -54,15 +52,17 @@ real `createGuestIdentity()` local persistence in CE-kit.
 ## Validation Plan
 
 - [x] API/quota-focused tests.
-- [ ] PostgreSQL test against a live disposable PostgreSQL database.
+- [x] PR #54 required CI ran the canonical `python scripts/agent/runner.py postgresql-check`
+  successfully against a live PostgreSQL service.
 - [x] Dedicated GitHub Actions job provisions PostgreSQL and runs the production-dialect quota
   concurrency test.
-- [x] PostgreSQL test guard executed and reported explicit skip without
-  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`.
+- Historical local PostgreSQL test-guard run skipped without
+  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`; it is not counted as successful validation.
 - [x] Docs validation and generated-docs check.
 - [x] Frontend typecheck/build because CE-kit scope files remain in play.
 - [x] Canonical quick-check.
-- [ ] Scenario-dimension PostgreSQL quota test revalidated after the July 28, 2026 policy-limit assertion cleanup.
+- [x] PR #54's canonical PostgreSQL CI run revalidated the scenario-dimension quota assertions
+  after the July 28 policy-limit cleanup.
 
 ## PostgreSQL Test Command
 
@@ -81,3 +81,4 @@ Legacy non-PostgreSQL concurrency harnesses have been removed from the supported
 | 2026-07-22 | Added a dedicated backend CI job with a PostgreSQL service that runs `apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql"` against a disposable database URL. | Confirm the new workflow job is configured as a required check for PRs. |
 | 2026-07-28 | Tightened the scenario-dimension PostgreSQL quota test so it explicitly reads `kernel_demo.guest_quota_v1`, asserts the policy exists, derives `scenario_quota_limit` from `policy.limit_count`, and still drives the scenario-scoped override through the existing registry mutation helper. | Re-run the PostgreSQL slow test plus `quick-check` and record whether local validation can execute or skips for missing PostgreSQL configuration. |
 | 2026-07-28 | Ran the requested PostgreSQL pytest command locally with a repo-local `UV_CACHE_DIR`; the test module skipped because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was unset. `python scripts/agent/runner.py quick-check` passed. | Re-run the PostgreSQL slow test against a disposable PostgreSQL maintenance database URL to complete live-dialect validation. |
+| 2026-08-05 | PR #54's required CI completed the canonical PostgreSQL check against a live service. Reassigned the separately deferred CE integration to ANY-171. | None for A13. |

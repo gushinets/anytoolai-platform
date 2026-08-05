@@ -3,16 +3,15 @@
 ## Status
 
 - State: active
- - Scope status: implementation complete, live-postgresql execution partially skipped
+- Scope status: regression found during 2026-08-05 gardening; implementation is not complete
 - Owner: agent
 - Created: 2026-07-30
-- Last updated: 2026-07-30
+- Last updated: 2026-08-05
 - Review date: 2026-07-30
-- Next action: rerun the PostgreSQL-marked suites against a live disposable maintenance database URL
-  when available to replace local skips with live execution evidence.
-- Blocker: `python scripts/agent/runner.py doctor` still fails under the system Python because
-  `pytest`, `yaml`, and `pydantic` are missing there. This is an existing repo papercut, not a new
-  SQLite-specific blocker.
+- Next action: decide whether the current SQLite fast-test and worker fallback paths are accepted
+  test-only compatibility or must be removed to satisfy this plan's original zero-SQLite goal.
+- Blocker: current code and docs intentionally use SQLite in fast tests and non-PostgreSQL worker
+  fallbacks, which conflicts with this plan's stated goal and needs an explicit scope decision.
 
 ## Goal
 
@@ -84,10 +83,10 @@ SQLite-based test infrastructure, or current docs/plans that present SQLite as s
 - Current docs:
   - `docs/architecture/runtime-storage.md`
   - `docs/architecture/quota-model.md`
-- Active plans:
-  - `docs/exec-plans/active/a13-guest-identity-and-quota.md`
-  - `docs/exec-plans/active/a13-postgresql-concurrency-and-ce-scope.md`
-  - `docs/exec-plans/active/runtime-storage-postgresql-test-alignment.md`
+- Completed plans retained as historical evidence:
+  - `docs/exec-plans/completed/a13-guest-identity-and-quota.md`
+  - `docs/exec-plans/completed/a13-postgresql-concurrency-and-ce-scope.md`
+  - `docs/exec-plans/completed/runtime-storage-postgresql-test-alignment.md`
 - Completed plans with historical references:
   - `docs/exec-plans/completed/a04-runtime-storage-and-repositories.md`
   - `docs/exec-plans/completed/a13-configurable-quota-dimension.md`
@@ -98,25 +97,34 @@ SQLite-based test infrastructure, or current docs/plans that present SQLite as s
 ## Implementation steps
 
 - [x] Add a shared disposable-PostgreSQL test helper for tracked DB-backed tests.
-- [x] Convert all attached-SQLite DB-backed tests to the PostgreSQL helper pattern.
-- [x] Remove SQLite-specific migration branches from runtime migrations.
-- [x] Update docs and active plans so SQLite is no longer presented as a supported or tolerated path.
-- [x] Re-run targeted DB-backed suites and the canonical validation commands.
+- [ ] Convert all attached-SQLite DB-backed tests to the PostgreSQL helper pattern; later work
+  reintroduced `tests/support/sqlite_harness.py` and SQLite-backed fast tests.
+- [ ] Remove SQLite-specific migration branches from runtime migrations; revision `0009` currently
+  contains SQLite branches.
+- [ ] Update docs and active plans so SQLite is no longer presented as supported; current runtime
+  docs intentionally describe the fast SQLite suite and worker fallback.
+- [ ] Re-run the final PostgreSQL-only validation ladder after the zero-SQLite contract is restored
+  or explicitly narrowed.
 
 ## Validation
 
-- [x] `uv run python -m pytest apps/platform-api/tests/test_migrate.py -q`
-  - `6 passed, 2 skipped`
-- [x] `uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q`
-  - `5 skipped` locally because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was unset
-- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_event_log.py -m "slow and postgresql" -q`
-  - `2 passed, 18 skipped`
+- Historical local migration selection passed six cases and skipped two PostgreSQL cases; the
+  skips are not counted as successful production-dialect validation.
+- Local attempt, not completion evidence: `uv run python -m pytest
+  apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q`
+  collected and skipped 5 tests because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was unset.
+- Local attempt, not completion evidence: `uv run python -m pytest
+  packages/backend/platform-core/tests/unit/test_event_log.py -m "slow and postgresql" -q`
+  reported 2 non-PostgreSQL passes and 18 skipped PostgreSQL tests.
+- [x] PR #54 required CI ran `python scripts/agent/runner.py postgresql-check` against PostgreSQL
+  successfully; this is production-dialect evidence, but it does not close the reintroduced SQLite
+  scope regression above.
 - [x] `python -m compileall ...` across the converted helper and DB-backed test modules
 - [x] `uv run python scripts/agent/runner.py validate-architecture`
 - [x] `uv run python scripts/agent/runner.py validate-docs`
 - [x] `uv run python scripts/agent/runner.py quick-check`
-- [ ] `uv run python scripts/agent/runner.py quick-check` after moving shared DB helpers out of
-  ambiguous `conftest` imports
+- [x] PR #54 required CI ran canonical `python scripts/agent/runner.py quick-check` successfully
+  on Linux and Windows after the shared-helper import cleanup.
 
 ## Decision log
 
@@ -134,3 +142,4 @@ SQLite-based test infrastructure, or current docs/plans that present SQLite as s
 | 2026-07-30 | Added `repo_test_support.postgresql`, migrated the tracked DB-backed test harnesses to disposable PostgreSQL patterns, removed the remaining SQLite migration branch, deleted the obsolete SQLite stress test, and scrubbed current docs/plans so PostgreSQL is the only supported DB path. | Re-run PostgreSQL-marked suites against a live disposable maintenance database URL when available. |
 | 2026-07-30 | Local validation passed on the supported fast path: targeted migration/event-log suites collected cleanly, `validate-architecture` passed, `validate-docs` passed, and `quick-check` passed with `207 passed, 230 deselected`. | None in-repo; only live PostgreSQL execution remains environment-dependent. |
 | 2026-07-30 | A later `quick-check` surfaced a pytest collection bug: several tests imported shared DB helpers via `from conftest import ...`, which resolved to the wrong `conftest.py`. The follow-up cleanup moved those reusable helpers into an explicit test-only module under `tests/` so `conftest.py` returned to pure pytest wiring. | Re-run the affected pytest slice and `quick-check` to confirm collection is stable again. |
+| 2026-08-05 | Gardening found tracked SQLite branches/harnesses again in migration `0009`, scenario conflict handling, worker lease fallbacks, and `tests/support/sqlite_harness.py`; current architecture docs also describe the fast SQLite suite. | Keep the plan active and obtain an explicit contract decision before claiming eradication. |
