@@ -39,9 +39,11 @@ Repo asset:
 
 Reason: Codex must be able to boot, inspect, query, and validate the system.
 
-Current status: partial. PostgreSQL Compose and canonical checks exist. Worktree isolation, safe
-context collection, and structured runtime diagnostics are tracked by ANY-129 and ANY-130.
-`kernel-smoke` is currently a placeholder and is not validation evidence.
+Current status: implemented for the kernel smoke path. Worktree-scoped dev and production Compose
+commands, safe context collection, and structured runtime diagnostics are available. The
+`dev-smoke` and `prod-smoke` commands drive the real `kernel_demo.single_action_smoke_v1` scenario
+over HTTP against the API and worker and run as separate CI jobs. Browser smoke coverage remains
+feature-owned and is not yet evidence for unfinished extension journeys.
 
 ## 4. Repository knowledge is the system of record
 
@@ -133,9 +135,9 @@ Repo asset:
 - `python scripts/agent/runner.py full-check`
 - `scripts/agent/summarize-failures.sh`
 
-Reason: Codex should validate current state, implement, re-run checks, and iterate. A kernel or browser
-smoke command becomes evidence only after its underlying vertical slice exists; placeholders do not
-count.
+Reason: Codex should validate current state, implement, re-run checks, and iterate. The live
+`kernel_demo` Compose smoke is evidence for its one-action vertical slice; browser smoke becomes
+evidence only after its owning extension journey exists.
 
 ## 13. Entropy and garbage collection
 

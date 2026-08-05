@@ -2,3 +2,6 @@ packages:
   - "apps/web-mirror"
   - "extensions/*"
   - "packages/frontend/*"
+allowBuilds:
+  esbuild: true
+  spawn-sync: true

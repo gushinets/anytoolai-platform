@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 
@@ -21,6 +22,10 @@ def test_generated_documents_are_deterministic_and_source_marked() -> None:
     assert first == second
     assert set(first) == set(module.GENERATED_SOURCES)
     for name, content in first.items():
+        if name == "openapi.json":
+            # Raw OpenAPI schema consumed by openapi-typescript codegen: must stay valid JSON,
+            # so it carries no human-readable header.
+            continue
         assert "Generated file. Do not edit by hand." in content
         assert module.GENERATED_SOURCES[name] in content
 
@@ -35,3 +40,13 @@ def test_openapi_includes_handoff_and_runtime_routes() -> None:
     assert "/v1/handoffs/{handoff_token}" in openapi
     assert "/v1/handoffs/{handoff_token}/accept" in openapi
     assert "/v1/handoffs/{handoff_token}/decline" in openapi
+
+
+def test_openapi_json_is_valid_and_matches_the_live_schema() -> None:
+    module = load_module()
+    schema = json.loads(module.render_openapi_json())
+
+    from anytoolai_platform_api.openapi.generate import build_openapi_schema
+
+    assert "/v1/products/{product_id}/runtime-config" in schema["paths"]
+    assert schema == build_openapi_schema()

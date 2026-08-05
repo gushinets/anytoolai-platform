@@ -1,7 +1,7 @@
 # OpenAPI
 
 <!-- Generated file. Do not edit by hand. -->
-Canonical source: anytoolai_platform_api.main.create_app().openapi().
+Canonical source: anytoolai_platform_api.openapi.generate.build_openapi_schema().
 
 API title: AnytoolAI Platform API
 

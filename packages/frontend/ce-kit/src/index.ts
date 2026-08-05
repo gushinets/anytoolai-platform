@@ -1,5 +1,18 @@
-export { createGuestIdentity } from "./identity/guestIdentity";
-export type { GuestIdentity, GuestIdentityOptions } from "./identity/guestIdentity";
+export { PlatformApiClient } from "./api/client";
+export type {
+  PlatformApiClientOptions,
+  PlatformApiMethod,
+  PlatformApiRequestOptions,
+  PlatformApiResult,
+  PlatformApiRetryPolicy,
+} from "./api/client";
+export type { PlatformApiError } from "./api/errors";
+export { createInMemoryAsyncStorage } from "./storage/inMemoryAsyncStorage";
+export type { AsyncStorage } from "./storage/asyncStorage";
+export { createChromeStorageAdapter } from "./storage/chromeStorageAdapter";
+export type { ChromeStorageArea } from "./storage/chromeStorageAdapter";
+
+export type { GuestIdentity, GuestIdentityOptions, GuestIdentityResult } from "./identity/guestIdentity";
 export { getQuota } from "./quota/getQuota";
 export type { QuotaRequest } from "./quota/getQuota";
 export { startScenario } from "./scenarios/startScenario";
@@ -8,9 +21,14 @@ export type {
   ScenarioStartRequest,
 } from "./scenarios/startScenario";
 
-export async function getRuntimeConfig(productId: string): Promise<{ productId: string }> {
-  return { productId };
-}
+export { getRuntimeConfig } from "./runtime";
+export type {
+  RuntimeConfig,
+  RuntimeFrontend,
+  RuntimeQuotaSummary,
+  RuntimeRendererHint,
+  RuntimeScenario,
+} from "./runtime";
 
 export async function pollJob(jobId: string): Promise<{ jobId: string; status: string }> {
   return { jobId, status: "succeeded" };
