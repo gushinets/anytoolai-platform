@@ -142,7 +142,7 @@ class FailingProviderAdapter:
 
 
 class BarrierJobLease:
-    """Test-only lease wrapper that synchronizes workers before the real lease."""
+    """Test-only lease wrapper that makes real advisory-lock contention deterministic."""
 
     def __init__(
         self,
@@ -150,20 +150,31 @@ class BarrierJobLease:
         *,
         job_id: str,
         barrier: threading.Barrier,
+        loser_attempted: threading.Event,
         attempts: list[LeaseAttempt],
         lock: threading.Lock,
     ) -> None:
         self._delegate = delegate
         self._job_id = job_id
         self._barrier = barrier
+        self._loser_attempted = loser_attempted
         self._attempts = attempts
         self._lock = lock
 
     def acquire(self, job_id: str) -> bool:
-        if job_id == self._job_id:
+        if job_id != self._job_id:
+            return self._delegate.acquire(job_id)
+
+        acquired = False
+        try:
             self._barrier.wait()
-        acquired = self._delegate.acquire(job_id)
-        if job_id == self._job_id:
+            acquired = self._delegate.acquire(job_id)
+            if acquired:
+                assert self._loser_attempted.wait(timeout=10), (
+                    "losing worker did not complete the real advisory-lock acquisition"
+                )
+            else:
+                self._loser_attempted.set()
             with self._lock:
                 self._attempts.append(
                     LeaseAttempt(
@@ -172,7 +183,10 @@ class BarrierJobLease:
                         acquired=acquired,
                     )
                 )
-        return acquired
+            return acquired
+        finally:
+            if not acquired:
+                self._loser_attempted.set()
 
     def release(self, job_id: str) -> None:
         self._delegate.release(job_id)
@@ -258,10 +272,12 @@ def _install_contention_spies(
     list[ClaimAttempt],
     list[RunnerInvocation],
     threading.Barrier,
+    threading.Event,
     threading.Lock,
 ]:
     lock = threading.Lock()
     lease_barrier = threading.Barrier(2, timeout=20)
+    loser_attempted = threading.Event()
     poll_attempts: list[PollAttempt] = []
     lease_attempts: list[LeaseAttempt] = []
     claim_attempts: list[ClaimAttempt] = []
@@ -326,7 +342,15 @@ def _install_contention_spies(
         "run_claimed_job",
         run_claimed_job_with_recording,
     )
-    return poll_attempts, lease_attempts, claim_attempts, runner_invocations, lease_barrier, lock
+    return (
+        poll_attempts,
+        lease_attempts,
+        claim_attempts,
+        runner_invocations,
+        lease_barrier,
+        loser_attempted,
+        lock,
+    )
 
 
 def _wrap_worker_lease(
@@ -334,6 +358,7 @@ def _wrap_worker_lease(
     *,
     job_id: str,
     barrier: threading.Barrier,
+    loser_attempted: threading.Event,
     attempts: list[LeaseAttempt],
     lock: threading.Lock,
 ) -> None:
@@ -343,6 +368,7 @@ def _wrap_worker_lease(
         delegate,
         job_id=job_id,
         barrier=barrier,
+        loser_attempted=loser_attempted,
         attempts=attempts,
         lock=lock,
     )
@@ -553,6 +579,7 @@ def test_two_postgresql_workers_claim_one_job_success_once(
             claim_attempts,
             runner_invocations,
             lease_barrier,
+            loser_attempted,
             spy_lock,
         ) = _install_contention_spies(
             monkeypatch,
@@ -567,6 +594,7 @@ def test_two_postgresql_workers_claim_one_job_success_once(
             worker_a,
             job_id=job.id,
             barrier=lease_barrier,
+            loser_attempted=loser_attempted,
             attempts=lease_attempts,
             lock=spy_lock,
         )
@@ -574,6 +602,7 @@ def test_two_postgresql_workers_claim_one_job_success_once(
             worker_b,
             job_id=job.id,
             barrier=lease_barrier,
+            loser_attempted=loser_attempted,
             attempts=lease_attempts,
             lock=spy_lock,
         )
@@ -671,6 +700,7 @@ def test_two_postgresql_workers_claim_one_job_failure_once(
             claim_attempts,
             runner_invocations,
             lease_barrier,
+            loser_attempted,
             spy_lock,
         ) = _install_contention_spies(
             monkeypatch,
@@ -685,6 +715,7 @@ def test_two_postgresql_workers_claim_one_job_failure_once(
             worker_a,
             job_id=job.id,
             barrier=lease_barrier,
+            loser_attempted=loser_attempted,
             attempts=lease_attempts,
             lock=spy_lock,
         )
@@ -692,6 +723,7 @@ def test_two_postgresql_workers_claim_one_job_failure_once(
             worker_b,
             job_id=job.id,
             barrier=lease_barrier,
+            loser_attempted=loser_attempted,
             attempts=lease_attempts,
             lock=spy_lock,
         )

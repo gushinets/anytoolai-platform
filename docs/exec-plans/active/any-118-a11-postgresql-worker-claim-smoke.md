@@ -5,12 +5,12 @@
 - State: active
 - Owner: Codex
 - Created: 2026-08-03
-- Last updated: 2026-08-03
-- Review date: 2026-08-03
-- Next action: push the lease-first follow-up commit to the PR branch.
-- Blocker: none. The focused smoke, repeated smoke loop, worker PostgreSQL suite,
-  `postgresql-check`, and repository quick-check have passed against the configured local
-  PostgreSQL maintenance URL.
+- Last updated: 2026-08-05
+- Review date: 2026-08-05
+- Next action: run the required PostgreSQL validations where
+  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` is configured.
+- Blocker: the current workspace does not expose `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`; the
+  canonical PostgreSQL gate correctly refuses to run without it.
 
 ## Goal
 
@@ -71,6 +71,9 @@ and executes it. Cover both successful terminalization and safe failure terminal
 - [x] Update assertions so exactly one lease acquisition and exactly one downstream claim/execution
   are required.
 - [x] Update architecture/runtime docs for lease-first coordination.
+- [x] Add test-only post-acquisition coordination so the lease winner cannot release before the
+  losing real advisory-lock acquisition has returned `False`.
+- [ ] Run the requested 10x focused PostgreSQL smoke and `postgresql-check`.
 
 ## Validation
 
@@ -123,6 +126,7 @@ and executes it. Cover both successful terminalization and safe failure terminal
 | 2026-08-03 | Use separate SQLAlchemy engines and session factories per worker. | Independent PostgreSQL connections are the production concurrency contract. |
 | 2026-08-03 | Keep CI wiring marker-driven. | `postgresql-check` already selects all `postgresql` tests under worker roots and quick-check excludes `slow`. |
 | 2026-08-03 | Synchronize current contention before `JobLease.acquire(...)`, not inside `JobRepository.claim_created(...)`. | The rebased production handler is lease-first; only the advisory lease winner reaches the repository claim, so a two-party post-lease barrier can wait forever. |
+| 2026-08-05 | Add a one-way event after the real losing advisory-lock attempt. | It makes the real contention observable before the winner can execute and release its lease, without changing production behavior. |
 
 ## Progress log
 
@@ -134,6 +138,9 @@ and executes it. Cover both successful terminalization and safe failure terminal
 | 2026-08-03 | Added a unique `--basetemp` to `postgresql-check` after a Windows pytest temp-root collision. | Retry `postgresql-check` with the configured PostgreSQL maintenance URL. |
 | 2026-08-03 | Addressed still-valid inline review comments and skipped the invalid public-loser-returns-None request because current handler reloads the job after a lost claim. | Push the follow-up commit to the PR branch. |
 | 2026-08-03 | Reproduced `BrokenBarrierError` after rebasing onto the lease-first implementation, then moved the smoke barrier to a test-only `JobLease` wrapper before real advisory acquisition. | Push the lease-first follow-up commit to the PR branch. |
+| 2026-08-05 | Began hardening the test wrapper against post-barrier scheduling nondeterminism. | Update both smoke cases through their shared wrapper, then run requested PostgreSQL checks. |
+| 2026-08-05 | Added the shared loser-attempt event and verified collection. | Run live PostgreSQL validation with the required maintenance URL. |
+| 2026-08-05 | `postgresql-check` stopped at `PGTEST001` because the maintenance URL is unset. | Hand off the exact focused loop and canonical gate to an environment with that URL. |
 
 ## Open questions
 
