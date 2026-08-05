@@ -226,6 +226,68 @@ describe("PlatformApiClient.createGuestIdentity", () => {
 
     const result = await client.createGuestIdentity({ storage });
 
-    expect(result).toEqual({ ok: false, error: { type: "network_error", message: "Failed to fetch" } });
+    expect(result).toEqual({
+      ok: false,
+      error: { type: "network_error", message: "Network request failed." },
+    });
+  });
+
+  it("does not clobber a concurrently cached guest id when this call's own storage read failed", async () => {
+    // Caller A's read succeeds and returns the already-cached id without touching the shared
+    // backend request. Caller B's read on the *same key* fails and is treated as a miss, so it
+    // falls through to the shared backend request and gets back a fresh id. B must not persist
+    // that fresh id over the key A already read and returned -- doing so would orphan the id A is
+    // already using.
+    const store = new Map<string, string>([["anytoolai.guest_id", "guest_original"]]);
+    let getCallCount = 0;
+    const storage: AsyncStorage = {
+      get: vi.fn(async (key) => {
+        getCallCount += 1;
+        if (getCallCount === 1) {
+          return store.get(key);
+        }
+        throw new Error("storage read failed");
+      }),
+      set: vi.fn(async (key, value) => {
+        store.set(key, value);
+      }),
+      remove: vi.fn(async (key) => {
+        store.delete(key);
+      }),
+    };
+    const fetchImpl = vi.fn(async () => jsonResponse(200, { guest_id: "guest_new" }));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const [resultA, resultB] = await Promise.all([
+      client.createGuestIdentity({ storage }),
+      client.createGuestIdentity({ storage }),
+    ]);
+
+    expect(resultA).toEqual({ ok: true, value: { guestId: "guest_original" } });
+    expect(resultB).toEqual({ ok: true, value: { guestId: "guest_new" } });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(store.get("anytoolai.guest_id")).toBe("guest_original");
+  });
+
+  it("treats a rejected storage read as a cache miss and still returns a valid GuestIdentityResult, without throwing", async () => {
+    const storage: AsyncStorage = {
+      get: vi.fn(async () => {
+        throw new Error("chrome.storage.local: QUOTA_BYTES exceeded");
+      }),
+      set: vi.fn(async () => {}),
+      remove: vi.fn(async () => {}),
+    };
+    const fetchImpl = vi.fn(async () => jsonResponse(200, { guest_id: "guest_after_read_failure" }));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const result = await client.createGuestIdentity({ storage });
+
+    expect(result).toEqual({ ok: true, value: { guestId: "guest_after_read_failure" } });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    // Persistence is intentionally skipped when this call's own read failed -- a concurrent caller
+    // on the same key may have read a genuinely cached id successfully and already returned it, and
+    // this call has no reliable way to tell that apart from a real cache miss. See "does not
+    // clobber a concurrently cached guest id..." above for the race this avoids.
+    expect(storage.set).not.toHaveBeenCalled();
   });
 });

@@ -96,6 +96,10 @@ retried; `backend_error`, `invalid_response`, and `aborted` never are.
 await client.request({ path: "/v1/x", retry: { attempts: 3, delayMs: 200 } }); // GET only
 ```
 
+The wait between retry attempts observes the caller's `signal`: if it aborts during that delay,
+the request settles promptly with `aborted` and no further attempt is made -- cancellation is not
+delayed until the next `fetchImpl` call would otherwise have started.
+
 ## Errors
 
 Every failure from `PlatformApiClient.request()` is one of five variants, safe to log or display
@@ -108,6 +112,11 @@ as-is (no raw response bodies or headers ever leak through):
 | `network_error` | `fetch` itself rejected (offline, DNS, CORS, ...) | `message` |
 | `timeout` | The client's own timeout elapsed | -- |
 | `aborted` | The caller's own `signal` was aborted | -- |
+
+`network_error.message` is always the fixed string `"Network request failed."` -- the raw caught
+exception (which can contain URLs, internal hostnames, or other environment detail) is never
+copied into it. There is currently no private diagnostics/telemetry sink in CE-kit to preserve
+that raw detail elsewhere; it is simply dropped.
 
 ```ts
 if (!result.ok) {
@@ -170,6 +179,19 @@ Like `getRuntimeConfig()` below, this returns a result object (`{ ok: true, valu
 cancellation, and malformed-response failures through the same stable `PlatformApiError` union
 everywhere else in CE-kit.
 
+A rejected `storage.get()` (e.g. a Chrome storage read failure) is treated as a cache miss, not
+surfaced as a thrown exception -- `createGuestIdentity()` falls through to requesting a new guest
+id from the backend exactly as it would if nothing were cached. As with the persist-side
+`storage.set()` failure already documented above, guest creation still returns its documented
+`GuestIdentityResult`.
+
+If the read fails, the fresh id from that fallback request is *not* persisted back to
+`storage`/`storageKey`, unlike the ordinary cache-miss path. A failed read is indistinguishable
+from "another concurrent call already has the real cached value and is about to return it without
+persisting anything new" -- persisting anyway risks overwriting that already-in-use cached id with
+a different one from the same backend response. The returned identity is still valid and usable by
+the caller; only the write-back is skipped.
+
 ## Runtime config
 
 `getRuntimeConfig(client, productId)` is the first real safe `GET` on the client. Unlike guest
@@ -202,15 +224,25 @@ the frontend's view of the contract can't silently drift from the backend or fro
 `PlatformApiClient` and the hand-written response parsers (`parseGuestIdentityPayload()`,
 `parseRuntimeConfig()`) don't consume the generated types directly at runtime -- the backend's
 snake_case wire format still needs runtime validation and mapping to CE-kit's camelCase DTOs, which
-`openapi-typescript`'s static types alone can't provide. Instead, `src/api/driftAssertions.ts`'s
-`AssertExactSchemaKeys<T, Keys>` ties each parser to the generated schema at the type level: every
-parser file lists the exact snake_case keys it reads (e.g. `guestIdentity.ts`'s
-`_guestIdentityResponseKeys`, `parseRuntimeConfig.ts`'s per-schema key lists) and asserts that list
-against `keyof components["schemas"][...]`. If the backend schema grows a field the parser doesn't
-know about, regenerating `platformApi.ts` makes that assertion fail typecheck instead of silently
-leaving the parser stale. Beyond these drift assertions, nothing in this package consumes the
-generated types directly yet -- `PlatformApiClient` and the hand-written response shapes stay as
-they are; this is the codegen + drift-check plumbing for future callers to build on.
+`openapi-typescript`'s static types alone can't provide. Instead, `src/api/driftAssertions.ts` ties
+each parser to the generated schema at the type level, with two assertions:
+
+- `AssertExactSchemaKeys<T, Keys>` -- every parser file lists the exact snake_case keys it reads
+  (e.g. `guestIdentity.ts`'s `_guestIdentityResponseKeys`, `parseRuntimeConfig.ts`'s per-schema key
+  lists) and asserts that list against `keyof components["schemas"][...]`. Catches added/removed
+  fields, but not a same-key type or nullability change.
+- `AssertExactSchemaShape<T, Shape>` -- a hand-maintained `Shape` object type mirroring each
+  backend schema field-for-field (e.g. `guestIdentity.ts`'s `{ guest_id: string }`,
+  `parseRuntimeConfig.ts`'s per-schema shapes) is compared against `components["schemas"][...]` by
+  key set *and* by type, including optionality/nullability. A backend change such as
+  `limit_count: number -> string`, or a field losing its `| null`, fails this assertion even though
+  the key set is unchanged.
+
+If the backend schema drifts in either way, regenerating `platformApi.ts` makes the relevant
+assertion fail typecheck instead of silently leaving the parser's runtime type guards stale. Beyond
+these drift assertions, nothing in this package consumes the generated types directly yet --
+`PlatformApiClient` and the hand-written response shapes stay as they are; this is the codegen +
+drift-check plumbing for future callers to build on.
 
 The pipeline:
 

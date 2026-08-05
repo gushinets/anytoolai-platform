@@ -86,6 +86,94 @@ describe("parseRuntimeConfig", () => {
     expect(parseRuntimeConfig(payload)).toBeNull();
   });
 
+  it("accepts a scenario whose allowed_next_actions is absent, defaulting to an empty array", () => {
+    // allowed_next_actions is optional on the wire (RuntimeScenarioResponse) -- a scenario
+    // omitting it entirely (not just sending []) is a valid payload per the backend schema and
+    // must not be treated as malformed.
+    const payload = {
+      ...VALID_PAYLOAD,
+      scenario_ids: ["s1"],
+      scenarios: [
+        {
+          scenario_id: "s1",
+          version: 1,
+          input_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+          output_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+        },
+      ],
+    };
+    expect(parseRuntimeConfig(payload)).toEqual({
+      productId: "kernel_demo",
+      frontendIds: [],
+      frontends: [],
+      scenarioIds: ["s1"],
+      scenarios: [
+        {
+          scenarioId: "s1",
+          version: 1,
+          allowedNextActions: [],
+          inputRendererHint: { renderer: "json_schema", schemaRef: "x", schemaVersion: null },
+          outputRendererHint: { renderer: "json_schema", schemaRef: "x", schemaVersion: null },
+        },
+      ],
+      quotaSummary: null,
+      allowedUiCapabilities: [],
+    });
+  });
+
+  it("accepts a scenario whose allowed_next_actions is explicitly null, defaulting to an empty array", () => {
+    // `allowed_next_actions` is optional (not `| null`) on the generated backend schema, but an
+    // explicit `null` on the wire must be treated the same as an absent key, not as malformed --
+    // both mean "no next actions".
+    const payload = {
+      ...VALID_PAYLOAD,
+      scenario_ids: ["s1"],
+      scenarios: [
+        {
+          scenario_id: "s1",
+          version: 1,
+          allowed_next_actions: null,
+          input_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+          output_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+        },
+      ],
+    };
+    expect(parseRuntimeConfig(payload)).toEqual({
+      productId: "kernel_demo",
+      frontendIds: [],
+      frontends: [],
+      scenarioIds: ["s1"],
+      scenarios: [
+        {
+          scenarioId: "s1",
+          version: 1,
+          allowedNextActions: [],
+          inputRendererHint: { renderer: "json_schema", schemaRef: "x", schemaVersion: null },
+          outputRendererHint: { renderer: "json_schema", schemaRef: "x", schemaVersion: null },
+        },
+      ],
+      quotaSummary: null,
+      allowedUiCapabilities: [],
+    });
+  });
+
+  it("returns null when allowed_next_actions is present but not an array of strings", () => {
+    const payload = {
+      ...VALID_PAYLOAD,
+      scenario_ids: ["s1"],
+      scenarios: [
+        {
+          scenario_id: "s1",
+          version: 1,
+          allowed_next_actions: "not-an-array",
+          input_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+          output_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+        },
+      ],
+    };
+    expect(parseRuntimeConfig(payload)).toBeNull();
+  });
+
   it("accepts a valid minimal payload with a null quota summary", () => {
     expect(parseRuntimeConfig(VALID_PAYLOAD)).toEqual({
       productId: "kernel_demo",

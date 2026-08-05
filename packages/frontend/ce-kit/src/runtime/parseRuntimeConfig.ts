@@ -1,4 +1,4 @@
-import type { AssertExactSchemaKeys } from "../api/driftAssertions";
+import type { AssertExactSchemaShape } from "../api/driftAssertions";
 import type { components } from "../api/generated/platformApi";
 import type {
   RuntimeConfig,
@@ -144,10 +144,13 @@ function _parseScenario(value: unknown): RuntimeScenario | null {
     input_renderer_hint: inputRendererHint,
     output_renderer_hint: outputRendererHint,
   } = value;
+  // `allowed_next_actions` is optional on the wire (RuntimeScenarioResponse) -- both an absent key
+  // and an explicit `null` mean "no next actions", not "malformed payload".
+  const allowedNextActionsMissing = allowedNextActions === undefined || allowedNextActions === null;
   if (
     typeof scenarioId !== "string" ||
     typeof version !== "number" ||
-    !_isStringArray(allowedNextActions)
+    (!allowedNextActionsMissing && !_isStringArray(allowedNextActions))
   ) {
     return null;
   }
@@ -161,7 +164,7 @@ function _parseScenario(value: unknown): RuntimeScenario | null {
   return {
     scenarioId,
     version,
-    allowedNextActions,
+    allowedNextActions: allowedNextActionsMissing ? [] : allowedNextActions,
     inputRendererHint: parsedInputHint,
     outputRendererHint: parsedOutputHint,
   };
@@ -190,58 +193,53 @@ function _parseQuotaSummary(value: unknown): RuntimeQuotaSummary | null {
   return { quotaPolicyId, unit, limitCount, period, dimension };
 }
 
-// Compile-time drift check: fails typecheck if any of these backend response schemas grows a
-// field the parsers above don't know about.
-const _runtimeConfigKeys = [
-  "product_id",
-  "frontend_ids",
-  "frontends",
-  "scenario_ids",
-  "scenarios",
-  "quota_summary",
-  "allowed_ui_capabilities",
-] as const;
-type _RuntimeConfigKeysCheck = AssertExactSchemaKeys<
+// Compile-time drift check: fails typecheck if any of these backend response schemas grows,
+// loses, retypes, or changes the nullability of a field the parsers above don't know about.
+type _RuntimeConfigShapeCheck = AssertExactSchemaShape<
   components["schemas"]["RuntimeConfigResponse"],
-  typeof _runtimeConfigKeys
+  {
+    product_id: string;
+    frontend_ids: string[];
+    frontends: components["schemas"]["RuntimeFrontendResponse"][];
+    scenario_ids: string[];
+    scenarios: components["schemas"]["RuntimeScenarioResponse"][];
+    quota_summary: components["schemas"]["RuntimeQuotaSummaryResponse"] | null;
+    allowed_ui_capabilities: string[];
+  }
 >;
-const _assertRuntimeConfigKeysMatchGenerated: _RuntimeConfigKeysCheck = true;
-void _assertRuntimeConfigKeysMatchGenerated;
+const _assertRuntimeConfigShapeMatchesGenerated: _RuntimeConfigShapeCheck = true;
+void _assertRuntimeConfigShapeMatchesGenerated;
 
-const _runtimeFrontendKeys = ["frontend_id", "type", "enabled"] as const;
-type _RuntimeFrontendKeysCheck = AssertExactSchemaKeys<
+type _RuntimeFrontendShapeCheck = AssertExactSchemaShape<
   components["schemas"]["RuntimeFrontendResponse"],
-  typeof _runtimeFrontendKeys
+  { frontend_id: string; type: string; enabled: boolean }
 >;
-const _assertRuntimeFrontendKeysMatchGenerated: _RuntimeFrontendKeysCheck = true;
-void _assertRuntimeFrontendKeysMatchGenerated;
+const _assertRuntimeFrontendShapeMatchesGenerated: _RuntimeFrontendShapeCheck = true;
+void _assertRuntimeFrontendShapeMatchesGenerated;
 
-const _runtimeScenarioKeys = [
-  "scenario_id",
-  "version",
-  "allowed_next_actions",
-  "input_renderer_hint",
-  "output_renderer_hint",
-] as const;
-type _RuntimeScenarioKeysCheck = AssertExactSchemaKeys<
+type _RuntimeScenarioShapeCheck = AssertExactSchemaShape<
   components["schemas"]["RuntimeScenarioResponse"],
-  typeof _runtimeScenarioKeys
+  {
+    scenario_id: string;
+    version: number;
+    allowed_next_actions?: string[];
+    input_renderer_hint: components["schemas"]["RuntimeRendererHintResponse"];
+    output_renderer_hint: components["schemas"]["RuntimeRendererHintResponse"];
+  }
 >;
-const _assertRuntimeScenarioKeysMatchGenerated: _RuntimeScenarioKeysCheck = true;
-void _assertRuntimeScenarioKeysMatchGenerated;
+const _assertRuntimeScenarioShapeMatchesGenerated: _RuntimeScenarioShapeCheck = true;
+void _assertRuntimeScenarioShapeMatchesGenerated;
 
-const _runtimeRendererHintKeys = ["renderer", "schema_ref", "schema_version"] as const;
-type _RuntimeRendererHintKeysCheck = AssertExactSchemaKeys<
+type _RuntimeRendererHintShapeCheck = AssertExactSchemaShape<
   components["schemas"]["RuntimeRendererHintResponse"],
-  typeof _runtimeRendererHintKeys
+  { renderer: "json_schema"; schema_ref: string; schema_version?: number | null }
 >;
-const _assertRuntimeRendererHintKeysMatchGenerated: _RuntimeRendererHintKeysCheck = true;
-void _assertRuntimeRendererHintKeysMatchGenerated;
+const _assertRuntimeRendererHintShapeMatchesGenerated: _RuntimeRendererHintShapeCheck = true;
+void _assertRuntimeRendererHintShapeMatchesGenerated;
 
-const _runtimeQuotaSummaryKeys = ["quota_policy_id", "unit", "limit_count", "period", "dimension"] as const;
-type _RuntimeQuotaSummaryKeysCheck = AssertExactSchemaKeys<
+type _RuntimeQuotaSummaryShapeCheck = AssertExactSchemaShape<
   components["schemas"]["RuntimeQuotaSummaryResponse"],
-  typeof _runtimeQuotaSummaryKeys
+  { quota_policy_id: string; unit: string; limit_count: number; period: string; dimension: string }
 >;
-const _assertRuntimeQuotaSummaryKeysMatchGenerated: _RuntimeQuotaSummaryKeysCheck = true;
-void _assertRuntimeQuotaSummaryKeysMatchGenerated;
+const _assertRuntimeQuotaSummaryShapeMatchesGenerated: _RuntimeQuotaSummaryShapeCheck = true;
+void _assertRuntimeQuotaSummaryShapeMatchesGenerated;

@@ -45,7 +45,13 @@ export class PlatformApiClient {
     let result: PlatformApiResult<T> = await this.performOnce<T>(method, options);
     for (let attempt = 2; attempt <= attempts && !result.ok && isRetryable(result.error); attempt += 1) {
       if (options.retry?.delayMs) {
-        await delay(options.retry.delayMs);
+        await delay(options.retry.delayMs, options.signal);
+      }
+      // Checked unconditionally, not just after a delay -- with `delayMs` unset or `0` the loop
+      // would otherwise call `performOnce()` (and thus `fetchImpl`) again immediately after the
+      // caller already cancelled, even though no wait ever happened to observe the signal.
+      if (options.signal?.aborted) {
+        return { ok: false, error: abortedError() };
       }
       result = await this.performOnce<T>(method, options);
     }
@@ -95,9 +101,13 @@ export class PlatformApiClient {
       if (controller.signal.aborted) {
         return { ok: false, error: abortReason === "timeout" ? timeoutError() : abortedError() };
       }
+      // `cause` may hold sensitive detail (URLs, headers, internal exception text) -- never surface
+      // it in the public result. Raw detail is dropped here; wire up a private diagnostics sink if
+      // that ever needs to be observable.
+      void cause;
       return {
         ok: false,
-        error: networkError(cause instanceof Error ? cause.message : undefined),
+        error: networkError(),
       };
     } finally {
       clearTimeout(timeoutHandle);
@@ -119,13 +129,27 @@ export class PlatformApiClient {
     this.activeGuestIdentityCalls += 1;
     try {
       const storageKey = options.storageKey ?? DEFAULT_GUEST_STORAGE_KEY;
-      const storedGuestId = await options.storage.get(storageKey);
+      let storedGuestId: string | undefined;
+      let storageReadFailed = false;
+      try {
+        storedGuestId = await options.storage.get(storageKey);
+      } catch {
+        // A failed cache read is treated as a cache miss -- it must not surface as an arbitrary
+        // exception from createGuestIdentity(), and the backend fallback below still produces a
+        // valid GuestIdentityResult.
+        storageReadFailed = true;
+      }
       if (storedGuestId) {
         return { ok: true, value: { guestId: storedGuestId } };
       }
 
       const result = await this.shareGuestIdentityRequest();
-      if (result.ok) {
+      // Skip persisting when this caller's own read failed: a concurrent caller under the same
+      // `storageKey` may have read a genuinely cached id successfully (and already returned it
+      // above, without joining this shared request) while this call's read merely errored --
+      // blindly writing here would clobber that still-valid cached id with a second, different
+      // guest id from the same backend response, orphaning the one the other caller already used.
+      if (result.ok && !storageReadFailed) {
         try {
           await options.storage.set(storageKey, result.value.guestId);
         } catch {
