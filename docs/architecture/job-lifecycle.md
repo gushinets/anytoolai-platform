@@ -20,24 +20,44 @@ On success it sets `status=running` and `started_at`. `WorkflowJobService.claim_
 `workflow.started` in that same caller-owned transaction, so either both the running state and its
 start event commit or neither does. The transaction commits before action execution starts. A
 repeated claim returns no claim for running or terminal jobs, so it cannot create a duplicate
-execution. This is the MVP coordination mechanism; it is not a lease, distributed lock, or queue
-engine.
+execution. This conditional update remains the lifecycle idempotency guard even when another
+coordination mechanism observes the same row first.
+
+PostgreSQL is the production concurrency contract for this lifecycle. Independent worker processes
+are not preassigned jobs; they may all observe the same `created` row, but they first contend for the
+PostgreSQL advisory job lease. Only the lease winner proceeds to the conditional `created ->
+running` repository transition and may execute the workflow. Workers that do not acquire the lease
+return before attempting the repository claim and must not invoke the workflow runner.
+
+The advisory lease and the conditional claim are complementary protections. The lease is held only
+while one worker is actively processing a job; it is not permanent ownership or queue assignment.
+The guarded repository update is still necessary because lease acquisition does not prove the row is
+still `created`: cancellation, a terminal transition, or a stale/repeated processing attempt may
+already have changed the lifecycle state.
 
 ## Worker flow
 
 The worker application polls PostgreSQL for the oldest `created` job id. Polling is discovery only;
-the conditional claim remains the coordination boundary, so multiple observations cannot create
-duplicate execution. For each discovered id, the worker handler:
+the lease and conditional claim remain the coordination boundaries, so multiple observations cannot
+create duplicate execution. For each discovered id, the worker handler:
 
-1. Atomically claims the job and persists `workflow.started`, then commits that unit of work.
-2. Loads the linked scenario session using the job's tenant, region, product, frontend, and
+1. Attempts to acquire the PostgreSQL advisory job lease; lease loss is a normal no-work result.
+2. If the lease is acquired, attempts the conditional claim. If no claim is returned, the claim
+   path releases the lease, skips scenario loading and runner execution, and returns the current
+   durable job snapshot. If the claim succeeds, it persists `workflow.started` in the same
+   transaction and commits that unit of work.
+3. Loads the linked scenario session using the job's tenant, region, product, frontend, and
    `scenario_session_id` dimensions.
-3. Reads the workflow input from `scenario_session.metadata["input"]`.
-4. Builds an execution context containing the session and job identifiers.
-5. Runs the existing sequential workflow runner against the claimed job.
-6. Returns the durable final job snapshot.
+4. Reads the workflow input from `scenario_session.metadata["input"]`.
+5. Builds an execution context containing the session and job identifiers.
+6. Runs the existing sequential workflow runner against the claimed job.
+7. Releases the advisory lease and returns the durable final job snapshot.
 
 The runner's claimed-job entrypoint never creates another job row.
+
+Worker instances do not run Alembic migrations as part of polling, claim, or execution. Deployment
+and test database setup apply the migration graph before workers start, then workers use the
+migrated `platform` schema.
 
 ## A12 scenario runtime start flow
 
