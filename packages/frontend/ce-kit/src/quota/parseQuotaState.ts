@@ -1,8 +1,5 @@
+import { isRecord } from "../api/parsing";
 import type { QuotaState } from "./types";
-
-function _isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
 /**
  * Validates and maps the backend's `QuotaStateResponse` payload (snake_case) into the client's
@@ -10,7 +7,7 @@ function _isRecord(value: unknown): value is Record<string, unknown> {
  * back to `invalid_response` instead of trusting arbitrary payload content.
  */
 export function parseQuotaState(payload: unknown): QuotaState | null {
-  if (!_isRecord(payload)) {
+  if (!isRecord(payload)) {
     return null;
   }
 

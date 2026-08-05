@@ -22,6 +22,12 @@ def _require_stored_job(stored: JobRecord | None, record_id: str, operation: str
     return stored
 
 
+_CREATED_TRANSITION_OPERATION_NAMES = {
+    JobStatus.running: "claim",
+    JobStatus.canceled: "cancel",
+}
+
+
 class JobRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -77,7 +83,6 @@ class JobRepository:
             status=JobStatus.running,
             timestamp_field="started_at",
             metadata=metadata,
-            operation="claim",
         )
 
     def cancel_created(
@@ -93,7 +98,6 @@ class JobRepository:
             status=JobStatus.canceled,
             timestamp_field="completed_at",
             metadata=metadata,
-            operation="cancel",
         )
 
     def _conditional_transition_from_created(
@@ -103,8 +107,10 @@ class JobRepository:
         status: JobStatus,
         timestamp_field: str,
         metadata: Mapping[str, Any] | None,
-        operation: str,
     ) -> JobRecord | None:
+        # Only used for the round-trip-failure error message below; derived from `status`
+        # rather than taken as a caller-supplied parameter so it can never disagree with it.
+        operation = _CREATED_TRANSITION_OPERATION_NAMES[status]
         values: dict[str, Any] = {
             "status": status,
             timestamp_field: utc_now(),

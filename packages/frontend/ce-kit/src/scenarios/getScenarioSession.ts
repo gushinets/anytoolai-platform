@@ -1,12 +1,9 @@
 import { requestAndParse } from "../api/client";
-import type { PlatformApiClient, PlatformApiResult } from "../api/client";
+import type { PlatformApiClient, PlatformApiRequestOptions, PlatformApiResult } from "../api/client";
 import { parseScenarioSession } from "./parseScenarioSessionSnapshot";
 import type { ScenarioSession } from "./types";
 
-export type GetScenarioSessionOptions = {
-  signal?: AbortSignal;
-  timeoutMs?: number;
-};
+export type GetScenarioSessionOptions = Pick<PlatformApiRequestOptions, "signal" | "timeoutMs">;
 
 export async function getScenarioSession(
   client: PlatformApiClient,

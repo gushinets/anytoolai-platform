@@ -1,12 +1,5 @@
+import { isRecord, isStringArray } from "../api/parsing";
 import type { ScenarioSession, ScenarioSessionSnapshot } from "./types";
-
-function _isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function _isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
 
 /**
  * Validates and maps the backend's `ScenarioStartResponse` / `ScenarioSessionResponse` payload
@@ -17,7 +10,7 @@ function _isStringArray(value: unknown): value is string[] {
  * payload content.
  */
 export function parseScenarioSessionSnapshot(payload: unknown): ScenarioSessionSnapshot | null {
-  if (!_isRecord(payload)) {
+  if (!isRecord(payload)) {
     return null;
   }
 
@@ -32,7 +25,7 @@ export function parseScenarioSessionSnapshot(payload: unknown): ScenarioSessionS
   if (
     typeof scenarioSessionId !== "string" ||
     typeof status !== "string" ||
-    !_isStringArray(allowedNextActions)
+    !isStringArray(allowedNextActions)
   ) {
     return null;
   }
@@ -59,7 +52,9 @@ export function parseScenarioSessionSnapshot(payload: unknown): ScenarioSessionS
  */
 export function parseScenarioSession(payload: unknown): ScenarioSession | null {
   const snapshot = parseScenarioSessionSnapshot(payload);
-  if (!snapshot || !_isRecord(payload)) {
+  // `snapshot` is only non-null once `parseScenarioSessionSnapshot` has already confirmed
+  // `isRecord(payload)`, so this narrows `payload`'s type without re-checking it.
+  if (!snapshot || !isRecord(payload)) {
     return null;
   }
 

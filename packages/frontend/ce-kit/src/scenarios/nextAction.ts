@@ -1,5 +1,5 @@
 import { requestAndParse } from "../api/client";
-import type { PlatformApiClient, PlatformApiResult } from "../api/client";
+import type { PlatformApiClient, PlatformApiRequestOptions, PlatformApiResult } from "../api/client";
 import { parseScenarioSession } from "./parseScenarioSessionSnapshot";
 import type { ScenarioSession } from "./types";
 
@@ -10,10 +10,7 @@ export type NextActionRequest = {
   checkpointId: string;
 };
 
-export type NextActionOptions = {
-  signal?: AbortSignal;
-  timeoutMs?: number;
-};
+export type NextActionOptions = Pick<PlatformApiRequestOptions, "signal" | "timeoutMs">;
 
 /**
  * Sends the current checkpoint for a next-action click and treats the backend's validation as

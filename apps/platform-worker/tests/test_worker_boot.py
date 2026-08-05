@@ -45,7 +45,10 @@ from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_core.workflows.runner import WorkflowJobService
 from anytoolai_platform_worker.composition import build_worker
-from anytoolai_platform_worker.handlers.run_workflow import RunWorkflowHandler
+from anytoolai_platform_worker.handlers.run_workflow import (
+    JobScenarioSessionInvalidError,
+    RunWorkflowHandler,
+)
 from anytoolai_platform_worker.queues import DatabaseJobQueue, WorkflowJobMessage
 from anytoolai_platform_worker.reconciliation import OrphanedRunningJobReconciler
 from anytoolai_platform_worker.worker import Worker
@@ -1141,6 +1144,59 @@ def test_worker_terminalizes_poison_created_job_and_advances_queue(
 
     assert [event_row["event_type"] for event_row in poison_events] == ["workflow.failed"]
     assert poison_events[0]["error_code"] == "job_scenario_session_invalid"
+
+
+def test_handle_terminalizes_scenario_invalidated_between_claim_and_reload_as_failed(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression test for the fourth review pass: `handle()`'s post-claim transaction calls
+    `_load_scenario()` a second time (after the one inside `_claim()`), and that call site --
+    unlike `_claim()`/`cancel()` -- has no `except JobScenarioSessionInvalidError` of its own.
+    Proves it still doesn't leak: the general `except Exception` a few lines down catches it and
+    produces the same `job_scenario_session_invalid` failure, just via `_persist_handler_failure`
+    (the only path that applies here, since claim already moved the job past `created` --
+    `_persist_created_job_failure` would silently no-op on a `running` job).
+    """
+    job = _seed_job(
+        session_factory,
+        input_payload={"source_text": "deadline budget deliverables"},
+    )
+
+    original_load_scenario = RunWorkflowHandler._load_scenario
+    call_count = {"count": 0}
+
+    def fail_load_scenario_on_second_call(
+        self: RunWorkflowHandler,
+        session: sa.orm.Session,
+        job_record: JobRecord,
+    ) -> ScenarioSessionRecord:
+        call_count["count"] += 1
+        if call_count["count"] == 2:
+            # Simulates the scenario link becoming invalid in the window between
+            # `_claim()`'s commit and `handle()`'s own reload a few lines later.
+            raise JobScenarioSessionInvalidError()
+        return original_load_scenario(self, session, job_record)
+
+    monkeypatch.setattr(RunWorkflowHandler, "_load_scenario", fail_load_scenario_on_second_call)
+
+    handler = RunWorkflowHandler(
+        session_factory=session_factory,
+        runner_factory=lambda session: RecordingRunner(session),
+    )
+    result = asyncio.run(handler.handle(job.id))
+
+    assert call_count["count"] == 2
+    assert result is not None
+    assert result.status is JobStatus.failed
+    assert result.error_code == "job_scenario_session_invalid"
+    assert result.completed_at is not None
+
+    with transaction_boundary(session_factory) as session:
+        events = _event_rows_for_job(session, job.id)
+    failed_events = [event for event in events if event["event_type"] == "workflow.failed"]
+    assert len(failed_events) == 1
+    assert failed_events[0]["error_code"] == "job_scenario_session_invalid"
 
 
 def test_worker_run_forever_continues_after_unexpected_iteration_exception(

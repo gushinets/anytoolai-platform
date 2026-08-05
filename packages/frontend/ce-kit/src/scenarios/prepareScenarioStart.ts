@@ -1,14 +1,14 @@
 import { requestAndParse } from "../api/client";
-import type { PlatformApiClient, PlatformApiResult } from "../api/client";
+import type { PlatformApiClient, PlatformApiRequestOptions, PlatformApiResult } from "../api/client";
 import { generateIdempotencyKey } from "./idempotencyKey";
 import { parseScenarioSessionSnapshot } from "./parseScenarioSessionSnapshot";
 import type { ScenarioSessionSnapshot, ScenarioStartRequest } from "./types";
 
-export type PreparedScenarioStartExecuteOptions = {
-  /** Independent of the client's own timeout; cancels this attempt only. */
-  signal?: AbortSignal;
-  timeoutMs?: number;
-};
+/** Independent of the client's own timeout; cancels this attempt only. */
+export type PreparedScenarioStartExecuteOptions = Pick<
+  PlatformApiRequestOptions,
+  "signal" | "timeoutMs"
+>;
 
 /**
  * An opaque, retryable handle for one logical scenario-start submission (ANY-150).
