@@ -116,10 +116,14 @@ If immediate handoff acceptance observes target quota exhaustion and then rolls 
 claim, quota recovery must retain one `quota.checked` / `quota.exhausted` pair with the target
 product, frontend, scenario-session/chain, guest, and `handoff_id`. This is the rollback equivalent
 of the ordinary scenario-start path, which commits those same events before returning HTTP 429.
-Recovery ownership and the terminal `failed` transition are one conditional update in the same
-transaction that recreates this pair and emits `handoff.failed`. Parallel claimants cannot each
-append a recovered event chain, and no committed pre-terminal reservation can outlive its failure
-event.
+Once accept has reached exhausted target quota evaluation under the handoff lifecycle advisory lock,
+quota recovery owns terminal arbitration: decline and expiry must wait and then observe the durable
+`failed` state. The critical recovery transaction recreates the quota pair and emits
+`handoff.failed` only if its conditional `created/viewed -> failed` transition wins; if recovery is
+retried after a committed pass, the existing quota pair suppresses duplicates. A terminal-CAS loss
+without the quota pair is recovery failure and must not produce a returned `429 quota_exhausted`.
+`handoff.declined` and `handoff.expired` are not emitted for races after quota-rejection ownership,
+so the terminal event chain is not contradictory.
 
 When idempotent recovery encounters an existing deterministic replay-owned event whose timestamp no
 longer fits the causal sequence, recovery may repair that replay-owned timestamp. It must not

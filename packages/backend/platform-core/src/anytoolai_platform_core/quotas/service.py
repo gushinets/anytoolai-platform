@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
 from anytoolai_platform_core.common.errors import PlatformError
@@ -22,6 +23,7 @@ from anytoolai_platform_core.quotas.models import (
     QuotaUsageRecord,
 )
 from anytoolai_platform_core.quotas.repository import QuotaUsageRepository
+from anytoolai_platform_core.storage.db import event_log_table
 from anytoolai_platform_core.storage.transactions import (
     RollbackRecoveryPhase,
     register_rollback_recovery_callback,
@@ -303,6 +305,7 @@ class GuestQuotaService:
                 recovery=recovery,
             ),
             phase=RollbackRecoveryPhase.quota_exhaustion,
+            critical=recovery.handoff_id is not None,
         )
 
     def _require_product_quota_policy(self, product_id: str) -> QuotaPolicy:
@@ -429,17 +432,24 @@ def _recover_quota_exhaustion(
                 tenant_id=recovery.tenant_id,
                 region=recovery.region,
             )
-            if handoff is not None:
-                failure = handoffs.finalize_quota_failure_recovery(
-                    handoff.id,
-                    tenant_id=recovery.tenant_id,
-                    region=recovery.region,
-                    error_code="quota_exhausted",
-                    now=utc_now(),
+            if handoff is None:
+                raise RuntimeError(
+                    f"handoff not found during quota recovery: {recovery.handoff_id}"
                 )
-                if not failure.changed:
+            failure = handoffs.finalize_quota_failure_recovery(
+                handoff.id,
+                tenant_id=recovery.tenant_id,
+                region=recovery.region,
+                error_code="quota_exhausted",
+                now=utc_now(),
+            )
+            if not failure.changed:
+                if _quota_recovery_audit_pair_exists(session, recovery):
                     return
-                failed_handoff = failure.record
+                raise RuntimeError(
+                    "handoff quota recovery lost terminal arbitration before audit persisted"
+                )
+            failed_handoff = failure.record
         quota_repository = QuotaUsageRepository(session)
         usage = quota_repository.ensure_usage(
             tenant_id=recovery.tenant_id,
@@ -486,6 +496,44 @@ def _recover_quota_exhaustion(
                 failed_handoff,
                 properties={"error_code": "quota_exhausted"},
             )
+
+
+def _quota_recovery_audit_pair_exists(
+    session: Session,
+    recovery: QuotaExhaustionRecovery,
+) -> bool:
+    checked_exists = session.execute(
+        sa.select(
+            sa.exists().where(
+                event_log_table.c.event_type == "quota.checked",
+                event_log_table.c.tenant_id == recovery.tenant_id,
+                event_log_table.c.region == recovery.region,
+                event_log_table.c.product_id == recovery.product_id,
+                event_log_table.c.frontend_id == recovery.frontend_id,
+                event_log_table.c.guest_id == recovery.guest_id,
+                event_log_table.c.scenario_session_id == recovery.scenario_session_id,
+                event_log_table.c.scenario_chain_id == recovery.scenario_chain_id,
+                event_log_table.c.handoff_id == recovery.handoff_id,
+            )
+        )
+    ).scalar_one()
+    exhausted_exists = session.execute(
+        sa.select(
+            sa.exists().where(
+                event_log_table.c.event_type == "quota.exhausted",
+                event_log_table.c.tenant_id == recovery.tenant_id,
+                event_log_table.c.region == recovery.region,
+                event_log_table.c.product_id == recovery.product_id,
+                event_log_table.c.frontend_id == recovery.frontend_id,
+                event_log_table.c.guest_id == recovery.guest_id,
+                event_log_table.c.scenario_session_id == recovery.scenario_session_id,
+                event_log_table.c.scenario_chain_id == recovery.scenario_chain_id,
+                event_log_table.c.handoff_id == recovery.handoff_id,
+                event_log_table.c.error_code == "quota_exhausted",
+            )
+        )
+    ).scalar_one()
+    return checked_exists and exhausted_exists
 
 
 def _state_from_usage(record: QuotaUsageRecord, policy: QuotaPolicy) -> QuotaState:

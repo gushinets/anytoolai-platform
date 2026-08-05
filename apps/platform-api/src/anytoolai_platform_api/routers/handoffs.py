@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from datetime import datetime
 from typing import Annotated, Any
 
 from anytoolai_platform_api.dependencies import (
@@ -187,7 +189,12 @@ def decline_handoff(
     return _preview_response(preview)
 
 
-def _service(session: Any, registry: ConfigRegistry) -> HandoffService:
+def _service(
+    session: Any,
+    registry: ConfigRegistry,
+    *,
+    clock: Callable[[], datetime] | None = None,
+) -> HandoffService:
     emitter = EventEmitter(EventLogRepository(session))
     sessions = ScenarioSessionRepository(session)
     jobs = JobRepository(session)
@@ -219,6 +226,7 @@ def _service(session: Any, registry: ConfigRegistry) -> HandoffService:
         scenario_repository=sessions,
         guest_repository=guests,
         event_emitter=emitter,
+        clock=clock,
     )
 
 

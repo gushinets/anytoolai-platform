@@ -10,6 +10,7 @@ from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.handoffs.events import emit_handoff_event
+from anytoolai_platform_core.handoffs.locks import acquire_handoff_lifecycle_lock
 from anytoolai_platform_core.handoffs.models import (
     AcceptHandoffCommand,
     CreateHandoffCommand,
@@ -87,7 +88,7 @@ class HandoffService:
         scenario_repository: ScenarioSessionRepository,
         guest_repository: GuestIdentityRepository,
         event_emitter: EventEmitter,
-        clock: Callable[[], datetime] = utc_now,
+        clock: Callable[[], datetime] | None = None,
         token_ttl: timedelta = DEFAULT_TOKEN_TTL,
         token_service: HandoffTokenService | None = None,
     ) -> None:
@@ -98,7 +99,7 @@ class HandoffService:
         self._scenarios = scenario_repository
         self._guests = guest_repository
         self._events = event_emitter
-        self._clock = clock
+        self._clock = clock or utc_now
         self._token_ttl = token_ttl
         self._token_service = token_service or HandoffTokenService()
 
@@ -307,12 +308,20 @@ class HandoffService:
         return self.build_safe_preview(transition.record)
 
     def expire(self, record: HandoffRecord, *, now: datetime | None = None) -> HandoffRecord:
-        effective_now = self._clock() if now is None else now
-        transition = self._repository.expire_if_due(
+        acquire_handoff_lifecycle_lock(self._repository.session, record.id)
+        current = self._repository.get_by_id(
             record.id,
-            effective_now,
             tenant_id=record.tenant_id,
             region=record.region,
+        )
+        if current is None:
+            raise HandoffNotFoundError()
+        effective_now = self._clock() if now is None else now
+        transition = self._repository.expire_if_due(
+            current.id,
+            effective_now,
+            tenant_id=current.tenant_id,
+            region=current.region,
         )
         if transition.changed:
             self._emit("handoff.expired", transition.record)
@@ -400,7 +409,15 @@ class HandoffService:
         )
         if record is None:
             raise HandoffNotFoundError()
-        return record
+        acquire_handoff_lifecycle_lock(self._repository.session, record.id)
+        locked_record = self._repository.get_by_id(
+            record.id,
+            tenant_id=tenant_id,
+            region=region,
+        )
+        if locked_record is None:
+            raise HandoffNotFoundError()
+        return locked_record
 
     def _emit(
         self,
