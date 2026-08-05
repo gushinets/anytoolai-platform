@@ -2,14 +2,13 @@
 
 ## Status
 
-- State: active
-- Scope status: backend-complete, integration pending
+- State: completed
+- Scope status: backend scope complete; frontend integration remains a separate ANY-171 follow-up
 - Owner: agent
 - Created: 2026-07-20
-- Last updated: 2026-07-20
+- Last updated: 2026-08-05
 - Review date: 2026-07-20
-- Next action: A16 must complete the shared CE-kit Platform API client and full frontend quota
-  integration.
+- Next action: none for A13; ANY-171 owns the remaining frontend quota/start integration.
 - Blocker: none
 
 ## Goal
