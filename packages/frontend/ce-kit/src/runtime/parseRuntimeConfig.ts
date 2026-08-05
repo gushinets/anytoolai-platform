@@ -144,13 +144,15 @@ function _parseScenario(value: unknown): RuntimeScenario | null {
     input_renderer_hint: inputRendererHint,
     output_renderer_hint: outputRendererHint,
   } = value;
-  // `allowed_next_actions` is optional on the wire (RuntimeScenarioResponse) -- both an absent key
-  // and an explicit `null` mean "no next actions", not "malformed payload".
-  const allowedNextActionsMissing = allowedNextActions === undefined || allowedNextActions === null;
+  // `allowed_next_actions` is optional on the wire (RuntimeScenarioResponse:
+  // `allowed_next_actions?: string[]`) -- an absent key means "no next actions". It is NOT
+  // nullable per the generated schema, so an explicit `null` is off-contract and must be
+  // rejected like any other malformed field, not silently normalized to `[]`.
+  const allowedNextActionsAbsent = allowedNextActions === undefined;
   if (
     typeof scenarioId !== "string" ||
     typeof version !== "number" ||
-    (!allowedNextActionsMissing && !_isStringArray(allowedNextActions))
+    (!allowedNextActionsAbsent && !_isStringArray(allowedNextActions))
   ) {
     return null;
   }
@@ -164,7 +166,7 @@ function _parseScenario(value: unknown): RuntimeScenario | null {
   return {
     scenarioId,
     version,
-    allowedNextActions: allowedNextActionsMissing ? [] : allowedNextActions,
+    allowedNextActions: allowedNextActionsAbsent ? [] : allowedNextActions,
     inputRendererHint: parsedInputHint,
     outputRendererHint: parsedOutputHint,
   };

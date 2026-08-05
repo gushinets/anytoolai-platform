@@ -7,8 +7,8 @@
 - Created: 2026-08-05
 - Last updated: 2026-08-05
 - Review date: 2026-08-05
-- Next action: run `python scripts/agent/runner.py full-check`, open the PR, link this file from
-  the PR description.
+- Next action: none -- PR is open, CI (frontend, docs, Windows/Ubuntu baseline, PostgreSQL, smoke,
+  full-check workflows) is green, and the fourth review pass below is addressed.
 - Blocker: none
 
 ## Goal
@@ -80,7 +80,8 @@ retry-loop abort check that only ran after a configured delay, and two variants 
 - `python scripts/agent/runner.py doctor` -- passed.
 - `python scripts/agent/runner.py frontend-check` -- passed (typecheck, `pnpm -r test`,
   `generate-api-types:check`, build all green).
-- `python scripts/agent/runner.py full-check` -- to run before opening the PR.
+- `python scripts/agent/runner.py full-check` -- passed locally; PR is open and CI (frontend, docs,
+  Windows/Ubuntu baseline, PostgreSQL, smoke, full-check workflows) is green on the current head.
 - Manual check: temporarily reintroduced a `limit_count: number -> string` mismatch under
   `src/api/__drift_scratch.ts` and confirmed `tsc --noEmit` fails with `typeMismatch: "limit_count"`
   before removing the scratch file.
@@ -201,3 +202,27 @@ exec plan itself are addressed by this section and the updated Goal above.
 4. Nitpick -- exec plan's Goal only listed the four original scope items, not the second-pass
    fixes. Fixed by extending the Goal paragraph above to reference the follow-on issues fixed by
    later review passes.
+
+## Code review (2026-08-05, fourth pass -- pre-merge CI review)
+
+1. VALID `parseRuntimeConfig.ts` `_parseScenario()` -- the second-pass fix normalized an explicit
+   `allowed_next_actions: null` to `[]`, treating it the same as an absent key. But the generated
+   schema types it `allowed_next_actions?: string[]` -- optional, not nullable -- and the
+   `_RuntimeScenarioShapeCheck` drift assertion right below the parser asserts exactly that
+   optional-not-nullable shape. Accepting `null` anyway was inconsistent with the very drift check
+   this ticket added, and silently masked either a payload bug or genuine backend/schema drift
+   that should surface as `invalid_response` instead. Since backend/OpenAPI schema changes are
+   out of scope for ANY-195 (see Out of scope above), the fix is on the parser side: `null` is now
+   rejected like any other malformed field; only an absent key defaults to `[]`. Regression test
+   updated: `test/runtime/parseRuntimeConfig.test.ts` > "returns null when allowed_next_actions is
+   explicitly null" (previously asserted acceptance; now asserts rejection).
+2. Acknowledged, no code change -- the `createGuestIdentity()` re-read-before-write guard (third
+   pass, finding 3 above) narrows but does not eliminate the storage-write race; a genuinely
+   atomic fix needs a `setIfAbsent`/compare-and-set primitive on `AsyncStorage`, which is a
+   breaking interface change out of proportion for this ticket (see finding 3's reasoning above).
+   This was already stated as "narrowed rather than eliminated" rather than "fixed" in both the
+   code comments and finding 3 above; recorded here explicitly as follow-up debt for a future
+   ticket, not something this pass silently closes.
+3. VALID (docs) -- Status/Verification still said `full-check` and PR-opening were pending,
+   stale now that the PR is open and CI is green on this head. Fixed by updating both to reflect
+   current state (see Status and Verification above).

@@ -121,10 +121,11 @@ describe("parseRuntimeConfig", () => {
     });
   });
 
-  it("accepts a scenario whose allowed_next_actions is explicitly null, defaulting to an empty array", () => {
-    // `allowed_next_actions` is optional (not `| null`) on the generated backend schema, but an
-    // explicit `null` on the wire must be treated the same as an absent key, not as malformed --
-    // both mean "no next actions".
+  it("returns null when allowed_next_actions is explicitly null", () => {
+    // `allowed_next_actions` is optional (`?: string[]`) but NOT nullable on the generated
+    // backend schema -- only an absent key means "no next actions". An explicit `null` is
+    // off-contract and must be rejected, not silently normalized to `[]`, so a real backend
+    // drift (the schema gaining `| null`) surfaces as invalid_response instead of being masked.
     const payload = {
       ...VALID_PAYLOAD,
       scenario_ids: ["s1"],
@@ -138,23 +139,7 @@ describe("parseRuntimeConfig", () => {
         },
       ],
     };
-    expect(parseRuntimeConfig(payload)).toEqual({
-      productId: "kernel_demo",
-      frontendIds: [],
-      frontends: [],
-      scenarioIds: ["s1"],
-      scenarios: [
-        {
-          scenarioId: "s1",
-          version: 1,
-          allowedNextActions: [],
-          inputRendererHint: { renderer: "json_schema", schemaRef: "x", schemaVersion: null },
-          outputRendererHint: { renderer: "json_schema", schemaRef: "x", schemaVersion: null },
-        },
-      ],
-      quotaSummary: null,
-      allowedUiCapabilities: [],
-    });
+    expect(parseRuntimeConfig(payload)).toBeNull();
   });
 
   it("returns null when allowed_next_actions is present but not an array of strings", () => {
