@@ -225,22 +225,25 @@ the frontend's view of the contract can't silently drift from the backend or fro
 `parseRuntimeConfig()`) don't consume the generated types directly at runtime -- the backend's
 snake_case wire format still needs runtime validation and mapping to CE-kit's camelCase DTOs, which
 `openapi-typescript`'s static types alone can't provide. Instead, `src/api/driftAssertions.ts` ties
-each parser to the generated schema at the type level, with two assertions:
+each parser to the generated schema at the type level via `AssertExactSchemaShape<T, Shape>`: a
+hand-maintained `Shape` object type mirroring each backend schema field-for-field (e.g.
+`guestIdentity.ts`'s `{ guest_id: string }`, `parseRuntimeConfig.ts`'s per-schema shapes) is
+compared against `components["schemas"][...]` by key set *and* by type -- including
+optionality/nullability -- in both directions (a key missing from `Shape`, an extra key not on the
+backend schema, or a same-key type/nullability/optionality mismatch all fail). A backend change
+such as `limit_count: number -> string`, or a field losing its `| null`, fails this assertion even
+though the key set is unchanged.
 
-- `AssertExactSchemaKeys<T, Keys>` -- every parser file lists the exact snake_case keys it reads
-  (e.g. `guestIdentity.ts`'s `_guestIdentityResponseKeys`, `parseRuntimeConfig.ts`'s per-schema key
-  lists) and asserts that list against `keyof components["schemas"][...]`. Catches added/removed
-  fields, but not a same-key type or nullability change.
-- `AssertExactSchemaShape<T, Shape>` -- a hand-maintained `Shape` object type mirroring each
-  backend schema field-for-field (e.g. `guestIdentity.ts`'s `{ guest_id: string }`,
-  `parseRuntimeConfig.ts`'s per-schema shapes) is compared against `components["schemas"][...]` by
-  key set *and* by type, including optionality/nullability. A backend change such as
-  `limit_count: number -> string`, or a field losing its `| null`, fails this assertion even though
-  the key set is unchanged.
+`driftAssertions.ts` also exports `AssertExactSchemaKeys<T, Keys>`, an older, narrower check kept
+for reference: it only verifies that a flat list of key names covers every property of `T`, one-way
+(it does not fail if `Keys` lists a name `T` doesn't have, since `Keys extends readonly (keyof
+T)[]` already rejects that at the type-parameter level, but it also does not catch a same-key type
+or nullability change). No parser in this package uses it anymore -- `AssertExactSchemaShape` above
+is strictly more precise and is what every parser is actually checked against.
 
-If the backend schema drifts in either way, regenerating `platformApi.ts` makes the relevant
-assertion fail typecheck instead of silently leaving the parser's runtime type guards stale. Beyond
-these drift assertions, nothing in this package consumes the generated types directly yet --
+If the backend schema drifts, regenerating `platformApi.ts` makes the relevant assertion fail
+typecheck instead of silently leaving the parser's runtime type guards stale. Beyond these drift
+assertions, nothing in this package consumes the generated types directly yet --
 `PlatformApiClient` and the hand-written response shapes stay as they are; this is the codegen +
 drift-check plumbing for future callers to build on.
 

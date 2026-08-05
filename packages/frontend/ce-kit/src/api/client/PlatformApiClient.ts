@@ -151,7 +151,15 @@ export class PlatformApiClient {
       // guest id from the same backend response, orphaning the one the other caller already used.
       if (result.ok && !storageReadFailed) {
         try {
-          await options.storage.set(storageKey, result.value.guestId);
+          // `AsyncStorage` has no atomic set-if-absent, so this is a best-effort narrowing of the
+          // same race, not a full fix: re-read right before writing to catch a value that was
+          // cached (by another caller, tab, or process) in the window between this call's own
+          // miss-read above and this point, and prefer that existing value over clobbering it with
+          // a second, different guest id from this call's own backend response.
+          const existingGuestId = await options.storage.get(storageKey);
+          if (!existingGuestId) {
+            await options.storage.set(storageKey, result.value.guestId);
+          }
         } catch {
           // The backend already created this identity; a storage failure must not discard it --
           // that would orphan it on the backend and cause the next call to create a duplicate.

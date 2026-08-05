@@ -17,7 +17,12 @@ Close four correctness/safety gaps left in the `PlatformApiClient` foundation (A
 before A15b (ANY-171) builds scenario/quota/polling client methods on top of it: unsafe fetch
 exception text leaking into public errors, retry backoff not observing caller cancellation,
 `storage.get()` rejections escaping `createGuestIdentity()`, and OpenAPI drift checks that only
-compare property names, not types/nullability.
+compare property names, not types/nullability. Two subsequent `/code-review` passes (see "Code
+review" sections below) surfaced and fixed follow-on issues in the same four areas that weren't
+caught by the original scope: an unreachable branch and a missing optionality check in the new
+drift assertion, a `parseRuntimeConfig` false-rejection the drift assertion itself exposed, a
+retry-loop abort check that only ran after a configured delay, and two variants of a
+`createGuestIdentity()` storage-write race that could clobber a concurrently cached guest id.
 
 ## Scope
 
@@ -160,3 +165,39 @@ issues (3 CONFIRMED, 1 PLAUSIBLE). All fixed except the PLAUSIBLE one, which was
    fire until the synchronous executor body -- including the `onAbort` declaration below it -- has
    finished), but reordered `onAbort` before the `setTimeout` call for readability/robustness
    against future refactors. No behavior change, no new test.
+
+## Code review (2026-08-05, third pass -- inline review comments)
+
+Verified each inline finding against current code before changing anything; two nitpicks on the
+exec plan itself are addressed by this section and the updated Goal above.
+
+1. VALID `README.md` drift-assertion section -- described `AssertExactSchemaKeys` as still used by
+   parsers (`_guestIdentityResponseKeys`, per-schema key lists) and read as bidirectional. Both were
+   stale: `AssertExactSchemaShape` replaced every use in the first-pass fix, and
+   `AssertExactSchemaKeys` is now unused (`grep -rn "AssertExactSchemaKeys" src test` -> only its
+   own declaration). Fixed by rewriting the section to describe `AssertExactSchemaShape` as the
+   active check and `AssertExactSchemaKeys` as an unused, one-way-only legacy type kept for
+   reference.
+2. VALID `driftAssertions.ts` `MismatchedShapeKeys` -- compared only `IsEqual<T[K], Shape[K]>`.
+   Indexing an optional property already produces `... | undefined` independent of the mapped
+   type's own `-?` modifier, so `backend?: string` and `backend: string | undefined` index to the
+   *same* type and were wrongly treated as equal. Fixed by adding `IsOptionalKey<T, K>` (`{} extends
+   Pick<T, K>`) and requiring it to match between `T` and `Shape` too. Regression tests:
+   `test/api/driftAssertions.test.ts` > "rejects an optionality mismatch even when the indexed value
+   type is identical..." and its reverse-direction counterpart.
+3. VALID `PlatformApiClient.createGuestIdentity()` -- the second-pass fix (skip persisting when
+   *this call's own* `storage.get()` threw) doesn't cover a second variant of the same class of
+   race: this call's own read genuinely misses (no throw), and *before* this call persists its
+   freshly-fetched id, some other context (another tab, another client instance, a concurrent
+   caller with a successful cache-hit read) writes a valid id to the same key -- blindly persisting
+   would still clobber it. `AsyncStorage` has no atomic set-if-absent/compare-and-set primitive to
+   fully close this (adding one is a breaking interface change touching
+   `createChromeStorageAdapter()` and `createInMemoryAsyncStorage()` too, out of proportion for a
+   minimal fix), so this is narrowed rather than eliminated: re-read the key immediately before
+   persisting and skip the write if a value is already there, preferring whatever's already cached
+   over this call's own fetched id. Regression test: `test/identity/guestIdentity.test.ts` > "does
+   not overwrite a guest id cached concurrently between this call's own miss-read and its persist
+   step".
+4. Nitpick -- exec plan's Goal only listed the four original scope items, not the second-pass
+   fixes. Fixed by extending the Goal paragraph above to reference the follow-on issues fixed by
+   later review passes.

@@ -49,6 +49,27 @@ describe("AssertExactSchemaShape", () => {
     expect(reported).toBe("b");
   });
 
+  it("rejects an optionality mismatch even when the indexed value type is identical, e.g. backend?: string vs backend: string | undefined", () => {
+    // Indexing an optional property already produces `... | undefined` regardless of the mapped
+    // type's own `-?` modifier, so `IsEqual<T[K], Shape[K]>` alone can't tell "optional" apart from
+    // "required and typed as `X | undefined`" -- this must be checked separately.
+    type Backend = { backend?: string };
+    type Shape = { backend: string | undefined };
+    type Check = AssertExactSchemaShape<Backend, Shape>;
+    // @ts-expect-error `backend` is optional on Backend but required on Shape -- must fail typecheck.
+    const check: Check = true;
+    void check;
+  });
+
+  it("rejects the reverse optionality mismatch: backend: string | undefined vs backend?: string", () => {
+    type Backend = { backend: string | undefined };
+    type Shape = { backend?: string };
+    type Check = AssertExactSchemaShape<Backend, Shape>;
+    // @ts-expect-error `backend` is required on Backend but optional on Shape -- must fail typecheck.
+    const check: Check = true;
+    void check;
+  });
+
   it("rejects a shape with an extra field not on the backend schema", () => {
     type Backend = { a: string };
     type Shape = { a: string; extra: number };

@@ -269,6 +269,40 @@ describe("PlatformApiClient.createGuestIdentity", () => {
     expect(store.get("anytoolai.guest_id")).toBe("guest_original");
   });
 
+  it("does not overwrite a guest id cached concurrently between this call's own miss-read and its persist step", async () => {
+    // This call's own initial read genuinely misses (no throw, no cached value yet). Before this
+    // call persists the id it fetched from the backend, some other context (another tab, another
+    // client instance, another caller with a successful cache-hit read of its own) writes a valid
+    // id to the same key. The persist step must re-check and prefer that already-cached value
+    // instead of blindly overwriting it with this call's own (different) fetched id.
+    const store = new Map<string, string>();
+    let getCallCount = 0;
+    const storage: AsyncStorage = {
+      get: vi.fn(async (key) => {
+        getCallCount += 1;
+        if (getCallCount === 1) {
+          return undefined;
+        }
+        store.set(key, "guest_written_concurrently");
+        return store.get(key);
+      }),
+      set: vi.fn(async (key, value) => {
+        store.set(key, value);
+      }),
+      remove: vi.fn(async (key) => {
+        store.delete(key);
+      }),
+    };
+    const fetchImpl = vi.fn(async () => jsonResponse(200, { guest_id: "guest_fetched" }));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const result = await client.createGuestIdentity({ storage });
+
+    expect(result).toEqual({ ok: true, value: { guestId: "guest_fetched" } });
+    expect(store.get("anytoolai.guest_id")).toBe("guest_written_concurrently");
+    expect(storage.set).not.toHaveBeenCalled();
+  });
+
   it("treats a rejected storage read as a cache miss and still returns a valid GuestIdentityResult, without throwing", async () => {
     const storage: AsyncStorage = {
       get: vi.fn(async () => {

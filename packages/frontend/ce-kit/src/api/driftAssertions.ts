@@ -41,13 +41,27 @@ type ExtraShapeKeys<T extends object, Shape extends object> = {
 }[keyof Shape];
 
 /**
- * Names of `T`'s properties that `Shape` does declare, but with a different type (including a
- * nullability/optionality difference). Only meaningful once `MissingShapeKeys` is empty --
- * `K extends keyof Shape` is re-checked per key so this stays safe to evaluate even when some
- * keys are missing.
+ * Whether `K` is an optional property of `T`. `{} extends Pick<T, K>` is true exactly when picking
+ * just that one property still allows an empty object -- i.e. the property can be omitted.
+ */
+type IsOptionalKey<T extends object, K extends keyof T> = {} extends Pick<T, K> ? true : false;
+
+/**
+ * Names of `T`'s properties that `Shape` does declare, but with a different type, or a different
+ * optionality (e.g. `backend?: string` vs `backend: string | undefined`) -- `IsEqual<T[K],
+ * Shape[K]>` alone can't tell these apart, since indexing an optional property already produces
+ * `... | undefined` independent of the mapped type's own `-?` modifier. Only meaningful once
+ * `MissingShapeKeys` is empty -- `K extends keyof Shape` is re-checked per key so this stays safe
+ * to evaluate even when some keys are missing.
  */
 type MismatchedShapeKeys<T extends object, Shape extends object> = {
-  [K in keyof T]-?: K extends keyof Shape ? (IsEqual<T[K], Shape[K]> extends true ? never : K) : never;
+  [K in keyof T]-?: K extends keyof Shape
+    ? IsEqual<T[K], Shape[K]> extends true
+      ? IsOptionalKey<T, K> extends IsOptionalKey<Shape, K>
+        ? never
+        : K
+      : K
+    : never;
 }[keyof T];
 
 /**
