@@ -353,7 +353,6 @@ def test_quota_exhaustion_recovery_survives_caller_transaction_rollback(
             scenario_id="kernel_demo.handoff_smoke_target_v1",
             scenario_session_id="scenario_session_rejected_handoff",
             scenario_chain_id="scenario_chain_handoff",
-            handoff_id="handoff_quota_recovery",
         )
 
     with transaction_boundary(session_factory) as session:
@@ -361,7 +360,10 @@ def test_quota_exhaustion_recovery_survives_caller_transaction_rollback(
         quota_events = list(
             session.execute(
                 sa.select(event_log_table)
-                .where(event_log_table.c.handoff_id == "handoff_quota_recovery")
+                .where(
+                    event_log_table.c.scenario_session_id
+                    == "scenario_session_rejected_handoff"
+                )
                 .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
             ).mappings()
         )
@@ -376,5 +378,6 @@ def test_quota_exhaustion_recovery_survives_caller_transaction_rollback(
         event["scenario_session_id"] == "scenario_session_rejected_handoff"
         for event in quota_events
     )
+    assert all(event["handoff_id"] is None for event in quota_events)
     assert quota_events[-1]["error_code"] == "quota_exhausted"
     assert quota_events[-1]["properties"]["exhausted"] is True

@@ -462,38 +462,43 @@ def test_quota_exhausted_accept_racing_with_decline_preserves_exactly_once_audit
 
         release_recovery = threading.Event()
         recovery_ready = threading.Event()
-        decline_waiting_for_lock = threading.Event()
+        decline_attempting_lock = threading.Event()
+        decline_acquired_lock = threading.Event()
         _pause_handoff_quota_recovery(
             monkeypatch,
             recovery_ready=recovery_ready,
             release_recovery=release_recovery,
         )
-        _observe_handoff_lock_attempt(
+        _observe_handoff_lock_contention(
             monkeypatch,
-            thread_name_prefix="decline-race",
-            observed=decline_waiting_for_lock,
+            armed=recovery_ready,
+            handoff_id=created["handoff_id"],
+            attempting=decline_attempting_lock,
+            acquired=decline_acquired_lock,
         )
 
         with ThreadPoolExecutor(max_workers=2, thread_name_prefix="handoff-race") as executor:
-            accept_future = executor.submit(
-                _accept_handoff_response,
-                app,
-                created["handoff_token"],
-                "req_pg_handoff_decline_race_accept",
-            )
-            assert recovery_ready.wait(10)
-            decline_future = executor.submit(
-                _run_named,
-                "decline-race",
-                _decline_handoff_response,
-                app,
-                created["handoff_token"],
-                "req_pg_handoff_decline_race_decline",
-            )
-            assert decline_waiting_for_lock.wait(10)
-            release_recovery.set()
+            try:
+                accept_future = executor.submit(
+                    _accept_handoff_response,
+                    app,
+                    created["handoff_token"],
+                    "req_pg_handoff_decline_race_accept",
+                )
+                assert recovery_ready.wait(10)
+                decline_future = executor.submit(
+                    _decline_handoff_response,
+                    app,
+                    created["handoff_token"],
+                    "req_pg_handoff_decline_race_decline",
+                )
+                assert decline_attempting_lock.wait(10)
+                assert not decline_acquired_lock.is_set()
+            finally:
+                release_recovery.set()
             accepted = accept_future.result(timeout=10)
             declined = decline_future.result(timeout=10)
+            assert decline_acquired_lock.wait(10)
 
         assert accepted.status_code == HTTPStatus.TOO_MANY_REQUESTS
         assert accepted.json()["error"]["code"] == "quota_exhausted"
@@ -523,39 +528,44 @@ def test_quota_exhausted_accept_racing_with_expiry_preserves_exactly_once_audit(
 
         release_recovery = threading.Event()
         recovery_ready = threading.Event()
-        expiry_waiting_for_lock = threading.Event()
+        expiry_attempting_lock = threading.Event()
+        expiry_acquired_lock = threading.Event()
         _pause_handoff_quota_recovery(
             monkeypatch,
             recovery_ready=recovery_ready,
             release_recovery=release_recovery,
         )
-        _observe_handoff_lock_attempt(
+        _observe_handoff_lock_contention(
             monkeypatch,
-            thread_name_prefix="expiry-race",
-            observed=expiry_waiting_for_lock,
+            armed=recovery_ready,
+            handoff_id=created["handoff_id"],
+            attempting=expiry_attempting_lock,
+            acquired=expiry_acquired_lock,
         )
 
         with ThreadPoolExecutor(max_workers=2, thread_name_prefix="handoff-race") as executor:
-            accept_future = executor.submit(
-                _accept_handoff_response,
-                app,
-                created["handoff_token"],
-                "req_pg_handoff_expiry_race_accept",
-            )
-            assert recovery_ready.wait(10)
-            expiry_future = executor.submit(
-                _run_named,
-                "expiry-race",
-                _expired_preview,
-                session_factory,
-                app,
-                created["handoff_token"],
-                created["expires_at"],
-            )
-            assert expiry_waiting_for_lock.wait(10)
-            release_recovery.set()
+            try:
+                accept_future = executor.submit(
+                    _accept_handoff_response,
+                    app,
+                    created["handoff_token"],
+                    "req_pg_handoff_expiry_race_accept",
+                )
+                assert recovery_ready.wait(10)
+                expiry_future = executor.submit(
+                    _expired_preview,
+                    session_factory,
+                    app,
+                    created["handoff_token"],
+                    created["expires_at"],
+                )
+                assert expiry_attempting_lock.wait(10)
+                assert not expiry_acquired_lock.is_set()
+            finally:
+                release_recovery.set()
             accepted = accept_future.result(timeout=10)
             expired_preview = expiry_future.result(timeout=10)
+            assert expiry_acquired_lock.wait(10)
 
         assert accepted.status_code == HTTPStatus.TOO_MANY_REQUESTS
         assert accepted.json()["error"]["code"] == "quota_exhausted"
@@ -855,18 +865,23 @@ def _pause_handoff_quota_recovery(
     )
 
 
-def _observe_handoff_lock_attempt(
+def _observe_handoff_lock_contention(
     monkeypatch: pytest.MonkeyPatch,
     *,
-    thread_name_prefix: str,
-    observed: threading.Event,
+    armed: threading.Event,
+    handoff_id: str,
+    attempting: threading.Event,
+    acquired: threading.Event,
 ) -> None:
     original_lock = handoff_service_module.acquire_handoff_lifecycle_lock
 
-    def observed_lock(session, handoff_id):  # noqa: ANN001
-        if threading.current_thread().name.startswith(thread_name_prefix):
-            observed.set()
-        return original_lock(session, handoff_id)
+    def observed_lock(session, observed_handoff_id):  # noqa: ANN001
+        if armed.is_set() and observed_handoff_id == handoff_id:
+            attempting.set()
+            result = original_lock(session, observed_handoff_id)
+            acquired.set()
+            return result
+        return original_lock(session, observed_handoff_id)
 
     monkeypatch.setattr(
         handoff_service_module,
@@ -897,11 +912,6 @@ def _decline_handoff_response(app, handoff_token: str, request_id: str) -> httpx
             request_id,
         )
     )
-
-
-def _run_named(thread_name: str, function, *args):  # noqa: ANN001, ANN002, ANN202
-    threading.current_thread().name = thread_name
-    return function(*args)
 
 
 async def _request_with_id(
