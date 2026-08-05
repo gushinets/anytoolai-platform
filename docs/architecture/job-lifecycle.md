@@ -42,8 +42,10 @@ the lease and conditional claim remain the coordination boundaries, so multiple 
 create duplicate execution. For each discovered id, the worker handler:
 
 1. Attempts to acquire the PostgreSQL advisory job lease; lease loss is a normal no-work result.
-2. If the lease is acquired, atomically claims the job and persists `workflow.started`, then commits
-   that unit of work.
+2. If the lease is acquired, attempts the conditional claim. If no claim is returned, the claim
+   path releases the lease, skips scenario loading and runner execution, and returns the current
+   durable job snapshot. If the claim succeeds, it persists `workflow.started` in the same
+   transaction and commits that unit of work.
 3. Loads the linked scenario session using the job's tenant, region, product, frontend, and
    `scenario_session_id` dimensions.
 4. Reads the workflow input from `scenario_session.metadata["input"]`.

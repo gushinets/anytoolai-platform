@@ -70,7 +70,8 @@ available. CI sets the maintenance URL in the required PostgreSQL job.
 
 ## Validation results
 
-Record concrete command results in
-`docs/exec-plans/active/any-118-a11-postgresql-worker-claim-smoke.md` during implementation. Local
-PostgreSQL execution requires `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`; when that URL is unavailable,
-the smoke must not be treated as locally completed.
+Concrete command results are recorded in
+`docs/exec-plans/completed/any-118-a11-postgresql-worker-claim-smoke.md`. Local PostgreSQL execution
+requires `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`; when that URL is unavailable, a local skip is not
+completion evidence. The required current-head PostgreSQL CI gate supplies the production-dialect
+completion evidence for this task.
