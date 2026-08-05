@@ -35,15 +35,35 @@ def acquire_handoff_lifecycle_lock(session: Session, handoff_id: str) -> None:
             cleanup_session,
             key,
         ),
+        critical=True,
     )
 
 
 def _release_handoff_lifecycle_lock(session: Session, lock_key: int) -> None:
     if session.bind is None or session.bind.dialect.name != "postgresql":
         return
-    session.execute(sa.text("SELECT pg_advisory_unlock(:lock_key)"), {"lock_key": lock_key})
+    try:
+        unlocked = session.execute(
+            sa.text("SELECT pg_advisory_unlock(:lock_key)"),
+            {"lock_key": lock_key},
+        ).scalar_one()
+    except BaseException:
+        _invalidate_session_connection(session)
+        raise
+    if unlocked is not True:
+        _invalidate_session_connection(session)
+        raise RuntimeError(
+            "handoff lifecycle advisory unlock failed: connection does not own lock"
+        )
 
 
 def _handoff_lock_key(handoff_id: str) -> int:
     digest = sha256(f"{_LOCK_NAMESPACE}:{handoff_id}".encode("utf-8")).digest()
     return int.from_bytes(digest[:8], byteorder="big", signed=True)
+
+
+def _invalidate_session_connection(session: Session) -> None:
+    try:
+        session.connection().invalidate()
+    except Exception:  # pragma: no cover - best effort after invariant failure
+        return

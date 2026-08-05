@@ -41,6 +41,7 @@ class RegisteredRollbackRecoveryCallback:
 class RegisteredTransactionCleanupCallback:
     order: int
     callback: TransactionCleanupCallback
+    critical: bool = False
 
 
 def build_session_factory(engine: Engine) -> SessionFactory:
@@ -70,6 +71,8 @@ def register_rollback_recovery_callback(
 def register_transaction_cleanup_callback(
     session: Session,
     callback: TransactionCleanupCallback,
+    *,
+    critical: bool = False,
 ) -> None:
     callbacks = session.info.setdefault(_CLEANUP_CALLBACKS_KEY, [])
     order = int(session.info.get(_CLEANUP_CALLBACK_ORDER_KEY, 0))
@@ -78,26 +81,42 @@ def register_transaction_cleanup_callback(
         RegisteredTransactionCleanupCallback(
             order=order,
             callback=callback,
+            critical=critical,
         )
     )
 
 
 @contextmanager
 def transaction_boundary(session_factory: SessionFactory) -> Iterator[Session]:
-    session = session_factory()
+    bind = _bind_from_session_factory(session_factory)
+    connection = bind if isinstance(bind, Connection) else bind.connect()
+    owns_connection = not isinstance(bind, Connection)
+    session = session_factory(bind=connection)
     try:
         try:
             with session.begin():
                 yield session
         except BaseException as exc:
+            active_exc = exc
+            recovery_failed = False
             try:
                 _run_rollback_recovery_callbacks(session, exc)
+            except BaseException as recovery_exc:
+                active_exc = recovery_exc
+                recovery_failed = True
+                raise
             finally:
-                _run_transaction_cleanup_callbacks(session, exc)
+                _run_transaction_cleanup_callbacks(
+                    session,
+                    active_exc,
+                    suppress_critical=recovery_failed,
+                )
             raise
         _run_transaction_cleanup_callbacks(session, None)
     finally:
         session.close()
+        if owns_connection:
+            connection.close()
 
 
 def _run_rollback_recovery_callbacks(session: Session, exc: BaseException) -> None:
@@ -118,11 +137,17 @@ def _run_rollback_recovery_callbacks(session: Session, exc: BaseException) -> No
 def _run_transaction_cleanup_callbacks(
     session: Session,
     exc: BaseException | None,
+    *,
+    suppress_critical: bool = False,
 ) -> None:
     for registered_callback in _pop_transaction_cleanup_callbacks(session):
         try:
             registered_callback.callback(session)
         except Exception as cleanup_exc:  # pragma: no cover - defensive
+            if registered_callback.critical and not suppress_critical:
+                raise RuntimeError(
+                    "critical transaction cleanup callback failed"
+                ) from cleanup_exc
             if exc is not None:
                 exc.add_note(
                     "transaction cleanup callback failed: "
@@ -171,4 +196,20 @@ def engine_from_session_factory(session_factory: SessionFactory) -> Engine:
 
 
 def _independent_session_factory(session: Session) -> SessionFactory:
-    return build_session_factory(_engine_from_bind(session.get_bind()))
+    return sessionmaker(
+        bind=session.get_bind(),
+        expire_on_commit=False,
+        autoflush=False,
+        future=True,
+    )
+
+
+def _bind_from_session_factory(session_factory: SessionFactory) -> Connection | Engine:
+    bind = session_factory.kw.get("bind")
+    if bind is not None:
+        return bind
+    session = session_factory()
+    try:
+        return session.get_bind()
+    finally:
+        session.close()
