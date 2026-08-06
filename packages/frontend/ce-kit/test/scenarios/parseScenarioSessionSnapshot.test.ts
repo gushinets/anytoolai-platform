@@ -53,6 +53,16 @@ describe("parseScenarioSessionSnapshot", () => {
     expect(parsed?.allowedNextActions).toEqual(["copy_result", "create_handoff"]);
     expect(parsed?.resultArtifactId).toBe("artifact_123");
   });
+
+  it("defaults a missing allowed_next_actions to [], since the field is optional on the wire", () => {
+    const { allowed_next_actions: _allowedNextActions, ...rest } = VALID_PAYLOAD;
+    expect(parseScenarioSessionSnapshot(rest)?.allowedNextActions).toEqual([]);
+  });
+
+  it("returns null for a missing job_id, since the field is required (though nullable) on the wire", () => {
+    const { job_id: _jobId, ...rest } = VALID_PAYLOAD;
+    expect(parseScenarioSessionSnapshot(rest)).toBeNull();
+  });
 });
 
 describe("parseScenarioSession", () => {

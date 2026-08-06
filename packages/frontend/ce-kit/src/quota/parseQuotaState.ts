@@ -1,3 +1,5 @@
+import type { AssertExactSchemaShape } from "../api/driftAssertions";
+import type { components } from "../api/generated/platformApi";
 import { isRecord } from "../api/parsing";
 import type { QuotaState } from "./types";
 
@@ -60,3 +62,26 @@ export function parseQuotaState(payload: unknown): QuotaState | null {
     exhausted,
   };
 }
+
+// Compile-time drift check: fails typecheck if the backend's QuotaStateResponse schema grows,
+// loses, retypes, or changes the nullability/optionality of a field that parseQuotaState() above
+// doesn't know about.
+type _QuotaStateShapeCheck = AssertExactSchemaShape<
+  components["schemas"]["QuotaStateResponse"],
+  {
+    dimension_key: string;
+    exhausted: boolean;
+    guest_id: string;
+    limit_count: number;
+    period: string;
+    product_id: string;
+    quota_dimension: string;
+    quota_policy_id: string;
+    remaining_count: number;
+    scenario_id?: string | null;
+    unit: string;
+    used_count: number;
+  }
+>;
+const _assertQuotaStateShapeMatchesGenerated: _QuotaStateShapeCheck = true;
+void _assertQuotaStateShapeMatchesGenerated;

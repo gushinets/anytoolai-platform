@@ -1,3 +1,5 @@
+import type { AssertExactSchemaShape } from "../api/driftAssertions";
+import type { components } from "../api/generated/platformApi";
 import { isRecord, isStringArray } from "../api/parsing";
 import type { ScenarioSession, ScenarioSessionSnapshot } from "./types";
 
@@ -22,14 +24,20 @@ export function parseScenarioSessionSnapshot(payload: unknown): ScenarioSessionS
     result_artifact_id: resultArtifactId,
   } = payload;
 
+  // `allowed_next_actions` is optional on the wire (both ScenarioSessionResponse and
+  // ScenarioStartResponse declare it `allowed_next_actions?: string[]`) -- an absent key means
+  // "no next actions", not a malformed payload.
+  const allowedNextActionsAbsent = allowedNextActions === undefined;
   if (
     typeof scenarioSessionId !== "string" ||
     typeof status !== "string" ||
-    !isStringArray(allowedNextActions)
+    (!allowedNextActionsAbsent && !isStringArray(allowedNextActions))
   ) {
     return null;
   }
-  if (jobId !== null && jobId !== undefined && typeof jobId !== "string") {
+  // `job_id` is a required (but nullable) property on both response models -- the key must be
+  // present, unlike `allowed_next_actions` above. An absent key is malformed, not `null`.
+  if (jobId !== null && typeof jobId !== "string") {
     return null;
   }
   if (resultArtifactId !== null && resultArtifactId !== undefined && typeof resultArtifactId !== "string") {
@@ -38,9 +46,9 @@ export function parseScenarioSessionSnapshot(payload: unknown): ScenarioSessionS
 
   return {
     scenarioSessionId,
-    jobId: jobId ?? null,
+    jobId,
     status,
-    allowedNextActions,
+    allowedNextActions: allowedNextActionsAbsent ? [] : allowedNextActions,
     resultArtifactId: resultArtifactId ?? null,
   };
 }
@@ -80,3 +88,32 @@ export function parseScenarioSession(payload: unknown): ScenarioSession | null {
 
   return { ...snapshot, currentCheckpointId: currentCheckpointId ?? null };
 }
+
+// Compile-time drift checks: fail typecheck if either backend response schema grows, loses,
+// retypes, or changes the nullability/optionality of a field the parsers above don't know about.
+type _ScenarioSessionResponseShapeCheck = AssertExactSchemaShape<
+  components["schemas"]["ScenarioSessionResponse"],
+  {
+    allowed_next_actions?: string[];
+    current_checkpoint_id?: string | null;
+    job_id: string | null;
+    result_artifact_id?: string | null;
+    scenario_session_id: string;
+    status: string;
+  }
+>;
+const _assertScenarioSessionResponseShapeMatchesGenerated: _ScenarioSessionResponseShapeCheck = true;
+void _assertScenarioSessionResponseShapeMatchesGenerated;
+
+type _ScenarioStartResponseShapeCheck = AssertExactSchemaShape<
+  components["schemas"]["ScenarioStartResponse"],
+  {
+    allowed_next_actions?: string[];
+    job_id: string;
+    result_artifact_id?: string | null;
+    scenario_session_id: string;
+    status: string;
+  }
+>;
+const _assertScenarioStartResponseShapeMatchesGenerated: _ScenarioStartResponseShapeCheck = true;
+void _assertScenarioStartResponseShapeMatchesGenerated;
