@@ -91,6 +91,12 @@ The repository has explicit operations rather than a generic status update:
 | `mark_failed` | idempotent `created\|viewed -> failed` for ordinary recovery |
 | `finalize_quota_failure_recovery` | atomic single-owner `created\|viewed -> failed` |
 
+Token-driven lifecycle operations acquire a PostgreSQL session-level advisory lock for the handoff
+before they mutate or expire it. The lock is held past transaction rollback and released only after
+rollback recovery callbacks finish. This is intentionally stronger than a transaction-level row
+lock: immediate accept can roll back its temporary `accepted` claim while still owning terminal
+arbitration long enough for quota recovery to commit the durable `failed` outcome.
+
 Concurrent or sequential accept calls cannot both claim the record. A repeated accept returns
 `409 handoff_already_accepted` and does not create another target session, job, quota consumption,
 or accepted event. Declined, consumed, expired, and failed are terminal.
@@ -146,14 +152,23 @@ transaction changes the original pre-consent row to `failed`, stores a bounded s
 emits `handoff.failed`. Acceptance conflicts are not treated as orchestration failures.
 
 Target quota exhaustion follows the same rollback rule, but quota audit state is not discarded.
-After the acceptance rollback, one recovery transaction conditionally finalizes the handoff as
-`failed`, stores safe `quota_exhausted`, restores the ensured target quota row, and emits the single
-`quota.checked` / `quota.exhausted` pair plus `handoff.failed`. These state and event writes commit
-or roll back together, so no durable pre-terminal failure marker exists and process interruption
-cannot strand the token in `created`/`viewed`. The router's later `mark_failed` call is an
-idempotent no-op after successful recovery. Correlation retains the target scenario/session chain
-and runtime `handoff_id`. The owning request returns safe `429 quota_exhausted`; concurrent
-requests may receive the safe terminal conflict. No target session, job, quota consumption,
+After the accepted claim reaches target quota evaluation and discovers exhaustion, quota recovery
+owns terminal arbitration. The accepting transaction rolls back the temporary `accepted` state,
+target session/job, and in-transaction events, but the handoff lifecycle advisory lock remains held.
+Before the owning request can return `429 quota_exhausted`, one critical recovery transaction
+conditionally finalizes the handoff as `failed`, stores safe `quota_exhausted`, restores the ensured
+target quota row, and emits exactly one `quota.checked` / `quota.exhausted` pair plus
+`handoff.failed`. These state and event writes commit or roll back together, so no durable
+pre-terminal failure marker exists and process interruption cannot strand the token in
+`created`/`viewed`.
+
+Decline and expiry may win only before accept reaches this ownership point. If they race after
+quota exhaustion has been discovered, they wait on the lifecycle advisory lock and then observe the
+durable `failed` handoff; they do not emit `handoff.declined` or `handoff.expired`. An expired-token
+preview may still render a redacted safe `expired` response for UI purposes, but the stored lifecycle
+state remains `failed`. The router's later `mark_failed` call is an idempotent no-op after
+successful recovery. Correlation retains the target scenario/session chain and runtime `handoff_id`.
+No target session, job, workflow execution, target artifact, provider call, quota consumption,
 `handoff.accepted`, `handoff.declined`, `handoff.expired`, or `handoff.consumed` remains durable.
 
 ## API

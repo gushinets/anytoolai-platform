@@ -283,7 +283,7 @@ def test_event_log_migration_creates_table_at_0002() -> None:
 
 def test_platform_migration_chain_is_single_head() -> None:
     script = ScriptDirectory.from_config(build_alembic_config(PLACEHOLDER_POSTGRESQL_URL))
-    assert script.get_heads() == ["0010"]
+    assert script.get_heads() == ["0011"]
 
 
 def test_event_log_upgrade_from_0005_renames_provider_policy_column() -> None:

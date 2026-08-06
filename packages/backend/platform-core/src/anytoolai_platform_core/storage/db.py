@@ -475,6 +475,19 @@ event_log_table = sa.Table(
     sa.Index("ix_event_log_action_run_id", "action_run_id"),
     sa.Index("ix_event_log_provider_call_id", "provider_call_id"),
     sa.Index("ix_event_log_handoff_id", "handoff_id"),
+    sa.Index(
+        "ix_event_log_quota_recovery_audit",
+        "event_type",
+        "tenant_id",
+        "region",
+        "product_id",
+        "frontend_id",
+        "guest_id",
+        "scenario_session_id",
+        "scenario_chain_id",
+        "handoff_id",
+        "error_code",
+    ),
 )
 
 runtime_tables = {

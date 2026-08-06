@@ -81,10 +81,12 @@ tenant, region, product, and frontend dimensions match the session.
 
 This commit is the A13 accepted scenario start boundary. Quota is not consumed on frontend click,
 workflow success, validation retry, transport retry, or provider-call count. If quota is exhausted,
-the API commits `quota.checked`/`quota.exhausted` events, creates no session or job, and returns
-standardized `quota_exhausted` with HTTP `429`. Missing guest identity for a quota-protected
-product returns HTTP `422`; an unknown guest identity returns HTTP `404`. Both are rejected before
-quota consumption, session creation, or job creation.
+the API creates no session or job, persists the `quota.checked`/`quota.exhausted` audit pair through
+the quota rollback-recovery path, and returns standardized `quota_exhausted` with HTTP `429`.
+Immediate handoff accept additionally terminalizes the handoff as `failed` before that `429` can be
+returned. Missing guest identity for a quota-protected product returns HTTP `422`; an unknown guest
+identity returns HTTP `404`. Both are rejected before quota consumption, session creation, or job
+creation.
 
 Concurrent accepted starts for the same configured guest/product quota dimension are guarded by the
 quota usage row's unique dimension and conditional `used_count < limit_count` update. Product-wide
