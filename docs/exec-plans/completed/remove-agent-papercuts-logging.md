@@ -2,10 +2,10 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-03
-- Last updated: 2026-08-03
+- Last updated: 2026-08-05
 - Review date: 2026-08-03
 - Next action: none; implementation and clean-worktree validation are complete.
 - Blocker: none
@@ -56,7 +56,7 @@ minor workflow friction to a shared `PAPERCUTS.md` file.
   reviews papercut entries.
 - [x] Search `AGENTS.md`, `docs/`, and other tracked Markdown for `PAPERCUTS`, `papercut`, and
   `papercuts`; remove or update only live guidance and active maintenance references.
-- [ ] Leave historical completed-plan references intact when they only describe past work.
+- [x] Leave historical completed-plan references intact when they only describe past work.
 
 ## Validation
 
@@ -82,6 +82,7 @@ minor workflow friction to a shared `PAPERCUTS.md` file.
 | 2026-08-03 | Removed live logging guidance, deleted the tracked log, and removed weekly gardening/index references. | Run search/manual checks and repository validation. |
 | 2026-08-03 | Search/manual checks passed. `doctor` passed. `validate-docs` and `quick-check` fail on pre-existing untracked docs validation issues in `docs/reviews/mvp-a-p0-review.md` and `docs/exec-plans/active/any-150-idempotent-scenario-start-review.md`. | Resolve or remove the unrelated untracked docs files, then rerun validation. |
 | 2026-08-03 | Clean detached worktree validation at the PR commit passed `doctor`, `validate-docs`, and `quick-check`; `quick-check` reported 215 passed and 266 deselected. | None. |
+| 2026-08-05 | Confirmed historical references were intentionally preserved and no completion criterion remains open. | None. |
 
 ## Open questions
 

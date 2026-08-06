@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from http import HTTPStatus
 from typing import Iterator
 
@@ -10,7 +13,10 @@ import httpx
 import pytest
 import sqlalchemy as sa
 from anytoolai_platform_api.routers.handoffs import _service as _handoff_service
+from anytoolai_platform_core.handoffs import locks as handoff_locks_module
+from anytoolai_platform_core.handoffs import service as handoff_service_module
 from anytoolai_platform_core.handoffs.models import AcceptHandoffCommand
+from anytoolai_platform_core.handoffs.repository import HandoffRepository
 from anytoolai_platform_core.handoffs.service import HandoffAcceptanceExecutionError
 from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaPolicy
 from anytoolai_platform_core.storage.db import (
@@ -23,6 +29,7 @@ from anytoolai_platform_core.storage.db import (
 from anytoolai_platform_core.storage.transactions import (
     SessionFactory,
     build_session_factory,
+    engine_from_session_factory,
     transaction_boundary,
 )
 from tests.db_support import provision_database
@@ -441,6 +448,335 @@ def test_postgresql_parallel_exhausted_handoff_accept_recovers_quota_once() -> N
 
 @pytest.mark.postgresql
 @pytest.mark.slow
+def test_quota_exhausted_accept_racing_with_decline_preserves_exactly_once_audit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _provision_api_app("anytoolai_a17_handoff_decline_race") as (
+        session_factory,
+        app,
+    ):
+        _force_zero_guest_quota(app)
+        with transaction_boundary(session_factory) as session:
+            source_session_id, artifact_id = _seed_handoff_source(session)
+        created = _create_handoff(app, source_session_id, artifact_id).json()
+
+        release_recovery = threading.Event()
+        recovery_ready = threading.Event()
+        decline_attempting_lock = threading.Event()
+        decline_acquired_lock = threading.Event()
+        _pause_handoff_quota_recovery(
+            monkeypatch,
+            recovery_ready=recovery_ready,
+            release_recovery=release_recovery,
+        )
+        _observe_handoff_lock_contention(
+            monkeypatch,
+            armed=recovery_ready,
+            handoff_id=created["handoff_id"],
+            attempting=decline_attempting_lock,
+            acquired=decline_acquired_lock,
+        )
+
+        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="handoff-race") as executor:
+            try:
+                accept_future = executor.submit(
+                    _accept_handoff_response,
+                    app,
+                    created["handoff_token"],
+                    "req_pg_handoff_decline_race_accept",
+                )
+                assert recovery_ready.wait(10)
+                decline_future = executor.submit(
+                    _decline_handoff_response,
+                    app,
+                    created["handoff_token"],
+                    "req_pg_handoff_decline_race_decline",
+                )
+                assert decline_attempting_lock.wait(10)
+                assert not decline_acquired_lock.wait(0.5)
+            finally:
+                release_recovery.set()
+            accepted = accept_future.result(timeout=10)
+            declined = decline_future.result(timeout=10)
+            assert decline_acquired_lock.wait(10)
+
+        assert accepted.status_code == HTTPStatus.TOO_MANY_REQUESTS
+        assert accepted.json()["error"]["code"] == "quota_exhausted"
+        assert declined.status_code == HTTPStatus.CONFLICT
+        assert declined.json()["error"]["code"] == "handoff_failed"
+        _assert_quota_exhausted_handoff_recovery_state(
+            session_factory,
+            handoff_id=created["handoff_id"],
+            source_session_id=source_session_id,
+            expected_handoff_status="failed",
+        )
+
+
+@pytest.mark.postgresql
+@pytest.mark.slow
+def test_quota_exhausted_accept_racing_with_expiry_preserves_exactly_once_audit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _provision_api_app("anytoolai_a17_handoff_expiry_race") as (
+        session_factory,
+        app,
+    ):
+        _force_zero_guest_quota(app)
+        with transaction_boundary(session_factory) as session:
+            source_session_id, artifact_id = _seed_handoff_source(session)
+        created = _create_handoff(app, source_session_id, artifact_id).json()
+
+        release_recovery = threading.Event()
+        recovery_ready = threading.Event()
+        expiry_attempting_lock = threading.Event()
+        expiry_acquired_lock = threading.Event()
+        _pause_handoff_quota_recovery(
+            monkeypatch,
+            recovery_ready=recovery_ready,
+            release_recovery=release_recovery,
+        )
+        _observe_handoff_lock_contention(
+            monkeypatch,
+            armed=recovery_ready,
+            handoff_id=created["handoff_id"],
+            attempting=expiry_attempting_lock,
+            acquired=expiry_acquired_lock,
+        )
+
+        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="handoff-race") as executor:
+            try:
+                accept_future = executor.submit(
+                    _accept_handoff_response,
+                    app,
+                    created["handoff_token"],
+                    "req_pg_handoff_expiry_race_accept",
+                )
+                assert recovery_ready.wait(10)
+                expiry_future = executor.submit(
+                    _expired_preview,
+                    session_factory,
+                    app,
+                    created["handoff_token"],
+                    created["expires_at"],
+                )
+                assert expiry_attempting_lock.wait(10)
+                assert not expiry_acquired_lock.wait(0.5)
+            finally:
+                release_recovery.set()
+            accepted = accept_future.result(timeout=10)
+            expired_preview = expiry_future.result(timeout=10)
+            assert expiry_acquired_lock.wait(10)
+
+        assert accepted.status_code == HTTPStatus.TOO_MANY_REQUESTS
+        assert accepted.json()["error"]["code"] == "quota_exhausted"
+        assert expired_preview.status.value == "expired"
+        _assert_quota_exhausted_handoff_recovery_state(
+            session_factory,
+            handoff_id=created["handoff_id"],
+            source_session_id=source_session_id,
+            expected_handoff_status="failed",
+        )
+
+
+@pytest.mark.postgresql
+@pytest.mark.slow
+def test_handoff_lifecycle_advisory_lock_uses_one_backend_through_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _provision_api_app("anytoolai_a17_handoff_lock_connection") as (
+        session_factory,
+        app,
+    ):
+        _force_zero_guest_quota(app)
+        _prewarm_distinct_postgresql_connections(session_factory, count=3)
+        with transaction_boundary(session_factory) as session:
+            source_session_id, artifact_id = _seed_handoff_source(session)
+        created = _create_handoff(app, source_session_id, artifact_id).json()
+        handoff_id = created["handoff_id"]
+        phase_pids: dict[str, int] = {}
+
+        original_acquire = handoff_service_module.acquire_handoff_lifecycle_lock
+
+        def observed_acquire(session, observed_handoff_id):  # noqa: ANN001
+            original_acquire(session, observed_handoff_id)
+            if observed_handoff_id == handoff_id:
+                phase_pids["acquire"] = _postgresql_backend_pid(session)
+
+        monkeypatch.setattr(
+            handoff_service_module,
+            "acquire_handoff_lifecycle_lock",
+            observed_acquire,
+        )
+
+        original_finalize = HandoffRepository.finalize_quota_failure_recovery
+
+        def observed_finalize(  # noqa: ANN001, ANN002, ANN003
+            self,
+            observed_handoff_id,
+            *args,
+            **kwargs,
+        ):
+            if observed_handoff_id == handoff_id:
+                phase_pids["recovery"] = _postgresql_backend_pid(self.session)
+            return original_finalize(self, observed_handoff_id, *args, **kwargs)
+
+        monkeypatch.setattr(
+            HandoffRepository,
+            "finalize_quota_failure_recovery",
+            observed_finalize,
+        )
+
+        original_release = handoff_locks_module._release_handoff_lifecycle_lock
+
+        def observed_release(session, lock_key):  # noqa: ANN001
+            phase_pids["unlock"] = _postgresql_backend_pid(session)
+            return original_release(session, lock_key)
+
+        monkeypatch.setattr(
+            handoff_locks_module,
+            "_release_handoff_lifecycle_lock",
+            observed_release,
+        )
+
+        with (
+            pytest.raises(HandoffAcceptanceExecutionError) as acceptance_error,
+            transaction_boundary(session_factory) as session,
+        ):
+            _handoff_service(
+                session,
+                app.state.runtime.config_registry,
+            ).accept(
+                created["handoff_token"],
+                AcceptHandoffCommand(
+                    tenant_id="anytoolai",
+                    region="default",
+                ),
+            )
+
+        assert acceptance_error.value.error_code == "quota_exhausted"
+        assert set(phase_pids) == {"acquire", "recovery", "unlock"}
+        assert len(set(phase_pids.values())) == 1
+        _assert_handoff_lifecycle_lock_released(session_factory, handoff_id)
+
+
+@pytest.mark.postgresql
+@pytest.mark.slow
+def test_parallel_quota_exhausted_accept_recovery_is_idempotent() -> None:
+    with _provision_api_app("anytoolai_a17_handoff_parallel_quota") as (
+        session_factory,
+        app,
+    ):
+        _force_zero_guest_quota(app)
+        with transaction_boundary(session_factory) as session:
+            source_session_id, artifact_id = _seed_handoff_source(session)
+        created = _create_handoff(app, source_session_id, artifact_id).json()
+        request_count = 8
+
+        async def accept_many() -> list[httpx.Response]:
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app),
+                base_url="http://testserver",
+            ) as client:
+                path = f"/v1/handoffs/{created['handoff_token']}/accept"
+                return await asyncio.gather(
+                    *[
+                        client.post(
+                            path,
+                            json={},
+                            headers={
+                                "X-Request-ID": f"req_pg_handoff_parallel_quota_{index}"
+                            },
+                        )
+                        for index in range(request_count)
+                    ]
+                )
+
+        responses = asyncio.run(accept_many())
+        quota_exhausted_responses = [
+            response
+            for response in responses
+            if response.status_code == HTTPStatus.TOO_MANY_REQUESTS
+            and response.json()["error"]["code"] == "quota_exhausted"
+        ]
+        assert len(quota_exhausted_responses) == 1
+        assert all(
+            response.status_code in {HTTPStatus.CONFLICT, HTTPStatus.TOO_MANY_REQUESTS}
+            for response in responses
+        )
+        _assert_quota_exhausted_handoff_recovery_state(
+            session_factory,
+            handoff_id=created["handoff_id"],
+            source_session_id=source_session_id,
+            expected_handoff_status="failed",
+        )
+
+
+@pytest.mark.postgresql
+@pytest.mark.slow
+def test_handoff_quota_recovery_failure_does_not_return_quota_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _provision_api_app("anytoolai_a17_handoff_critical_recovery") as (
+        session_factory,
+        app,
+    ):
+        _force_zero_guest_quota(app)
+        with transaction_boundary(session_factory) as session:
+            source_session_id, artifact_id = _seed_handoff_source(session)
+        created = _create_handoff(app, source_session_id, artifact_id).json()
+
+        def fail_recovery(self, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+            raise RuntimeError("forced quota recovery failure")
+
+        monkeypatch.setattr(
+            HandoffRepository,
+            "finalize_quota_failure_recovery",
+            fail_recovery,
+        )
+
+        response = asyncio.run(
+            _request_with_exception_response(
+                app,
+                "POST",
+                f"/v1/handoffs/{created['handoff_token']}/accept",
+                {},
+            )
+        )
+
+        assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+        assert response.json()["error"]["code"] == "internal_server_error"
+
+        with transaction_boundary(session_factory) as session:
+            handoff = (
+                session.execute(
+                    sa.select(product_handoffs_table).where(
+                        product_handoffs_table.c.id == created["handoff_id"]
+                    )
+                )
+                .mappings()
+                .one()
+            )
+            quota_event_count = session.execute(
+                sa.select(sa.func.count())
+                .select_from(event_log_table)
+                .where(
+                    event_log_table.c.handoff_id == created["handoff_id"],
+                    event_log_table.c.event_type.in_(["quota.checked", "quota.exhausted"]),
+                )
+            ).scalar_one()
+            target_session_count = session.execute(
+                sa.select(sa.func.count())
+                .select_from(scenario_sessions_table)
+                .where(scenario_sessions_table.c.parent_scenario_session_id == source_session_id)
+            ).scalar_one()
+
+        assert handoff["status"] in {"created", "viewed"}
+        assert quota_event_count == 0
+        assert target_session_count == 0
+
+
+@pytest.mark.postgresql
+@pytest.mark.slow
 def test_postgresql_quota_recovery_finalizes_without_router_transaction() -> None:
     with _provision_api_app("anytoolai_a17_handoff_reservation_test") as (session_factory, app):
         _force_zero_guest_quota(app)
@@ -509,6 +845,238 @@ def test_postgresql_quota_recovery_finalizes_without_router_transaction() -> Non
 
         assert repeated.status.value == "failed"
         assert handoff_failed_count == 1
+
+
+def _pause_handoff_quota_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    recovery_ready: threading.Event,
+    release_recovery: threading.Event,
+) -> None:
+    original_finalize = HandoffRepository.finalize_quota_failure_recovery
+
+    def paused_finalize(self, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        recovery_ready.set()
+        assert release_recovery.wait(10)
+        return original_finalize(self, *args, **kwargs)
+
+    monkeypatch.setattr(
+        HandoffRepository,
+        "finalize_quota_failure_recovery",
+        paused_finalize,
+    )
+
+
+def _observe_handoff_lock_contention(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    armed: threading.Event,
+    handoff_id: str,
+    attempting: threading.Event,
+    acquired: threading.Event,
+) -> None:
+    original_lock = handoff_service_module.acquire_handoff_lifecycle_lock
+
+    def observed_lock(session, observed_handoff_id):  # noqa: ANN001
+        if armed.is_set() and observed_handoff_id == handoff_id:
+            attempting.set()
+            result = original_lock(session, observed_handoff_id)
+            acquired.set()
+            return result
+        return original_lock(session, observed_handoff_id)
+
+    monkeypatch.setattr(
+        handoff_service_module,
+        "acquire_handoff_lifecycle_lock",
+        observed_lock,
+    )
+
+
+def _accept_handoff_response(app, handoff_token: str, request_id: str) -> httpx.Response:
+    return asyncio.run(
+        _request_with_id(
+            app,
+            "POST",
+            f"/v1/handoffs/{handoff_token}/accept",
+            {},
+            request_id,
+        )
+    )
+
+
+def _decline_handoff_response(app, handoff_token: str, request_id: str) -> httpx.Response:
+    return asyncio.run(
+        _request_with_id(
+            app,
+            "POST",
+            f"/v1/handoffs/{handoff_token}/decline",
+            None,
+            request_id,
+        )
+    )
+
+
+async def _request_with_id(
+    app,
+    method: str,
+    path: str,
+    json: object | None,
+    request_id: str,
+) -> httpx.Response:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        return await client.request(
+            method,
+            path,
+            json=json,
+            headers={"X-Request-ID": request_id},
+        )
+
+
+def _expired_preview(
+    session_factory: SessionFactory,
+    app,
+    handoff_token: str,
+    expires_at: str,
+):
+    expiry_time = datetime_from_isoformat(expires_at) + timedelta(seconds=1)
+    with transaction_boundary(session_factory) as session:
+        return _handoff_service(
+            session,
+            app.state.runtime.config_registry,
+            clock=lambda: expiry_time,
+        ).get_preview(
+            handoff_token,
+            tenant_id="anytoolai",
+            region="default",
+        )
+
+
+async def _request_with_exception_response(
+    app,
+    method: str,
+    path: str,
+    json: object | None = None,
+) -> httpx.Response:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://testserver",
+    ) as client:
+        return await client.request(
+            method,
+            path,
+            json=json,
+            headers={"X-Request-ID": "req_pg_handoff_critical_recovery"},
+        )
+
+
+def _assert_quota_exhausted_handoff_recovery_state(
+    session_factory: SessionFactory,
+    *,
+    handoff_id: str,
+    source_session_id: str,
+    expected_handoff_status: str,
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        handoff = (
+            session.execute(
+                sa.select(product_handoffs_table).where(
+                    product_handoffs_table.c.id == handoff_id
+                )
+            )
+            .mappings()
+            .one()
+        )
+        quota_event_types = list(
+            session.execute(
+                sa.select(event_log_table.c.event_type).where(
+                    event_log_table.c.handoff_id == handoff_id,
+                    event_log_table.c.event_type.in_(["quota.checked", "quota.exhausted"]),
+                )
+            ).scalars()
+        )
+        handoff_event_types = list(
+            session.execute(
+                sa.select(event_log_table.c.event_type).where(
+                    event_log_table.c.handoff_id == handoff_id,
+                    event_log_table.c.event_type.like("handoff.%"),
+                )
+            ).scalars()
+        )
+        target_session_count = session.execute(
+            sa.select(sa.func.count())
+            .select_from(scenario_sessions_table)
+            .where(scenario_sessions_table.c.parent_scenario_session_id == source_session_id)
+        ).scalar_one()
+        target_job_count = session.execute(
+            sa.select(sa.func.count())
+            .select_from(jobs_table)
+            .where(jobs_table.c.scenario_session_id != source_session_id)
+        ).scalar_one()
+        usage = session.execute(sa.select(guest_quota_usage_table)).mappings().one()
+
+    assert handoff["status"] == expected_handoff_status
+    assert handoff["error_code"] == "quota_exhausted"
+    assert handoff["target_scenario_session_id"] is None
+    assert handoff["target_job_id"] is None
+    assert quota_event_types.count("quota.checked") == 1
+    assert quota_event_types.count("quota.exhausted") == 1
+    assert handoff_event_types.count("handoff.failed") == 1
+    assert "handoff.declined" not in handoff_event_types
+    assert "handoff.expired" not in handoff_event_types
+    assert "handoff.accepted" not in handoff_event_types
+    assert "handoff.consumed" not in handoff_event_types
+    assert target_session_count == 0
+    assert target_job_count == 0
+    assert usage["limit_count"] == 0
+    assert usage["used_count"] == 0
+
+
+def _prewarm_distinct_postgresql_connections(
+    session_factory: SessionFactory,
+    *,
+    count: int,
+) -> None:
+    engine = engine_from_session_factory(session_factory)
+    connections = [engine.connect() for _ in range(count)]
+    try:
+        pids = [
+            connection.execute(sa.text("SELECT pg_backend_pid()")).scalar_one()
+            for connection in connections
+        ]
+        assert len(set(pids)) == count
+    finally:
+        for connection in connections:
+            connection.close()
+
+
+def _postgresql_backend_pid(session) -> int:  # noqa: ANN001
+    return session.execute(sa.text("SELECT pg_backend_pid()")).scalar_one()
+
+
+def _assert_handoff_lifecycle_lock_released(
+    session_factory: SessionFactory,
+    handoff_id: str,
+) -> None:
+    engine = engine_from_session_factory(session_factory)
+    lock_key = handoff_locks_module._handoff_lock_key(handoff_id)
+    with engine.connect() as connection:
+        acquired = connection.execute(
+            sa.text("SELECT pg_try_advisory_lock(:lock_key)"),
+            {"lock_key": lock_key},
+        ).scalar_one()
+        assert acquired is True
+        unlocked = connection.execute(
+            sa.text("SELECT pg_advisory_unlock(:lock_key)"),
+            {"lock_key": lock_key},
+        ).scalar_one()
+        assert unlocked is True
+
+
+def datetime_from_isoformat(value: str):
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
 
 
 def _scenario_start_quota_limit(app) -> int:

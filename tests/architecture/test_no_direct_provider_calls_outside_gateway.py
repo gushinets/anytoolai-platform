@@ -9,10 +9,12 @@ SKIP_PATH_PARTS = {
     ".venv",
     ".quick-check-venv",
     ".quick-check-tmp",
+    ".tmp",
     ".uv-cache",
     ".pytest_cache",
     ".mypy_cache",
     ".ruff_cache",
+    ".tmp",
     "__pycache__",
     "site-packages",
     "node_modules",
@@ -22,6 +24,7 @@ SKIP_PATH_PARTS = {
     "build",
     "coverage",
     "tmp",
+    "uv-cache",
 }
 ALLOWED_ADAPTER_MODULE_ROOT = (
     ROOT

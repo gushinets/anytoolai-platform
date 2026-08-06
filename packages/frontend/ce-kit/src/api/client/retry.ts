@@ -27,6 +27,24 @@ export function isRetryable(error: PlatformApiError): boolean {
   return error.type === "network_error" || error.type === "timeout";
 }
 
-export function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Resolves after `ms`, or immediately if `signal` aborts first -- the caller distinguishes the two
+ * outcomes via `signal.aborted` after this settles. Always removes its listener/timer so an
+ * already-settled retry loop can't leak either.
+ */
+export function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const onAbort = () => {
+      clearTimeout(timeoutHandle);
+      resolve();
+    };
+    const timeoutHandle = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }

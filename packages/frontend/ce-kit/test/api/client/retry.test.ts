@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { assertRetryAllowed, isRetryable } from "../../../src/api/client/retry";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { assertRetryAllowed, delay, isRetryable } from "../../../src/api/client/retry";
 
 describe("assertRetryAllowed", () => {
   it("allows a retry policy on GET", () => {
@@ -42,5 +42,47 @@ describe("isRetryable", () => {
     expect(isRetryable({ type: "invalid_response", status: 200, message: "bad shape" })).toBe(
       false,
     );
+  });
+});
+
+describe("delay", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("resolves after the given duration when not cancelled", async () => {
+    const spy = vi.fn();
+    void delay(1000).then(spy);
+
+    await vi.advanceTimersByTimeAsync(999);
+    expect(spy).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it("resolves immediately when the signal aborts before the duration elapses", async () => {
+    const controller = new AbortController();
+    const spy = vi.fn();
+    void delay(10_000, controller.signal).then(spy);
+
+    await vi.advanceTimersByTimeAsync(0);
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it("resolves immediately when the signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const spy = vi.fn();
+    void delay(10_000, controller.signal).then(spy);
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(spy).toHaveBeenCalled();
   });
 });

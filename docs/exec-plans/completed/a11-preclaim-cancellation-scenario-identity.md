@@ -2,14 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-03
 - Last updated: 2026-08-05
-- Review date: 2026-08-05
-- Next action: none; PostgreSQL-marked lifecycle coverage has been run against a real
-  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`, not just collected.
-- Blocker: none.
+- Review date: 2026-08-03
+- Next action: none; implementation and required production-dialect validation are complete.
+- Blocker: none
 
 ## Task
 
@@ -41,12 +40,18 @@ References:
 ## Validation
 
 - [x] `uv run python scripts/agent/runner.py doctor` passed.
-- [x] `uv run python -m pytest apps/platform-worker/tests/test_worker_boot.py -k "cancel or cancellation or claim" -q` run against a real `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`: 21 passed, 0 skipped.
-- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_runtime_storage.py -k "cancel or claim" -q` run against a real `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`: 1 passed, 0 skipped.
-- [x] `uv run python -m pytest -m "postgresql" packages/backend/platform-core/tests apps/platform-api/tests apps/platform-worker/tests -k "cancel or cancellation or claim" -q` run against a real `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`: 33 passed, 0 skipped.
-- [x] `uv run python scripts/agent/runner.py postgresql-check` run against a real `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`: 293 passed, 0 skipped, 0 failed (the full `postgresql`-marked suite across platform-core/actions, platform API, and platform worker -- not just the cancel/claim slice above). Earlier entries in this section only ever ran the `-m "postgresql"` selections without a database URL configured, so every PostgreSQL-marked case silently skipped instead of executing; that gap is what `postgresql-check` exists to prevent (see `docs/tasks/a11-preclaim-cancellation-scenario-identity.md` for the same correction on the task doc). This run is the first genuine execution of that coverage for this change.
+- Historical targeted worker selection exited 0, but its PostgreSQL cases skipped without a local maintenance database URL; that skip is not counted as production-dialect evidence.
+- Historical targeted runtime-storage selection collected but skipped the PostgreSQL case without a local maintenance database URL; that skip is not counted as production-dialect evidence.
+- Historical PostgreSQL-marked selection collected but skipped without a local maintenance database URL; that skip is not counted as production-dialect evidence.
+- [x] PR #54 required CI ran the canonical `python scripts/agent/runner.py postgresql-check` successfully against PostgreSQL, including the cancellation and claim regressions.
 - [x] `uv run python scripts/agent/runner.py validate-configs` passed.
 - [x] `uv run python scripts/agent/runner.py validate-architecture` passed.
 - [x] `uv run python scripts/agent/runner.py validate-docs` passed.
 - [x] `uv run python scripts/agent/runner.py generate-docs --check` passed.
 - [x] `uv run python scripts/agent/runner.py quick-check` passed on the final run: 219 passed, 293 deselected.
+
+## Progress Log
+
+| Date | Progress | Next |
+|---|---|---|
+| 2026-08-05 | Reconciled the locally skipped PostgreSQL selections with PR #54's successful canonical PostgreSQL CI run. The merged implementation and production-dialect proof complete the plan scope. | None. |

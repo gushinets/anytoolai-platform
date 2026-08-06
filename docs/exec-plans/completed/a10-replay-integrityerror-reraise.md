@@ -2,13 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-07-17
-- Last updated: 2026-07-17
+- Last updated: 2026-08-05
 - Review date: 2026-07-17
 - Last run: 2026-07-17
-- Next action: patch the replay IntegrityError handler, add a focused regression, and validate.
+- Next action: none; implementation and validation are complete.
 - Blocker: none
 
 ## Goal
@@ -41,17 +41,18 @@ be read back.
 
 ## Implementation steps
 
-- [ ] Re-raise the original replay `IntegrityError` when no stored duplicate is found.
-- [ ] Add a focused regression for the non-duplicate failure path.
-- [ ] Run targeted validation.
+- [x] Re-raise the original replay `IntegrityError` when no stored duplicate is found.
+- [x] Add a focused regression for the non-duplicate failure path.
+- [x] Run targeted validation.
 
 ## Validation
 
-- [ ] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_event_log.py -q`
-- [ ] `python scripts/agent/runner.py quick-check`
+- [x] The event-log regression asserts propagation of the original `sa.exc.IntegrityError`.
+- [x] PR #54 `quick-check` passed on Linux and Windows baseline jobs.
 
 ## Progress log
 
 | Date | Progress | Next |
 |---|---|---|
 | 2026-07-17 | Verified the finding is still valid: the replay insert handler currently masks some non-duplicate `IntegrityError` cases by converting them into a round-trip failure. | Patch the handler and add a focused propagation regression. |
+| 2026-08-05 | Verified commit `1881c79` contains the replay error fix and regression; PR #54 quick-check passed. | None. |

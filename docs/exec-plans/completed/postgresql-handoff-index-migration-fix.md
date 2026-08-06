@@ -2,13 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: Codex
 - Created: 2026-07-31
-- Last updated: 2026-07-31
+- Last updated: 2026-08-05
 - Review date: 2026-07-31
-- Next action: correct revision `0010` PostgreSQL index DDL and verify offline SQL output.
-- Blocker: local PostgreSQL maintenance URL is not configured, so online migration validation must run in CI.
+- Next action: none; the migration fix and required validation are complete.
+- Blocker: none
 
 ## Goal
 
@@ -46,12 +46,15 @@ canonical handoff index contract.
 
 ## Validation
 
-- [x] `apps/platform-api/tests/test_migrate.py -q` (`7 passed, 2 skipped`)
+- Historical local migration selection passed seven non-PostgreSQL cases and skipped two
+  PostgreSQL cases; the skips are not counted as production-dialect evidence.
 - [x] `.venv\\Scripts\\python.exe -m alembic -c migrations/platform/alembic.ini upgrade head --sql`
-- [ ] PostgreSQL migration tests when a maintenance URL is available
+- [x] PR #54 required CI ran canonical `python scripts/agent/runner.py postgresql-check`
+  successfully against PostgreSQL, including migration coverage.
 - [x] `python scripts/agent/runner.py validate-architecture`
 - [x] `python scripts/agent/runner.py validate-docs`
-- [ ] `python scripts/agent/runner.py quick-check`
+- [x] PR #54 required CI ran canonical `python scripts/agent/runner.py quick-check` successfully
+  on Linux and Windows.
 
 ## Decision log
 
@@ -65,6 +68,7 @@ canonical handoff index contract.
 |---|---|---|
 | 2026-07-31 | Located invalid raw SQL in `0010`; `0004`/`0008` already use schema-aware Alembic APIs and the canonical head index set excludes the redundant target-session index. | Replace the qualified raw index identifiers and verify rendered SQL. |
 | 2026-07-31 | Replaced schema-qualified raw `CREATE INDEX` identifiers with bare index names; SQLAlchemy/Alembic output confirmed the valid PostgreSQL form. | Run the required PostgreSQL CI migration/storage coverage with a maintenance URL. |
+| 2026-08-05 | PR #54 required CI supplied the canonical PostgreSQL migration proof and Linux/Windows quick-check evidence. | None. |
 
 ## Open questions
 

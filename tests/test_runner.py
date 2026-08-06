@@ -204,11 +204,15 @@ def test_quick_check_strips_pythonpath_from_subprocess_env(monkeypatch) -> None:
 def test_postgresql_check_uses_marker_driven_backend_roots(monkeypatch) -> None:
     runner = load_runner_module()
     commands: list[list[str]] = []
+    tmp_root = Path("/tmp/repo/.quick-check-tmp")
     monkeypatch.setenv(
         runner.POSTGRESQL_TEST_DATABASE_URL_ENV,
         "postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:5432/postgres",
     )
     monkeypatch.setattr(runner.sys, "executable", "/tmp/repo/.venv/bin/python")
+    monkeypatch.setattr(runner.os, "getpid", lambda: 1234)
+    monkeypatch.setattr(runner, "TMP_ROOT", tmp_root)
+    monkeypatch.setattr(runner, "PYTEST_BASETEMP_ROOT", tmp_root / "pytest-runs")
     monkeypatch.setattr(
         runner,
         "run",
@@ -223,6 +227,8 @@ def test_postgresql_check_uses_marker_driven_backend_roots(monkeypatch) -> None:
             "pytest",
             "-m",
             "postgresql",
+            "--basetemp",
+            str(tmp_root / "pytest-runs" / "postgresql-1234"),
             "packages/backend/platform-core/tests",
             "packages/backend/platform-actions/tests",
             "apps/platform-api/tests",

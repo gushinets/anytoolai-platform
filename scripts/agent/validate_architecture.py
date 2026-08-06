@@ -17,6 +17,7 @@ SKIP_PATH_PARTS = {
     ".venv",
     ".quick-check-venv",
     ".quick-check-tmp",
+    ".tmp",
     ".uv-cache",
     ".pytest_cache",
     ".mypy_cache",
@@ -29,6 +30,7 @@ SKIP_PATH_PARTS = {
     "dist",
     "build",
     "coverage",
+    "tmp",
 }
 
 FORBIDDEN_PLATFORM_TERMS = [
