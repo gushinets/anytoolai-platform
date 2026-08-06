@@ -5,15 +5,15 @@
 - State: completed
 - Owner: agent
 - Created: 2026-07-20
-- Last updated: 2026-08-05
+- Last updated: 2026-08-06
 - Review date: 2026-07-20
 - Next action: none repo-side; canonical `postgresql-check` runs in the backend PostgreSQL CI job.
 - Blocker: none
 
 ## Decision
 
-**A13 remains backend-complete; ANY-170 delivered the CE client foundation, and ANY-171 owns the
-deferred real quota/start/polling integration.**
+**A13 remains backend-complete; ANY-170 delivered the CE client foundation, and ANY-171 has since
+delivered the real quota/start/polling integration this plan deferred.**
 
 The current patch will not implement the central CE-kit Platform API client because that would widen
 scope into the explicitly deferred ANY-171 frontend/runtime-client work. A13 will continue to expose only
@@ -44,10 +44,10 @@ real `createGuestIdentity()` local persistence in CE-kit.
 
 ## Follow-up Debt Owned By ANY-171
 
-- Real CE-kit `getQuota()` and `startScenario()` HTTP clients.
-- Guest-id propagation from local CE storage into scenario-start calls.
-- Typed CE handling for `429 quota_exhausted`, `422`, polling, and normalized API errors.
-- CE-kit integration tests for guest create + quota + scenario start.
+- None. ANY-171 delivered real CE-kit `getQuota()` and `startScenario()`/`prepareScenarioStart()`
+  HTTP clients, guest-id propagation from local CE storage into scenario-start calls, typed CE
+  handling for `429 quota_exhausted`, `422`, polling (`pollScenarioSession()`), and normalized API
+  errors, plus CE-kit integration tests for guest create + quota + scenario start.
 
 ## Validation Plan
 
@@ -82,3 +82,4 @@ Legacy non-PostgreSQL concurrency harnesses have been removed from the supported
 | 2026-07-28 | Tightened the scenario-dimension PostgreSQL quota test so it explicitly reads `kernel_demo.guest_quota_v1`, asserts the policy exists, derives `scenario_quota_limit` from `policy.limit_count`, and still drives the scenario-scoped override through the existing registry mutation helper. | Re-run the PostgreSQL slow test plus `quick-check` and record whether local validation can execute or skips for missing PostgreSQL configuration. |
 | 2026-07-28 | Ran the requested PostgreSQL pytest command locally with a repo-local `UV_CACHE_DIR`; the test module skipped because `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` was unset. `python scripts/agent/runner.py quick-check` passed. | Re-run the PostgreSQL slow test against a disposable PostgreSQL maintenance database URL to complete live-dialect validation. |
 | 2026-08-05 | PR #54's required CI completed the canonical PostgreSQL check against a live service. Reassigned the separately deferred CE integration to ANY-171. | None for A13. |
+| 2026-08-06 | Re-synced this plan after merging `main` into the ANY-171 branch reverted it to its pre-ANY-171-completion wording. ANY-171 has since delivered the deferred CE-kit quota/start/polling integration; cleared the "Follow-up Debt Owned By ANY-171" section. | None for A13. |

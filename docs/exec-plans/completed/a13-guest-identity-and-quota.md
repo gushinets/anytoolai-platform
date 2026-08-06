@@ -3,12 +3,13 @@
 ## Status
 
 - State: completed
-- Scope status: backend scope complete; frontend integration remains a separate ANY-171 follow-up
+- Scope status: backend scope complete; ANY-171 has since delivered the frontend quota/start/polling
+  integration this plan deferred
 - Owner: agent
 - Created: 2026-07-20
-- Last updated: 2026-08-05
+- Last updated: 2026-08-06
 - Review date: 2026-07-20
-- Next action: none for A13; ANY-171 owns the remaining frontend quota/start integration.
+- Next action: none for A13; ANY-171 delivered the frontend quota/start/polling integration.
 - Blocker: none
 
 ## Goal
@@ -16,8 +17,8 @@
 Implement backend-enforced access-lite quota for guest identities.
 
 A13 scope is backend storage, policy resolution, API behavior, event emission, and local CE guest-id
-persistence. ANY-170 delivered the CE client foundation; ANY-171 owns the deferred real
-quota/start/polling integration.
+persistence. ANY-170 delivered the CE client foundation; ANY-171 has since delivered the real
+quota/start/polling integration this plan deferred.
 
 ## Research Summary
 
@@ -83,9 +84,10 @@ quota/start/polling integration.
 
 ## Follow-up Debt
 
-- ANY-171 owns real CE-kit `getQuota()` and `startScenario()` clients, guest-id propagation,
-  polling, typed error handling, and integration tests. This is separate from A13's completed
-  backend scope.
+- None. ANY-171 delivered real CE-kit `getQuota()`, `startScenario()`/`prepareScenarioStart()`,
+  `getScenarioSession()`/`pollScenarioSession()`, and `nextAction()` clients, guest-id propagation,
+  polling, typed error handling, and integration tests -- separate from, and on top of, A13's
+  completed backend scope.
 
 ## Progress Log
 
@@ -97,3 +99,4 @@ quota/start/polling integration.
 | 2026-07-20 | Added PostgreSQL-backed quota concurrency integration coverage gated by `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` and clarified that only PostgreSQL-backed tests count as production concurrency proof. Docker CLI was present locally, but the daemon was unavailable during this pass. | Run the PostgreSQL test on a Docker-enabled host or against a disposable PostgreSQL test database. |
 | 2026-07-22 | Added explicit quota policy dimensions for product-wide and scenario-specific quota counters, persisted resolved dimension keys, and aligned tests/docs with configurable scope. | Run focused validation and refresh generated docs. |
 | 2026-08-05 | Recorded ANY-170 as the delivered CE client foundation, assigned deferred real quota/start/polling integration to ANY-171, and reconciled local skips with PR #54's successful canonical PostgreSQL CI evidence. | None for A13. |
+| 2026-08-06 | Re-synced this plan after merging `main` into the ANY-171 branch reverted it to its pre-ANY-171-completion wording. ANY-171 has since delivered the real CE-kit `getQuota()`/`startScenario()`/polling/`nextAction()` clients this plan deferred; cleared the "Follow-up Debt" section. | None for A13. |
