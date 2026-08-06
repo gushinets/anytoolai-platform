@@ -54,17 +54,17 @@ the `createGuestIdentity()` helper could create and locally persist an opaque gu
 - Runtime/session/job docs for no session/job on quota exhaustion.
 - Tests proving quota is consumed only on accepted starts and concurrency does not over-consume.
 
-## Deferred To A16 (Historical -- Delivered By A15/ANY-171)
+## A16 Deferral (Historical) -- All Delivered By A15/ANY-171
 
-- Central `PlatformApiClient`.
-- Real CE-kit `getQuota()` and `startScenario()` HTTP implementations.
-- Automatic guest-id propagation from CE-kit identity storage into scenario start calls.
-- Typed CE handling for `429 quota_exhausted`, `422`, polling, and normalized API errors.
-- CE-kit integration tests for guest create + scenario start and frontend quota handling.
+At the time, this plan deferred the following to A16. A15/ANY-171 has since delivered all of it (see
+`packages/frontend/ce-kit/README.md`); none of it remains outstanding.
 
-None of the above remains outstanding: A15/ANY-171 delivered the `PlatformApiClient`, real
-`getQuota()`/`startScenario()`/`prepareScenarioStart()`, guest-id propagation, typed error handling,
-`pollScenarioSession()`/`nextAction()`, and CE-kit integration tests.
+- [x] Central `PlatformApiClient`.
+- [x] Real CE-kit `getQuota()` and `startScenario()`/`prepareScenarioStart()` HTTP implementations.
+- [x] Automatic guest-id propagation from CE-kit identity storage into scenario start calls.
+- [x] Typed CE handling for `429 quota_exhausted`, `422`, polling
+  (`getScenarioSession()`/`pollScenarioSession()`), and normalized API errors.
+- [x] CE-kit integration tests for guest create + scenario start and frontend quota handling.
 
 ## Documentation Updates
 
