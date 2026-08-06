@@ -75,9 +75,12 @@ export async function pollScenarioSession(
       if (result.error.type === "aborted") {
         return { reason: "aborted", result };
       }
-      // A request timeout here can only mean it was cut off by the `timeoutMs` bound above,
-      // i.e. it ran into the polling deadline -- report it as a polling timeout, not a generic
-      // API error.
+      // Any individual request timeout stops the whole poll and is reported as a polling
+      // timeout, not a generic API error -- whether it was cut off by the remaining poll budget
+      // or by the client's own (possibly shorter) `timeoutMs`. `maxDurationMs` is an upper bound
+      // on total poll duration, not a per-request retry budget: e.g. with the defaults, a slow
+      // GET can time out at 10s (client.timeoutMs) even with ~50s of `maxDurationMs` still left,
+      // and this intentionally ends the entire poll rather than retrying the request.
       return { reason: result.error.type === "timeout" ? "timeout" : "error", result };
     }
     if (POLL_STOP_STATUSES.has(result.value.status)) {

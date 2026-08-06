@@ -256,8 +256,11 @@ const prepared = prepareScenarioStart({
 });
 
 let result = await prepared.execute(client);
-if (!result.ok && result.error.type !== "backend_error") {
-  // Ambiguous failure (network_error/timeout/aborted) -- explicit retry, same Idempotency-Key.
+if (!result.ok && (result.error.type === "network_error" || result.error.type === "timeout")) {
+  // Genuinely ambiguous outcomes only -- explicit retry, same Idempotency-Key. `aborted` means
+  // the caller's own signal fired, so retrying would defeat that cancellation; `backend_error`
+  // and `invalid_response` are not retried here either since the backend already answered (with
+  // an error or a malformed body), so a same-key resubmit is unlikely to change the outcome.
   result = await prepared.execute(client);
 }
 ```
@@ -292,6 +295,12 @@ one stops polling too, since only `nextAction()` can move it forward -- continui
 just idle until `maxDurationMs`), on a backend error, on cancellation, or once `maxDurationMs`
 elapses. It never starts, replays, or configures workflow/LLM execution -- it only reads
 backend-owned session state.
+
+Any individual request's own timeout also stops the whole poll immediately (reported as
+`reason: "timeout"`), even if it fires well before `maxDurationMs` would have elapsed -- e.g. with
+the defaults, a slow `GET` can time out at the client's 10s `timeoutMs` while `maxDurationMs` still
+has ~50s left. `maxDurationMs` is an upper bound on total poll duration, not a per-request retry
+budget; this is intentional fail-fast behavior, not a bug.
 
 ```ts
 import { pollScenarioSession } from "@anytoolai/ce-kit";

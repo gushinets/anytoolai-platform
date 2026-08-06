@@ -1,5 +1,6 @@
 import type { AssertExactSchemaShape } from "../api/driftAssertions";
 import type { components } from "../api/generated/platformApi";
+import { isRecord, isStringArray } from "../api/parsing";
 import type {
   RuntimeConfig,
   RuntimeFrontend,
@@ -14,7 +15,7 @@ import type {
  * so callers fall back to `invalid_response` instead of trusting arbitrary payload content.
  */
 export function parseRuntimeConfig(payload: unknown): RuntimeConfig | null {
-  if (!_isRecord(payload)) {
+  if (!isRecord(payload)) {
     return null;
   }
 
@@ -30,11 +31,11 @@ export function parseRuntimeConfig(payload: unknown): RuntimeConfig | null {
 
   if (
     typeof productId !== "string" ||
-    !_isStringArray(frontendIds) ||
+    !isStringArray(frontendIds) ||
     !Array.isArray(frontends) ||
-    !_isStringArray(scenarioIds) ||
+    !isStringArray(scenarioIds) ||
     !Array.isArray(scenarios) ||
-    !_isStringArray(allowedUiCapabilities)
+    !isStringArray(allowedUiCapabilities)
   ) {
     return null;
   }
@@ -82,14 +83,6 @@ export function parseRuntimeConfig(payload: unknown): RuntimeConfig | null {
   };
 }
 
-function _isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function _isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
-
 /** Guards against the id list and the entry list (e.g. frontend_ids vs. frontends) desyncing. */
 function _sameIds(ids: string[], entryIds: string[]): boolean {
   if (ids.length !== entryIds.length) {
@@ -105,7 +98,7 @@ function _sameIds(ids: string[], entryIds: string[]): boolean {
 }
 
 function _parseRendererHint(value: unknown): RuntimeRendererHint | null {
-  if (!_isRecord(value)) {
+  if (!isRecord(value)) {
     return null;
   }
   const { renderer, schema_ref: schemaRef, schema_version: schemaVersion } = value;
@@ -123,7 +116,7 @@ function _parseRendererHint(value: unknown): RuntimeRendererHint | null {
 }
 
 function _parseFrontend(value: unknown): RuntimeFrontend | null {
-  if (!_isRecord(value)) {
+  if (!isRecord(value)) {
     return null;
   }
   const { frontend_id: frontendId, type, enabled } = value;
@@ -134,7 +127,7 @@ function _parseFrontend(value: unknown): RuntimeFrontend | null {
 }
 
 function _parseScenario(value: unknown): RuntimeScenario | null {
-  if (!_isRecord(value)) {
+  if (!isRecord(value)) {
     return null;
   }
   const {
@@ -152,7 +145,7 @@ function _parseScenario(value: unknown): RuntimeScenario | null {
   if (
     typeof scenarioId !== "string" ||
     typeof version !== "number" ||
-    (!allowedNextActionsAbsent && !_isStringArray(allowedNextActions))
+    (!allowedNextActionsAbsent && !isStringArray(allowedNextActions))
   ) {
     return null;
   }
@@ -173,7 +166,7 @@ function _parseScenario(value: unknown): RuntimeScenario | null {
 }
 
 function _parseQuotaSummary(value: unknown): RuntimeQuotaSummary | null {
-  if (!_isRecord(value)) {
+  if (!isRecord(value)) {
     return null;
   }
   const {
