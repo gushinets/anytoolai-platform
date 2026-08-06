@@ -5,10 +5,10 @@
 - State: active
 - Owner: agent
 - Created: 2026-08-05
-- Last updated: 2026-08-05
-- Review date: 2026-08-05
-- Next action: none -- PR is open, CI (frontend, docs, Windows/Ubuntu baseline, PostgreSQL, smoke,
-  full-check workflows) is green, and the fourth review pass below is addressed.
+- Last updated: 2026-08-06
+- Review date: 2026-08-06
+- Next action: commit and push the fifth- and sixth-pass fixes below (validated locally; not yet
+  on the PR head, so CI has not run on them).
 - Blocker: none
 
 ## Goal
@@ -81,10 +81,14 @@ retry-loop abort check that only ran after a configured delay, and two variants 
 - `python scripts/agent/runner.py frontend-check` -- passed (typecheck, `pnpm -r test`,
   `generate-api-types:check`, build all green).
 - `python scripts/agent/runner.py full-check` -- passed locally; PR is open and CI (frontend, docs,
-  Windows/Ubuntu baseline, PostgreSQL, smoke, full-check workflows) is green on the current head.
+  Windows/Ubuntu baseline, PostgreSQL, smoke, full-check workflows) is green as of the fourth-pass
+  head.
 - Manual check: temporarily reintroduced a `limit_count: number -> string` mismatch under
   `src/api/__drift_scratch.ts` and confirmed `tsc --noEmit` fails with `typeMismatch: "limit_count"`
   before removing the scratch file.
+- Fifth- and sixth-pass fixes (below): `tsc --noEmit`, `pnpm -r test`, and `frontend-check` all
+  pass locally against the working tree. Not yet committed/pushed, so CI has not run against them --
+  pending, not claimed green, until they land on the PR head.
 
 ## Decision log
 
@@ -249,3 +253,26 @@ exec plan itself are addressed by this section and the updated Goal above.
    `createGuestIdentity()` call reuses the persisted id without calling the backend again.
    README's guest-identity section updated to match (previously said a failed initial read
    always skips the write-back, which is no longer true).
+
+## Code review (2026-08-06, sixth pass -- P2 return recovered cached identity)
+
+1. VALID `PlatformApiClient.createGuestIdentity()` -- when the persist-time re-read found an
+   existing guest id (another caller already won the race and cached its own), the write was
+   correctly skipped but the method still `return`ed the outer `result`, i.e. *this* call's own
+   backend-fetched id, not the cached one it just found and deferred to. The caller therefore used
+   one id while storage (and every later call) used a different one, splitting guest-based quota
+   across two ids -- the same failure mode the fifth pass fixed for the *initial*-read-failure
+   path, just reachable from the concurrent-write path instead. Fixed by returning
+   `{ ok: true, value: { guestId: existingGuestId } }` immediately once that second read finds a
+   value, instead of falling through to the outer `result`. Regression test:
+   `test/identity/guestIdentity.test.ts` > "returns the concurrently cached guest id, not its own
+   fetched id, when the persist-step re-read finds one" (renamed/updated from "does not overwrite
+   a guest id cached concurrently between this call's own miss-read and its persist step", which
+   asserted the old, buggy return value as if it were correct). The sibling race test ("does not
+   clobber a concurrently cached guest id when this call's own storage read failed") is unaffected
+   -- there the persist-time re-read itself throws rather than finding a value, so it still falls
+   through to the outer `result` by design; nothing to prefer was ever observed. README's
+   guest-identity section updated to state that the recovered cached id, not this call's own
+   fetched id, is what gets returned when the second read finds a value, and to explicitly note
+   the still-open two-concurrent-empty-reads race (separate, non-atomic `get`/`set` on
+   `AsyncStorage` means two callers can still both miss the re-read and both write different ids).

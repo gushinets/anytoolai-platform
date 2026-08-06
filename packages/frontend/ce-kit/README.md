@@ -188,11 +188,19 @@ id from the backend exactly as it would if nothing were cached. As with the pers
 Persisting the fresh id from that fallback request re-reads `storage`/`storageKey` immediately
 before writing, regardless of whether the *initial* read above failed or genuinely missed --
 skipping persistence just because the first read errored would risk losing the id forever on a
-transient failure, forcing every later call to create (and pay quota for) a new one. The write is
-skipped only if that second read already finds a value there (another concurrent call already has
-the real cached value; persisting anyway would overwrite it with a different id from the same
-backend response) or if the second read/write itself fails. The returned identity is always valid
-and usable by the caller either way; only the write-back is ever skipped.
+transient failure, forcing every later call to create (and pay quota for) a new one. If that second
+read already finds a value there, the write is skipped and *that* cached value is returned instead
+of this call's own freshly-fetched id -- another concurrent call already has the real cached value,
+so persisting or returning this call's different id would split guest-based quota across two ids.
+The write is otherwise skipped only if the second read/write itself fails, in which case this call's
+own fetched id is returned unpersisted (still valid and usable, just not cached).
+
+This second read narrows the race but does not eliminate it: `AsyncStorage`'s `get` and `set` are
+separate, non-atomic calls, so two concurrent callers can both perform their re-read, both observe
+nothing cached, and both then `set()` a different guest id -- the last write wins and silently
+orphans the other caller's id on the backend. Closing this fully would need an atomic
+set-if-absent/compare-and-set primitive on `AsyncStorage`, which none of the current adapters
+provide.
 
 ## Runtime config
 

@@ -269,12 +269,14 @@ describe("PlatformApiClient.createGuestIdentity", () => {
     expect(store.get("anytoolai.guest_id")).toBe("guest_original");
   });
 
-  it("does not overwrite a guest id cached concurrently between this call's own miss-read and its persist step", async () => {
+  it("returns the concurrently cached guest id, not its own fetched id, when the persist-step re-read finds one", async () => {
     // This call's own initial read genuinely misses (no throw, no cached value yet). Before this
     // call persists the id it fetched from the backend, some other context (another tab, another
     // client instance, another caller with a successful cache-hit read of its own) writes a valid
-    // id to the same key. The persist step must re-check and prefer that already-cached value
-    // instead of blindly overwriting it with this call's own (different) fetched id.
+    // id to the same key. The persist step must re-check, prefer that already-cached value over
+    // blindly overwriting it with this call's own (different) fetched id, AND return that same
+    // cached value to the caller -- returning its own fetched id here while storage (and every
+    // future call) uses a different one would split guest-based quota across two ids.
     const store = new Map<string, string>();
     let getCallCount = 0;
     const storage: AsyncStorage = {
@@ -298,7 +300,7 @@ describe("PlatformApiClient.createGuestIdentity", () => {
 
     const result = await client.createGuestIdentity({ storage });
 
-    expect(result).toEqual({ ok: true, value: { guestId: "guest_fetched" } });
+    expect(result).toEqual({ ok: true, value: { guestId: "guest_written_concurrently" } });
     expect(store.get("anytoolai.guest_id")).toBe("guest_written_concurrently");
     expect(storage.set).not.toHaveBeenCalled();
   });

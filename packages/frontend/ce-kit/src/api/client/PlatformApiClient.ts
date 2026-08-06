@@ -155,9 +155,15 @@ export class PlatformApiClient {
       if (result.ok) {
         try {
           const existingGuestId = await options.storage.get(storageKey);
-          if (!existingGuestId) {
-            await options.storage.set(storageKey, result.value.guestId);
+          if (existingGuestId) {
+            // Another caller already won the race and cached its own id -- return that one
+            // instead of this call's freshly-fetched id, so this caller's return value and what's
+            // in storage never disagree (a mismatch here is exactly what splits guest-based quota
+            // across two ids: this call would keep using the un-persisted one while every future
+            // call reads the cached one).
+            return { ok: true, value: { guestId: existingGuestId } };
           }
+          await options.storage.set(storageKey, result.value.guestId);
         } catch {
           // The backend already created this identity; a storage failure must not discard it --
           // that would orphan it on the backend and cause the next call to create a duplicate.
