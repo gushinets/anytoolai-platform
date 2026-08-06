@@ -1,4 +1,4 @@
-import type { AssertExactSchemaKeys } from "../api/driftAssertions";
+import type { AssertExactSchemaShape } from "../api/driftAssertions";
 import type { PlatformApiError } from "../api/errors";
 import type { components } from "../api/generated/platformApi";
 import type { AsyncStorage } from "../storage/asyncStorage";
@@ -30,12 +30,12 @@ export function parseGuestIdentityPayload(payload: unknown): string | null {
   return null;
 }
 
-// Compile-time drift check: fails typecheck if the backend's GuestIdentityResponse schema grows a
-// field that parseGuestIdentityPayload() above doesn't know about.
-const _guestIdentityResponseKeys = ["guest_id"] as const;
-type _GuestIdentityResponseKeysCheck = AssertExactSchemaKeys<
+// Compile-time drift check: fails typecheck if the backend's GuestIdentityResponse schema grows,
+// loses, retypes, or changes the nullability of a field that parseGuestIdentityPayload() above
+// doesn't know about.
+type _GuestIdentityResponseShapeCheck = AssertExactSchemaShape<
   components["schemas"]["GuestIdentityResponse"],
-  typeof _guestIdentityResponseKeys
+  { guest_id: string }
 >;
-const _assertGuestIdentityResponseKeysMatchGenerated: _GuestIdentityResponseKeysCheck = true;
-void _assertGuestIdentityResponseKeysMatchGenerated;
+const _assertGuestIdentityResponseShapeMatchesGenerated: _GuestIdentityResponseShapeCheck = true;
+void _assertGuestIdentityResponseShapeMatchesGenerated;

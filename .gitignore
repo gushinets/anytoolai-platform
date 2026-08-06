@@ -39,3 +39,4 @@ temp/
 .tmp/
 .pytest-tmp
 .agent/
+plans/

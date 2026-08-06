@@ -115,15 +115,15 @@ describe("PlatformApiClient", () => {
     });
   });
 
-  it("returns network_error when fetch rejects", async () => {
+  it("returns a fixed, safe network_error message when fetch rejects, without leaking the raw exception text", async () => {
     const fetchImpl = vi.fn(async () => {
-      throw new TypeError("Failed to fetch");
+      throw new TypeError("Failed to fetch: connect ECONNREFUSED 10.0.0.5:443");
     });
     const client = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl });
 
     const result = await client.request({ path: "/v1/x" });
 
-    expect(result).toEqual({ ok: false, error: { type: "network_error", message: "Failed to fetch" } });
+    expect(result).toEqual({ ok: false, error: { type: "network_error", message: "Network request failed." } });
   });
 
   it("times out and reports a timeout error", async () => {
@@ -233,6 +233,54 @@ describe("PlatformApiClient", () => {
     await vi.advanceTimersByTimeAsync(50);
 
     await expect(pending).resolves.toEqual({ ok: false, error: { type: "aborted" } });
+    // Cancellation during the backoff delay must settle promptly and must not trigger the second
+    // fetchImpl attempt -- only the first attempt's call should have happened.
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry when the caller cancels mid-attempt and no retry delayMs is set", async () => {
+    // With `delayMs` unset (or 0), the retry loop has no `await delay()` to check the signal
+    // after -- the caller-cancellation check must not be conditional on a delay having happened,
+    // or cancellation during an in-flight attempt (with no delay configured at all) would still
+    // let a second `fetchImpl` call slip through.
+    const fetchImpl = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      });
+    });
+    const client = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl, timeoutMs: 10_000 });
+    const controller = new AbortController();
+
+    const pending = client.request({
+      path: "/v1/x",
+      signal: controller.signal,
+      retry: { attempts: 3 }, // no delayMs
+    });
+    controller.abort();
+
+    await expect(pending).resolves.toEqual({ ok: false, error: { type: "aborted" } });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves promptly with aborted when the caller cancels during the retry delay, without waiting out the full delay", async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    const client = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+    const controller = new AbortController();
+
+    const pending = client.request({
+      path: "/v1/x",
+      signal: controller.signal,
+      retry: { attempts: 3, delayMs: 10_000 },
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(0);
+
+    await expect(pending).resolves.toEqual({ ok: false, error: { type: "aborted" } });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it("retries a safe GET request on network_error up to the configured attempts", async () => {
