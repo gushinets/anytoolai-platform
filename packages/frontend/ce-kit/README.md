@@ -2,13 +2,14 @@
 
 Shared Platform API client foundation for AnytoolAI Chrome Extensions and web frontends.
 
-This package currently covers **A15a — CE Kit API Client Foundation** (ANY-170): the transport
-layer, the stable error union, injectable storage, guest identity, and runtime config. It does
-**not** yet cover quota, scenario start, or polling (A15b / ANY-171) — `getQuota()` and
-`startScenario()` are still demo stubs, and several other exports (`pollJob`, `getScenarioSession`,
-`getArtifact`, `createHandoff`, `openHandoffConsent`, `captureEmail`, `trackClientEvent`, the
-`render*` helpers) are fake-success placeholders deferred to later tickets. Do not treat their
-presence in `src/index.ts` as a working contract.
+This package covers **A15 — CE Kit MVP API Client** (ANY-8): both **A15a — Foundation** (ANY-170)
+and **A15b — Scenario, Quota, and Polling Client** (ANY-171). The transport layer, the stable error
+union, injectable storage, guest identity, runtime config, quota, idempotent scenario start,
+session polling, and next-action are all real. Several other exports (`pollJob`, `getArtifact`,
+`createHandoff`, `openHandoffConsent`, `captureEmail`, `trackClientEvent`, the `render*` helpers)
+remain fake-success placeholders deferred to later tickets (public job polling, artifact fetching,
+handoff, email capture, client-event ingestion). Do not treat their presence in `src/index.ts` as a
+working contract.
 
 ## PlatformApiClient
 
@@ -215,6 +216,151 @@ import { getRuntimeConfig } from "@anytoolai/ce-kit";
 const result = await getRuntimeConfig(client, "kernel_demo");
 if (result.ok) {
   const { scenarios, quotaSummary, allowedUiCapabilities } = result.value;
+}
+```
+
+## Quota
+
+`getQuota(client, { productId, guestId, scenarioId? })` reads backend-owned guest quota state.
+`scenarioId` is only needed for scenario-dimension quota policies; product-dimension queries omit
+it. Quota is never enforced client-side -- this is read-only visibility into state the backend
+already checks on scenario start.
+
+```ts
+import { getQuota } from "@anytoolai/ce-kit";
+
+const result = await getQuota(client, { productId: "kernel_demo", guestId });
+if (result.ok) {
+  const { usedCount, remainingCount, exhausted } = result.value;
+}
+```
+
+## Scenario start and idempotent retry (ANY-150)
+
+`prepareScenarioStart(request)` returns an opaque, retryable handle: it generates one
+`Idempotency-Key` when prepared, and every `.execute(client)` call on that same handle -- including
+an explicit retry of an ambiguous failure -- reuses that key, so the backend collapses duplicate
+submits into the original session/job instead of double-charging quota. A genuinely new submission
+means calling `prepareScenarioStart()` again for a fresh key. Callers never see or manage the key or
+its header directly.
+
+```ts
+import { prepareScenarioStart } from "@anytoolai/ce-kit";
+
+const prepared = prepareScenarioStart({
+  productId: "kernel_demo",
+  scenarioId: "kernel_demo.single_action_smoke_v1",
+  frontendId: "kernel_demo_ce",
+  input: { text: "hello" },
+  guestId,
+});
+
+let result = await prepared.execute(client);
+if (
+  !result.ok &&
+  (result.error.type === "network_error" ||
+    result.error.type === "timeout" ||
+    (result.error.type === "invalid_response" && result.error.status >= 200 && result.error.status < 300))
+) {
+  // Genuinely ambiguous outcomes only -- explicit retry, same Idempotency-Key. A 2xx
+  // invalid_response means the backend already created the session and consumed quota but
+  // returned an unparseable body, so the caller still lacks the session/job IDs -- that is
+  // ambiguous too, and retrying with the same key is the recovery path (the backend returns the
+  // existing session/job instead of creating a new one). `aborted` means the caller's own signal
+  // fired, so retrying would defeat that cancellation; `backend_error` and a non-2xx
+  // `invalid_response` are not retried here either, since the backend already answered with an
+  // error it isn't expected to reconsider on a same-key resubmit.
+  result = await prepared.execute(client);
+}
+```
+
+`startScenario(client, request)` is a one-shot convenience wrapper -- `prepareScenarioStart(request).execute(client)`
+-- for callers that don't need to retry:
+
+```ts
+import { startScenario } from "@anytoolai/ce-kit";
+
+const result = await startScenario(client, {
+  productId: "kernel_demo",
+  scenarioId: "kernel_demo.single_action_smoke_v1",
+  frontendId: "kernel_demo_ce",
+  input: { text: "hello" },
+  guestId,
+});
+```
+
+Both surface `404` (unknown scenario/guest), `409 idempotency_key_conflict` (retry with a new key
+or the original request), `422` (invalid input/guest requirement), and `429 quota_exhausted` (no
+session/job/quota state is created in CE-kit on this path) through the standard `PlatformApiResult`.
+
+## Scenario session and polling
+
+`getScenarioSession(client, scenarioSessionId, { signal?, timeoutMs? })` is a single typed
+`GET /v1/scenario-sessions/{id}` read.
+
+`pollScenarioSession(client, scenarioSessionId, { intervalMs?, maxDurationMs?, signal? })` polls it
+on a bounded interval and stops on `completed`, `failed`, `expired`, or `waiting_for_user` (the last
+one stops polling too, since only `nextAction()` can move it forward -- continuing to poll would
+just idle until `maxDurationMs`), on a backend error, on cancellation, or once `maxDurationMs`
+elapses. It never starts, replays, or configures workflow/LLM execution -- it only reads
+backend-owned session state.
+
+Any individual request's own timeout also stops the whole poll immediately (reported as
+`reason: "timeout"`), even if it fires well before `maxDurationMs` would have elapsed -- e.g. with
+the defaults, a slow `GET` can time out at the client's 10s `timeoutMs` while `maxDurationMs` still
+has ~50s left. `maxDurationMs` is an upper bound on total poll duration, not a per-request retry
+budget; this is intentional fail-fast behavior, not a bug.
+
+```ts
+import { pollScenarioSession } from "@anytoolai/ce-kit";
+
+const controller = new AbortController();
+const outcome = await pollScenarioSession(client, scenarioSessionId, {
+  intervalMs: 2_000,
+  maxDurationMs: 60_000,
+  signal: controller.signal, // e.g. tied to a popup closing
+});
+
+switch (outcome.reason) {
+  case "session_status": // outcome.result.value.status is a stop status
+  case "error": // outcome.result is the backend_error/invalid_response that stopped polling
+  case "timeout": // maxDurationMs elapsed, or a single poll ran into the deadline and had to be
+                  // cut short; outcome.result is the last successful read if one happened before
+                  // the deadline, otherwise a failed (timeout-type) result
+  case "aborted": // signal fired mid-poll
+}
+```
+
+## Next action
+
+`nextAction(client, { scenarioSessionId, nextActionId, checkpointId })` sends the checkpoint the
+frontend is currently acting on; the backend is authoritative on whether it's stale, returning
+`409` if the session moved on. That `409` is a **different** conflict than scenario-start's
+`409 idempotency_key_conflict` even though both are HTTP 409 -- see `isScenarioActionConflict()` /
+`isIdempotencyKeyConflict()` below.
+
+```ts
+import { nextAction } from "@anytoolai/ce-kit";
+
+const result = await nextAction(client, {
+  scenarioSessionId,
+  nextActionId: "copy_result",
+  checkpointId: currentCheckpointId,
+});
+```
+
+## Classifying backend errors
+
+`isIdempotencyKeyConflict()`, `isScenarioActionConflict()`, and `isQuotaExhausted()` are typed
+guards over `PlatformApiError` for the ambiguous cases above -- prefer them over comparing
+`error.code` strings directly, since they're the tested, reusable source of truth for which codes
+mean what:
+
+```ts
+import { isIdempotencyKeyConflict, isQuotaExhausted } from "@anytoolai/ce-kit";
+
+if (!result.ok && isQuotaExhausted(result.error)) {
+  // no session/job was created; show the paywall/upsell path
 }
 ```
 

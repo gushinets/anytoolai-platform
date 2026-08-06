@@ -29,9 +29,9 @@ They must not:
 - own authoritative scenario state.
 
 Shared `ce-kit` must provide reusable API/job/quota/handoff helpers so MVP-B Chrome Extensions do not copy that code.
-After A13, only `createGuestIdentity()` is wired as a real CE-kit helper: it creates an opaque
-backend guest id and may store it locally. Full CE-kit API integration for `getQuota()` and
-`startScenario()` is deferred to A16.
+After A13/A15 (ANY-8, ANY-170/ANY-171), `createGuestIdentity()`, `getQuota()`, `startScenario()`
+(via `prepareScenarioStart()`), `getScenarioSession()`, `pollScenarioSession()`, and `nextAction()`
+are all real CE-kit helpers backed by `PlatformApiClient`.
 
 Required `ce-kit` capabilities:
 
@@ -50,14 +50,14 @@ Required `ce-kit` capabilities:
 - `renderJobStatus()`
 - `renderError()`
 
-A13 status:
+A13/A15 status:
 
 - backend guest identity and quota enforcement are implemented;
-- CE local guest-id persistence is the only implemented CE-kit integration and is provided through
-  `createGuestIdentity()`;
-- `startScenario()` and `getQuota()` remain A13 demo/deferred helpers;
-- A16 owns the central `PlatformApiClient`, real HTTP start/quota calls, guest-id propagation,
-  typed `429 quota_exhausted` handling, and CE integration tests.
+- CE local guest-id persistence is provided through `createGuestIdentity()`;
+- `startScenario()` (via `prepareScenarioStart()`) and `getQuota()` are real HTTP clients, not demo
+  stubs;
+- A15 (ANY-8, ANY-170/ANY-171) owns the central `PlatformApiClient`, real HTTP start/quota calls,
+  guest-id propagation, typed `429 quota_exhausted` handling, and CE integration tests.
 
 ## A12/A13 public scenario runtime contract
 

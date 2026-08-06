@@ -208,9 +208,9 @@ Guest quota is backend-enforced. Chrome Extensions may store the opaque guest id
 is checked and consumed by the backend on accepted scenario start, not on frontend click and not from
 provider usage or retry telemetry.
 
-A13 is backend-complete for guest identity/quota and integration pending for the reusable CE-kit
-runtime client. A16 owns real `getQuota()` and `startScenario()` HTTP helpers, guest-id propagation,
-typed `429 quota_exhausted` handling, and CE-kit integration tests.
+A13 is backend-complete for guest identity/quota. A15 (ANY-8, ANY-170/ANY-171) owns real
+`getQuota()` and `startScenario()` HTTP helpers, guest-id propagation, typed `429 quota_exhausted`
+handling, and CE-kit integration tests.
 
 ## Web Mirror
 

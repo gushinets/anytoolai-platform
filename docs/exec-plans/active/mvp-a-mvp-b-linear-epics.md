@@ -222,8 +222,8 @@ LLM runtime decisions from `docs/architecture/llm-runtime.md` and ADR 0007 apply
 
 **Priority:** P1  
 **Depends on:** A04, A12  
-**Status:** backend-complete; ANY-170 delivered the CE client foundation and ANY-171 owns the
-deferred real quota/start/polling integration.
+**Status:** backend-complete; ANY-170 delivered the CE client foundation and ANY-171 has since
+delivered the real quota/start/polling integration this plan deferred.
 **Goal:** реализовать backend-enforced access-lite quota для guests.  
 **Implementation details:** Alembic `0003` guest/quota tables. API creates opaque guest id; CE stores it locally. Quota consumed server-side on accepted scenario start, not frontend click.  
 **Acceptance criteria:** guest can run N times; N+1 returns standardized `quota_exhausted`; quota events emitted; quota check endpoint returns current state.  
@@ -263,10 +263,11 @@ deferred real quota/start/polling integration.
 
 **Implementation notes for assignee:** ce-kit должен быть shared integration layer для всех CE, поэтому helpers возвращают typed results/errors и скрывают HTTP plumbing. Описать base URL configuration, timeout/retry/polling behavior, guest id persistence expectations, API versioning path и stable error union; не включать prompts, provider/model selection или product-specific UI decisions.
 ANY-170 delivered the central `PlatformApiClient`, async storage, real `createGuestIdentity()`, and
-real `getRuntimeConfig()`. ANY-171 must replace the A13 demo/deferred `startScenario()` and `getQuota()` helpers with real
-Platform API calls, propagate the opaque guest id created by `createGuestIdentity()`, and handle
-`429 quota_exhausted`, `422`, normal start success, and polling without moving quota enforcement into
-the frontend.
+real `getRuntimeConfig()`. ANY-171 has since replaced the A13 demo/deferred `startScenario()` and
+`getQuota()` helpers with real Platform API calls (`prepareScenarioStart()`/`startScenario()`,
+`getQuota()`, `getScenarioSession()`/`pollScenarioSession()`, `nextAction()`), propagating the
+opaque guest id created by `createGuestIdentity()` and handling `429 quota_exhausted`, `422`,
+normal start success, and polling without moving quota enforcement into the frontend.
 
 **LLM runtime alignment:** `ce-kit` must never expose provider/model selection, `provider_policy_ref`, prompt text, retry controls, PydanticAI settings, LiteLLM settings, or provider-call internals. Browser retry/polling behavior is API-level only and must not attempt to replay LLM actions directly.
 

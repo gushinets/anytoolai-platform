@@ -17,7 +17,13 @@ const DEFAULT_TIMEOUT_MS = 10_000;
 export class PlatformApiClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
-  private readonly timeoutMs: number;
+  /**
+   * This client's configured per-request default. Public so callers that must bound an
+   * individual request more tightly than this (e.g. `pollScenarioSession()` enforcing its own
+   * overall deadline) can take `Math.min(client.timeoutMs, ...)` instead of passing a raw
+   * `timeoutMs` that would silently replace -- and could loosen -- this configured default.
+   */
+  readonly timeoutMs: number;
   private readonly defaultHeaders: Record<string, string>;
   /** Single-flight guard for createGuestIdentity(), scoped to this client instance only. */
   private inFlightGuestIdentity: Promise<GuestIdentityResult> | null = null;

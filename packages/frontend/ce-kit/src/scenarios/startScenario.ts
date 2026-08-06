@@ -1,25 +1,17 @@
-export type ScenarioStartRequest = {
-  productId: string;
-  scenarioId: string;
-  input: unknown;
-};
-
-export type ScenarioStartDemoResponse = {
-  scenarioSessionId: string;
-};
+import type { PlatformApiClient, PlatformApiResult } from "../api/client";
+import { prepareScenarioStart } from "./prepareScenarioStart";
+import type { ScenarioSessionSnapshot, ScenarioStartRequest } from "./types";
 
 /**
- * A13 demo helper only.
- *
- * It does not call the Platform API and it does not propagate guest identity. A16 owns the real
- * shared Platform API client, including backend `POST /scenario/start`, `429 quota_exhausted`,
- * `422`, polling, and normalized frontend error handling.
- * TODO(A16, ANY-150): the real client must send an `Idempotency-Key` header on every start
- * request (same key on retry) so duplicate submits replay instead of double-charging quota --
- * see docs/architecture/scenario-session-model.md.
+ * Convenience one-shot start: prepares a single `Idempotency-Key`-bound operation (ANY-150) and
+ * executes it immediately. Callers that need to retry an ambiguous failure with the same key --
+ * rather than risk a new submission double-charging quota -- must use `prepareScenarioStart()`
+ * directly and call `.execute()` again on the same handle instead of calling `startScenario()`
+ * a second time.
  */
 export async function startScenario(
-  _request: ScenarioStartRequest,
-): Promise<ScenarioStartDemoResponse> {
-  return { scenarioSessionId: "ssn_demo" };
+  client: PlatformApiClient,
+  request: ScenarioStartRequest,
+): Promise<PlatformApiResult<ScenarioSessionSnapshot>> {
+  return prepareScenarioStart(request).execute(client);
 }

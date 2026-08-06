@@ -4,10 +4,10 @@ MVP-A uses guest quota instead of billing.
 
 ## A13 status
 
-A13 is **backend-complete, integration pending**. The backend owns guest identity persistence,
-quota policy resolution, quota state, quota consumption, standardized API errors, and quota events.
-CE-kit currently has real local guest-id creation/persistence only; the real shared CE-kit
-`getQuota()` and `startScenario()` HTTP clients are deferred to A16.
+A13 is **backend-complete**. The backend owns guest identity persistence, quota policy resolution,
+quota state, quota consumption, standardized API errors, and quota events. CE-kit's shared
+`getQuota()` and `startScenario()` HTTP clients (A15, ANY-8/ANY-170/ANY-171) are real, propagate
+the opaque guest id, and handle `429 quota_exhausted`.
 
 Rules:
 

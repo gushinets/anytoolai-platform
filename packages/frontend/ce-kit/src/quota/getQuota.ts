@@ -1,15 +1,24 @@
-export type QuotaRequest = {
-  productId: string;
-  guestId: string;
-};
+import { requestAndParse } from "../api/client";
+import type { PlatformApiClient, PlatformApiResult } from "../api/client";
+import { parseQuotaState } from "./parseQuotaState";
+import type { QuotaRequest, QuotaState } from "./types";
 
-/**
- * A16-deferred placeholder.
- *
- * A13 quota is backend-complete, but the shared CE-kit HTTP quota client belongs to A16's
- * PlatformApiClient work. Frontends must treat backend quota state as authoritative and must not
- * enforce quota from this placeholder.
- */
-export async function getQuota(_request: QuotaRequest): Promise<never> {
-  throw new Error("CE-kit getQuota() is deferred to A16 PlatformApiClient integration.");
+export async function getQuota(
+  client: PlatformApiClient,
+  request: QuotaRequest,
+): Promise<PlatformApiResult<QuotaState>> {
+  const query = new URLSearchParams({ guest_id: request.guestId });
+  if (request.scenarioId !== undefined) {
+    query.set("scenario_id", request.scenarioId);
+  }
+
+  return requestAndParse(
+    client,
+    {
+      method: "GET",
+      path: `/v1/products/${encodeURIComponent(request.productId)}/quota?${query.toString()}`,
+    },
+    parseQuotaState,
+    "Quota response was invalid.",
+  );
 }
