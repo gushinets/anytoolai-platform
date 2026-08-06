@@ -51,15 +51,24 @@ extensions/* -> ce-kit -> platform API
 ## Runtime principle
 
 ```text
-Product Definition -> Scenario Session -> Workflow Definition -> Action Configurations -> Atomic Actions -> Provider Gateway -> Structured Output -> Artifact -> Event Log -> Guest Quota -> Email Capture / Waitlist Intent -> Handoff -> Web Mirror / CE Kit
+Product Definition -> Scenario Session -> Workflow Definition -> Action Configurations -> Atomic Actions -> Provider Gateway -> Structured Output -> Artifact -> Event Log -> Frontend-safe Result API
 ```
 
 ## MVP-A scope
 
-MVP-A is the Platform Kernel. It proves that a declarative product/scenario/workflow/action configuration can create a scenario session, run a typed workflow, call a provider through the gateway, validate structured output, store artifacts, write events, apply guest quota, capture email, and create a user-confirmed handoff.
+MVP-A is delivered in two sequential milestones:
+
+- MVP-A1 Atom Runtime Proof proves all 11 typed atoms individually and in composite workflows
+  through API, PostgreSQL, worker, Provider Gateway, artifacts, and events. It does not depend on a
+  web page or Chrome Extension.
+- MVP-A2 Client Surfaces delivers CE-kit, web mirror, handoff consent, paywall/onboarding, the
+  kernel-demo Chrome Extension, and browser evidence over frontend-safe Platform Core APIs.
 
 MVP-A has no real Freelancer product semantics. `kernel_demo` is an internal smoke-test surface only.
 
 ## MVP-B scope
 
-MVP-B is the Freelancer Validation Bundle v0. It adds thin product configs, prompts, schemas, workflows, result renderers, handoff maps, product events, and separate Chrome Extensions for the Freelancer products. ProposalAI is the first real product after the kernel because it is the fastest end-to-end proof. MVP-B must not change platform-core.
+MVP-B is the Freelancer Validation Bundle v0. Each product is a parent delivery item with separate
+bundle/workflow, Chrome Extension, and runtime E2E slices. Product extensions use Client Surfaces
+contracts but remain owned by Freelancer Suite. Web mirror is optional. MVP-B must not change
+platform-core.

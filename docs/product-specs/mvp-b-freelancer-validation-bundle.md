@@ -2,7 +2,8 @@
 
 ## Goal
 
-Validate that real CE-first Freelancer products can be added on top of Platform Kernel without changing `platform-core`.
+Validate that real CE-first Freelancer products can be added after MVP-A1 Atom Runtime Proof and on
+the required MVP-A2 CE-kit contracts without changing `platform-core`.
 
 MVP-B is not a separate backend. It is a validation bundle made from product configs, prompts, schemas, workflows, CE wrappers, result renderers, handoff maps, and product events.
 
@@ -32,11 +33,24 @@ MVP-B contains eight thin Freelancer validation products:
 - Brief Decoder
 - Persuasion Lens
 
-Each product should have product-specific config under the Freelancer Suite bundle and a separate Chrome Extension wrapper that uses `packages/frontend/ce-kit`.
+Each product has one coordinating Linear parent and exactly three delivery children:
+
+1. `<Product> Bundle And Workflow` owns product config, prompts, strict schemas, workflow, renderer
+   contract, events, handoff contracts, and deterministic fixtures.
+2. `<Product> Chrome Extension` owns the dedicated manifest and product UX using
+   `packages/frontend/ce-kit`.
+3. `<Product> Runtime E2E And QA` owns the complete CE → CE-kit → API → scenario → workflow →
+   result → copy/handoff proof.
+
+The parent completes only when all three children complete. Bundle children depend on B01 and the
+required MVP-A1 atom packs. Chrome Extension children depend on their bundle and the required
+MVP-A2 CE-kit slices, but never on web mirror. Runtime E2E children depend on bundle plus CE and,
+where configured, the B06 handoff map and A18 client handoff integration.
 
 ## Product Order
 
-After MVP-A, all 11 atom action types already exist. MVP-B should mostly be prompts, schemas, workflows, CE UX, and handoff maps.
+After MVP-A1, all 11 atom action types are proven individually and in composite workflows. MVP-B
+should mostly be prompts, schemas, workflows, CE UX, renderers, fixtures, and handoff maps.
 
 Recommended order:
 
@@ -50,6 +64,9 @@ Recommended order:
 8. Persuasion Lens: `A03 + A04 + A09 + A08 + A06`
 
 ProposalAI should be the first real product after the kernel because it has one workflow, one atom, a clear CE surface, and a quick `result copied` aha moment.
+
+Every product extension completes through CE-kit scenario polling and the frontend-safe result API.
+Opening a result in web mirror is optional MVP-A2 integration, not product Definition of Done.
 
 ## Handoff Examples
 
@@ -82,4 +99,6 @@ Undesirable:
 - adding product-specific backend endpoints
 - adding Freelancer-specific code in `platform-core`
 
-If a product requires changing core, update MVP-A contracts first; the kernel was not complete enough.
+If a product bundle requires changing core, update MVP-A1 contracts first; the kernel was not
+complete enough. If multiple extensions require missing shared client behavior, update MVP-A2
+Client Surfaces rather than duplicating it in product extensions.

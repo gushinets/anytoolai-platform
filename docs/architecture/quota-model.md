@@ -6,8 +6,8 @@ MVP-A uses guest quota instead of billing.
 
 A13 is **backend-complete**. The backend owns guest identity persistence, quota policy resolution,
 quota state, quota consumption, standardized API errors, and quota events. CE-kit's shared
-`getQuota()` and `startScenario()` HTTP clients (A15, ANY-8/ANY-170/ANY-171) are real, propagate
-the opaque guest id, and handle `429 quota_exhausted`.
+`getQuota()` and `startScenario()` HTTP clients in the MVP-A2 A15 slice (ANY-8/ANY-170/ANY-171)
+are real, propagate the opaque guest id, and handle `429 quota_exhausted`.
 
 Rules:
 

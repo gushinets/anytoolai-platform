@@ -8,15 +8,23 @@ D:\Work\AI\AnytoolAI\platform concept\anytoolai-mvp-a-platform-kernel-and-mvp-b-
 
 Keep `AGENTS.md`, `ARCHITECTURE.md`, `docs/**`, configs, tests, and scaffold aligned with this summary. The external concept file remains the source for nuance; this repo-local file exists so future agents can work from repository context.
 
-## Core Split
+## Delivery Split
 
-MVP-A is Platform Kernel: the smallest platform runtime that can launch typed atom actions, workflows, scenario sessions, artifacts, events, guest quota, email capture/paywall intent, handoff, web mirror, and CE kit.
+The accepted MVP-A scope is delivered through two sequential milestones:
+
+- **MVP-A1 — Atom Runtime Proof:** the smallest product-neutral backend runtime that can launch all
+  11 typed atoms individually and in config-defined composite workflows, persist auditable runtime
+  state, and expose normalized results without a UI dependency.
+- **MVP-A2 — Client Surfaces:** shared CE-kit, web mirror, handoff consent, paywall/onboarding,
+  kernel-demo Chrome Extension, and browser evidence over frontend-safe Platform Core APIs.
 
 MVP-B is Freelancer Validation Bundle: thin CE-first Freelancer products added on top of the kernel through product configs, prompts, schemas, workflows, result renderers, handoff maps, product events, and separate Chrome Extensions.
 
-If the first real Freelancer CE cannot be added without changing `platform-core`, MVP-A is not complete.
+MVP-B bundle/workflow work may begin after MVP-A1. Product Chrome Extension work depends on the
+required MVP-A2 CE-kit slices, not on web mirror completion. If the first real Freelancer bundle
+cannot be added without changing `platform-core`, MVP-A1 is not complete.
 
-## MVP-A Runtime Flow
+## MVP-A1 Runtime Flow
 
 ```text
 Product Definition
@@ -28,15 +36,12 @@ Product Definition
 -> Structured Output
 -> Artifact
 -> Event Log
--> Guest Quota
--> Email Capture / Waitlist Intent
--> Handoff
--> Web Mirror / CE Kit
+-> Frontend-safe Result API
 ```
 
 Every user journey starts with `scenario_session_id`.
 
-## MVP-A In Scope
+## MVP-A1 In Scope
 
 - config loader
 - product, frontend, scenario, workflow, action, prompt, and provider policy registries
@@ -50,12 +55,21 @@ Every user journey starts with `scenario_session_id`.
 - event log
 - guest identity and guest quota
 - quota exhausted state
-- email capture
-- waitlist/paywall intent
 - backend-owned handoff token flow
-- minimal web mirror
-- shared `ce-kit`
+- frontend-safe `GET /v1/results/{artifact_id}`
+- deterministic 11/11 standalone atom proof
+- three composite workflows covering all 11 atoms
+- one `atoms-proof` command and machine-readable evidence
+- credentialed 11-atom live-provider canary outside baseline CI
+
+## MVP-A2 In Scope
+
+- shared `packages/frontend/ce-kit`
+- minimal web mirror result, handoff, paywall, and onboarding pages
+- handoff CE helpers and web consent
+- email capture/paywall client journey over Platform Core backend contracts
 - `kernel-demo-ce`
+- frontend build, integration, and browser evidence
 
 ## MVP-A Out Of Scope
 
@@ -184,18 +198,19 @@ text.extract_structured_fields
 -> document.generate_from_template
 ```
 
-## CE Kit
+## MVP-A2 CE Kit
 
-MVP-A needs shared `packages/frontend/ce-kit`; MVP-B must not copy API/job/quota/handoff code across CEs.
+MVP-A2 owns shared `packages/frontend/ce-kit`; MVP-B must not copy API/session/quota/result/handoff
+code across CEs. Product-specific Chrome Extensions remain owned by Freelancer Suite.
 
 Required kit capabilities:
 
 - `createGuestIdentity()`
 - `getRuntimeConfig()`
 - `startScenario()`
-- `pollJob()`
+- `pollScenarioSession()`
 - `getScenarioSession()`
-- `getArtifact()`
+- `getResult()`
 - `createHandoff()`
 - `openHandoffConsent()`
 - `captureEmail()`
@@ -208,20 +223,22 @@ Guest quota is backend-enforced. Chrome Extensions may store the opaque guest id
 is checked and consumed by the backend on accepted scenario start, not on frontend click and not from
 provider usage or retry telemetry.
 
-A13 is backend-complete for guest identity/quota. A15 (ANY-8, ANY-170/ANY-171) owns real
-`getQuota()` and `startScenario()` HTTP helpers, guest-id propagation, typed `429 quota_exhausted`
-handling, and CE-kit integration tests.
+A13 is backend-complete for guest identity/quota. In MVP-A2, A15a delivered the shared client/storage
+foundation, A15b delivered real quota/start/polling helpers, guest-id propagation, typed
+`429 quota_exhausted` handling and CE-kit integration tests, and A15c owns result fetching over the
+A12b frontend-safe result API. A18 owns shared client handoff integration.
 
-## Web Mirror
+## MVP-A2 Web Mirror
 
-MVP-A web mirror pages:
+MVP-A2 web mirror pages:
 
 - `/r/{artifact_id}`
 - `/handoff/{handoff_token}`
 - `/paywall/{product_id}`
 - `/onboarding/{product_id}`
 
-Web mirror must not become a user dashboard.
+Web mirror must not become a user dashboard and is not a prerequisite for MVP-A1 or for an
+individual Freelancer product Chrome Extension.
 
 ## Event Taxonomy
 
@@ -260,7 +277,7 @@ MVP-A platform events:
 
 Product-specific events begin in MVP-B.
 
-## Development Sequence
+## Delivery Sequence
 
 1. Contracts and config loader.
 2. Runtime storage and event log.
@@ -268,14 +285,18 @@ Product-specific events begin in MVP-B.
 4. Action runner and first atom definitions.
 5. Workflow runner.
 6. Scenario runtime.
-7. Guest quota and email capture.
-8. Handoff core.
-9. Web mirror, CE kit, and kernel demo CE.
-10. All 11 atom definitions.
+7. Guest quota and backend handoff core.
+8. All 11 strict atom contracts, prompts, configs, and deterministic fixtures.
+9. Eleven standalone and three composite runtime proofs.
+10. Frontend-safe result API, `atoms-proof`, and live-provider canary.
+11. MVP-A1 release gate.
+12. CE-kit scenario/result/handoff clients.
+13. Web mirror, paywall/onboarding, and kernel demo CE.
+14. MVP-A2 client/browser release gate.
 
-## MVP-A Definition Of Done
+## MVP-A1 Definition Of Done
 
-MVP-A is complete when:
+MVP-A1 is complete when:
 
 - backend starts and validates configs
 - runtime DB tables exist for sessions, jobs, actions, artifacts, and events
@@ -287,16 +308,23 @@ MVP-A is complete when:
 - artifact storage exists
 - event log exists
 - guest quota exists
-- email capture exists
-- paywall/waitlist intent exists
-- handoff token flow exists
-- web mirror supports result and handoff
-- shared CE kit exists
-- kernel demo CE exists
 - all 11 atom action types are registered and runnable
-- one-action smoke workflow exists
-- three-action smoke workflow exists
-- smoke handoff links source session to target session
+- every atom passes the deterministic standalone matrix
+- three composite workflows use all 11 atoms with real mappings
+- `GET /v1/results/{artifact_id}` exposes only normalized canonical results
+- `atoms-proof` reports 11/11 and 3/3 with auditable rows/events/artifacts
+- a recent live-provider canary proves schema-valid execution for all 11 atoms
+- no web mirror, CE, email/paywall UI, or handoff-consent dependency exists in the A1 gate
+
+## MVP-A2 Definition Of Done
+
+MVP-A2 is complete when:
+
+- shared CE-kit covers guest identity, quota, idempotent start, polling, result, and handoff helpers
+- web mirror supports normalized result, consent, paywall, and onboarding states
+- backend email/paywall intent contracts support the client conversion journey
+- kernel demo CE runs through CE-kit without prompts or provider/model controls
+- frontend checks and browser evidence pass
 
 ## MVP-B Scope
 
@@ -312,6 +340,16 @@ MVP-B adds product-level assets only:
 - result renderers
 - handoff maps
 - product events
+
+Each of the eight product issues is a coordinating parent with exactly three delivery children:
+
+1. `Bundle And Workflow` for configs, prompts, strict schemas, renderer contract, and fixtures.
+2. `Chrome Extension` for the dedicated product surface using CE-kit.
+3. `Runtime E2E And QA` for the complete deterministic product vertical.
+
+Product bundle children depend on MVP-A1 and the required atom packs. Product Chrome Extension
+children depend on their bundle and the required MVP-A2 CE-kit slices, but never on web mirror.
+Product parents complete only when all three children complete.
 
 MVP-B must not change `platform-core`. It is undesirable for MVP-B to change workflow runner, action runner, provider/scenario/event/quota/handoff kernel modules, or to add product-specific backend endpoints.
 
@@ -334,4 +372,7 @@ Do not say: "Let's build this like ProposalAI / Send-Ready / Brief Decoder."
 
 Say: "Let's verify whether the kernel can run this as a config-defined workflow."
 
-Everything that knows Freelancer product meaning belongs in MVP-B. Everything that runs atoms, workflows, scenario sessions, events, artifacts, quota, and handoff belongs in MVP-A.
+Everything that knows Freelancer product meaning or implements a product-specific Chrome Extension
+belongs in MVP-B. Everything that runs atoms, workflows, scenario sessions, events, artifacts,
+quota, frontend-safe results, and backend handoff belongs in Platform Core. Shared CE-kit, web
+mirror, and shared client journeys belong in MVP-A2 Client Surfaces.

@@ -2,7 +2,8 @@
 
 ## 1. Platform first, products second
 
-MVP-A builds Platform Kernel. MVP-B validates products on top of Kernel.
+MVP-A1 proves Platform Kernel without a UI dependency. MVP-A2 delivers shared client surfaces.
+MVP-B validates product bundles and product-owned Chrome Extensions on top of those contracts.
 
 ## 2. Backend-defined workflows
 
