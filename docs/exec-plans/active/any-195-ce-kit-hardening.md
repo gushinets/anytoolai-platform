@@ -7,8 +7,9 @@
 - Created: 2026-08-05
 - Last updated: 2026-08-06
 - Review date: 2026-08-06
-- Next action: commit and push the fifth- and sixth-pass fixes below (validated locally; not yet
-  on the PR head, so CI has not run on them).
+- Next action: fifth- and sixth-pass fixes are pushed (PR #56, head `c2b0adb`) and CI is green
+  (frontend, docs, Windows/Ubuntu baseline, PostgreSQL, smoke, full-check, CodeRabbit); awaiting
+  review sign-off/merge.
 - Blocker: none
 
 ## Goal
@@ -80,15 +81,12 @@ retry-loop abort check that only ran after a configured delay, and two variants 
 - `python scripts/agent/runner.py doctor` -- passed.
 - `python scripts/agent/runner.py frontend-check` -- passed (typecheck, `pnpm -r test`,
   `generate-api-types:check`, build all green).
-- `python scripts/agent/runner.py full-check` -- passed locally; PR is open and CI (frontend, docs,
-  Windows/Ubuntu baseline, PostgreSQL, smoke, full-check workflows) is green as of the fourth-pass
-  head.
+- `python scripts/agent/runner.py full-check` -- passed locally; PR #56 is open and CI (frontend,
+  docs, Windows/Ubuntu baseline, PostgreSQL, smoke, full-check, CodeRabbit) is green on the current
+  head (`c2b0adb`), which includes the fifth- and sixth-pass fixes below.
 - Manual check: temporarily reintroduced a `limit_count: number -> string` mismatch under
   `src/api/__drift_scratch.ts` and confirmed `tsc --noEmit` fails with `typeMismatch: "limit_count"`
   before removing the scratch file.
-- Fifth- and sixth-pass fixes (below): `tsc --noEmit`, `pnpm -r test`, and `frontend-check` all
-  pass locally against the working tree. Not yet committed/pushed, so CI has not run against them --
-  pending, not claimed green, until they land on the PR head.
 
 ## Decision log
 
