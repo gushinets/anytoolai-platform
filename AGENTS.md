@@ -16,14 +16,19 @@ Read these first:
 6. `docs/architecture/package-layering.md`
 7. `docs/architecture/llm-runtime.md`
 8. `docs/product-specs/mvp-a-platform-kernel.md`
-9. `docs/agent/harness-engineering-map.md`
+9. `docs/product-specs/mvp-a2-client-surfaces.md`
+10. `docs/agent/harness-engineering-map.md`
 
 ## Current MVP
 
-MVP-A: Platform Kernel.
+MVP-A1: Atom Runtime Proof.
+MVP-A2: Client Surfaces.
 MVP-B: Freelancer Validation Bundle v0.
 
-MVP-A builds the platform execution kernel. MVP-B validates it with thin product bundles and separate Chrome Extensions.
+MVP-A is delivered in two milestones. MVP-A1 proves the platform execution kernel and all 11
+generic atoms without depending on web or Chrome UI. MVP-A2 delivers shared CE-kit, web mirror,
+handoff consent, paywall/onboarding, and kernel-demo client surfaces. MVP-B validates the kernel
+with thin product bundles and separate product-owned Chrome Extensions.
 
 The controlling concept source for MVP-A/MVP-B scope is mirrored in `docs/product-specs/mvp-scope-source-of-truth.md`. Keep repo-local docs and scaffold aligned with that file.
 
@@ -55,7 +60,10 @@ Deep rules live in `docs/architecture/llm-runtime.md`.
 - Events must include required dimensions where applicable.
 - Definitions live in YAML/Markdown; runtime state lives in PostgreSQL.
 - Handoff is backend-owned and user-confirmed.
-- `kernel_demo` is the only MVP-A product surface and exists only for smoke testing the kernel.
+- `kernel_demo` is the only platform smoke product: backend/CLI proof belongs to MVP-A1 and its
+  reference Chrome Extension belongs to MVP-A2.
+- Platform Core owns frontend-safe result/artifact APIs and backend runtime state.
+- Client Surfaces owns shared CE-kit, web mirror, and shared browser journeys.
 - Freelancer product meaning belongs to MVP-B config, prompts, schemas, renderers, and CE wrappers.
 
 ## Before coding

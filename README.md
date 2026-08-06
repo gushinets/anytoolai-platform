@@ -54,7 +54,8 @@ smoke commands will be added only when feature issues deliver real vertical slic
 
 ## MVPs
 
-- MVP-A: Platform Kernel — execution runtime for typed atoms, workflows, scenario sessions, artifacts, events, guest quota, email capture, and handoff.
+- MVP-A1: Atom Runtime Proof — backend proof of all 11 typed atoms individually and in composite workflows, with deterministic and live-provider evidence.
+- MVP-A2: Client Surfaces — shared CE-kit, web mirror, consent/paywall/onboarding surfaces, kernel-demo CE, and browser evidence.
 - MVP-B: Freelancer Validation Bundle v0 — eight thin Freelancer CE-first products added through configs, prompts, schemas, workflows, result renderers, handoff maps, product events, and separate Chrome Extension wrappers.
 
 ## First places to read
@@ -66,4 +67,5 @@ smoke commands will be added only when feature issues deliver real vertical slic
 - `docs/core-beliefs.md`
 - `docs/agent/harness-engineering-map.md`
 - `docs/product-specs/mvp-a-platform-kernel.md`
+- `docs/product-specs/mvp-a2-client-surfaces.md`
 - `docs/product-specs/mvp-b-freelancer-validation-bundle.md`

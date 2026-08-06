@@ -34,7 +34,15 @@ It must not know product semantics such as ProposalAI, Brief, Upwork, Scope Cree
 - `generate_proposal` as a platform action type
 - product prompts
 
-Everything that knows Freelancer product meaning belongs in MVP-B. Everything that runs atoms, workflows, scenario sessions, events, artifacts, quota, and handoff belongs in MVP-A.
+Everything that knows Freelancer product meaning belongs in MVP-B Freelancer Suite. Everything that
+runs atoms, workflows, scenario sessions, events, artifacts, quota, and backend handoff belongs in
+MVP-A1 Platform Core. Frontend-safe result consumption, CE-kit, web mirror, shared handoff consent,
+and Kernel Demo CE/browser proof belong in MVP-A2 Client Surfaces; the result/artifact API and
+backend state remain owned by Platform Core.
+
+Each Freelancer product owns its product bundle/workflow and a separate Chrome Extension. Product
+extensions use CE-kit and contain no prompts, provider/model selection, or workflow logic. They do
+not depend on the web mirror.
 
 ## Composition
 

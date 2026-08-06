@@ -42,6 +42,7 @@ This directory is the system of record for agents. Keep it current. If a decisio
 ## Product specs
 
 - `product-specs/mvp-a-platform-kernel.md`
+- `product-specs/mvp-a2-client-surfaces.md`
 - `product-specs/mvp-b-freelancer-validation-bundle.md`
 - `product-specs/mvp-scope-source-of-truth.md`
 - `product-specs/kernel-demo.md`

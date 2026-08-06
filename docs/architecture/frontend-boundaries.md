@@ -28,10 +28,13 @@ They must not:
 - call LLM providers directly;
 - own authoritative scenario state.
 
-Shared `ce-kit` must provide reusable API/job/quota/handoff helpers so MVP-B Chrome Extensions do not copy that code.
+MVP-A2 Client Surfaces owns shared `ce-kit`, web mirror, and shared browser journeys. Product-owned
+Chrome Extensions remain in Freelancer Suite and must consume CE-kit rather than copy transport,
+storage, identity, quota, polling, result, or handoff code. MVP-A1 has no frontend dependency.
+
 After A13/A15 (ANY-8, ANY-170/ANY-171), `createGuestIdentity()`, `getQuota()`, `startScenario()`
 (via `prepareScenarioStart()`), `getScenarioSession()`, `pollScenarioSession()`, and `nextAction()`
-are all real CE-kit helpers backed by `PlatformApiClient`.
+are real CE-kit helpers backed by `PlatformApiClient`.
 
 Required `ce-kit` capabilities:
 
@@ -40,8 +43,8 @@ Required `ce-kit` capabilities:
 - `startScenario()`
 - `getScenarioSession()`
 - `nextAction()`
-- `pollJob()`
-- `getArtifact()`
+- `pollScenarioSession()`
+- `getResult()`
 - `createHandoff()`
 - `openHandoffConsent()`
 - `captureEmail()`
@@ -50,14 +53,16 @@ Required `ce-kit` capabilities:
 - `renderJobStatus()`
 - `renderError()`
 
-A13/A15 status:
+A15 ownership and delivery slices:
 
-- backend guest identity and quota enforcement are implemented;
-- CE local guest-id persistence is provided through `createGuestIdentity()`;
-- `startScenario()` (via `prepareScenarioStart()`) and `getQuota()` are real HTTP clients, not demo
-  stubs;
-- A15 (ANY-8, ANY-170/ANY-171) owns the central `PlatformApiClient`, real HTTP start/quota calls,
-  guest-id propagation, typed `429 quota_exhausted` handling, and CE integration tests.
+- A13 backend guest identity and quota enforcement are implemented;
+- A15a / ANY-170 delivered the central `PlatformApiClient`, async storage, guest identity, runtime config,
+  safe errors, cancellation, and OpenAPI drift foundation;
+- A15b / ANY-171 delivered real quota HTTP calls, idempotent scenario start, bounded session polling,
+  next actions, typed `429 quota_exhausted` handling, and CE integration tests;
+- A15c / ANY-226 owns `getResult()` over the Platform Core frontend-safe result API;
+- A18 owns shared client handoff helpers and web consent; product-specific handoff routes remain in
+  Freelancer Suite.
 
 ## A12/A13 public scenario runtime contract
 
@@ -68,6 +73,7 @@ The A12/A13 public runtime surface is:
 - `POST /v1/products/{product_id}/scenarios/{scenario_id}/start`
 - `GET /v1/scenario-sessions/{id}`
 - `POST /v1/scenario-sessions/{id}/next-actions/{next_action_id}`
+- planned by A12b / ANY-217: `GET /v1/results/{artifact_id}`
 
 `startScenario()` request body:
 
@@ -141,6 +147,10 @@ Recommended frontend behavior for `429 quota_exhausted`:
 
 Frontend-safe responses must not expose prompts, provider policies, provider/model names, retry
 budgets, PydanticAI run ids, LiteLLM response ids, or raw unsafe exception text.
+
+Product Chrome Extensions complete through CE-kit and the frontend-safe result API. Opening the
+same result in web mirror is an optional MVP-A2 integration, never a prerequisite for MVP-A1 or an
+individual Freelancer product.
 
 ## A17 public handoff contract
 

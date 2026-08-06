@@ -1,16 +1,21 @@
-# MVP-A Platform Kernel
+# MVP-A1 Atom Runtime Proof
 
 ## Goal
 
-Build the minimum AnytoolAI platform runtime that can launch config-defined scenarios and workflows from typed atom actions.
+Build and prove the minimum product-neutral AnytoolAI backend runtime that can launch all 11 typed
+atoms individually and in config-defined composite workflows.
 
-MVP-A answers one question:
+MVP-A1 answers one question:
 
 ```text
-Can the backend read product/scenario/workflow/action config, create scenario_session_id, run the chain, store artifacts, emit events, apply quota, and return a frontend-safe result?
+Can the backend read product/scenario/workflow/action config, create scenario_session_id, run every
+generic atom and composite chain through the real worker/provider path, store auditable artifacts and
+events, and return a frontend-safe result without depending on web or Chrome UI?
 ```
 
-MVP-A is not ProposalAI, Send-Ready, Brief Decoder, or any other Freelancer product. Freelancer Suite is absent from MVP-A except for package placeholders that are not imported by the kernel.
+MVP-A1 is not ProposalAI, Send-Ready, Brief Decoder, or any other Freelancer product. Freelancer
+Suite is absent except for package placeholders that are not imported by the kernel. Shared client
+delivery belongs to MVP-A2 Client Surfaces.
 
 ## Runtime Flow
 
@@ -24,10 +29,7 @@ Product Definition
 -> Structured Output
 -> Artifact
 -> Event Log
--> Guest Quota
--> Email Capture / Waitlist Intent
--> Handoff
--> Web Mirror / CE Kit
+-> Frontend-safe Result API
 ```
 
 ## In Scope
@@ -43,7 +45,7 @@ Product Definition
 - prompt registry
 - provider policy registry
 
-Registries may be read-only and loaded from repo YAML/Markdown. Runtime editing and admin UI are not part of MVP-A.
+Registries may be read-only and loaded from repo YAML/Markdown. Runtime editing and admin UI are not part of MVP-A1.
 
 ### Runtime
 
@@ -59,13 +61,13 @@ Registries may be read-only and loaded from repo YAML/Markdown. Runtime editing 
 
 Every user-facing run must have `scenario_session_id`. No `scenario_session_id` means no user journey.
 
-### Access-Lite
+### Access-Lite Backend
 
 - guest identity
 - guest quota
 - quota exhausted state
-- email capture
-- waitlist/paywall intent
+- email capture and waitlist/paywall intent remain Platform Core backend contracts, but they are
+  MVP-A2 enablement and do not gate the Atom Runtime Proof
 
 This validates:
 
@@ -78,28 +80,32 @@ ids locally, and quota is consumed only when the backend accepts a scenario star
 started scenario session and linked created job. Quota is not tied to frontend clicks, provider-call
 count, retries, or LLM telemetry.
 
-A13 delivers this access-lite behavior as backend-complete, and A15 (ANY-8, ANY-170/ANY-171)
-delivers the CE-kit integration: real shared `getQuota()` and `startScenario()` API clients,
-guest-id propagation, and typed frontend handling for `429 quota_exhausted`.
+A13 delivers this backend guest identity/quota behavior. A15a/A15b in MVP-A2 delivered the CE-kit
+integration: shared client storage, real `getQuota()`, idempotent `startScenario()`, bounded session
+polling, guest-id propagation, and typed frontend handling for `429 quota_exhausted`.
 
-### Continuity And Handoff
+### Continuity And Handoff Backend
 
 - product handoff entity
 - handoff token
-- handoff consent page
+- safe preview and accept/decline API
 - `source_scenario_session_id`
 - `target_scenario_session_id`
 - link between source and target sessions through `handoff_id`
 
-MVP-A only needs one smoke handoff inside `kernel_demo`.
+The implemented backend remains Platform Core-owned. API-only handoff E2E is tracked separately and
+does not gate the MVP-A1 Atom Runtime Proof.
 
-### Frontend Support
+### Proof Surface
 
-- minimal web mirror
-- shared `ce-kit`
-- one reference `kernel-demo-ce`
+- frontend-safe `GET /v1/results/{artifact_id}`
+- eleven deterministic standalone scenarios
+- three composite workflows covering all 11 atoms
+- `python scripts/agent/runner.py atoms-proof`
+- credentialed live-provider canary, separate from baseline CI
 
-Do not build a unified CE for all products. MVP-B products each get separate Chrome Extensions that use the shared `ce-kit`.
+Web mirror, shared CE-kit, kernel-demo CE, consent, paywall/onboarding, and browser smoke belong to
+MVP-A2. MVP-B products each get separate product-owned Chrome Extensions.
 
 ## Out Of Scope
 
@@ -121,6 +127,7 @@ Do not build a unified CE for all products. MVP-B products each get separate Chr
 - full multitenancy
 - full regional deployment
 - product-specific domain tables
+- web mirror, Chrome Extension, or browser automation as an MVP-A1 release dependency
 
 ## Required Action Types
 
@@ -162,7 +169,7 @@ MVP-A tables:
 
 Do not create MVP-A tables for product definitions, workflow definitions, action definitions, action configurations, prompt versions, subscriptions, wallets, ledger entries, or admin users.
 
-## Minimal API
+## Minimal MVP-A1 API
 
 ```text
 POST /v1/identity/guest
@@ -187,6 +194,10 @@ POST /v1/handoffs/{handoff_token}/decline
 POST /v1/client-events
 ```
 
+The required Atom Runtime Proof subset is scenario start/polling plus
+`GET /v1/results/{artifact_id}`. Email/paywall, client-event, and handoff endpoints remain Platform
+Core contracts but do not gate MVP-A1.
+
 The handoff endpoints implement an opaque 30-minute token, safe mapped preview, guarded
 created/viewed/accepted/declined/consumed/expired/failed lifecycle, and explicit source/target
 session linkage. Accept always creates the target session; config decides whether a target job is
@@ -194,7 +205,7 @@ queued immediately or deferred.
 
 ## Definition Of Done
 
-Platform Kernel is done when:
+MVP-A1 Atom Runtime Proof is done when:
 
 - Backend starts and validates configs.
 - Runtime DB tables exist for sessions, jobs, actions, artifacts, and events.
@@ -206,15 +217,14 @@ Platform Kernel is done when:
 - Artifact storage exists.
 - Event log exists.
 - Guest quota exists.
-- Email capture exists.
-- Paywall/waitlist intent exists.
-- Handoff token flow exists.
-- Web mirror supports result and handoff.
-- Shared `ce-kit` exists.
-- `kernel-demo-ce` exists.
 - All 11 atom action types are registered and runnable.
-- One-action smoke workflow exists.
-- Three-action smoke workflow exists.
-- Smoke handoff links source session to target session.
+- Every atom passes one production-shaped deterministic standalone scenario.
+- Three neutral composite workflows cover all 11 atoms with real input/output mappings.
+- The frontend-safe result API returns only normalized canonical artifacts.
+- `atoms-proof` reports 11/11 standalone and 3/3 composite evidence with runtime ledger checks.
+- A recent manual live-provider canary proves schema-valid output for all 11 atoms.
+- The completion gate has no dependency on CE-kit, web mirror, Chrome, consent, or email/paywall UI.
 
-The most important acceptance criterion: the first real Freelancer CE can be added without changing `platform-core`.
+The most important acceptance criterion: a Freelancer product bundle can be added without changing
+`platform-core`; its Chrome Extension consumes MVP-A2 CE-kit contracts without making web mirror a
+prerequisite.

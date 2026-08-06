@@ -181,7 +181,7 @@ of the guest-quota model -- `consume_for_accepted_start` already requires a non-
 quota path. Deduplicating the `guest_id IS NULL` path is not fixed here.
 
 Idempotency-Key is orthogonal to the request body: `ScenarioStartRequest`/`ScenarioStartResponse`
-are unchanged. CE-kit's real client (A15, ANY-8/ANY-170/ANY-171) sends `Idempotency-Key` via
+are unchanged. CE-kit's real MVP-A2 A15 client (ANY-8/ANY-170/ANY-171) sends `Idempotency-Key` via
 `prepareScenarioStart()` (see `packages/frontend/ce-kit/src/scenarios/prepareScenarioStart.ts`),
 which generates one key per prepared operation and reuses it on every `execute()` retry;
 `startScenario()` (`packages/frontend/ce-kit/src/scenarios/startScenario.ts`) is a one-shot
