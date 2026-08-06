@@ -15,9 +15,12 @@
 **A13 remains backend-complete; ANY-170 delivered the CE client foundation, and ANY-171 has since
 delivered the real quota/start/polling integration this plan deferred.**
 
-The current patch will not implement the central CE-kit Platform API client because that would widen
-scope into the explicitly deferred ANY-171 frontend/runtime-client work. A13 will continue to expose only
-real `createGuestIdentity()` local persistence in CE-kit.
+At the time, this plan's patch did not implement the central CE-kit Platform API client, since that
+would have widened scope into the explicitly deferred ANY-171 frontend/runtime-client work; A13
+exposed only real `createGuestIdentity()` local persistence in CE-kit. ANY-171 has since delivered
+the rest: `PlatformApiClient`-backed `getQuota()`, `startScenario()`/`prepareScenarioStart()`,
+`getScenarioSession()`/`pollScenarioSession()`, and `nextAction()` (see
+`packages/frontend/ce-kit/README.md`).
 
 ## Reviewed
 
