@@ -111,7 +111,7 @@ runtime E2E/QA.
 
 Dependency rules:
 
-- bundle children depend on B01 and the required A20 atom packs;
+- bundle children depend on B01, the MVP-A1 release gate (ANY-5), and the required A20 atom packs;
 - CE children depend on their bundle plus A15b/A15c and, where needed, A18a;
 - E2E children depend on bundle plus CE and, for configured handoffs, B06/A18c;
 - product parents complete only after all three children;
