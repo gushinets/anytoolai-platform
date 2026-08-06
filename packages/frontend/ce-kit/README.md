@@ -256,11 +256,20 @@ const prepared = prepareScenarioStart({
 });
 
 let result = await prepared.execute(client);
-if (!result.ok && (result.error.type === "network_error" || result.error.type === "timeout")) {
-  // Genuinely ambiguous outcomes only -- explicit retry, same Idempotency-Key. `aborted` means
-  // the caller's own signal fired, so retrying would defeat that cancellation; `backend_error`
-  // and `invalid_response` are not retried here either since the backend already answered (with
-  // an error or a malformed body), so a same-key resubmit is unlikely to change the outcome.
+if (
+  !result.ok &&
+  (result.error.type === "network_error" ||
+    result.error.type === "timeout" ||
+    (result.error.type === "invalid_response" && result.error.status >= 200 && result.error.status < 300))
+) {
+  // Genuinely ambiguous outcomes only -- explicit retry, same Idempotency-Key. A 2xx
+  // invalid_response means the backend already created the session and consumed quota but
+  // returned an unparseable body, so the caller still lacks the session/job IDs -- that is
+  // ambiguous too, and retrying with the same key is the recovery path (the backend returns the
+  // existing session/job instead of creating a new one). `aborted` means the caller's own signal
+  // fired, so retrying would defeat that cancellation; `backend_error` and a non-2xx
+  // `invalid_response` are not retried here either, since the backend already answered with an
+  // error it isn't expected to reconsider on a same-key resubmit.
   result = await prepared.execute(client);
 }
 ```

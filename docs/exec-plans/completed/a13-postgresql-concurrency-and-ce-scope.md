@@ -48,9 +48,11 @@ the rest: `PlatformApiClient`-backed `getQuota()`, `startScenario()`/`prepareSce
 ## Follow-up Debt Owned By ANY-171
 
 - None. ANY-171 delivered real CE-kit `getQuota()` and `startScenario()`/`prepareScenarioStart()`
-  HTTP clients, guest-id propagation from local CE storage into scenario-start calls, typed CE
-  handling for `429 quota_exhausted`, `422`, polling (`pollScenarioSession()`), and normalized API
-  errors, plus CE-kit integration tests for guest create + quota + scenario start.
+  HTTP clients, caller-supplied opaque guest-id propagation into scenario-start calls (callers pass
+  the id `createGuestIdentity()` returned; `prepareScenarioStart()` does not read CE-kit identity
+  storage automatically), typed CE handling for `429 quota_exhausted`, `422`, polling
+  (`pollScenarioSession()`), and normalized API errors, plus CE-kit integration tests for guest
+  create + quota + scenario start.
 
 ## Validation Plan
 

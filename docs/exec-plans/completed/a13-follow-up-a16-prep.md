@@ -61,7 +61,9 @@ At the time, this plan deferred the following to A16. A15/ANY-171 has since deli
 
 - [x] Central `PlatformApiClient`.
 - [x] Real CE-kit `getQuota()` and `startScenario()`/`prepareScenarioStart()` HTTP implementations.
-- [x] Automatic guest-id propagation from CE-kit identity storage into scenario start calls.
+- [x] Caller-supplied opaque guest-id propagation into scenario start calls (`prepareScenarioStart()`
+  forwards `request.guestId` into the request body; it does not read CE-kit identity storage
+  automatically -- callers pass the id returned by `createGuestIdentity()` themselves).
 - [x] Typed CE handling for `429 quota_exhausted`, `422`, polling
   (`getScenarioSession()`/`pollScenarioSession()`), and normalized API errors.
 - [x] CE-kit integration tests for guest create + scenario start and frontend quota handling.
