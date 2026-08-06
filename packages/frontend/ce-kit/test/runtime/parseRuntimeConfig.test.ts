@@ -86,6 +86,96 @@ describe("parseRuntimeConfig", () => {
     expect(parseRuntimeConfig(payload)).toBeNull();
   });
 
+  it("accepts a scenario whose allowed_next_actions is absent, defaulting to an empty array", () => {
+    // allowed_next_actions is optional on the wire (RuntimeScenarioResponse) -- a scenario
+    // omitting it entirely (not just sending []) is a valid payload per the backend schema and
+    // must not be treated as malformed.
+    const payload = {
+      ...VALID_PAYLOAD,
+      scenario_ids: ["s1"],
+      scenarios: [
+        {
+          scenario_id: "s1",
+          version: 1,
+          input_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+          output_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+        },
+      ],
+    };
+    expect(parseRuntimeConfig(payload)).toEqual({
+      productId: "kernel_demo",
+      frontendIds: [],
+      frontends: [],
+      scenarioIds: ["s1"],
+      scenarios: [
+        {
+          scenarioId: "s1",
+          version: 1,
+          allowedNextActions: [],
+          inputRendererHint: { renderer: "json_schema", schemaRef: "x", schemaVersion: null },
+          outputRendererHint: { renderer: "json_schema", schemaRef: "x", schemaVersion: null },
+        },
+      ],
+      quotaSummary: null,
+      allowedUiCapabilities: [],
+    });
+  });
+
+  it("returns null when allowed_next_actions is explicitly null", () => {
+    // `allowed_next_actions` is optional (`?: string[]`) but NOT nullable on the generated
+    // backend schema -- only an absent key means "no next actions". An explicit `null` is
+    // off-contract and must be rejected, not silently normalized to `[]`, so a real backend
+    // drift (the schema gaining `| null`) surfaces as invalid_response instead of being masked.
+    const payload = {
+      ...VALID_PAYLOAD,
+      scenario_ids: ["s1"],
+      scenarios: [
+        {
+          scenario_id: "s1",
+          version: 1,
+          allowed_next_actions: null,
+          input_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+          output_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+        },
+      ],
+    };
+    expect(parseRuntimeConfig(payload)).toBeNull();
+  });
+
+  it("returns null when allowed_next_actions is present but not an array of strings", () => {
+    const payload = {
+      ...VALID_PAYLOAD,
+      scenario_ids: ["s1"],
+      scenarios: [
+        {
+          scenario_id: "s1",
+          version: 1,
+          allowed_next_actions: "not-an-array",
+          input_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+          output_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+        },
+      ],
+    };
+    expect(parseRuntimeConfig(payload)).toBeNull();
+  });
+
+  it("returns null when allowed_next_actions contains a non-string element", () => {
+    const payload = {
+      ...VALID_PAYLOAD,
+      scenario_ids: ["s1"],
+      scenarios: [
+        {
+          scenario_id: "s1",
+          version: 1,
+          allowed_next_actions: ["continue", 1],
+          input_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+          output_renderer_hint: { renderer: "json_schema", schema_ref: "x" },
+        },
+      ],
+    };
+    expect(parseRuntimeConfig(payload)).toBeNull();
+  });
+
   it("accepts a valid minimal payload with a null quota summary", () => {
     expect(parseRuntimeConfig(VALID_PAYLOAD)).toEqual({
       productId: "kernel_demo",

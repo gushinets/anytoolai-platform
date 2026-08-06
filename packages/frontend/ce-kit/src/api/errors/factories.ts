@@ -17,8 +17,11 @@ export function backendError(status: number, detail: BackendErrorDetail): Backen
   };
 }
 
-export function networkError(message = "Network request failed."): NetworkApiError {
-  return { type: "network_error", message };
+/** Fixed, user-safe message -- never pass raw caught-exception text here (may contain URLs, headers, or other sensitive detail). */
+const NETWORK_ERROR_MESSAGE = "Network request failed.";
+
+export function networkError(): NetworkApiError {
+  return { type: "network_error", message: NETWORK_ERROR_MESSAGE };
 }
 
 export function timeoutError(): TimeoutApiError {
