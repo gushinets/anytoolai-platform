@@ -1279,7 +1279,7 @@ def test_workflow_runner_preserves_safe_validation_failure_category(
             asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {"source_text": "invalid output"},
+                    {"source_text": "invalid output", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
