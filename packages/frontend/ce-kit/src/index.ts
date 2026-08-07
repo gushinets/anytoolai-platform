@@ -57,30 +57,6 @@ export { getResult } from "./results/getResult";
 export type { GetResultOptions } from "./results/getResult";
 export type { ResultArtifact } from "./results/types";
 
-export async function pollJob(jobId: string): Promise<{ jobId: string; status: string }> {
-  return { jobId, status: "succeeded" };
-}
-
-export async function getArtifact(artifactId: string): Promise<{ artifactId: string }> {
-  return { artifactId };
-}
-
-export async function createHandoff(): Promise<{ handoffToken: string }> {
-  return { handoffToken: "handoff_demo" };
-}
-
-export function openHandoffConsent(handoffToken: string): { url: string } {
-  return { url: `/handoff/${handoffToken}` };
-}
-
-export async function captureEmail(email: string): Promise<{ email: string }> {
-  return { email };
-}
-
-export function trackClientEvent(eventType: string, properties: Record<string, unknown> = {}) {
-  return { eventType, properties };
-}
-
 export function renderQuotaState(status: string): { status: string } {
   return { status };
 }
