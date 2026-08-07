@@ -8,6 +8,9 @@ from typing import Any
 from anytoolai_platform_core.common.literal_source import (
     LITERAL_SOURCE_PREFIX as _LITERAL_SOURCE_PREFIX,
 )
+from anytoolai_platform_core.common.literal_source import (
+    parse_strict_literal_json as _parse_strict_literal_json,
+)
 from anytoolai_platform_core.workflows.errors import (
     WorkflowConditionEvaluationError,
     WorkflowMappingResolutionError,
@@ -154,7 +157,7 @@ def parse_source_path(source_path: str) -> WorkflowSourcePath:
     if source_path.startswith(_LITERAL_SOURCE_PREFIX):
         payload = source_path[len(_LITERAL_SOURCE_PREFIX) :]
         try:
-            literal_value = json.loads(payload)
+            literal_value = _parse_strict_literal_json(payload)
         except json.JSONDecodeError as exc:
             raise WorkflowMappingResolutionError(
                 f"workflow literal source path is not valid JSON: {source_path}"

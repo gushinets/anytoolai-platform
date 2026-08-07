@@ -172,6 +172,21 @@ def test_loader_rejects_literal_source_in_preview_mapping(
     assert "does not allow literal: sources" in str(exc_info.value)
 
 
+def test_loader_rejects_non_finite_literal_constant_in_context_mapping(
+    tmp_path: Path,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    data = _load_yaml(handoff_path)
+    data["handoffs"][0]["context_mapping"]["strict"] = "literal:NaN"
+    _write_yaml(handoff_path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert "literal source is not valid JSON" in str(exc_info.value)
+
+
 def test_loader_accepts_literal_source_in_context_mapping() -> None:
     registry = ConfigLoader(CONFIG_ROOT).load()
 

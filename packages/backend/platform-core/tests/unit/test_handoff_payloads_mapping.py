@@ -25,6 +25,17 @@ def test_apply_mapping_rejects_literal_source_when_disallowed() -> None:
     assert "not allowed here" in str(exc_info.value)
 
 
+def test_apply_mapping_rejects_non_finite_literal_constant() -> None:
+    with pytest.raises(HandoffPayloadError) as exc_info:
+        _apply_mapping(
+            {"strict": "literal:NaN"},
+            {},
+            allow_literal=True,
+        )
+
+    assert "not valid JSON" in str(exc_info.value)
+
+
 def test_apply_mapping_still_resolves_artifact_paths_regardless_of_allow_literal() -> None:
     artifact = {"values": {"deadline": "Friday"}}
 

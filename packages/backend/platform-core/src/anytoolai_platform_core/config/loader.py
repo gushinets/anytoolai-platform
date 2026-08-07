@@ -13,7 +13,10 @@ from anytoolai_platform_core.actions.models import (
     ActionDefinition,
     ActionExecutor,
 )
-from anytoolai_platform_core.common.literal_source import LITERAL_SOURCE_PREFIX
+from anytoolai_platform_core.common.literal_source import (
+    LITERAL_SOURCE_PREFIX,
+    parse_strict_literal_json,
+)
 from anytoolai_platform_core.config.errors import (
     BrokenReferenceError,
     ConfigError,
@@ -346,7 +349,7 @@ def _validate_handoff_literal_source(
 ) -> None:
     payload = source[len(LITERAL_SOURCE_PREFIX) :]
     try:
-        json.loads(payload)
+        parse_strict_literal_json(payload)
     except json.JSONDecodeError as exc:
         raise InvalidConfigShapeError(
             path,

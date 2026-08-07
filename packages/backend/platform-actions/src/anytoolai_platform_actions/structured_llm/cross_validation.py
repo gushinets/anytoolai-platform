@@ -95,22 +95,26 @@ class ExtractStructuredFieldsCrossValidator:
             if spec.get("required") is True:
                 required_names.add(name)
             field_type = spec.get("type")
-            if name not in values:
-                continue
             type_check = _FIELD_TYPE_CHECKS.get(field_type)
             if type_check is None:
                 raise _cross_validation_error(f"unknown_field_type:{name}:{field_type}")
+            if name not in values:
+                continue
             if not type_check(values[name]):
                 raise _cross_validation_error(f"field_type_mismatch:{name}")
 
         for name in values:
             if name not in known_names:
                 raise _cross_validation_error(f"unrequested_field:{name}")
+        seen_missing_names: set[str] = set()
         for name in missing_fields:
             if name not in known_names:
                 raise _cross_validation_error(f"unrequested_missing_field:{name}")
             if name in values:
                 raise _cross_validation_error(f"field_marked_missing_but_present:{name}")
+            if name in seen_missing_names:
+                raise _cross_validation_error(f"duplicate_missing_field:{name}")
+            seen_missing_names.add(name)
 
         missing_field_set = set(missing_fields)
         for name in known_names:

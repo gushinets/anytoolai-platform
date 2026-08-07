@@ -170,6 +170,14 @@ def test_parse_source_path_rejects_malformed_literal_json() -> None:
     assert "not valid JSON" in str(exc_info.value)
 
 
+def test_parse_source_path_rejects_non_finite_literal_constants() -> None:
+    for payload in ("literal:NaN", "literal:Infinity", "literal:-Infinity"):
+        with pytest.raises(WorkflowMappingResolutionError) as exc_info:
+            parse_source_path(payload)
+
+        assert "not valid JSON" in str(exc_info.value)
+
+
 def test_validate_step_contract_accepts_optional_source_with_valid_shape() -> None:
     validate_step_contract(
         step_id="extract",

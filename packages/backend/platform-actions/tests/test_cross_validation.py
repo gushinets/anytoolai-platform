@@ -89,6 +89,20 @@ class TestExtractStructuredFieldsCrossValidator:
                 output={"values": {"deadline": "anything at all"}, "missing_fields": []},
             )
 
+    def test_rejects_unknown_field_type_even_when_reported_in_missing_fields(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"fields": [_field("deadline", "timestamp", required=False)]},
+                output={"values": {}, "missing_fields": ["deadline"]},
+            )
+
+    def test_rejects_duplicate_entries_in_missing_fields(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"fields": [_field("deadline", "string", required=False)]},
+                output={"values": {}, "missing_fields": ["deadline", "deadline"]},
+            )
+
     def test_rejects_type_mismatch(self) -> None:
         with pytest.raises(StructuredOutputValidationError):
             self.validator.validate(

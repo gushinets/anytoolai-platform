@@ -15,6 +15,9 @@ from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.common.literal_source import (
     LITERAL_SOURCE_PREFIX as _LITERAL_SOURCE_PREFIX,
 )
+from anytoolai_platform_core.common.literal_source import (
+    parse_strict_literal_json as _parse_strict_literal_json,
+)
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.handoffs.models import HandoffDefinition
 from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
@@ -180,7 +183,7 @@ def _apply_mapping(
                     f"handoff literal source paths are not allowed here: {source_path}"
                 )
             try:
-                value = json.loads(source_path[len(_LITERAL_SOURCE_PREFIX) :])
+                value = _parse_strict_literal_json(source_path[len(_LITERAL_SOURCE_PREFIX) :])
             except json.JSONDecodeError as exc:
                 raise HandoffPayloadError(
                     f"handoff literal source path is not valid JSON: {source_path}"
