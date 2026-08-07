@@ -73,7 +73,7 @@ The A12/A13 public runtime surface is:
 - `POST /v1/products/{product_id}/scenarios/{scenario_id}/start`
 - `GET /v1/scenario-sessions/{id}`
 - `POST /v1/scenario-sessions/{id}/next-actions/{next_action_id}`
-- planned by A12b / ANY-217: `GET /v1/results/{artifact_id}`
+- `GET /v1/results/{result_artifact_id}` (A12b / ANY-217)
 
 `startScenario()` request body:
 
@@ -151,6 +151,47 @@ budgets, PydanticAI run ids, LiteLLM response ids, or raw unsafe exception text.
 Product Chrome Extensions complete through CE-kit and the frontend-safe result API. Opening the
 same result in web mirror is an optional MVP-A2 integration, never a prerequisite for MVP-A1 or an
 individual Freelancer product.
+
+## A12b public result artifact contract
+
+`GET /v1/results/{result_artifact_id}` returns only the normalized canonical workflow result for a
+`result_artifact_id` already surfaced by `startScenario()` / `getScenarioSession()`:
+
+```json
+{
+  "result_artifact_id": "artifact_123",
+  "scenario_session_id": "scenario_session_123",
+  "job_id": "job_123",
+  "workflow_id": "kernel_demo.single_action_extract_v1",
+  "workflow_version": 1,
+  "schema_ref": "kernel_demo.extract_output_v1",
+  "schema_version": 1,
+  "created_at": "2026-01-01T00:00:00Z",
+  "output": { "...": "workflow output schema-shaped payload" }
+}
+```
+
+The endpoint is scoped to tenant/region and only ever serves an artifact that is: `stored`, of the
+canonical `structured_output` type (never `structured_output_debug_raw` or any raw/debug artifact),
+tagged `artifact_role: workflow_result`, linked as `result_artifact_id` on a `succeeded` job, and
+re-validated against its workflow's output schema/version at read time. `output` is never returned
+raw from storage without this re-validation pass.
+
+It never returns provider-call metadata, prompts, model/provider identifiers, PydanticAI run ids,
+LiteLLM response ids, or any other raw/debug artifact content.
+
+Safe API behavior — both cases return `404` with no distinguishing detail beyond the error `code`,
+so a caller cannot use this endpoint to probe artifact existence or internal state:
+
+- `result_artifact_not_found`: the id is unknown, or belongs to a different tenant/region;
+- `result_artifact_unavailable`: the artifact exists but is not an available canonical result (a
+  raw/debug artifact, an artifact from an unfinished/non-succeeded job, a schema/version drifted
+  artifact, or content that fails re-validation against its declared output schema).
+
+The canonical-artifact guard (job/workflow/schema consistency + schema re-validation) is shared with
+the handoff payload builder (see `handoff-model.md`) through
+`anytoolai_platform_core.artifacts.canonical.resolve_canonical_workflow_result`, so both consumers
+reject the same non-canonical states identically.
 
 ## A17 public handoff contract
 
