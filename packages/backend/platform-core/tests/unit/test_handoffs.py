@@ -605,9 +605,8 @@ def test_handoff_preview_is_allowlisted_and_bounded(
                 artifact,
                 content_json={
                     "values": {
-                        f"field_{index}": "x" * 600 for index in range(20)
-                    }
-                    | {
+                        "deadline": "safe target input",
+                        **{f"field_{index}": "x" * 600 for index in range(20)},
                         "raw_provider_output": "must never appear",
                         "debug_metadata": {"model": "must never appear"},
                     },
