@@ -174,6 +174,18 @@ def test_get_result_artifact_out_of_tenant_scope_fails_safely(
     assert response.json()["error"]["code"] == "result_artifact_not_found"
 
 
+def test_get_result_artifact_out_of_region_scope_fails_safely(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+    with transaction_boundary(session_factory) as session:
+        _, _, artifact_id = _seed_result(session, region="other_region")
+
+    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "result_artifact_not_found"
+
+
 def test_get_result_artifact_rejects_raw_debug_artifact(session_factory: SessionFactory) -> None:
     app = _create_test_app(session_factory)
     with transaction_boundary(session_factory) as session:
@@ -214,12 +226,38 @@ def test_get_result_artifact_rejects_schema_version_drift(
     assert response.json()["error"]["code"] == "result_artifact_unavailable"
 
 
-def test_get_result_artifact_rejects_non_object_content(
+def test_get_result_artifact_rejects_content_violating_output_schema(
     session_factory: SessionFactory,
 ) -> None:
+    # The configured kernel_demo.extract_output_v1 schema is permissive
+    # ({"type": "object", "additionalProperties": true}), so no dict can violate it as
+    # shipped. Tighten it in the live registry (same technique as the workflow-version
+    # drift test above) to exercise the real jsonschema re-validation failure path in
+    # resolve_canonical_workflow_result, not just the isinstance(..., Mapping) guard.
     app = _create_test_app(session_factory)
     with transaction_boundary(session_factory) as session:
-        _, _, artifact_id = _seed_result(session, content_json=["not", "an", "object"])
+        _, _, artifact_id = _seed_result(session, content_json={"unexpected": "shape"})
+
+    registry = app.state.runtime.config_registry
+    schema = registry.get_schema(SCHEMA_REF)
+    assert schema is not None
+    app.state.runtime = replace(
+        app.state.runtime,
+        config_registry=replace(
+            registry,
+            schemas={
+                **registry.schemas,
+                SCHEMA_REF: replace(
+                    schema,
+                    schema={
+                        "type": "object",
+                        "required": ["title"],
+                        "properties": {"title": {"type": "string"}},
+                    },
+                ),
+            },
+        ),
+    )
 
     response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
     assert response.status_code == HTTPStatus.NOT_FOUND
