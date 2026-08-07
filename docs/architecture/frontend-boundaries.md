@@ -178,15 +178,21 @@ tenant/region/product/frontend match the artifact's, and re-validated against it
 output schema/version at read time. `output` is never returned raw from storage without this
 re-validation pass.
 
-Because the endpoint returns the full normalized output object (unlike handoffs, which only ever
-expose an explicit per-field allowlist mapping), and shipped workflow output schemas may still
-declare `additionalProperties: true`, `ResultService` additionally rejects any normalized output
-containing a key name that matches a small denylist of internal/unsafe markers (`prompt`,
-`provider`, `model`, `litellm`, `pydantic_run_id`, `trace_id`, `debug`) at any nesting depth, as a
-defense-in-depth backstop while workflow output schemas are not yet uniformly closed.
+Raw/debug artifacts (`structured_output_debug_raw` type, or any artifact not tagged
+`artifact_role: workflow_result`) are rejected outright by the canonical-artifact guard above and
+never reach response serialization.
 
-It never returns provider-call metadata, prompts, model/provider identifiers, PydanticAI run ids,
-LiteLLM response ids, or any other raw/debug artifact content.
+Separately, because the endpoint returns the full normalized output *object* (unlike handoffs,
+which only ever expose an explicit per-field allowlist mapping), and shipped workflow output
+schemas may still declare `additionalProperties: true`, `ResultService` additionally rejects any
+normalized output containing a *key name* that matches a small denylist of markers (built from
+`common.logging.SENSITIVE_KEY_PARTS` plus `litellm`, `pydantic_run_id`, `trace_id`,
+`provider_model`, `provider_name`, `model_name`, `model_id`) at any nesting depth. This is a
+defense-in-depth backstop against those specific marker names appearing as keys while workflow
+output schemas are not yet uniformly closed — it is not a general guarantee against every possible
+form of provider/prompt/debug content (an unlisted key name, or a value rather than a key, is not
+inspected). Closing the relevant workflow output schemas, or introducing a dedicated public output
+schema per workflow, remains open follow-up work.
 
 Safe API behavior — both cases return `404`, and neither ever includes artifact/job internals,
 prompts, or provider/model identifiers in the response body:
@@ -194,12 +200,15 @@ prompts, or provider/model identifiers in the response body:
 - `result_artifact_not_found`: the id is unknown, or belongs to a different tenant/region;
 - `result_artifact_unavailable`: the artifact exists in the caller's tenant/region but is not an
   available canonical result (a raw/debug artifact, an artifact from an unfinished/non-succeeded
-  job, a schema/version drifted artifact, or content that fails re-validation against its
+  job, an artifact with schema/version drift, or content that fails re-validation against its
   declared output schema).
 
-The two codes intentionally differ so legitimate frontend polling (e.g. an artifact id surfaced by
-`getScenarioSession()` before the job finishes) can tell "not ready yet" apart from "wrong id."
-This does distinguish "exists in my own tenant/region" from "unknown," i.e. it is not a strict
+`getScenarioSession()` only ever surfaces a non-null `result_artifact_id` once the job has
+succeeded, so this endpoint is not meant to be polled for an in-progress job. The two codes
+intentionally differ so a caller holding a previously-valid id (e.g. from before a config redeploy
+changed the workflow's output schema/version) can tell "this id is wrong or out of scope" apart
+from "this id was valid but the artifact is no longer an available canonical result." This does
+distinguish "exists in my own tenant/region" from "unknown," i.e. it is not a strict
 no-existence-oracle guarantee across all callers who can reach an id in-scope — it only guarantees
 that a caller cannot learn anything about artifacts outside their own tenant/region.
 

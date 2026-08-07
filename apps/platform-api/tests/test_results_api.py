@@ -236,7 +236,7 @@ def test_get_result_artifact_rejects_artifact_job_scope_mismatch(
     # canonical guard now rejects it.
     app = _create_test_app(session_factory)
     with transaction_boundary(session_factory) as session:
-        scenario_id, job_id, canonical_artifact_id = _seed_result(session)
+        _, job_id, canonical_artifact_id = _seed_result(session)
         canonical_artifact = ArtifactRepository(session).get(canonical_artifact_id)
         assert canonical_artifact is not None
         mismatched_artifact = ArtifactRepository(session).create(
