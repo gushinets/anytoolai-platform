@@ -8,6 +8,7 @@ workflows:
         action_config_id: kernel_demo.extract_structured_fields_v1
         input_mapping:
           source_text: scenario.input.source_text
+          fields: scenario.input.fields
 
   - workflow_id: kernel_demo.extract_detect_report_v1
     version: 1
@@ -18,6 +19,7 @@ workflows:
         action_config_id: kernel_demo.extract_structured_fields_v1
         input_mapping:
           source_text: scenario.input.source_text
+          fields: scenario.input.fields
         output_mapping:
           context.extracted: steps.extract.output
       - step_id: detect_issues
@@ -45,12 +47,14 @@ workflows:
         action_config_id: kernel_demo.extract_structured_fields_v1
         input_mapping:
           source_text: scenario.input.source_text
+          fields: scenario.input.fields
         output_mapping:
           context.workflow_output: steps.extract.output
       - step_id: optional_extract
         action_config_id: kernel_demo.extract_structured_fields_v1
         input_mapping:
           source_text: scenario.input.source_text
+          fields: scenario.input.fields
         when: scenario.input.run_optional_step
 
   - workflow_id: kernel_demo.retry_extract_v1
@@ -62,4 +66,5 @@ workflows:
         action_config_id: kernel_demo.extract_structured_fields_v1
         input_mapping:
           source_text: scenario.input.source_text
+          fields: scenario.input.fields
         retry_count: 1

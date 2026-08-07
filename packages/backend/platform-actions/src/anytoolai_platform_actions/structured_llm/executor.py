@@ -14,6 +14,7 @@ from anytoolai_platform_core.actions.executor import (
     ActionExecutorResponse,
     ProviderCallInfo,
 )
+from anytoolai_platform_core.actions.output_validation import ActionOutputCrossValidator
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.config.registry import ConfigRegistry
@@ -52,11 +53,13 @@ class StructuredLlmActionExecutor:
         config_registry: ConfigRegistry,
         provider_gateway: ProviderGateway,
         artifact_service: ArtifactService | None = None,
+        output_cross_validators: Mapping[str, ActionOutputCrossValidator] | None = None,
     ) -> None:
         self._config_registry = config_registry
         self._provider_gateway = provider_gateway
         self._structured_runner = PydanticAIStructuredRunner()
         self._artifact_service = artifact_service
+        self._output_cross_validators = dict(output_cross_validators or {})
 
     async def execute(
         self,
@@ -91,6 +94,7 @@ class StructuredLlmActionExecutor:
             correlation_id=request.correlation_id,
         )
         provider_policy = self._require_provider_policy(action_config.provider_policy_ref)
+        cross_validator = self._output_cross_validators.get(action_config.action_type)
         try:
             result = await self._structured_runner.run(
                 provider_request,
@@ -99,6 +103,8 @@ class StructuredLlmActionExecutor:
                     session=session,
                 ),
                 validation_max_attempts=provider_policy.retry_policy.validation.max_attempts,
+                input_payload=request.input_payload,
+                cross_validator=cross_validator,
             )
         except PydanticAIValidationExhaustedError as exc:
             return self._to_executor_response(
@@ -159,6 +165,15 @@ class StructuredLlmActionExecutor:
         schema_mapping = None if response_schema is None else dict(response_schema.schema)
         if schema_mapping is None:
             return response
+        cross_validator = self._output_cross_validators.get(request.action_type)
+
+        def _check_cross_validation(validation_result: Any) -> None:
+            if cross_validator is not None:
+                cross_validator.validate(
+                    input_payload=request.input_payload,
+                    output=validation_result.normalized_output,
+                )
+
         if self._artifact_service is None:
             validation_result = None
             try:
@@ -169,6 +184,7 @@ class StructuredLlmActionExecutor:
                         schema_ref=response_schema.schema_ref,
                         schema_version=response_schema.version,
                     )
+                    _check_cross_validation(validation_result)
             except StructuredOutputError as exc:
                 raise to_safe_validation_error(exc) from exc
             return replace(
@@ -207,6 +223,7 @@ class StructuredLlmActionExecutor:
             schema=schema_mapping,
             schema_ref=None if response_schema is None else response_schema.schema_ref,
             schema_version=None if response_schema is None else response_schema.version,
+            post_schema_validation=_check_cross_validation,
         )
         return replace(
             response,

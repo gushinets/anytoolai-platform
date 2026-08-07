@@ -6,6 +6,10 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from anytoolai_platform_actions.structured_llm.cross_validation import (
+    DetectIssuesByTaxonomyCrossValidator,
+    ExtractStructuredFieldsCrossValidator,
+)
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.actions.runner import ActionRunner, ActionRunService
@@ -73,6 +77,10 @@ def build_worker(
             config_registry=registry,
             provider_gateway=provider_gateway,
             artifact_service=artifact_service,
+            output_cross_validators={
+                "text.extract_structured_fields": ExtractStructuredFieldsCrossValidator(),
+                "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
+            },
         )
         action_runner = ActionRunner(
             session=session,

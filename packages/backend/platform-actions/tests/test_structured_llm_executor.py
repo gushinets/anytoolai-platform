@@ -41,6 +41,9 @@ from anytoolai_platform_core.structured_output.errors import (
     STRUCTURED_OUTPUT_VALIDATION_SAFE_MESSAGE,
     StructuredOutputValidationError,
 )
+from anytoolai_platform_actions.structured_llm.cross_validation import (
+    DetectIssuesByTaxonomyCrossValidator,
+)
 from anytoolai_platform_actions.structured_llm.executor import (
     StructuredLlmActionExecutor,
     StructuredLlmActionRequest,
@@ -78,7 +81,7 @@ class SpyGateway:
             provider_policy_ref=request.provider_policy_ref,
             provider="fake",
             model="fake-json-v1",
-            output_text='{"title": "Summary", "fields": ["budget", "timeline"]}',
+            output_text='{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": []}',
             status=ProviderCallStatus.succeeded,
         )
 
@@ -103,7 +106,56 @@ class ValidationRetrySpyGateway:
             provider_policy_ref=request.provider_policy_ref,
             provider="fake",
             model="fake-json-v1",
-            output_text='{"title": "Summary", "fields": ["budget", "timeline"]}',
+            output_text='{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": []}',
+            status=ProviderCallStatus.succeeded,
+        )
+
+
+class CrossValidationRetrySpyGateway:
+    """First reply violates the A04 taxonomy cross-validation rule; second is valid."""
+
+    def __init__(self) -> None:
+        self.requests = []
+        self.sessions = []
+
+    async def request(self, request, *, session):
+        self.requests.append(request)
+        self.sessions.append(session)
+        if len(self.requests) == 1:
+            output_text = (
+                '{"issues": [{"category": "not_in_taxonomy", '
+                '"description": "d", "severity": "high"}]}'
+            )
+        else:
+            output_text = (
+                '{"issues": [{"category": "timeline", '
+                '"description": "d", "severity": "high"}]}'
+            )
+        return ProviderResponse(
+            provider_policy_ref=request.provider_policy_ref,
+            provider="fake",
+            model="fake-json-v1",
+            output_text=output_text,
+            status=ProviderCallStatus.succeeded,
+        )
+
+
+class CrossValidationAlwaysFailingSpyGateway:
+    def __init__(self) -> None:
+        self.requests = []
+        self.sessions = []
+
+    async def request(self, request, *, session):
+        self.requests.append(request)
+        self.sessions.append(session)
+        return ProviderResponse(
+            provider_policy_ref=request.provider_policy_ref,
+            provider="fake",
+            model="fake-json-v1",
+            output_text=(
+                '{"issues": [{"category": "not_in_taxonomy", '
+                '"description": "d", "severity": "high"}]}'
+            ),
             status=ProviderCallStatus.succeeded,
         )
 
@@ -181,8 +233,8 @@ def test_structured_llm_executor_routes_calls_through_provider_gateway() -> None
     response = asyncio.run(executor.execute(request, session=session))
 
     assert response.structured_output == {
-        "title": "Summary",
-        "fields": ["budget", "timeline"],
+        "values": {"budget": "5000", "timeline": "Q1"},
+        "missing_fields": [],
     }
     assert response.provider_call is not None
     assert response.provider_call.provider == "fake"
@@ -243,8 +295,8 @@ def test_structured_llm_executor_owns_validation_retries_through_gateway_dtos() 
     response = asyncio.run(executor.execute(request, session=session))
 
     assert response.structured_output == {
-        "title": "Summary",
-        "fields": ["budget", "timeline"],
+        "values": {"budget": "5000", "timeline": "Q1"},
+        "missing_fields": [],
     }
     assert response.provider_call is not None
     assert spy_gateway.sessions == [session, session]
@@ -255,6 +307,139 @@ def test_structured_llm_executor_owns_validation_retries_through_gateway_dtos() 
     assert {gateway_request.action_run_id for gateway_request in spy_gateway.requests} == {
         "action_run_demo"
     }
+
+
+def test_structured_llm_executor_retries_on_cross_validation_failure() -> None:
+    """ANY-251 regression: cross-validation failures must get the same semantic
+    retries as static schema mismatches, not just a single unretried check."""
+    registry = build_config_registry(CONFIG_ROOT)
+    spy_gateway = CrossValidationRetrySpyGateway()
+    executor = StructuredLlmActionExecutor(
+        config_registry=registry,
+        provider_gateway=spy_gateway,
+        output_cross_validators={
+            "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
+        },
+    )
+    base_policy = registry.get_provider_policy("default_fake_provider_v1")
+    assert base_policy is not None
+    executor._require_provider_policy = lambda _provider_policy_ref: replace(
+        base_policy,
+        retry_policy=replace(
+            base_policy.retry_policy,
+            validation=ProviderValidationRetryPolicy(
+                owner=base_policy.retry_policy.validation.owner,
+                max_attempts=2,
+            ),
+        ),
+    )
+    request = StructuredLlmActionRequest(
+        tenant_id="tenant_demo",
+        region="eu-central",
+        product_id="kernel_demo",
+        frontend_id="kernel_demo_ce",
+        scenario_session_id="scenario_session_demo",
+        job_id="job_demo",
+        workflow_id="kernel_demo.extract_detect_report_v1",
+        workflow_version=1,
+        step_id="detect_issues",
+        action_run_id="action_run_demo",
+        action_type="text.detect_issues_by_taxonomy",
+        action_config_id="kernel_demo.detect_issues_v1",
+        input_payload={"source_text": "text", "taxonomy": ["timeline"]},
+    )
+    session = object()
+
+    response = asyncio.run(executor.execute(request, session=session))
+
+    assert response.structured_output == {
+        "issues": [{"category": "timeline", "description": "d", "severity": "high"}]
+    }
+    assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
+        1,
+        2,
+    ]
+
+
+def test_structured_llm_executor_raises_safe_error_when_cross_validation_never_passes(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    registry = build_config_registry(CONFIG_ROOT)
+    spy_gateway = CrossValidationAlwaysFailingSpyGateway()
+    base_policy = registry.get_provider_policy("default_fake_provider_v1")
+    assert base_policy is not None
+    with transaction_boundary(session_factory) as session:
+        artifact_service = ArtifactService(
+            ArtifactRepository(session),
+            EventEmitter(EventLogRepository(session)),
+        )
+        provider_call_repository = ProviderCallRepository(session)
+        provider_call_repository.create(
+            ProviderCallRecord(
+                tenant_id="tenant_demo",
+                region="eu-central",
+                product_id="kernel_demo",
+                frontend_id="kernel_demo_ce",
+                scenario_session_id="scenario_session_demo",
+                job_id="job_demo",
+                action_run_id="action_run_demo",
+                workflow_id="kernel_demo.extract_detect_report_v1",
+                workflow_version=1,
+                step_id="detect_issues",
+                action_type="text.detect_issues_by_taxonomy",
+                action_config_id="kernel_demo.detect_issues_v1",
+                provider_policy_ref="default_fake_provider_v1",
+                provider="fake",
+                model="fake-json-v1",
+                gateway_backend="fake",
+                gateway_model="fake-json-v1",
+                semantic_attempt_index=1,
+                transport_attempt_index=1,
+                physical_call_index=1,
+            )
+        )
+        executor = StructuredLlmActionExecutor(
+            config_registry=registry,
+            provider_gateway=spy_gateway,
+            artifact_service=artifact_service,
+            output_cross_validators={
+                "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
+            },
+        )
+        executor._require_provider_policy = lambda _provider_policy_ref: replace(
+            base_policy,
+            retry_policy=replace(
+                base_policy.retry_policy,
+                validation=ProviderValidationRetryPolicy(
+                    owner=base_policy.retry_policy.validation.owner,
+                    max_attempts=2,
+                ),
+            ),
+        )
+        request = StructuredLlmActionRequest(
+            tenant_id="tenant_demo",
+            region="eu-central",
+            product_id="kernel_demo",
+            frontend_id="kernel_demo_ce",
+            scenario_session_id="scenario_session_demo",
+            job_id="job_demo",
+            workflow_id="kernel_demo.extract_detect_report_v1",
+            workflow_version=1,
+            step_id="detect_issues",
+            action_run_id="action_run_demo",
+            action_type="text.detect_issues_by_taxonomy",
+            action_config_id="kernel_demo.detect_issues_v1",
+            input_payload={"source_text": "text", "taxonomy": ["timeline"]},
+        )
+
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            asyncio.run(executor.execute(request, session=session))
+        artifact_rows = list(session.execute(sa.select(artifacts_table)).mappings())
+
+    assert exc_info.value.code == STRUCTURED_OUTPUT_VALIDATION_ERROR_CODE
+    assert len(spy_gateway.requests) == 2
+    assert len(artifact_rows) == 1
+    assert artifact_rows[0]["artifact_type"] == "structured_output_debug_raw"
 
 
 def test_structured_llm_executor_finalizes_and_persists_structured_artifact(
@@ -318,16 +503,16 @@ def test_structured_llm_executor_finalizes_and_persists_structured_artifact(
         )
 
     assert response.structured_output == {
-        "title": "Summary",
-        "fields": ["budget", "timeline"],
+        "values": {"budget": "5000", "timeline": "Q1"},
+        "missing_fields": [],
     }
     assert response.provider_call is not None
     assert response.metadata["structured_output_artifact_id"].startswith("artifact_")
     assert len(artifact_rows) == 1
     assert artifact_rows[0]["artifact_type"] == "structured_output"
     assert artifact_rows[0]["content_json"] == {
-        "title": "Summary",
-        "fields": ["budget", "timeline"],
+        "values": {"budget": "5000", "timeline": "Q1"},
+        "missing_fields": [],
     }
 
 

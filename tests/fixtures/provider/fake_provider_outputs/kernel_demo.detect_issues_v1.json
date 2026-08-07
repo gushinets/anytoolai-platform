@@ -2,8 +2,10 @@
   "response_json": {
     "issues": [
       {
+        "category": "timeline",
+        "description": "Timeline is underspecified",
         "severity": "high",
-        "issue": "Timeline is underspecified"
+        "evidence": "We need this soon."
       }
     ]
   },

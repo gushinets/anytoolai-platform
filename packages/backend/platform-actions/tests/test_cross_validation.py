@@ -1,0 +1,139 @@
+from __future__ import annotations
+
+import pytest
+
+from anytoolai_platform_actions.structured_llm.cross_validation import (
+    DetectIssuesByTaxonomyCrossValidator,
+    ExtractStructuredFieldsCrossValidator,
+)
+from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
+
+
+def _field(name: str, field_type: str, *, required: bool) -> dict:
+    return {
+        "name": name,
+        "type": field_type,
+        "description": f"{name} field",
+        "required": required,
+    }
+
+
+class TestExtractStructuredFieldsCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = ExtractStructuredFieldsCrossValidator()
+
+    def test_accepts_matching_typed_values(self) -> None:
+        self.validator.validate(
+            input_payload={
+                "fields": [
+                    _field("deadline", "string", required=True),
+                    _field("budget", "number", required=False),
+                ],
+            },
+            output={
+                "values": {"deadline": "next Friday", "budget": 500},
+                "missing_fields": [],
+            },
+        )
+
+    def test_accepts_partial_result_with_missing_fields_reported(self) -> None:
+        self.validator.validate(
+            input_payload={
+                "fields": [
+                    _field("deadline", "string", required=True),
+                    _field("budget", "number", required=False),
+                ],
+                "strict": False,
+            },
+            output={
+                "values": {"deadline": "next Friday"},
+                "missing_fields": ["budget"],
+            },
+        )
+
+    def test_rejects_type_mismatch(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"fields": [_field("budget", "number", required=False)]},
+                output={"values": {"budget": "not a number"}, "missing_fields": []},
+            )
+
+    def test_rejects_value_for_unrequested_field(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"fields": [_field("deadline", "string", required=True)]},
+                output={
+                    "values": {"deadline": "Friday", "extra": "unexpected"},
+                    "missing_fields": [],
+                },
+            )
+
+    def test_rejects_field_marked_both_present_and_missing(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"fields": [_field("deadline", "string", required=True)]},
+                output={
+                    "values": {"deadline": "Friday"},
+                    "missing_fields": ["deadline"],
+                },
+            )
+
+    def test_strict_true_requires_all_required_fields_present(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={
+                    "fields": [_field("deadline", "string", required=True)],
+                    "strict": True,
+                },
+                output={"values": {}, "missing_fields": ["deadline"]},
+            )
+
+    def test_strict_false_allows_missing_required_fields(self) -> None:
+        self.validator.validate(
+            input_payload={
+                "fields": [_field("deadline", "string", required=True)],
+                "strict": False,
+            },
+            output={"values": {}, "missing_fields": ["deadline"]},
+        )
+
+    def test_array_of_strings_type_check(self) -> None:
+        self.validator.validate(
+            input_payload={"fields": [_field("deliverables", "array_of_strings", required=False)]},
+            output={"values": {"deliverables": ["logo", "site"]}, "missing_fields": []},
+        )
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"fields": [_field("deliverables", "array_of_strings", required=False)]},
+                output={"values": {"deliverables": "not a list"}, "missing_fields": []},
+            )
+
+
+class TestDetectIssuesByTaxonomyCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = DetectIssuesByTaxonomyCrossValidator()
+
+    def test_accepts_category_within_taxonomy(self) -> None:
+        self.validator.validate(
+            input_payload={"taxonomy": ["timeline", "scope"]},
+            output={"issues": [{"category": "timeline", "description": "d", "severity": "high"}]},
+        )
+
+    def test_rejects_category_outside_taxonomy(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"taxonomy": ["timeline"]},
+                output={"issues": [{"category": "scope", "description": "d", "severity": "high"}]},
+            )
+
+    def test_allows_free_form_category_when_taxonomy_omitted(self) -> None:
+        self.validator.validate(
+            input_payload={},
+            output={"issues": [{"category": "anything", "description": "d", "severity": "low"}]},
+        )
+
+    def test_allows_empty_issues_list(self) -> None:
+        self.validator.validate(
+            input_payload={"taxonomy": ["timeline"]},
+            output={"issues": []},
+        )

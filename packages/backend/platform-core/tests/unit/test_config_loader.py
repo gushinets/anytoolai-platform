@@ -100,6 +100,7 @@ def test_loader_builds_registry_from_current_tree() -> None:
     assert multi_step is not None
     assert multi_step.steps[0].input_mapping == {
         "source_text": "scenario.input.source_text",
+        "fields": "scenario.input.fields",
     }
     assert multi_step.steps[2].output_mapping == {
         "context.workflow_output": "steps.generate_report.output",

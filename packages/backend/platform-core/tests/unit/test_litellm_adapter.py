@@ -257,7 +257,7 @@ def test_litellm_adapter_serializes_real_registry_schema_before_dispatch() -> No
             "Return JSON that matches this schema exactly. "
             "Do not wrap the JSON in markdown fences.\n"
             "JSON Schema: "
-            '{"additionalProperties":false,"properties":{"fields":{"items":{"minLength":1,"type":"string"},"type":"array"},"title":{"minLength":1,"type":"string"}},"required":["title","fields"],"type":"object"}'
+            '{"additionalProperties":false,"properties":{"confidence":{"additionalProperties":{"maximum":1,"minimum":0,"type":"number"},"type":"object"},"missing_fields":{"items":{"minLength":1,"type":"string"},"type":"array"},"values":{"additionalProperties":true,"type":"object"}},"required":["values","missing_fields"],"type":"object"}'
         ),
     }
 

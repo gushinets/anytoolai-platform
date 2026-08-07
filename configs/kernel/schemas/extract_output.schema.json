@@ -1,21 +1,26 @@
 {
   "type": "object",
   "properties": {
-    "title": {
-      "type": "string",
-      "minLength": 1
+    "values": {
+      "type": "object",
+      "additionalProperties": true
     },
-    "fields": {
+    "missing_fields": {
       "type": "array",
       "items": {
         "type": "string",
         "minLength": 1
       }
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
     }
   },
-  "required": [
-    "title",
-    "fields"
-  ],
+  "required": ["values", "missing_fields"],
   "additionalProperties": false
 }
