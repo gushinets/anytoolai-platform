@@ -82,10 +82,10 @@ raw/debug artifacts, or state from another tenant/region.
         no comparison against the artifact's scope.
 - [x] Add `anytoolai_platform_core/results/service.py` (`ResultService`,
       `ResultArtifactNotFoundError`, `ResultArtifactUnavailableError`, `ResultArtifactView`).
-  - [x] Add `_contains_forbidden_key` denylist backstop (built from
-        `common.logging.SENSITIVE_KEY_PARTS` plus compound provider/model-lineage markers) after
-        review found the endpoint returns the full output object verbatim against workflow
-        output schemas that may still be `additionalProperties: true`.
+  - [x] Add `_contains_forbidden_key` denylist backstop (a dedicated, results-specific set of
+        compound provider/model-lineage markers, matched after normalizing `-`/`_`/camelCase key
+        separators) after review found the endpoint returns the full output object verbatim
+        against workflow output schemas that may still be `additionalProperties: true`.
 - [x] Add `apps/platform-api/src/anytoolai_platform_api/routers/results.py` and
       `ResultArtifactResponse` schema; wire the router in `main.py`.
 - [x] Add focused API tests covering: happy path, unknown id, out-of-tenant scope, out-of-region
@@ -105,16 +105,15 @@ raw/debug artifacts, or state from another tenant/region.
 
 ## Validation
 
-- [x] `uv run pytest apps/platform-api/tests/test_results_api.py -q` (14 passed)
-- [x] `uv run pytest apps/platform-api/tests/test_scenario_runtime_api.py -q` (worker-driven
-      vertical test included)
-- [x] `uv run pytest apps/platform-api/tests/test_handoffs_api.py packages/backend/platform-core/tests/unit/test_handoffs.py -q`
-      (no regressions from the shared canonical-guard change)
-- [x] `uv run pytest -m postgresql -q` (full postgres-gated suite)
-- [x] `uv run ruff check` on all touched files
-- [x] `python scripts/agent/runner.py quick-check`
-- [x] `python scripts/agent/runner.py generate-docs --check`
-- [x] `pnpm --filter @anytoolai/ce-kit generate-api-types:check`
+- [x] `python scripts/agent/runner.py doctor`
+- [x] `python scripts/agent/runner.py quick-check` (config/architecture/docs validation,
+      `generate-docs --check`, and the DB-free backend pytest subset)
+- [x] `python scripts/agent/runner.py postgresql-check` (full postgres-gated suite: results API,
+      the worker-driven A12 vertical test, and handoffs regression, all in one canonical run)
+- [x] `python scripts/agent/runner.py frontend-check` (typecheck, `ce-kit` unit tests,
+      `generate-api-types:check` OpenAPI-contract drift, build)
+- [x] `uv run ruff check` on all touched files (no dedicated runner subcommand wraps ruff; run
+      directly)
 
 ## Decision log
 
@@ -135,7 +134,8 @@ raw/debug artifacts, or state from another tenant/region.
 | 2026-08-07 | Fixed `workflow_version` sourcing bug (was reading the live registry instead of the job-pinned value); added region-scope-miss and real jsonschema-mismatch regression tests per second review pass | Address team-lead review (job scope, frontend-safety denylist, test isolation, doc wording) |
 | 2026-08-07 | Added artifact/job cross-scope guard, `ResultService` denylist backstop, split the raw/debug test into three isolated cases, reworded the 404-code doc claim | Address denylist follow-up review (false-positive risk, list duplication) and the two remaining P3 items |
 | 2026-08-07 | Fixed denylist to reuse `SENSITIVE_KEY_PARTS` with compound markers instead of bare words; added the false-positive regression test; extended the worker-driven vertical test with a `GET /v1/results/{id}` assertion; added this execution plan and completed the PR description | Address team-lead review #1 (key-separator normalization, log-list reuse, plan/doc consistency) |
-| 2026-08-07 | Replaced the `SENSITIVE_KEY_PARTS`-based denylist with a dedicated, results-specific marker list; normalized `-`/`_`/camelCase key separators before matching; added parametrized regression coverage for `provider-model`/`providerModel`/`ProviderModel`/`pydantic-run-id`/`pydanticRunId`; fixed this plan's self-contradictory "non-distinguishing 404" wording and its obsolete "not ready yet" polling rationale in the decision log | None; ready for merge |
+| 2026-08-07 | Replaced the `SENSITIVE_KEY_PARTS`-based denylist with a dedicated, results-specific marker list; normalized `-`/`_`/camelCase key separators before matching; added parametrized regression coverage for `provider-model`/`providerModel`/`ProviderModel`/`pydantic-run-id`/`pydanticRunId`; fixed this plan's self-contradictory "non-distinguishing 404" wording and its obsolete "not ready yet" polling rationale in the decision log | Address team-lead review #2 (self-referential timestamp assertion, stale plan wording, validation checklist not routed through canonical runner commands) |
+| 2026-08-07 | Fixed the worker-driven vertical test's `created_at` assertion to compare against the DB-persisted `artifacts_table` row instead of the response echoing itself; updated this plan's implementation-step description of the denylist (stale `SENSITIVE_KEY_PARTS` reference) and rewrote the Validation checklist to route through `doctor`/`quick-check`/`postgresql-check`/`frontend-check` instead of raw `pytest`/`generate-docs`/`generate-api-types:check` invocations | None; ready for merge |
 
 ## Open questions
 

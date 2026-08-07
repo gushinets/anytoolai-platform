@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
+from datetime import datetime
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Iterator
@@ -753,6 +754,7 @@ def test_start_then_real_worker_execution_preserves_a12_runtime_correlation(
     )
     assert result_response.status_code == HTTPStatus.OK
     result_body = result_response.json()
+    assert datetime.fromisoformat(result_body["created_at"]) == result_artifact["created_at"]
     assert result_body == {
         "result_artifact_id": processed.result_artifact_id,
         "scenario_session_id": started["scenario_session_id"],
