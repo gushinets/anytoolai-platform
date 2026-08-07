@@ -1,0 +1,93 @@
+# Execution Plan: ANY-8 A15 CE Kit MVP API Client closeout
+
+## Status
+
+- State: active
+- Owner: agent
+- Created: 2026-08-07
+- Last updated: 2026-08-07
+- Review date: 2026-08-07
+- Next action: push `feature/ANY-8` and open a PR; update Linear status once merged.
+- Blocker: none
+
+## Goal
+
+ANY-8 is the coordinating parent for A15a (ANY-170, merged in PR #49) and A15b (ANY-171, merged in
+PR #52). Both were already complete on `main` at session start. This plan covers the closeout work
+only: a line-by-line DoD/AC audit of the parent ticket and both children against the merged code,
+and fixing the one real gap the audit found.
+
+## Scope
+
+### In scope
+
+- Audit every AC bullet in the parent ANY-8 and both children (ANY-170, ANY-171) against
+  `packages/frontend/ce-kit/src` and its tests, file by file.
+- Audit for stale "A16 owns `PlatformApiClient`/`startScenario()`/`getQuota()`" references outside
+  `docs/exec-plans/completed/`.
+- Remove the fake-success stubs (`pollJob`, `getArtifact`, `createHandoff`, `openHandoffConsent`,
+  `captureEmail`, `trackClientEvent`) from `src/index.ts`. ANY-8's "Deferred" section explicitly
+  defers these capabilities to later tickets (ANY-36, ANY-6/A18, artifact/event backend contracts)
+  and states "unsupported capabilities must not ship as fake-success helpers" -- but they still
+  shipped fake-success payloads, mitigated only by a README disclaimer. Confirmed zero consumers
+  repo-wide (`grep` across `packages/`, `extensions/`, `apps/` found only `index.ts` itself;
+  `extensions/kernel-demo-ce` doesn't import `ce-kit` at all yet -- wiring it up is ANY-39, a
+  separate blocked-by ticket).
+- Delete the now-unused empty placeholder files those stubs lived behind
+  (`src/artifacts/getArtifact.ts`, `src/events/trackClientEvent.ts`,
+  `src/handoffs/createHandoff.ts`, `src/handoffs/openHandoffConsent.ts`,
+  `src/scenarios/pollJob.ts` -- all were `export {}` with no real implementation).
+- Update the README's opening disclaimer to match (no longer describes stubs present in
+  `src/index.ts`; explains why they're absent instead).
+- Re-run `frontend-check`/`full-check` after the removal.
+
+### Out of scope
+
+- Any new capability implementation (`getResult()`/A15c/ANY-226, handoff helpers/A18, email
+  capture/ANY-36, client-event ingestion) -- all separate tickets per ANY-8's own Deferred section.
+- `renderQuotaState()`, `renderJobStatus()`, `renderError()` -- pure formatting helpers with no
+  backend call to fake, not mentioned in ANY-8's Deferred list, left untouched.
+- Wiring `extensions/kernel-demo-ce` to consume `ce-kit` (ANY-39).
+
+## Verification
+
+- `python scripts/agent/runner.py doctor` -- passed.
+- `python scripts/agent/runner.py frontend-check` -- passed before the stub removal (baseline) and
+  again after (typecheck, `pnpm -r test` 197/197, `generate-api-types:check`, build all green).
+- `python scripts/agent/runner.py full-check` -- passed before and after the stub removal (backend
+  pytest suites unaffected, frontend re-verified).
+- `grep -rn "A16 owns" docs/ packages/ extensions/ apps/` (excluding
+  `docs/exec-plans/completed/`) -- no matches.
+- `grep -rln "pollJob|getArtifact|createHandoff|openHandoffConsent|captureEmail|trackClientEvent"
+  packages/ extensions/ apps/` -- only `src/index.ts` before the fix; confirms zero consumers.
+- Cross-checked every parent/child AC bullet against a named, matching unit or integration test
+  (`test/identity/guestIdentity.test.ts` for single-flight/guest-storage races,
+  `test/scenarios/prepareScenarioStart.test.ts` for idempotency-key generation/reuse/isolation,
+  `test/integration/scenarioLifecycle.test.ts` for the required
+  `create guest -> get quota -> prepare keyed start -> retry -> assert same session/job -> poll ->
+  one quota unit consumed` flow plus the `429 quota_exhausted` no-fake-state case,
+  `test/scenarios/pollScenarioSession.test.ts` for bounded/cancellable polling and the "never
+  starts/replays/configures workflow execution" invariant).
+- Scanned all public `types.ts` files (`api/client/types.ts`, `scenarios/types.ts`,
+  `quota/types.ts`, `runtime/types.ts`, `identity/guestIdentity.ts`) for
+  prompt/provider/model/policy/LiteLLM/PydanticAI/secret leakage -- none found (`quotaPolicyId` is
+  a quota rate-limit policy id, unrelated to `provider_policy_ref`).
+- Swept every `*.md` file mentioning ANY-8/A15/CE-kit
+  (`docs/architecture/frontend-boundaries.md`, `docs/architecture/quota-model.md`,
+  `docs/architecture/scenario-session-model.md`, `docs/product-specs/mvp-a2-client-surfaces.md`,
+  `docs/product-specs/mvp-scope-source-of-truth.md`,
+  `docs/exec-plans/active/mvp-a-mvp-b-linear-epics.md`) -- all describe the current real
+  implementation accurately; no stale claims found beyond the README disclaimer fixed above. The
+  Linear-epics tracker table's "A15 CE-kit parent | ANY-8 | In progress" row is accurate as of this
+  writing (not yet merged) and should flip to "Done" once the PR merges and Linear is updated.
+
+## Decision log
+
+- Removed the fake-success stubs rather than replacing them with explicit throwing stubs or leaving
+  them with a stronger README disclaimer: zero consumers made removal risk-free, and it's the only
+  option that satisfies the literal "must not ship as fake-success helpers" text rather than
+  documenting around it. Confirmed with the ticket owner before making the change.
+- Did not touch `renderQuotaState()`/`renderJobStatus()`/`renderError()` even though the old README
+  disclaimer grouped them with the fake-success stubs -- they don't call a backend or fake a
+  success/failure outcome (no I/O to fake), and they aren't named in ANY-8's Deferred list, so
+  removing them would be scope creep beyond what the ticket's explicit text requires.
