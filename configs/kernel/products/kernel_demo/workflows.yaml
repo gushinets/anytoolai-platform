@@ -9,6 +9,7 @@ workflows:
         input_mapping:
           source_text: scenario.input.source_text
           fields: scenario.input.fields
+          strict: scenario.input.strict
 
   - workflow_id: kernel_demo.extract_detect_report_v1
     version: 1
@@ -20,6 +21,7 @@ workflows:
         input_mapping:
           source_text: scenario.input.source_text
           fields: scenario.input.fields
+          strict: scenario.input.strict
         output_mapping:
           context.extracted: steps.extract.output
       - step_id: detect_issues
@@ -48,6 +50,7 @@ workflows:
         input_mapping:
           source_text: scenario.input.source_text
           fields: scenario.input.fields
+          strict: scenario.input.strict
         output_mapping:
           context.workflow_output: steps.extract.output
       - step_id: optional_extract
@@ -55,6 +58,7 @@ workflows:
         input_mapping:
           source_text: scenario.input.source_text
           fields: scenario.input.fields
+          strict: scenario.input.strict
         when: scenario.input.run_optional_step
 
   - workflow_id: kernel_demo.retry_extract_v1
@@ -67,4 +71,5 @@ workflows:
         input_mapping:
           source_text: scenario.input.source_text
           fields: scenario.input.fields
+          strict: scenario.input.strict
         retry_count: 1

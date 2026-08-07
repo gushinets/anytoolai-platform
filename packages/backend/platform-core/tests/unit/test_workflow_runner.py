@@ -356,7 +356,7 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
         result = asyncio.run(
             runner.run(
                 "kernel_demo.single_action_extract_v1",
-                {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                 context,
             )
         )
@@ -480,7 +480,7 @@ def test_workflow_runner_executes_an_existing_claimed_job_without_duplicate_job(
         result = asyncio.run(
             runner.run_claimed_job(
                 claimed,
-                {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                 context,
             )
         )
@@ -533,7 +533,7 @@ def test_workflow_runner_recovers_failed_state_for_existing_claimed_job_after_ro
             asyncio.run(
                 runner.run_claimed_job(
                     job,
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -619,7 +619,7 @@ def test_workflow_runner_recovers_canceled_state_for_existing_claimed_job_after_
             asyncio.run(
                 runner.run_claimed_job(
                     job,
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -697,7 +697,7 @@ def test_workflow_runner_recovers_succeeded_state_for_existing_claimed_job_after
             result = asyncio.run(
                 runner.run_claimed_job(
                     job,
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -767,7 +767,7 @@ def test_workflow_runner_recovers_succeeded_state_for_newly_created_job_after_ro
             result = asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -827,6 +827,7 @@ def test_workflow_runner_recovers_skipped_action_run_after_success_rollback(
                     {
                         "source_text": "deadline budget deliverables",
                         "fields": _EXTRACT_FIELDS,
+                        "strict": False,
                         "run_optional_step": False,
                     },
                     context,
@@ -917,7 +918,7 @@ def test_workflow_runner_fails_loudly_instead_of_recovering_succeeded_job_with_l
             result = asyncio.run(
                 runner.run_claimed_job(
                     job,
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -969,7 +970,7 @@ def test_workflow_runner_rejects_claimed_job_context_with_mismatched_ownership_d
             asyncio.run(
                 runner.run_claimed_job(
                     claimed,
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     replace(context, product_id="kernel_demo_other"),
                 )
             )
@@ -1005,6 +1006,7 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
                 {
                     "source_text": "deadline budget deliverables",
                     "fields": _EXTRACT_FIELDS,
+                    "strict": False,
                     "taxonomy": ["timeline", "scope"],
                 },
                 context,
@@ -1022,6 +1024,7 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
     assert executor.inputs_by_step["extract"][0] == {
         "source_text": "deadline budget deliverables",
         "fields": _EXTRACT_FIELDS,
+        "strict": False,
     }
     assert executor.inputs_by_step["detect_issues"][0] == {
         "source_text": "deadline budget deliverables",
@@ -1069,6 +1072,7 @@ def test_workflow_runner_skips_step_and_records_reason(
                 {
                     "source_text": "deadline budget deliverables",
                     "fields": _EXTRACT_FIELDS,
+                    "strict": False,
                     "run_optional_step": False,
                 },
                 context,
@@ -1106,7 +1110,7 @@ def test_workflow_runner_retries_step_without_mixing_provider_retry_layers(
         result = asyncio.run(
             runner.run(
                 "kernel_demo.retry_extract_v1",
-                {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                 context,
             )
         )
@@ -1151,6 +1155,7 @@ def test_workflow_runner_stops_after_failed_step(
                     {
                         "source_text": "deadline budget deliverables",
                         "fields": _EXTRACT_FIELDS,
+                        "strict": False,
                         "taxonomy": ["timeline", "scope"],
                     },
                     context,
@@ -1247,7 +1252,7 @@ def test_workflow_runner_persists_generic_safe_message_for_unknown_exceptions(
             asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -1301,7 +1306,7 @@ def test_workflow_runner_persists_failed_state_when_exception_escapes_transactio
             asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -1358,6 +1363,7 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
                     {
                         "source_text": "deadline budget deliverables",
                         "fields": _EXTRACT_FIELDS,
+                        "strict": False,
                         "taxonomy": ["timeline", "scope"],
                     },
                     context,
@@ -1498,7 +1504,7 @@ def test_workflow_runner_recovery_does_not_synthesize_step_started_for_pre_start
             asyncio.run(
                 runner.run(
                     "kernel_demo.conditional_skip_extract_v1",
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -1554,7 +1560,7 @@ def test_workflow_runner_caught_condition_failure_does_not_emit_step_started(
             asyncio.run(
                 runner.run(
                     "kernel_demo.conditional_skip_extract_v1",
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -1607,7 +1613,7 @@ def test_workflow_runner_recovery_replays_step_started_for_input_mapping_failure
             asyncio.run(
                 runner.run(
                     "kernel_demo.extract_detect_report_v1",
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -1959,7 +1965,7 @@ def test_workflow_runner_uses_generic_safe_provider_message_for_unknown_adapter_
             asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )

@@ -38,17 +38,22 @@ class ExtractStructuredFieldsCrossValidator:
             return
         values = output.get("values")
         missing_fields = output.get("missing_fields")
+        confidence = output.get("confidence")
         if not isinstance(values, Mapping) or not isinstance(missing_fields, list):
             raise _cross_validation_error("malformed_extraction_output")
 
         known_names = set()
         required_names = set()
+        seen_names: set[str] = set()
         for spec in field_specs:
             if not isinstance(spec, Mapping):
                 continue
             name = spec.get("name")
             if not isinstance(name, str):
                 continue
+            if name in seen_names:
+                raise _cross_validation_error(f"duplicate_field_name:{name}")
+            seen_names.add(name)
             known_names.add(name)
             if spec.get("required") is True:
                 required_names.add(name)
@@ -67,6 +72,16 @@ class ExtractStructuredFieldsCrossValidator:
                 raise _cross_validation_error(f"unrequested_missing_field:{name}")
             if name in values:
                 raise _cross_validation_error(f"field_marked_missing_but_present:{name}")
+
+        missing_field_set = set(missing_fields)
+        for name in known_names:
+            if name not in values and name not in missing_field_set:
+                raise _cross_validation_error(f"unreported_requested_field:{name}")
+
+        if isinstance(confidence, Mapping):
+            for name in confidence:
+                if name not in values:
+                    raise _cross_validation_error(f"confidence_for_unpopulated_field:{name}")
 
         strict = input_payload.get("strict") is True
         if strict:

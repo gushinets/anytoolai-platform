@@ -161,18 +161,34 @@ class HandoffPayloadBuilder:
         )
 
 
+_LITERAL_SOURCE_PREFIX = "literal:"
+
+
 def _apply_mapping(mapping: Mapping[str, str], artifact: Mapping[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for target_path, source_path in mapping.items():
-        parts = source_path.split(".")
-        current: Any = artifact
-        for segment in parts[2:]:
-            if not isinstance(current, Mapping) or segment not in current:
+        if source_path.startswith(_LITERAL_SOURCE_PREFIX):
+            try:
+                value = json.loads(source_path[len(_LITERAL_SOURCE_PREFIX) :])
+            except json.JSONDecodeError as exc:
                 raise HandoffPayloadError(
-                    f"handoff source path could not be resolved: {source_path}"
+                    f"handoff literal source path is not valid JSON: {source_path}"
+                ) from exc
+        else:
+            parts = source_path.split(".")
+            if parts[:2] != ["artifact", "content_json"]:
+                raise HandoffPayloadError(
+                    f"unsupported handoff source path: {source_path}"
                 )
-            current = current[segment]
-        _set_path(result, target_path, current)
+            current: Any = artifact
+            for segment in parts[2:]:
+                if not isinstance(current, Mapping) or segment not in current:
+                    raise HandoffPayloadError(
+                        f"handoff source path could not be resolved: {source_path}"
+                    )
+                current = current[segment]
+            value = current
+        _set_path(result, target_path, value)
     return result
 
 

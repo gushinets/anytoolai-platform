@@ -82,7 +82,8 @@ def test_loader_builds_registry_from_current_tree() -> None:
     assert handoff is not None
     assert handoff.target_frontend_id == "kernel_demo_ce"
     assert handoff.target_start_policy.value == "immediate"
-    assert handoff.context_mapping == {"source_text": "artifact.content_json.title"}
+    assert handoff.context_mapping["source_text"] == "artifact.content_json.values.deadline"
+    assert handoff.context_mapping["fields"].startswith("literal:")
     assert registry.get_action_configuration("kernel_demo.extract_structured_fields_v1") is not None
     assert registry.get_prompt("kernel_demo.extract_structured_fields.v1") is not None
     assert registry.get_provider_policy("default_fake_provider_v1") is not None
@@ -101,6 +102,7 @@ def test_loader_builds_registry_from_current_tree() -> None:
     assert multi_step.steps[0].input_mapping == {
         "source_text": "scenario.input.source_text",
         "fields": "scenario.input.fields",
+        "strict": "scenario.input.strict",
     }
     assert multi_step.steps[2].output_mapping == {
         "context.workflow_output": "steps.generate_report.output",

@@ -97,6 +97,51 @@ class TestExtractStructuredFieldsCrossValidator:
             output={"values": {}, "missing_fields": ["deadline"]},
         )
 
+    def test_rejects_requested_field_missing_from_both_values_and_missing_fields(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={
+                    "fields": [
+                        _field("deadline", "string", required=True),
+                        _field("budget", "number", required=False),
+                    ],
+                },
+                output={"values": {"deadline": "Friday"}, "missing_fields": []},
+            )
+
+    def test_rejects_confidence_for_field_absent_from_values(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"fields": [_field("deadline", "string", required=True)]},
+                output={
+                    "values": {},
+                    "missing_fields": ["deadline"],
+                    "confidence": {"deadline": 0.9},
+                },
+            )
+
+    def test_accepts_confidence_only_for_populated_fields(self) -> None:
+        self.validator.validate(
+            input_payload={"fields": [_field("deadline", "string", required=True)]},
+            output={
+                "values": {"deadline": "Friday"},
+                "missing_fields": [],
+                "confidence": {"deadline": 0.9},
+            },
+        )
+
+    def test_rejects_duplicate_field_names_in_input(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={
+                    "fields": [
+                        _field("deadline", "string", required=True),
+                        _field("deadline", "string", required=False),
+                    ],
+                },
+                output={"values": {"deadline": "Friday"}, "missing_fields": []},
+            )
+
     def test_array_of_strings_type_check(self) -> None:
         self.validator.validate(
             input_payload={"fields": [_field("deliverables", "array_of_strings", required=False)]},

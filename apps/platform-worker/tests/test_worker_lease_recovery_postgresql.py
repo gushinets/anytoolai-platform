@@ -28,7 +28,13 @@ from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
 from anytoolai_platform_worker.lease import AdvisoryJobLease, _advisory_lock_key
-from test_worker_boot import CONFIG_ROOT, FIXTURE_ROOT, _seed_job, _seed_running_job
+from test_worker_boot import (
+    CONFIG_ROOT,
+    FIXTURE_ROOT,
+    _EXTRACT_FIELDS,
+    _seed_job,
+    _seed_running_job,
+)
 
 from tests.db_support import provision_database
 
@@ -203,7 +209,11 @@ def test_real_sigterm_drains_inflight_job_before_exiting(
     _engine, session_factory, database_url = db
     job = _seed_job(
         session_factory,
-        input_payload={"source_text": "deadline budget deliverables"},
+        input_payload={
+            "source_text": "deadline budget deliverables",
+            "fields": _EXTRACT_FIELDS,
+            "strict": False,
+        },
     )
 
     script = _SUBPROCESS_WORKER_SCRIPT.format(

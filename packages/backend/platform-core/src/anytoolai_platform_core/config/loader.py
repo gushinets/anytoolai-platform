@@ -334,6 +334,28 @@ def _build_unique_key_yaml_loader(
     return _UniqueKeySafeLoader
 
 
+def _validate_handoff_literal_source(
+    source: str,
+    *,
+    field_name: str,
+    path: Path,
+    config_id: str | None,
+    ref_type: str,
+    ref_value: str,
+) -> None:
+    payload = source[len("literal:") :]
+    try:
+        json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise InvalidConfigShapeError(
+            path,
+            f"Handoff {field_name} literal source is not valid JSON: {source}",
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=ref_value,
+        ) from exc
+
+
 def _handoff_mapping(
     value: Any,
     *,
@@ -381,7 +403,17 @@ def _handoff_mapping(
                 ref_type=ref_type,
                 ref_value=ref_value,
             )
-        if (
+        is_literal_source = source.startswith("literal:")
+        if is_literal_source:
+            _validate_handoff_literal_source(
+                source,
+                field_name=field_name,
+                path=path,
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value,
+            )
+        elif (
             (source != "artifact.content_json" and not source.startswith("artifact.content_json."))
             or any(marker in source for marker in ("[", "]", ".."))
             or source.endswith(".")
