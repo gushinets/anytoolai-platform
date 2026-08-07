@@ -100,7 +100,7 @@ def _seed_result(
             artifact_type=artifact_type,
             status=ArtifactStatus.stored,
             content_json=(
-                {"deadline": "2026-08-30", "fields": ["budget", "deliverables"]}
+                {"title": "Extracted", "fields": ["budget", "deliverables"]}
                 if content_json is None
                 else content_json
             ),
@@ -145,7 +145,7 @@ def test_get_result_artifact_returns_frontend_safe_canonical_result(
         "schema_ref": SCHEMA_REF,
         "schema_version": SCHEMA_VERSION,
         "created_at": body["created_at"],
-        "output": {"deadline": "2026-08-30", "fields": ["budget", "deliverables"]},
+        "output": {"title": "Extracted", "fields": ["budget", "deliverables"]},
     }
     # frontend-safe: no raw/debug internals, prompts, or provider/model identifiers leak.
     for forbidden in ("prompt", "provider", "model", "litellm", "pydantic_run_id", "metadata"):
@@ -187,26 +187,72 @@ def test_get_result_artifact_out_of_region_scope_fails_safely(
 
 
 def test_get_result_artifact_rejects_raw_debug_artifact(session_factory: SessionFactory) -> None:
+    # The job's result_artifact_id must point at the tested artifact itself, otherwise the
+    # canonical guard rejects it on `job.result_artifact_id != artifact.id` before ever
+    # evaluating `artifact_type`, making this test pass even if the artifact-type guard broke.
     app = _create_test_app(session_factory)
     with transaction_boundary(session_factory) as session:
-        scenario_id, job_id, _canonical_artifact_id = _seed_result(session)
-        debug_artifact = ArtifactRepository(session).create(
-            ArtifactRecord(
-                tenant_id="anytoolai",
-                region="default",
-                product_id="kernel_demo",
-                frontend_id="kernel_demo_ce",
-                scenario_session_id=scenario_id,
-                job_id=job_id,
-                action_run_id="action_run_debug",
-                artifact_type="structured_output_debug_raw",
-                status=ArtifactStatus.stored,
-                content_json={"raw_provider_payload": "should never be frontend-safe"},
-                metadata={"artifact_role": "raw_debug"},
-            )
+        _, _, artifact_id = _seed_result(session, artifact_type="structured_output_debug_raw")
+
+    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "result_artifact_unavailable"
+
+
+def test_get_result_artifact_rejects_action_scoped_artifact(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+    with transaction_boundary(session_factory) as session:
+        _, _, artifact_id = _seed_result(session, action_run_id="action_run_demo")
+
+    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "result_artifact_unavailable"
+
+
+def test_get_result_artifact_rejects_non_workflow_result_role(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+    with transaction_boundary(session_factory) as session:
+        _, _, artifact_id = _seed_result(
+            session, metadata_overrides={"artifact_role": "raw_debug"}
         )
 
-    response = asyncio.run(_request(app, "GET", f"/v1/results/{debug_artifact.id}"))
+    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "result_artifact_unavailable"
+
+
+def test_get_result_artifact_rejects_artifact_job_scope_mismatch(
+    session_factory: SessionFactory,
+) -> None:
+    # The artifact lookup is tenant/region-scoped, but the linked job was previously loaded
+    # globally by job_id with no comparison of tenant/region/product/frontend against the
+    # artifact. Simulate a corrupted/cross-scope pairing directly at the repository layer
+    # (job creation enforces its own tenant/region/product/frontend against the scenario
+    # session, so the mismatch must be introduced on the artifact instead) to prove the
+    # canonical guard now rejects it.
+    app = _create_test_app(session_factory)
+    with transaction_boundary(session_factory) as session:
+        scenario_id, job_id, canonical_artifact_id = _seed_result(session)
+        canonical_artifact = ArtifactRepository(session).get(canonical_artifact_id)
+        assert canonical_artifact is not None
+        mismatched_artifact = ArtifactRepository(session).create(
+            replace(
+                canonical_artifact,
+                id=f"{canonical_artifact_id}_mismatch",
+                product_id="other_product",
+            )
+        )
+        jobs = JobRepository(session)
+        job = jobs.get(job_id)
+        assert job is not None
+        jobs.update(replace(job, result_artifact_id=mismatched_artifact.id))
+        artifact_id = mismatched_artifact.id
+
+    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
     assert response.status_code == HTTPStatus.NOT_FOUND
     assert response.json()["error"]["code"] == "result_artifact_unavailable"
 
@@ -262,6 +308,54 @@ def test_get_result_artifact_rejects_content_violating_output_schema(
     response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
     assert response.status_code == HTTPStatus.NOT_FOUND
     assert response.json()["error"]["code"] == "result_artifact_unavailable"
+
+
+def test_get_result_artifact_allows_generic_words_as_key_substrings(
+    session_factory: SessionFactory,
+) -> None:
+    # The denylist backstop must use specific compound markers (e.g. `provider_model`), not
+    # bare generic words (`model`, `provider`), so a legitimate field like `car_model` or
+    # `insurance_provider` is never mistaken for a leaked provider/model identifier.
+    app = _create_test_app(session_factory)
+    with transaction_boundary(session_factory) as session:
+        _, _, artifact_id = _seed_result(
+            session,
+            content_json={
+                "title": "Extracted",
+                "fields": ["budget"],
+                "car_model": "Model X",
+                "insurance_provider": "Acme Insurance",
+            },
+        )
+
+    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
+    assert response.status_code == HTTPStatus.OK
+    assert response.json()["output"]["car_model"] == "Model X"
+
+
+def test_get_result_artifact_rejects_leak_shaped_content_under_open_schema(
+    session_factory: SessionFactory,
+) -> None:
+    # The shipped kernel_demo.extract_output_v1 workflow output schema is
+    # `{"type": "object", "additionalProperties": true}`, so schema-valid content can still
+    # carry a provider/prompt-shaped key the schema never restricted. Unlike handoffs (which
+    # only ever expose an explicit per-field allowlist mapping), this endpoint returns the
+    # full normalized output object, so ResultService applies its own denylist backstop.
+    app = _create_test_app(session_factory)
+    with transaction_boundary(session_factory) as session:
+        _, _, artifact_id = _seed_result(
+            session,
+            content_json={
+                "title": "Extracted",
+                "fields": ["budget"],
+                "provider_model": "leaked-internal-model-id",
+            },
+        )
+
+    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "result_artifact_unavailable"
+    assert "leaked-internal-model-id" not in response.text
 
 
 def test_get_result_artifact_rejects_unfinished_job(session_factory: SessionFactory) -> None:

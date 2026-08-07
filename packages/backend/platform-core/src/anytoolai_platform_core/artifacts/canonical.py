@@ -38,8 +38,8 @@ def resolve_canonical_workflow_result(
     """Guard and re-validate a stored artifact as a frontend-safe canonical workflow result.
 
     Shared by the handoffs payload builder and the results API so both consumers reject
-    raw/debug artifacts, stale job/workflow/schema pairings, and schema-invalid content the
-    same way.
+    raw/debug artifacts, stale job/workflow/schema pairings, cross-scope artifact/job pairings,
+    and schema-invalid content the same way.
     """
     workflow = None if job is None else config_registry.get_workflow(job.workflow_id)
     schema = None if workflow is None else config_registry.get_schema(workflow.output_schema_ref)
@@ -50,6 +50,10 @@ def resolve_canonical_workflow_result(
         or job.result_artifact_id != artifact.id
         or artifact.status is not ArtifactStatus.stored
         or artifact.artifact_type != CANONICAL_WORKFLOW_RESULT_ARTIFACT_TYPE
+        or artifact.tenant_id != job.tenant_id
+        or artifact.region != job.region
+        or artifact.product_id != job.product_id
+        or artifact.frontend_id != job.frontend_id
         or artifact.scenario_session_id != job.scenario_session_id
         or artifact.job_id != job.id
         or artifact.action_run_id is not None

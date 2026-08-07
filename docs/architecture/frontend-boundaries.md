@@ -173,20 +173,35 @@ individual Freelancer product.
 
 The endpoint is scoped to tenant/region and only ever serves an artifact that is: `stored`, of the
 canonical `structured_output` type (never `structured_output_debug_raw` or any raw/debug artifact),
-tagged `artifact_role: workflow_result`, linked as `result_artifact_id` on a `succeeded` job, and
-re-validated against its workflow's output schema/version at read time. `output` is never returned
-raw from storage without this re-validation pass.
+tagged `artifact_role: workflow_result`, linked as `result_artifact_id` on a `succeeded` job whose
+tenant/region/product/frontend match the artifact's, and re-validated against its workflow's
+output schema/version at read time. `output` is never returned raw from storage without this
+re-validation pass.
+
+Because the endpoint returns the full normalized output object (unlike handoffs, which only ever
+expose an explicit per-field allowlist mapping), and shipped workflow output schemas may still
+declare `additionalProperties: true`, `ResultService` additionally rejects any normalized output
+containing a key name that matches a small denylist of internal/unsafe markers (`prompt`,
+`provider`, `model`, `litellm`, `pydantic_run_id`, `trace_id`, `debug`) at any nesting depth, as a
+defense-in-depth backstop while workflow output schemas are not yet uniformly closed.
 
 It never returns provider-call metadata, prompts, model/provider identifiers, PydanticAI run ids,
 LiteLLM response ids, or any other raw/debug artifact content.
 
-Safe API behavior — both cases return `404` with no distinguishing detail beyond the error `code`,
-so a caller cannot use this endpoint to probe artifact existence or internal state:
+Safe API behavior — both cases return `404`, and neither ever includes artifact/job internals,
+prompts, or provider/model identifiers in the response body:
 
 - `result_artifact_not_found`: the id is unknown, or belongs to a different tenant/region;
-- `result_artifact_unavailable`: the artifact exists but is not an available canonical result (a
-  raw/debug artifact, an artifact from an unfinished/non-succeeded job, a schema/version drifted
-  artifact, or content that fails re-validation against its declared output schema).
+- `result_artifact_unavailable`: the artifact exists in the caller's tenant/region but is not an
+  available canonical result (a raw/debug artifact, an artifact from an unfinished/non-succeeded
+  job, a schema/version drifted artifact, or content that fails re-validation against its
+  declared output schema).
+
+The two codes intentionally differ so legitimate frontend polling (e.g. an artifact id surfaced by
+`getScenarioSession()` before the job finishes) can tell "not ready yet" apart from "wrong id."
+This does distinguish "exists in my own tenant/region" from "unknown," i.e. it is not a strict
+no-existence-oracle guarantee across all callers who can reach an id in-scope — it only guarantees
+that a caller cannot learn anything about artifacts outside their own tenant/region.
 
 The canonical-artifact guard (job/workflow/schema consistency + schema re-validation) is shared with
 the handoff payload builder (see `handoff-model.md`) through

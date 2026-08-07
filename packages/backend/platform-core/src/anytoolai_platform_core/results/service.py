@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -10,8 +11,43 @@ from anytoolai_platform_core.artifacts.canonical import (
 )
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.common.errors import PlatformError
+from anytoolai_platform_core.common.logging import SENSITIVE_KEY_PARTS
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.workflows.repository import JobRepository
+
+# Defense-in-depth backstop: unlike handoffs (which only ever expose an explicit per-field
+# allowlist mapping), this endpoint returns the full normalized output object, and shipped
+# workflow output schemas may still declare `additionalProperties: true`. Reject output
+# containing a key name that matches an internal/unsafe marker at any nesting depth.
+#
+# Reuses `SENSITIVE_KEY_PARTS` (the log-redaction denylist) instead of maintaining a second,
+# independently-drifting list, extended with lineage-specific markers not relevant to logging.
+# Markers are deliberately compound (`provider_model`, not bare `provider`/`model`) so a
+# legitimate field like `car_model` or `insurance_provider` does not false-positive into an
+# opaque `result_artifact_unavailable` for an otherwise valid result.
+_FORBIDDEN_OUTPUT_KEY_MARKERS = SENSITIVE_KEY_PARTS + (
+    "litellm",
+    "pydantic_run_id",
+    "trace_id",
+    "provider_model",
+    "provider_name",
+    "model_name",
+    "model_id",
+)
+
+
+def _contains_forbidden_key(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            key_lower = str(key).lower()
+            if any(marker in key_lower for marker in _FORBIDDEN_OUTPUT_KEY_MARKERS):
+                return True
+            if _contains_forbidden_key(nested):
+                return True
+        return False
+    if isinstance(value, list):
+        return any(_contains_forbidden_key(item) for item in value)
+    return False
 
 
 class ResultArtifactNotFoundError(PlatformError):
@@ -74,6 +110,8 @@ class ResultService:
             )
         except CanonicalArtifactError as exc:
             raise ResultArtifactUnavailableError() from exc
+        if _contains_forbidden_key(canonical.normalized_output):
+            raise ResultArtifactUnavailableError()
         return ResultArtifactView(
             artifact_id=canonical.artifact.id,
             scenario_session_id=canonical.artifact.scenario_session_id,
