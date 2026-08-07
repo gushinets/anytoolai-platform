@@ -13,6 +13,7 @@ from anytoolai_platform_core.actions.models import (
     ActionDefinition,
     ActionExecutor,
 )
+from anytoolai_platform_core.common.literal_source import LITERAL_SOURCE_PREFIX
 from anytoolai_platform_core.config.errors import (
     BrokenReferenceError,
     ConfigError,
@@ -343,7 +344,7 @@ def _validate_handoff_literal_source(
     ref_type: str,
     ref_value: str,
 ) -> None:
-    payload = source[len("literal:") :]
+    payload = source[len(LITERAL_SOURCE_PREFIX) :]
     try:
         json.loads(payload)
     except json.JSONDecodeError as exc:
@@ -364,6 +365,7 @@ def _handoff_mapping(
     config_id: str | None,
     ref_type: str,
     ref_value: str,
+    allow_literal: bool,
 ) -> dict[str, str]:
     if not isinstance(value, dict):
         raise InvalidConfigShapeError(
@@ -403,7 +405,16 @@ def _handoff_mapping(
                 ref_type=ref_type,
                 ref_value=ref_value,
             )
-        is_literal_source = source.startswith("literal:")
+        is_literal_source = source.startswith(LITERAL_SOURCE_PREFIX)
+        if is_literal_source and not allow_literal:
+            raise InvalidConfigShapeError(
+                path,
+                f"Handoff {field_name} does not allow literal: sources; "
+                f"only artifact.content_json paths are permitted here: {source}",
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value,
+            )
         if is_literal_source:
             _validate_handoff_literal_source(
                 source,
@@ -1705,6 +1716,7 @@ class ConfigLoader:
                     config_id=handoff_id,
                     ref_type="context_mapping",
                     ref_value=_stringify_config_value(handoff_data.get("context_mapping")),
+                    allow_literal=True,
                 )
                 preview_mapping = _handoff_mapping(
                     handoff_data.get("preview_mapping"),
@@ -1713,6 +1725,7 @@ class ConfigLoader:
                     config_id=handoff_id,
                     ref_type="preview_mapping",
                     ref_value=_stringify_config_value(handoff_data.get("preview_mapping")),
+                    allow_literal=False,
                 )
 
                 if consent_required is not True:

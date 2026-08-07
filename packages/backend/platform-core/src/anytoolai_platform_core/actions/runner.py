@@ -13,6 +13,7 @@ from anytoolai_platform_core.actions.executor import (
     ActionExecutorRequest,
     ActionExecutorResponse,
 )
+from anytoolai_platform_core.actions.input_validation import ActionInputValidator
 from anytoolai_platform_core.actions.models import ActionResult, ActionRunRecord, ActionRunStatus
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
@@ -56,12 +57,14 @@ class ActionRunner:
         action_run_service: ActionRunService,
         executors: Mapping[str, ActionExecutor],
         artifact_repository: ArtifactRepository | None = None,
+        input_validators: Mapping[str, ActionInputValidator] | None = None,
     ) -> None:
         self._session = session
         self._config_registry = config_registry
         self._action_run_service = action_run_service
         self._executors = dict(executors)
         self._artifact_repository = artifact_repository or ArtifactRepository(session)
+        self._input_validators = dict(input_validators or {})
 
     async def run(
         self,
@@ -119,6 +122,9 @@ class ActionRunner:
                 schema=input_schema.schema,
                 schema_ref=input_schema.schema_ref,
             )
+            input_validator = self._input_validators.get(action_type)
+            if input_validator is not None:
+                input_validator.validate(input_payload=input_payload)
             executor = self._resolve_executor(action_definition.executor.value)
             request = ActionExecutorRequest(
                 tenant_id=context.tenant_id,

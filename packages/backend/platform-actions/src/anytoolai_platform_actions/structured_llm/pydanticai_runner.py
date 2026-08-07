@@ -150,7 +150,10 @@ class PydanticAIStructuredRunner:
                         output=normalized_output,
                     )
                 except StructuredOutputValidationError as exc:
-                    raise ModelRetry(str(exc)) from exc
+                    # exc.reason is an internal, field-level correction hint for the
+                    # model's next attempt; it is never the user-facing safe error
+                    # (str(exc)/exc.details.safe_message stay generic for callers).
+                    raise ModelRetry(exc.reason) from exc
             ctx.deps.parsed_output = normalized_output
             return data
 

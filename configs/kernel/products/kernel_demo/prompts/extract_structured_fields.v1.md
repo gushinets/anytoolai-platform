@@ -7,6 +7,12 @@ what to look for, and a `required` flag.
 
 Rules:
 
+- A `date` field's value must be a calendar date string in ISO 8601 `YYYY-MM-DD` format (for
+  example `2026-08-07`). If `source_text` only implies a relative or partial date (such as "next
+  Friday" or "August"), resolve it to a concrete `YYYY-MM-DD` date using the surrounding context;
+  if you cannot resolve a concrete calendar date, treat the field as not found and omit it from
+  `values` per the missing-field rule below.
+
 - Return one entry per requested field in `values`, keyed by the field's `name`, with a value that
   matches its declared `type`.
 - If a field's value cannot be found in `source_text`, omit it from `values` and list its `name` in

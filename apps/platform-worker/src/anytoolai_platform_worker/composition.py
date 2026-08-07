@@ -9,6 +9,7 @@ from typing import Any
 from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
+    ExtractStructuredFieldsInputValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.repository import ActionRunRepository
@@ -91,6 +92,9 @@ def build_worker(
             ),
             executors={structured_executor.executor_id: structured_executor},
             artifact_repository=artifact_repository,
+            input_validators={
+                "text.extract_structured_fields": ExtractStructuredFieldsInputValidator(),
+            },
         )
         return SequentialWorkflowRunner(
             session=session,

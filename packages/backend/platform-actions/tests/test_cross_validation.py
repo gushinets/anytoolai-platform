@@ -5,7 +5,9 @@ import pytest
 from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
+    ExtractStructuredFieldsInputValidator,
 )
+from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
 
 
@@ -16,6 +18,35 @@ def _field(name: str, field_type: str, *, required: bool) -> dict:
         "description": f"{name} field",
         "required": required,
     }
+
+
+class TestExtractStructuredFieldsInputValidator:
+    def setup_method(self) -> None:
+        self.validator = ExtractStructuredFieldsInputValidator()
+
+    def test_accepts_unique_field_names(self) -> None:
+        self.validator.validate(
+            input_payload={
+                "fields": [
+                    _field("deadline", "string", required=True),
+                    _field("budget", "number", required=False),
+                ],
+            }
+        )
+
+    def test_rejects_duplicate_field_names_even_with_different_types(self) -> None:
+        with pytest.raises(ActionInputValidationError):
+            self.validator.validate(
+                input_payload={
+                    "fields": [
+                        _field("deadline", "string", required=True),
+                        _field("deadline", "number", required=False),
+                    ],
+                }
+            )
+
+    def test_ignores_non_list_fields_payload(self) -> None:
+        self.validator.validate(input_payload={"fields": "not-a-list"})
 
 
 class TestExtractStructuredFieldsCrossValidator:
@@ -51,11 +82,41 @@ class TestExtractStructuredFieldsCrossValidator:
             },
         )
 
+    def test_rejects_unknown_field_type_instead_of_skipping_the_check(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"fields": [_field("deadline", "timestamp", required=False)]},
+                output={"values": {"deadline": "anything at all"}, "missing_fields": []},
+            )
+
     def test_rejects_type_mismatch(self) -> None:
         with pytest.raises(StructuredOutputValidationError):
             self.validator.validate(
                 input_payload={"fields": [_field("budget", "number", required=False)]},
                 output={"values": {"budget": "not a number"}, "missing_fields": []},
+            )
+
+    def test_accepts_valid_iso_date(self) -> None:
+        self.validator.validate(
+            input_payload={"fields": [_field("deadline", "date", required=False)]},
+            output={"values": {"deadline": "2026-08-07"}, "missing_fields": []},
+        )
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "banana",
+            "2026-13-40",
+            "08/07/2026",
+            "2026-8-7",
+            "next Friday",
+        ],
+    )
+    def test_rejects_non_iso_date_values(self, value: str) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"fields": [_field("deadline", "date", required=False)]},
+                output={"values": {"deadline": value}, "missing_fields": []},
             )
 
     def test_rejects_value_for_unrequested_field(self) -> None:

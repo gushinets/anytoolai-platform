@@ -1,15 +1,31 @@
 from __future__ import annotations
 
+import re
+from datetime import date
 from typing import Any, Mapping
 
+from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
+
+_ISO_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _is_iso_date_string(value: Any) -> bool:
+    if not isinstance(value, str) or not _ISO_DATE_PATTERN.match(value):
+        return False
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
 
 _FIELD_TYPE_CHECKS: Mapping[str, Any] = {
     "string": lambda value: isinstance(value, str),
     "number": lambda value: isinstance(value, (int, float)) and not isinstance(value, bool),
     "integer": lambda value: isinstance(value, int) and not isinstance(value, bool),
     "boolean": lambda value: isinstance(value, bool),
-    "date": lambda value: isinstance(value, str),
+    "date": _is_iso_date_string,
     "array_of_strings": lambda value: isinstance(value, list)
     and all(isinstance(item, str) for item in value),
 }
@@ -20,6 +36,27 @@ def _cross_validation_error(reason: str) -> StructuredOutputValidationError:
         reason=reason,
         error_type="ActionOutputCrossValidationError",
     )
+
+
+class ExtractStructuredFieldsInputValidator:
+    """Rejects semantically ambiguous A01 input.fields before any provider call is made."""
+
+    def validate(self, *, input_payload: Mapping[str, Any]) -> None:
+        field_specs = input_payload.get("fields")
+        if not isinstance(field_specs, list):
+            return
+        seen_names: set[str] = set()
+        for spec in field_specs:
+            if not isinstance(spec, Mapping):
+                continue
+            name = spec.get("name")
+            if not isinstance(name, str):
+                continue
+            if name in seen_names:
+                raise ActionInputValidationError(
+                    f"Action input validation failed: duplicate fields[*].name '{name}'."
+                )
+            seen_names.add(name)
 
 
 class ExtractStructuredFieldsCrossValidator:
@@ -61,7 +98,9 @@ class ExtractStructuredFieldsCrossValidator:
             if name not in values:
                 continue
             type_check = _FIELD_TYPE_CHECKS.get(field_type)
-            if type_check is not None and not type_check(values[name]):
+            if type_check is None:
+                raise _cross_validation_error(f"unknown_field_type:{name}:{field_type}")
+            if not type_check(values[name]):
                 raise _cross_validation_error(f"field_type_mismatch:{name}")
 
         for name in values:

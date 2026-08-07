@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
+    ExtractStructuredFieldsInputValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.executor import ActionExecutorResponse
@@ -136,6 +137,16 @@ class GenericExecutor:
         )
 
 
+class CountingFakeAdapter:
+    def __init__(self, delegate: Any) -> None:
+        self._delegate = delegate
+        self.call_count = 0
+
+    async def complete(self, request: Any) -> Any:
+        self.call_count += 1
+        return await self._delegate.complete(request)
+
+
 class InvalidStructuredOutputAdapter:
     async def complete(self, request: Any) -> ProviderResponse:
         return ProviderResponse(
@@ -197,6 +208,9 @@ def _build_runner(
         action_run_service=ActionRunService(ActionRunRepository(session), emitter),
         executors={executor.executor_id: executor},
         artifact_repository=ArtifactRepository(session),
+        input_validators={
+            "text.extract_structured_fields": ExtractStructuredFieldsInputValidator(),
+        },
     )
 
 
@@ -716,6 +730,47 @@ def test_action_runner_does_not_link_failed_action_to_debug_raw_artifact(
     assert len(artifacts) == 1
     assert artifacts[0]["artifact_type"] == "structured_output_debug_raw"
     assert artifacts[0]["action_run_id"] == action_run["id"]
+
+
+def test_action_runner_rejects_duplicate_field_names_before_any_provider_call(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    counting_adapter = CountingFakeAdapter(FakeProviderAdapter(FIXTURE_ROOT))
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session, fake_adapter=counting_adapter)
+        duplicate_fields = [
+            {
+                "name": "deadline",
+                "type": "string",
+                "description": "Project deadline mentioned in the text.",
+                "required": True,
+            },
+            {
+                "name": "deadline",
+                "type": "number",
+                "description": "A conflicting second spec with the same name.",
+                "required": False,
+            },
+        ]
+
+        with pytest.raises(ActionInputValidationError):
+            asyncio.run(
+                runner.run(
+                    "text.extract_structured_fields",
+                    "kernel_demo.extract_structured_fields_v1",
+                    {"source_text": "deadline budget deliverables", "fields": duplicate_fields},
+                    _context(
+                        step_id="extract",
+                        action_type="text.extract_structured_fields",
+                        action_config_id="kernel_demo.extract_structured_fields_v1",
+                    ),
+                )
+            )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+
+    assert counting_adapter.call_count == 0
+    assert action_run["status"].value == "failed"
+    assert action_run["error_code"] == "action_input_validation_failed"
 
 
 def test_action_runner_rejects_missing_workflow_version_before_creating_action_run(

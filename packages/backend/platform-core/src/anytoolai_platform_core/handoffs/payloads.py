@@ -12,6 +12,9 @@ from jsonschema import validate as validate_json_schema
 
 from anytoolai_platform_core.artifacts.models import ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
+from anytoolai_platform_core.common.literal_source import (
+    LITERAL_SOURCE_PREFIX as _LITERAL_SOURCE_PREFIX,
+)
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.handoffs.models import HandoffDefinition
 from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
@@ -128,9 +131,11 @@ class HandoffPayloadBuilder:
             ) from exc
         normalized_artifact = validated_source.normalized_output
         assert isinstance(normalized_artifact, dict)
-        context_payload = _apply_mapping(definition.context_mapping, normalized_artifact)
+        context_payload = _apply_mapping(
+            definition.context_mapping, normalized_artifact, allow_literal=True
+        )
         preview_payload = _safe_preview(
-            _apply_mapping(definition.preview_mapping, normalized_artifact)
+            _apply_mapping(definition.preview_mapping, normalized_artifact, allow_literal=False)
         )
         target_scenario = self._registry.get_scenario(definition.target_scenario_id)
         if target_scenario is None:
@@ -161,13 +166,19 @@ class HandoffPayloadBuilder:
         )
 
 
-_LITERAL_SOURCE_PREFIX = "literal:"
-
-
-def _apply_mapping(mapping: Mapping[str, str], artifact: Mapping[str, Any]) -> dict[str, Any]:
+def _apply_mapping(
+    mapping: Mapping[str, str],
+    artifact: Mapping[str, Any],
+    *,
+    allow_literal: bool,
+) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for target_path, source_path in mapping.items():
         if source_path.startswith(_LITERAL_SOURCE_PREFIX):
+            if not allow_literal:
+                raise HandoffPayloadError(
+                    f"handoff literal source paths are not allowed here: {source_path}"
+                )
             try:
                 value = json.loads(source_path[len(_LITERAL_SOURCE_PREFIX) :])
             except json.JSONDecodeError as exc:

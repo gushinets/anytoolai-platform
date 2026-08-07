@@ -111,6 +111,7 @@ class StructuredLlmActionExecutor:
                 self._finalize_response(
                     response=exc.last_response,
                     request=request,
+                    action_type=action_config.action_type,
                     response_schema=response_schema,
                     session=session,
                 )
@@ -119,6 +120,7 @@ class StructuredLlmActionExecutor:
             self._finalize_response(
                 response=result.last_response,
                 request=request,
+                action_type=action_config.action_type,
                 response_schema=response_schema,
                 session=session,
             )
@@ -159,13 +161,14 @@ class StructuredLlmActionExecutor:
         *,
         response: ProviderResponse,
         request: ActionExecutorRequest,
+        action_type: str,
         response_schema: Any,
         session: Session,
     ) -> ProviderResponse:
         schema_mapping = None if response_schema is None else dict(response_schema.schema)
         if schema_mapping is None:
             return response
-        cross_validator = self._output_cross_validators.get(request.action_type)
+        cross_validator = self._output_cross_validators.get(action_type)
 
         def _check_cross_validation(validation_result: Any) -> None:
             if cross_validator is not None:

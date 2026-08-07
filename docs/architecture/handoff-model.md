@@ -34,6 +34,16 @@ frontends, non-consensual definitions, missing mappings, and paths outside
 payload construction never depends on YAML declaration order. Routes are therefore
 deployment-owned config, not arbitrary user-created destinations.
 
+`context_mapping` sources may additionally use a `literal:<json>` prefix to inject a fixed,
+config-owned JSON constant instead of reading from the source artifact — for example a dynamic
+action's constant field spec that the target workflow requires but the source artifact cannot
+provide. This is the one deliberate, narrowly scoped exception to "mapping sources only read the
+source artifact"; it never carries data out of the source artifact, only injects a value the
+config author already wrote in plaintext. `preview_mapping` does not allow `literal:` sources: the
+preview is the only handoff surface returned to an unauthenticated bearer before consent, so every
+preview field must still be traceable to the source artifact's own content, not an arbitrary
+config-authored constant. The config loader rejects `literal:` in `preview_mapping` at load time.
+
 ## Canonical source artifact
 
 Creation accepts only the selected completed source session's latest succeeded job result. The

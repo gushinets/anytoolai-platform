@@ -48,6 +48,9 @@ Supported source paths are:
 - `steps.<step_id>.output`
 - `steps.<step_id>.output.<field>...`
 - `context.<field>...`
+- `literal:<json>` (`input_mapping` only) — a config-owned JSON constant, not resolved against
+  scenario input, step output, or context. Used when a step needs a fixed value the workflow must
+  guarantee regardless of caller-supplied scenario input.
 
 Path rules:
 
@@ -58,6 +61,19 @@ Path rules:
 - `steps.<step_id>.output` references must point to an earlier step when used by `input_mapping` or `when`.
 
 If `input_mapping` is omitted, the runner passes the full `scenario.input` object to the step.
+
+### Optional input mapping sources
+
+An `input_mapping` source path may be prefixed with `?` (for example
+`?scenario.input.strict`) to mark it optional. If the path cannot be resolved at runtime (the
+referenced scenario input/context/step-output key is absent), the runner omits that target field
+from the resolved step input instead of failing the step — equivalent to the caller never having
+supplied it. Config-load-time shape validation still applies to the path after the `?` is
+stripped; only runtime absence is tolerated. This is the mechanism for forwarding JSON-Schema
+`default`-backed or otherwise optional action input fields (for example a boolean `strict` flag or
+an optional `taxonomy`/`context` field) without forcing every scenario caller to supply them
+explicitly. `?` is only meaningful on `input_mapping`; it is not supported on `output_mapping` or
+`when`.
 
 Every successful step output is always available to later steps under
 `steps.<step_id>.output`, even when `output_mapping` is empty.
