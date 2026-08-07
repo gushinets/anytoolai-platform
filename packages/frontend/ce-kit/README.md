@@ -5,11 +5,11 @@ Shared Platform API client foundation for AnytoolAI Chrome Extensions and web fr
 This package covers **A15 — CE Kit MVP API Client** (ANY-8): both **A15a — Foundation** (ANY-170)
 and **A15b — Scenario, Quota, and Polling Client** (ANY-171). The transport layer, the stable error
 union, injectable storage, guest identity, runtime config, quota, idempotent scenario start,
-session polling, and next-action are all real. Several other exports (`pollJob`, `getArtifact`,
-`createHandoff`, `openHandoffConsent`, `captureEmail`, `trackClientEvent`, the `render*` helpers)
-remain fake-success placeholders deferred to later tickets (public job polling, artifact fetching,
-handoff, email capture, client-event ingestion). Do not treat their presence in `src/index.ts` as a
-working contract.
+session polling, and next-action are all real. `pollJob`, `getArtifact`, `createHandoff`,
+`openHandoffConsent`, `captureEmail`, and `trackClientEvent` are intentionally not exported: their
+backend contracts don't exist yet (public job polling, artifact fetching, handoff, email capture,
+client-event ingestion, owned by ANY-36 / ANY-6 / later tickets). Unsupported capabilities must not
+ship as fake-success helpers, so they will be added for real once those tickets land.
 
 ## PlatformApiClient
 
