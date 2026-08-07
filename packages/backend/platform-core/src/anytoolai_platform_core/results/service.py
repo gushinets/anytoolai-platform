@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -11,7 +12,6 @@ from anytoolai_platform_core.artifacts.canonical import (
 )
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.common.errors import PlatformError
-from anytoolai_platform_core.common.logging import SENSITIVE_KEY_PARTS
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.workflows.repository import JobRepository
 
@@ -20,27 +20,45 @@ from anytoolai_platform_core.workflows.repository import JobRepository
 # workflow output schemas may still declare `additionalProperties: true`. Reject output
 # containing a key name that matches an internal/unsafe marker at any nesting depth.
 #
-# Reuses `SENSITIVE_KEY_PARTS` (the log-redaction denylist) instead of maintaining a second,
-# independently-drifting list, extended with lineage-specific markers not relevant to logging.
-# Markers are deliberately compound (`provider_model`, not bare `provider`/`model`) so a
-# legitimate field like `car_model` or `insurance_provider` does not false-positive into an
-# opaque `result_artifact_unavailable` for an otherwise valid result.
-_FORBIDDEN_OUTPUT_KEY_MARKERS = SENSITIVE_KEY_PARTS + (
+# This is a dedicated, results-specific list -- deliberately NOT
+# `common.logging.SENSITIVE_KEY_PARTS`. That list is tuned for log redaction, where a false
+# positive just replaces a value with `[REDACTED]`; here a false positive makes an entire valid,
+# already-succeeded result silently disappear as a 404. Broad single-word markers from that list
+# (`email`, `token`, `handoff`, `secret`, `prompt`) would reject legitimate fields like
+# `email_subject`, `token_count`, `handoff_summary`, or `secretary_name`. Markers here are
+# deliberately compound/lineage-specific (`provider_model`, not bare `provider`/`model`) so a
+# legitimate field like `car_model` or `insurance_provider` does not false-positive either.
+_FORBIDDEN_OUTPUT_KEY_MARKERS = (
+    "system_prompt",
+    "raw_prompt",
+    "prompt_template",
+    "raw_provider",
+    "provider_output",
+    "provider_model",
+    "provider_name",
+    "provider_policy",
+    "model_name",
+    "model_id",
+    "model_version",
     "litellm",
     "pydantic_run_id",
     "trace_id",
-    "provider_model",
-    "provider_name",
-    "model_name",
-    "model_id",
 )
+
+_CAMEL_CASE_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+
+
+def _normalize_key(key: Any) -> str:
+    """Fold `provider-model`, `providerModel`, and `provider_model` to the same form."""
+    text = _CAMEL_CASE_BOUNDARY.sub("_", str(key))
+    return text.casefold().replace("-", "_")
 
 
 def _contains_forbidden_key(value: Any) -> bool:
     if isinstance(value, Mapping):
         for key, nested in value.items():
-            key_lower = str(key).lower()
-            if any(marker in key_lower for marker in _FORBIDDEN_OUTPUT_KEY_MARKERS):
+            normalized_key = _normalize_key(key)
+            if any(marker in normalized_key for marker in _FORBIDDEN_OUTPUT_KEY_MARKERS):
                 return True
             if _contains_forbidden_key(nested):
                 return True

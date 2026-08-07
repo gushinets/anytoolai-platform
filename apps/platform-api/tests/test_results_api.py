@@ -333,6 +333,33 @@ def test_get_result_artifact_allows_generic_words_as_key_substrings(
     assert response.json()["output"]["car_model"] == "Model X"
 
 
+@pytest.mark.parametrize(
+    "key",
+    ["provider-model", "providerModel", "ProviderModel", "pydantic-run-id", "pydanticRunId"],
+)
+def test_get_result_artifact_rejects_leak_shaped_key_variants(
+    session_factory: SessionFactory,
+    key: str,
+) -> None:
+    # The denylist matcher must normalize hyphen/underscore/camelCase separators before
+    # matching, otherwise a schema-valid key like `provider-model` or `providerModel` bypasses
+    # the underscore-form marker `provider_model` entirely.
+    app = _create_test_app(session_factory)
+    with transaction_boundary(session_factory) as session:
+        _, _, artifact_id = _seed_result(
+            session,
+            content_json={
+                "title": "Extracted",
+                "fields": ["budget"],
+                key: "leaked-internal-model-id",
+            },
+        )
+
+    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "result_artifact_unavailable"
+
+
 def test_get_result_artifact_rejects_leak_shaped_content_under_open_schema(
     session_factory: SessionFactory,
 ) -> None:

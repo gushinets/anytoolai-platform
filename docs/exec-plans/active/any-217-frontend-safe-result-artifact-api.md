@@ -29,9 +29,11 @@ raw/debug artifacts, or state from another tenant/region.
   extracted out of `HandoffPayloadBuilder.build()`, so handoffs and the results API reject
   non-canonical artifacts (raw/debug type, wrong role, cross-scope artifact/job pairing, stale
   workflow/schema version, schema-invalid content) identically.
-- Safe, non-distinguishing `404` responses: `result_artifact_not_found` (unknown id or
-  out-of-tenant/region) vs `result_artifact_unavailable` (exists in-scope but not an available
-  canonical result).
+- Safe `404` responses that never leak artifact/job internals, prompts, or provider/model
+  identifiers in the body: `result_artifact_not_found` (unknown id or out-of-tenant/region) vs
+  `result_artifact_unavailable` (exists in-scope but not an available canonical result). The two
+  codes intentionally differ (see decision log); the guarantee is no cross-tenant/region
+  existence oracle, not a blanket no-oracle claim.
 - Focused API tests (hand-seeded fixtures covering every guard branch) plus one true worker-driven
   vertical test proving a genuinely `WorkflowRunner`-produced artifact satisfies every invariant
   the endpoint checks.
@@ -121,8 +123,9 @@ raw/debug artifacts, or state from another tenant/region.
 | 2026-08-07 | Extract the canonical-artifact guard into a shared `artifacts/canonical.py` helper instead of duplicating `HandoffPayloadBuilder`'s logic | The plan explicitly called for reusing the existing guard pattern; both consumers must reject non-canonical artifacts identically |
 | 2026-08-07 | Duplicate `ArtifactRepository.get_in_scope`'s tenant/region-scoped SELECT idiom from `ScenarioSessionRepository` rather than introducing a shared repository mixin | Only 2 call sites exist repo-wide; a shared abstraction for 2 callers is premature, and the plan directed copying the existing pattern |
 | 2026-08-07 | Reject frontend-safety via a `ResultService`-only denylist backstop, not a closed-schema (`additionalProperties: false`) requirement in the shared canonical guard | A first attempt requiring closed schemas broke `test_handoff_preview_is_allowlisted_and_bounded`, which deliberately keeps the shared source schema open because handoffs' safety model is an explicit per-field allowlist mapping, not schema strictness. Results API safety needed a mechanism scoped to the one consumer that returns the full object verbatim |
-| 2026-08-07 | Build the denylist from `common.logging.SENSITIVE_KEY_PARTS` plus a few compound markers, not bare words like `model`/`provider`/`debug` | A follow-up review found bare generic markers would false-positive on legitimate fields (`car_model`, `insurance_provider`) and duplicated an existing, unsynced list |
-| 2026-08-07 | Use the same tenant/region 404 code (`result_artifact_not_found`) for both unknown ids and out-of-scope ids, and a distinct `result_artifact_unavailable` for in-scope-but-non-canonical | Distinguishing "not ready yet" from "wrong id" is useful for legitimate same-tenant frontend polling; the safety guarantee is scoped to no cross-tenant/region existence oracle, not a blanket no-oracle claim (documented explicitly after review flagged the original wording as overclaiming) |
+| 2026-08-07 | First built the denylist from `common.logging.SENSITIVE_KEY_PARTS` plus a few compound markers, not bare words like `model`/`provider`/`debug` | A review found bare generic markers would false-positive on legitimate fields (`car_model`, `insurance_provider`) and duplicated an existing, unsynced list |
+| 2026-08-07 | Replaced `SENSITIVE_KEY_PARTS` reuse with a dedicated, results-specific marker list, and normalized `-`/`_`/camelCase key separators before matching | A later review found (a) `SENSITIVE_KEY_PARTS`'s own broad single-word markers (`email`, `token`, `handoff`, `secret`, `prompt`) would false-positive on legitimate fields like `email_subject`/`token_count`, and log-redaction/API-rejection have different false-positive tolerances; (b) the matcher only lowercased keys, so `provider-model`/`providerModel`/`pydantic-run-id` bypassed the underscore-form markers entirely |
+| 2026-08-07 | Use the same tenant/region 404 code (`result_artifact_not_found`) for both unknown ids and out-of-scope ids, and a distinct `result_artifact_unavailable` for in-scope-but-non-canonical | `getScenarioSession()` only ever surfaces a non-null `result_artifact_id` once the job has succeeded, so this is not a "not ready yet" polling distinction; it lets a caller holding a previously-valid id (e.g. from before a config redeploy changed the workflow's output schema/version) tell "wrong id" apart from "was valid, no longer an available canonical result." The safety guarantee is scoped to no cross-tenant/region existence oracle, not a blanket no-oracle claim |
 
 ## Progress log
 
@@ -131,7 +134,8 @@ raw/debug artifacts, or state from another tenant/region.
 | 2026-08-07 | Implemented the results API, shared canonical guard, router, schema, and initial test suite; regenerated docs/OpenAPI/TS client | Address first code-review pass (workflow_version bug, repository duplication note) |
 | 2026-08-07 | Fixed `workflow_version` sourcing bug (was reading the live registry instead of the job-pinned value); added region-scope-miss and real jsonschema-mismatch regression tests per second review pass | Address team-lead review (job scope, frontend-safety denylist, test isolation, doc wording) |
 | 2026-08-07 | Added artifact/job cross-scope guard, `ResultService` denylist backstop, split the raw/debug test into three isolated cases, reworded the 404-code doc claim | Address denylist follow-up review (false-positive risk, list duplication) and the two remaining P3 items |
-| 2026-08-07 | Fixed denylist to reuse `SENSITIVE_KEY_PARTS` with compound markers instead of bare words; added the false-positive regression test; extended the worker-driven vertical test with a `GET /v1/results/{id}` assertion; added this execution plan and completed the PR description | None; ready for merge |
+| 2026-08-07 | Fixed denylist to reuse `SENSITIVE_KEY_PARTS` with compound markers instead of bare words; added the false-positive regression test; extended the worker-driven vertical test with a `GET /v1/results/{id}` assertion; added this execution plan and completed the PR description | Address team-lead review #1 (key-separator normalization, log-list reuse, plan/doc consistency) |
+| 2026-08-07 | Replaced the `SENSITIVE_KEY_PARTS`-based denylist with a dedicated, results-specific marker list; normalized `-`/`_`/camelCase key separators before matching; added parametrized regression coverage for `provider-model`/`providerModel`/`ProviderModel`/`pydantic-run-id`/`pydanticRunId`; fixed this plan's self-contradictory "non-distinguishing 404" wording and its obsolete "not ready yet" polling rationale in the decision log | None; ready for merge |
 
 ## Open questions
 
