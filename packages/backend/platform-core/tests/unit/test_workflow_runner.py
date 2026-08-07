@@ -269,8 +269,9 @@ def _build_recording_workflow_runner(
     session: sa.orm.Session,
     *,
     executor: RecordingExecutor,
+    registry: ConfigRegistry | None = None,
 ) -> SequentialWorkflowRunner:
-    registry = build_config_registry(CONFIG_ROOT)
+    registry = registry or build_config_registry(CONFIG_ROOT)
     emitter = EventEmitter(EventLogRepository(session))
     action_runner = ActionRunner(
         session=session,
@@ -286,6 +287,35 @@ def _build_recording_workflow_runner(
         action_runner=action_runner,
         artifact_service=ArtifactService(ArtifactRepository(session), emitter),
         event_emitter=emitter,
+    )
+
+
+def _registry_with_mandatory_detect_issues_taxonomy_mapping(
+    registry: ConfigRegistry,
+) -> ConfigRegistry:
+    """`kernel_demo.extract_detect_report_v1`'s `detect_issues` step maps `taxonomy` as an
+    optional source path (ANY-251 team-lead #3 review: A04's `taxonomy` is schema-optional, so
+    the mapping must not force every caller to supply it). This patches a private copy of the
+    registry to make that one mapping mandatory again, purely so tests that need a genuine
+    WorkflowMappingResolutionError on the *second* step of a real multi-step workflow (after the
+    first step already succeeded) still have a way to trigger one without touching the real
+    product config."""
+    workflow = registry.workflows["kernel_demo.extract_detect_report_v1"]
+    patched_steps = [
+        replace(
+            step,
+            input_mapping={**step.input_mapping, "taxonomy": "scenario.input.taxonomy"},
+        )
+        if step.step_id == "detect_issues"
+        else step
+        for step in workflow.steps
+    ]
+    return replace(
+        registry,
+        workflows={
+            **registry.workflows,
+            "kernel_demo.extract_detect_report_v1": replace(workflow, steps=patched_steps),
+        },
     )
 
 
@@ -1608,6 +1638,9 @@ def test_workflow_runner_recovery_replays_step_started_for_input_mapping_failure
                             "summary": "ignored",
                         },
                     }
+                ),
+                registry=_registry_with_mandatory_detect_issues_taxonomy_mapping(
+                    build_config_registry(CONFIG_ROOT)
                 ),
             )
             asyncio.run(
