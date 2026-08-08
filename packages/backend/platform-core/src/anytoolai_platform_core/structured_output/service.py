@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
 from anytoolai_platform_core.artifacts.correlation import (
     build_artifact_correlation_metadata,
@@ -64,6 +65,7 @@ class StructuredOutputFinalizer:
         schema: dict[str, object] | None,
         schema_ref: str | None = None,
         schema_version: int | None = None,
+        post_schema_validation: Callable[[StructuredOutputValidationResult], None] | None = None,
     ) -> StructuredOutputFinalizationResult:
         try:
             validation_result = validate_structured_output(
@@ -72,6 +74,8 @@ class StructuredOutputFinalizer:
                 schema_ref=schema_ref,
                 schema_version=schema_version,
             )
+            if post_schema_validation is not None:
+                post_schema_validation(validation_result)
         except StructuredOutputError as exc:
             safe_error = to_safe_validation_error(exc)
             self.persist_debug_artifact(
@@ -82,6 +86,15 @@ class StructuredOutputFinalizer:
                 schema_version=schema_version,
             )
             raise safe_error from exc
+        except StructuredOutputValidationError as safe_error:
+            self.persist_debug_artifact(
+                raw_text,
+                persistence_context=persistence_context,
+                safe_error=safe_error,
+                schema_ref=schema_ref,
+                schema_version=schema_version,
+            )
+            raise
 
         provider_call = self._latest_provider_call(persistence_context.action_run_id)
         artifact = self._artifact_service.create_structured_output_artifact(

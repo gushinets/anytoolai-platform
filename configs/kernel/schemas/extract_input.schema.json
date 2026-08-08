@@ -5,16 +5,38 @@
       "type": "string",
       "minLength": 1
     },
-    "field_names": {
+    "fields": {
       "type": "array",
+      "minItems": 1,
       "items": {
-        "type": "string",
-        "minLength": 1
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["string", "number", "integer", "boolean", "date", "array_of_strings"]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "required": ["name", "type", "description", "required"],
+        "additionalProperties": false
       }
+    },
+    "strict": {
+      "type": "boolean",
+      "default": false
     }
   },
-  "required": [
-    "source_text"
-  ],
+  "required": ["source_text", "fields"],
   "additionalProperties": false
 }

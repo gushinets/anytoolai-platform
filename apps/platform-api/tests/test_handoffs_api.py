@@ -97,7 +97,7 @@ def _seed_source(session) -> tuple[str, str]:
             job_id=job.id,
             artifact_type="structured_output",
             status=ArtifactStatus.stored,
-            content_json={"title": "API safe summary", "fields": ["one", "two"]},
+            content_json={"values": {"deadline": "next Friday"}, "missing_fields": []},
             metadata={
                 "artifact_role": "workflow_result",
                 "schema_ref": "kernel_demo.extract_output_v1",
@@ -190,7 +190,10 @@ def test_handoff_api_create_preview_accept_decline_and_expiry(
     preview = asyncio.run(_request(app, "GET", f"/v1/handoffs/{token}"))
     assert preview.status_code == HTTPStatus.OK
     assert preview.json()["status"] == "viewed"
-    assert preview.json()["preview"] == {"title": "API safe summary", "fields": ["one", "two"]}
+    assert preview.json()["preview"] == {
+        "values": {"deadline": "next Friday"},
+        "missing_fields": [],
+    }
     assert "source_artifact_id" not in preview.text
     assert "token_hash" not in preview.text
 

@@ -55,6 +55,29 @@ CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 SHA256_HEX_LENGTH = 64
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
+# Mirrors the literal `fields` spec baked into
+# configs/kernel/products/kernel_demo/handoffs.yaml's context_mapping.
+_HANDOFF_TARGET_FIELDS = [
+    {
+        "name": "deadline",
+        "type": "string",
+        "description": "Project deadline mentioned in the text.",
+        "required": True,
+    },
+    {
+        "name": "budget",
+        "type": "string",
+        "description": "Budget mentioned in the text.",
+        "required": False,
+    },
+    {
+        "name": "deliverables",
+        "type": "array_of_strings",
+        "description": "Deliverables mentioned in the text.",
+        "required": False,
+    },
+]
+
 
 @pytest.fixture
 def session_factory() -> Iterator[SessionFactory]:
@@ -86,8 +109,8 @@ def test_handoff_preview_mapping_executes_non_conflicting_nested_siblings(
             definition.handoff_id: replace(
                 definition,
                 preview_mapping={
-                    "summary.title": "artifact.content_json.title",
-                    "summary.fields": "artifact.content_json.fields",
+                    "summary.values": "artifact.content_json.values",
+                    "summary.missing_fields": "artifact.content_json.missing_fields",
                 },
             ),
         },
@@ -100,8 +123,8 @@ def test_handoff_preview_mapping_executes_non_conflicting_nested_siblings(
 
     assert created.preview.preview == {
         "summary": {
-            "title": "Safe summary",
-            "fields": ["deadline", "budget"],
+            "values": {"deadline": "Safe summary"},
+            "missing_fields": ["budget"],
         }
     }
 
@@ -125,8 +148,8 @@ def test_handoff_context_mapping_executes_non_conflicting_nested_siblings(
             definition.handoff_id: replace(
                 definition,
                 context_mapping={
-                    "request.source_text": "artifact.content_json.title",
-                    "request.fields": "artifact.content_json.fields",
+                    "request.source_text": "artifact.content_json.values.deadline",
+                    "request.fields": "artifact.content_json.missing_fields",
                 },
             ),
         },
@@ -171,7 +194,7 @@ def test_handoff_context_mapping_executes_non_conflicting_nested_siblings(
     assert record.context_payload == {
         "request": {
             "source_text": "Safe summary",
-            "fields": ["deadline", "budget"],
+            "fields": ["budget"],
         }
     }
 
@@ -271,7 +294,10 @@ def _seed_source(session, *, guest_id: str = "guest_handoff") -> tuple[str, str]
             job_id=job.id,
             artifact_type="structured_output",
             status=ArtifactStatus.stored,
-            content_json={"title": "Safe summary", "fields": ["deadline", "budget"]},
+            content_json={
+                "values": {"deadline": "Safe summary"},
+                "missing_fields": ["budget"],
+            },
             metadata={
                 "artifact_role": "workflow_result",
                 "schema_ref": "kernel_demo.extract_output_v1",
@@ -393,7 +419,10 @@ def test_handoff_create_view_accept_and_double_accept(
         service = _service(session, registry)
         viewed = service.get_preview(created.handoff_token, tenant_id="anytoolai", region="default")
         assert viewed.status is HandoffStatus.viewed
-        assert viewed.preview == {"title": "Safe summary", "fields": ["deadline", "budget"]}
+        assert viewed.preview == {
+            "values": {"deadline": "Safe summary"},
+            "missing_fields": ["budget"],
+        }
         service.get_preview(created.handoff_token, tenant_id="anytoolai", region="default")
 
     with transaction_boundary(factory) as session:
@@ -412,7 +441,11 @@ def test_handoff_create_view_accept_and_double_accept(
         assert target is not None
         assert target.parent_scenario_session_id == source_session_id
         assert target.metadata["handoff_id"] == accepted.preview.handoff_id
-        assert target.metadata["input"] == {"source_text": "Safe summary"}
+        assert target.metadata["input"] == {
+            "source_text": "Safe summary",
+            "fields": _HANDOFF_TARGET_FIELDS,
+            "strict": False,
+        }
 
     with transaction_boundary(factory) as session:
         with pytest.raises(HandoffNotActionableError) as error:
@@ -571,10 +604,13 @@ def test_handoff_preview_is_allowlisted_and_bounded(
             replace(
                 artifact,
                 content_json={
-                    "title": "safe target input",
-                    "fields": ["x" * 600 for _ in range(20)],
-                    "raw_provider_output": "must never appear",
-                    "debug_metadata": {"model": "must never appear"},
+                    "values": {
+                        "deadline": "safe target input",
+                        **{f"field_{index}": "x" * 600 for index in range(20)},
+                        "raw_provider_output": "must never appear",
+                        "debug_metadata": {"model": "must never appear"},
+                    },
+                    "missing_fields": [],
                 },
             )
         )

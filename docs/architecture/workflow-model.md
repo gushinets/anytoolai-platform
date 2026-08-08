@@ -48,6 +48,15 @@ Supported source paths are:
 - `steps.<step_id>.output`
 - `steps.<step_id>.output.<field>...`
 - `context.<field>...`
+- `literal:<json>` (`input_mapping` only) — a config-owned JSON constant, not resolved against
+  scenario input, step output, or context. `<json>` is parsed with the repo's strict JSON parser
+  (`common/strict_json.py`, shared with provider structured-output parsing): it must be valid JSON
+  and must not use the non-standard `NaN`/`Infinity`/`-Infinity` tokens. The whole source path
+  (prefix plus JSON payload) is a single YAML scalar, so the YAML must quote it so the JSON's own
+  `{`, `[`, `:`, and `"` characters survive intact — for example `strict: 'literal:true'` or
+  `fields: 'literal:[{"name":"deadline","type":"string","description":"...","required":true}]'`.
+  Used when a step needs a fixed value the workflow must guarantee regardless of caller-supplied
+  scenario input.
 
 Path rules:
 
@@ -58,6 +67,28 @@ Path rules:
 - `steps.<step_id>.output` references must point to an earlier step when used by `input_mapping` or `when`.
 
 If `input_mapping` is omitted, the runner passes the full `scenario.input` object to the step.
+
+### Optional input mapping sources
+
+An `input_mapping` source path may be prefixed with `?` (for example
+`?scenario.input.strict`) to mark it optional. If a path segment key is genuinely absent from its
+parent object at runtime, the runner omits that target field from the resolved step input instead
+of failing the step — equivalent to the caller never having supplied it. Config-load-time shape
+validation still applies to the path after the `?` is stripped; only runtime absence of a key is
+tolerated. This is the mechanism for forwarding JSON-Schema `default`-backed or otherwise optional
+action input fields (for example a boolean `strict` flag or an optional `taxonomy`/`context`
+field) without forcing every scenario caller to supply them explicitly. `?` is only meaningful on
+`input_mapping`; it is not supported on `output_mapping` or `when`.
+
+A `literal:<json>` source always resolves — it never depends on caller-supplied scenario input,
+step output, or context, so it can never be "absent". `?literal:<json>` is therefore accepted
+(both at config-load time and at runtime) but has no effect: it resolves identically to
+`literal:<json>` without the prefix.
+
+Optional resolution only tolerates a missing key, never an incompatible shape along the way. If an
+intermediate segment resolves to a non-object value (for example `?scenario.input.settings.enabled`
+against `{"settings": false}`), that is malformed caller data, not omission, and the step still
+fails loudly even though the target is optional.
 
 Every successful step output is always available to later steps under
 `steps.<step_id>.output`, even when `output_mapping` is empty.

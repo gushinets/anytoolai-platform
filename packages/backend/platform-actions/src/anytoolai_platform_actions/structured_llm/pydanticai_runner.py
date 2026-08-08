@@ -21,7 +21,11 @@ from anytoolai_platform_core.providers.models import (
     ProviderRequest,
     ProviderResponse,
 )
-from anytoolai_platform_core.structured_output.errors import StructuredOutputError
+from anytoolai_platform_core.actions.output_validation import ActionOutputCrossValidator
+from anytoolai_platform_core.structured_output.errors import (
+    StructuredOutputError,
+    StructuredOutputValidationError,
+)
 from anytoolai_platform_core.structured_output.validator import (
     parse_json_object,
     validate_structured_output,
@@ -67,6 +71,8 @@ class PydanticAIStructuredRunner:
         *,
         request_executor: Callable[[ProviderRequest], Awaitable[ProviderResponse]],
         validation_max_attempts: int,
+        input_payload: Mapping[str, Any] | None = None,
+        cross_validator: ActionOutputCrossValidator | None = None,
     ) -> PydanticAIValidationResult:
         state = PydanticAIValidationState(
             request=request,
@@ -136,7 +142,19 @@ class PydanticAIStructuredRunner:
                 )
             except StructuredOutputError as exc:
                 raise ModelRetry(str(exc)) from exc
-            ctx.deps.parsed_output = validation_result.normalized_output or parsed
+            normalized_output = validation_result.normalized_output or parsed
+            if cross_validator is not None:
+                try:
+                    cross_validator.validate(
+                        input_payload=input_payload or {},
+                        output=normalized_output,
+                    )
+                except StructuredOutputValidationError as exc:
+                    # exc.reason is an internal, field-level correction hint for the
+                    # model's next attempt; it is never the user-facing safe error
+                    # (str(exc)/exc.details.safe_message stay generic for callers).
+                    raise ModelRetry(exc.reason) from exc
+            ctx.deps.parsed_output = normalized_output
             return data
 
         try:

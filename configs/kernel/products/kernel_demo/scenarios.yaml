@@ -19,7 +19,7 @@ scenarios:
       - view_paywall
   - scenario_id: kernel_demo.handoff_smoke_source_v1
     version: 1
-    workflow_id: kernel_demo.single_action_extract_v1
+    workflow_id: kernel_demo.handoff_smoke_source_extract_v1
     allowed_next_actions:
       - continue_to_target
   - scenario_id: kernel_demo.handoff_smoke_target_v1

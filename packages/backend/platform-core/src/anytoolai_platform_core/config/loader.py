@@ -13,6 +13,10 @@ from anytoolai_platform_core.actions.models import (
     ActionDefinition,
     ActionExecutor,
 )
+from anytoolai_platform_core.common.literal_source import (
+    LITERAL_SOURCE_PREFIX,
+    parse_strict_literal_json,
+)
 from anytoolai_platform_core.config.errors import (
     BrokenReferenceError,
     ConfigError,
@@ -334,6 +338,28 @@ def _build_unique_key_yaml_loader(
     return _UniqueKeySafeLoader
 
 
+def _validate_handoff_literal_source(
+    source: str,
+    *,
+    field_name: str,
+    path: Path,
+    config_id: str | None,
+    ref_type: str,
+    ref_value: str,
+) -> None:
+    payload = source[len(LITERAL_SOURCE_PREFIX) :]
+    try:
+        parse_strict_literal_json(payload)
+    except json.JSONDecodeError as exc:
+        raise InvalidConfigShapeError(
+            path,
+            f"Handoff {field_name} literal source is not valid JSON: {source}",
+            config_id=config_id,
+            ref_type=ref_type,
+            ref_value=ref_value,
+        ) from exc
+
+
 def _handoff_mapping(
     value: Any,
     *,
@@ -342,6 +368,7 @@ def _handoff_mapping(
     config_id: str | None,
     ref_type: str,
     ref_value: str,
+    allow_literal: bool,
 ) -> dict[str, str]:
     if not isinstance(value, dict):
         raise InvalidConfigShapeError(
@@ -381,7 +408,26 @@ def _handoff_mapping(
                 ref_type=ref_type,
                 ref_value=ref_value,
             )
-        if (
+        is_literal_source = source.startswith(LITERAL_SOURCE_PREFIX)
+        if is_literal_source and not allow_literal:
+            raise InvalidConfigShapeError(
+                path,
+                f"Handoff {field_name} does not allow literal: sources; "
+                f"only artifact.content_json paths are permitted here: {source}",
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value,
+            )
+        if is_literal_source:
+            _validate_handoff_literal_source(
+                source,
+                field_name=field_name,
+                path=path,
+                config_id=config_id,
+                ref_type=ref_type,
+                ref_value=ref_value,
+            )
+        elif (
             (source != "artifact.content_json" and not source.startswith("artifact.content_json."))
             or any(marker in source for marker in ("[", "]", ".."))
             or source.endswith(".")
@@ -1673,6 +1719,7 @@ class ConfigLoader:
                     config_id=handoff_id,
                     ref_type="context_mapping",
                     ref_value=_stringify_config_value(handoff_data.get("context_mapping")),
+                    allow_literal=True,
                 )
                 preview_mapping = _handoff_mapping(
                     handoff_data.get("preview_mapping"),
@@ -1681,6 +1728,7 @@ class ConfigLoader:
                     config_id=handoff_id,
                     ref_type="preview_mapping",
                     ref_value=_stringify_config_value(handoff_data.get("preview_mapping")),
+                    allow_literal=False,
                 )
 
                 if consent_required is not True:

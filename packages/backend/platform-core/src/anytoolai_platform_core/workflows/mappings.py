@@ -1,14 +1,24 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from anytoolai_platform_core.common.literal_source import (
+    LITERAL_SOURCE_PREFIX as _LITERAL_SOURCE_PREFIX,
+)
+from anytoolai_platform_core.common.literal_source import (
+    parse_strict_literal_json as _parse_strict_literal_json,
+)
 from anytoolai_platform_core.workflows.errors import (
     WorkflowConditionEvaluationError,
     WorkflowMappingResolutionError,
+    WorkflowSourcePathAbsentError,
     WorkflowStepContractValidationError,
 )
+
+_OPTIONAL_SOURCE_PREFIX = "?"
 
 
 @dataclass(frozen=True)
@@ -16,6 +26,7 @@ class WorkflowSourcePath:
     root: str
     path: tuple[str, ...]
     step_id: str | None = None
+    literal_value: Any = None
 
 
 def validate_step_contract(
@@ -48,12 +59,24 @@ def resolve_step_input(
 
     resolved: dict[str, Any] = {}
     for target_path, source_path in input_mapping.items():
-        value = resolve_source_path(
-            source_path,
-            scenario_input=scenario_input,
-            step_outputs=step_outputs,
-            context=context,
-        )
+        is_optional, effective_source_path = _split_optional_source_path(source_path)
+        if is_optional:
+            try:
+                value = resolve_source_path(
+                    effective_source_path,
+                    scenario_input=scenario_input,
+                    step_outputs=step_outputs,
+                    context=context,
+                )
+            except WorkflowSourcePathAbsentError:
+                continue
+        else:
+            value = resolve_source_path(
+                effective_source_path,
+                scenario_input=scenario_input,
+                step_outputs=step_outputs,
+                context=context,
+            )
         _set_target_value(resolved, _parse_target_path(target_path), _normalize_value(value))
     return resolved
 
@@ -65,6 +88,7 @@ def resolve_when_condition(
     step_outputs: Mapping[str, Any],
     context: Mapping[str, Any],
 ) -> bool:
+    _reject_literal_when_reference(parse_source_path(when))
     try:
         return bool(
             resolve_source_path(
@@ -117,6 +141,8 @@ def resolve_source_path(
     context: Mapping[str, Any],
 ) -> Any:
     reference = parse_source_path(source_path)
+    if reference.root == "literal":
+        return reference.literal_value
     if reference.root == "scenario_input":
         current: Any = scenario_input
     elif reference.root == "context":
@@ -132,6 +158,15 @@ def resolve_source_path(
 
 
 def parse_source_path(source_path: str) -> WorkflowSourcePath:
+    if source_path.startswith(_LITERAL_SOURCE_PREFIX):
+        payload = source_path[len(_LITERAL_SOURCE_PREFIX) :]
+        try:
+            literal_value = _parse_strict_literal_json(payload)
+        except json.JSONDecodeError as exc:
+            raise WorkflowMappingResolutionError(
+                f"workflow literal source path is not valid JSON: {source_path}"
+            ) from exc
+        return WorkflowSourcePath(root="literal", path=(), literal_value=literal_value)
     _require_plain_dotted_path(source_path)
     parts = source_path.split(".")
     if parts[:2] == ["scenario", "input"]:
@@ -158,7 +193,8 @@ def _validate_input_mapping(
     mapping = _require_mapping_of_strings("input_mapping", input_mapping)
     for target_path, source_path in mapping.items():
         _parse_target_path(target_path)
-        reference = parse_source_path(source_path)
+        _, effective_source_path = _split_optional_source_path(source_path)
+        reference = parse_source_path(effective_source_path)
         _validate_step_reference(reference, prior_step_ids=prior_step_ids)
 
 
@@ -183,6 +219,7 @@ def _validate_when(when: Any, *, prior_step_ids: tuple[str, ...]) -> None:
     if not isinstance(when, str) or not when.strip():
         raise WorkflowConditionEvaluationError("`when` must be a non-empty string path.")
     reference = parse_source_path(when)
+    _reject_literal_when_reference(reference)
     _validate_step_reference(reference, prior_step_ids=prior_step_ids)
 
 
@@ -191,6 +228,13 @@ def _validate_retry_count(retry_count: Any) -> None:
         raise WorkflowMappingResolutionError("`retry_count` must be an integer.")
     if retry_count < 0:
         raise WorkflowMappingResolutionError("`retry_count` must be greater than or equal to 0.")
+
+
+def _reject_literal_when_reference(reference: WorkflowSourcePath) -> None:
+    if reference.root == "literal":
+        raise WorkflowConditionEvaluationError(
+            "`when` does not support literal: sources; literal: is input_mapping only."
+        )
 
 
 def _validate_step_reference(
@@ -202,6 +246,12 @@ def _validate_step_reference(
         raise WorkflowMappingResolutionError(
             "workflow step references must point to a previous step output."
         )
+
+
+def _split_optional_source_path(source_path: str) -> tuple[bool, str]:
+    if source_path.startswith(_OPTIONAL_SOURCE_PREFIX):
+        return True, source_path[len(_OPTIONAL_SOURCE_PREFIX) :]
+    return False, source_path
 
 
 def _require_mapping_of_strings(field_name: str, value: Any) -> dict[str, str]:
@@ -229,7 +279,7 @@ def _parse_target_path(target_path: str) -> tuple[str, ...]:
     parts = tuple(target_path.split("."))
     if not parts or any(not part for part in parts):
         raise WorkflowMappingResolutionError("workflow target paths must be non-empty.")
-    if parts[0] in {"scenario", "steps", "context"}:
+    if parts[0] in {"scenario", "steps"} or (len(parts) > 1 and parts[0] == "context"):
         raise WorkflowMappingResolutionError(
             "step input target paths must be relative field paths, not rooted source paths."
         )
@@ -250,8 +300,12 @@ def _parse_context_target_path(target_path: str) -> tuple[str, ...]:
 
 def _walk_value(current: Any, path: tuple[str, ...], *, source_path: str) -> Any:
     for segment in path:
-        if not isinstance(current, Mapping) or segment not in current:
+        if not isinstance(current, Mapping):
             raise WorkflowMappingResolutionError(
+                f"workflow source path could not be resolved: {source_path}"
+            )
+        if segment not in current:
+            raise WorkflowSourcePathAbsentError(
                 f"workflow source path could not be resolved: {source_path}"
             )
         current = current[segment]

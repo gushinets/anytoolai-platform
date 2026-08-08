@@ -8,7 +8,9 @@ handoffs:
     target_start_policy: immediate
     consent_required: true
     context_mapping:
-      source_text: artifact.content_json.title
+      source_text: artifact.content_json.values.deadline
+      fields: 'literal:[{"name":"deadline","type":"string","description":"Project deadline mentioned in the text.","required":true},{"name":"budget","type":"string","description":"Budget mentioned in the text.","required":false},{"name":"deliverables","type":"array_of_strings","description":"Deliverables mentioned in the text.","required":false}]'
+      strict: 'literal:false'
     preview_mapping:
-      title: artifact.content_json.title
-      fields: artifact.content_json.fields
+      values: artifact.content_json.values
+      missing_fields: artifact.content_json.missing_fields
