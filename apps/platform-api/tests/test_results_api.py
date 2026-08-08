@@ -364,89 +364,45 @@ def test_get_result_artifact_allows_domain_fields_containing_a_marker_as_substri
 
 @pytest.mark.parametrize(
     "key",
-    ["prompt", "provider", "model", "provider_call_id", "gateway_model"],
-)
-def test_get_result_artifact_rejects_bare_internal_field_names(
-    session_factory: SessionFactory,
-    key: str,
-) -> None:
-    # These are the actual bare internal field names used for provider/prompt lineage elsewhere
-    # in the platform (`providers/models.py`, `context/execution_context.py`). A prior denylist
-    # deliberately left bare words off to avoid false-positiving on `car_model`/
-    # `insurance_provider`, which also let these exact internal names through undetected.
-    app = _create_test_app(session_factory)
-    with transaction_boundary(session_factory) as session:
-        _, _, artifact_id = _seed_result(
-            session,
-            content_json={
-                "title": "Extracted",
-                "fields": ["budget"],
-                key: "leaked-internal-value",
-            },
-        )
-
-    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
-    assert response.status_code == HTTPStatus.NOT_FOUND
-    assert response.json()["error"]["code"] == "result_artifact_unavailable"
-
-
-@pytest.mark.parametrize("key", ["litellm_debug_info", "parent_trace_id"])
-def test_get_result_artifact_rejects_additional_leak_shaped_compound_keys(
-    session_factory: SessionFactory,
-    key: str,
-) -> None:
-    # Named coverage gaps found after the substring-to-exact-match switch: these compound
-    # leak-shaped keys aren't equal to any bare marker, so they need their own exact entries.
-    app = _create_test_app(session_factory)
-    with transaction_boundary(session_factory) as session:
-        _, _, artifact_id = _seed_result(
-            session,
-            content_json={
-                "title": "Extracted",
-                "fields": ["budget"],
-                key: "leaked-internal-value",
-            },
-        )
-
-    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
-    assert response.status_code == HTTPStatus.NOT_FOUND
-    assert response.json()["error"]["code"] == "result_artifact_unavailable"
-
-
-def test_get_result_artifact_rejects_acronym_prefixed_key_variant(
-    session_factory: SessionFactory,
-) -> None:
-    # `_CAMEL_CASE_BOUNDARY` originally only split lower/digit -> upper transitions, so an
-    # all-caps acronym run directly followed by a capitalized word (`GATEWAYModel`) had no such
-    # transition and normalized to `gatewaymodel`, bypassing the exact-match `gateway_model`
-    # marker entirely. The regex now also splits the acronym-run -> capitalized-word boundary.
-    app = _create_test_app(session_factory)
-    with transaction_boundary(session_factory) as session:
-        _, _, artifact_id = _seed_result(
-            session,
-            content_json={
-                "title": "Extracted",
-                "fields": ["budget"],
-                "GATEWAYModel": "leaked-internal-value",
-            },
-        )
-
-    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
-    assert response.status_code == HTTPStatus.NOT_FOUND
-    assert response.json()["error"]["code"] == "result_artifact_unavailable"
-
-
-@pytest.mark.parametrize(
-    "key",
-    ["provider-model", "providerModel", "ProviderModel", "pydantic-run-id", "pydanticRunId"],
+    [
+        # Bare internal field names used for provider/prompt lineage elsewhere in the platform
+        # (`providers/models.py`, `context/execution_context.py`). A prior denylist deliberately
+        # left bare words off to avoid false-positiving on `car_model`/`insurance_provider`,
+        # which also let these exact internal names through undetected.
+        "prompt",
+        "provider",
+        "model",
+        "provider_call_id",
+        "gateway_model",
+        # Compound leak-shaped keys with no matching bare marker, found as a coverage gap after
+        # the substring-to-exact-match switch.
+        "litellm_debug_info",
+        "parent_trace_id",
+        # `-`/camelCase spellings of `provider_model`/`pydantic_run_id`. Matching must fold
+        # separators, otherwise these bypass the underscore-form marker entirely.
+        "provider-model",
+        "providerModel",
+        "ProviderModel",
+        "pydantic-run-id",
+        "pydanticRunId",
+        # Acronym-prefixed and fully-uppercase spellings have no lower->upper transition for a
+        # camelCase-boundary regex to split on at all; canonical-form (separator-stripped)
+        # comparison catches these without needing to detect word boundaries.
+        "GATEWAYModel",
+        "GATEWAYMODEL",
+        "PARENTTRACEID",
+        "MODELID",
+        "TRACEID",
+        # Nested-acronym PascalCase: a boundary-insertion regex would split this into more words
+        # (`lite_llm_debug_info`) than the marker has (`litellm_debug_info`); canonical form
+        # matches regardless of how many words got split out.
+        "LiteLlmDebugInfo",
+    ],
 )
 def test_get_result_artifact_rejects_leak_shaped_key_variants(
     session_factory: SessionFactory,
     key: str,
 ) -> None:
-    # The denylist matcher must normalize hyphen/underscore/camelCase separators before
-    # matching, otherwise a schema-valid key like `provider-model` or `providerModel` bypasses
-    # the underscore-form marker `provider_model` entirely.
     app = _create_test_app(session_factory)
     with transaction_boundary(session_factory) as session:
         _, _, artifact_id = _seed_result(
@@ -454,7 +410,7 @@ def test_get_result_artifact_rejects_leak_shaped_key_variants(
             content_json={
                 "title": "Extracted",
                 "fields": ["budget"],
-                key: "leaked-internal-model-id",
+                key: "leaked-internal-value",
             },
         )
 

@@ -72,24 +72,37 @@ _FORBIDDEN_OUTPUT_KEYS = frozenset(
     }
 )
 
-# Two boundary rules, combined: lower/digit -> upper (`providerModel`) and the acronym-run ->
-# capitalized-word transition (`HTTPProvider` -> `HTTP_Provider`). A single-rule regex missed the
-# second case entirely, silently normalizing `GATEWAYModel` to `gatewaymodel` instead of
-# `gateway_model`, bypassing the exact-match denylist for all-caps-prefixed spellings.
-_CAMEL_CASE_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+_SEPARATORS = re.compile(r"[-_]")
 
 
-def _normalize_key(key: Any) -> str:
-    """Fold `provider-model`, `providerModel`, `ProviderModel`, and `provider_model` (and
-    acronym-prefixed spellings like `GATEWAYModel`) to the same form."""
-    text = _CAMEL_CASE_BOUNDARY.sub("_", str(key))
-    return text.casefold().replace("-", "_")
+def _canonical_key(key: Any) -> str:
+    """Collapse `-`/`_` and case so every spelling of a marker compares equal.
+
+    Two earlier revisions tried to re-insert word boundaries into arbitrary camelCase/acronym
+    spellings before matching (`providerModel` -> `provider_model`), adding one regex rule per
+    reported bypass (lower/digit -> upper, then acronym-run -> capitalized-word). That approach
+    is inherently incomplete: fully-uppercase spellings (`GATEWAYMODEL`, `TRACEID`) have no
+    lowercase letter to anchor a boundary on, and multi-acronym PascalCase (`LiteLlmDebugInfo`)
+    splits into more words than the marker has (`lite_llm_debug_info` vs `litellm_debug_info`).
+    Word-boundary detection is ambiguous in general (is `TRACEID` `trace_id` or `traceid`?) and
+    doesn't need solving here: matching is against a small, fixed, known marker list, not
+    free-form text, so stripping separators from *both* the key and the marker and comparing the
+    result for equality sidesteps the boundary question entirely. This still can't reopen the
+    earlier substring false-positive problem (`vehicle_model_id`, `business_trace_id`, ...)
+    because it stays a whole-string equality check, just on a separator-free canonical form.
+    """
+    return _SEPARATORS.sub("", str(key)).casefold()
+
+
+_FORBIDDEN_OUTPUT_KEYS_CANONICAL = frozenset(
+    _canonical_key(marker) for marker in _FORBIDDEN_OUTPUT_KEYS
+)
 
 
 def _contains_forbidden_key(value: Any) -> bool:
     if isinstance(value, Mapping):
         for key, nested in value.items():
-            if _normalize_key(key) in _FORBIDDEN_OUTPUT_KEYS:
+            if _canonical_key(key) in _FORBIDDEN_OUTPUT_KEYS_CANONICAL:
                 return True
             if _contains_forbidden_key(nested):
                 return True

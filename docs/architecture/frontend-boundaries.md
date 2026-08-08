@@ -185,18 +185,24 @@ never reach response serialization.
 Separately, because the endpoint returns the full normalized output *object* (unlike handoffs,
 which only ever expose an explicit per-field allowlist mapping), and shipped workflow output
 schemas may still declare `additionalProperties: true`, `ResultService` additionally rejects any
-normalized output containing a *key* that exactly matches (after normalizing `-`/`_`/camelCase
-separators to a common form) a small, results-specific denylist, at any nesting depth. The list
-covers both the actual bare internal field names used for provider/prompt lineage elsewhere in the
-platform (`prompt`, `prompt_ref`, `provider`, `model`, `provider_policy_ref`, `provider_call_id`,
+normalized output containing a *key* that exactly matches (after normalizing `-`/`_`/case to a
+common form) a small, results-specific denylist, at any nesting depth. The list covers both the
+actual bare internal field names used for provider/prompt lineage elsewhere in the platform
+(`prompt`, `prompt_ref`, `provider`, `model`, `provider_policy_ref`, `provider_call_id`,
 `gateway_backend`, `gateway_model`, `pydantic_run_id`, `litellm_response_id`) and additional
 compound/lineage-shaped names not currently used verbatim elsewhere but plausible leak shapes
 (`system_prompt`, `raw_prompt`, `prompt_template`, `raw_provider`, `provider_output`,
 `provider_model`, `provider_name`, `provider_policy`, `model_name`, `model_id`, `model_version`,
-`litellm`, `litellm_debug_info`, `trace_id`, `parent_trace_id`). Key normalization also splits
-acronym-run-to-capitalized-word boundaries (`GATEWAYModel` -> `gateway_model`), not just
-lower/digit-to-upper ones, so all-caps-prefixed spellings of a marker cannot bypass the exact
-match by skipping the underscore insertion. Matching is against the whole normalized key, not a
+`litellm`, `litellm_debug_info`, `trace_id`, `parent_trace_id`). Key normalization strips `-`/`_`
+separators and casefolds, from both the incoming key and the marker, then compares the results for
+equality — it deliberately does **not** try to re-insert word boundaries into camelCase/acronym
+spellings (an earlier revision did, and needed a growing pile of regex rules that still missed
+fully-uppercase spellings like `TRACEID`/`GATEWAYMODEL`, which have no lowercase letter to anchor
+a boundary on, and multi-acronym PascalCase like `LiteLlmDebugInfo`, which splits into more words
+than its marker has). Comparing separator-stripped canonical forms sidesteps that ambiguity
+entirely while still being a whole-string equality check, so `provider-model`, `providerModel`,
+`GATEWAYMODEL`, and `LiteLlmDebugInfo` all resolve to the same canonical form as their marker.
+Matching is against the whole normalized key, not a
 substring: an earlier
 revision matched markers as substrings, which both left the bare internal names above undetected
 (they were deliberately excluded from a substring-based list to avoid colliding with fields like
