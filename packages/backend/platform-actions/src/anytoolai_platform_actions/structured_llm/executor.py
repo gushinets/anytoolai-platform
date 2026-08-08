@@ -220,7 +220,7 @@ class StructuredLlmActionExecutor:
                 handoff_id=metadata_str(request.metadata, "handoff_id"),
                 scenario_chain_id=metadata_str(request.metadata, "scenario_chain_id"),
                 acquisition_source=metadata_str(request.metadata, "acquisition_source"),
-                action_type=request.action_type,
+                action_type=action_type,
                 action_config_id=request.action_config_id,
             ),
             schema=schema_mapping,

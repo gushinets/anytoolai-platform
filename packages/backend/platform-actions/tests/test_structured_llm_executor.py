@@ -650,6 +650,11 @@ def test_structured_llm_executor_finalizes_and_persists_structured_artifact(
         "values": {"budget": "5000", "timeline": "Q1"},
         "missing_fields": [],
     }
+    # ANY-251 regression: persisted metadata must reflect the resolved action_config's
+    # action_type ("text.extract_structured_fields"), not request.action_type, which this
+    # request deliberately leaves at its default "" -- the same divergence finding #2
+    # (cross-validator lookup) already fixed for the retry/finalize path.
+    assert artifact_rows[0]["metadata"]["action_type"] == "text.extract_structured_fields"
 
 
 def test_structured_llm_executor_skips_schema_less_finalization_with_artifact_service(

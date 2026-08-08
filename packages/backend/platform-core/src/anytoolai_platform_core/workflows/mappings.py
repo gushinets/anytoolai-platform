@@ -20,6 +20,14 @@ from anytoolai_platform_core.workflows.errors import (
 _OPTIONAL_SOURCE_PREFIX = "?"
 
 
+class _WorkflowSourcePathAbsentError(WorkflowMappingResolutionError):
+    """Raised by `_walk_value` only when a path segment key is genuinely missing from its
+    parent mapping -- as opposed to an intermediate value existing with an incompatible
+    (non-mapping) shape. Only this specific case is tolerated by optional (`?`) input_mapping
+    sources; malformed intermediate data must still fail loudly even when the target is
+    optional."""
+
+
 @dataclass(frozen=True)
 class WorkflowSourcePath:
     root: str
@@ -59,17 +67,23 @@ def resolve_step_input(
     resolved: dict[str, Any] = {}
     for target_path, source_path in input_mapping.items():
         is_optional, effective_source_path = _split_optional_source_path(source_path)
-        try:
+        if is_optional:
+            try:
+                value = resolve_source_path(
+                    effective_source_path,
+                    scenario_input=scenario_input,
+                    step_outputs=step_outputs,
+                    context=context,
+                )
+            except _WorkflowSourcePathAbsentError:
+                continue
+        else:
             value = resolve_source_path(
                 effective_source_path,
                 scenario_input=scenario_input,
                 step_outputs=step_outputs,
                 context=context,
             )
-        except WorkflowMappingResolutionError:
-            if is_optional:
-                continue
-            raise
         _set_target_value(resolved, _parse_target_path(target_path), _normalize_value(value))
     return resolved
 
@@ -81,10 +95,7 @@ def resolve_when_condition(
     step_outputs: Mapping[str, Any],
     context: Mapping[str, Any],
 ) -> bool:
-    if parse_source_path(when).root == "literal":
-        raise WorkflowConditionEvaluationError(
-            "`when` does not support literal: sources; literal: is input_mapping only."
-        )
+    _reject_literal_when_reference(parse_source_path(when))
     try:
         return bool(
             resolve_source_path(
@@ -215,10 +226,7 @@ def _validate_when(when: Any, *, prior_step_ids: tuple[str, ...]) -> None:
     if not isinstance(when, str) or not when.strip():
         raise WorkflowConditionEvaluationError("`when` must be a non-empty string path.")
     reference = parse_source_path(when)
-    if reference.root == "literal":
-        raise WorkflowConditionEvaluationError(
-            "`when` does not support literal: sources; literal: is input_mapping only."
-        )
+    _reject_literal_when_reference(reference)
     _validate_step_reference(reference, prior_step_ids=prior_step_ids)
 
 
@@ -227,6 +235,13 @@ def _validate_retry_count(retry_count: Any) -> None:
         raise WorkflowMappingResolutionError("`retry_count` must be an integer.")
     if retry_count < 0:
         raise WorkflowMappingResolutionError("`retry_count` must be greater than or equal to 0.")
+
+
+def _reject_literal_when_reference(reference: WorkflowSourcePath) -> None:
+    if reference.root == "literal":
+        raise WorkflowConditionEvaluationError(
+            "`when` does not support literal: sources; literal: is input_mapping only."
+        )
 
 
 def _validate_step_reference(
@@ -292,8 +307,12 @@ def _parse_context_target_path(target_path: str) -> tuple[str, ...]:
 
 def _walk_value(current: Any, path: tuple[str, ...], *, source_path: str) -> Any:
     for segment in path:
-        if not isinstance(current, Mapping) or segment not in current:
+        if not isinstance(current, Mapping):
             raise WorkflowMappingResolutionError(
+                f"workflow source path could not be resolved: {source_path}"
+            )
+        if segment not in current:
+            raise _WorkflowSourcePathAbsentError(
                 f"workflow source path could not be resolved: {source_path}"
             )
         current = current[segment]

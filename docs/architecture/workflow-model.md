@@ -65,15 +65,19 @@ If `input_mapping` is omitted, the runner passes the full `scenario.input` objec
 ### Optional input mapping sources
 
 An `input_mapping` source path may be prefixed with `?` (for example
-`?scenario.input.strict`) to mark it optional. If the path cannot be resolved at runtime (the
-referenced scenario input/context/step-output key is absent), the runner omits that target field
-from the resolved step input instead of failing the step — equivalent to the caller never having
-supplied it. Config-load-time shape validation still applies to the path after the `?` is
-stripped; only runtime absence is tolerated. This is the mechanism for forwarding JSON-Schema
-`default`-backed or otherwise optional action input fields (for example a boolean `strict` flag or
-an optional `taxonomy`/`context` field) without forcing every scenario caller to supply them
-explicitly. `?` is only meaningful on `input_mapping`; it is not supported on `output_mapping` or
-`when`.
+`?scenario.input.strict`) to mark it optional. If a path segment key is genuinely absent from its
+parent object at runtime, the runner omits that target field from the resolved step input instead
+of failing the step — equivalent to the caller never having supplied it. Config-load-time shape
+validation still applies to the path after the `?` is stripped; only runtime absence of a key is
+tolerated. This is the mechanism for forwarding JSON-Schema `default`-backed or otherwise optional
+action input fields (for example a boolean `strict` flag or an optional `taxonomy`/`context`
+field) without forcing every scenario caller to supply them explicitly. `?` is only meaningful on
+`input_mapping`; it is not supported on `output_mapping` or `when`.
+
+Optional resolution only tolerates a missing key, never an incompatible shape along the way. If an
+intermediate segment resolves to a non-object value (for example `?scenario.input.settings.enabled`
+against `{"settings": false}`), that is malformed caller data, not omission, and the step still
+fails loudly even though the target is optional.
 
 Every successful step output is always available to later steps under
 `steps.<step_id>.output`, even when `output_mapping` is empty.

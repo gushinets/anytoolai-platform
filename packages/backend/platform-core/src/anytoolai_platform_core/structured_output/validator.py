@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from anytoolai_platform_core.common.strict_json import parse_strict_json
 from anytoolai_platform_core.structured_output.errors import (
     StructuredOutputMalformedJsonError,
     StructuredOutputNonObjectJsonError,
@@ -28,7 +29,7 @@ class StructuredOutputValidationResult:
 
 def parse_json_value(raw: str) -> Any:
     try:
-        return json.loads(raw)
+        return parse_strict_json(raw)
     except json.JSONDecodeError as exc:
         raise StructuredOutputMalformedJsonError("Malformed JSON") from exc
 

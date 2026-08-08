@@ -1,25 +1,10 @@
 from __future__ import annotations
 
-import json
-from typing import Any
+from anytoolai_platform_core.common.strict_json import parse_strict_json
 
 LITERAL_SOURCE_PREFIX = "literal:"
 
-
-def _reject_non_finite_constant(token: str) -> Any:
-    raise json.JSONDecodeError(
-        f"literal JSON does not allow non-finite constant: {token}",
-        token,
-        0,
-    )
-
-
-def parse_strict_literal_json(payload: str) -> Any:
-    """Parses a `literal:` source payload as strict JSON.
-
-    Python's `json.loads` non-standardly accepts the bare tokens `NaN`, `Infinity`, and
-    `-Infinity` by default. A config-owned literal is meant to be plain, portable JSON, so this
-    rejects those tokens the same way as any other malformed literal: by raising
-    `json.JSONDecodeError`.
-    """
-    return json.loads(payload, parse_constant=_reject_non_finite_constant)
+# Kept as an alias so existing importers (workflow mappings, handoff payloads, config loader)
+# don't need call-site changes; `parse_strict_json` is the general-purpose primitive, also used
+# for provider structured-output parsing which has nothing to do with `literal:` sources.
+parse_strict_literal_json = parse_strict_json

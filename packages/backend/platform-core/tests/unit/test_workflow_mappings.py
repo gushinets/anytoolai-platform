@@ -142,6 +142,32 @@ def test_resolve_step_input_uses_optional_source_when_present() -> None:
     assert resolved == {"strict": True}
 
 
+def test_resolve_step_input_omits_optional_source_when_nested_key_absent() -> None:
+    resolved = resolve_step_input(
+        input_mapping={"enabled": "?scenario.input.settings.enabled"},
+        scenario_input={"settings": {}},
+        step_outputs={},
+        context={},
+    )
+
+    assert resolved == {}
+
+
+def test_resolve_step_input_still_raises_for_optional_source_with_malformed_intermediate_value() -> (
+    None
+):
+    # `settings` resolves, but it's not a mapping, so `.enabled` cannot be a genuinely absent
+    # key -- this is malformed caller data, not omission, and must not be silently swallowed
+    # even though the target is optional.
+    with pytest.raises(WorkflowMappingResolutionError):
+        resolve_step_input(
+            input_mapping={"enabled": "?scenario.input.settings.enabled"},
+            scenario_input={"settings": False},
+            step_outputs={},
+            context={},
+        )
+
+
 def test_resolve_step_input_still_raises_for_required_missing_source() -> None:
     with pytest.raises(WorkflowMappingResolutionError):
         resolve_step_input(
