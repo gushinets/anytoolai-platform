@@ -23,26 +23,51 @@ from anytoolai_platform_core.workflows.repository import JobRepository
 # This is a dedicated, results-specific list -- deliberately NOT
 # `common.logging.SENSITIVE_KEY_PARTS`. That list is tuned for log redaction, where a false
 # positive just replaces a value with `[REDACTED]`; here a false positive makes an entire valid,
-# already-succeeded result silently disappear as a 404. Broad single-word markers from that list
-# (`email`, `token`, `handoff`, `secret`, `prompt`) would reject legitimate fields like
-# `email_subject`, `token_count`, `handoff_summary`, or `secretary_name`. Markers here are
-# deliberately compound/lineage-specific (`provider_model`, not bare `provider`/`model`) so a
-# legitimate field like `car_model` or `insurance_provider` does not false-positive either.
-_FORBIDDEN_OUTPUT_KEY_MARKERS = (
-    "system_prompt",
-    "raw_prompt",
-    "prompt_template",
-    "raw_provider",
-    "provider_output",
-    "provider_model",
-    "provider_name",
-    "provider_policy",
-    "model_name",
-    "model_id",
-    "model_version",
-    "litellm",
-    "pydantic_run_id",
-    "trace_id",
+# already-succeeded result silently disappear as a 404.
+#
+# Matching is against the *whole* normalized key, not a substring: an earlier revision matched
+# markers as substrings, which both under- and over-blocked. Substring matching let bare internal
+# names (`prompt`, `provider`, `model`, `provider_call_id`, `gateway_model` -- the actual field
+# names used for provider/prompt lineage in `providers/models.py` and
+# `context/execution_context.py`) through, because those bare words were deliberately left off the
+# marker list to avoid rejecting legitimate compound fields like `car_model`/`insurance_provider`.
+# But the same substring check then rejected *other* legitimate compound fields that happen to
+# contain a marker, e.g. `vehicle_model_id`, `car_model_version`, `insurance_provider_name`, or
+# `business_trace_id`. Exact whole-key matching (after normalization) avoids both problems: it
+# blocks the real bare internal names outright, and it no longer collides with domain fields that
+# merely contain a marker as a substring.
+_FORBIDDEN_OUTPUT_KEYS = frozenset(
+    {
+        # Bare internal identifier/lineage field names used elsewhere in the platform (see
+        # `providers/models.py`, `context/execution_context.py`,
+        # `common.logging.IDENTIFIER_FIELDS`). Safe to block exactly now that matching is
+        # whole-key, not substring.
+        "prompt",
+        "prompt_ref",
+        "provider",
+        "model",
+        "provider_policy_ref",
+        "provider_call_id",
+        "gateway_backend",
+        "gateway_model",
+        "pydantic_run_id",
+        "litellm_response_id",
+        # Compound/lineage-shaped names not found verbatim elsewhere in the platform today, but
+        # plausible leak shapes for provider/prompt/model/debug lineage.
+        "system_prompt",
+        "raw_prompt",
+        "prompt_template",
+        "raw_provider",
+        "provider_output",
+        "provider_model",
+        "provider_name",
+        "provider_policy",
+        "model_name",
+        "model_id",
+        "model_version",
+        "litellm",
+        "trace_id",
+    }
 )
 
 _CAMEL_CASE_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
@@ -57,8 +82,7 @@ def _normalize_key(key: Any) -> str:
 def _contains_forbidden_key(value: Any) -> bool:
     if isinstance(value, Mapping):
         for key, nested in value.items():
-            normalized_key = _normalize_key(key)
-            if any(marker in normalized_key for marker in _FORBIDDEN_OUTPUT_KEY_MARKERS):
+            if _normalize_key(key) in _FORBIDDEN_OUTPUT_KEYS:
                 return True
             if _contains_forbidden_key(nested):
                 return True

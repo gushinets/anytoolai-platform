@@ -185,16 +185,25 @@ never reach response serialization.
 Separately, because the endpoint returns the full normalized output *object* (unlike handoffs,
 which only ever expose an explicit per-field allowlist mapping), and shipped workflow output
 schemas may still declare `additionalProperties: true`, `ResultService` additionally rejects any
-normalized output containing a *key name* that matches a small, results-specific denylist of
-compound markers (`system_prompt`, `raw_prompt`, `prompt_template`, `raw_provider`,
-`provider_output`, `provider_model`, `provider_name`, `provider_policy`, `model_name`, `model_id`,
-`model_version`, `litellm`, `pydantic_run_id`, `trace_id`) at any nesting depth, after normalizing
-`-`/`_`/camelCase separators to a common form. This list is deliberately its own, narrower policy
-rather than a reuse of `common.logging.SENSITIVE_KEY_PARTS` (the log-redaction denylist): a false
-positive there just redacts a logged value, while a false positive here would make an entire
-valid, already-succeeded result silently disappear as a 404, so broad single-word markers like
-`email`/`token`/`handoff`/`secret`/`prompt` are intentionally not used. This is a defense-in-depth
-backstop against those specific marker names appearing as keys while workflow output schemas are
+normalized output containing a *key* that exactly matches (after normalizing `-`/`_`/camelCase
+separators to a common form) a small, results-specific denylist, at any nesting depth. The list
+covers both the actual bare internal field names used for provider/prompt lineage elsewhere in the
+platform (`prompt`, `prompt_ref`, `provider`, `model`, `provider_policy_ref`, `provider_call_id`,
+`gateway_backend`, `gateway_model`, `pydantic_run_id`, `litellm_response_id`) and additional
+compound/lineage-shaped names not currently used verbatim elsewhere but plausible leak shapes
+(`system_prompt`, `raw_prompt`, `prompt_template`, `raw_provider`, `provider_output`,
+`provider_model`, `provider_name`, `provider_policy`, `model_name`, `model_id`, `model_version`,
+`litellm`, `trace_id`). Matching is against the whole normalized key, not a substring: an earlier
+revision matched markers as substrings, which both left the bare internal names above undetected
+(they were deliberately excluded from a substring-based list to avoid colliding with fields like
+`car_model`/`insurance_provider`) and, separately, rejected unrelated legitimate compound fields
+that happened to contain a marker substring (e.g. `vehicle_model_id`, `car_model_version`,
+`insurance_provider_name`, `business_trace_id`). Whole-key matching fixes both. This list is
+deliberately its own, narrower policy rather than a reuse of `common.logging.SENSITIVE_KEY_PARTS`
+(the log-redaction denylist): a false positive there just redacts a logged value, while a false
+positive here would make an entire valid, already-succeeded result silently disappear as a 404, so
+broad single-word markers like `email`/`token`/`handoff`/`secret` are intentionally not used. This
+is a defense-in-depth backstop against those specific key names while workflow output schemas are
 not yet uniformly closed — it is not a general guarantee against every possible form of
 provider/prompt/debug content (an unlisted key name, or a value rather than a key, is not
 inspected). Closing the relevant workflow output schemas, or introducing a dedicated public output

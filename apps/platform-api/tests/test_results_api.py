@@ -313,9 +313,9 @@ def test_get_result_artifact_rejects_content_violating_output_schema(
 def test_get_result_artifact_allows_generic_words_as_key_substrings(
     session_factory: SessionFactory,
 ) -> None:
-    # The denylist backstop must use specific compound markers (e.g. `provider_model`), not
-    # bare generic words (`model`, `provider`), so a legitimate field like `car_model` or
-    # `insurance_provider` is never mistaken for a leaked provider/model identifier.
+    # The denylist backstop matches the *whole* normalized key, not a substring, so a legitimate
+    # field like `car_model` or `insurance_provider` is never mistaken for a leaked
+    # provider/model identifier.
     app = _create_test_app(session_factory)
     with transaction_boundary(session_factory) as session:
         _, _, artifact_id = _seed_result(
@@ -331,6 +331,63 @@ def test_get_result_artifact_allows_generic_words_as_key_substrings(
     response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
     assert response.status_code == HTTPStatus.OK
     assert response.json()["output"]["car_model"] == "Model X"
+
+
+def test_get_result_artifact_allows_domain_fields_containing_a_marker_as_substring(
+    session_factory: SessionFactory,
+) -> None:
+    # Whole-key matching must not collide with legitimate compound domain fields that happen to
+    # contain a denylist marker as a substring (e.g. `model_id` inside `vehicle_model_id`). A
+    # prior substring-based matcher would have 404'd all of these.
+    app = _create_test_app(session_factory)
+    with transaction_boundary(session_factory) as session:
+        _, _, artifact_id = _seed_result(
+            session,
+            content_json={
+                "title": "Extracted",
+                "fields": ["budget"],
+                "vehicle_model_id": "vin-123",
+                "car_model_version": "2024",
+                "insurance_provider_name": "Acme Insurance",
+                "business_trace_id": "biz-456",
+            },
+        )
+
+    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
+    assert response.status_code == HTTPStatus.OK
+    output = response.json()["output"]
+    assert output["vehicle_model_id"] == "vin-123"
+    assert output["car_model_version"] == "2024"
+    assert output["insurance_provider_name"] == "Acme Insurance"
+    assert output["business_trace_id"] == "biz-456"
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["prompt", "provider", "model", "provider_call_id", "gateway_model"],
+)
+def test_get_result_artifact_rejects_bare_internal_field_names(
+    session_factory: SessionFactory,
+    key: str,
+) -> None:
+    # These are the actual bare internal field names used for provider/prompt lineage elsewhere
+    # in the platform (`providers/models.py`, `context/execution_context.py`). A prior denylist
+    # deliberately left bare words off to avoid false-positiving on `car_model`/
+    # `insurance_provider`, which also let these exact internal names through undetected.
+    app = _create_test_app(session_factory)
+    with transaction_boundary(session_factory) as session:
+        _, _, artifact_id = _seed_result(
+            session,
+            content_json={
+                "title": "Extracted",
+                "fields": ["budget"],
+                key: "leaked-internal-value",
+            },
+        )
+
+    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "result_artifact_unavailable"
 
 
 @pytest.mark.parametrize(
