@@ -374,6 +374,12 @@ def test_get_result_artifact_allows_domain_fields_containing_a_marker_as_substri
         "model",
         "provider_call_id",
         "gateway_model",
+        # `model_ref` is one of config.loader.FORBIDDEN_RAW_LLM_FIELDS (the config-authoring-time
+        # raw-LLM-field guard); a schema with `additionalProperties: true` could still let it
+        # through as workflow output, so it needs the same results-side denylist entry.
+        "model_ref",
+        "model-ref",
+        "modelRef",
         # Compound leak-shaped keys with no matching bare marker, found as a coverage gap after
         # the substring-to-exact-match switch.
         "litellm_debug_info",

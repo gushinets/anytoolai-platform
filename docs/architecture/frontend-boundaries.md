@@ -188,8 +188,12 @@ schemas may still declare `additionalProperties: true`, `ResultService` addition
 normalized output containing a *key* that exactly matches (after normalizing `-`/`_`/case to a
 common form) a small, results-specific denylist, at any nesting depth. The list covers both the
 actual bare internal field names used for provider/prompt lineage elsewhere in the platform
-(`prompt`, `prompt_ref`, `provider`, `model`, `provider_policy_ref`, `provider_call_id`,
-`gateway_backend`, `gateway_model`, `pydantic_run_id`, `litellm_response_id`) and additional
+(`prompt`, `prompt_ref`, `provider`, `model`, `model_ref`, `provider_policy_ref`,
+`provider_call_id`, `gateway_backend`, `gateway_model`, `pydantic_run_id`,
+`litellm_response_id` — `model_ref` mirrors `config.loader.FORBIDDEN_RAW_LLM_FIELDS`, the
+config-authoring-time guard against the same raw-LLM field names; the rest of that list
+(`temperature`, `top_p`, `seed`, `stop`, `stream`, `tools`, ...) is deliberately not mirrored
+here, since those are generic words with real domain-field collision risk) and additional
 compound/lineage-shaped names not currently used verbatim elsewhere but plausible leak shapes
 (`system_prompt`, `raw_prompt`, `prompt_template`, `raw_provider`, `provider_output`,
 `provider_model`, `provider_name`, `provider_policy`, `model_name`, `model_id`, `model_version`,

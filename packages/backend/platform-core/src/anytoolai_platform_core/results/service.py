@@ -46,6 +46,15 @@ _FORBIDDEN_OUTPUT_KEYS = frozenset(
         "prompt_ref",
         "provider",
         "model",
+        # `model_ref` is one of `config.loader.FORBIDDEN_RAW_LLM_FIELDS` (config-authoring-time
+        # guard against raw LLM params leaking into config), included here too so the same field
+        # name can't reach a public response either. The rest of that list (`temperature`,
+        # `top_p`, `seed`, `stop`, `stream`, `tools`, ...) is deliberately NOT mirrored here: those
+        # are generic English words with real domain-field collision risk (a weather workflow's
+        # `temperature`, a bus-route workflow's `stop`), the same reason bare `email`/`token` were
+        # excluded earlier -- `model_ref`/`prompt_ref`/`provider_policy_ref` are specific enough
+        # to not have that problem.
+        "model_ref",
         "provider_policy_ref",
         "provider_call_id",
         "gateway_backend",
