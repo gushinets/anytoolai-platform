@@ -193,7 +193,11 @@ platform (`prompt`, `prompt_ref`, `provider`, `model`, `provider_policy_ref`, `p
 compound/lineage-shaped names not currently used verbatim elsewhere but plausible leak shapes
 (`system_prompt`, `raw_prompt`, `prompt_template`, `raw_provider`, `provider_output`,
 `provider_model`, `provider_name`, `provider_policy`, `model_name`, `model_id`, `model_version`,
-`litellm`, `trace_id`). Matching is against the whole normalized key, not a substring: an earlier
+`litellm`, `litellm_debug_info`, `trace_id`, `parent_trace_id`). Key normalization also splits
+acronym-run-to-capitalized-word boundaries (`GATEWAYModel` -> `gateway_model`), not just
+lower/digit-to-upper ones, so all-caps-prefixed spellings of a marker cannot bypass the exact
+match by skipping the underscore insertion. Matching is against the whole normalized key, not a
+substring: an earlier
 revision matched markers as substrings, which both left the bare internal names above undetected
 (they were deliberately excluded from a substring-based list to avoid colliding with fields like
 `car_model`/`insurance_provider`) and, separately, rejected unrelated legitimate compound fields
@@ -206,8 +210,13 @@ broad single-word markers like `email`/`token`/`handoff`/`secret` are intentiona
 is a defense-in-depth backstop against those specific key names while workflow output schemas are
 not yet uniformly closed — it is not a general guarantee against every possible form of
 provider/prompt/debug content (an unlisted key name, or a value rather than a key, is not
-inspected). Closing the relevant workflow output schemas, or introducing a dedicated public output
-schema per workflow, remains open follow-up work.
+inspected). It also cuts both ways: because `prompt`/`provider`/`model` are blocked as bare exact
+keys (not just compound markers), a future workflow whose *legitimate* schema-declared output
+happens to use one of those exact names (e.g. a prompt-generation product returning a field
+literally called `prompt`) would incorrectly 404 rather than leak. This is an accepted trade-off
+of a key-name denylist over a schema; a workflow needing a legitimate field with one of these
+exact names must pick a differently-named field. Closing the relevant workflow output schemas, or
+introducing a dedicated public output schema per workflow, remains open follow-up work.
 
 Safe API behavior — both cases return `404`, and neither ever includes artifact/job internals,
 prompts, or provider/model identifiers in the response body:

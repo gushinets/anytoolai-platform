@@ -390,6 +390,52 @@ def test_get_result_artifact_rejects_bare_internal_field_names(
     assert response.json()["error"]["code"] == "result_artifact_unavailable"
 
 
+@pytest.mark.parametrize("key", ["litellm_debug_info", "parent_trace_id"])
+def test_get_result_artifact_rejects_additional_leak_shaped_compound_keys(
+    session_factory: SessionFactory,
+    key: str,
+) -> None:
+    # Named coverage gaps found after the substring-to-exact-match switch: these compound
+    # leak-shaped keys aren't equal to any bare marker, so they need their own exact entries.
+    app = _create_test_app(session_factory)
+    with transaction_boundary(session_factory) as session:
+        _, _, artifact_id = _seed_result(
+            session,
+            content_json={
+                "title": "Extracted",
+                "fields": ["budget"],
+                key: "leaked-internal-value",
+            },
+        )
+
+    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "result_artifact_unavailable"
+
+
+def test_get_result_artifact_rejects_acronym_prefixed_key_variant(
+    session_factory: SessionFactory,
+) -> None:
+    # `_CAMEL_CASE_BOUNDARY` originally only split lower/digit -> upper transitions, so an
+    # all-caps acronym run directly followed by a capitalized word (`GATEWAYModel`) had no such
+    # transition and normalized to `gatewaymodel`, bypassing the exact-match `gateway_model`
+    # marker entirely. The regex now also splits the acronym-run -> capitalized-word boundary.
+    app = _create_test_app(session_factory)
+    with transaction_boundary(session_factory) as session:
+        _, _, artifact_id = _seed_result(
+            session,
+            content_json={
+                "title": "Extracted",
+                "fields": ["budget"],
+                "GATEWAYModel": "leaked-internal-value",
+            },
+        )
+
+    response = asyncio.run(_request(app, "GET", f"/v1/results/{artifact_id}"))
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "result_artifact_unavailable"
+
+
 @pytest.mark.parametrize(
     "key",
     ["provider-model", "providerModel", "ProviderModel", "pydantic-run-id", "pydanticRunId"],

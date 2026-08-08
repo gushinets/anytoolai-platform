@@ -66,15 +66,22 @@ _FORBIDDEN_OUTPUT_KEYS = frozenset(
         "model_id",
         "model_version",
         "litellm",
+        "litellm_debug_info",
         "trace_id",
+        "parent_trace_id",
     }
 )
 
-_CAMEL_CASE_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+# Two boundary rules, combined: lower/digit -> upper (`providerModel`) and the acronym-run ->
+# capitalized-word transition (`HTTPProvider` -> `HTTP_Provider`). A single-rule regex missed the
+# second case entirely, silently normalizing `GATEWAYModel` to `gatewaymodel` instead of
+# `gateway_model`, bypassing the exact-match denylist for all-caps-prefixed spellings.
+_CAMEL_CASE_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
 
 
 def _normalize_key(key: Any) -> str:
-    """Fold `provider-model`, `providerModel`, and `provider_model` to the same form."""
+    """Fold `provider-model`, `providerModel`, `ProviderModel`, and `provider_model` (and
+    acronym-prefixed spellings like `GATEWAYModel`) to the same form."""
     text = _CAMEL_CASE_BOUNDARY.sub("_", str(key))
     return text.casefold().replace("-", "_")
 
