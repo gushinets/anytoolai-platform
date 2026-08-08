@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
+from datetime import datetime
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Iterator
@@ -739,6 +740,35 @@ def test_start_then_real_worker_execution_preserves_a12_runtime_correlation(
     for event_row in events:
         if event_row["job_id"] is not None:
             assert event_row["job_id"] == started["job_id"]
+
+    # ANY-217: the API-hand-seeded results tests can drift from what the real worker actually
+    # persists via WorkflowRunner._create_final_artifact. Prove a genuine worker-produced
+    # artifact satisfies every invariant resolve_canonical_workflow_result checks.
+    result_response = asyncio.run(
+        _request(
+            app,
+            "GET",
+            f"/v1/results/{processed.result_artifact_id}",
+            request_id="req_vertical_result",
+        )
+    )
+    assert result_response.status_code == HTTPStatus.OK
+    result_body = result_response.json()
+    assert datetime.fromisoformat(result_body["created_at"]) == result_artifact["created_at"]
+    assert result_body == {
+        "result_artifact_id": processed.result_artifact_id,
+        "scenario_session_id": started["scenario_session_id"],
+        "job_id": started["job_id"],
+        "workflow_id": "kernel_demo.single_action_extract_v1",
+        "workflow_version": 1,
+        "schema_ref": "kernel_demo.extract_output_v1",
+        "schema_version": 1,
+        "created_at": result_body["created_at"],
+        "output": {
+            "title": "Kernel Demo Source Summary",
+            "fields": ["deadline", "budget", "deliverables"],
+        },
+    }
 
 
 def test_get_scenario_session_returns_failed_snapshot(

@@ -41,6 +41,26 @@ class ArtifactRepository:
         )
         return None if row is None else ArtifactRecord(**dict(row))
 
+    def get_in_scope(
+        self,
+        artifact_id: str,
+        *,
+        tenant_id: str,
+        region: str,
+    ) -> ArtifactRecord | None:
+        row = (
+            self._session.execute(
+                sa.select(artifacts_table).where(
+                    artifacts_table.c.id == artifact_id,
+                    artifacts_table.c.tenant_id == tenant_id,
+                    artifacts_table.c.region == region,
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return None if row is None else ArtifactRecord(**dict(row))
+
     def get_latest_for_action_run(self, action_run_id: str) -> ArtifactRecord | None:
         row = (
             self._session.execute(
