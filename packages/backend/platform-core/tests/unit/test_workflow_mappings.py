@@ -168,6 +168,33 @@ def test_resolve_step_input_still_raises_for_optional_source_with_malformed_inte
         )
 
 
+def test_resolve_step_input_omits_optional_source_referencing_a_skipped_step() -> None:
+    # The workflow runner never adds a skipped step's id to step_outputs (SequentialWorkflowRunner
+    # returns before that assignment when a `when` condition is falsy), so an optional mapping
+    # referencing that step's output must be treated as absent, not fail the step.
+    resolved = resolve_step_input(
+        input_mapping={
+            "source_text": "scenario.input.source_text",
+            "value": "?steps.optional_step.output.value",
+        },
+        scenario_input={"source_text": "hello"},
+        step_outputs={},
+        context={},
+    )
+
+    assert resolved == {"source_text": "hello"}
+
+
+def test_resolve_step_input_still_raises_for_required_source_referencing_a_skipped_step() -> None:
+    with pytest.raises(WorkflowMappingResolutionError):
+        resolve_step_input(
+            input_mapping={"value": "steps.optional_step.output.value"},
+            scenario_input={},
+            step_outputs={},
+            context={},
+        )
+
+
 def test_resolve_step_input_still_raises_for_required_missing_source() -> None:
     with pytest.raises(WorkflowMappingResolutionError):
         resolve_step_input(

@@ -150,7 +150,7 @@ def resolve_source_path(
     else:
         assert reference.step_id is not None
         if reference.step_id not in step_outputs:
-            raise WorkflowMappingResolutionError(
+            raise WorkflowSourcePathAbsentError(
                 f"workflow step output not available: {reference.step_id}"
             )
         current = step_outputs[reference.step_id]

@@ -91,7 +91,10 @@ against `{"settings": false}`), that is malformed caller data, not omission, and
 fails loudly even though the target is optional.
 
 Every successful step output is always available to later steps under
-`steps.<step_id>.output`, even when `output_mapping` is empty.
+`steps.<step_id>.output`, even when `output_mapping` is empty. A step's output is never available
+under that path if the step was skipped by `when` — an optional (`?steps.<step_id>.output...`)
+mapping referencing a skipped step's output is tolerated the same as a missing scenario input key;
+a required (non-`?`) mapping referencing it still fails the step.
 
 ## Skip semantics
 
