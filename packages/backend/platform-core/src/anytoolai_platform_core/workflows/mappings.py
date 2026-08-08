@@ -14,18 +14,11 @@ from anytoolai_platform_core.common.literal_source import (
 from anytoolai_platform_core.workflows.errors import (
     WorkflowConditionEvaluationError,
     WorkflowMappingResolutionError,
+    WorkflowSourcePathAbsentError,
     WorkflowStepContractValidationError,
 )
 
 _OPTIONAL_SOURCE_PREFIX = "?"
-
-
-class _WorkflowSourcePathAbsentError(WorkflowMappingResolutionError):
-    """Raised by `_walk_value` only when a path segment key is genuinely missing from its
-    parent mapping -- as opposed to an intermediate value existing with an incompatible
-    (non-mapping) shape. Only this specific case is tolerated by optional (`?`) input_mapping
-    sources; malformed intermediate data must still fail loudly even when the target is
-    optional."""
 
 
 @dataclass(frozen=True)
@@ -75,7 +68,7 @@ def resolve_step_input(
                     step_outputs=step_outputs,
                     context=context,
                 )
-            except _WorkflowSourcePathAbsentError:
+            except WorkflowSourcePathAbsentError:
                 continue
         else:
             value = resolve_source_path(
@@ -312,7 +305,7 @@ def _walk_value(current: Any, path: tuple[str, ...], *, source_path: str) -> Any
                 f"workflow source path could not be resolved: {source_path}"
             )
         if segment not in current:
-            raise _WorkflowSourcePathAbsentError(
+            raise WorkflowSourcePathAbsentError(
                 f"workflow source path could not be resolved: {source_path}"
             )
         current = current[segment]
