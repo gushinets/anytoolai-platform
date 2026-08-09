@@ -114,6 +114,20 @@ class ScenarioSessionResponse(BaseModel):
     result_artifact_id: str | None = None
 
 
+class ResultArtifactResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    result_artifact_id: str
+    scenario_session_id: str
+    job_id: str
+    workflow_id: str
+    workflow_version: int
+    schema_ref: str
+    schema_version: int
+    created_at: datetime
+    output: dict[str, Any]
+
+
 class ErrorDetailResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
