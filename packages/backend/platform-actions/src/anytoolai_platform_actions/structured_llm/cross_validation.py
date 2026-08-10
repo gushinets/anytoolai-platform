@@ -7,6 +7,7 @@ from typing import Any, Mapping
 
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
+from markdown_it import MarkdownIt
 
 _ISO_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -170,26 +171,39 @@ class DetectIssuesByTaxonomyCrossValidator:
                 raise _cross_validation_error(f"category_not_in_taxonomy:{category}")
 
 
-# Allowlisted tag names only: a bare `<[a-zA-Z][^>]*>` also matches non-markup bracketed
-# text like "<Tuesday>" or "<user@example.com>".
+# The complete WHATWG HTML5 element vocabulary: a bare `<[a-zA-Z][^>]*>` also matches
+# non-markup bracketed text like "<Tuesday>" or "<user@example.com>", so tag names are
+# allowlisted — but the list must cover every real element (not just common formatting
+# ones), or a genuine tag like <script>/<kbd> would wrongly pass plain_text/fail html.
 _HTML_TAG_NAMES = (
-    "a|abbr|b|blockquote|br|code|div|em|h[1-6]|hr|i|img|li|ol|p|pre|span|strong|table|td|th|tr|u|ul"
+    "a|abbr|address|area|article|aside|audio|b|base|bdi|bdo|blockquote|body|br|button|"
+    "canvas|caption|cite|code|col|colgroup|data|datalist|dd|del|details|dfn|dialog|div|dl|"
+    "dt|em|embed|fieldset|figcaption|figure|footer|form|h[1-6]|head|header|hgroup|hr|html|"
+    "i|iframe|img|input|ins|kbd|label|legend|li|link|main|map|mark|menu|meta|meter|nav|"
+    "noscript|object|ol|optgroup|option|output|p|param|picture|pre|progress|q|rp|rt|ruby|"
+    "s|samp|script|search|section|select|slot|small|source|span|strong|style|sub|summary|"
+    "sup|table|tbody|td|template|textarea|tfoot|th|thead|time|title|tr|track|u|ul|var|"
+    "video|wbr"
 )
 _HTML_TAG_PATTERN = re.compile(rf"</?(?:{_HTML_TAG_NAMES})\b[^>]*>", re.IGNORECASE)
 
-# Covers the common markdown constructs (bold, paired italic, links, headings). Not
-# exhaustive (tables, code fences, strikethrough go undetected) — a *lone*, unpaired `*`/
-# `_`/`#`/`[` is too common in plain English to blacklist without false-positiving on
-# legitimate plain text (e.g. "5 * 3", "room #4"), so italic emphasis only counts when the
-# asterisks are genuinely paired (CommonMark-style: no whitespace right inside the markers).
-_MARKDOWN_PATTERN = re.compile(
-    r"\*\*[^*\n]+\*\*"                        # **bold**
-    r"|__[^_\n]+__"                            # __bold__
-    r"|(?<!\*)\*(?!\s)[^*\n]+?(?<!\s)\*(?!\*)"  # *italic*
-    r"|\[[^\]\n]+\]\([^)\n]+\)"                # [text](url)
-    r"|^#{1,6}\s",                              # # heading
-    re.MULTILINE,
-)
+# GFM-like (tables, strikethrough) with linkify/raw-HTML passthrough disabled: linkify
+# isn't installed, and raw HTML would reopen the "<Tuesday>" false-positive HTML detection
+# already covers separately. A real parser (not a hand-rolled regex) is the only way to
+# completely cover every CommonMark/GFM construct (tables, code fences, strikethrough,
+# emphasis pairing rules, ...) without an endless game of regex whack-a-mole.
+_MARKDOWN_RENDERER = MarkdownIt("gfm-like")
+_MARKDOWN_RENDERER.options["linkify"] = False
+_MARKDOWN_RENDERER.options["html"] = False
+# Token types a plain paragraph of text (no markdown formatting) produces on its own.
+_PLAIN_TEXT_TOKEN_TYPES = frozenset({"paragraph_open", "paragraph_close", "inline", "text", "softbreak"})
+
+# CommonMark's real emphasis rule allows an unspaced `*` to open/close emphasis intraword
+# (unlike `_`), so a parser alone flags plain arithmetic/dimensions like "2*3*4" as italic.
+# Escaping a `*` sitting directly between two digits makes CommonMark treat it as literal
+# punctuation instead, while leaving every other emphasis case (including letter-adjacent
+# "a*b*c") to the parser's real rules.
+_DIGIT_FLANKED_ASTERISK = re.compile(r"(?<=\d)\*(?=\d)")
 
 
 def _has_html_tag(value: str) -> bool:
@@ -197,7 +211,15 @@ def _has_html_tag(value: str) -> bool:
 
 
 def _has_markdown(value: str) -> bool:
-    return bool(_MARKDOWN_PATTERN.search(value))
+    value = _DIGIT_FLANKED_ASTERISK.sub(r"\*", value)
+    tokens = _MARKDOWN_RENDERER.parse(value)
+    for token in tokens:
+        if token.type not in _PLAIN_TEXT_TOKEN_TYPES:
+            return True
+        for child in token.children or ():
+            if child.type not in _PLAIN_TEXT_TOKEN_TYPES:
+                return True
+    return False
 
 
 def _has_markup(value: str) -> bool:

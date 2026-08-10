@@ -52,6 +52,17 @@ class TestComposeReplyInputSchema:
                 schema=COMPOSE_REPLY_INPUT,
             )
 
+    def test_empty_intent_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={
+                    "situation": "The client asked for a status update.",
+                    "intent": "",
+                    "tone": "neutral",
+                },
+                schema=COMPOSE_REPLY_INPUT,
+            )
+
     def test_unexpected_property_rejected(self) -> None:
         with pytest.raises(ValidationError):
             validate(
@@ -164,3 +175,16 @@ class TestComposeReplyOutputSchema:
     def test_text_exceeding_max_length_rejected(self) -> None:
         with pytest.raises(ValidationError):
             validate(instance={"text": "x" * 4001}, schema=COMPOSE_REPLY_OUTPUT)
+
+    def test_call_to_action_exceeding_max_length_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={"text": "Reply.", "call_to_action": "x" * 201},
+                schema=COMPOSE_REPLY_OUTPUT,
+            )
+
+    def test_call_to_action_at_max_length_allowed(self) -> None:
+        validate(
+            instance={"text": "Reply.", "call_to_action": "x" * 200},
+            schema=COMPOSE_REPLY_OUTPUT,
+        )

@@ -302,13 +302,24 @@ class TestComposeReplyCrossValidator:
             ),
             # Non-markup bracketed text must not be mistaken for HTML.
             ({}, {"text": "Please confirm <Tuesday> works for the call."}),
-            ({}, {"text": "Reach me at <user@example.com>."}),
             # An unpaired asterisk is common casual usage (multiplication, footnotes), not
             # markdown emphasis.
             ({}, {"text": "5 * 3 is 15, not * asterisk footnote."}),
+            # Unspaced arithmetic/dimensions aren't markdown italic either, even though
+            # CommonMark's real intraword-emphasis rule for `*` would otherwise flag them.
+            ({}, {"text": "2*3*4"}),
+            ({}, {"text": "Use 2*4*8 packing."}),
             ({}, {"text": "Plain reply.", "call_to_action": "Book a call."}),
-            # A real but non-allowlisted tag name is out of scope, by design.
-            ({}, {"text": "Use the <kbd>Enter</kbd> key."}),
+            # A real tag anywhere in the HTML5 vocabulary, not just common formatting ones,
+            # satisfies "html".
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "Use the <kbd>Enter</kbd> key."},
+            ),
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "Reply with <script>alert(1)</script>."},
+            ),
         ],
     )
     def test_accepts(self, input_payload: dict, output: dict) -> None:
@@ -333,6 +344,16 @@ class TestComposeReplyCrossValidator:
             ({}, {"text": "# Heading\nBody."}),
             ({}, {"text": "The *actual* deadline is Friday."}),
             ({}, {"text": "Plain reply.", "call_to_action": "**Book** a call."}),
+            # GFM constructs beyond core CommonMark: tables, strikethrough.
+            ({}, {"text": "| a | b |\n|---|---|\n| 1 | 2 |"}),
+            ({}, {"text": "This is ~~struck~~ text."}),
+            # A fenced code block is markup too.
+            ({}, {"text": "```\ncode block\n```"}),
+            # A real but non-formatting tag (e.g. <kbd>) is markup outside the old, narrower
+            # allowlist too.
+            ({}, {"text": "Use the <kbd>Enter</kbd> key."}),
+            # <email@domain> is CommonMark autolink syntax, not just plain bracketed text.
+            ({}, {"text": "Reach me at <user@example.com>."}),
             # Markdown alone doesn't satisfy "html" — it must contain a real tag.
             (
                 {"constraints": {"output_format": "html"}},
