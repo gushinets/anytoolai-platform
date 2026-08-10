@@ -794,8 +794,13 @@ def test_start_then_real_worker_execution_preserves_a12_runtime_correlation(
         "schema_version": 1,
         "created_at": result_body["created_at"],
         "output": {
-            "title": "Kernel Demo Source Summary",
-            "fields": ["deadline", "budget", "deliverables"],
+            "values": {
+                "deadline": "next Friday",
+                "budget": "$5,000",
+                "deliverables": ["logo", "landing page"],
+            },
+            "missing_fields": [],
+            "confidence": {"deadline": 0.9, "budget": 0.8, "deliverables": 0.7},
         },
     }
 

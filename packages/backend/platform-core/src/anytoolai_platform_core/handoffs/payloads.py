@@ -102,7 +102,6 @@ class HandoffPayloadBuilder:
                 "source artifact is not a canonical workflow result"
             ) from exc
         normalized_artifact = canonical.normalized_output
-        assert isinstance(normalized_artifact, dict)
         context_payload = _apply_mapping(
             definition.context_mapping, normalized_artifact, allow_literal=True
         )

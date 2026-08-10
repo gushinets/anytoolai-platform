@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-from typing import Any
-from typing import Annotated
-
-from fastapi import APIRouter, Body, Depends, Header
+from typing import Annotated, Any
 
 from anytoolai_platform_api.dependencies import (
     get_config_registry,
     get_session_factory,
     get_settings,
 )
-from anytoolai_platform_api.errors import ApiError
+from anytoolai_platform_api.errors import ApiError, platform_error_to_api_error
 from anytoolai_platform_api.schemas import (
     ErrorResponse,
     ScenarioNextActionRequest,
@@ -34,6 +31,7 @@ from anytoolai_platform_core.scenarios.repository import (
 from anytoolai_platform_core.scenarios.service import ScenarioRuntimeService, ScenarioSessionService
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 from anytoolai_platform_core.workflows.repository import JobRepository
+from fastapi import APIRouter, Body, Depends, Header
 
 router = APIRouter(tags=["scenario-runtime"])
 
@@ -397,10 +395,8 @@ def _status_code_for_platform_error(error: PlatformError) -> int:
 
 
 def _to_api_error(error: PlatformError) -> ApiError:
-    return ApiError(
-        status_code=_status_code_for_platform_error(error),
-        code=error.code,
-        message=str(error),
+    return platform_error_to_api_error(
+        error, status_code=_status_code_for_platform_error(error)
     )
 
 

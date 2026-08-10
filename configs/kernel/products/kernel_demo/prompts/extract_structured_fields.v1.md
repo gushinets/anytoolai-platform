@@ -13,10 +13,10 @@ Rules:
   if you cannot resolve a concrete calendar date, treat the field as not found and omit it from
   `values` per the missing-field rule below.
 
-- Return one entry per requested field in `values`, keyed by the field's `name`, with a value that
-  matches its declared `type`.
-- If a field's value cannot be found in `source_text`, omit it from `values` and list its `name` in
-  `missing_fields` instead. Never guess or fabricate a value.
+- Each requested field must either have a correctly typed extracted value in `values`, keyed by
+  the field's `name`, or be omitted from `values` and have its `name` listed in `missing_fields`
+  instead. Never guess or fabricate a value — a fabricated placeholder (an empty string, a zero, a
+  made-up date) is not an extracted value, even if it happens to match the declared `type`.
 - If `strict` is `false` (or omitted), return every field you can find and report the rest as
   missing — partial results are a valid success.
 - If `strict` is `true`, every `required` field must be present in `values`; if you cannot find a

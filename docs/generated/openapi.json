@@ -1579,11 +1579,12 @@
                   "created_at": "2026-01-01T00:00:00Z",
                   "job_id": "job_123",
                   "output": {
-                    "fields": [
-                      "one",
+                    "missing_fields": [
                       "two"
                     ],
-                    "title": "Example"
+                    "values": {
+                      "one": "example value"
+                    }
                   },
                   "result_artifact_id": "artifact_123",
                   "scenario_session_id": "scenario_session_123",

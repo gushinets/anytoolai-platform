@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import pytest
+import json
 
+import pytest
 from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
@@ -109,6 +110,23 @@ class TestExtractStructuredFieldsCrossValidator:
                 input_payload={"fields": [_field("budget", "number", required=False)]},
                 output={"values": {"budget": "not a number"}, "missing_fields": []},
             )
+
+    def test_rejects_non_finite_number_from_exponent_overflow(self) -> None:
+        # json.loads("1e309") overflows to float("inf") via ordinary float parsing, not the
+        # NaN/Infinity/-Infinity literal tokens parse_strict_json's parse_constant intercepts, so
+        # this must be caught by the field type check itself, not by JSON parsing.
+        overflowed = json.loads("1e309")
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"fields": [_field("budget", "number", required=False)]},
+                output={"values": {"budget": overflowed}, "missing_fields": []},
+            )
+
+    def test_accepts_large_but_finite_number(self) -> None:
+        self.validator.validate(
+            input_payload={"fields": [_field("budget", "number", required=False)]},
+            output={"values": {"budget": 1e100}, "missing_fields": []},
+        )
 
     def test_accepts_valid_iso_date(self) -> None:
         self.validator.validate(

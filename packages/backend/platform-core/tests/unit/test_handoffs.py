@@ -506,7 +506,15 @@ def test_handoff_context_must_pass_target_workflow_input_schema(
         artifacts = ArtifactRepository(session)
         artifact = artifacts.get(artifact_id)
         assert artifact is not None
-        artifacts.update(replace(artifact, content_json={"title": 123, "fields": []}))
+        # Keep the mapping resolvable (source schema still valid, values.deadline still present)
+        # so the failure genuinely comes from target-schema validation, not from an earlier
+        # source-schema/mapping-resolution failure on an unrelated shape.
+        artifacts.update(
+            replace(
+                artifact,
+                content_json={"values": {"deadline": 123}, "missing_fields": []},
+            )
+        )
 
         with pytest.raises(HandoffSourceInvalidError):
             _create(_service(session, strict_registry), source_id, artifact_id)

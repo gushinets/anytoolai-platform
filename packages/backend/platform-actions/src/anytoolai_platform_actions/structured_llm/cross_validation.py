@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from datetime import date
 from typing import Any, Mapping
@@ -20,9 +21,15 @@ def _is_iso_date_string(value: Any) -> bool:
     return True
 
 
+def _is_finite_number(value: Any) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return not isinstance(value, float) or math.isfinite(value)
+
+
 _FIELD_TYPE_CHECKS: Mapping[str, Any] = {
     "string": lambda value: isinstance(value, str),
-    "number": lambda value: isinstance(value, (int, float)) and not isinstance(value, bool),
+    "number": _is_finite_number,
     "integer": lambda value: isinstance(value, int) and not isinstance(value, bool),
     "boolean": lambda value: isinstance(value, bool),
     "date": _is_iso_date_string,
