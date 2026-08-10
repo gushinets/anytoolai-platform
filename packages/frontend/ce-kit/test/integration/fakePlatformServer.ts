@@ -21,6 +21,26 @@ type StartLedgerEntry = {
   scenarioSessionId: string;
 };
 
+type ResultArtifactRecord = {
+  resultArtifactId: string;
+  scenarioSessionId: string;
+  jobId: string;
+  workflowId: string;
+  workflowVersion: number;
+  schemaRef: string;
+  schemaVersion: number;
+  createdAt: string;
+  output: Record<string, unknown>;
+};
+
+/**
+ * Sentinel ids `GET /v1/results/:id` recognizes without a linked completed session, so tests can
+ * exercise the safe-error and malformed-body edge cases directly instead of driving a full session
+ * to completion for each one.
+ */
+const RESULT_ARTIFACT_UNAVAILABLE_ID = "artifact_unavailable";
+const RESULT_ARTIFACT_MALFORMED_ID = "artifact_malformed";
+
 export type FakePlatformServerOptions = {
   quotaLimit?: number;
   /** How many poll GETs before the session flips from "running" to "completed". */
@@ -37,6 +57,7 @@ export function createFakePlatformServer(options: FakePlatformServerOptions = {}
   const startLedger = new Map<string, StartLedgerEntry>(); // keyed by idempotencyKey
   const sessions = new Map<string, ScenarioSessionRecord>();
   const pollCounts = new Map<string, number>();
+  const resultArtifacts = new Map<string, ResultArtifactRecord>(); // keyed by resultArtifactId
 
   function jsonResponse(status: number, body: unknown): Response {
     return new Response(JSON.stringify(body), {
@@ -155,9 +176,42 @@ export function createFakePlatformServer(options: FakePlatformServerOptions = {}
         session.status = "completed";
         session.currentCheckpointId = "result_ready";
         session.allowedNextActions = ["copy_result"];
-        session.resultArtifactId = "artifact_1";
+        const resultArtifactId = `artifact_${scenarioSessionId.replace(/^scenario_session_/, "")}`;
+        session.resultArtifactId = resultArtifactId;
+        resultArtifacts.set(resultArtifactId, {
+          resultArtifactId,
+          scenarioSessionId: session.scenarioSessionId,
+          jobId: session.jobId,
+          workflowId: "kernel_demo.single_action_extract_v1",
+          workflowVersion: 1,
+          schemaRef: "kernel_demo.extract_output_v1",
+          schemaVersion: 1,
+          createdAt: "2026-01-01T00:00:00Z",
+          output: { title: "Example", fields: ["one", "two"] },
+        });
       }
       return jsonResponse(200, _sessionPayload(session));
+    }
+
+    const resultMatch = path.match(/^\/v1\/results\/([^/]+)$/);
+    if (method === "GET" && resultMatch) {
+      const resultArtifactId = decodeURIComponent(resultMatch[1]);
+      if (resultArtifactId === RESULT_ARTIFACT_UNAVAILABLE_ID) {
+        return errorResponse(
+          404,
+          "result_artifact_unavailable",
+          "Result artifact is not available.",
+        );
+      }
+      if (resultArtifactId === RESULT_ARTIFACT_MALFORMED_ID) {
+        // Missing every field but result_artifact_id -- exercises invalid_response mapping.
+        return jsonResponse(200, { result_artifact_id: resultArtifactId });
+      }
+      const artifact = resultArtifacts.get(resultArtifactId);
+      if (!artifact) {
+        return errorResponse(404, "result_artifact_not_found", "Result artifact not found.");
+      }
+      return jsonResponse(200, _resultPayload(artifact));
     }
 
     return jsonResponse(500, { error: { code: "unhandled_route", message: `${method} ${path}`, request_id: "req_unhandled" } });
@@ -175,6 +229,20 @@ export function createFakePlatformServer(options: FakePlatformServerOptions = {}
 
   function _sessionPayload(session: ScenarioSessionRecord) {
     return { ..._startPayload(session), current_checkpoint_id: session.currentCheckpointId };
+  }
+
+  function _resultPayload(artifact: ResultArtifactRecord) {
+    return {
+      result_artifact_id: artifact.resultArtifactId,
+      scenario_session_id: artifact.scenarioSessionId,
+      job_id: artifact.jobId,
+      workflow_id: artifact.workflowId,
+      workflow_version: artifact.workflowVersion,
+      schema_ref: artifact.schemaRef,
+      schema_version: artifact.schemaVersion,
+      created_at: artifact.createdAt,
+      output: artifact.output,
+    };
   }
 
   return {

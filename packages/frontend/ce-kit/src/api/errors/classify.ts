@@ -12,6 +12,8 @@ export const BACKEND_ERROR_CODE = {
   scenarioCheckpointNotActionable: "scenario_checkpoint_not_actionable",
   scenarioNextActionNotAllowed: "scenario_next_action_not_allowed",
   quotaExhausted: "quota_exhausted",
+  resultArtifactNotFound: "result_artifact_not_found",
+  resultArtifactUnavailable: "result_artifact_unavailable",
 } as const;
 
 function _isBackendErrorWithCode(
@@ -41,4 +43,18 @@ export function isScenarioActionConflict(error: PlatformApiError): boolean {
 /** True only for the 429 that means the guest has no quota left; no session/job was created. */
 export function isQuotaExhausted(error: PlatformApiError): boolean {
   return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.quotaExhausted);
+}
+
+/** True only for the 404 that means the result artifact id is unknown, or out of tenant/region scope. */
+export function isResultNotFound(error: PlatformApiError): boolean {
+  return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.resultArtifactNotFound);
+}
+
+/**
+ * True only for the 404 that means the id is a real artifact but not an available canonical
+ * frontend-safe result (raw/debug artifact, unfinished job, or a schema/version mismatch) --
+ * distinct from `isResultNotFound()` even though both surface as HTTP 404.
+ */
+export function isResultUnavailable(error: PlatformApiError): boolean {
+  return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.resultArtifactUnavailable);
 }

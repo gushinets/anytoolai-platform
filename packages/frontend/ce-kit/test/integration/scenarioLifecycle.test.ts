@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { PlatformApiClient } from "../../src/api/client";
+import { isResultNotFound, isResultUnavailable } from "../../src/api/errors/classify";
 import { getQuota } from "../../src/quota/getQuota";
+import { getResult } from "../../src/results/getResult";
 import { getScenarioSession } from "../../src/scenarios/getScenarioSession";
 import { pollScenarioSession } from "../../src/scenarios/pollScenarioSession";
 import { prepareScenarioStart } from "../../src/scenarios/prepareScenarioStart";
@@ -84,6 +86,45 @@ describe("scenario lifecycle integration (create guest -> quota -> keyed start -
     // Polling never mutated quota -- only the two prior scenario starts did.
     const quotaAfterPoll = await getQuota(client, { productId: "kernel_demo", guestId: identity.guestId });
     expect(quotaAfterPoll).toMatchObject({ ok: true, value: { usedCount: 2 } });
+
+    // The terminal snapshot's resultArtifactId feeds straight into getResult() -- CE-kit callers
+    // never construct this id themselves.
+    const resultArtifactId = polled.result.ok ? polled.result.value.resultArtifactId : null;
+    expect(resultArtifactId).not.toBeNull();
+    const result = await getResult(client, resultArtifactId as string);
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        resultArtifactId,
+        scenarioSessionId: firstAttempt.value.scenarioSessionId,
+        jobId: firstAttempt.value.jobId,
+        workflowId: "kernel_demo.single_action_extract_v1",
+        output: { title: "Example", fields: ["one", "two"] },
+      },
+    });
+  });
+
+  it("returns safe not_found/unavailable/invalid_response results for the result artifact edge cases", async () => {
+    const server = createFakePlatformServer();
+    const client = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl: server.fetchImpl });
+
+    const notFound = await getResult(client, "artifact_never_existed");
+    expect(notFound.ok).toBe(false);
+    expect(!notFound.ok && isResultNotFound(notFound.error)).toBe(true);
+
+    const unavailable = await getResult(client, "artifact_unavailable");
+    expect(unavailable.ok).toBe(false);
+    expect(!unavailable.ok && isResultUnavailable(unavailable.error)).toBe(true);
+
+    const malformed = await getResult(client, "artifact_malformed");
+    expect(malformed).toEqual({
+      ok: false,
+      error: {
+        type: "invalid_response",
+        status: 200,
+        message: "Result artifact response was invalid.",
+      },
+    });
   });
 
   it("surfaces 429 quota_exhausted with no fake session/job once quota runs out", async () => {

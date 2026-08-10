@@ -32,9 +32,9 @@ MVP-A2 Client Surfaces owns shared `ce-kit`, web mirror, and shared browser jour
 Chrome Extensions remain in Freelancer Suite and must consume CE-kit rather than copy transport,
 storage, identity, quota, polling, result, or handoff code. MVP-A1 has no frontend dependency.
 
-After A13/A15 (ANY-8, ANY-170/ANY-171), `createGuestIdentity()`, `getQuota()`, `startScenario()`
-(via `prepareScenarioStart()`), `getScenarioSession()`, `pollScenarioSession()`, and `nextAction()`
-are real CE-kit helpers backed by `PlatformApiClient`.
+After A13/A15 (ANY-8, ANY-170/ANY-171/ANY-226), `createGuestIdentity()`, `getQuota()`,
+`startScenario()` (via `prepareScenarioStart()`), `getScenarioSession()`, `pollScenarioSession()`,
+`nextAction()`, and `getResult()` are real CE-kit helpers backed by `PlatformApiClient`.
 
 Required `ce-kit` capabilities:
 
@@ -60,7 +60,9 @@ A15 ownership and delivery slices:
   safe errors, cancellation, and OpenAPI drift foundation;
 - A15b / ANY-171 delivered real quota HTTP calls, idempotent scenario start, bounded session polling,
   next actions, typed `429 quota_exhausted` handling, and CE integration tests;
-- A15c / ANY-226 owns `getResult()` over the Platform Core frontend-safe result API;
+- A15c / ANY-226 delivered `getResult()` over the Platform Core frontend-safe result API (A12b /
+  ANY-217), with typed `result_artifact_not_found` / `result_artifact_unavailable` handling via
+  `isResultNotFound()` / `isResultUnavailable()`;
 - A18 owns shared client handoff helpers and web consent; product-specific handoff routes remain in
   Freelancer Suite.
 
