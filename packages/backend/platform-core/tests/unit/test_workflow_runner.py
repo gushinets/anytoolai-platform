@@ -1020,7 +1020,9 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
             "extract": {"values": {"deadline": "Q1", "budget": "5000"}, "missing_fields": []},
             "detect_issues": {"issues": [{"category": "timeline", "description": "Timeline risk", "severity": "high"}]},
             "generate_report": {
-                "headline": "Report",
+                "sections": [
+                    {"id": "overview", "title": "Overview", "content": "Structured workflow complete"}
+                ],
                 "summary": "Structured workflow complete",
             },
         }
@@ -1061,15 +1063,20 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
         "taxonomy": ["timeline", "scope"],
     }
     assert executor.inputs_by_step["generate_report"][0] == {
-        "source_text": "deadline budget deliverables",
-        "extracted": {"values": {"deadline": "Q1", "budget": "5000"}, "missing_fields": []},
-        "issues": {"issues": [{"category": "timeline", "description": "Timeline risk", "severity": "high"}]},
+        "template_ref": "kernel_demo.report_v1",
+        "data": {
+            "source_text": "deadline budget deliverables",
+            "extracted": {"values": {"deadline": "Q1", "budget": "5000"}, "missing_fields": []},
+            "issues": {"issues": [{"category": "timeline", "description": "Timeline risk", "severity": "high"}]},
+        },
     }
     assert [row["step_id"] for row in action_runs] == ["extract", "detect_issues", "generate_report"]
     assert all(row["status"].value == "succeeded" for row in action_runs)
     assert len(artifacts) == 1
     assert result.output_payload == {
-        "headline": "Report",
+        "sections": [
+            {"id": "overview", "title": "Overview", "content": "Structured workflow complete"}
+        ],
         "summary": "Structured workflow complete",
     }
     assert job["metadata"]["workflow_state"]["context"]["workflow_output"] == result.output_payload
