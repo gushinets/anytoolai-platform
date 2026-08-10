@@ -4,6 +4,7 @@ import json
 
 import pytest
 from anytoolai_platform_actions.structured_llm.cross_validation import (
+    ComposeReplyCrossValidator,
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
@@ -275,3 +276,63 @@ class TestDetectIssuesByTaxonomyCrossValidator:
             input_payload={"taxonomy": ["timeline"]},
             output={"issues": []},
         )
+
+
+class TestComposeReplyCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = ComposeReplyCrossValidator()
+
+    @pytest.mark.parametrize(
+        ("input_payload", "output"),
+        [
+            ({}, {"text": "Plain reply."}),
+            ({"constraints": {"max_length": 20}}, {"text": "Short reply."}),
+            (
+                {"constraints": {"max_length": True}},
+                {"text": "This reply is longer than one character."},
+            ),
+            ({"constraints": {"output_format": "plain_text"}}, {"text": "Plain reply."}),
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "Reply with <b>markup</b>."},
+            ),
+            (
+                {"constraints": {"output_format": "markdown"}},
+                {"text": "**Bold** reply with *markdown* markers."},
+            ),
+            # Non-markup bracketed text must not be mistaken for HTML.
+            ({}, {"text": "Please confirm <Tuesday> works for the call."}),
+            ({}, {"text": "Reach me at <user@example.com>."}),
+            # A single asterisk is common casual emphasis, not markdown bold.
+            ({}, {"text": "The *actual* deadline is Friday."}),
+            ({}, {"text": "Plain reply.", "call_to_action": "Book a call."}),
+        ],
+    )
+    def test_accepts(self, input_payload: dict, output: dict) -> None:
+        self.validator.validate(input_payload=input_payload, output=output)
+
+    @pytest.mark.parametrize(
+        ("input_payload", "output"),
+        [
+            ({"constraints": {"max_length": 5}}, {"text": "This reply is too long."}),
+            (
+                {"constraints": {"output_format": "plain_text"}},
+                {"text": "Reply with <b>markup</b>."},
+            ),
+            ({"constraints": {}}, {"text": "Reply with <b>markup</b>."}),
+            ({}, {"text": "Reply with <b>markup</b>."}),
+            # A lone closing tag is still markup.
+            ({}, {"text": "Thanks for your patience.</p>"}),
+            ({"constraints": {"output_format": "html"}}, {"text": "Plain reply."}),
+            # Markdown syntax is markup too, not just HTML tags.
+            ({}, {"text": "Reply with **bold** text."}),
+            ({}, {"text": "See [details](https://example.com)."}),
+            ({}, {"text": "# Heading\nBody."}),
+            ({}, {"text": "Plain reply.", "call_to_action": "**Book** a call."}),
+            ({}, None),
+            ({}, {"text": 123}),
+        ],
+    )
+    def test_rejects(self, input_payload: dict, output: dict | None) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(input_payload=input_payload, output=output)

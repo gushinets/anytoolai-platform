@@ -42,6 +42,7 @@ from anytoolai_platform_core.structured_output.errors import (
     StructuredOutputValidationError,
 )
 from anytoolai_platform_actions.structured_llm.cross_validation import (
+    ComposeReplyCrossValidator,
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
 )
@@ -70,8 +71,11 @@ def session_factory() -> Iterator[sa.orm.sessionmaker[sa.orm.Session]]:
         yield build_session_factory(engine)
 
 
-class SpyGateway:
-    def __init__(self) -> None:
+class _FixedResponseSpyGateway:
+    """Every request receives the same output_text."""
+
+    def __init__(self, output_text: str) -> None:
+        self._output_text = output_text
         self.requests = []
         self.sessions = []
 
@@ -82,121 +86,32 @@ class SpyGateway:
             provider_policy_ref=request.provider_policy_ref,
             provider="fake",
             model="fake-json-v1",
-            output_text='{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": []}',
+            output_text=self._output_text,
             status=ProviderCallStatus.succeeded,
         )
 
 
-class ValidationRetrySpyGateway:
-    def __init__(self) -> None:
+class _TwoAttemptSpyGateway:
+    """The first request receives first_output_text; every later request receives
+    second_output_text."""
+
+    def __init__(self, first_output_text: str, second_output_text: str) -> None:
+        self._first_output_text = first_output_text
+        self._second_output_text = second_output_text
         self.requests = []
         self.sessions = []
 
     async def request(self, request, *, session):
         self.requests.append(request)
         self.sessions.append(session)
-        if len(self.requests) == 1:
-            return ProviderResponse(
-                provider_policy_ref=request.provider_policy_ref,
-                provider="fake",
-                model="fake-json-v1",
-                output_text="not-json",
-                status=ProviderCallStatus.succeeded,
-            )
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text='{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": []}',
-            status=ProviderCallStatus.succeeded,
+        output_text = (
+            self._first_output_text if len(self.requests) == 1 else self._second_output_text
         )
-
-
-class CrossValidationRetrySpyGateway:
-    """First reply violates the A04 taxonomy cross-validation rule; second is valid."""
-
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        if len(self.requests) == 1:
-            output_text = (
-                '{"issues": [{"category": "not_in_taxonomy", '
-                '"description": "d", "severity": "high"}]}'
-            )
-        else:
-            output_text = (
-                '{"issues": [{"category": "timeline", '
-                '"description": "d", "severity": "high"}]}'
-            )
         return ProviderResponse(
             provider_policy_ref=request.provider_policy_ref,
             provider="fake",
             model="fake-json-v1",
             output_text=output_text,
-            status=ProviderCallStatus.succeeded,
-        )
-
-
-class CrossValidationAlwaysFailingSpyGateway:
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text=(
-                '{"issues": [{"category": "not_in_taxonomy", '
-                '"description": "d", "severity": "high"}]}'
-            ),
-            status=ProviderCallStatus.succeeded,
-        )
-
-
-class InvalidThenValidDateSpyGateway:
-    """First reply uses a non-ISO date string; second uses a valid ISO date."""
-
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        if len(self.requests) == 1:
-            output_text = '{"values": {"deadline": "next Friday"}, "missing_fields": []}'
-        else:
-            output_text = '{"values": {"deadline": "2026-08-14"}, "missing_fields": []}'
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text=output_text,
-            status=ProviderCallStatus.succeeded,
-        )
-
-
-class ExhaustedValidationSpyGateway:
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text="not-json",
             status=ProviderCallStatus.succeeded,
         )
 
@@ -229,7 +144,9 @@ def test_platform_actions_package_declares_runtime_dependencies() -> None:
 
 def test_structured_llm_executor_routes_calls_through_provider_gateway() -> None:
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = SpyGateway()
+    spy_gateway = _FixedResponseSpyGateway(
+        '{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": []}'
+    )
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
         provider_gateway=spy_gateway,
@@ -283,7 +200,10 @@ def test_structured_llm_executor_routes_calls_through_provider_gateway() -> None
 
 def test_structured_llm_executor_owns_validation_retries_through_gateway_dtos() -> None:
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = ValidationRetrySpyGateway()
+    spy_gateway = _TwoAttemptSpyGateway(
+        "not-json",
+        '{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": []}',
+    )
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
         provider_gateway=spy_gateway,
@@ -333,11 +253,75 @@ def test_structured_llm_executor_owns_validation_retries_through_gateway_dtos() 
     }
 
 
+def test_structured_llm_executor_retries_compose_reply_on_cross_validation_failure() -> None:
+    """A07: caller-supplied constraints.max_length is enforced via cross-validation (the
+    static output schema only bounds text to a fixed maxLength, not the per-call limit), and
+    a violation must get the same semantic retry as a static schema mismatch."""
+    registry = build_config_registry(CONFIG_ROOT)
+    spy_gateway = _TwoAttemptSpyGateway(
+        '{"text": "This reply is far longer than the ten character limit."}',
+        '{"text": "Short."}',
+    )
+    executor = StructuredLlmActionExecutor(
+        config_registry=registry,
+        provider_gateway=spy_gateway,
+        output_cross_validators={
+            "text.compose_reply": ComposeReplyCrossValidator(),
+        },
+    )
+    base_policy = registry.get_provider_policy("default_fake_provider_v1")
+    assert base_policy is not None
+    executor._require_provider_policy = lambda _provider_policy_ref: replace(
+        base_policy,
+        retry_policy=replace(
+            base_policy.retry_policy,
+            validation=ProviderValidationRetryPolicy(
+                owner=base_policy.retry_policy.validation.owner,
+                max_attempts=2,
+            ),
+        ),
+    )
+    request = StructuredLlmActionRequest(
+        tenant_id="tenant_demo",
+        region="eu-central",
+        product_id="kernel_demo",
+        frontend_id="kernel_demo_ce",
+        scenario_session_id="scenario_session_demo",
+        job_id="job_demo",
+        workflow_id="kernel_demo.compose_reply_v1",
+        workflow_version=1,
+        step_id="compose_reply",
+        action_run_id="action_run_demo",
+        action_type="text.compose_reply",
+        action_config_id="kernel_demo.compose_reply_v1",
+        input_payload={
+            "situation": "The client asked for a status update on the project.",
+            "intent": "Reassure the client and confirm the new delivery date.",
+            "tone": "warm",
+            "constraints": {"max_length": 10},
+        },
+    )
+    session = object()
+
+    response = asyncio.run(executor.execute(request, session=session))
+
+    assert response.structured_output == {"text": "Short."}
+    assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
+        1,
+        2,
+    ]
+
+
 def test_structured_llm_executor_retries_on_cross_validation_failure() -> None:
     """ANY-251 regression: cross-validation failures must get the same semantic
     retries as static schema mismatches, not just a single unretried check."""
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = CrossValidationRetrySpyGateway()
+    spy_gateway = _TwoAttemptSpyGateway(
+        '{"issues": [{"category": "not_in_taxonomy", '
+        '"description": "d", "severity": "high"}]}',
+        '{"issues": [{"category": "timeline", '
+        '"description": "d", "severity": "high"}]}',
+    )
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
         provider_gateway=spy_gateway,
@@ -390,7 +374,10 @@ def test_structured_llm_executor_retries_on_invalid_date_with_actionable_feedbac
     the retry prompt must carry the specific field-level reason (not just the generic safe
     message), so the model can self-correct."""
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = InvalidThenValidDateSpyGateway()
+    spy_gateway = _TwoAttemptSpyGateway(
+        '{"values": {"deadline": "next Friday"}, "missing_fields": []}',
+        '{"values": {"deadline": "2026-08-14"}, "missing_fields": []}',
+    )
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
         provider_gateway=spy_gateway,
@@ -467,7 +454,10 @@ def test_structured_llm_executor_finalize_cross_validation_uses_resolved_action_
     validator resolved from the action config, not silently skip it and let an already-exhausted,
     taxonomy-violating response be accepted as a successful final output."""
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = CrossValidationAlwaysFailingSpyGateway()
+    spy_gateway = _FixedResponseSpyGateway(
+        '{"issues": [{"category": "not_in_taxonomy", '
+        '"description": "d", "severity": "high"}]}'
+    )
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
         provider_gateway=spy_gateway,
@@ -501,7 +491,10 @@ def test_structured_llm_executor_raises_safe_error_when_cross_validation_never_p
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = CrossValidationAlwaysFailingSpyGateway()
+    spy_gateway = _FixedResponseSpyGateway(
+        '{"issues": [{"category": "not_in_taxonomy", '
+        '"description": "d", "severity": "high"}]}'
+    )
     base_policy = registry.get_provider_policy("default_fake_provider_v1")
     assert base_policy is not None
     with transaction_boundary(session_factory) as session:
@@ -582,7 +575,9 @@ def test_structured_llm_executor_finalizes_and_persists_structured_artifact(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = SpyGateway()
+    spy_gateway = _FixedResponseSpyGateway(
+        '{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": []}'
+    )
     with transaction_boundary(session_factory) as session:
         artifact_service = ArtifactService(
             ArtifactRepository(session),
@@ -661,7 +656,9 @@ def test_structured_llm_executor_skips_schema_less_finalization_with_artifact_se
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = SpyGateway()
+    spy_gateway = _FixedResponseSpyGateway(
+        '{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": []}'
+    )
     with transaction_boundary(session_factory) as session:
         artifact_service = ArtifactService(
             ArtifactRepository(session),
@@ -707,7 +704,7 @@ def test_structured_llm_executor_raises_safe_error_and_persists_debug_artifact_a
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = ExhaustedValidationSpyGateway()
+    spy_gateway = _FixedResponseSpyGateway("not-json")
     base_policy = registry.get_provider_policy("default_fake_provider_v1")
     assert base_policy is not None
     with transaction_boundary(session_factory) as session:

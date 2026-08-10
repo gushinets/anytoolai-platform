@@ -168,3 +168,74 @@ class DetectIssuesByTaxonomyCrossValidator:
             category = issue.get("category")
             if category not in allowed_categories:
                 raise _cross_validation_error(f"category_not_in_taxonomy:{category}")
+
+
+# Allowlisted tag names only: a bare `<[a-zA-Z][^>]*>` also matches non-markup bracketed
+# text like "<Tuesday>" or "<user@example.com>".
+_HTML_TAG_NAMES = (
+    "a|abbr|b|blockquote|br|code|div|em|h[1-6]|hr|i|img|li|ol|p|pre|span|strong|table|td|th|tr|u|ul"
+)
+_HTML_TAG_PATTERN = re.compile(rf"</?(?:{_HTML_TAG_NAMES})\b[^>]*>", re.IGNORECASE)
+
+# Covers the common markdown constructs (bold, links, headings). Not exhaustive (italics,
+# tables, code fences, strikethrough go undetected) — single `*`/`_`/`#`/`[` are too common
+# in plain English to blacklist without false-positiving on legitimate plain text.
+_MARKDOWN_PATTERN = re.compile(
+    r"\*\*[^*\n]+\*\*"          # **bold**
+    r"|__[^_\n]+__"              # __bold__
+    r"|\[[^\]\n]+\]\([^)\n]+\)"  # [text](url)
+    r"|^#{1,6}\s",               # # heading
+    re.MULTILINE,
+)
+
+
+def _has_markup(value: str) -> bool:
+    return bool(_HTML_TAG_PATTERN.search(value) or _MARKDOWN_PATTERN.search(value))
+
+
+class ComposeReplyCrossValidator:
+    """Validates A07 output.text against the caller-supplied input.constraints
+    (max_length, output_format) that the static output schema cannot express because they
+    vary per call."""
+
+    def validate(
+        self,
+        *,
+        input_payload: Mapping[str, Any],
+        output: Mapping[str, Any] | None,
+    ) -> None:
+        if output is None:
+            raise _cross_validation_error("missing_output")
+        text = output.get("text")
+        if not isinstance(text, str):
+            raise _cross_validation_error("malformed_compose_reply_output")
+        call_to_action = output.get("call_to_action")
+        constraints = input_payload.get("constraints")
+        constraints = constraints if isinstance(constraints, Mapping) else {}
+
+        max_length = constraints.get("max_length")
+        if (
+            isinstance(max_length, int)
+            and not isinstance(max_length, bool)
+            and len(text) > max_length
+        ):
+            raise _cross_validation_error(
+                f"text_exceeds_constraints_max_length:{len(text)}>{max_length}"
+            )
+
+        # Prompt contract: "if it is plain_text or omitted, text must contain no markup".
+        output_format = constraints.get("output_format")
+        if output_format in (None, "plain_text") and _has_markup(text):
+            raise _cross_validation_error("text_contains_markup_for_plain_text_format")
+        # Only the main body is required to *prove* html-ness; a short call_to_action
+        # (e.g. "Book a call") is plausibly plain text even inside an HTML-formatted reply.
+        if output_format == "html" and not _has_markup(text):
+            raise _cross_validation_error("text_missing_markup_for_html_format")
+        if (
+            output_format in (None, "plain_text")
+            and isinstance(call_to_action, str)
+            and _has_markup(call_to_action)
+        ):
+            raise _cross_validation_error(
+                "call_to_action_contains_markup_for_plain_text_format"
+            )

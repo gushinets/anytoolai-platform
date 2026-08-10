@@ -1,4 +1,38 @@
 {
   "type": "object",
-  "additionalProperties": true
+  "properties": {
+    "situation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tone": {
+      "type": "string",
+      "enum": ["neutral", "warm", "firm"]
+    },
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+        },
+        "max_length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "output_format": {
+          "type": "string",
+          "enum": ["plain_text", "markdown", "html"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["situation", "intent", "tone"],
+  "additionalProperties": false
 }
