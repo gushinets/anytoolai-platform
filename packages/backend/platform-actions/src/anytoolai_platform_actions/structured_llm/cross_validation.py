@@ -171,55 +171,59 @@ class DetectIssuesByTaxonomyCrossValidator:
                 raise _cross_validation_error(f"category_not_in_taxonomy:{category}")
 
 
-# The complete WHATWG HTML5 element vocabulary: a bare `<[a-zA-Z][^>]*>` also matches
-# non-markup bracketed text like "<Tuesday>" or "<user@example.com>", so tag names are
-# allowlisted — but the list must cover every real element (not just common formatting
-# ones), or a genuine tag like <script>/<kbd> would wrongly pass plain_text/fail html.
-_HTML_TAG_NAMES = (
-    "a|abbr|address|area|article|aside|audio|b|base|bdi|bdo|blockquote|body|br|button|"
-    "canvas|caption|cite|code|col|colgroup|data|datalist|dd|del|details|dfn|dialog|div|dl|"
-    "dt|em|embed|fieldset|figcaption|figure|footer|form|h[1-6]|head|header|hgroup|hr|html|"
-    "i|iframe|img|input|ins|kbd|label|legend|li|link|main|map|mark|menu|meta|meter|nav|"
-    "noscript|object|ol|optgroup|option|output|p|param|picture|pre|progress|q|rp|rt|ruby|"
-    "s|samp|script|search|section|select|slot|small|source|span|strong|style|sub|summary|"
-    "sup|table|tbody|td|template|textarea|tfoot|th|thead|time|title|tr|track|u|ul|var|"
-    "video|wbr"
-)
-_HTML_TAG_PATTERN = re.compile(rf"</?(?:{_HTML_TAG_NAMES})\b[^>]*>", re.IGNORECASE)
+# A hand-rolled tag-name allowlist keeps missing real constructs (svg/math, custom
+# elements like <x-card>, comments, doctypes) no matter how many names get added, and a
+# bare `<[a-zA-Z][^>]*>` regex over-matches non-markup bracketed text like "<Tuesday>". A
+# real HTML tokenizer resolves both: markdown-it-py's `html_inline`/`html_block` rules
+# recognize every HTML5 construct (tags of any name, comments, doctypes, CDATA, ...) by
+# parsing the actual grammar, not by enumerating known names.
+_HTML_RENDERER = MarkdownIt("gfm-like")
+_HTML_RENDERER.options["linkify"] = False
+_HTML_RENDERER.options["html"] = True
 
-# GFM-like (tables, strikethrough) with linkify/raw-HTML passthrough disabled: linkify
-# isn't installed, and raw HTML would reopen the "<Tuesday>" false-positive HTML detection
-# already covers separately. A real parser (not a hand-rolled regex) is the only way to
-# completely cover every CommonMark/GFM construct (tables, code fences, strikethrough,
-# emphasis pairing rules, ...) without an endless game of regex whack-a-mole.
+# With `html` disabled, raw "<...>" is inert (never a markup signal here — _has_html_tag
+# covers it separately), so only genuine CommonMark/GFM syntax (bold, tables, code fences,
+# strikethrough, emphasis pairing rules, ...) is left to detect, all by the same real
+# parser instead of a growing pile of regexes.
 _MARKDOWN_RENDERER = MarkdownIt("gfm-like")
 _MARKDOWN_RENDERER.options["linkify"] = False
 _MARKDOWN_RENDERER.options["html"] = False
-# Token types a plain paragraph of text (no markdown formatting) produces on its own.
+
+# Token types a plain paragraph of text (no formatting) produces on its own.
 _PLAIN_TEXT_TOKEN_TYPES = frozenset({"paragraph_open", "paragraph_close", "inline", "text", "softbreak"})
 
 # CommonMark's real emphasis rule allows an unspaced `*` to open/close emphasis intraword
-# (unlike `_`), so a parser alone flags plain arithmetic/dimensions like "2*3*4" as italic.
-# Escaping a `*` sitting directly between two digits makes CommonMark treat it as literal
-# punctuation instead, while leaving every other emphasis case (including letter-adjacent
-# "a*b*c") to the parser's real rules.
-_DIGIT_FLANKED_ASTERISK = re.compile(r"(?<=\d)\*(?=\d)")
+# (unlike `_`), so a parser alone flags plain arithmetic/dimension expressions - numeric
+# ("2*3*4"), variable ("a*b*c", "2*x*4"), or symbolic ("L*W*H") - as italic. Escaping a `*`
+# sitting directly between two alphanumeric characters makes CommonMark treat it as literal
+# punctuation instead, while leaving whitespace/punctuation-flanked emphasis (e.g.
+# "*actual*") to the parser's real rules.
+_ALNUM_FLANKED_ASTERISK = re.compile(r"(?<=[A-Za-z0-9])\*(?=[A-Za-z0-9])")
+
+
+def _flatten_token_types(tokens: Any) -> Any:
+    for token in tokens:
+        yield token.type
+        for child in token.children or ():
+            yield child.type
 
 
 def _has_html_tag(value: str) -> bool:
-    return bool(_HTML_TAG_PATTERN.search(value))
+    # html_inline/html_block are the only token types the "html"-enabled parser adds on
+    # top of the plain/markdown ones, so this is unaffected by any markdown syntax also
+    # present in the same text.
+    return any(
+        token_type.startswith("html_")
+        for token_type in _flatten_token_types(_HTML_RENDERER.parse(value))
+    )
 
 
 def _has_markdown(value: str) -> bool:
-    value = _DIGIT_FLANKED_ASTERISK.sub(r"\*", value)
-    tokens = _MARKDOWN_RENDERER.parse(value)
-    for token in tokens:
-        if token.type not in _PLAIN_TEXT_TOKEN_TYPES:
-            return True
-        for child in token.children or ():
-            if child.type not in _PLAIN_TEXT_TOKEN_TYPES:
-                return True
-    return False
+    value = _ALNUM_FLANKED_ASTERISK.sub(r"\*", value)
+    return any(
+        token_type not in _PLAIN_TEXT_TOKEN_TYPES
+        for token_type in _flatten_token_types(_MARKDOWN_RENDERER.parse(value))
+    )
 
 
 def _has_markup(value: str) -> bool:
