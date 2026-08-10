@@ -5,17 +5,18 @@
 - State: active
 - Owner: agent
 - Created: 2026-08-07
-- Last updated: 2026-08-07
-- Review date: 2026-08-07
+- Last updated: 2026-08-10
+- Review date: 2026-08-10
 - Next action: push `feature/ANY-8` and open a PR; update Linear status once merged.
 - Blocker: none
 
 ## Goal
 
-ANY-8 is the coordinating parent for A15a (ANY-170, merged in PR #49) and A15b (ANY-171, merged in
-PR #52). Both were already complete on `main` at session start. This plan covers the closeout work
-only: a line-by-line DoD/AC audit of the parent ticket and both children against the merged code,
-and fixing the one real gap the audit found.
+ANY-8 is the coordinating parent for A15a (ANY-170, merged in PR #49), A15b (ANY-171, merged in
+PR #52), and A15c (ANY-226, merged in PR #62 on 2026-08-10, after this plan was first written). All
+three are now complete on `main`. This plan covers the closeout work only: a line-by-line DoD/AC
+audit of the parent ticket and all three children against the merged code, and fixing the one real
+gap the audit found.
 
 ## Scope
 
@@ -43,8 +44,10 @@ and fixing the one real gap the audit found.
 
 ### Out of scope
 
-- Any new capability implementation (`getResult()`/A15c/ANY-226, handoff helpers/A18, email
-  capture/ANY-36, client-event ingestion) -- all separate tickets per ANY-8's own Deferred section.
+- Any new capability implementation (handoff helpers/A18, email capture/ANY-36, client-event
+  ingestion) -- all separate tickets per ANY-8's own Deferred section. `getResult()`/A15c/ANY-226
+  was merged separately (PR #62) and is already real on `main`; this plan only needed to fold that
+  fact into the README and this doc, since both predated it.
 - `renderQuotaState()`, `renderJobStatus()`, `renderError()` -- pure formatting helpers with no
   backend call to fake, not mentioned in ANY-8's Deferred list, left untouched.
 - Wiring `extensions/kernel-demo-ce` to consume `ce-kit` (ANY-39).
@@ -77,9 +80,10 @@ and fixing the one real gap the audit found.
   `docs/architecture/scenario-session-model.md`, `docs/product-specs/mvp-a2-client-surfaces.md`,
   `docs/product-specs/mvp-scope-source-of-truth.md`,
   `docs/exec-plans/active/mvp-a-mvp-b-linear-epics.md`) -- all describe the current real
-  implementation accurately; no stale claims found beyond the README disclaimer fixed above. The
-  Linear-epics tracker table's "A15 CE-kit parent | ANY-8 | In progress" row is accurate as of this
-  writing (not yet merged) and should flip to "Done" once the PR merges and Linear is updated.
+  implementation accurately, including `frontend-boundaries.md` already crediting A15c/ANY-226 as
+  delivered; no stale claims found beyond the README disclaimer fixed above. Flipped the
+  Linear-epics tracker table's "A15 CE-kit parent | ANY-8 | In progress" row to "Done" now that all
+  three children are merged to `main`.
 
 ## Decision log
 
