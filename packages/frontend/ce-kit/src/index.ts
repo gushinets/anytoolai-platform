@@ -10,6 +10,8 @@ export type { PlatformApiError } from "./api/errors";
 export {
   isIdempotencyKeyConflict,
   isQuotaExhausted,
+  isResultNotFound,
+  isResultUnavailable,
   isScenarioActionConflict,
 } from "./api/errors";
 export { createInMemoryAsyncStorage } from "./storage/inMemoryAsyncStorage";
@@ -50,6 +52,10 @@ export type {
   RuntimeRendererHint,
   RuntimeScenario,
 } from "./runtime";
+
+export { getResult } from "./results/getResult";
+export type { GetResultOptions } from "./results/getResult";
+export type { ResultArtifact } from "./results/types";
 
 export async function pollJob(jobId: string): Promise<{ jobId: string; status: string }> {
   return { jobId, status: "succeeded" };

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   isIdempotencyKeyConflict,
   isQuotaExhausted,
+  isResultNotFound,
+  isResultUnavailable,
   isScenarioActionConflict,
 } from "../../src/api/errors/classify";
 import type { PlatformApiError } from "../../src/api/errors/types";
@@ -46,5 +48,27 @@ describe("isQuotaExhausted", () => {
   it("is true only for the quota_exhausted code", () => {
     expect(isQuotaExhausted(backendError("quota_exhausted"))).toBe(true);
     expect(isQuotaExhausted(backendError("guest_identity_required"))).toBe(false);
+  });
+});
+
+describe("isResultNotFound", () => {
+  it("is true only for the result_artifact_not_found code", () => {
+    expect(isResultNotFound(backendError("result_artifact_not_found"))).toBe(true);
+    expect(isResultNotFound(backendError("result_artifact_unavailable"))).toBe(false);
+  });
+
+  it("is false for non-backend_error variants", () => {
+    expect(isResultNotFound({ type: "timeout" })).toBe(false);
+  });
+});
+
+describe("isResultUnavailable", () => {
+  it("is true only for the result_artifact_unavailable code", () => {
+    expect(isResultUnavailable(backendError("result_artifact_unavailable"))).toBe(true);
+    expect(isResultUnavailable(backendError("result_artifact_not_found"))).toBe(false);
+  });
+
+  it("is false for an unrelated code, even though both are HTTP 404", () => {
+    expect(isResultUnavailable(backendError("scenario_session_not_found"))).toBe(false);
   });
 });

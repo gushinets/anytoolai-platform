@@ -2,14 +2,16 @@
 
 Shared Platform API client foundation for AnytoolAI Chrome Extensions and web frontends.
 
-This package covers **A15 — CE Kit MVP API Client** (ANY-8): both **A15a — Foundation** (ANY-170)
-and **A15b — Scenario, Quota, and Polling Client** (ANY-171). The transport layer, the stable error
-union, injectable storage, guest identity, runtime config, quota, idempotent scenario start,
-session polling, and next-action are all real. Several other exports (`pollJob`, `getArtifact`,
-`createHandoff`, `openHandoffConsent`, `captureEmail`, `trackClientEvent`, the `render*` helpers)
-remain fake-success placeholders deferred to later tickets (public job polling, artifact fetching,
-handoff, email capture, client-event ingestion). Do not treat their presence in `src/index.ts` as a
-working contract.
+This package covers **A15 — CE Kit MVP API Client** (ANY-8): **A15a — Foundation** (ANY-170),
+**A15b — Scenario, Quota, and Polling Client** (ANY-171), and **A15c — Result Artifact Client**
+(ANY-226). The transport layer, the stable error union, injectable storage, guest identity, runtime
+config, quota, idempotent scenario start, session polling, next-action, and the frontend-safe
+result artifact read are all real. Several other exports (`pollJob`, `getArtifact`, `createHandoff`,
+`openHandoffConsent`, `captureEmail`, `trackClientEvent`, the `render*` helpers) remain
+fake-success placeholders deferred to later tickets (public job polling, raw artifact fetching,
+handoff, email capture, client-event ingestion). `getArtifact` here is unrelated to `getResult()`
+below -- it is a distinct, still-deferred placeholder. Do not treat their presence in `src/index.ts`
+as a working contract.
 
 ## PlatformApiClient
 
@@ -331,6 +333,49 @@ switch (outcome.reason) {
 }
 ```
 
+## Result artifact
+
+`getResult(client, resultArtifactId, { signal?, timeoutMs? })` is a single typed
+`GET /v1/results/{result_artifact_id}` read of the normalized, frontend-safe canonical workflow
+result -- the `resultArtifactId` a terminal `pollScenarioSession()` / `getScenarioSession()`
+snapshot surfaces once a job succeeds. CE-kit callers never construct this URL, and never receive
+raw/debug artifacts or provider/model/provider-call fields through it -- see [A12b public result
+artifact contract](../../../docs/architecture/frontend-boundaries.md#a12b-public-result-artifact-contract)
+for what the backend guarantees.
+
+```ts
+import { getResult } from "@anytoolai/ce-kit";
+
+const outcome = await pollScenarioSession(client, scenarioSessionId, { intervalMs: 2_000, maxDurationMs: 60_000 });
+if (outcome.reason === "session_status" && outcome.result.ok && outcome.result.value.resultArtifactId) {
+  const result = await getResult(client, outcome.result.value.resultArtifactId);
+  if (result.ok) {
+    const { workflowId, schemaRef, output } = result.value;
+  }
+}
+```
+
+Both safe-404 codes collapse to the same `PlatformApiResult` shape as every other backend error
+(`{ ok: false, error: { type: "backend_error", status: 404, code, message, requestId } }`); use
+`isResultNotFound()` / `isResultUnavailable()` to branch on which one, rather than comparing
+`error.code` strings directly:
+
+```ts
+import { isResultNotFound, isResultUnavailable } from "@anytoolai/ce-kit";
+
+if (!result.ok && result.error.type === "backend_error") {
+  if (isResultNotFound(result.error)) {
+    // the id is unknown, or out of tenant/region scope
+  } else if (isResultUnavailable(result.error)) {
+    // a real artifact, but not an available canonical frontend-safe result
+  }
+}
+```
+
+A malformed 200 body (or any other unparseable response) falls back to the same
+`invalid_response` result every other CE-kit read produces, distinct from the two safe-404 codes
+above.
+
 ## Next action
 
 `nextAction(client, { scenarioSessionId, nextActionId, checkpointId })` sends the checkpoint the
@@ -351,10 +396,10 @@ const result = await nextAction(client, {
 
 ## Classifying backend errors
 
-`isIdempotencyKeyConflict()`, `isScenarioActionConflict()`, and `isQuotaExhausted()` are typed
-guards over `PlatformApiError` for the ambiguous cases above -- prefer them over comparing
-`error.code` strings directly, since they're the tested, reusable source of truth for which codes
-mean what:
+`isIdempotencyKeyConflict()`, `isScenarioActionConflict()`, `isQuotaExhausted()`,
+`isResultNotFound()`, and `isResultUnavailable()` are typed guards over `PlatformApiError` for the
+ambiguous cases above -- prefer them over comparing `error.code` strings directly, since they're
+the tested, reusable source of truth for which codes mean what:
 
 ```ts
 import { isIdempotencyKeyConflict, isQuotaExhausted } from "@anytoolai/ce-kit";
