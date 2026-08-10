@@ -157,6 +157,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/results/{result_artifact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a frontend-safe normalized workflow result artifact */
+        get: operations["get_result_artifact_v1_results__result_artifact_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/scenario-sessions/{scenario_session_id}": {
         parameters: {
             query?: never;
@@ -304,6 +321,32 @@ export interface components {
             unit: string;
             /** Used Count */
             used_count: number;
+        };
+        /** ResultArtifactResponse */
+        ResultArtifactResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Job Id */
+            job_id: string;
+            /** Output */
+            output: {
+                [key: string]: unknown;
+            };
+            /** Result Artifact Id */
+            result_artifact_id: string;
+            /** Scenario Session Id */
+            scenario_session_id: string;
+            /** Schema Ref */
+            schema_ref: string;
+            /** Schema Version */
+            schema_version: number;
+            /** Workflow Id */
+            workflow_id: string;
+            /** Workflow Version */
+            workflow_version: number;
         };
         /** RuntimeConfigResponse */
         RuntimeConfigResponse: {
@@ -1030,6 +1073,65 @@ export interface operations {
                      *     }
                      */
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_result_artifact_v1_results__result_artifact_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                result_artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Frontend-safe normalized canonical workflow result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "created_at": "2026-01-01T00:00:00Z",
+                     *       "job_id": "job_123",
+                     *       "output": {
+                     *         "fields": [
+                     *           "one",
+                     *           "two"
+                     *         ],
+                     *         "title": "Example"
+                     *       },
+                     *       "result_artifact_id": "artifact_123",
+                     *       "scenario_session_id": "scenario_session_123",
+                     *       "schema_ref": "kernel_demo.extract_output_v1",
+                     *       "schema_version": 1,
+                     *       "workflow_id": "kernel_demo.single_action_extract_v1",
+                     *       "workflow_version": 1
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ResultArtifactResponse"];
+                };
+            };
+            /** @description Safe response when the artifact is unknown, out of tenant/region scope, or is not an available canonical frontend-safe result (raw/debug artifact, unfinished job, or a schema/version mismatch). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

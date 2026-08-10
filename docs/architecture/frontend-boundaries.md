@@ -73,7 +73,7 @@ The A12/A13 public runtime surface is:
 - `POST /v1/products/{product_id}/scenarios/{scenario_id}/start`
 - `GET /v1/scenario-sessions/{id}`
 - `POST /v1/scenario-sessions/{id}/next-actions/{next_action_id}`
-- planned by A12b / ANY-217: `GET /v1/results/{artifact_id}`
+- `GET /v1/results/{result_artifact_id}` (A12b / ANY-217)
 
 `startScenario()` request body:
 
@@ -151,6 +151,105 @@ budgets, PydanticAI run ids, LiteLLM response ids, or raw unsafe exception text.
 Product Chrome Extensions complete through CE-kit and the frontend-safe result API. Opening the
 same result in web mirror is an optional MVP-A2 integration, never a prerequisite for MVP-A1 or an
 individual Freelancer product.
+
+## A12b public result artifact contract
+
+`GET /v1/results/{result_artifact_id}` returns only the normalized canonical workflow result for a
+`result_artifact_id` already surfaced by `startScenario()` / `getScenarioSession()`:
+
+```json
+{
+  "result_artifact_id": "artifact_123",
+  "scenario_session_id": "scenario_session_123",
+  "job_id": "job_123",
+  "workflow_id": "kernel_demo.single_action_extract_v1",
+  "workflow_version": 1,
+  "schema_ref": "kernel_demo.extract_output_v1",
+  "schema_version": 1,
+  "created_at": "2026-01-01T00:00:00Z",
+  "output": { "...": "workflow output schema-shaped payload" }
+}
+```
+
+The endpoint is scoped to tenant/region and only ever serves an artifact that is: `stored`, of the
+canonical `structured_output` type (never `structured_output_debug_raw` or any raw/debug artifact),
+tagged `artifact_role: workflow_result`, linked as `result_artifact_id` on a `succeeded` job whose
+tenant/region/product/frontend match the artifact's, and re-validated against its workflow's
+output schema/version at read time. `output` is never returned raw from storage without this
+re-validation pass.
+
+Raw/debug artifacts (`structured_output_debug_raw` type, or any artifact not tagged
+`artifact_role: workflow_result`) are rejected outright by the canonical-artifact guard above and
+never reach response serialization.
+
+Separately, because the endpoint returns the full normalized output *object* (unlike handoffs,
+which only ever expose an explicit per-field allowlist mapping), and shipped workflow output
+schemas may still declare `additionalProperties: true`, `ResultService` additionally rejects any
+normalized output containing a *key* that exactly matches (after normalizing `-`/`_`/case to a
+common form) a small, results-specific denylist, at any nesting depth. The list covers both the
+actual bare internal field names used for provider/prompt lineage elsewhere in the platform
+(`prompt`, `prompt_ref`, `provider`, `model`, `model_ref`, `provider_policy_ref`,
+`provider_call_id`, `gateway_backend`, `gateway_model`, `pydantic_run_id`,
+`litellm_response_id` — `model_ref` mirrors `config.loader.FORBIDDEN_RAW_LLM_FIELDS`, the
+config-authoring-time guard against the same raw-LLM field names; the rest of that list
+(`temperature`, `top_p`, `seed`, `stop`, `stream`, `tools`, ...) is deliberately not mirrored
+here, since those are generic words with real domain-field collision risk) and additional
+compound/lineage-shaped names not currently used verbatim elsewhere but plausible leak shapes
+(`system_prompt`, `raw_prompt`, `prompt_template`, `raw_provider`, `provider_output`,
+`provider_model`, `provider_name`, `provider_policy`, `model_name`, `model_id`, `model_version`,
+`litellm`, `litellm_debug_info`, `trace_id`, `parent_trace_id`). Key normalization strips `-`/`_`
+separators and casefolds, from both the incoming key and the marker, then compares the results for
+equality — it deliberately does **not** try to re-insert word boundaries into camelCase/acronym
+spellings (an earlier revision did, and needed a growing pile of regex rules that still missed
+fully-uppercase spellings like `TRACEID`/`GATEWAYMODEL`, which have no lowercase letter to anchor
+a boundary on, and multi-acronym PascalCase like `LiteLlmDebugInfo`, which splits into more words
+than its marker has). Comparing separator-stripped canonical forms sidesteps that ambiguity
+entirely while still being a whole-string equality check, so `provider-model`, `providerModel`,
+`GATEWAYMODEL`, and `LiteLlmDebugInfo` all resolve to the same canonical form as their marker.
+Matching is against the whole normalized key, not a
+substring: an earlier
+revision matched markers as substrings, which both left the bare internal names above undetected
+(they were deliberately excluded from a substring-based list to avoid colliding with fields like
+`car_model`/`insurance_provider`) and, separately, rejected unrelated legitimate compound fields
+that happened to contain a marker substring (e.g. `vehicle_model_id`, `car_model_version`,
+`insurance_provider_name`, `business_trace_id`). Whole-key matching fixes both. This list is
+deliberately its own, narrower policy rather than a reuse of `common.logging.SENSITIVE_KEY_PARTS`
+(the log-redaction denylist): a false positive there just redacts a logged value, while a false
+positive here would make an entire valid, already-succeeded result silently disappear as a 404, so
+broad single-word markers like `email`/`token`/`handoff`/`secret` are intentionally not used. This
+is a defense-in-depth backstop against those specific key names while workflow output schemas are
+not yet uniformly closed — it is not a general guarantee against every possible form of
+provider/prompt/debug content (an unlisted key name, or a value rather than a key, is not
+inspected). It also cuts both ways: because `prompt`/`provider`/`model` are blocked as bare exact
+keys (not just compound markers), a future workflow whose *legitimate* schema-declared output
+happens to use one of those exact names (e.g. a prompt-generation product returning a field
+literally called `prompt`) would incorrectly 404 rather than leak. This is an accepted trade-off
+of a key-name denylist over a schema; a workflow needing a legitimate field with one of these
+exact names must pick a differently-named field. Closing the relevant workflow output schemas, or
+introducing a dedicated public output schema per workflow, remains open follow-up work.
+
+Safe API behavior — both cases return `404`, and neither ever includes artifact/job internals,
+prompts, or provider/model identifiers in the response body:
+
+- `result_artifact_not_found`: the id is unknown, or belongs to a different tenant/region;
+- `result_artifact_unavailable`: the artifact exists in the caller's tenant/region but is not an
+  available canonical result (a raw/debug artifact, an artifact from an unfinished/non-succeeded
+  job, an artifact with schema/version drift, or content that fails re-validation against its
+  declared output schema).
+
+`getScenarioSession()` only ever surfaces a non-null `result_artifact_id` once the job has
+succeeded, so this endpoint is not meant to be polled for an in-progress job. The two codes
+intentionally differ so a caller holding a previously-valid id (e.g. from before a config redeploy
+changed the workflow's output schema/version) can tell "this id is wrong or out of scope" apart
+from "this id was valid but the artifact is no longer an available canonical result." This does
+distinguish "exists in my own tenant/region" from "unknown," i.e. it is not a strict
+no-existence-oracle guarantee across all callers who can reach an id in-scope — it only guarantees
+that a caller cannot learn anything about artifacts outside their own tenant/region.
+
+The canonical-artifact guard (job/workflow/schema consistency + schema re-validation) is shared with
+the handoff payload builder (see `handoff-model.md`) through
+`anytoolai_platform_core.artifacts.canonical.resolve_canonical_workflow_result`, so both consumers
+reject the same non-canonical states identically.
 
 ## A17 public handoff contract
 

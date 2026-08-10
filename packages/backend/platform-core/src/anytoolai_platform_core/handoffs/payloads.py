@@ -10,7 +10,10 @@ from jsonschema import SchemaError
 from jsonschema import ValidationError as JsonSchemaValidationError
 from jsonschema import validate as validate_json_schema
 
-from anytoolai_platform_core.artifacts.models import ArtifactStatus
+from anytoolai_platform_core.artifacts.canonical import (
+    CanonicalArtifactError,
+    resolve_canonical_workflow_result,
+)
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.common.literal_source import (
     LITERAL_SOURCE_PREFIX as _LITERAL_SOURCE_PREFIX,
@@ -22,12 +25,7 @@ from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.handoffs.models import HandoffDefinition
 from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
-from anytoolai_platform_core.structured_output.errors import StructuredOutputError
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
-from anytoolai_platform_core.structured_output.validator import (
-    validate_structured_output_value,
-)
-from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 
 PREVIEW_MAX_DEPTH = 4
@@ -90,49 +88,20 @@ class HandoffPayloadBuilder:
         ):
             raise HandoffPayloadError("source scenario session is not ready for this handoff")
         source_job = self._jobs.get_latest_for_scenario_session(source_session.id)
-        if (
-            source_job is None
-            or source_job.status is not JobStatus.succeeded
-            or source_job.result_artifact_id != source_artifact_id
-        ):
+        if source_job is None or source_job.result_artifact_id != source_artifact_id:
             raise HandoffPayloadError("source workflow result is not ready for handoff")
-        source_workflow = self._registry.get_workflow(source_job.workflow_id)
-        source_schema = (
-            None
-            if source_workflow is None
-            else self._registry.get_schema(source_workflow.output_schema_ref)
-        )
         artifact = self._artifacts.get(source_artifact_id)
-        if (
-            artifact is None
-            or artifact.status is not ArtifactStatus.stored
-            or artifact.artifact_type != "structured_output"
-            or artifact.scenario_session_id != source_session.id
-            or artifact.job_id != source_job.id
-            or artifact.action_run_id is not None
-            or artifact.metadata.get("artifact_role") != "workflow_result"
-            or source_workflow is None
-            or source_schema is None
-            or artifact.metadata.get("workflow_id") != source_job.workflow_id
-            or artifact.metadata.get("workflow_version") != source_job.workflow_version
-            or artifact.metadata.get("schema_ref") != source_workflow.output_schema_ref
-            or artifact.metadata.get("schema_version") != source_schema.version
-            or not isinstance(artifact.content_json, Mapping)
-        ):
-            raise HandoffPayloadError("source artifact is not a canonical workflow result")
-
         try:
-            validated_source = validate_structured_output_value(
-                artifact.content_json,
-                schema=source_schema.schema,
-                schema_ref=source_schema.schema_ref,
-                schema_version=source_schema.version,
+            canonical = resolve_canonical_workflow_result(
+                artifact=artifact,
+                job=source_job,
+                config_registry=self._registry,
             )
-        except StructuredOutputError as exc:
+        except CanonicalArtifactError as exc:
             raise HandoffPayloadError(
-                "source artifact is invalid for its workflow output schema"
+                "source artifact is not a canonical workflow result"
             ) from exc
-        normalized_artifact = validated_source.normalized_output
+        normalized_artifact = canonical.normalized_output
         assert isinstance(normalized_artifact, dict)
         context_payload = _apply_mapping(
             definition.context_mapping, normalized_artifact, allow_literal=True
