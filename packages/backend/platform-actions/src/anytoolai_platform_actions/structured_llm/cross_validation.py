@@ -177,20 +177,31 @@ _HTML_TAG_NAMES = (
 )
 _HTML_TAG_PATTERN = re.compile(rf"</?(?:{_HTML_TAG_NAMES})\b[^>]*>", re.IGNORECASE)
 
-# Covers the common markdown constructs (bold, links, headings). Not exhaustive (italics,
-# tables, code fences, strikethrough go undetected) — single `*`/`_`/`#`/`[` are too common
-# in plain English to blacklist without false-positiving on legitimate plain text.
+# Covers the common markdown constructs (bold, paired italic, links, headings). Not
+# exhaustive (tables, code fences, strikethrough go undetected) — a *lone*, unpaired `*`/
+# `_`/`#`/`[` is too common in plain English to blacklist without false-positiving on
+# legitimate plain text (e.g. "5 * 3", "room #4"), so italic emphasis only counts when the
+# asterisks are genuinely paired (CommonMark-style: no whitespace right inside the markers).
 _MARKDOWN_PATTERN = re.compile(
-    r"\*\*[^*\n]+\*\*"          # **bold**
-    r"|__[^_\n]+__"              # __bold__
-    r"|\[[^\]\n]+\]\([^)\n]+\)"  # [text](url)
-    r"|^#{1,6}\s",               # # heading
+    r"\*\*[^*\n]+\*\*"                        # **bold**
+    r"|__[^_\n]+__"                            # __bold__
+    r"|(?<!\*)\*(?!\s)[^*\n]+?(?<!\s)\*(?!\*)"  # *italic*
+    r"|\[[^\]\n]+\]\([^)\n]+\)"                # [text](url)
+    r"|^#{1,6}\s",                              # # heading
     re.MULTILINE,
 )
 
 
+def _has_html_tag(value: str) -> bool:
+    return bool(_HTML_TAG_PATTERN.search(value))
+
+
+def _has_markdown(value: str) -> bool:
+    return bool(_MARKDOWN_PATTERN.search(value))
+
+
 def _has_markup(value: str) -> bool:
-    return bool(_HTML_TAG_PATTERN.search(value) or _MARKDOWN_PATTERN.search(value))
+    return _has_html_tag(value) or _has_markdown(value)
 
 
 class ComposeReplyCrossValidator:
@@ -229,7 +240,8 @@ class ComposeReplyCrossValidator:
             raise _cross_validation_error("text_contains_markup_for_plain_text_format")
         # Only the main body is required to *prove* html-ness; a short call_to_action
         # (e.g. "Book a call") is plausibly plain text even inside an HTML-formatted reply.
-        if output_format == "html" and not _has_markup(text):
+        # Markdown syntax alone doesn't satisfy "html" — it must contain an actual tag.
+        if output_format == "html" and not _has_html_tag(text):
             raise _cross_validation_error("text_missing_markup_for_html_format")
         if (
             output_format in (None, "plain_text")

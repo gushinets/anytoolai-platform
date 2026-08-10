@@ -303,9 +303,12 @@ class TestComposeReplyCrossValidator:
             # Non-markup bracketed text must not be mistaken for HTML.
             ({}, {"text": "Please confirm <Tuesday> works for the call."}),
             ({}, {"text": "Reach me at <user@example.com>."}),
-            # A single asterisk is common casual emphasis, not markdown bold.
-            ({}, {"text": "The *actual* deadline is Friday."}),
+            # An unpaired asterisk is common casual usage (multiplication, footnotes), not
+            # markdown emphasis.
+            ({}, {"text": "5 * 3 is 15, not * asterisk footnote."}),
             ({}, {"text": "Plain reply.", "call_to_action": "Book a call."}),
+            # A real but non-allowlisted tag name is out of scope, by design.
+            ({}, {"text": "Use the <kbd>Enter</kbd> key."}),
         ],
     )
     def test_accepts(self, input_payload: dict, output: dict) -> None:
@@ -328,7 +331,13 @@ class TestComposeReplyCrossValidator:
             ({}, {"text": "Reply with **bold** text."}),
             ({}, {"text": "See [details](https://example.com)."}),
             ({}, {"text": "# Heading\nBody."}),
+            ({}, {"text": "The *actual* deadline is Friday."}),
             ({}, {"text": "Plain reply.", "call_to_action": "**Book** a call."}),
+            # Markdown alone doesn't satisfy "html" — it must contain a real tag.
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "Reply with **bold** text."},
+            ),
             ({}, None),
             ({}, {"text": 123}),
         ],
