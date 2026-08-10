@@ -35,6 +35,11 @@ describe("parseResultArtifact", () => {
     expect(parseResultArtifact({ ...VALID_PAYLOAD, output: null })).toBeNull();
   });
 
+  it("returns null when output is an array, even though typeof [] === \"object\"", () => {
+    expect(parseResultArtifact({ ...VALID_PAYLOAD, output: [] })).toBeNull();
+    expect(parseResultArtifact({ ...VALID_PAYLOAD, output: ["one", "two"] })).toBeNull();
+  });
+
   it("maps a valid payload to camelCase", () => {
     expect(parseResultArtifact(VALID_PAYLOAD)).toEqual({
       resultArtifactId: "artifact_123",

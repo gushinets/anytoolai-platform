@@ -34,7 +34,8 @@ export function parseResultArtifact(payload: unknown): ResultArtifact | null {
     typeof schemaRef !== "string" ||
     typeof schemaVersion !== "number" ||
     typeof createdAt !== "string" ||
-    !isRecord(output)
+    !isRecord(output) ||
+    Array.isArray(output)
   ) {
     return null;
   }
