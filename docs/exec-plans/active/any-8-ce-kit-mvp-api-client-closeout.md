@@ -22,8 +22,12 @@ gap the audit found.
 
 ### In scope
 
-- Audit every AC bullet in the parent ANY-8 and both children (ANY-170, ANY-171) against
-  `packages/frontend/ce-kit/src` and its tests, file by file.
+- Audit every AC bullet in the parent ANY-8 and all three children (ANY-170, ANY-171, ANY-226)
+  against `packages/frontend/ce-kit/src` and its tests, file by file. For ANY-226 specifically:
+  `src/results/getResult.ts` implements typed `getResult()` over `GET /v1/results/{artifact_id}`,
+  `src/results/types.ts`'s `ResultArtifact` carries no raw/debug/provider fields, and
+  `test/results/getResult.test.ts` (5 cases: happy path, id percent-encoding, not-found, unavailable,
+  malformed/invalid-response, abort) covers its AC.
 - Audit for stale "A16 owns `PlatformApiClient`/`startScenario()`/`getQuota()`" references outside
   `docs/exec-plans/completed/`.
 - Remove the fake-success stubs (`pollJob`, `getArtifact`, `createHandoff`, `openHandoffConsent`,
@@ -33,7 +37,10 @@ gap the audit found.
   shipped fake-success payloads, mitigated only by a README disclaimer. Confirmed zero consumers
   repo-wide (`grep` across `packages/`, `extensions/`, `apps/` found only `index.ts` itself;
   `extensions/kernel-demo-ce` doesn't import `ce-kit` at all yet -- wiring it up is ANY-39, a
-  separate blocked-by ticket).
+  separate blocked-by ticket). Note `createHandoff`/`openHandoffConsent` are removed for a different
+  reason than the other four: the `/v1/handoffs` backend (create/get/accept/decline) already exists
+  and is in the generated OpenAPI types -- only the CE-kit client helpers are deferred, to
+  ANY-222/A18a.
 - Delete the now-unused empty placeholder files those stubs lived behind
   (`src/artifacts/getArtifact.ts`, `src/events/trackClientEvent.ts`,
   `src/handoffs/createHandoff.ts`, `src/handoffs/openHandoffConsent.ts`,
@@ -56,7 +63,8 @@ gap the audit found.
 
 - `python scripts/agent/runner.py doctor` -- passed.
 - `python scripts/agent/runner.py frontend-check` -- passed before the stub removal (baseline) and
-  again after (typecheck, `pnpm -r test` 197/197, `generate-api-types:check`, build all green).
+  again after (typecheck, `pnpm -r test` 216/216 including `test/results/getResult.test.ts`,
+  `generate-api-types:check`, build all green).
 - `python scripts/agent/runner.py full-check` -- passed before and after the stub removal (backend
   pytest suites unaffected, frontend re-verified).
 - `grep -rn "A16 owns" docs/ packages/ extensions/ apps/` (excluding
