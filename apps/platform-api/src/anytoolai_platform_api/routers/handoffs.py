@@ -9,7 +9,7 @@ from anytoolai_platform_api.dependencies import (
     get_session_factory,
     get_settings,
 )
-from anytoolai_platform_api.errors import ApiError
+from anytoolai_platform_api.errors import ApiError, platform_error_to_api_error
 from anytoolai_platform_api.schemas import (
     ErrorResponse,
     HandoffAcceptRequest,
@@ -255,4 +255,4 @@ def _api_error(error: PlatformError) -> ApiError:
         status = 429
     else:
         status = 409
-    return ApiError(status_code=status, code=error.code, message=str(error))
+    return platform_error_to_api_error(error, status_code=status)

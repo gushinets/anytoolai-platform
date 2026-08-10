@@ -51,6 +51,27 @@ CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
+_EXTRACT_FIELDS = [
+    {
+        "name": "deadline",
+        "type": "string",
+        "description": "Project deadline mentioned in the text.",
+        "required": True,
+    },
+    {
+        "name": "budget",
+        "type": "string",
+        "description": "Budget mentioned in the text.",
+        "required": False,
+    },
+    {
+        "name": "deliverables",
+        "type": "array_of_strings",
+        "description": "Deliverables mentioned in the text.",
+        "required": False,
+    },
+]
+
 
 @pytest.fixture
 def session_factory() -> Iterator[SessionFactory]:
@@ -106,7 +127,11 @@ def _start_payload(**overrides: Any) -> dict[str, Any]:
     payload = {
         "frontend_id": "kernel_demo_ce",
         "guest_id": "guest_demo",
-        "input": {"source_text": "deadline budget deliverables"},
+        "input": {
+            "source_text": "deadline budget deliverables",
+            "fields": _EXTRACT_FIELDS,
+            "strict": False,
+        },
     }
     payload.update(overrides)
     return payload
@@ -271,7 +296,11 @@ def test_start_scenario_creates_session_and_linked_job(
         job = JobRepository(session).get(data["job_id"])
 
     assert scenario is not None
-    assert scenario.metadata["input"] == {"source_text": "deadline budget deliverables"}
+    assert scenario.metadata["input"] == {
+        "source_text": "deadline budget deliverables",
+        "fields": _EXTRACT_FIELDS,
+        "strict": False,
+    }
     assert scenario.current_checkpoint_id == PROCESSING_CHECKPOINT_ID
     assert job is not None
     assert job.scenario_session_id == data["scenario_session_id"]
@@ -765,8 +794,13 @@ def test_start_then_real_worker_execution_preserves_a12_runtime_correlation(
         "schema_version": 1,
         "created_at": result_body["created_at"],
         "output": {
-            "title": "Kernel Demo Source Summary",
-            "fields": ["deadline", "budget", "deliverables"],
+            "values": {
+                "deadline": "next Friday",
+                "budget": "$5,000",
+                "deliverables": ["logo", "landing page"],
+            },
+            "missing_fields": [],
+            "confidence": {"deadline": 0.9, "budget": 0.8, "deliverables": 0.7},
         },
     }
 

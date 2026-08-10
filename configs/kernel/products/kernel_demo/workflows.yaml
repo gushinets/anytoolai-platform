@@ -8,6 +8,8 @@ workflows:
         action_config_id: kernel_demo.extract_structured_fields_v1
         input_mapping:
           source_text: scenario.input.source_text
+          fields: scenario.input.fields
+          strict: '?scenario.input.strict'
 
   - workflow_id: kernel_demo.extract_detect_report_v1
     version: 1
@@ -18,13 +20,16 @@ workflows:
         action_config_id: kernel_demo.extract_structured_fields_v1
         input_mapping:
           source_text: scenario.input.source_text
+          fields: scenario.input.fields
+          strict: '?scenario.input.strict'
         output_mapping:
           context.extracted: steps.extract.output
       - step_id: detect_issues
         action_config_id: kernel_demo.detect_issues_v1
         input_mapping:
           source_text: scenario.input.source_text
-          taxonomy: scenario.input.taxonomy
+          taxonomy: '?scenario.input.taxonomy'
+          context: '?scenario.input.context'
         output_mapping:
           context.detected_issues: steps.detect_issues.output.issues
       - step_id: generate_report
@@ -45,13 +50,29 @@ workflows:
         action_config_id: kernel_demo.extract_structured_fields_v1
         input_mapping:
           source_text: scenario.input.source_text
+          fields: scenario.input.fields
+          strict: '?scenario.input.strict'
         output_mapping:
           context.workflow_output: steps.extract.output
       - step_id: optional_extract
         action_config_id: kernel_demo.extract_structured_fields_v1
         input_mapping:
           source_text: scenario.input.source_text
+          fields: scenario.input.fields
+          strict: '?scenario.input.strict'
         when: scenario.input.run_optional_step
+
+  - workflow_id: kernel_demo.handoff_smoke_source_extract_v1
+    version: 1
+    input_schema_ref: kernel_demo.generic_text_input_v1
+    output_schema_ref: kernel_demo.extract_output_v1
+    steps:
+      - step_id: extract
+        action_config_id: kernel_demo.extract_structured_fields_v1
+        input_mapping:
+          source_text: scenario.input.source_text
+          fields: 'literal:[{"name":"deadline","type":"string","description":"Project deadline mentioned in the text.","required":true},{"name":"budget","type":"string","description":"Budget mentioned in the text.","required":false},{"name":"deliverables","type":"array_of_strings","description":"Deliverables mentioned in the text.","required":false}]'
+          strict: 'literal:true'
 
   - workflow_id: kernel_demo.retry_extract_v1
     version: 1
@@ -62,4 +83,6 @@ workflows:
         action_config_id: kernel_demo.extract_structured_fields_v1
         input_mapping:
           source_text: scenario.input.source_text
+          fields: scenario.input.fields
+          strict: '?scenario.input.strict'
         retry_count: 1

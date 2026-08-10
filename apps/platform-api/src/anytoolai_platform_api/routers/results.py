@@ -7,7 +7,7 @@ from anytoolai_platform_api.dependencies import (
     get_session_factory,
     get_settings,
 )
-from anytoolai_platform_api.errors import ApiError
+from anytoolai_platform_api.errors import ApiError, platform_error_to_api_error
 from anytoolai_platform_api.schemas import ErrorResponse, ResultArtifactResponse
 from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
@@ -29,7 +29,10 @@ RESULT_RESPONSE_EXAMPLE = {
     "schema_ref": "kernel_demo.extract_output_v1",
     "schema_version": 1,
     "created_at": "2026-01-01T00:00:00Z",
-    "output": {"title": "Example", "fields": ["one", "two"]},
+    "output": {
+        "values": {"one": "example value"},
+        "missing_fields": ["two"],
+    },
 }
 
 SAFE_NOT_FOUND_404_EXAMPLE = {
@@ -124,4 +127,4 @@ def _to_api_error(error: PlatformError) -> ApiError:
         if error.code in {"result_artifact_not_found", "result_artifact_unavailable"}
         else 500
     )
-    return ApiError(status_code=status_code, code=error.code, message=str(error))
+    return platform_error_to_api_error(error, status_code=status_code)

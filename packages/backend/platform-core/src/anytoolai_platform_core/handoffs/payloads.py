@@ -15,6 +15,12 @@ from anytoolai_platform_core.artifacts.canonical import (
     resolve_canonical_workflow_result,
 )
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
+from anytoolai_platform_core.common.literal_source import (
+    LITERAL_SOURCE_PREFIX as _LITERAL_SOURCE_PREFIX,
+)
+from anytoolai_platform_core.common.literal_source import (
+    parse_strict_literal_json as _parse_strict_literal_json,
+)
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.handoffs.models import HandoffDefinition
 from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
@@ -96,9 +102,11 @@ class HandoffPayloadBuilder:
                 "source artifact is not a canonical workflow result"
             ) from exc
         normalized_artifact = canonical.normalized_output
-        context_payload = _apply_mapping(definition.context_mapping, normalized_artifact)
+        context_payload = _apply_mapping(
+            definition.context_mapping, normalized_artifact, allow_literal=True
+        )
         preview_payload = _safe_preview(
-            _apply_mapping(definition.preview_mapping, normalized_artifact)
+            _apply_mapping(definition.preview_mapping, normalized_artifact, allow_literal=False)
         )
         target_scenario = self._registry.get_scenario(definition.target_scenario_id)
         if target_scenario is None:
@@ -129,18 +137,40 @@ class HandoffPayloadBuilder:
         )
 
 
-def _apply_mapping(mapping: Mapping[str, str], artifact: Mapping[str, Any]) -> dict[str, Any]:
+def _apply_mapping(
+    mapping: Mapping[str, str],
+    artifact: Mapping[str, Any],
+    *,
+    allow_literal: bool,
+) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for target_path, source_path in mapping.items():
-        parts = source_path.split(".")
-        current: Any = artifact
-        for segment in parts[2:]:
-            if not isinstance(current, Mapping) or segment not in current:
+        if source_path.startswith(_LITERAL_SOURCE_PREFIX):
+            if not allow_literal:
                 raise HandoffPayloadError(
-                    f"handoff source path could not be resolved: {source_path}"
+                    f"handoff literal source paths are not allowed here: {source_path}"
                 )
-            current = current[segment]
-        _set_path(result, target_path, current)
+            try:
+                value = _parse_strict_literal_json(source_path[len(_LITERAL_SOURCE_PREFIX) :])
+            except json.JSONDecodeError as exc:
+                raise HandoffPayloadError(
+                    f"handoff literal source path is not valid JSON: {source_path}"
+                ) from exc
+        else:
+            parts = source_path.split(".")
+            if parts[:2] != ["artifact", "content_json"]:
+                raise HandoffPayloadError(
+                    f"unsupported handoff source path: {source_path}"
+                )
+            current: Any = artifact
+            for segment in parts[2:]:
+                if not isinstance(current, Mapping) or segment not in current:
+                    raise HandoffPayloadError(
+                        f"handoff source path could not be resolved: {source_path}"
+                    )
+                current = current[segment]
+            value = current
+        _set_path(result, target_path, value)
     return result
 
 

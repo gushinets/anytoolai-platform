@@ -9,6 +9,10 @@ from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
+from anytoolai_platform_actions.structured_llm.cross_validation import (
+    DetectIssuesByTaxonomyCrossValidator,
+    ExtractStructuredFieldsCrossValidator,
+)
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.executor import ActionExecutorResponse
 from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
@@ -56,6 +60,28 @@ from anytoolai_platform_core.workflows.runner import (
     _emit_recovered_workflow_events,
 )
 from tests.db_support import provision_database
+
+_EXTRACT_FIELDS = [
+    {
+        "name": "deadline",
+        "type": "string",
+        "description": "Project deadline mentioned in the text.",
+        "required": True,
+    },
+    {
+        "name": "budget",
+        "type": "string",
+        "description": "Budget mentioned in the text.",
+        "required": False,
+    },
+    {
+        "name": "deliverables",
+        "type": "array_of_strings",
+        "description": "Deliverables mentioned in the text.",
+        "required": False,
+    },
+]
+
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
@@ -243,8 +269,9 @@ def _build_recording_workflow_runner(
     session: sa.orm.Session,
     *,
     executor: RecordingExecutor,
+    registry: ConfigRegistry | None = None,
 ) -> SequentialWorkflowRunner:
-    registry = build_config_registry(CONFIG_ROOT)
+    registry = registry or build_config_registry(CONFIG_ROOT)
     emitter = EventEmitter(EventLogRepository(session))
     action_runner = ActionRunner(
         session=session,
@@ -260,6 +287,35 @@ def _build_recording_workflow_runner(
         action_runner=action_runner,
         artifact_service=ArtifactService(ArtifactRepository(session), emitter),
         event_emitter=emitter,
+    )
+
+
+def _registry_with_mandatory_detect_issues_taxonomy_mapping(
+    registry: ConfigRegistry,
+) -> ConfigRegistry:
+    """`kernel_demo.extract_detect_report_v1`'s `detect_issues` step maps `taxonomy` as an
+    optional source path (ANY-251 team-lead #3 review: A04's `taxonomy` is schema-optional, so
+    the mapping must not force every caller to supply it). This patches a private copy of the
+    registry to make that one mapping mandatory again, purely so tests that need a genuine
+    WorkflowMappingResolutionError on the *second* step of a real multi-step workflow (after the
+    first step already succeeded) still have a way to trigger one without touching the real
+    product config."""
+    workflow = registry.workflows["kernel_demo.extract_detect_report_v1"]
+    patched_steps = [
+        replace(
+            step,
+            input_mapping={**step.input_mapping, "taxonomy": "scenario.input.taxonomy"},
+        )
+        if step.step_id == "detect_issues"
+        else step
+        for step in workflow.steps
+    ]
+    return replace(
+        registry,
+        workflows={
+            **registry.workflows,
+            "kernel_demo.extract_detect_report_v1": replace(workflow, steps=patched_steps),
+        },
     )
 
 
@@ -280,6 +336,10 @@ def _build_structured_workflow_runner(
         config_registry=registry,
         provider_gateway=gateway,
         artifact_service=ArtifactService(ArtifactRepository(session), emitter),
+        output_cross_validators={
+            "text.extract_structured_fields": ExtractStructuredFieldsCrossValidator(),
+            "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
+        },
     )
     action_runner = ActionRunner(
         session=session,
@@ -326,7 +386,7 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
         result = asyncio.run(
             runner.run(
                 "kernel_demo.single_action_extract_v1",
-                {"source_text": "deadline budget deliverables"},
+                {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                 context,
             )
         )
@@ -338,8 +398,13 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
 
     assert result.status.value == "succeeded"
     assert result.output_payload == {
-        "title": "Kernel Demo Source Summary",
-        "fields": ["deadline", "budget", "deliverables"],
+        "values": {
+            "deadline": "next Friday",
+            "budget": "$5,000",
+            "deliverables": ["logo", "landing page"],
+        },
+        "missing_fields": [],
+        "confidence": {"deadline": 0.9, "budget": 0.8, "deliverables": 0.7},
     }
     assert job["status"].value == "succeeded"
     assert job["result_artifact_id"] == result.result_artifact_id
@@ -445,7 +510,7 @@ def test_workflow_runner_executes_an_existing_claimed_job_without_duplicate_job(
         result = asyncio.run(
             runner.run_claimed_job(
                 claimed,
-                {"source_text": "deadline budget deliverables"},
+                {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                 context,
             )
         )
@@ -498,7 +563,7 @@ def test_workflow_runner_recovers_failed_state_for_existing_claimed_job_after_ro
             asyncio.run(
                 runner.run_claimed_job(
                     job,
-                    {"source_text": "deadline budget deliverables"},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -584,7 +649,7 @@ def test_workflow_runner_recovers_canceled_state_for_existing_claimed_job_after_
             asyncio.run(
                 runner.run_claimed_job(
                     job,
-                    {"source_text": "deadline budget deliverables"},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -662,7 +727,7 @@ def test_workflow_runner_recovers_succeeded_state_for_existing_claimed_job_after
             result = asyncio.run(
                 runner.run_claimed_job(
                     job,
-                    {"source_text": "deadline budget deliverables"},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -732,7 +797,7 @@ def test_workflow_runner_recovers_succeeded_state_for_newly_created_job_after_ro
             result = asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {"source_text": "deadline budget deliverables"},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -775,8 +840,8 @@ def test_workflow_runner_recovers_skipped_action_run_after_success_rollback(
 ) -> None:
     executor = RecordingExecutor(
         {
-            "extract": {"title": "Extracted", "fields": ["deadline", "budget"]},
-            "optional_extract": {"title": "Optional", "fields": ["ignored"]},
+            "extract": {"values": {"deadline": "Q1", "budget": "5000"}, "missing_fields": []},
+            "optional_extract": {"values": {"deadline": "ignored"}, "missing_fields": []},
         }
     )
     context = _base_context()
@@ -791,6 +856,8 @@ def test_workflow_runner_recovers_skipped_action_run_after_success_rollback(
                     "kernel_demo.conditional_skip_extract_v1",
                     {
                         "source_text": "deadline budget deliverables",
+                        "fields": _EXTRACT_FIELDS,
+                        "strict": False,
                         "run_optional_step": False,
                     },
                     context,
@@ -881,7 +948,7 @@ def test_workflow_runner_fails_loudly_instead_of_recovering_succeeded_job_with_l
             result = asyncio.run(
                 runner.run_claimed_job(
                     job,
-                    {"source_text": "deadline budget deliverables"},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -933,7 +1000,7 @@ def test_workflow_runner_rejects_claimed_job_context_with_mismatched_ownership_d
             asyncio.run(
                 runner.run_claimed_job(
                     claimed,
-                    {"source_text": "deadline budget deliverables"},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     replace(context, product_id="kernel_demo_other"),
                 )
             )
@@ -950,8 +1017,8 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
 ) -> None:
     executor = RecordingExecutor(
         {
-            "extract": {"title": "Extracted", "fields": ["deadline", "budget"]},
-            "detect_issues": {"issues": [{"severity": "high", "issue": "Timeline risk"}]},
+            "extract": {"values": {"deadline": "Q1", "budget": "5000"}, "missing_fields": []},
+            "detect_issues": {"issues": [{"category": "timeline", "description": "Timeline risk", "severity": "high"}]},
             "generate_report": {
                 "headline": "Report",
                 "summary": "Structured workflow complete",
@@ -968,6 +1035,8 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
                 "kernel_demo.extract_detect_report_v1",
                 {
                     "source_text": "deadline budget deliverables",
+                    "fields": _EXTRACT_FIELDS,
+                    "strict": False,
                     "taxonomy": ["timeline", "scope"],
                 },
                 context,
@@ -984,6 +1053,8 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
     assert result.status.value == "succeeded"
     assert executor.inputs_by_step["extract"][0] == {
         "source_text": "deadline budget deliverables",
+        "fields": _EXTRACT_FIELDS,
+        "strict": False,
     }
     assert executor.inputs_by_step["detect_issues"][0] == {
         "source_text": "deadline budget deliverables",
@@ -991,8 +1062,8 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
     }
     assert executor.inputs_by_step["generate_report"][0] == {
         "source_text": "deadline budget deliverables",
-        "extracted": {"title": "Extracted", "fields": ["deadline", "budget"]},
-        "issues": {"issues": [{"severity": "high", "issue": "Timeline risk"}]},
+        "extracted": {"values": {"deadline": "Q1", "budget": "5000"}, "missing_fields": []},
+        "issues": {"issues": [{"category": "timeline", "description": "Timeline risk", "severity": "high"}]},
     }
     assert [row["step_id"] for row in action_runs] == ["extract", "detect_issues", "generate_report"]
     assert all(row["status"].value == "succeeded" for row in action_runs)
@@ -1003,11 +1074,11 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
     }
     assert job["metadata"]["workflow_state"]["context"]["workflow_output"] == result.output_payload
     assert job["metadata"]["workflow_state"]["context"]["extracted"] == {
-        "title": "Extracted",
-        "fields": ["deadline", "budget"],
+        "values": {"deadline": "Q1", "budget": "5000"},
+        "missing_fields": [],
     }
     assert job["metadata"]["workflow_state"]["context"]["detected_issues"] == [
-        {"severity": "high", "issue": "Timeline risk"}
+        {"category": "timeline", "description": "Timeline risk", "severity": "high"}
     ]
 
 
@@ -1016,8 +1087,8 @@ def test_workflow_runner_skips_step_and_records_reason(
 ) -> None:
     executor = RecordingExecutor(
         {
-            "extract": {"title": "Extracted", "fields": ["deadline", "budget"]},
-            "optional_extract": {"title": "Optional", "fields": ["ignored"]},
+            "extract": {"values": {"deadline": "Q1", "budget": "5000"}, "missing_fields": []},
+            "optional_extract": {"values": {"deadline": "ignored"}, "missing_fields": []},
         }
     )
     with transaction_boundary(session_factory) as session:
@@ -1030,6 +1101,8 @@ def test_workflow_runner_skips_step_and_records_reason(
                 "kernel_demo.conditional_skip_extract_v1",
                 {
                     "source_text": "deadline budget deliverables",
+                    "fields": _EXTRACT_FIELDS,
+                    "strict": False,
                     "run_optional_step": False,
                 },
                 context,
@@ -1067,7 +1140,7 @@ def test_workflow_runner_retries_step_without_mixing_provider_retry_layers(
         result = asyncio.run(
             runner.run(
                 "kernel_demo.retry_extract_v1",
-                {"source_text": "deadline budget deliverables"},
+                {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                 context,
             )
         )
@@ -1111,6 +1184,8 @@ def test_workflow_runner_stops_after_failed_step(
                     "kernel_demo.extract_detect_report_v1",
                     {
                         "source_text": "deadline budget deliverables",
+                        "fields": _EXTRACT_FIELDS,
+                        "strict": False,
                         "taxonomy": ["timeline", "scope"],
                     },
                     context,
@@ -1207,7 +1282,7 @@ def test_workflow_runner_persists_generic_safe_message_for_unknown_exceptions(
             asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {"source_text": "deadline budget deliverables"},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -1234,7 +1309,7 @@ def test_workflow_runner_preserves_safe_validation_failure_category(
             asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {"source_text": "invalid output"},
+                    {"source_text": "invalid output", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -1261,7 +1336,7 @@ def test_workflow_runner_persists_failed_state_when_exception_escapes_transactio
             asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {"source_text": "deadline budget deliverables"},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -1317,6 +1392,8 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
                     "kernel_demo.extract_detect_report_v1",
                     {
                         "source_text": "deadline budget deliverables",
+                        "fields": _EXTRACT_FIELDS,
+                        "strict": False,
                         "taxonomy": ["timeline", "scope"],
                     },
                     context,
@@ -1354,8 +1431,13 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
     assert workflow_state["result_artifact_id"] is None
     assert workflow_state["final_output_source"] is None
     assert workflow_state["context"]["extracted"] == {
-        "title": "Kernel Demo Source Summary",
-        "fields": ["deadline", "budget", "deliverables"],
+        "values": {
+            "deadline": "next Friday",
+            "budget": "$5,000",
+            "deliverables": ["logo", "landing page"],
+        },
+        "missing_fields": [],
+        "confidence": {"deadline": 0.9, "budget": 0.8, "deliverables": 0.7},
     }
     assert workflow_state["steps"]["extract"]["status"] == "succeeded"
     assert workflow_state["steps"]["extract"]["last_action_run_id"] == action_runs[0]["id"]
@@ -1444,15 +1526,15 @@ def test_workflow_runner_recovery_does_not_synthesize_step_started_for_pre_start
                 session,
                 executor=RecordingExecutor(
                     {
-                        "extract": {"title": "Extracted", "fields": ["deadline", "budget"]},
-                        "optional_extract": {"title": "Optional", "fields": ["ignored"]},
+                        "extract": {"values": {"deadline": "Q1", "budget": "5000"}, "missing_fields": []},
+                        "optional_extract": {"values": {"deadline": "ignored"}, "missing_fields": []},
                     }
                 ),
             )
             asyncio.run(
                 runner.run(
                     "kernel_demo.conditional_skip_extract_v1",
-                    {"source_text": "deadline budget deliverables"},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -1498,8 +1580,8 @@ def test_workflow_runner_caught_condition_failure_does_not_emit_step_started(
             session,
             executor=RecordingExecutor(
                 {
-                    "extract": {"title": "Extracted", "fields": ["deadline", "budget"]},
-                    "optional_extract": {"title": "Optional", "fields": ["ignored"]},
+                    "extract": {"values": {"deadline": "Q1", "budget": "5000"}, "missing_fields": []},
+                    "optional_extract": {"values": {"deadline": "ignored"}, "missing_fields": []},
                 }
             ),
         )
@@ -1508,7 +1590,7 @@ def test_workflow_runner_caught_condition_failure_does_not_emit_step_started(
             asyncio.run(
                 runner.run(
                     "kernel_demo.conditional_skip_extract_v1",
-                    {"source_text": "deadline budget deliverables"},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -1549,19 +1631,22 @@ def test_workflow_runner_recovery_replays_step_started_for_input_mapping_failure
                 session,
                 executor=RecordingExecutor(
                     {
-                        "extract": {"title": "Extracted", "fields": ["deadline", "budget"]},
-                        "detect_issues": {"issues": [{"severity": "high", "issue": "ignored"}]},
+                        "extract": {"values": {"deadline": "Q1", "budget": "5000"}, "missing_fields": []},
+                        "detect_issues": {"issues": [{"category": "timeline", "description": "ignored", "severity": "high"}]},
                         "generate_report": {
                             "headline": "Report",
                             "summary": "ignored",
                         },
                     }
                 ),
+                registry=_registry_with_mandatory_detect_issues_taxonomy_mapping(
+                    build_config_registry(CONFIG_ROOT)
+                ),
             )
             asyncio.run(
                 runner.run(
                     "kernel_demo.extract_detect_report_v1",
-                    {"source_text": "deadline budget deliverables"},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )
@@ -1913,7 +1998,7 @@ def test_workflow_runner_uses_generic_safe_provider_message_for_unknown_adapter_
             asyncio.run(
                 runner.run(
                     "kernel_demo.single_action_extract_v1",
-                    {"source_text": "deadline budget deliverables"},
+                    {"source_text": "deadline budget deliverables", "fields": _EXTRACT_FIELDS, "strict": False},
                     context,
                 )
             )

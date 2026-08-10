@@ -67,13 +67,13 @@ DEFAULT_SCHEMA = {
 KERNEL_EXTRACT_SCHEMA = {
     "type": "object",
     "properties": {
-        "title": {"type": "string"},
-        "fields": {
+        "values": {"type": "object"},
+        "missing_fields": {
             "type": "array",
             "items": {"type": "string"},
         },
     },
-    "required": ["title", "fields"],
+    "required": ["values", "missing_fields"],
     "additionalProperties": False,
 }
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
@@ -426,7 +426,7 @@ def test_gateway_success_persists_adr_0007_provider_call_ledger(
         )
         rows = _provider_rows(session)
 
-    assert json.loads(response.output_text)["title"] == "Kernel Demo Source Summary"
+    assert json.loads(response.output_text)["values"]["deadline"] == "next Friday"
     assert response.structured_output is None
     assert len(rows) == 1
     row = rows[0]
@@ -468,7 +468,7 @@ def test_gateway_uses_caller_supplied_semantic_attempt_index_and_pydantic_run_id
         )
         rows = _provider_rows(session)
 
-    assert json.loads(response.output_text)["title"] == "Kernel Demo Source Summary"
+    assert json.loads(response.output_text)["values"]["deadline"] == "next Friday"
     assert len(rows) == 1
     assert rows[0]["semantic_attempt_index"] == 2
     assert rows[0]["transport_attempt_index"] == 1
@@ -1033,7 +1033,7 @@ def test_gateway_skips_persistence_when_required_dimensions_are_invalid(
         gateway.request(build_request(scenario_session, job, action_run, tenant_id=""))
     )
 
-    assert json.loads(response.output_text)["title"] == "Kernel Demo Source Summary"
+    assert json.loads(response.output_text)["values"]["deadline"] == "next Friday"
 
 
 def test_fake_provider_selects_fixture_key_before_action_config_and_ignores_prompt() -> None:
@@ -1082,4 +1082,4 @@ def test_fake_provider_falls_back_to_action_config_id_when_no_fixture_key_presen
         )
     )
 
-    assert json.loads(response.output_text)["title"] == "Kernel Demo Source Summary"
+    assert json.loads(response.output_text)["values"]["deadline"] == "next Friday"

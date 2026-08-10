@@ -15,6 +15,7 @@ from anytoolai_platform_core.config.errors import (
     RegistryLoadError,
 )
 from anytoolai_platform_core.config.loader import ConfigLoader
+from anytoolai_platform_core.workflows.mappings import resolve_step_input
 
 
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
@@ -82,7 +83,8 @@ def test_loader_builds_registry_from_current_tree() -> None:
     assert handoff is not None
     assert handoff.target_frontend_id == "kernel_demo_ce"
     assert handoff.target_start_policy.value == "immediate"
-    assert handoff.context_mapping == {"source_text": "artifact.content_json.title"}
+    assert handoff.context_mapping["source_text"] == "artifact.content_json.values.deadline"
+    assert handoff.context_mapping["fields"].startswith("literal:")
     assert registry.get_action_configuration("kernel_demo.extract_structured_fields_v1") is not None
     assert registry.get_prompt("kernel_demo.extract_structured_fields.v1") is not None
     assert registry.get_provider_policy("default_fake_provider_v1") is not None
@@ -100,6 +102,13 @@ def test_loader_builds_registry_from_current_tree() -> None:
     assert multi_step is not None
     assert multi_step.steps[0].input_mapping == {
         "source_text": "scenario.input.source_text",
+        "fields": "scenario.input.fields",
+        "strict": "?scenario.input.strict",
+    }
+    assert multi_step.steps[1].input_mapping == {
+        "source_text": "scenario.input.source_text",
+        "taxonomy": "?scenario.input.taxonomy",
+        "context": "?scenario.input.context",
     }
     assert multi_step.steps[2].output_mapping == {
         "context.workflow_output": "steps.generate_report.output",
@@ -146,6 +155,45 @@ def test_loader_rejects_unsafe_or_broken_handoff_contracts(
         ConfigLoader(config_root).load()
 
     assert message in str(exc_info.value)
+
+
+def test_loader_rejects_literal_source_in_preview_mapping(
+    tmp_path: Path,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    data = _load_yaml(handoff_path)
+    data["handoffs"][0]["preview_mapping"] = {"deadline": 'literal:"safe"'}
+    _write_yaml(handoff_path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert "does not allow literal: sources" in str(exc_info.value)
+
+
+def test_loader_rejects_non_finite_literal_constant_in_context_mapping(
+    tmp_path: Path,
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    handoff_path = config_root / "products" / "kernel_demo" / "handoffs.yaml"
+    data = _load_yaml(handoff_path)
+    data["handoffs"][0]["context_mapping"]["strict"] = "literal:NaN"
+    _write_yaml(handoff_path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert "literal source is not valid JSON" in str(exc_info.value)
+
+
+def test_loader_accepts_literal_source_in_context_mapping() -> None:
+    registry = ConfigLoader(CONFIG_ROOT).load()
+
+    handoff = registry.get_handoff("kernel_demo_source_to_target_v1")
+
+    assert handoff is not None
+    assert handoff.context_mapping["fields"].startswith("literal:")
 
 
 def test_loader_rejects_trailing_dot_handoff_source_with_identity(
@@ -325,6 +373,36 @@ def test_loader_accepts_non_conflicting_handoff_mapping_siblings(
 
     assert handoff is not None
     assert getattr(handoff, field_name) == sibling_mapping
+
+
+def test_handoff_smoke_source_scenario_guarantees_deadline_field_regardless_of_caller_input() -> None:
+    registry = ConfigLoader(CONFIG_ROOT).load()
+
+    scenario = registry.get_scenario("kernel_demo.handoff_smoke_source_v1")
+    assert scenario is not None
+    assert scenario.workflow_id == "kernel_demo.handoff_smoke_source_extract_v1"
+
+    workflow = registry.get_workflow(scenario.workflow_id)
+    assert workflow is not None
+    step = workflow.steps[0]
+
+    # A dynamic caller supplying no fields/strict at all (or an unrelated fields list) must
+    # still resolve to the fixed, config-owned field spec that guarantees `values.deadline`,
+    # since the handoff's context_mapping depends on it unconditionally.
+    resolved = resolve_step_input(
+        input_mapping=step.input_mapping,
+        scenario_input={
+            "source_text": "irrelevant caller text",
+            "fields": [{"name": "unrelated", "type": "string", "description": "x", "required": False}],
+            "strict": False,
+        },
+        step_outputs={},
+        context={},
+    )
+
+    assert resolved["strict"] is True
+    field_names = {spec["name"]: spec for spec in resolved["fields"]}
+    assert field_names["deadline"]["required"] is True
 
 
 def test_loader_preserves_provider_policy_yaml_metadata() -> None:

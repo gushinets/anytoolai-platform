@@ -60,6 +60,27 @@ CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
 
+_EXTRACT_FIELDS = [
+    {
+        "name": "deadline",
+        "type": "string",
+        "description": "Project deadline mentioned in the text.",
+        "required": True,
+    },
+    {
+        "name": "budget",
+        "type": "string",
+        "description": "Budget mentioned in the text.",
+        "required": False,
+    },
+    {
+        "name": "deliverables",
+        "type": "array_of_strings",
+        "description": "Deliverables mentioned in the text.",
+        "required": False,
+    },
+]
+
 
 @pytest.fixture
 def session_factory() -> Iterator[sa.orm.sessionmaker[sa.orm.Session]]:
@@ -1249,7 +1270,11 @@ def test_production_composed_worker_processes_real_runtime_path_end_to_end(
 ) -> None:
     job = _seed_job(
         session_factory,
-        input_payload={"source_text": "deadline budget deliverables"},
+        input_payload={
+            "source_text": "deadline budget deliverables",
+            "fields": _EXTRACT_FIELDS,
+            "strict": False,
+        },
     )
     worker = build_worker(
         session_factory=session_factory,
@@ -1344,7 +1369,11 @@ def test_production_worker_recovers_scenario_completion_after_mark_completed_fai
 ) -> None:
     job = _seed_job(
         session_factory,
-        input_payload={"source_text": "deadline budget deliverables"},
+        input_payload={
+            "source_text": "deadline budget deliverables",
+            "fields": _EXTRACT_FIELDS,
+            "strict": False,
+        },
     )
     worker = build_worker(
         session_factory=session_factory,
@@ -1500,7 +1529,11 @@ def test_production_worker_retries_scenario_reconciliation_on_subsequent_handle_
 ) -> None:
     job = _seed_job(
         session_factory,
-        input_payload={"source_text": "deadline budget deliverables"},
+        input_payload={
+            "source_text": "deadline budget deliverables",
+            "fields": _EXTRACT_FIELDS,
+            "strict": False,
+        },
     )
     worker = build_worker(
         session_factory=session_factory,
@@ -1569,7 +1602,11 @@ def test_production_worker_cancellation_recovers_inflight_action_and_provider_le
 ) -> None:
     job = _seed_job(
         session_factory,
-        input_payload={"source_text": "deadline budget deliverables"},
+        input_payload={
+            "source_text": "deadline budget deliverables",
+            "fields": _EXTRACT_FIELDS,
+            "strict": False,
+        },
     )
     worker = build_worker(
         session_factory=session_factory,
@@ -1672,7 +1709,11 @@ def test_production_worker_provider_failure_uses_generic_safe_message(
 ) -> None:
     job = _seed_job(
         session_factory,
-        input_payload={"source_text": "deadline budget deliverables"},
+        input_payload={
+            "source_text": "deadline budget deliverables",
+            "fields": _EXTRACT_FIELDS,
+            "strict": False,
+        },
     )
     worker = build_worker(
         session_factory=session_factory,
@@ -1724,6 +1765,8 @@ def test_production_worker_provider_failure_preserves_claimed_job_recovery_state
         session_factory,
         input_payload={
             "source_text": "deadline budget deliverables",
+            "fields": _EXTRACT_FIELDS,
+            "strict": False,
             "taxonomy": ["timeline", "scope"],
         },
         workflow_id="kernel_demo.extract_detect_report_v1",

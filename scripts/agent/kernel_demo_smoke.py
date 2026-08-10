@@ -24,7 +24,30 @@ import urllib.request
 
 SCENARIO_ID = "kernel_demo.single_action_smoke_v1"
 FRONTEND_ID = "kernel_demo_ce"
-SCENARIO_INPUT = {"source_text": "deadline budget deliverables"}
+SCENARIO_INPUT = {
+    "source_text": "deadline budget deliverables",
+    "fields": [
+        {
+            "name": "deadline",
+            "type": "string",
+            "description": "Project deadline mentioned in the text.",
+            "required": True,
+        },
+        {
+            "name": "budget",
+            "type": "string",
+            "description": "Budget mentioned in the text.",
+            "required": False,
+        },
+        {
+            "name": "deliverables",
+            "type": "array_of_strings",
+            "description": "Deliverables mentioned in the text.",
+            "required": False,
+        },
+    ],
+    "strict": False,
+}
 POLL_INTERVAL_SECONDS = 0.5
 DEFAULT_TIMEOUT_SECONDS = 30.0
 

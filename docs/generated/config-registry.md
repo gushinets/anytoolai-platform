@@ -40,6 +40,7 @@ Canonical source: configs/kernel via ConfigLoader.
 
 - kernel_demo.conditional_skip_extract_v1
 - kernel_demo.extract_detect_report_v1
+- kernel_demo.handoff_smoke_source_extract_v1
 - kernel_demo.retry_extract_v1
 - kernel_demo.single_action_extract_v1
 

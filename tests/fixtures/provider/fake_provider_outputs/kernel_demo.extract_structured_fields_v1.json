@@ -1,11 +1,16 @@
 {
   "response_json": {
-    "title": "Kernel Demo Source Summary",
-    "fields": [
-      "deadline",
-      "budget",
-      "deliverables"
-    ]
+    "values": {
+      "deadline": "next Friday",
+      "budget": "$5,000",
+      "deliverables": ["logo", "landing page"]
+    },
+    "missing_fields": [],
+    "confidence": {
+      "deadline": 0.9,
+      "budget": 0.8,
+      "deliverables": 0.7
+    }
   },
   "input_tokens": 120,
   "output_tokens": 48,

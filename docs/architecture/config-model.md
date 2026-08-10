@@ -164,7 +164,10 @@ An MVP-A handoff definition explicitly owns `handoff_id`, source product/scenari
 product/frontend/scenario, `consent_required`, `target_start_policy`, `context_mapping`, and
 `preview_mapping`. Consent must be true. Mapping values may read only
 `artifact.content_json...`; context fields become target input and preview fields become the
-separately bounded public preview. Mapping target paths must not duplicate or prefix one another:
+separately bounded public preview. `context_mapping` sources may alternatively use a
+`literal:<json>` prefix to inject a fixed config-owned JSON constant instead of an artifact path;
+`preview_mapping` does not permit `literal:` sources and the loader rejects it there. Mapping
+target paths must not duplicate or prefix one another:
 siblings such as `summary.title` and `summary.fields` are valid, while `summary` together with
 `summary.title` is rejected during config loading.
 

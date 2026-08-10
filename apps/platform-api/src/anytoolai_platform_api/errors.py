@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from anytoolai_platform_core.common.errors import PlatformError
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -13,6 +14,16 @@ class ApiError(Exception):
         self.status_code = status_code
         self.code = code
         self.message = message
+
+
+def platform_error_to_api_error(error: PlatformError, *, status_code: int) -> ApiError:
+    """Builds the ApiError shape shared by every router's PlatformError -> HTTP mapping.
+
+    Each router still owns its own `PlatformError.code -> status_code` table (those encode
+    router-specific business rules and must not be conflated into one shared table), but the
+    construction of the resulting ApiError itself was independently duplicated three times.
+    """
+    return ApiError(status_code=status_code, code=error.code, message=str(error))
 
 
 async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
