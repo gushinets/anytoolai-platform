@@ -27,6 +27,7 @@
                 "enum": ["heading", "paragraph", "list", "table", "note"]
               }
             },
+            "required": ["kind"],
             "additionalProperties": false
           }
         },

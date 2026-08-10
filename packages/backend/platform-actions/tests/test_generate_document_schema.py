@@ -127,6 +127,16 @@ class TestGenerateDocumentOutputSchema:
                 schema=GENERATE_DOCUMENT_OUTPUT,
             )
 
+    def test_empty_section_metadata_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={
+                    "sections": [{"id": "a", "title": "A", "content": "c", "metadata": {}}],
+                    "summary": "s",
+                },
+                schema=GENERATE_DOCUMENT_OUTPUT,
+            )
+
     def test_malformed_section_missing_content_rejected(self) -> None:
         with pytest.raises(ValidationError):
             validate(

@@ -112,30 +112,27 @@ class ValidationRetrySpyGateway:
         )
 
 
-class GenerateDocumentValidationRetrySpyGateway:
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
+class _InvalidThenValidGenerateDocumentAdapter:
+    """First physical call returns non-JSON; the semantic retry that follows returns a
+    valid generate_document payload."""
 
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        if len(self.requests) == 1:
-            return ProviderResponse(
-                provider_policy_ref=request.provider_policy_ref,
-                provider="fake",
-                model="fake-json-v1",
-                output_text="not-json",
-                status=ProviderCallStatus.succeeded,
+    def __init__(self) -> None:
+        self.call_count = 0
+
+    async def complete(self, request: Any) -> ProviderResponse:
+        self.call_count += 1
+        if self.call_count == 1:
+            output_text = "not-json"
+        else:
+            output_text = (
+                '{"sections": [{"id": "overview", "title": "Overview", "content": "All set."}], '
+                '"summary": "All set."}'
             )
         return ProviderResponse(
             provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text=(
-                '{"sections": [{"id": "overview", "title": "Overview", "content": "All set."}], '
-                '"summary": "All set."}'
-            ),
+            provider=request.provider,
+            model=request.model,
+            output_text=output_text,
             status=ProviderCallStatus.succeeded,
         )
 
@@ -361,59 +358,76 @@ def test_structured_llm_executor_owns_validation_retries_through_gateway_dtos() 
     }
 
 
-def test_structured_llm_executor_owns_validation_retries_for_generate_document() -> None:
+def test_structured_llm_executor_owns_validation_retries_for_generate_document(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
     """ANY-253: document.generate_from_template goes through the same static-schema
     validation retry as every other structured_llm atom, with deterministic physical
-    provider-call accounting."""
+    provider-call accounting persisted through the real ProviderGateway ledger."""
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = GenerateDocumentValidationRetrySpyGateway()
-    executor = StructuredLlmActionExecutor(
-        config_registry=registry,
-        provider_gateway=spy_gateway,
-    )
-    base_policy = registry.get_provider_policy("default_fake_provider_v1")
-    assert base_policy is not None
-    executor._require_provider_policy = lambda _provider_policy_ref: replace(
-        base_policy,
-        retry_policy=replace(
-            base_policy.retry_policy,
-            validation=ProviderValidationRetryPolicy(
-                owner=base_policy.retry_policy.validation.owner,
-                max_attempts=2,
+    adapter = _InvalidThenValidGenerateDocumentAdapter()
+    gateway_policy = ProviderPolicy(
+        provider_policy_ref="default_fake_provider_v1",
+        provider="fake",
+        model="fake-json-v1",
+        retry_policy=ProviderRetryPolicy(
+            transport=ProviderTransportRetryPolicy(
+                owner="fake_adapter", max_attempts=1, litellm_num_retries_per_attempt=0
             ),
+            validation=ProviderValidationRetryPolicy(owner="pydanticai", max_attempts=2),
+            hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=5),
         ),
     )
-    request = StructuredLlmActionRequest(
-        tenant_id="tenant_demo",
-        region="eu-central",
-        product_id="kernel_demo",
-        frontend_id="kernel_demo_ce",
-        scenario_session_id="scenario_session_demo",
-        job_id="job_demo",
-        workflow_id="kernel_demo.extract_detect_report_v1",
-        workflow_version=1,
-        step_id="generate_report",
-        action_run_id="action_run_demo",
-        action_config_id="kernel_demo.generate_report_v1",
-        input_payload={"template_ref": "kernel_demo.report_v1", "data": {"source_text": "..."}},
-    )
-    session = object()
+    gateway = ProviderGateway({"fake": adapter}, _build_provider_policy_resolver(gateway_policy))
 
-    response = asyncio.run(executor.execute(request, session=session))
+    base_policy = registry.get_provider_policy("default_fake_provider_v1")
+    assert base_policy is not None
+
+    with transaction_boundary(session_factory) as session:
+        executor = StructuredLlmActionExecutor(
+            config_registry=registry,
+            provider_gateway=gateway,
+        )
+        executor._require_provider_policy = lambda _provider_policy_ref: replace(
+            base_policy,
+            retry_policy=replace(
+                base_policy.retry_policy,
+                validation=ProviderValidationRetryPolicy(
+                    owner=base_policy.retry_policy.validation.owner,
+                    max_attempts=2,
+                ),
+            ),
+        )
+        request = StructuredLlmActionRequest(
+            tenant_id="tenant_demo",
+            region="eu-central",
+            product_id="kernel_demo",
+            frontend_id="kernel_demo_ce",
+            scenario_session_id="scenario_session_demo",
+            job_id="job_demo",
+            workflow_id="kernel_demo.extract_detect_report_v1",
+            workflow_version=1,
+            step_id="generate_report",
+            action_run_id="action_run_demo",
+            action_config_id="kernel_demo.generate_report_v1",
+            input_payload={"template_ref": "kernel_demo.report_v1", "data": {"source_text": "..."}},
+        )
+
+        response = asyncio.run(executor.execute(request, session=session))
+        rows = list(
+            session.execute(
+                sa.select(provider_calls_table).order_by(provider_calls_table.c.physical_call_index)
+            ).mappings()
+        )
 
     assert response.structured_output == {
         "sections": [{"id": "overview", "title": "Overview", "content": "All set."}],
         "summary": "All set.",
     }
-    assert response.provider_call is not None
-    assert spy_gateway.sessions == [session, session]
-    assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
-        1,
-        2,
-    ]
-    assert {gateway_request.action_run_id for gateway_request in spy_gateway.requests} == {
-        "action_run_demo"
-    }
+    assert adapter.call_count == 2
+    assert len(rows) == 2
+    assert [row["semantic_attempt_index"] for row in rows] == [1, 2]
+    assert {row["action_run_id"] for row in rows} == {"action_run_demo"}
 
 
 def test_structured_llm_executor_retries_on_cross_validation_failure() -> None:
