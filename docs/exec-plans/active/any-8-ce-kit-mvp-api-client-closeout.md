@@ -7,7 +7,8 @@
 - Created: 2026-08-07
 - Last updated: 2026-08-10
 - Review date: 2026-08-10
-- Next action: push `feature/ANY-8` and open a PR; update Linear status once merged.
+- Next action: correct PR #61's description (backend-vs-client-helper wording, exec-plan link) per
+  team-lead review round 2, then merge and update Linear status.
 - Blocker: none
 
 ## Goal
