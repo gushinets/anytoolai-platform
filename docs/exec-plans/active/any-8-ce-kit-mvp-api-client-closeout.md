@@ -27,7 +27,7 @@ gap the audit found.
   against `packages/frontend/ce-kit/src` and its tests, file by file. For ANY-226 specifically:
   `src/results/getResult.ts` implements typed `getResult()` over `GET /v1/results/{artifact_id}`,
   `src/results/types.ts`'s `ResultArtifact` carries no raw/debug/provider fields, and
-  `test/results/getResult.test.ts` (5 cases: happy path, id percent-encoding, not-found, unavailable,
+  `test/results/getResult.test.ts` (6 cases: happy path, id percent-encoding, not-found, unavailable,
   malformed/invalid-response, abort) covers its AC.
 - Audit for stale "A16 owns `PlatformApiClient`/`startScenario()`/`getQuota()`" references outside
   `docs/exec-plans/completed/`.
@@ -45,7 +45,9 @@ gap the audit found.
 - Delete the now-unused empty placeholder files those stubs lived behind
   (`src/artifacts/getArtifact.ts`, `src/events/trackClientEvent.ts`,
   `src/handoffs/createHandoff.ts`, `src/handoffs/openHandoffConsent.ts`,
-  `src/scenarios/pollJob.ts` -- all were `export {}` with no real implementation).
+  `src/scenarios/pollJob.ts` -- all were `export {}` with no real implementation). `captureEmail` had
+  no separate placeholder file; it was defined inline in `src/index.ts` and removed from there
+  directly.
 - Update the README's opening disclaimer to match (no longer describes stubs present in
   `src/index.ts`; explains why they're absent instead).
 - Re-run `frontend-check`/`full-check` after the removal.
