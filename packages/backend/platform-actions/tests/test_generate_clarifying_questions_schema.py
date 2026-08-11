@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from jsonschema import ValidationError, validate
@@ -128,7 +129,7 @@ class TestGenerateClarifyingQuestionsInputSchema:
 
 
 class TestGenerateClarifyingQuestionsOutputSchema:
-    _QUESTION = {
+    _QUESTION: ClassVar[dict] = {
         "question": "What is the exact delivery date?",
         "rationale": "The timeline issue has no concrete date to plan around.",
         "priority": "high",
