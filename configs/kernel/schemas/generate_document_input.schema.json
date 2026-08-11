@@ -1,4 +1,19 @@
 {
   "type": "object",
-  "additionalProperties": true
+  "properties": {
+    "template_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "data": {
+      "type": "object"
+    },
+    "style": {
+      "type": "string",
+      "enum": ["professional", "concise", "detailed"],
+      "description": "Defaults to 'professional' when omitted."
+    }
+  },
+  "required": ["template_ref", "data"],
+  "additionalProperties": false
 }

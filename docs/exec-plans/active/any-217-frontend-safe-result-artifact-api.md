@@ -43,10 +43,14 @@ raw/debug artifacts, or state from another tenant/region.
 ### Out of scope
 
 - Rewriting shipped workflow output schemas to be closed (`additionalProperties: false`)
-  platform-wide — `kernel_demo.extract_output_v1`/`report_output_v1` intentionally stay open
-  because handoffs' safety model relies on an explicit per-field allowlist mapping
-  (`context_mapping`/`preview_mapping`) rather than schema strictness; changing that is a
-  separate, larger design decision affecting both consumers.
+  platform-wide — `kernel_demo.extract_output_v1` intentionally stays open because handoffs'
+  safety model relies on an explicit per-field allowlist mapping (`context_mapping`/
+  `preview_mapping`) rather than schema strictness; changing that is a separate, larger design
+  decision affecting both consumers.
+  (`kernel_demo.report_output_v1` was a separate, unintentional byte-for-byte duplicate of the
+  atom's own strict `kernel.schemas.generate_document_output_v1` schema, not an instance of this
+  open-by-design pattern; ANY-253 removed it in favor of a direct reference to the atom schema —
+  see `docs/exec-plans/active/any-253-a10-document-generate-from-template-contract-and-runtime.md`.)
 - CE-kit's `getResult()` client wiring (owned by A15c / ANY-226).
 - Any change to A01/A04 atom contracts (ANY-251's scope).
 
@@ -176,8 +180,9 @@ raw/debug artifacts, or state from another tenant/region.
 
 ## Follow-up debt
 
-- Shipped workflow output schemas (`kernel_demo.extract_output_v1`, `kernel_demo.report_output_v1`,
-  and future product schemas) are not uniformly closed (`additionalProperties: false`). The
+- Shipped workflow output schemas (`kernel_demo.extract_output_v1` and future product schemas) are
+  not uniformly closed (`additionalProperties: false`) — `kernel_demo.report_output_v1` was removed
+  by ANY-253 rather than closed, so it no longer belongs in this list. The
   `ResultService` denylist is a backstop, not a substitute for closing schemas or introducing a
   dedicated public/frontend-safe schema per workflow. Revisit once ANY-251 (A01/A04 contract
   hardening) lands and a decision is made on whether handoffs' allowlist-mapping safety model
