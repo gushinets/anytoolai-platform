@@ -325,6 +325,65 @@ def test_structured_llm_executor_owns_validation_retries_for_generate_document(
     assert {row["action_run_id"] for row in rows} == {"action_run_demo"}
 
 
+def test_structured_llm_executor_retries_compose_reply_on_cross_validation_failure() -> None:
+    """A07: caller-supplied constraints.max_length is enforced via cross-validation (the
+    static output schema only bounds text to a fixed maxLength, not the per-call limit), and
+    a violation must get the same semantic retry as a static schema mismatch."""
+    registry = build_config_registry(CONFIG_ROOT)
+    spy_gateway = _TwoAttemptSpyGateway(
+        '{"text": "This reply is far longer than the ten character limit."}',
+        '{"text": "Short."}',
+    )
+    executor = StructuredLlmActionExecutor(
+        config_registry=registry,
+        provider_gateway=spy_gateway,
+        output_cross_validators={
+            "text.compose_reply": ComposeReplyCrossValidator(),
+        },
+    )
+    base_policy = registry.get_provider_policy("default_fake_provider_v1")
+    assert base_policy is not None
+    executor._require_provider_policy = lambda _provider_policy_ref: replace(
+        base_policy,
+        retry_policy=replace(
+            base_policy.retry_policy,
+            validation=ProviderValidationRetryPolicy(
+                owner=base_policy.retry_policy.validation.owner,
+                max_attempts=2,
+            ),
+        ),
+    )
+    request = StructuredLlmActionRequest(
+        tenant_id="tenant_demo",
+        region="eu-central",
+        product_id="kernel_demo",
+        frontend_id="kernel_demo_ce",
+        scenario_session_id="scenario_session_demo",
+        job_id="job_demo",
+        workflow_id="kernel_demo.compose_reply_v1",
+        workflow_version=1,
+        step_id="compose_reply",
+        action_run_id="action_run_demo",
+        action_type="text.compose_reply",
+        action_config_id="kernel_demo.compose_reply_v1",
+        input_payload={
+            "situation": "The client asked for a status update on the project.",
+            "intent": "Reassure the client and confirm the new delivery date.",
+            "tone": "warm",
+            "constraints": {"max_length": 10},
+        },
+    )
+    session = object()
+
+    response = asyncio.run(executor.execute(request, session=session))
+
+    assert response.structured_output == {"text": "Short."}
+    assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
+        1,
+        2,
+    ]
+
+
 def test_structured_llm_executor_retries_on_cross_validation_failure() -> None:
     """ANY-251 regression: cross-validation failures must get the same semantic
     retries as static schema mismatches, not just a single unretried check."""
