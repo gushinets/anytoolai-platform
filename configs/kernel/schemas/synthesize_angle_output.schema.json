@@ -1,4 +1,19 @@
 {
   "type": "object",
-  "additionalProperties": true
+  "properties": {
+    "angle": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "secondary_angle": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": ["angle", "rationale"],
+  "additionalProperties": false
 }

@@ -7,6 +7,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
+    SynthesizeAngleCrossValidator,
 )
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
@@ -274,4 +275,61 @@ class TestDetectIssuesByTaxonomyCrossValidator:
         self.validator.validate(
             input_payload={"taxonomy": ["timeline"]},
             output={"issues": []},
+        )
+
+
+class TestSynthesizeAngleCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = SynthesizeAngleCrossValidator()
+
+    def test_allows_open_synthesis_when_options_omitted(self) -> None:
+        self.validator.validate(
+            input_payload={},
+            output={"angle": "Anything the model chooses", "rationale": "r"},
+        )
+
+    def test_allows_open_synthesis_when_options_empty(self) -> None:
+        self.validator.validate(
+            input_payload={"options": []},
+            output={"angle": "Anything the model chooses", "rationale": "r"},
+        )
+
+    def test_accepts_angle_within_options(self) -> None:
+        self.validator.validate(
+            input_payload={"options": ["Lead with urgency", "Lead with value"]},
+            output={"angle": "Lead with urgency", "rationale": "r"},
+        )
+
+    def test_rejects_angle_outside_options(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"options": ["Lead with urgency", "Lead with value"]},
+                output={"angle": "Something else entirely", "rationale": "r"},
+            )
+
+    def test_accepts_secondary_angle_within_options(self) -> None:
+        self.validator.validate(
+            input_payload={"options": ["Lead with urgency", "Lead with value"]},
+            output={
+                "angle": "Lead with urgency",
+                "rationale": "r",
+                "secondary_angle": "Lead with value",
+            },
+        )
+
+    def test_rejects_secondary_angle_outside_options(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"options": ["Lead with urgency", "Lead with value"]},
+                output={
+                    "angle": "Lead with urgency",
+                    "rationale": "r",
+                    "secondary_angle": "Something else entirely",
+                },
+            )
+
+    def test_ignores_missing_secondary_angle_when_options_supplied(self) -> None:
+        self.validator.validate(
+            input_payload={"options": ["Lead with urgency"]},
+            output={"angle": "Lead with urgency", "rationale": "r"},
         )

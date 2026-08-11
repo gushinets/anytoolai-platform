@@ -12,6 +12,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
+    SynthesizeAngleCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.executor import ActionExecutorResponse
@@ -200,6 +201,7 @@ def _build_runner(
         output_cross_validators={
             "text.extract_structured_fields": ExtractStructuredFieldsCrossValidator(),
             "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
+            "text.synthesize_angle": SynthesizeAngleCrossValidator(),
         },
     )
     return ActionRunner(
@@ -319,6 +321,50 @@ def test_action_runner_executes_detect_issues_atom_through_generic_path(
                 "evidence": "We need this soon.",
             }
         ]
+    }
+
+
+def test_action_runner_executes_synthesize_angle_atom_through_generic_path(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session)
+
+        result = asyncio.run(
+            runner.run(
+                "text.synthesize_angle",
+                "kernel_demo.synthesize_angle_v1",
+                {
+                    "signals": [
+                        {
+                            "id": "timeline_gap",
+                            "label": "Timeline gap",
+                            "value": "unconfirmed deadline",
+                            "evidence": "We haven't heard back on dates.",
+                        }
+                    ],
+                    "objective": "Win the deal",
+                    "options": [
+                        "Lead with the timeline risk to create urgency",
+                        "Anchor on budget flexibility as a fallback",
+                    ],
+                },
+                _context(
+                    step_id="synthesize_angle",
+                    action_type="text.synthesize_angle",
+                    action_config_id="kernel_demo.synthesize_angle_v1",
+                ),
+            )
+        )
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {
+        "angle": "Lead with the timeline risk to create urgency",
+        "rationale": (
+            "Signal timeline_gap shows the deadline is unconfirmed, which directly "
+            "threatens the objective; surfacing it first motivates fast action."
+        ),
+        "secondary_angle": "Anchor on budget flexibility as a fallback",
     }
 
 
