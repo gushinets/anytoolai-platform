@@ -58,10 +58,15 @@ def _optional_membership_set(values: Any) -> set[Any] | None:
     return set(values)
 
 
-def _truncated_repr(value: Any, *, limit: int = 100) -> str:
+_TRUNCATED_REPR_LIMIT = 100
+
+
+def _truncated_repr(value: Any) -> str:
     """Bounds free-form model text before it lands in exc.reason (retry prompt + debug artifact)."""
     text = str(value)
-    return text if len(text) <= limit else text[:limit] + "..."
+    if len(text) <= _TRUNCATED_REPR_LIMIT:
+        return text
+    return text[:_TRUNCATED_REPR_LIMIT] + "..."
 
 
 class ExtractStructuredFieldsInputValidator:
