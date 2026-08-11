@@ -12,6 +12,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
+    PersuasiveTextCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.executor import ActionExecutorResponse
@@ -200,6 +201,7 @@ def _build_runner(
         output_cross_validators={
             "text.extract_structured_fields": ExtractStructuredFieldsCrossValidator(),
             "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
+            "text.compose_persuasive_text": PersuasiveTextCrossValidator(),
         },
     )
     return ActionRunner(
@@ -320,6 +322,62 @@ def test_action_runner_executes_detect_issues_atom_through_generic_path(
             }
         ]
     }
+
+
+def test_action_runner_executes_compose_persuasive_text_atom_and_persists_event_lineage(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session)
+
+        result = asyncio.run(
+            runner.run(
+                "text.compose_persuasive_text",
+                "kernel_demo.compose_persuasive_text_v1",
+                {
+                    "context": {"product": "Widget Pro", "deadline": "March"},
+                    "objective": "Convince the reader to upgrade before March.",
+                },
+                _context(
+                    step_id="compose_persuasive_text",
+                    action_type="text.compose_persuasive_text",
+                    action_config_id="kernel_demo.compose_persuasive_text_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
+        events = _event_rows(session)
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {
+        "text": (
+            "Locking in the upgrade this quarter keeps your team on the discounted rate "
+            "and live well before the March rollout you flagged."
+        ),
+    }
+    assert result.output_artifact_id == artifact["id"]
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert artifact["metadata"]["schema_ref"] == "kernel.schemas.compose_persuasive_text_output_v1"
+    assert provider_call["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_succeeded": 1,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    action_started = _event_by_type(events, "action.started")
+    artifact_created = _event_by_type(events, "artifact.created")
+    action_succeeded = _event_by_type(events, "action.succeeded")
+    assert action_started["action_run_id"] == action_run["id"]
+    assert artifact_created["artifact_id"] == artifact["id"]
+    assert action_succeeded["action_run_id"] == action_run["id"]
 
 
 def test_action_runner_marks_failed_on_provider_failure(

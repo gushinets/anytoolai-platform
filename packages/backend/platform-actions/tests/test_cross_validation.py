@@ -7,6 +7,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
+    PersuasiveTextCrossValidator,
 )
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
@@ -275,3 +276,156 @@ class TestDetectIssuesByTaxonomyCrossValidator:
             input_payload={"taxonomy": ["timeline"]},
             output={"issues": []},
         )
+
+
+class TestPersuasiveTextCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = PersuasiveTextCrossValidator()
+
+    def test_pathological_bracket_text_does_not_hang(self) -> None:
+        """Regression: `[` repeated with no closing `]` used to make the markdown link
+        pattern's `.search()` retry an O(remaining-length) failed match at every `[`,
+        i.e. O(n^2) overall. This must stay fast regardless of input size."""
+        self.validator.validate(
+            input_payload={}, output={"text": "[" * 20000 + " end of message"}
+        )
+
+    @pytest.mark.parametrize(
+        ("input_payload", "output"),
+        [
+            ({}, {"text": "Plain persuasive text."}),
+            ({"constraints": {"length": 20}}, {"text": "Short persuasion."}),
+            (
+                {"constraints": {"length": True}},
+                {"text": "This text is longer than one character."},
+            ),
+            ({"constraints": {"format": "plain_text"}}, {"text": "Plain persuasive text."}),
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "Persuasive <b>markup</b>."},
+            ),
+            (
+                {"constraints": {"format": "markdown"}},
+                {"text": "**Bold** persuasion with *markdown* markers."},
+            ),
+            # Non-markup bracketed text must not be mistaken for HTML.
+            ({}, {"text": "Offer expires <Tuesday>."}),
+            ({}, {"text": "Reach me at <user@example.com>."}),
+            # A single asterisk is common casual emphasis, not markdown bold.
+            ({}, {"text": "The *actual* deadline is Friday."}),
+            # Short tag names (a/b/i/p/u) followed by ordinary bracketed words are not markup:
+            # no self-close and no "=" attribute value.
+            ({}, {"text": "Wait <a while longer> before deciding."}),
+            ({}, {"text": "<i said hello> to the team."}),
+            ({}, {"text": "Please be <b careful> with the budget."}),
+            ({}, {"text": "It is <p class or not> your call."}),
+            # Common HTML5 tags outside the original allowlist must still be recognized.
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "<section>Act now</section>"},
+            ),
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "Offer valid until <time>March 2026</time>, per <cite>the memo</cite>."},
+            ),
+            # Markdown lists, blockquotes, and inline code are markup too, not just bold/links.
+            (
+                {"constraints": {"format": "markdown"}},
+                {"text": "- Save 20%\n- Free shipping\n- Money-back guarantee"},
+            ),
+            (
+                {"constraints": {"format": "markdown"}},
+                {"text": "1. Sign up\n2. Claim the discount"},
+            ),
+            (
+                {"constraints": {"format": "markdown"}},
+                {"text": "> Act before the offer expires."},
+            ),
+            (
+                {"constraints": {"format": "markdown"}},
+                {"text": "Use code `SAVE20` at checkout."},
+            ),
+            # An integer-valued float length (schema `type: integer` allows 10.0) is honored.
+            ({"constraints": {"length": 20.0}}, {"text": "Short persuasion."}),
+            # A dash/digit/quote at the start of a *new sentence* (not a real block start) is
+            # prose, not markdown — block markers only count at text-start or after a blank line.
+            ({}, {"text": "Deal expires soon.\n- this is not a list, just a dash-prefixed sentence."}),
+            ({}, {"text": "Save now.\n3. is the number of days left."}),
+            ({}, {"text": "Offer ends.\n> 50% of customers already upgraded."}),
+            # A void element (img/br/hr) with a long attribute value must still be recognized
+            # as HTML — the detector must not truncate long attribute spans.
+            (
+                {"constraints": {"format": "html"}},
+                {
+                    "text": (
+                        '<img src="https://cdn.example.com/promo/'
+                        + "x" * 220
+                        + '.png" alt="Limited time offer">'
+                    )
+                },
+            ),
+            # A blank line with trailing whitespace (common LLM artifact) still starts a
+            # markdown block.
+            (
+                {"constraints": {"format": "markdown"}},
+                {"text": "Save today.\n \n- 20% off\n- Free shipping"},
+            ),
+            # mailto:/tel: links are valid markdown link targets too, not just http(s) URLs.
+            (
+                {"constraints": {"format": "markdown"}},
+                {"text": "Ready to upgrade? [Email our team](mailto:sales@example.com) today."},
+            ),
+            (
+                {"constraints": {"format": "markdown"}},
+                {"text": "Prefer to talk? [Call us](tel:+15551234567) now."},
+            ),
+            # Boolean HTML attributes (no "=") are still real markup.
+            ({"constraints": {"format": "html"}}, {"text": "Grab it now <img disabled>."}),
+            ({"constraints": {"format": "html"}}, {"text": "<hr noshade>"}),
+            # Python dunder identifiers are not markdown bold, despite the same __word__ shape.
+            ({}, {"text": "Configure __init__ before shipping."}),
+            ({}, {"text": "Run __main__ guard first."}),
+            # Genuine single-word bold is still detected.
+            ({"constraints": {"format": "markdown"}}, {"text": "This is __great__ news."}),
+        ],
+    )
+    def test_accepts(self, input_payload: dict, output: dict) -> None:
+        self.validator.validate(input_payload=input_payload, output=output)
+
+    @pytest.mark.parametrize(
+        ("input_payload", "output"),
+        [
+            ({"constraints": {"length": 5}}, {"text": "This text is too long."}),
+            (
+                {"constraints": {"format": "plain_text"}},
+                {"text": "Persuasive <b>markup</b>."},
+            ),
+            ({"constraints": {}}, {"text": "Persuasive <b>markup</b>."}),
+            ({}, {"text": "Persuasive <b>markup</b>."}),
+            # A lone closing tag is still markup.
+            ({}, {"text": "Act now.</p>"}),
+            ({"constraints": {"format": "html"}}, {"text": "Plain persuasive text."}),
+            # Markdown syntax is markup too, not just HTML tags.
+            ({}, {"text": "Act **now** to save."}),
+            ({}, {"text": "See [details](https://example.com)."}),
+            ({}, {"text": "# Heading\nBody."}),
+            # constraints.format == "markdown" must also require markup, same as "html".
+            ({"constraints": {"format": "markdown"}}, {"text": "Plain persuasive text."}),
+            # An integer-valued float length (10.0) must still be enforced, not silently
+            # ignored because it isn't a plain int.
+            ({"constraints": {"length": 5.0}}, {"text": "This text is too long."}),
+            # Each format must show its *own* markup kind: markdown-only text doesn't satisfy
+            # an html request, and html-only text doesn't satisfy a markdown request.
+            ({"constraints": {"format": "html"}}, {"text": "**Act now** and save."}),
+            ({"constraints": {"format": "markdown"}}, {"text": "Act <b>now</b> and save."}),
+            # Boolean HTML attributes are markup, so plain_text must still reject them.
+            ({}, {"text": "Grab it now <img disabled>."}),
+            # A dunder identifier is not markdown, so it can't satisfy a markdown format request.
+            ({"constraints": {"format": "markdown"}}, {"text": "Configure __init__ before shipping."}),
+            ({}, None),
+            ({}, {"text": 123}),
+        ],
+    )
+    def test_rejects(self, input_payload: dict, output: dict | None) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(input_payload=input_payload, output=output)

@@ -1,4 +1,46 @@
 {
   "type": "object",
-  "additionalProperties": true
+  "properties": {
+    "context": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audience": {
+      "type": "string",
+      "minLength": 1
+    },
+    "angle": {
+      "type": "string",
+      "minLength": 1
+    },
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "tone": {
+          "type": "string",
+          "enum": ["neutral", "warm", "firm"]
+        },
+        "length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+        },
+        "format": {
+          "type": "string",
+          "enum": ["plain_text", "markdown", "html"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["context", "objective"],
+  "additionalProperties": false
 }
