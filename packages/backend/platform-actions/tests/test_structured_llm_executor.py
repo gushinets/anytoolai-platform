@@ -44,6 +44,7 @@ from anytoolai_platform_core.structured_output.errors import (
 from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
+    GenerateClarifyingQuestionsCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import (
     StructuredLlmActionExecutor,
@@ -131,6 +132,36 @@ class CrossValidationRetrySpyGateway:
             output_text = (
                 '{"issues": [{"category": "timeline", '
                 '"description": "d", "severity": "high"}]}'
+            )
+        return ProviderResponse(
+            provider_policy_ref=request.provider_policy_ref,
+            provider="fake",
+            model="fake-json-v1",
+            output_text=output_text,
+            status=ProviderCallStatus.succeeded,
+        )
+
+
+class GenerateClarifyingQuestionsCrossValidationRetrySpyGateway:
+    """First reply references an out-of-bounds source_issue_index (violates A05 cross-
+    validation); second is valid."""
+
+    def __init__(self) -> None:
+        self.requests = []
+        self.sessions = []
+
+    async def request(self, request, *, session):
+        self.requests.append(request)
+        self.sessions.append(session)
+        if len(self.requests) == 1:
+            output_text = (
+                '{"questions": [{"question": "q", "rationale": "r", "priority": "high", '
+                '"category": "timeline", "source_issue_index": 5}]}'
+            )
+        else:
+            output_text = (
+                '{"questions": [{"question": "q", "rationale": "r", "priority": "high", '
+                '"category": "timeline", "source_issue_index": 0}]}'
             )
         return ProviderResponse(
             provider_policy_ref=request.provider_policy_ref,
@@ -378,6 +409,72 @@ def test_structured_llm_executor_retries_on_cross_validation_failure() -> None:
 
     assert response.structured_output == {
         "issues": [{"category": "timeline", "description": "d", "severity": "high"}]
+    }
+    assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
+        1,
+        2,
+    ]
+
+
+def test_structured_llm_executor_retries_on_generate_clarifying_questions_cross_validation_failure() -> (
+    None
+):
+    """A05 out-of-bounds source_issue_index must get the same semantic retry as any other
+    cross-validation failure, with deterministic physical provider-call accounting."""
+    registry = build_config_registry(CONFIG_ROOT)
+    spy_gateway = GenerateClarifyingQuestionsCrossValidationRetrySpyGateway()
+    executor = StructuredLlmActionExecutor(
+        config_registry=registry,
+        provider_gateway=spy_gateway,
+        output_cross_validators={
+            "text.generate_clarifying_questions": GenerateClarifyingQuestionsCrossValidator(),
+        },
+    )
+    base_policy = registry.get_provider_policy("default_fake_provider_v1")
+    assert base_policy is not None
+    executor._require_provider_policy = lambda _provider_policy_ref: replace(
+        base_policy,
+        retry_policy=replace(
+            base_policy.retry_policy,
+            validation=ProviderValidationRetryPolicy(
+                owner=base_policy.retry_policy.validation.owner,
+                max_attempts=2,
+            ),
+        ),
+    )
+    request = StructuredLlmActionRequest(
+        tenant_id="tenant_demo",
+        region="eu-central",
+        product_id="kernel_demo",
+        frontend_id="kernel_demo_ce",
+        scenario_session_id="scenario_session_demo",
+        job_id="job_demo",
+        workflow_id="kernel_demo.single_action_generate_clarifying_questions_v1",
+        workflow_version=1,
+        step_id="generate_clarifying_questions",
+        action_run_id="action_run_demo",
+        action_type="text.generate_clarifying_questions",
+        action_config_id="kernel_demo.generate_clarifying_questions_v1",
+        input_payload={
+            "issues": [{"category": "timeline", "description": "d", "severity": "high"}],
+            "context": "context",
+            "target_audience": "audience",
+        },
+    )
+    session = object()
+
+    response = asyncio.run(executor.execute(request, session=session))
+
+    assert response.structured_output == {
+        "questions": [
+            {
+                "question": "q",
+                "rationale": "r",
+                "priority": "high",
+                "category": "timeline",
+                "source_issue_index": 0,
+            }
+        ]
     }
     assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
         1,

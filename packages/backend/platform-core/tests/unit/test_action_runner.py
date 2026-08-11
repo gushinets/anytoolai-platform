@@ -12,6 +12,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
+    GenerateClarifyingQuestionsCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.executor import ActionExecutorResponse
@@ -158,6 +159,20 @@ class InvalidStructuredOutputAdapter:
         )
 
 
+class EmptyQuestionsFakeAdapter:
+    """Simulates a provider reply with no actionable issues: a valid, successful empty
+    `questions` array rather than the two-question default fixture."""
+
+    async def complete(self, request: Any) -> ProviderResponse:
+        return ProviderResponse(
+            provider_policy_ref=request.provider_policy_ref,
+            provider=request.provider,
+            model=request.model,
+            output_text='{"questions": []}',
+            status=ProviderCallStatus.succeeded,
+        )
+
+
 def _event_rows(session: sa.orm.Session) -> list[dict[str, Any]]:
     return list(
         session.execute(
@@ -200,6 +215,7 @@ def _build_runner(
         output_cross_validators={
             "text.extract_structured_fields": ExtractStructuredFieldsCrossValidator(),
             "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
+            "text.generate_clarifying_questions": GenerateClarifyingQuestionsCrossValidator(),
         },
     )
     return ActionRunner(
@@ -320,6 +336,152 @@ def test_action_runner_executes_detect_issues_atom_through_generic_path(
             }
         ]
     }
+
+
+def test_action_runner_executes_generate_clarifying_questions_from_a04_issue_artifact(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """Feeds the finalized A04 `issue_detection_output` shape (category/description/severity)
+    straight into A05's `issues` input, proving the direct workflow mapping the ticket requires
+    without any adapter step in between."""
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session)
+
+        result = asyncio.run(
+            runner.run(
+                "text.generate_clarifying_questions",
+                "kernel_demo.generate_clarifying_questions_v1",
+                {
+                    "issues": [
+                        {
+                            "category": "timeline",
+                            "description": "Delivery date not specified",
+                            "severity": "high",
+                            "evidence": "We need this soon.",
+                        },
+                        {
+                            "category": "scope",
+                            "description": "Deliverables list is incomplete",
+                            "severity": "medium",
+                        },
+                    ],
+                    "context": "Client project kickoff conversation.",
+                    "target_audience": "client stakeholder",
+                },
+                _context(
+                    step_id="generate_clarifying_questions",
+                    action_type="text.generate_clarifying_questions",
+                    action_config_id="kernel_demo.generate_clarifying_questions_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
+        events = _event_rows(session)
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {
+        "questions": [
+            {
+                "question": "What is the exact delivery date the client is expecting?",
+                "rationale": "The timeline issue has no concrete date to plan around.",
+                "priority": "high",
+                "category": "timeline",
+                "source_issue_index": 0,
+            },
+            {
+                "question": "Which deliverables are still missing from the agreed scope?",
+                "rationale": "The scope issue leaves the deliverable list incomplete.",
+                "priority": "medium",
+                "category": "scope",
+                "source_issue_index": 1,
+            },
+        ]
+    }
+    assert result.output_artifact_id == artifact["id"]
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert artifact["metadata"]["schema_ref"] == "kernel.schemas.generate_questions_output_v1"
+    assert provider_call["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_succeeded": 1,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    action_started = _event_by_type(events, "action.started")
+    artifact_created = _event_by_type(events, "artifact.created")
+    action_succeeded = _event_by_type(events, "action.succeeded")
+    assert action_started["action_run_id"] == action_run["id"]
+    assert artifact_created["artifact_id"] == artifact["id"]
+    assert action_succeeded["action_run_id"] == action_run["id"]
+
+
+def test_action_runner_executes_generate_clarifying_questions_with_empty_output_when_no_issue_is_actionable(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """Ticket-required successful empty-output behavior: when no supplied issue is
+    actionable, `questions: []` must go through the real fake-provider/ActionRunner path as a
+    succeeded run with full artifact/event lineage, not just pass schema/cross-validator unit
+    checks in isolation."""
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session, fake_adapter=EmptyQuestionsFakeAdapter())
+
+        result = asyncio.run(
+            runner.run(
+                "text.generate_clarifying_questions",
+                "kernel_demo.generate_clarifying_questions_v1",
+                {
+                    "issues": [
+                        {
+                            "category": "context",
+                            "description": "Purely informational note, nothing to resolve.",
+                            "severity": "low",
+                        }
+                    ],
+                    "context": "Client project kickoff conversation.",
+                    "target_audience": "client stakeholder",
+                },
+                _context(
+                    step_id="generate_clarifying_questions",
+                    action_type="text.generate_clarifying_questions",
+                    action_config_id="kernel_demo.generate_clarifying_questions_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
+        events = _event_rows(session)
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {"questions": []}
+    assert result.output_artifact_id == artifact["id"]
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert artifact["metadata"]["schema_ref"] == "kernel.schemas.generate_questions_output_v1"
+    assert provider_call["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_succeeded": 1,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    action_started = _event_by_type(events, "action.started")
+    artifact_created = _event_by_type(events, "artifact.created")
+    action_succeeded = _event_by_type(events, "action.succeeded")
+    assert action_started["action_run_id"] == action_run["id"]
+    assert artifact_created["artifact_id"] == artifact["id"]
+    assert action_succeeded["action_run_id"] == action_run["id"]
 
 
 def test_action_runner_marks_failed_on_provider_failure(

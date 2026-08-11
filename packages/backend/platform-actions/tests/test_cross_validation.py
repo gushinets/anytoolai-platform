@@ -7,6 +7,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
+    GenerateClarifyingQuestionsCrossValidator,
 )
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
@@ -275,3 +276,135 @@ class TestDetectIssuesByTaxonomyCrossValidator:
             input_payload={"taxonomy": ["timeline"]},
             output={"issues": []},
         )
+
+
+_ISSUES = [
+    {"category": "timeline", "description": "d0", "severity": "high"},
+    {"category": "scope", "description": "d1", "severity": "medium"},
+    {"category": "budget", "description": "d2", "severity": "low"},
+]
+
+
+def _question(*, priority: str, source_issue_index: int) -> dict:
+    return {
+        "question": "q",
+        "rationale": "r",
+        "priority": priority,
+        "category": "timeline",
+        "source_issue_index": source_issue_index,
+    }
+
+
+class TestGenerateClarifyingQuestionsCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = GenerateClarifyingQuestionsCrossValidator()
+
+    def test_accepts_empty_questions_when_no_issue_is_actionable(self) -> None:
+        self.validator.validate(input_payload={"issues": _ISSUES}, output={"questions": []})
+
+    def test_accepts_in_bounds_deterministically_ordered_questions(self) -> None:
+        self.validator.validate(
+            input_payload={"issues": _ISSUES},
+            output={
+                "questions": [
+                    _question(priority="high", source_issue_index=0),
+                    _question(priority="medium", source_issue_index=1),
+                    _question(priority="medium", source_issue_index=2),
+                    _question(priority="low", source_issue_index=1),
+                ]
+            },
+        )
+
+    def test_accepts_up_to_max_questions_default_of_five(self) -> None:
+        self.validator.validate(
+            input_payload={"issues": _ISSUES * 2},
+            output={
+                "questions": [
+                    _question(priority="high", source_issue_index=i) for i in range(5)
+                ]
+            },
+        )
+
+    def test_rejects_source_issue_index_out_of_bounds(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"issues": _ISSUES},
+                output={"questions": [_question(priority="high", source_issue_index=3)]},
+            )
+
+    def test_rejects_negative_source_issue_index(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"issues": _ISSUES},
+                output={"questions": [_question(priority="high", source_issue_index=-1)]},
+            )
+
+    def test_rejects_questions_when_no_issues_supplied(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"issues": []},
+                output={"questions": [_question(priority="high", source_issue_index=0)]},
+            )
+
+    def test_rejects_questions_exceeding_default_max_questions(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"issues": _ISSUES * 2},
+                output={
+                    "questions": [
+                        _question(priority="high", source_issue_index=i) for i in range(6)
+                    ]
+                },
+            )
+
+    def test_rejects_questions_exceeding_explicit_max_questions(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"issues": _ISSUES, "max_questions": 2},
+                output={
+                    "questions": [
+                        _question(priority="high", source_issue_index=0),
+                        _question(priority="medium", source_issue_index=1),
+                        _question(priority="low", source_issue_index=2),
+                    ]
+                },
+            )
+
+    def test_rejects_questions_out_of_priority_order(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"issues": _ISSUES},
+                output={
+                    "questions": [
+                        _question(priority="medium", source_issue_index=0),
+                        _question(priority="high", source_issue_index=1),
+                    ]
+                },
+            )
+
+    def test_rejects_questions_out_of_source_order_within_same_priority(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"issues": _ISSUES},
+                output={
+                    "questions": [
+                        _question(priority="high", source_issue_index=2),
+                        _question(priority="high", source_issue_index=0),
+                    ]
+                },
+            )
+
+    def test_rejects_unknown_priority(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"issues": _ISSUES},
+                output={"questions": [_question(priority="urgent", source_issue_index=0)]},
+            )
+
+    def test_rejects_missing_output(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(input_payload={"issues": _ISSUES}, output=None)
+
+    def test_rejects_malformed_questions(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(input_payload={"issues": _ISSUES}, output={"questions": "nope"})
