@@ -54,7 +54,7 @@ RUNTIME_CONFIG_EXAMPLE = {
             },
             "output_renderer_hint": {
                 "renderer": "json_schema",
-                "schema_ref": "kernel_demo.report_output_v1",
+                "schema_ref": "kernel.schemas.generate_document_output_v1",
                 "schema_version": 1,
             },
         },

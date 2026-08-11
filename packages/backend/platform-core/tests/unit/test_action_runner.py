@@ -484,6 +484,79 @@ def test_action_runner_executes_generate_clarifying_questions_with_empty_output_
     assert action_succeeded["action_run_id"] == action_run["id"]
 
 
+def test_action_runner_executes_generate_document_atom_and_persists_event_lineage(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session)
+
+        result = asyncio.run(
+            runner.run(
+                "document.generate_from_template",
+                "kernel_demo.generate_report_v1",
+                {
+                    "template_ref": "kernel_demo.report_v1",
+                    "data": {
+                        "source_text": "deadline budget deliverables",
+                        "extracted": {"values": {"deadline": "next Friday"}, "missing_fields": []},
+                        "issues": {"issues": []},
+                    },
+                },
+                _context(
+                    step_id="generate_report",
+                    action_type="document.generate_from_template",
+                    action_config_id="kernel_demo.generate_report_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
+        events = _event_rows(session)
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {
+        "sections": [
+            {
+                "id": "overview",
+                "title": "Overview",
+                "content": "The project is on track with a deadline of next Friday and a budget of $5,000.",
+            },
+            {
+                "id": "risks",
+                "title": "Risks",
+                "content": (
+                    "Timeline is underspecified: the requester says the work is needed soon "
+                    "without a firm date."
+                ),
+                "metadata": {"kind": "note"},
+            },
+        ],
+        "summary": "Scope and budget are set, but the timeline needs to be confirmed before work starts.",
+    }
+    assert result.output_artifact_id == artifact["id"]
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert artifact["metadata"]["schema_ref"] == "kernel.schemas.generate_document_output_v1"
+    assert provider_call["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_succeeded": 1,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    action_started = _event_by_type(events, "action.started")
+    artifact_created = _event_by_type(events, "artifact.created")
+    action_succeeded = _event_by_type(events, "action.succeeded")
+    assert action_started["action_run_id"] == action_run["id"]
+    assert artifact_created["artifact_id"] == artifact["id"]
+    assert action_succeeded["action_run_id"] == action_run["id"]
+
+
 def test_action_runner_marks_failed_on_provider_failure(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
