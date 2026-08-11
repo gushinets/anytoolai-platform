@@ -92,7 +92,6 @@ Canonical source: configs/kernel via ConfigLoader.
 - kernel_demo.extract_output_v1
 - kernel_demo.generic_text_input_v1
 - kernel_demo.issues_output_v1
-- kernel_demo.report_output_v1
 
 ## Quotas
 

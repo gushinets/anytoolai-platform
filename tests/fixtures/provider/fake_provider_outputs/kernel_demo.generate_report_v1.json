@@ -1,5 +1,22 @@
 {
-  "output_text": "# Report\n\n- Scope needs clarification.\n- Budget assumptions should be confirmed.",
+  "response_json": {
+    "sections": [
+      {
+        "id": "overview",
+        "title": "Overview",
+        "content": "The project is on track with a deadline of next Friday and a budget of $5,000."
+      },
+      {
+        "id": "risks",
+        "title": "Risks",
+        "content": "Timeline is underspecified: the requester says the work is needed soon without a firm date.",
+        "metadata": {
+          "kind": "note"
+        }
+      }
+    ],
+    "summary": "Scope and budget are set, but the timeline needs to be confirmed before work starts."
+  },
   "input_tokens": 180,
   "output_tokens": 72,
   "latency_ms": 18,
