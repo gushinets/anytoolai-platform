@@ -135,15 +135,19 @@ class ExtractStructuredFieldsCrossValidator:
 
         for name in values:
             if name not in known_names:
-                raise _cross_validation_error(f"unrequested_field:{name}")
+                raise _cross_validation_error(f"unrequested_field:{_truncated_repr(name)}")
         seen_missing_names: set[str] = set()
         for name in missing_fields:
             if name not in known_names:
-                raise _cross_validation_error(f"unrequested_missing_field:{name}")
+                raise _cross_validation_error(
+                    f"unrequested_missing_field:{_truncated_repr(name)}"
+                )
             if name in values:
-                raise _cross_validation_error(f"field_marked_missing_but_present:{name}")
+                raise _cross_validation_error(
+                    f"field_marked_missing_but_present:{_truncated_repr(name)}"
+                )
             if name in seen_missing_names:
-                raise _cross_validation_error(f"duplicate_missing_field:{name}")
+                raise _cross_validation_error(f"duplicate_missing_field:{_truncated_repr(name)}")
             seen_missing_names.add(name)
 
         missing_field_set = set(missing_fields)
@@ -154,7 +158,9 @@ class ExtractStructuredFieldsCrossValidator:
         if isinstance(confidence, Mapping):
             for name in confidence:
                 if name not in values:
-                    raise _cross_validation_error(f"confidence_for_unpopulated_field:{name}")
+                    raise _cross_validation_error(
+                        f"confidence_for_unpopulated_field:{_truncated_repr(name)}"
+                    )
 
         strict = input_payload.get("strict") is True
         if strict:
@@ -188,7 +194,9 @@ class DetectIssuesByTaxonomyCrossValidator:
                 raise _cross_validation_error("malformed_issue_entry")
             category = issue.get("category")
             if category not in allowed_categories:
-                raise _cross_validation_error(f"category_not_in_taxonomy:{category}")
+                raise _cross_validation_error(
+                    f"category_not_in_taxonomy:{_truncated_repr(category)}"
+                )
 
 
 class SynthesizeAngleCrossValidator:

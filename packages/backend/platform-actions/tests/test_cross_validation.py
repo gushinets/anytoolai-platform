@@ -247,6 +247,19 @@ class TestExtractStructuredFieldsCrossValidator:
                 output={"values": {"deliverables": "not a list"}, "missing_fields": []},
             )
 
+    def test_truncates_rejected_unrequested_field_name_in_error_reason(self) -> None:
+        overlong_name = "x" * 500
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            self.validator.validate(
+                input_payload={"fields": [_field("deadline", "string", required=True)]},
+                output={
+                    "values": {"deadline": "Friday", overlong_name: "anything"},
+                    "missing_fields": [],
+                },
+            )
+        assert len(exc_info.value.reason) < len(overlong_name)
+        assert exc_info.value.reason.endswith("...")
+
 
 class TestDetectIssuesByTaxonomyCrossValidator:
     def setup_method(self) -> None:
@@ -276,6 +289,20 @@ class TestDetectIssuesByTaxonomyCrossValidator:
             input_payload={"taxonomy": ["timeline"]},
             output={"issues": []},
         )
+
+    def test_truncates_rejected_category_in_error_reason(self) -> None:
+        overlong_category = "x" * 500
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            self.validator.validate(
+                input_payload={"taxonomy": ["timeline"]},
+                output={
+                    "issues": [
+                        {"category": overlong_category, "description": "d", "severity": "low"}
+                    ]
+                },
+            )
+        assert len(exc_info.value.reason) < len(overlong_category)
+        assert exc_info.value.reason.endswith("...")
 
 
 class TestSynthesizeAngleCrossValidator:
