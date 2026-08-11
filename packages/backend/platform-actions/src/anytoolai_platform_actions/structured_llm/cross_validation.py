@@ -58,6 +58,12 @@ def _optional_membership_set(values: Any) -> set[Any] | None:
     return set(values)
 
 
+def _truncated_repr(value: Any, *, limit: int = 100) -> str:
+    """Bounds free-form model text before it lands in exc.reason (retry prompt + debug artifact)."""
+    text = str(value)
+    return text if len(text) <= limit else text[:limit] + "..."
+
+
 class ExtractStructuredFieldsInputValidator:
     """Rejects semantically ambiguous A01 input.fields before any provider call is made."""
 
@@ -195,7 +201,9 @@ class SynthesizeAngleCrossValidator:
             return
         angle = output.get("angle")
         if angle not in allowed_options:
-            raise _cross_validation_error(f"angle_not_in_options:{angle}")
+            raise _cross_validation_error(f"angle_not_in_options:{_truncated_repr(angle)}")
         secondary_angle = output.get("secondary_angle")
         if secondary_angle is not None and secondary_angle not in allowed_options:
-            raise _cross_validation_error(f"secondary_angle_not_in_options:{secondary_angle}")
+            raise _cross_validation_error(
+                f"secondary_angle_not_in_options:{_truncated_repr(secondary_angle)}"
+            )

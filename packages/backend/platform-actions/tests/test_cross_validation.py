@@ -333,3 +333,13 @@ class TestSynthesizeAngleCrossValidator:
             input_payload={"options": ["Lead with urgency"]},
             output={"angle": "Lead with urgency", "rationale": "r"},
         )
+
+    def test_truncates_rejected_angle_in_error_reason(self) -> None:
+        overlong_angle = "x" * 500
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            self.validator.validate(
+                input_payload={"options": ["Lead with urgency"]},
+                output={"angle": overlong_angle, "rationale": "r"},
+            )
+        assert len(exc_info.value.reason) < len(overlong_angle)
+        assert exc_info.value.reason.endswith("...")
