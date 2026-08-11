@@ -116,6 +116,31 @@ class _TwoAttemptSpyGateway:
         )
 
 
+class _InvalidThenValidGenerateDocumentAdapter:
+    """First physical call returns non-JSON; the semantic retry that follows returns a
+    valid generate_document payload."""
+
+    def __init__(self) -> None:
+        self.call_count = 0
+
+    async def complete(self, request: Any) -> ProviderResponse:
+        self.call_count += 1
+        if self.call_count == 1:
+            output_text = "not-json"
+        else:
+            output_text = (
+                '{"sections": [{"id": "overview", "title": "Overview", "content": "All set."}], '
+                '"summary": "All set."}'
+            )
+        return ProviderResponse(
+            provider_policy_ref=request.provider_policy_ref,
+            provider=request.provider,
+            model=request.model,
+            output_text=output_text,
+            status=ProviderCallStatus.succeeded,
+        )
+
+
 def test_platform_actions_package_declares_runtime_dependencies() -> None:
     pyproject = tomllib.loads((PACKAGE_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     core_pyproject = tomllib.loads(
