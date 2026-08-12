@@ -44,6 +44,7 @@ from anytoolai_platform_core.structured_output.errors import (
 from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
+    GapRewritesCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import (
     StructuredLlmActionExecutor,
@@ -200,6 +201,38 @@ class InvalidThenValidDateSpyGateway:
             output_text = '{"values": {"deadline": "next Friday"}, "missing_fields": []}'
         else:
             output_text = '{"values": {"deadline": "2026-08-14"}, "missing_fields": []}'
+        return ProviderResponse(
+            provider_policy_ref=request.provider_policy_ref,
+            provider="fake",
+            model="fake-json-v1",
+            output_text=output_text,
+            status=ProviderCallStatus.succeeded,
+        )
+
+
+class GapRewritesValidationRetrySpyGateway:
+    """First reply violates the A08 rewrite-count cross-validation rule (requested n=2, only
+    1 rewrite returned); second reply is valid."""
+
+    def __init__(self) -> None:
+        self.requests = []
+        self.sessions = []
+
+    async def request(self, request, *, session):
+        self.requests.append(request)
+        self.sessions.append(session)
+        if len(self.requests) == 1:
+            output_text = (
+                '{"rewrites": [{"text": "Only one rewrite.", "explanation": "e", '
+                '"change_made": "c"}], "best_pick": 0}'
+            )
+        else:
+            output_text = (
+                '{"rewrites": ['
+                '{"text": "First rewrite.", "explanation": "e", "change_made": "c"}, '
+                '{"text": "Second rewrite.", "explanation": "e", "change_made": "c"}'
+                '], "best_pick": 1}'
+            )
         return ProviderResponse(
             provider_policy_ref=request.provider_policy_ref,
             provider="fake",
@@ -476,6 +509,72 @@ def test_structured_llm_executor_retries_on_cross_validation_failure() -> None:
     assert response.structured_output == {
         "issues": [{"category": "timeline", "description": "d", "severity": "high"}]
     }
+    assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
+        1,
+        2,
+    ]
+
+
+def test_structured_llm_executor_retries_generate_gap_rewrites_on_cross_validation_failure() -> (
+    None
+):
+    """A08: output.rewrites item count must equal the requested input.n (a cross-field
+    constraint the static output schema cannot express), and a violation must get the same
+    semantic retry as a static schema mismatch, with the physical provider-call count matching
+    the number of semantic attempts (not a silent truncation to fewer alternatives)."""
+    registry = build_config_registry(CONFIG_ROOT)
+    spy_gateway = GapRewritesValidationRetrySpyGateway()
+    executor = StructuredLlmActionExecutor(
+        config_registry=registry,
+        provider_gateway=spy_gateway,
+        output_cross_validators={
+            "text.generate_gap_rewrites": GapRewritesCrossValidator(),
+        },
+    )
+    base_policy = registry.get_provider_policy("default_fake_provider_v1")
+    assert base_policy is not None
+    executor._require_provider_policy = lambda _provider_policy_ref: replace(
+        base_policy,
+        retry_policy=replace(
+            base_policy.retry_policy,
+            validation=ProviderValidationRetryPolicy(
+                owner=base_policy.retry_policy.validation.owner,
+                max_attempts=2,
+            ),
+        ),
+    )
+    request = StructuredLlmActionRequest(
+        tenant_id="tenant_demo",
+        region="eu-central",
+        product_id="kernel_demo",
+        frontend_id="kernel_demo_ce",
+        scenario_session_id="scenario_session_demo",
+        job_id="job_demo",
+        workflow_id="kernel_demo.generate_gap_rewrites_v1",
+        workflow_version=1,
+        step_id="generate_gap_rewrites",
+        action_run_id="action_run_demo",
+        action_type="text.generate_gap_rewrites",
+        action_config_id="kernel_demo.generate_gap_rewrites_v1",
+        input_payload={
+            "source_text": "We will deliver the project soon.",
+            "gap": "No concrete delivery date is given.",
+            "n": 2,
+            "style": "moderate",
+        },
+    )
+    session = object()
+
+    response = asyncio.run(executor.execute(request, session=session))
+
+    assert response.structured_output == {
+        "rewrites": [
+            {"text": "First rewrite.", "explanation": "e", "change_made": "c"},
+            {"text": "Second rewrite.", "explanation": "e", "change_made": "c"},
+        ],
+        "best_pick": 1,
+    }
+    assert len(spy_gateway.requests) == 2
     assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
         1,
         2,

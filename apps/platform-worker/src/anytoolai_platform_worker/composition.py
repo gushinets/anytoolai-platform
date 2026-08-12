@@ -10,6 +10,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
+    GapRewritesCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.repository import ActionRunRepository
@@ -81,6 +82,7 @@ def build_worker(
             output_cross_validators={
                 "text.extract_structured_fields": ExtractStructuredFieldsCrossValidator(),
                 "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
+                "text.generate_gap_rewrites": GapRewritesCrossValidator(),
             },
         )
         action_runner = ActionRunner(

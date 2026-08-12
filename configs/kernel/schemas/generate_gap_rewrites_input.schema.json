@@ -1,4 +1,25 @@
 {
   "type": "object",
-  "additionalProperties": true
+  "properties": {
+    "source_text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gap": {
+      "type": "string",
+      "minLength": 1
+    },
+    "n": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "default": 3
+    },
+    "style": {
+      "type": "string",
+      "enum": ["conservative", "moderate", "bold"]
+    }
+  },
+  "required": ["source_text", "gap", "style"],
+  "additionalProperties": false
 }

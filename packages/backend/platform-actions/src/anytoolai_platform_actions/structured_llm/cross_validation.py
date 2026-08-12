@@ -27,10 +27,23 @@ def _is_finite_number(value: Any) -> bool:
     return not isinstance(value, float) or math.isfinite(value)
 
 
+def _coerce_integer_valued(value: Any) -> int | None:
+    """JSON Schema `type: integer` also accepts integer-valued floats (2.0), and JSON floats
+    like `1.0` decode to Python `float` — a plain `isinstance(value, int)` check would wrongly
+    reject those. Returns None for bools and non-integer-valued numbers."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return None
+
+
 _FIELD_TYPE_CHECKS: Mapping[str, Any] = {
     "string": lambda value: isinstance(value, str),
     "number": _is_finite_number,
-    "integer": lambda value: isinstance(value, int) and not isinstance(value, bool),
+    "integer": lambda value: _coerce_integer_valued(value) is not None,
     "boolean": lambda value: isinstance(value, bool),
     "date": _is_iso_date_string,
     "array_of_strings": lambda value: isinstance(value, list)
@@ -43,6 +56,23 @@ def _cross_validation_error(reason: str) -> StructuredOutputValidationError:
         reason=reason,
         error_type="ActionOutputCrossValidationError",
     )
+
+
+def _require_output(output: Mapping[str, Any] | None) -> Mapping[str, Any]:
+    if output is None:
+        raise _cross_validation_error("missing_output")
+    return output
+
+
+def _normalized_for_distinctness(text: str) -> str:
+    """Whitespace-collapsed, case-insensitive form used to detect near-duplicate rewrites."""
+    return " ".join(text.split()).casefold()
+
+
+# Must match the "default" declared in generate_gap_rewrites_input.schema.json's `n` property
+# (asserted by test_generate_gap_rewrites_schema.py) — jsonschema validation does not apply
+# JSON Schema defaults to the payload, so this is the actual runtime default, not the schema.
+GAP_REWRITES_DEFAULT_N = 3
 
 
 class ExtractStructuredFieldsInputValidator:
@@ -75,8 +105,7 @@ class ExtractStructuredFieldsCrossValidator:
         input_payload: Mapping[str, Any],
         output: Mapping[str, Any] | None,
     ) -> None:
-        if output is None:
-            raise _cross_validation_error("missing_output")
+        output = _require_output(output)
         field_specs = input_payload.get("fields")
         if not isinstance(field_specs, list):
             return
@@ -153,8 +182,7 @@ class DetectIssuesByTaxonomyCrossValidator:
         input_payload: Mapping[str, Any],
         output: Mapping[str, Any] | None,
     ) -> None:
-        if output is None:
-            raise _cross_validation_error("missing_output")
+        output = _require_output(output)
         taxonomy = input_payload.get("taxonomy")
         if not isinstance(taxonomy, list) or not taxonomy:
             return
@@ -168,3 +196,44 @@ class DetectIssuesByTaxonomyCrossValidator:
             category = issue.get("category")
             if category not in allowed_categories:
                 raise _cross_validation_error(f"category_not_in_taxonomy:{category}")
+
+
+class GapRewritesCrossValidator:
+    """Validates A08 output.rewrites/best_pick: item count must equal the requested A08
+    input.n (default 3), rewrites must be distinct after whitespace/case normalization, and
+    best_pick must index into rewrites."""
+
+    def validate(
+        self,
+        *,
+        input_payload: Mapping[str, Any],
+        output: Mapping[str, Any] | None,
+    ) -> None:
+        output = _require_output(output)
+        requested_n = _coerce_integer_valued(input_payload.get("n", GAP_REWRITES_DEFAULT_N))
+        if requested_n is None:
+            requested_n = GAP_REWRITES_DEFAULT_N
+
+        rewrites = output.get("rewrites")
+        if not isinstance(rewrites, list):
+            raise _cross_validation_error("malformed_gap_rewrites_output")
+        if len(rewrites) != requested_n:
+            raise _cross_validation_error(
+                f"rewrite_count_mismatch:{len(rewrites)}!={requested_n}"
+            )
+
+        seen_normalized: set[str] = set()
+        for rewrite in rewrites:
+            if not isinstance(rewrite, Mapping):
+                raise _cross_validation_error("malformed_rewrite_entry")
+            text = rewrite.get("text")
+            if not isinstance(text, str):
+                raise _cross_validation_error("malformed_rewrite_text")
+            normalized = _normalized_for_distinctness(text)
+            if normalized in seen_normalized:
+                raise _cross_validation_error("duplicate_rewrite_after_normalization")
+            seen_normalized.add(normalized)
+
+        best_pick = _coerce_integer_valued(output.get("best_pick"))
+        if best_pick is None or not (0 <= best_pick < len(rewrites)):
+            raise _cross_validation_error(f"best_pick_out_of_bounds:{output.get('best_pick')}")

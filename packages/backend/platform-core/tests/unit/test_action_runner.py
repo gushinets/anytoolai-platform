@@ -12,6 +12,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
+    GapRewritesCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.executor import ActionExecutorResponse
@@ -200,6 +201,7 @@ def _build_runner(
         output_cross_validators={
             "text.extract_structured_fields": ExtractStructuredFieldsCrossValidator(),
             "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
+            "text.generate_gap_rewrites": GapRewritesCrossValidator(),
         },
     )
     return ActionRunner(
@@ -393,6 +395,131 @@ def test_action_runner_executes_generate_document_atom_and_persists_event_lineag
     assert action_started["action_run_id"] == action_run["id"]
     assert artifact_created["artifact_id"] == artifact["id"]
     assert action_succeeded["action_run_id"] == action_run["id"]
+
+
+def test_action_runner_executes_generate_gap_rewrites_atom_and_persists_event_lineage(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session)
+
+        result = asyncio.run(
+            runner.run(
+                "text.generate_gap_rewrites",
+                "kernel_demo.generate_gap_rewrites_v1",
+                {
+                    "source_text": "We will deliver the project soon.",
+                    "gap": "No concrete delivery date is given.",
+                    "style": "moderate",
+                },
+                _context(
+                    step_id="generate_gap_rewrites",
+                    action_type="text.generate_gap_rewrites",
+                    action_config_id="kernel_demo.generate_gap_rewrites_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
+        events = _event_rows(session)
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {
+        "rewrites": [
+            {
+                "text": "The proposal includes a fixed delivery date of March 15.",
+                "explanation": (
+                    "States a concrete delivery date to close the timeline gap directly."
+                ),
+                "change_made": "Added an explicit delivery date.",
+            },
+            {
+                "text": (
+                    "Delivery is targeted for mid-March, with the final date confirmed "
+                    "within one week."
+                ),
+                "explanation": (
+                    "Commits to a narrow window while flagging when the exact date follows."
+                ),
+                "change_made": "Added a target window and a confirmation deadline.",
+            },
+            {
+                "text": (
+                    "We will deliver by March 15, guaranteed, or issue a full refund for "
+                    "the delay."
+                ),
+                "explanation": (
+                    "Backs the delivery date with a guarantee, removing any timeline "
+                    "ambiguity."
+                ),
+                "change_made": "Added a delivery date plus a guarantee clause.",
+            },
+        ],
+        "best_pick": 2,
+    }
+    assert result.output_artifact_id == artifact["id"]
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert artifact["metadata"]["schema_ref"] == "kernel.schemas.generate_gap_rewrites_output_v1"
+    assert provider_call["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_succeeded": 1,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    action_started = _event_by_type(events, "action.started")
+    artifact_created = _event_by_type(events, "artifact.created")
+    action_succeeded = _event_by_type(events, "action.succeeded")
+    assert action_started["action_run_id"] == action_run["id"]
+    assert artifact_created["artifact_id"] == artifact["id"]
+    assert action_succeeded["action_run_id"] == action_run["id"]
+
+
+def test_action_runner_generate_gap_rewrites_fails_safely_for_non_default_n(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """A08: the kernel_demo fake-provider fixture always returns 3 rewrites (the schema's
+    declared default n), and no action_config/workflow pins n=3 — a caller is free to request
+    any n in the schema's 1-5 range. Against the demo fixture, any n other than 3 is
+    unsatisfiable, and default_fake_provider_v1 allows exactly 1 physical call
+    (hard_limits.max_physical_provider_calls_per_action: 1), so this must surface as a single
+    clean, safe StructuredOutputValidationError — the "define validation failure rather than
+    silently returning fewer alternatives" contract requirement — not a silent success, a
+    retry hang, or an unhandled crash."""
+    counting_adapter = CountingFakeAdapter(FakeProviderAdapter(FIXTURE_ROOT))
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session, fake_adapter=counting_adapter)
+
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            asyncio.run(
+                runner.run(
+                    "text.generate_gap_rewrites",
+                    "kernel_demo.generate_gap_rewrites_v1",
+                    {
+                        "source_text": "We will deliver the project soon.",
+                        "gap": "No concrete delivery date is given.",
+                        "n": 2,
+                        "style": "moderate",
+                    },
+                    _context(
+                        step_id="generate_gap_rewrites",
+                        action_type="text.generate_gap_rewrites",
+                        action_config_id="kernel_demo.generate_gap_rewrites_v1",
+                    ),
+                )
+            )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+
+    assert exc_info.value.code == "structured_output_validation_failed"
+    assert exc_info.value.reason == "rewrite_count_mismatch:3!=2"
+    assert action_run["status"].value == "failed"
+    assert counting_adapter.call_count == 1
 
 
 def test_action_runner_marks_failed_on_provider_failure(

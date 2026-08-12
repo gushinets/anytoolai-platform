@@ -7,6 +7,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
+    GapRewritesCrossValidator,
 )
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
@@ -246,6 +247,24 @@ class TestExtractStructuredFieldsCrossValidator:
                 output={"values": {"deliverables": "not a list"}, "missing_fields": []},
             )
 
+    def test_integer_type_accepts_integer_valued_float(self) -> None:
+        # json.loads('{"budget": 500.0}') decodes to a Python float; that must still satisfy
+        # an "integer" field type, not be rejected as a type mismatch.
+        self.validator.validate(
+            input_payload={"fields": [_field("budget", "integer", required=False)]},
+            output={"values": {"budget": 500.0}, "missing_fields": []},
+        )
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"fields": [_field("budget", "integer", required=False)]},
+                output={"values": {"budget": 500.5}, "missing_fields": []},
+            )
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"fields": [_field("budget", "integer", required=False)]},
+                output={"values": {"budget": True}, "missing_fields": []},
+            )
+
 
 class TestDetectIssuesByTaxonomyCrossValidator:
     def setup_method(self) -> None:
@@ -275,3 +294,108 @@ class TestDetectIssuesByTaxonomyCrossValidator:
             input_payload={"taxonomy": ["timeline"]},
             output={"issues": []},
         )
+
+
+def _rewrite(text: str) -> dict:
+    return {"text": text, "explanation": "e", "change_made": "c"}
+
+
+class TestGapRewritesCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = GapRewritesCrossValidator()
+
+    def test_accepts_matching_count_and_distinct_rewrites(self) -> None:
+        self.validator.validate(
+            input_payload={"n": 2},
+            output={
+                "rewrites": [_rewrite("Alpha version."), _rewrite("Beta version.")],
+                "best_pick": 1,
+            },
+        )
+
+    def test_defaults_requested_count_to_three_when_n_omitted(self) -> None:
+        self.validator.validate(
+            input_payload={},
+            output={
+                "rewrites": [_rewrite("Alpha"), _rewrite("Beta"), _rewrite("Gamma")],
+                "best_pick": 0,
+            },
+        )
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={},
+                output={"rewrites": [_rewrite("Alpha"), _rewrite("Beta")], "best_pick": 0},
+            )
+
+    def test_rejects_rewrite_count_below_requested_n(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"n": 3},
+                output={
+                    "rewrites": [_rewrite("Alpha"), _rewrite("Beta")],
+                    "best_pick": 0,
+                },
+            )
+
+    def test_rejects_rewrite_count_above_requested_n(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"n": 1},
+                output={
+                    "rewrites": [_rewrite("Alpha"), _rewrite("Beta")],
+                    "best_pick": 0,
+                },
+            )
+
+    def test_accepts_integer_valued_float_n_from_json_schema_type_integer(self) -> None:
+        # JSON Schema `type: integer` also accepts integer-valued floats (2.0), so n=2.0 must
+        # be treated as n=2, not silently reset to the default.
+        self.validator.validate(
+            input_payload={"n": 2.0},
+            output={
+                "rewrites": [_rewrite("Alpha version."), _rewrite("Beta version.")],
+                "best_pick": 0,
+            },
+        )
+
+    def test_accepts_integer_valued_float_best_pick_from_json_decode(self) -> None:
+        # json.loads('{"best_pick": 1.0}') decodes to a Python float; that must still be
+        # treated as index 1, not rejected as out of bounds.
+        self.validator.validate(
+            input_payload={"n": 2},
+            output={
+                "rewrites": [_rewrite("Alpha version."), _rewrite("Beta version.")],
+                "best_pick": 1.0,
+            },
+        )
+
+    def test_rejects_duplicate_rewrites_differing_only_in_whitespace_and_case(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"n": 2},
+                output={
+                    "rewrites": [
+                        _rewrite("Deliver by March 15."),
+                        _rewrite("  deliver   by march 15.  "),
+                    ],
+                    "best_pick": 0,
+                },
+            )
+
+    def test_rejects_best_pick_out_of_bounds(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"n": 1},
+                output={"rewrites": [_rewrite("Alpha")], "best_pick": 1},
+            )
+
+    def test_rejects_negative_best_pick(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"n": 1},
+                output={"rewrites": [_rewrite("Alpha")], "best_pick": -1},
+            )
+
+    def test_rejects_missing_output(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(input_payload={"n": 1}, output=None)
