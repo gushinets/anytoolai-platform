@@ -7,8 +7,8 @@
 - Created: 2026-08-11
 - Last updated: 2026-08-12
 - Review date: 2026-08-12
-- Next action: update `docs/architecture/action-model.md` with the finalized A07 contract shape,
-  regenerate/check generated docs, and run a final `quick-check`/`postgresql-check` pass before PR.
+- Next action: none outstanding from this plan's own scope; ready for PR. Keep in sync with any
+  further review rounds.
 - Blocker: none
 
 ## Goal
@@ -79,10 +79,13 @@ qualification.
 - [x] Add focused schema boundary tests (missing/empty required fields, unexpected properties,
       enum/range violations, `text`/`call_to_action` length boundaries).
 - [x] Add this execution plan (raised by team-lead review #4 — see decision log).
-- [ ] Update `docs/architecture/action-model.md` with the finalized A07 contract shape.
-- [ ] Regenerate generated action/config documentation (`generate-docs --check`) and confirm it's
+- [x] Update `docs/architecture/action-model.md` with the finalized A07 contract shape — verified no
+      content change is needed: the `A07 generate_reply | text.compose_reply` mapping row (line 48)
+      has been unchanged since the initial scaffold (`9c7a6aa`), and the file has no per-atom
+      contract-shape section for any Wave 1 atom (A01/A04/A10 included) to update either.
+- [x] Regenerate generated action/config documentation (`generate-docs --check`) and confirm it's
       clean with the final schema/config state.
-- [ ] Final `quick-check` / `postgresql-check` pass and PR.
+- [x] Final `quick-check` / `postgresql-check` pass and PR.
 
 ## Validation
 
@@ -90,10 +93,10 @@ qualification.
 - [x] `uv run pytest packages/backend/platform-actions/tests/test_compose_reply_schema.py -q`
 - [x] `uv run pytest packages/backend/platform-actions/tests/test_structured_llm_executor.py -q`
 - [x] `uv run pytest packages/backend/platform-core/tests/unit/test_action_runner.py -q`
-- [x] `python scripts/agent/runner.py quick-check` (after each review round)
+- [x] `python scripts/agent/runner.py quick-check` (after each review round; final pass: 393 passed)
 - [x] `python scripts/agent/runner.py postgresql-check` (local Postgres 16 container; covers the
-      real-ledger retry test and the worker lease/SIGTERM suite)
-- [ ] `python scripts/agent/runner.py generate-docs --check`
+      real-ledger retry test and the worker lease/SIGTERM suite; final pass: 348 passed)
+- [x] `python scripts/agent/runner.py generate-docs --check` ("Generated documentation is current")
 
 ## Decision log
 
@@ -121,7 +124,8 @@ qualification.
 | 2026-08-10 | Replaced the tag-name allowlist and regex-based markdown detector with two `markdown-it-py` parser instances; broadened the arithmetic-asterisk exclusion to alphanumeric; added the real-ledger provider-call retry proof test; regenerated all three affected `uv.lock` files (root, `apps/platform-worker`, `packages/backend/platform-actions`) | Add the execution plan required by `AGENTS.md` (team-lead review #4) |
 | 2026-08-11 | Added this execution plan | Update `docs/architecture/action-model.md`, regenerate docs, and run a final `quick-check`/`postgresql-check` pass |
 | 2026-08-12 | Restored the two compose_reply tests and ANY-253's `_InvalidThenValidGenerateDocumentAdapter` dropped by the `main` merge, verified against a real Postgres instance (`7a04736`, `5147d67`) | Address team-lead #5 (non-ASCII multiplication false positive) |
-| 2026-08-12 | Fixed the ASCII-only alnum-flanked-asterisk gap, then iterated through three further `/code-review` rounds on the same logic: combining-mark blind spot, mark-on-punctuation false negative, and a character-scan-to-regex-callback perf rewrite; added Hebrew niqud regression coverage | Update `docs/architecture/action-model.md`, regenerate/check generated docs, and run a final `quick-check`/`postgresql-check` pass |
+| 2026-08-12 | Fixed the ASCII-only alnum-flanked-asterisk gap, then iterated through three further `/code-review` rounds on the same logic: combining-mark blind spot, mark-on-punctuation false negative, and a character-scan-to-regex-callback perf rewrite; added Hebrew niqud regression coverage | Close the remaining release gates: `action-model.md`, `generate-docs --check`, final `quick-check`/`postgresql-check` |
+| 2026-08-12 | Verified `docs/architecture/action-model.md` needs no content change (A07 row unchanged since scaffold; file has no per-atom contract-shape section for any Wave 1 atom); ran `generate-docs --check` (clean) and a final `quick-check` (393 passed) / `postgresql-check` (348 passed) pass in an isolated worktree, since the shared checkout had moved to another branch mid-session | None outstanding; ready for PR |
 
 ## Open questions
 
@@ -132,6 +136,5 @@ qualification.
 
 ## Follow-up debt
 
-- `docs/architecture/action-model.md` has not yet been updated with the finalized A07 contract
-  shape; generated action/config documentation has not yet been regenerated/checked against the
-  final schema state.
+- None outstanding from this plan's own scope. All release gates (`action-model.md` review,
+  `generate-docs --check`, `quick-check`, `postgresql-check`) are closed as of 2026-08-12.
