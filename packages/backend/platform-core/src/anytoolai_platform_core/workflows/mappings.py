@@ -116,10 +116,12 @@ def apply_output_mapping(
     applied: dict[str, Any] = {}
     for target_path, source_path in output_mapping.items():
         reference = parse_source_path(source_path)
-        if reference.root != "step_output" or reference.step_id != step_id:
+        if reference.root != "literal" and (
+            reference.root != "step_output" or reference.step_id != step_id
+        ):
             raise WorkflowMappingResolutionError(
-                "output_mapping sources must reference the current step output: "
-                f"{source_path}"
+                "output_mapping sources must reference the current step output or a "
+                f"literal: constant: {source_path}"
             )
         value = resolve_source_path(
             source_path,
@@ -207,9 +209,12 @@ def _validate_output_mapping(
     for target_path, source_path in mapping.items():
         _parse_context_target_path(target_path)
         reference = parse_source_path(source_path)
+        if reference.root == "literal":
+            continue
         if reference.root != "step_output" or reference.step_id != current_step_id:
             raise WorkflowMappingResolutionError(
-                "output_mapping must map from the current step output to `context.*`."
+                "output_mapping must map from the current step output or a literal: "
+                "constant to `context.*`."
             )
 
 
@@ -233,7 +238,7 @@ def _validate_retry_count(retry_count: Any) -> None:
 def _reject_literal_when_reference(reference: WorkflowSourcePath) -> None:
     if reference.root == "literal":
         raise WorkflowConditionEvaluationError(
-            "`when` does not support literal: sources; literal: is input_mapping only."
+            "`when` does not support literal: sources."
         )
 
 
