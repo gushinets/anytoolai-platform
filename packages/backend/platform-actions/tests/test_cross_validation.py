@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import unicodedata
 
 import pytest
 from anytoolai_platform_actions.structured_llm.cross_validation import (
@@ -311,6 +312,21 @@ class TestComposeReplyCrossValidator:
             ({}, {"text": "a*b*c"}),
             ({}, {"text": "L*W*H"}),
             ({}, {"text": "2*x*4"}),
+            # Unicode-aware: non-ASCII alphanumeric flanking (Cyrillic, Greek, CJK) must be
+            # excluded too, not only ASCII letters/digits.
+            ({}, {"text": "Д*Ш*В"}),
+            ({}, {"text": "α*β*γ"}),
+            ({}, {"text": "宽*高*深"}),
+            # A base letter followed by a combining diacritic (NFD form) must still count as
+            # flanking material, not only precomposed (NFC) letters.
+            ({}, {"text": unicodedata.normalize("NFD", "café*2*")}),
+            # Scripts with no precomposed base+mark form at all (Hebrew niqud, Arabic tashkil,
+            # Devanagari matras, ...) - not just NFD-decomposable Latin - must flank correctly
+            # too. A single combining mark (niqud) between the base letter and `*`:
+            ({}, {"text": "בָ*2*3"}),
+            # Two stacked combining marks (niqud + shin dot) - the walk-back must skip past
+            # both, not stop at the first one, to reach the alphanumeric base letter.
+            ({}, {"text": "בָׁ*2*3"}),
             ({}, {"text": "Plain reply.", "call_to_action": "Book a call."}),
             # Any real HTML5 construct - not just a fixed set of "common" tag names -
             # satisfies "html", via a real tokenizer rather than a name allowlist.
@@ -349,6 +365,9 @@ class TestComposeReplyCrossValidator:
             ({}, {"text": "See [details](https://example.com)."}),
             ({}, {"text": "# Heading\nBody."}),
             ({}, {"text": "The *actual* deadline is Friday."}),
+            # A combining mark attached to punctuation right before `*` must not itself count
+            # as alphanumeric-flanking material - real emphasis here must still be detected.
+            ({}, {"text": "Wait!́*urgent* now"}),
             ({}, {"text": "Plain reply.", "call_to_action": "**Book** a call."}),
             # GFM constructs beyond core CommonMark: tables, strikethrough.
             ({}, {"text": "| a | b |\n|---|---|\n| 1 | 2 |"}),
