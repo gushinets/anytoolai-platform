@@ -52,9 +52,10 @@ retry-loop abort check that only ran after a configured delay, and two variants 
 
 ### Out of scope
 
-- A private diagnostics/telemetry sink for raw exception text (`src/events/trackClientEvent.ts` is
-  still an empty stub) -- raw detail is simply dropped, not routed anywhere, per the ticket's "only
-  in private diagnostics/telemetry where applicable."
+- A private diagnostics/telemetry sink for raw exception text (`trackClientEvent()` is not exported
+  from `ce-kit` -- removed as an unimplemented fake-success stub by ANY-8's closeout, see
+  `docs/exec-plans/active/any-8-ce-kit-mvp-api-client-closeout.md`) -- raw detail is simply dropped,
+  not routed anywhere, per the ticket's "only in private diagnostics/telemetry where applicable."
 - Scenario/quota/polling client methods (A15b / ANY-171).
 - Any backend or OpenAPI schema changes.
 
