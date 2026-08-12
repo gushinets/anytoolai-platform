@@ -7,13 +7,6 @@
         "priority": "high",
         "category": "timeline",
         "source_issue_index": 0
-      },
-      {
-        "question": "Which deliverables are still missing from the agreed scope?",
-        "rationale": "The scope issue leaves the deliverable list incomplete.",
-        "priority": "medium",
-        "category": "scope",
-        "source_issue_index": 1
       }
     ]
   },

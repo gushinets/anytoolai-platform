@@ -390,13 +390,6 @@ def test_action_runner_executes_generate_clarifying_questions_from_a04_issue_art
                 "category": "timeline",
                 "source_issue_index": 0,
             },
-            {
-                "question": "Which deliverables are still missing from the agreed scope?",
-                "rationale": "The scope issue leaves the deliverable list incomplete.",
-                "priority": "medium",
-                "category": "scope",
-                "source_issue_index": 1,
-            },
         ]
     }
     assert result.output_artifact_id == artifact["id"]

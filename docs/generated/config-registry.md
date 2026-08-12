@@ -40,6 +40,7 @@ Canonical source: configs/kernel via ConfigLoader.
 ## Workflows
 
 - kernel_demo.conditional_skip_extract_v1
+- kernel_demo.detect_questions_v1
 - kernel_demo.extract_detect_report_v1
 - kernel_demo.handoff_smoke_source_extract_v1
 - kernel_demo.retry_extract_v1
@@ -47,6 +48,7 @@ Canonical source: configs/kernel via ConfigLoader.
 
 ## Scenarios
 
+- kernel_demo.detect_questions_smoke_v1
 - kernel_demo.handoff_smoke_source_v1
 - kernel_demo.handoff_smoke_target_v1
 - kernel_demo.multi_step_workflow_smoke_v1
