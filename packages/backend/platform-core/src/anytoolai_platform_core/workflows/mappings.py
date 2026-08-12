@@ -238,7 +238,7 @@ def _validate_retry_count(retry_count: Any) -> None:
 def _reject_literal_when_reference(reference: WorkflowSourcePath) -> None:
     if reference.root == "literal":
         raise WorkflowConditionEvaluationError(
-            "`when` does not support literal: sources; literal: is input_mapping only."
+            "`when` does not support literal: sources."
         )
 
 

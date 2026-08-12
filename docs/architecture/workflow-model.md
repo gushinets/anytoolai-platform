@@ -38,25 +38,33 @@ Existing simple YAML remains valid because every new field is optional.
 `output_mapping` is a mapping of:
 
 ```text
-context.<target path> -> steps.<current_step_id>.output[.<field>...]
+context.<target path> -> steps.<current_step_id>.output[.<field>...] | literal:<json>
 ```
 
-Supported source paths are:
+`output_mapping` sources are restricted to the current step's own output or a `literal:<json>`
+constant — never scenario input, `context`, or another step's output.
+
+Supported `input_mapping` source paths are:
 
 - `scenario.input`
 - `scenario.input.<field>...`
 - `steps.<step_id>.output`
 - `steps.<step_id>.output.<field>...`
 - `context.<field>...`
-- `literal:<json>` (`input_mapping` only) — a config-owned JSON constant, not resolved against
-  scenario input, step output, or context. `<json>` is parsed with the repo's strict JSON parser
-  (`common/strict_json.py`, shared with provider structured-output parsing): it must be valid JSON
-  and must not use the non-standard `NaN`/`Infinity`/`-Infinity` tokens. The whole source path
-  (prefix plus JSON payload) is a single YAML scalar, so the YAML must quote it so the JSON's own
-  `{`, `[`, `:`, and `"` characters survive intact — for example `strict: 'literal:true'` or
+- `literal:<json>` (`input_mapping` and `output_mapping` only; not supported on `when`) — a
+  config-owned JSON constant, not resolved against scenario input, step output, or context.
+  `<json>` is parsed with the repo's strict JSON parser (`common/strict_json.py`, shared with
+  provider structured-output parsing): it must be valid JSON and must not use the non-standard
+  `NaN`/`Infinity`/`-Infinity` tokens. The whole source path (prefix plus JSON payload) is a single
+  YAML scalar, so the YAML must quote it so the JSON's own `{`, `[`, `:`, and `"` characters
+  survive intact — for example `strict: 'literal:true'` or
   `fields: 'literal:[{"name":"deadline","type":"string","description":"...","required":true}]'`.
   Used when a step needs a fixed value the workflow must guarantee regardless of caller-supplied
-  scenario input.
+  scenario input. On `output_mapping` it is typically used to seed a default `context.*` value from
+  an always-run step, so a later step that gets skipped by `when` can still leave a schema-valid
+  final output behind (see `kernel_demo.detect_questions_v1`'s `detect_issues` step, which seeds
+  `context.workflow_output` with `literal:{"questions": []}` in case the following step is
+  skipped).
 
 Path rules:
 
