@@ -149,3 +149,16 @@ class TestSynthesizeAngleOutputSchema:
                 instance={"angle": "Lead with urgency", "rationale": "r", "secondary_angle": ""},
                 schema=SYNTHESIZE_ANGLE_OUTPUT,
             )
+
+    def test_rationale_exceeding_max_length_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={"angle": "Lead with urgency", "rationale": "x" * 501},
+                schema=SYNTHESIZE_ANGLE_OUTPUT,
+            )
+
+    def test_rationale_at_max_length_allowed(self) -> None:
+        validate(
+            instance={"angle": "Lead with urgency", "rationale": "x" * 500},
+            schema=SYNTHESIZE_ANGLE_OUTPUT,
+        )
