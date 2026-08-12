@@ -6,12 +6,15 @@ This package covers **A15 — CE Kit MVP API Client** (ANY-8): **A15a — Founda
 **A15b — Scenario, Quota, and Polling Client** (ANY-171), and **A15c — Result Artifact Client**
 (ANY-226). The transport layer, the stable error union, injectable storage, guest identity, runtime
 config, quota, idempotent scenario start, session polling, next-action, and the frontend-safe
-result artifact read are all real. Several other exports (`pollJob`, `getArtifact`, `createHandoff`,
-`openHandoffConsent`, `captureEmail`, `trackClientEvent`, the `render*` helpers) remain
-fake-success placeholders deferred to later tickets (public job polling, raw artifact fetching,
-handoff, email capture, client-event ingestion). `getArtifact` here is unrelated to `getResult()`
-below -- it is a distinct, still-deferred placeholder. Do not treat their presence in `src/index.ts`
-as a working contract.
+result artifact read are all real. `pollJob`, `getArtifact`, `captureEmail`, and `trackClientEvent`
+are intentionally not exported: their backend contracts don't exist yet (public job polling, raw
+artifact fetching, email capture, client-event ingestion, owned by ANY-36 / later tickets).
+`createHandoff` and `openHandoffConsent` are also not exported, but for a different reason: the
+`/v1/handoffs` backend (create/get/accept/decline) is already implemented and in the generated
+OpenAPI types -- only the CE-kit client helpers are deferred, to ANY-222/A18a, which owns wiring
+them up. Unsupported capabilities must not ship as fake-success helpers, so all of the above will be
+added for real once their owning tickets land. (The deferred `getArtifact` name above is unrelated
+to the real `getResult()` below.)
 
 ## PlatformApiClient
 
