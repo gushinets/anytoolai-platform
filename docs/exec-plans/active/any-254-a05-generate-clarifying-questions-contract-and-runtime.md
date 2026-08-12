@@ -109,6 +109,7 @@ placeholder/smoke qualification.
 - [x] `uv run pytest packages/backend/platform-actions/tests -k "clarifying_questions or generate_questions" -q`
 - [x] `uv run pytest packages/backend/platform-core/tests/unit/test_action_runner.py -q`
 - [x] `uv run pytest packages/backend/platform-core/tests/unit/test_config_loader.py -q`
+- [x] `uv run pytest packages/backend/platform-core/tests/unit/test_workflow_mappings.py -q`
 - [x] `uv run pytest apps/platform-api/tests/test_runtime_config.py -q`
 - [x] `python scripts/agent/runner.py generate-docs --check`
 - [x] `python scripts/agent/runner.py full-check` (final pass: 424 passed / 352 deselected +
@@ -130,6 +131,7 @@ placeholder/smoke qualification.
 | 2026-08-12 | Restored `GenerateClarifyingQuestionsCrossValidator`'s production wiring (`composition.py`), both A05 `test_action_runner.py` tests, and the `kernel_demo.generate_clarifying_questions.v1` `prompts.yaml` entry, all silently dropped by the `main` merge (`d307112`) | Same overlapping-insertion merge-drop pattern documented on ANY-252's plan (`64ba09f`): `main`'s ANY-252 additions landed at the same file locations as this ticket's A05 additions, and the merge kept only `main`'s side in three separate files with no conflict markers — the `prompts.yaml` drop broke the entire `kernel_demo` config registry load (`generate-docs --check` failed), not just A05 |
 | 2026-08-12 | Removed 4 unused post-merge duplicate spy-gateway classes and de-duplicated `GenerateClarifyingQuestionsCrossValidationRetrySpyGateway` into the shared `_TwoAttemptSpyGateway` in `test_structured_llm_executor.py` | `main`'s merge left both its own consolidated `_FixedResponseSpyGateway`/`_TwoAttemptSpyGateway` helpers and this ticket's now-redundant single-purpose spy classes in the same file (`/code-review` finding); confirmed via grep that the 4 removed classes had zero call sites |
 | 2026-08-12 | Added this execution plan retroactively, after implementation and four review rounds had already landed | `AGENTS.md:69-76` requires an execution plan under `docs/exec-plans/active/` for any non-trivial work before coding; `/code-review` flagged that no such plan existed for this branch, mirroring the same gap ANY-252's team-lead review #4 found and closed the same way |
+| 2026-08-12 | Extended `output_mapping` to accept `literal:` sources (mirroring `input_mapping`'s existing support), and used it to seed `context.workflow_output = {"questions": []}` from the always-run `detect_issues` step, plus added `when: steps.detect_issues.output.issues` to skip `generate_questions` when empty | Closed the `issues: []` schema-mismatch follow-up debt below: `apply_output_mapping`/`_validate_output_mapping` previously only allowed a step's own output as an output_mapping source, so a skipped step (whose `output_mapping` never runs) had no way to leave a valid final output behind; seeding the default from the *prior*, always-run step sidesteps the need for a new skip-time primitive entirely. Verified via the non-Postgres-gated `test_workflow_mappings.py` (no DB needed to exercise the pure mapping functions) |
 
 ## Progress log
 
@@ -139,6 +141,7 @@ placeholder/smoke qualification.
 | 2026-08-12 | Added the isolated `detect_questions_v1` workflow/scenario, trimmed the fixture for real-execution bounds coherence, added a `WorkflowRunner`-level mapping proof test | Address team-lead review #2 (scenario not registered in `product.yaml`) |
 | 2026-08-12 | Registered `detect_questions_smoke_v1` in `product.yaml`, updated `test_runtime_config.py`'s hardcoded scenario list; while verifying, found and fixed 3 further silent regressions from the `main` merge (`composition.py` cross-validator wiring, both `test_action_runner.py` tests, `prompts.yaml` registry entry) | Address `/code-review` findings on the resulting diff |
 | 2026-08-12 | Removed dead/duplicate spy-gateway classes in `test_structured_llm_executor.py`; added this execution plan | Confirm `full-check` is green end-to-end and hand off remaining `issues: []` workflow gap as documented follow-up debt |
+| 2026-08-12 | Closed the `issues: []` follow-up debt: extended `output_mapping` to accept `literal:` sources and used it to seed a `{"questions": []}` default from `detect_issues`, added a `when:` skip guard on `generate_questions`, added coverage in `test_workflow_mappings.py` | None outstanding |
 
 ## Open questions
 
@@ -146,17 +149,5 @@ placeholder/smoke qualification.
 
 ## Follow-up debt
 
-- **`detect_questions_v1` has no graceful path for `detect_issues` legitimately returning zero
-  issues.** `issue_detection_output.schema.json` allows an empty `issues[]`, but
-  `generate_questions_input.schema.json` requires `minItems: 1` (per this ticket's canonical
-  contract). Confirmed via direct `jsonschema.validate` that `{"issues": [], ...}` is rejected.
-  If `detect_issues` ever returns zero issues in this workflow, the run fails validation instead
-  of degrading to `questions: []`. Not currently reachable in this repo: `FakeProviderAdapter`
-  fixtures are static per `action_config_id` and do not vary with input text, so
-  `detect_issues_v1.json` always returns its fixed 1 issue through this scenario. Fixing it
-  properly needs a new `WorkflowRunner` primitive (a default/literal output applied when a step is
-  skipped — today `output_mapping` only runs on a step's own success, and a skipped step's
-  `output_mapping` never executes), which touches shared step-execution code used by every
-  workflow and would need Postgres-gated tests to verify; deferred rather than built and shipped
-  unverified. Revisit when a real (non-fake) provider is wired in and this branch becomes
-  reachable in practice.
+- None outstanding. The `issues: []` graceful-degrade gap (previously documented here) is closed
+  — see the 2026-08-12 decision-log entry on `literal:` output_mapping sources.

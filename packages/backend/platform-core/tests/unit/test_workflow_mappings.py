@@ -61,6 +61,55 @@ def test_apply_output_mapping_requires_context_targets() -> None:
     assert "context.*" in str(exc_info.value)
 
 
+def test_apply_output_mapping_accepts_literal_source() -> None:
+    context: dict[str, object] = {}
+    applied = apply_output_mapping(
+        {"context.workflow_output": 'literal:{"questions": []}'},
+        step_id="detect_issues",
+        step_output={"issues": []},
+        context=context,
+    )
+
+    assert applied == {"context.workflow_output": {"questions": []}}
+    assert context == {"workflow_output": {"questions": []}}
+
+
+def test_validate_step_contract_accepts_literal_output_mapping() -> None:
+    validate_step_contract(
+        step_id="detect_issues",
+        prior_step_ids=(),
+        input_mapping={},
+        output_mapping={"context.workflow_output": 'literal:{"questions": []}'},
+        when=None,
+        retry_count=0,
+    )
+
+
+def test_detect_questions_workflow_degrades_to_empty_questions_when_no_issues_detected() -> None:
+    """`kernel_demo.detect_questions_v1`: when `detect_issues` legitimately finds zero issues,
+    `generate_questions` must be skipped (A05's input schema requires a non-empty `issues[]`) and
+    the workflow must still produce a schema-valid `{"questions": []}` final output, not fail."""
+    step_outputs: dict[str, object] = {"detect_issues": {"issues": []}}
+    context: dict[str, object] = {}
+
+    apply_output_mapping(
+        {"context.workflow_output": 'literal:{"questions": []}'},
+        step_id="detect_issues",
+        step_output=step_outputs["detect_issues"],
+        context=context,
+    )
+
+    should_run_generate_questions = resolve_when_condition(
+        "steps.detect_issues.output.issues",
+        scenario_input={},
+        step_outputs=step_outputs,
+        context=context,
+    )
+
+    assert should_run_generate_questions is False
+    assert context == {"workflow_output": {"questions": []}}
+
+
 def test_resolve_when_condition_uses_source_path_truthiness() -> None:
     assert (
         resolve_when_condition(

@@ -86,8 +86,11 @@ workflows:
           source_text: scenario.input.source_text
           taxonomy: '?scenario.input.taxonomy'
           context: '?scenario.input.context'
+        output_mapping:
+          context.workflow_output: 'literal:{"questions": []}'
       - step_id: generate_questions
         action_config_id: kernel_demo.generate_clarifying_questions_v1
+        when: steps.detect_issues.output.issues
         input_mapping:
           issues: steps.detect_issues.output.issues
           context: scenario.input.source_text
