@@ -1091,6 +1091,61 @@ def test_workflow_runner_executes_multi_step_workflow_with_input_and_output_mapp
     ]
 
 
+def test_workflow_runner_maps_detected_issues_directly_into_generate_clarifying_questions(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """Proves `kernel_demo.detect_questions_v1`'s `generate_questions` step input_mapping
+    (`issues: steps.detect_issues.output.issues`) really does wire A04's finalized issue shape
+    straight into A05's `issues` field through the config-driven WorkflowRunner mapping engine --
+    not just via a hand-built ActionRunner call (team-lead #1 review finding)."""
+    detected_issues = [{"category": "timeline", "description": "Timeline risk", "severity": "high"}]
+    executor = RecordingExecutor(
+        {
+            "detect_issues": {"issues": detected_issues},
+            "generate_questions": {
+                "questions": [
+                    {
+                        "question": "What is the exact delivery date?",
+                        "rationale": "The timeline issue has no concrete date to plan around.",
+                        "priority": "high",
+                        "category": "timeline",
+                        "source_issue_index": 0,
+                    }
+                ]
+            },
+        }
+    )
+    with transaction_boundary(session_factory) as session:
+        context = _base_context()
+        _seed_context_scenario(session, context)
+        runner = _build_recording_workflow_runner(session, executor=executor)
+
+        result = asyncio.run(
+            runner.run(
+                "kernel_demo.detect_questions_v1",
+                {"source_text": "deadline budget deliverables", "taxonomy": ["timeline"]},
+                context,
+            )
+        )
+        job = session.execute(sa.select(jobs_table)).mappings().one()
+        action_runs = list(
+            session.execute(
+                sa.select(action_runs_table).order_by(action_runs_table.c.created_at, action_runs_table.c.id)
+            ).mappings()
+        )
+
+    assert result.status.value == "succeeded"
+    assert executor.inputs_by_step["generate_questions"][0] == {
+        "issues": detected_issues,
+        "context": "deadline budget deliverables",
+        "target_audience": "internal reviewer",
+    }
+    assert [row["step_id"] for row in action_runs] == ["detect_issues", "generate_questions"]
+    assert all(row["status"].value == "succeeded" for row in action_runs)
+    assert result.output_payload == executor.outputs_by_step["generate_questions"]
+    assert job["metadata"]["workflow_state"]["context"]["workflow_output"] == result.output_payload
+
+
 def test_workflow_runner_skips_step_and_records_reason(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

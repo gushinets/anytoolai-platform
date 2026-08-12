@@ -1,18 +1,9 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
 from jsonschema import ValidationError, validate
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
-SCHEMA_ROOT = REPO_ROOT / "configs" / "kernel" / "schemas"
-
-
-def _schema(name: str) -> dict:
-    return json.loads((SCHEMA_ROOT / name).read_text(encoding="utf-8"))
-
+from schema_support import load_schema as _schema
 
 EXTRACT_INPUT = _schema("extract_input.schema.json")
 EXTRACT_OUTPUT = _schema("extract_output.schema.json")

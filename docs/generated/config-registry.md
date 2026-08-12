@@ -32,14 +32,17 @@ Canonical source: configs/kernel via ConfigLoader.
 
 ## Action configurations
 
+- kernel_demo.compose_reply_v1
 - kernel_demo.detect_issues_v1
 - kernel_demo.extract_structured_fields_v1
+- kernel_demo.generate_clarifying_questions_v1
 - kernel_demo.generate_gap_rewrites_v1
 - kernel_demo.generate_report_v1
 
 ## Workflows
 
 - kernel_demo.conditional_skip_extract_v1
+- kernel_demo.detect_questions_v1
 - kernel_demo.extract_detect_report_v1
 - kernel_demo.handoff_smoke_source_extract_v1
 - kernel_demo.retry_extract_v1
@@ -47,6 +50,7 @@ Canonical source: configs/kernel via ConfigLoader.
 
 ## Scenarios
 
+- kernel_demo.detect_questions_smoke_v1
 - kernel_demo.handoff_smoke_source_v1
 - kernel_demo.handoff_smoke_target_v1
 - kernel_demo.multi_step_workflow_smoke_v1
@@ -59,8 +63,10 @@ Canonical source: configs/kernel via ConfigLoader.
 
 ## Prompts
 
+- kernel_demo.compose_reply.v1
 - kernel_demo.detect_issues.v1
 - kernel_demo.extract_structured_fields.v1
+- kernel_demo.generate_clarifying_questions.v1
 - kernel_demo.generate_gap_rewrites.v1
 - kernel_demo.generate_report.v1
 
