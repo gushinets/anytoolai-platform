@@ -1,0 +1,20 @@
+{
+  "response_json": {
+    "questions": [
+      {
+        "question": "What is the exact delivery date the client is expecting?",
+        "rationale": "The timeline issue has no concrete date to plan around.",
+        "priority": "high",
+        "category": "timeline",
+        "source_issue_index": 0
+      }
+    ]
+  },
+  "input_tokens": 132,
+  "output_tokens": 54,
+  "latency_ms": 12,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "kernel_demo.generate_clarifying_questions_v1"
+  }
+}

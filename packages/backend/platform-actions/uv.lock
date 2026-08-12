@@ -161,6 +161,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "anytoolai-platform-core" },
+    { name = "markdown-it-py" },
     { name = "pydantic-ai-slim" },
     { name = "sqlalchemy" },
 ]
@@ -168,6 +169,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "anytoolai-platform-core", editable = "../platform-core" },
+    { name = "markdown-it-py", specifier = ">=3.0.0" },
     { name = "pydantic-ai-slim", specifier = ">=2.2.0" },
     { name = "sqlalchemy", specifier = ">=2.0" },
 ]

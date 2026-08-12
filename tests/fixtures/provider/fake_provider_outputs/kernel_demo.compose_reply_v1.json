@@ -1,0 +1,13 @@
+{
+  "response_json": {
+    "text": "Thanks for flagging the delay. I've adjusted the schedule and the revised draft will be with you by Friday.",
+    "call_to_action": "Let me know by Wednesday if Friday doesn't work for you."
+  },
+  "input_tokens": 96,
+  "output_tokens": 32,
+  "latency_ms": 11,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "kernel_demo.compose_reply_v1"
+  }
+}

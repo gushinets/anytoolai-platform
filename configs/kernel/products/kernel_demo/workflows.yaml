@@ -75,6 +75,29 @@ workflows:
           fields: 'literal:[{"name":"deadline","type":"string","description":"Project deadline mentioned in the text.","required":true},{"name":"budget","type":"string","description":"Budget mentioned in the text.","required":false},{"name":"deliverables","type":"array_of_strings","description":"Deliverables mentioned in the text.","required":false}]'
           strict: 'literal:true'
 
+  - workflow_id: kernel_demo.detect_questions_v1
+    version: 1
+    input_schema_ref: kernel_demo.generic_text_input_v1
+    output_schema_ref: kernel.schemas.generate_questions_output_v1
+    steps:
+      - step_id: detect_issues
+        action_config_id: kernel_demo.detect_issues_v1
+        input_mapping:
+          source_text: scenario.input.source_text
+          taxonomy: '?scenario.input.taxonomy'
+          context: '?scenario.input.context'
+        output_mapping:
+          context.workflow_output: 'literal:{"questions": []}'
+      - step_id: generate_questions
+        action_config_id: kernel_demo.generate_clarifying_questions_v1
+        when: steps.detect_issues.output.issues
+        input_mapping:
+          issues: steps.detect_issues.output.issues
+          context: scenario.input.source_text
+          target_audience: 'literal:"internal reviewer"'
+        output_mapping:
+          context.workflow_output: steps.generate_questions.output
+
   - workflow_id: kernel_demo.retry_extract_v1
     version: 1
     input_schema_ref: kernel_demo.generic_text_input_v1

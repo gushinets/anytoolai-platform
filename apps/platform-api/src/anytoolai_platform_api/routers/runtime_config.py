@@ -23,6 +23,7 @@ RUNTIME_CONFIG_EXAMPLE = {
     "scenario_ids": [
         "kernel_demo.single_action_smoke_v1",
         "kernel_demo.multi_step_workflow_smoke_v1",
+        "kernel_demo.detect_questions_smoke_v1",
         "kernel_demo.quota_exhausted_smoke_v1",
         "kernel_demo.handoff_smoke_source_v1",
         "kernel_demo.handoff_smoke_target_v1",
@@ -55,6 +56,21 @@ RUNTIME_CONFIG_EXAMPLE = {
             "output_renderer_hint": {
                 "renderer": "json_schema",
                 "schema_ref": "kernel.schemas.generate_document_output_v1",
+                "schema_version": 1,
+            },
+        },
+        {
+            "scenario_id": "kernel_demo.detect_questions_smoke_v1",
+            "version": 1,
+            "allowed_next_actions": ["copy_result", "create_handoff"],
+            "input_renderer_hint": {
+                "renderer": "json_schema",
+                "schema_ref": "kernel_demo.generic_text_input_v1",
+                "schema_version": 1,
+            },
+            "output_renderer_hint": {
+                "renderer": "json_schema",
+                "schema_ref": "kernel.schemas.generate_questions_output_v1",
                 "schema_version": 1,
             },
         },
