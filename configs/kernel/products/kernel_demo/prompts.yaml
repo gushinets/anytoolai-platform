@@ -14,8 +14,8 @@ prompts:
     template_path: prompts/generate_report.v1.md
     input_variables: []
     output_schema_ref: kernel.schemas.generate_document_output_v1
-  - prompt_ref: kernel_demo.generate_clarifying_questions.v1
+  - prompt_ref: kernel_demo.compose_reply.v1
     version: 1
-    template_path: prompts/generate_clarifying_questions.v1.md
+    template_path: prompts/compose_reply.v1.md
     input_variables: []
-    output_schema_ref: kernel.schemas.generate_questions_output_v1
+    output_schema_ref: kernel.schemas.compose_reply_output_v1

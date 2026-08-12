@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from anytoolai_platform_actions.structured_llm.cross_validation import (
+    ComposeReplyCrossValidator,
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
-    GenerateClarifyingQuestionsCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.repository import ActionRunRepository
@@ -82,7 +82,7 @@ def build_worker(
             output_cross_validators={
                 "text.extract_structured_fields": ExtractStructuredFieldsCrossValidator(),
                 "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
-                "text.generate_clarifying_questions": GenerateClarifyingQuestionsCrossValidator(),
+                "text.compose_reply": ComposeReplyCrossValidator(),
             },
         )
         action_runner = ActionRunner(
