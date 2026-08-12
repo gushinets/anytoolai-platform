@@ -5,10 +5,10 @@
 - State: active
 - Owner: agent
 - Created: 2026-08-11
-- Last updated: 2026-08-11
-- Review date: 2026-08-10
-- Next action: address the "team lead #4" review item this plan resolves (add this file), then
-  re-run `quick-check`/`postgresql-check` and continue with any further review rounds.
+- Last updated: 2026-08-12
+- Review date: 2026-08-12
+- Next action: update `docs/architecture/action-model.md` with the finalized A07 contract shape,
+  regenerate/check generated docs, and run a final `quick-check`/`postgresql-check` pass before PR.
 - Blocker: none
 
 ## Goal
@@ -106,6 +106,11 @@ qualification.
 | 2026-08-10 | Escape only alphanumeric-flanked (not just digit-flanked) asterisks before markdown parsing | CommonMark's real emphasis rule allows unspaced `*` to open/close intraword, so `a*b*c`/`L*W*H`/`2*x*4` (variable/symbolic products), not only `2*3*4`, were false-positived as italic emphasis |
 | 2026-08-10 | Kept `call_to_action` optional in the output schema (`required: ["text"]` only); declined a review request to make `ComposeReplyOverLimitThenValidAdapter`'s fake responses always include it | Verified directly against the loaded schema and a live re-run of the retry test that the finding's premise (static output validation requires `call_to_action` before the cross-validator runs) does not hold for the current schema; no code change made pending an explicit decision to change the contract itself |
 | 2026-08-11 | Added this execution plan retroactively, after most of the implementation and four review rounds had already landed | `AGENTS.md:69-76` requires an execution plan under `docs/exec-plans/active/` for any non-trivial work before coding; team-lead review #4 flagged that no such plan existed for this branch's scope (schemas, cross-validator, dependencies, tests across multiple lockfiles) |
+| 2026-08-12 | Restored two compose_reply ActionRunner/executor tests and ANY-253's own `_InvalidThenValidGenerateDocumentAdapter` class, all silently dropped by the `main` merge (`64ba09f`) | The merge's conflict resolution kept ANY-253's newly-added test at the same file location and fully deleted ANY-252's corresponding test rather than keeping both, in two files; the adapter-class drop only surfaced later because its test uses a Postgres-gated fixture that skips (not errors) without a DB configured, masking the `NameError` until Postgres was wired up |
+| 2026-08-12 | Extended the alphanumeric-flanked-asterisk exclusion (team-lead #5) from ASCII `[A-Za-z0-9]` to `str.isalnum()` | Non-ASCII arithmetic/dimension expressions (`Д*Ш*В`, `α*β*γ`, `宽*高*深`) were still false-positived as markdown emphasis |
+| 2026-08-12 | Replaced `str.isalnum()` flanking with `_is_flanking_character` (alnum **or** Unicode combining mark, category Mn/Mc/Me) | `/code-review` found `str.isalnum()` returns `False` on combining marks, so NFD-normalized text (and scripts that lean on combining diacritics) reproduced the same false positive the ASCII fix was meant to close |
+| 2026-08-12 | Replaced `_is_flanking_character` with `_base_character_before`, which walks back past combining marks to the real base character before checking `isalnum()`, and switched the scan from a full character-by-character pass to `_ASTERISK.sub()` with a callback | A follow-up `/code-review` pass found the mark-OR-alnum check treated *any* mark as flanking regardless of what it was attached to, so a mark stuck to punctuation (e.g. `!` + combining acute) wrongly escaped a real emphasis marker next to it, causing a false negative; the same pass also measured the character-by-character scan as ~70-80x slower than a regex-callback scanning only `*` positions |
+| 2026-08-12 | Added regression coverage for Hebrew niqud (single and stacked combining marks with no precomposed base+mark form) | A further `/code-review` pass found the walk-back logic itself was already correct for these scripts, but no test exercised them, so a regression to the walk-back (e.g. skipping only one mark) would pass CI unnoticed |
 
 ## Progress log
 
@@ -115,6 +120,8 @@ qualification.
 | 2026-08-10 | Registered the cross-validator in the composition root; extracted shared `schema_support.py`; fixed the `output_format` omitted-case gap and the `max_length` upper-bound schema gap; added `TestComposeReplyCrossValidator` and schema boundary tests | Address third review pass (HTML/markdown detection false positives and gaps) |
 | 2026-08-10 | Replaced the tag-name allowlist and regex-based markdown detector with two `markdown-it-py` parser instances; broadened the arithmetic-asterisk exclusion to alphanumeric; added the real-ledger provider-call retry proof test; regenerated all three affected `uv.lock` files (root, `apps/platform-worker`, `packages/backend/platform-actions`) | Add the execution plan required by `AGENTS.md` (team-lead review #4) |
 | 2026-08-11 | Added this execution plan | Update `docs/architecture/action-model.md`, regenerate docs, and run a final `quick-check`/`postgresql-check` pass |
+| 2026-08-12 | Restored the two compose_reply tests and ANY-253's `_InvalidThenValidGenerateDocumentAdapter` dropped by the `main` merge, verified against a real Postgres instance (`7a04736`, `5147d67`) | Address team-lead #5 (non-ASCII multiplication false positive) |
+| 2026-08-12 | Fixed the ASCII-only alnum-flanked-asterisk gap, then iterated through three further `/code-review` rounds on the same logic: combining-mark blind spot, mark-on-punctuation false negative, and a character-scan-to-regex-callback perf rewrite; added Hebrew niqud regression coverage | Update `docs/architecture/action-model.md`, regenerate/check generated docs, and run a final `quick-check`/`postgresql-check` pass |
 
 ## Open questions
 
