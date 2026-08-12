@@ -142,125 +142,6 @@ class _InvalidThenValidGenerateDocumentAdapter:
         )
 
 
-class CrossValidationRetrySpyGateway:
-    """First reply violates the A04 taxonomy cross-validation rule; second is valid."""
-
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        if len(self.requests) == 1:
-            output_text = (
-                '{"issues": [{"category": "not_in_taxonomy", '
-                '"description": "d", "severity": "high"}]}'
-            )
-        else:
-            output_text = (
-                '{"issues": [{"category": "timeline", '
-                '"description": "d", "severity": "high"}]}'
-            )
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text=output_text,
-            status=ProviderCallStatus.succeeded,
-        )
-
-
-class GenerateClarifyingQuestionsCrossValidationRetrySpyGateway:
-    """First reply references an out-of-bounds source_issue_index (violates A05 cross-
-    validation); second is valid."""
-
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        if len(self.requests) == 1:
-            output_text = (
-                '{"questions": [{"question": "q", "rationale": "r", "priority": "high", '
-                '"category": "timeline", "source_issue_index": 5}]}'
-            )
-        else:
-            output_text = (
-                '{"questions": [{"question": "q", "rationale": "r", "priority": "high", '
-                '"category": "timeline", "source_issue_index": 0}]}'
-            )
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text=output_text,
-            status=ProviderCallStatus.succeeded,
-        )
-
-
-class CrossValidationAlwaysFailingSpyGateway:
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text=(
-                '{"issues": [{"category": "not_in_taxonomy", '
-                '"description": "d", "severity": "high"}]}'
-            ),
-            status=ProviderCallStatus.succeeded,
-        )
-
-
-class InvalidThenValidDateSpyGateway:
-    """First reply uses a non-ISO date string; second uses a valid ISO date."""
-
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        if len(self.requests) == 1:
-            output_text = '{"values": {"deadline": "next Friday"}, "missing_fields": []}'
-        else:
-            output_text = '{"values": {"deadline": "2026-08-14"}, "missing_fields": []}'
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text=output_text,
-            status=ProviderCallStatus.succeeded,
-        )
-
-
-class ExhaustedValidationSpyGateway:
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text="not-json",
-            status=ProviderCallStatus.succeeded,
-        )
-
-
 def test_platform_actions_package_declares_runtime_dependencies() -> None:
     pyproject = tomllib.loads((PACKAGE_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     core_pyproject = tomllib.loads(
@@ -592,7 +473,12 @@ def test_structured_llm_executor_retries_on_generate_clarifying_questions_cross_
     """A05 out-of-bounds source_issue_index must get the same semantic retry as any other
     cross-validation failure, with deterministic physical provider-call accounting."""
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = GenerateClarifyingQuestionsCrossValidationRetrySpyGateway()
+    spy_gateway = _TwoAttemptSpyGateway(
+        '{"questions": [{"question": "q", "rationale": "r", "priority": "high", '
+        '"category": "timeline", "source_issue_index": 5}]}',
+        '{"questions": [{"question": "q", "rationale": "r", "priority": "high", '
+        '"category": "timeline", "source_issue_index": 0}]}',
+    )
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
         provider_gateway=spy_gateway,
