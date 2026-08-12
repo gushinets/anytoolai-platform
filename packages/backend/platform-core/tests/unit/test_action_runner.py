@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -9,6 +10,7 @@ import pytest
 import sqlalchemy as sa
 
 from anytoolai_platform_actions.structured_llm.cross_validation import (
+    ComposeReplyCrossValidator,
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
@@ -35,7 +37,12 @@ from anytoolai_platform_core.providers.gateway import (
     ProviderGateway,
     ProviderGatewayExecutionError,
 )
-from anytoolai_platform_core.providers.models import ProviderCallStatus, ProviderResponse
+from anytoolai_platform_core.providers.models import (
+    ProviderCallStatus,
+    ProviderResponse,
+    ProviderRetryHardLimits,
+    ProviderValidationRetryPolicy,
+)
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.storage.db import (
@@ -158,6 +165,29 @@ class InvalidStructuredOutputAdapter:
         )
 
 
+class ComposeReplyOverLimitThenValidAdapter:
+    """First reply violates the caller's constraints.max_length cross-validation rule;
+    second is compliant."""
+
+    def __init__(self) -> None:
+        self.call_count = 0
+
+    async def complete(self, request: Any) -> ProviderResponse:
+        self.call_count += 1
+        output_text = (
+            '{"text": "This reply is far longer than the ten character limit."}'
+            if self.call_count == 1
+            else '{"text": "Short."}'
+        )
+        return ProviderResponse(
+            provider_policy_ref=request.provider_policy_ref,
+            provider=request.provider,
+            model=request.model,
+            output_text=output_text,
+            status=ProviderCallStatus.succeeded,
+        )
+
+
 def _event_rows(session: sa.orm.Session) -> list[dict[str, Any]]:
     return list(
         session.execute(
@@ -200,6 +230,7 @@ def _build_runner(
         output_cross_validators={
             "text.extract_structured_fields": ExtractStructuredFieldsCrossValidator(),
             "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
+            "text.compose_reply": ComposeReplyCrossValidator(),
         },
     )
     return ActionRunner(
@@ -393,6 +424,147 @@ def test_action_runner_executes_generate_document_atom_and_persists_event_lineag
     assert action_started["action_run_id"] == action_run["id"]
     assert artifact_created["artifact_id"] == artifact["id"]
     assert action_succeeded["action_run_id"] == action_run["id"]
+
+
+def test_action_runner_executes_compose_reply_atom_and_persists_event_lineage(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session)
+
+        result = asyncio.run(
+            runner.run(
+                "text.compose_reply",
+                "kernel_demo.compose_reply_v1",
+                {
+                    "situation": "The client asked for a status update on the project.",
+                    "intent": "Reassure the client and confirm the new delivery date.",
+                    "tone": "warm",
+                },
+                _context(
+                    step_id="compose_reply",
+                    action_type="text.compose_reply",
+                    action_config_id="kernel_demo.compose_reply_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
+        events = _event_rows(session)
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {
+        "text": (
+            "Thanks for flagging the delay. I've adjusted the schedule and the revised "
+            "draft will be with you by Friday."
+        ),
+        "call_to_action": "Let me know by Wednesday if Friday doesn't work for you.",
+    }
+    assert result.output_artifact_id == artifact["id"]
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert artifact["metadata"]["schema_ref"] == "kernel.schemas.compose_reply_output_v1"
+    assert provider_call["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_succeeded": 1,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    action_started = _event_by_type(events, "action.started")
+    artifact_created = _event_by_type(events, "artifact.created")
+    action_succeeded = _event_by_type(events, "action.succeeded")
+    assert action_started["action_run_id"] == action_run["id"]
+    assert artifact_created["artifact_id"] == artifact["id"]
+    assert action_succeeded["action_run_id"] == action_run["id"]
+
+
+def test_action_runner_retries_compose_reply_cross_validation_through_real_ledger(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """A07: proves the constraints.max_length cross-validation retry through the real
+    ProviderGateway/ActionRunner path (not an in-memory spy) - a max_length failure
+    followed by success must create two physical provider_calls rows with the expected
+    semantic/physical indexes, provider events, and final artifact lineage."""
+    adapter = ComposeReplyOverLimitThenValidAdapter()
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session, fake_adapter=adapter)
+        # default_fake_provider_v1 allows 1 validation attempt / 1 physical call per action;
+        # widen both so the semantic retry this test drives can actually reach a 2nd
+        # physical call through the real ProviderGateway hard-limit check, not just PydanticAI.
+        executor = runner._executors["structured_llm"]
+        base_policy = executor._require_provider_policy("default_fake_provider_v1")
+        patched_policy = replace(
+            base_policy,
+            retry_policy=replace(
+                base_policy.retry_policy,
+                validation=ProviderValidationRetryPolicy(
+                    owner=base_policy.retry_policy.validation.owner,
+                    max_attempts=2,
+                ),
+                hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=2),
+            ),
+        )
+        executor._require_provider_policy = lambda _provider_policy_ref: patched_policy
+        executor._provider_gateway._policy_resolver.resolve = lambda _provider_policy_ref: patched_policy
+
+        result = asyncio.run(
+            runner.run(
+                "text.compose_reply",
+                "kernel_demo.compose_reply_v1",
+                {
+                    "situation": "The client asked for a status update on the project.",
+                    "intent": "Reassure the client and confirm the new delivery date.",
+                    "tone": "warm",
+                    "constraints": {"max_length": 10},
+                },
+                _context(
+                    step_id="compose_reply",
+                    action_type="text.compose_reply",
+                    action_config_id="kernel_demo.compose_reply_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+        provider_calls = list(
+            session.execute(
+                sa.select(provider_calls_table).order_by(
+                    provider_calls_table.c.created_at, provider_calls_table.c.id
+                )
+            ).mappings()
+        )
+        events = _event_rows(session)
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {"text": "Short."}
+    assert result.output_artifact_id == artifact["id"]
+    assert adapter.call_count == 2
+    assert len(provider_calls) == 2
+    assert [row["semantic_attempt_index"] for row in provider_calls] == [1, 2]
+    # physical_call_index tracks the action-wide physical-call budget, not a per-semantic-
+    # attempt counter, so it keeps climbing across semantic attempts too.
+    assert [row["physical_call_index"] for row in provider_calls] == [1, 2]
+    assert all(row["action_run_id"] == action_run["id"] for row in provider_calls)
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 2,
+            "provider.request_succeeded": 2,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    artifact_created = _event_by_type(events, "artifact.created")
+    assert artifact_created["artifact_id"] == artifact["id"]
 
 
 def test_action_runner_marks_failed_on_provider_failure(
