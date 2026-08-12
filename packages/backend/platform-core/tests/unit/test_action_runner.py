@@ -9,7 +9,7 @@ from typing import Any, Iterator
 import pytest
 import sqlalchemy as sa
 
-from action_runner_fakes import (
+from action_runner import (
     AlwaysFailFakeAdapter,
     CancelledFakeAdapter,
     ComposeReplyOverLimitThenValidAdapter,
