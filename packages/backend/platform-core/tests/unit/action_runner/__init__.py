@@ -12,6 +12,9 @@ from action_runner.invalid_structured_output_adapter import InvalidStructuredOut
 from action_runner.synthesize_angle_out_of_options_then_valid_adapter import (
     SynthesizeAngleOutOfOptionsThenValidAdapter,
 )
+from action_runner.synthesize_angle_secondary_out_of_options_then_valid_adapter import (
+    SynthesizeAngleSecondaryOutOfOptionsThenValidAdapter,
+)
 
 __all__ = [
     "AlwaysFailFakeAdapter",
@@ -22,4 +25,5 @@ __all__ = [
     "GenericExecutor",
     "InvalidStructuredOutputAdapter",
     "SynthesizeAngleOutOfOptionsThenValidAdapter",
+    "SynthesizeAngleSecondaryOutOfOptionsThenValidAdapter",
 ]
