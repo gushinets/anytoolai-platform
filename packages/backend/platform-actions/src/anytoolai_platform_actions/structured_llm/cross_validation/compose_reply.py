@@ -32,7 +32,7 @@ _PLAIN_TEXT_TOKEN_TYPES = frozenset({"paragraph_open", "paragraph_close", "inlin
 # CommonMark's real emphasis rule allows an unspaced `*` to open/close emphasis intraword
 # (unlike `_`), so a parser alone flags plain arithmetic/dimension expressions - numeric
 # ("2*3*4"), variable ("a*b*c", "2*x*4"), symbolic ("L*W*H"), or localized (
-# "Д*Ш*В", "宽*高*深") - as italic. Escaping a `*` sitting directly between two alphanumeric
+# "Д*Ш*Г", "宽*高*深") - as italic. Escaping a `*` sitting directly between two alphanumeric
 # characters makes CommonMark treat it as literal punctuation instead, while leaving
 # whitespace/punctuation-flanked emphasis (e.g. "*actual*") to the parser's real rules.
 # `str.isalnum()` is Unicode-aware (unlike an `[A-Za-z0-9]` character class), so this also

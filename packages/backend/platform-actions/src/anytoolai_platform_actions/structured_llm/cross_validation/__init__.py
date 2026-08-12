@@ -10,11 +10,11 @@ from .generate_clarifying_questions import GenerateClarifyingQuestionsCrossValid
 from .generate_gap_rewrites import GAP_REWRITES_DEFAULT_N, GapRewritesCrossValidator
 
 __all__ = [
+    "GAP_REWRITES_DEFAULT_N",
     "ComposeReplyCrossValidator",
     "DetectIssuesByTaxonomyCrossValidator",
     "ExtractStructuredFieldsCrossValidator",
     "ExtractStructuredFieldsInputValidator",
-    "GAP_REWRITES_DEFAULT_N",
     "GapRewritesCrossValidator",
     "GenerateClarifyingQuestionsCrossValidator",
 ]
