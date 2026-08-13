@@ -13,6 +13,8 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     ExtractStructuredFieldsInputValidator,
     PersuasiveTextCrossValidator,
     GenerateClarifyingQuestionsCrossValidator,
+    ScoreMatchByRubricCrossValidator,
+    ScoreMatchByRubricInputValidator,
     SynthesizeAngleCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
@@ -89,6 +91,7 @@ def build_worker(
                 "text.generate_clarifying_questions": GenerateClarifyingQuestionsCrossValidator(),
                 "text.synthesize_angle": SynthesizeAngleCrossValidator(),
                 "text.compose_persuasive_text": PersuasiveTextCrossValidator(),
+                "text.score_match_by_rubric": ScoreMatchByRubricCrossValidator(),
             },
         )
         action_runner = ActionRunner(
@@ -102,6 +105,7 @@ def build_worker(
             artifact_repository=artifact_repository,
             input_validators={
                 "text.extract_structured_fields": ExtractStructuredFieldsInputValidator(),
+                "text.score_match_by_rubric": ScoreMatchByRubricInputValidator(),
             },
         )
         return SequentialWorkflowRunner(

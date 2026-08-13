@@ -9,6 +9,9 @@ from action_runner.counting_fake_adapter import CountingFakeAdapter
 from action_runner.empty_questions_fake_adapter import EmptyQuestionsFakeAdapter
 from action_runner.generic_executor import GenericExecutor
 from action_runner.invalid_structured_output_adapter import InvalidStructuredOutputAdapter
+from action_runner.score_match_by_rubric_aggregate_mismatch_then_valid_adapter import (
+    ScoreMatchByRubricAggregateMismatchThenValidAdapter,
+)
 from action_runner.synthesize_angle_out_of_options_then_valid_adapter import (
     SynthesizeAngleOutOfOptionsThenValidAdapter,
 )
@@ -24,6 +27,7 @@ __all__ = [
     "EmptyQuestionsFakeAdapter",
     "GenericExecutor",
     "InvalidStructuredOutputAdapter",
+    "ScoreMatchByRubricAggregateMismatchThenValidAdapter",
     "SynthesizeAngleOutOfOptionsThenValidAdapter",
     "SynthesizeAngleSecondaryOutOfOptionsThenValidAdapter",
 ]

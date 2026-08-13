@@ -1,0 +1,149 @@
+# Execution Plan: ANY-256 A20b2. A02 text.score_match_by_rubric Contract And Runtime
+
+## Status
+
+- State: active
+- Owner: agent
+- Created: 2026-08-14
+- Last updated: 2026-08-14
+- Review date: 2026-08-14
+- Next action: none outstanding from the round-1 `/code-review` pass; keep in sync with any
+  further review rounds.
+- Blocker: none
+
+## Goal
+
+Implement the product-neutral `text.score_match_by_rubric` atom (legacy A02 `score_match`) as a
+strict, independently runnable JSON-schema contract — `text_a`/`text_b`/`rubric[]` in,
+`criterion_scores[]`/`score`/`strengths[]`/`gaps[]` out — executed through the existing
+`StructuredLlmActionExecutor`/`ProviderGateway`/`ActionRunner`, so ANY-218 can count this atom
+toward 11/11 without a placeholder/smoke qualification.
+
+## Scope
+
+### In scope
+
+- Strict, closed (`additionalProperties: false`) input/output JSON schemas replacing the previous
+  fully-permissive placeholders (`score_match_{input,output}.schema.json`).
+- `ScoreMatchByRubricInputValidator`: rejects duplicate `rubric[*].id` before any provider call
+  (JSON Schema can't express partial-key uniqueness); shares a `_reject_duplicate_ids` helper with
+  `ExtractStructuredFieldsInputValidator` (review round 1).
+- `ScoreMatchByRubricCrossValidator`: enforces `criterion_scores` maps exactly once onto `rubric`
+  (exists + unique + exhaustive), then recomputes the rubric-weighted average of `criterion_scores`
+  outside the model response and rejects a `score` that disagrees by more than a fixed `0.5`-point
+  tolerance — with an explicit `math.isfinite` guard on the recomputed aggregate so an
+  overflow-to-`NaN` weight combination can't silently bypass the check (review round 1, critical).
+- Product-neutral prompt (`score_match_by_rubric.v1.md`) instructing the model to compute the
+  aggregate as the rubric-weighted average rounded to the nearest whole number.
+- Registration: action definition, `schemas.yaml` (pre-existing), `kernel_demo`
+  `action_configs.yaml`/`prompts.yaml`, deterministic fake-provider fixture, and production
+  `output_cross_validators`/`input_validators` wiring in `apps/platform-worker/.../composition.py`.
+- Schema/cross-validation/ActionRunner test coverage plus config/architecture/docs/quick-check
+  gates.
+
+### Out of scope
+
+- The sibling A20b atoms (`text.compare_and_classify` / ANY-255, `text.score_multidimensional_axes`
+  / ANY-257).
+- Any product-specific rubric content, weighting scheme, or taxonomy — explicitly MVP-B scope per
+  the parent ANY-49 issue.
+
+## Relevant docs
+
+- `docs/architecture/action-model.md`
+- `docs/product-specs/mvp-a-platform-kernel.md`
+- `docs/exec-plans/active/any-259-a20c2-a09-text-synthesize-angle-contract-and-runtime.md`
+  (sibling Wave-1 atom; same review-driven exec-plan gap raised and fixed there first)
+
+## Contracts touched
+
+- API: none directly (action-runner atom, not an HTTP endpoint).
+- DB: none (uses existing `action_runs`/`provider_calls`/`artifacts`/event tables; no migration).
+- Config:
+  - `configs/kernel/schemas/score_match_{input,output}.schema.json` (now strict).
+  - `configs/kernel/products/kernel_demo/action_configs.yaml`
+    (`kernel_demo.score_match_by_rubric_v1` added).
+  - `configs/kernel/products/kernel_demo/prompts.yaml` (`kernel_demo.score_match_by_rubric.v1`
+    added).
+  - `configs/kernel/products/kernel_demo/prompts/score_match_by_rubric.v1.md` (new).
+  - `tests/fixtures/provider/fake_provider_outputs/kernel_demo.score_match_by_rubric_v1.json` (new).
+- Events: none new (existing `action.*`/`provider.*`/`artifact.*` event types).
+- Frontend: none (no OpenAPI/type-shape change).
+
+## Implementation steps
+
+- [x] Design the strict input/output JSON schemas (`text_a`/`text_b`/`rubric[]` ->
+      `criterion_scores[]`/`score`/`strengths[]`/`gaps[]`); close outer/nested objects with
+      `additionalProperties: false`; `weight` constrained to `exclusiveMinimum: 0` (no upper bound
+      — see decision log).
+- [x] Write `ScoreMatchByRubricInputValidator` (duplicate `rubric[*].id` rejection) and
+      `ScoreMatchByRubricCrossValidator` (exists+unique+exhaustive criterion mapping + weighted-
+      aggregate recompute/tolerance).
+- [x] Write the prompt `score_match_by_rubric.v1.md`, incl. the weighted-average rounding
+      instruction and an explicit chain-of-thought prohibition on `rationale`.
+- [x] Register action definition/action_configs.yaml/prompts.yaml/fake-provider fixture; wire both
+      validators into production `output_cross_validators`/`input_validators` in
+      `apps/platform-worker/.../composition.py`.
+- [x] Add schema fixture tests (`test_score_match_by_rubric_schema.py`): minimal/full valid,
+      missing required, unexpected property (top-level and nested rubric/criterion_scores items),
+      empty `rubric`/`criterion_scores`, non-positive `weight`, out-of-range scores.
+- [x] Add `TestScoreMatchByRubricInputValidator`/`TestScoreMatchByRubricCrossValidator` unit tests
+      and ActionRunner deterministic fake-provider execution + validation-retry
+      (provider-call-accounting) tests.
+- [x] Update `docs/architecture/action-model.md` with the finalized A02 contract shape and
+      `generate-docs` regen.
+- [x] `/code-review --high` round 1: fix the `NaN`-overflow aggregate bypass (critical), extract
+      the shared `_reject_duplicate_ids` helper, cross-reference the tolerance constant with the
+      prompt's rounding instruction (plus a pinning test), and accumulate `total_weight` in the
+      existing rubric loop instead of re-summing `rubric_weights.values()`.
+- [x] Add this execution plan (round 1 review also flagged its absence, matching the same
+      per-ticket gap ANY-259 hit first).
+- [x] Final `python scripts/agent/runner.py generate-docs --check` / `quick-check` /
+      `postgresql-check` pass.
+
+## Validation
+
+- [x] `uv run pytest packages/backend/platform-actions/tests -q` (full package: schema +
+      cross-validation + registration tests)
+- [x] `uv run pytest packages/backend/platform-core/tests/unit/test_action_runner.py -k
+      "score_match or duplicate_rubric" -q` (postgres-marked; run against a throwaway Docker
+      Postgres container in this sandbox, expected to run against CI's managed instance too)
+- [x] `python scripts/agent/runner.py validate-configs`
+- [x] `python scripts/agent/runner.py validate-architecture`
+- [x] `python scripts/agent/runner.py validate-docs`
+- [x] `python scripts/agent/runner.py generate-docs --check`
+- [x] `python scripts/agent/runner.py quick-check`
+- [x] `python scripts/agent/runner.py postgresql-check` — run against a throwaway Docker Postgres
+      container in this sandbox (no local Postgres by default); not run against CI's managed
+      instance
+
+## Decision log
+
+| Date | Decision | Why |
+|---|---|---|
+| 2026-08-14 | Aggregate rounding tolerance fixed at `0.5` points on the 0–100 scale | The ticket leaves the exact tolerance undefined; no prior numeric recompute/tolerance precedent exists in `cross_validation.py` (every earlier cross validator does membership/bounds/regex checks). `0.5` covers the model rounding a weighted average to the nearest whole point, matching the prompt's explicit rounding instruction — pinned by a dedicated test reading the prompt file so the two can't drift apart silently. |
+| 2026-08-14 | `rubric[*].weight` left with only `exclusiveMinimum: 0`, no upper bound in the schema | Round 1 review's critical finding (extreme weights overflowing float64 to `inf`/`NaN` and silently bypassing the aggregate check) was fixed at the arithmetic level instead — an explicit `math.isfinite(expected_score)` guard rejects any non-finite recomputed aggregate regardless of how it got there, which closes the hole without picking an arbitrary weight ceiling the ticket doesn't specify. |
+| 2026-08-14 | Extracted `_reject_duplicate_ids(items, id_field=..., error_label=...)` and had both `ExtractStructuredFieldsInputValidator` (A01) and `ScoreMatchByRubricInputValidator` (A02) call it | Round 1 review found the new A02 validator was a near line-for-line copy of the existing A01 one (same isinstance guards, seen-set, error-message shape, differing only in field names). Two call sites is the point this repo's own "three similar lines is better than a premature abstraction" guidance stops applying, since the duplicated surface is a multi-line control-flow rule, not a few standalone lines, and a third atom (A03 `score_multidimensional_axes`, ANY-257) is likely to want the same rule next. |
+
+## Progress log
+
+| Date | Progress | Next |
+|---|---|---|
+| 2026-08-14 | Implemented strict input/output schemas, both validators, prompt, config wiring, fake-provider fixture, and full test coverage; `quick-check`/`validate-configs`/`validate-architecture`/`validate-docs`/`generate-docs --check`/`postgresql-check` (Docker Postgres) all clean | Address round 1 `/code-review --high` findings |
+| 2026-08-14 | Fixed the critical `NaN`-overflow aggregate bypass, accumulated `total_weight` inline instead of re-summing, extracted the shared `_reject_duplicate_ids` helper, cross-referenced the tolerance constant with the prompt's rounding instruction plus a pinning test, added this execution plan | Re-run full validation suite and push |
+
+## Open questions
+
+- None.
+
+## Follow-up debt
+
+- `docs/architecture/action-model.md`'s A02 section and this plan both hardcode the `0.5`-point
+  tolerance value; if a later ticket changes the prompt's rounding granularity, both need a manual
+  update alongside the `_SCORE_MATCH_AGGREGATE_TOLERANCE` constant (the pinning test only catches a
+  wording change in the prompt itself, not a matching doc/plan edit).
+- Same pre-existing pattern as ANY-259: most of `text_score_match_by_rubric.py`'s module-level
+  constants (`INPUT_SCHEMA_REF`, `OUTPUT_SCHEMA_REF`, `KERNEL_DEMO_PROMPT_REF`,
+  `FAKE_PROVIDER_FIXTURE_ID`) are never imported elsewhere — shared by every sibling
+  `definitions/*.py` file, not specific to this atom; not fixed here to avoid an unrelated
+  repo-wide diff.

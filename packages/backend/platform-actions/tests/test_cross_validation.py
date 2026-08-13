@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unicodedata
+from pathlib import Path
 
 import pytest
 from anytoolai_platform_actions.structured_llm.cross_validation import (
@@ -10,6 +11,8 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
     GenerateClarifyingQuestionsCrossValidator,
+    ScoreMatchByRubricCrossValidator,
+    ScoreMatchByRubricInputValidator,
     SynthesizeAngleCrossValidator,
     PersuasiveTextCrossValidator,
 )
@@ -713,3 +716,195 @@ class TestPersuasiveTextCrossValidator:
     def test_rejects(self, input_payload: dict, output: dict | None) -> None:
         with pytest.raises(StructuredOutputValidationError):
             self.validator.validate(input_payload=input_payload, output=output)
+
+
+def _rubric_item(criterion_id: str, weight: float) -> dict:
+    return {"id": criterion_id, "description": f"{criterion_id} criterion", "weight": weight}
+
+
+class TestScoreMatchByRubricInputValidator:
+    def setup_method(self) -> None:
+        self.validator = ScoreMatchByRubricInputValidator()
+
+    def test_accepts_unique_rubric_ids(self) -> None:
+        self.validator.validate(
+            input_payload={"rubric": [_rubric_item("tone", 1), _rubric_item("completeness", 2)]}
+        )
+
+    def test_rejects_duplicate_rubric_ids(self) -> None:
+        with pytest.raises(ActionInputValidationError):
+            self.validator.validate(
+                input_payload={"rubric": [_rubric_item("tone", 1), _rubric_item("tone", 2)]}
+            )
+
+    def test_ignores_non_list_rubric_payload(self) -> None:
+        self.validator.validate(input_payload={"rubric": "not-a-list"})
+
+
+class TestScoreMatchByRubricCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = ScoreMatchByRubricCrossValidator()
+
+    def _output(self, aggregate_score: float) -> dict:
+        return {
+            "criterion_scores": [
+                {"criterion_id": "tone", "score": 100, "rationale": "r"},
+                {"criterion_id": "completeness", "score": 0, "rationale": "r"},
+            ],
+            "score": aggregate_score,
+            "strengths": [],
+            "gaps": [],
+        }
+
+    def test_accepts_matching_criteria_and_exact_aggregate(self) -> None:
+        self.validator.validate(
+            input_payload={"rubric": [_rubric_item("tone", 1), _rubric_item("completeness", 3)]},
+            output=self._output(25),
+        )
+
+    def test_accepts_aggregate_within_tolerance(self) -> None:
+        self.validator.validate(
+            input_payload={"rubric": [_rubric_item("tone", 1), _rubric_item("completeness", 3)]},
+            output=self._output(25.5),
+        )
+
+    def test_rejects_aggregate_beyond_tolerance(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={
+                    "rubric": [_rubric_item("tone", 1), _rubric_item("completeness", 3)]
+                },
+                output=self._output(26),
+            )
+
+    def test_rejects_criterion_id_not_in_rubric(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"rubric": [_rubric_item("tone", 1)]},
+                output={
+                    "criterion_scores": [{"criterion_id": "unknown", "score": 80, "rationale": "r"}],
+                    "score": 80,
+                    "strengths": [],
+                    "gaps": [],
+                },
+            )
+
+    def test_rejects_duplicate_criterion_id(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"rubric": [_rubric_item("tone", 1)]},
+                output={
+                    "criterion_scores": [
+                        {"criterion_id": "tone", "score": 80, "rationale": "r"},
+                        {"criterion_id": "tone", "score": 90, "rationale": "r"},
+                    ],
+                    "score": 85,
+                    "strengths": [],
+                    "gaps": [],
+                },
+            )
+
+    def test_rejects_rubric_criterion_missing_from_output(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"rubric": [_rubric_item("tone", 1), _rubric_item("completeness", 1)]},
+                output={
+                    "criterion_scores": [{"criterion_id": "tone", "score": 80, "rationale": "r"}],
+                    "score": 80,
+                    "strengths": [],
+                    "gaps": [],
+                },
+            )
+
+    def test_rejects_malformed_criterion_scores(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"rubric": [_rubric_item("tone", 1)]},
+                output={"criterion_scores": "nope", "score": 80, "strengths": [], "gaps": []},
+            )
+
+    def test_ignores_when_rubric_missing_from_input(self) -> None:
+        self.validator.validate(input_payload={}, output=self._output(0))
+
+    def test_truncates_rejected_criterion_id_in_error_reason(self) -> None:
+        overlong_id = "x" * 500
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            self.validator.validate(
+                input_payload={"rubric": [_rubric_item("tone", 1)]},
+                output={
+                    "criterion_scores": [{"criterion_id": overlong_id, "score": 80, "rationale": "r"}],
+                    "score": 80,
+                    "strengths": [],
+                    "gaps": [],
+                },
+            )
+        assert len(exc_info.value.reason) < len(overlong_id)
+        assert exc_info.value.reason.endswith("...")
+
+
+class TestScoreMatchByRubricAggregateToleranceMatchesPrompt:
+    """Pins the prompt wording that `_SCORE_MATCH_AGGREGATE_TOLERANCE` (0.5) is derived
+    from, so a prompt-side rounding-granularity change can't silently drift out of sync
+    with the validator's tolerance (see the comment above the constant)."""
+
+    def test_prompt_still_instructs_rounding_to_nearest_whole_number(self) -> None:
+        prompt_path = (
+            Path(__file__).resolve().parents[4]
+            / "configs"
+            / "kernel"
+            / "products"
+            / "kernel_demo"
+            / "prompts"
+            / "score_match_by_rubric.v1.md"
+        )
+        normalized = " ".join(prompt_path.read_text(encoding="utf-8").split())
+        assert "rounded to the nearest whole number" in normalized
+
+
+class TestScoreMatchByRubricCrossValidatorOverflow:
+    def setup_method(self) -> None:
+        self.validator = ScoreMatchByRubricCrossValidator()
+
+    def test_rejects_when_extreme_weights_overflow_to_nan_expected_score(self) -> None:
+        """Two individually-finite weights that overflow float64 once summed/multiplied
+        must not silently bypass the aggregate check via `inf / inf = nan` (every
+        comparison against `nan` is False in Python)."""
+        huge_weight = 1.5e308
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={
+                    "rubric": [
+                        _rubric_item("tone", huge_weight),
+                        _rubric_item("completeness", huge_weight),
+                    ]
+                },
+                output={
+                    "criterion_scores": [
+                        {"criterion_id": "tone", "score": 100, "rationale": "r"},
+                        {"criterion_id": "completeness", "score": 0, "rationale": "r"},
+                    ],
+                    "score": 0,
+                    "strengths": [],
+                    "gaps": [],
+                },
+            )
+
+
+class TestRejectDuplicateIdsSharedHelper:
+    """Covers the `_reject_duplicate_ids` helper both A01 and A02 input validators share,
+    through the two public validators that call it."""
+
+    def test_extract_structured_fields_and_score_match_share_duplicate_rejection_behavior(
+        self,
+    ) -> None:
+        extract_validator = ExtractStructuredFieldsInputValidator()
+        score_match_validator = ScoreMatchByRubricInputValidator()
+
+        with pytest.raises(ActionInputValidationError):
+            extract_validator.validate(
+                input_payload={"fields": [_field("deadline", "string", required=True), _field("deadline", "number", required=False)]}
+            )
+        with pytest.raises(ActionInputValidationError):
+            score_match_validator.validate(
+                input_payload={"rubric": [_rubric_item("tone", 1), _rubric_item("tone", 2)]}
+            )
