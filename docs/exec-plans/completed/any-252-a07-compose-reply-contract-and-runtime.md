@@ -2,13 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-11
-- Last updated: 2026-08-12
-- Review date: 2026-08-12
-- Next action: none outstanding from this plan's own scope; ready for PR. Keep in sync with any
-  further review rounds.
+- Last updated: 2026-08-13
+- Review date: 2026-08-13
+- Next action: none; merged (`9f06c91`) and Done in Linear. Plan closed and moved to
+  `docs/exec-plans/completed/` (ANY-37 parent-DoD verification pass).
 - Blocker: none
 
 ## Goal
@@ -126,6 +126,7 @@ qualification.
 | 2026-08-12 | Restored the two compose_reply tests and ANY-253's `_InvalidThenValidGenerateDocumentAdapter` dropped by the `main` merge, verified against a real Postgres instance (`7a04736`, `5147d67`) | Address team-lead #5 (non-ASCII multiplication false positive) |
 | 2026-08-12 | Fixed the ASCII-only alnum-flanked-asterisk gap, then iterated through three further `/code-review` rounds on the same logic: combining-mark blind spot, mark-on-punctuation false negative, and a character-scan-to-regex-callback perf rewrite; added Hebrew niqud regression coverage | Close the remaining release gates: `action-model.md`, `generate-docs --check`, final `quick-check`/`postgresql-check` |
 | 2026-08-12 | Verified `docs/architecture/action-model.md` needs no content change (A07 row unchanged since scaffold; file has no per-atom contract-shape section for any Wave 1 atom); ran `generate-docs --check` (clean) and a final `quick-check` (393 passed) / `postgresql-check` (348 passed) pass in an isolated worktree, since the shared checkout had moved to another branch mid-session | None outstanding; ready for PR |
+| 2026-08-13 | Merged as `9f06c91`; ticket confirmed Done in Linear during the ANY-37 parent-DoD verification pass | None — plan closed and moved to `docs/exec-plans/completed/` |
 
 ## Open questions
 

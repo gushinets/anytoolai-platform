@@ -1,0 +1,12 @@
+{
+  "response_json": {
+    "text": "Upgrading to Widget Pro now keeps you ahead of the March deadline you flagged, so don't wait to make the move."
+  },
+  "input_tokens": 88,
+  "output_tokens": 28,
+  "latency_ms": 9,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "kernel_demo.compose_persuasive_text_v1"
+  }
+}

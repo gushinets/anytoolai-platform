@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
+    PersuasiveTextCrossValidator,
     GapRewritesCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
@@ -340,6 +341,7 @@ def _build_structured_workflow_runner(
         output_cross_validators={
             "text.extract_structured_fields": ExtractStructuredFieldsCrossValidator(),
             "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
+            "text.compose_persuasive_text": PersuasiveTextCrossValidator(),
             "text.generate_gap_rewrites": GapRewritesCrossValidator(),
         },
     )

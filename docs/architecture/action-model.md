@@ -56,3 +56,19 @@ All physical provider attempts go through Provider Gateway so retry accounting a
 | A05 `generate_questions` | `text.generate_clarifying_questions` |
 
 `generate_proposal` must never become a platform action type. ProposalAI uses `text.compose_persuasive_text` through product-specific MVP-B action config.
+
+## A09 `text.synthesize_angle` contract
+
+Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.synthesize_angle_input_v1` / `kernel.schemas.synthesize_angle_output_v1`:
+
+- Input: `signals` (required, non-empty array of `{id, label, value, evidence?}`; `id`/`label` non-empty strings, `value` accepts any JSON type, `evidence` an optional non-empty string); `objective` (required, non-empty string); optional `options` (array of unique non-empty strings).
+- Output: `angle` (required, non-empty primary recommendation) and `rationale` (required, non-empty, `maxLength: 500` concise explanation); optional `secondary_angle` (non-empty string when present).
+- `SynthesizeAngleCrossValidator` enforces options-membership: when `options` is non-empty, `angle`/`secondary_angle` must each be one of them; when `options` is absent/empty, synthesis is open with no membership check. Rejected values are truncated (`_truncated_repr`) before flowing into the retry prompt and persisted debug-artifact metadata.
+- The chain-of-thought prohibition on `rationale` is a prompt instruction (`synthesize_angle.v1.md`), not a runtime heuristic — the ticket frames it as a validation/prompt requirement, not a strict contract.
+
+## A10 `document.generate_from_template` contract
+
+Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.generate_document_input_v1` / `kernel.schemas.generate_document_output_v1`:
+
+- Input: `template_ref` (required, non-empty and non-whitespace string) identifying the product-registered template; `data` (required object) holding the template's input fields; optional `style` enum (`professional | concise | detailed`, defaults to `professional`).
+- Output: `sections` (required, non-empty array of ordered document sections) and `summary` (required, non-empty and non-whitespace string). Each section is `{id, title, content}` (all required, non-empty and non-whitespace strings) plus an optional `metadata.kind` enum (`heading | paragraph | list | table | note`), required whenever `metadata` is present so an empty `metadata: {}` is rejected.

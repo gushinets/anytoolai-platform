@@ -46,6 +46,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     GenerateClarifyingQuestionsCrossValidator,
+    PersuasiveTextCrossValidator,
     GapRewritesCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import (
@@ -583,6 +584,68 @@ def test_structured_llm_executor_retries_on_cross_validation_failure() -> None:
     assert response.structured_output == {
         "issues": [{"category": "timeline", "description": "d", "severity": "high"}]
     }
+    assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
+        1,
+        2,
+    ]
+
+
+def test_structured_llm_executor_retries_compose_persuasive_text_on_cross_validation_failure() -> (
+    None
+):
+    """A06: caller-supplied constraints.length is enforced via cross-validation (the static
+    output schema only bounds text to a fixed maxLength, not the per-call limit), and a
+    violation must get the same semantic retry as a static schema mismatch, with the physical
+    provider-call count matching the number of semantic attempts."""
+    registry = build_config_registry(CONFIG_ROOT)
+    spy_gateway = _TwoAttemptSpyGateway(
+        '{"text": "This reply is far longer than the ten character limit."}',
+        '{"text": "Short."}',
+    )
+    executor = StructuredLlmActionExecutor(
+        config_registry=registry,
+        provider_gateway=spy_gateway,
+        output_cross_validators={
+            "text.compose_persuasive_text": PersuasiveTextCrossValidator(),
+        },
+    )
+    base_policy = registry.get_provider_policy("default_fake_provider_v1")
+    assert base_policy is not None
+    executor._require_provider_policy = lambda _provider_policy_ref: replace(
+        base_policy,
+        retry_policy=replace(
+            base_policy.retry_policy,
+            validation=ProviderValidationRetryPolicy(
+                owner=base_policy.retry_policy.validation.owner,
+                max_attempts=2,
+            ),
+        ),
+    )
+    request = StructuredLlmActionRequest(
+        tenant_id="tenant_demo",
+        region="eu-central",
+        product_id="kernel_demo",
+        frontend_id="kernel_demo_ce",
+        scenario_session_id="scenario_session_demo",
+        job_id="job_demo",
+        workflow_id="kernel_demo.compose_persuasive_text_v1",
+        workflow_version=1,
+        step_id="compose_persuasive_text",
+        action_run_id="action_run_demo",
+        action_type="text.compose_persuasive_text",
+        action_config_id="kernel_demo.compose_persuasive_text_v1",
+        input_payload={
+            "context": {"product": "Widget Pro"},
+            "objective": "Convince the reader to upgrade before March.",
+            "constraints": {"length": 10},
+        },
+    )
+    session = object()
+
+    response = asyncio.run(executor.execute(request, session=session))
+
+    assert response.structured_output == {"text": "Short."}
+    assert len(spy_gateway.requests) == 2
     assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
         1,
         2,

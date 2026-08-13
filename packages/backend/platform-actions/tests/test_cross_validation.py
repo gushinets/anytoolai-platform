@@ -10,6 +10,8 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
     GenerateClarifyingQuestionsCrossValidator,
+    SynthesizeAngleCrossValidator,
+    PersuasiveTextCrossValidator,
     GapRewritesCrossValidator,
 )
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
@@ -250,6 +252,19 @@ class TestExtractStructuredFieldsCrossValidator:
                 output={"values": {"deliverables": "not a list"}, "missing_fields": []},
             )
 
+    def test_truncates_rejected_unrequested_field_name_in_error_reason(self) -> None:
+        overlong_name = "x" * 500
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            self.validator.validate(
+                input_payload={"fields": [_field("deadline", "string", required=True)]},
+                output={
+                    "values": {"deadline": "Friday", overlong_name: "anything"},
+                    "missing_fields": [],
+                },
+            )
+        assert len(exc_info.value.reason) < len(overlong_name)
+        assert exc_info.value.reason.endswith("...")
+
     def test_integer_type_accepts_integer_valued_float(self) -> None:
         # json.loads('{"budget": 500.0}') decodes to a Python float; that must still satisfy
         # an "integer" field type, not be rejected as a type mismatch.
@@ -297,6 +312,87 @@ class TestDetectIssuesByTaxonomyCrossValidator:
             input_payload={"taxonomy": ["timeline"]},
             output={"issues": []},
         )
+
+    def test_truncates_rejected_category_in_error_reason(self) -> None:
+        overlong_category = "x" * 500
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            self.validator.validate(
+                input_payload={"taxonomy": ["timeline"]},
+                output={
+                    "issues": [
+                        {"category": overlong_category, "description": "d", "severity": "low"}
+                    ]
+                },
+            )
+        assert len(exc_info.value.reason) < len(overlong_category)
+        assert exc_info.value.reason.endswith("...")
+
+
+class TestSynthesizeAngleCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = SynthesizeAngleCrossValidator()
+
+    def test_allows_open_synthesis_when_options_omitted(self) -> None:
+        self.validator.validate(
+            input_payload={},
+            output={"angle": "Anything the model chooses", "rationale": "r"},
+        )
+
+    def test_allows_open_synthesis_when_options_empty(self) -> None:
+        self.validator.validate(
+            input_payload={"options": []},
+            output={"angle": "Anything the model chooses", "rationale": "r"},
+        )
+
+    def test_accepts_angle_within_options(self) -> None:
+        self.validator.validate(
+            input_payload={"options": ["Lead with urgency", "Lead with value"]},
+            output={"angle": "Lead with urgency", "rationale": "r"},
+        )
+
+    def test_rejects_angle_outside_options(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"options": ["Lead with urgency", "Lead with value"]},
+                output={"angle": "Something else entirely", "rationale": "r"},
+            )
+
+    def test_accepts_secondary_angle_within_options(self) -> None:
+        self.validator.validate(
+            input_payload={"options": ["Lead with urgency", "Lead with value"]},
+            output={
+                "angle": "Lead with urgency",
+                "rationale": "r",
+                "secondary_angle": "Lead with value",
+            },
+        )
+
+    def test_rejects_secondary_angle_outside_options(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"options": ["Lead with urgency", "Lead with value"]},
+                output={
+                    "angle": "Lead with urgency",
+                    "rationale": "r",
+                    "secondary_angle": "Something else entirely",
+                },
+            )
+
+    def test_ignores_missing_secondary_angle_when_options_supplied(self) -> None:
+        self.validator.validate(
+            input_payload={"options": ["Lead with urgency"]},
+            output={"angle": "Lead with urgency", "rationale": "r"},
+        )
+
+    def test_truncates_rejected_angle_in_error_reason(self) -> None:
+        overlong_angle = "x" * 500
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            self.validator.validate(
+                input_payload={"options": ["Lead with urgency"]},
+                output={"angle": overlong_angle, "rationale": "r"},
+            )
+        assert len(exc_info.value.reason) < len(overlong_angle)
+        assert exc_info.value.reason.endswith("...")
 
 
 class TestComposeReplyCrossValidator:
@@ -658,3 +754,86 @@ class TestGapRewritesCrossValidator:
     def test_rejects_missing_output(self) -> None:
         with pytest.raises(StructuredOutputValidationError):
             self.validator.validate(input_payload={"n": 1}, output=None)
+
+
+class TestPersuasiveTextCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = PersuasiveTextCrossValidator()
+
+    @pytest.mark.parametrize(
+        ("input_payload", "output"),
+        [
+            ({}, {"text": "Plain persuasive text."}),
+            ({"constraints": {"length": 20}}, {"text": "Short persuasion."}),
+            (
+                {"constraints": {"length": True}},
+                {"text": "This text is longer than one character."},
+            ),
+            ({"constraints": {"format": "plain_text"}}, {"text": "Plain persuasive text."}),
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "Persuasive <b>markup</b>."},
+            ),
+            (
+                {"constraints": {"format": "markdown"}},
+                {"text": "**Bold** persuasion with *markdown* markers."},
+            ),
+            # Markdown is not required to prove itself with a decorative token — a plain
+            # paragraph is valid Markdown too, same as the sibling A07 validator.
+            ({"constraints": {"format": "markdown"}}, {"text": "Plain persuasive text."}),
+            # Unspaced arithmetic/dimension expressions aren't markdown italic (CommonMark's
+            # intraword-emphasis rule for `*` is escaped for alnum-flanked asterisks).
+            ({}, {"text": "L*W*H"}),
+            # An integer-valued float length (schema `type: integer` allows 10.0) is honored.
+            ({"constraints": {"length": 20.0}}, {"text": "Short persuasion."}),
+            # Any real HTML5 construct - not just a fixed set of "common" tag names - satisfies
+            # "html", via the same real tokenizer used by A07.
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "Use the <kbd>Enter</kbd> key."},
+            ),
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "Custom <x-card>widget</x-card>."},
+            ),
+        ],
+    )
+    def test_accepts(self, input_payload: dict, output: dict) -> None:
+        self.validator.validate(input_payload=input_payload, output=output)
+
+    @pytest.mark.parametrize(
+        ("input_payload", "output"),
+        [
+            ({"constraints": {"length": 5}}, {"text": "This text is too long."}),
+            (
+                {"constraints": {"format": "plain_text"}},
+                {"text": "Persuasive <b>markup</b>."},
+            ),
+            ({"constraints": {}}, {"text": "Persuasive <b>markup</b>."}),
+            ({}, {"text": "Persuasive <b>markup</b>."}),
+            # A lone closing tag is still markup.
+            ({}, {"text": "Act now.</p>"}),
+            ({"constraints": {"format": "html"}}, {"text": "Plain persuasive text."}),
+            # Markdown syntax is markup too, not just HTML tags.
+            ({}, {"text": "Act **now** to save."}),
+            ({}, {"text": "See [details](https://example.com)."}),
+            ({}, {"text": "# Heading\nBody."}),
+            # A well-formed "<word>" is a (possibly unknown) HTML tag to a real tokenizer.
+            ({}, {"text": "Offer expires <Tuesday>."}),
+            # "<email@domain>" is CommonMark autolink syntax, not just plain bracketed text.
+            ({}, {"text": "Reach me at <user@example.com>."}),
+            # Spaced single-asterisk emphasis is real markdown italic, unlike unspaced
+            # arithmetic/dimension expressions (e.g. "L*W*H").
+            ({}, {"text": "The *actual* deadline is Friday."}),
+            # An integer-valued float length (10.0) must still be enforced, not silently
+            # ignored because it isn't a plain int.
+            ({"constraints": {"length": 5.0}}, {"text": "This text is too long."}),
+            # "html" must show its own markup kind: markdown-only text doesn't satisfy it.
+            ({"constraints": {"format": "html"}}, {"text": "**Act now** and save."}),
+            ({}, None),
+            ({}, {"text": 123}),
+        ],
+    )
+    def test_rejects(self, input_payload: dict, output: dict | None) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(input_payload=input_payload, output=output)
