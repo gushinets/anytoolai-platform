@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from action_runner import (
     AlwaysFailFakeAdapter,
     CancelledFakeAdapter,
+    CompareAndClassifyOutOfCategoriesThenValidAdapter,
     ComposeReplyOverLimitThenValidAdapter,
     CountingFakeAdapter,
     EmptyQuestionsFakeAdapter,
@@ -21,6 +22,8 @@ from action_runner import (
     SynthesizeAngleSecondaryOutOfOptionsThenValidAdapter,
 )
 from anytoolai_platform_actions.structured_llm.cross_validation import (
+    CompareAndClassifyCrossValidator,
+    CompareAndClassifyInputValidator,
     ComposeReplyCrossValidator,
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
@@ -176,6 +179,7 @@ def _build_runner(
             "text.generate_clarifying_questions": GenerateClarifyingQuestionsCrossValidator(),
             "text.synthesize_angle": SynthesizeAngleCrossValidator(),
             "text.compose_persuasive_text": PersuasiveTextCrossValidator(),
+            "text.compare_and_classify": CompareAndClassifyCrossValidator(),
         },
     )
     return ActionRunner(
@@ -186,6 +190,7 @@ def _build_runner(
         artifact_repository=ArtifactRepository(session),
         input_validators={
             "text.extract_structured_fields": ExtractStructuredFieldsInputValidator(),
+            "text.compare_and_classify": CompareAndClassifyInputValidator(),
         },
     )
 
@@ -945,6 +950,169 @@ def test_action_runner_retries_compose_reply_cross_validation_through_real_ledge
     assert artifact_created["artifact_id"] == artifact["id"]
 
 
+def test_action_runner_executes_compare_and_classify_atom_through_generic_path(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session)
+
+        result = asyncio.run(
+            runner.run(
+                "text.compare_and_classify",
+                "kernel_demo.compare_and_classify_v1",
+                {
+                    "subject_text": "Subject copy",
+                    "reference_text": "Reference copy",
+                    "categories": ["meets_bar", "below_bar"],
+                    "criteria": [
+                        {"id": "tone", "description": "Matches the reference tone."},
+                        {"id": "coverage", "description": "Covers the required topics."},
+                    ],
+                },
+                _context(
+                    step_id="compare_and_classify",
+                    action_type="text.compare_and_classify",
+                    action_config_id="kernel_demo.compare_and_classify_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
+        events = _event_rows(session)
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {
+        "verdict": "meets_bar",
+        "confidence": 0.82,
+        "deltas": [
+            {
+                "criterion_id": "tone",
+                "status": "match",
+                "evidence": "Subject uses the same professional, direct tone as the reference.",
+            },
+            {
+                "criterion_id": "coverage",
+                "status": "partial",
+                "evidence": "Subject omits the pricing section that the reference includes.",
+            },
+        ],
+        "rationale": (
+            "Subject matches the reference on tone and mostly covers the required topics, "
+            "missing only pricing, which is enough to meet the bar."
+        ),
+    }
+    assert result.output_artifact_id == artifact["id"]
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert artifact["metadata"]["schema_ref"] == "kernel.schemas.compare_classify_output_v1"
+    assert provider_call["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_succeeded": 1,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    action_started = _event_by_type(events, "action.started")
+    artifact_created = _event_by_type(events, "artifact.created")
+    action_succeeded = _event_by_type(events, "action.succeeded")
+    assert action_started["action_run_id"] == action_run["id"]
+    assert artifact_created["artifact_id"] == artifact["id"]
+    assert action_succeeded["action_run_id"] == action_run["id"]
+
+
+def test_action_runner_retries_compare_and_classify_cross_validation_through_real_ledger(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """A11: proves the categories-membership cross-validation retry through the real
+    ProviderGateway/ActionRunner path (not an in-memory spy) - an out-of-categories verdict
+    followed by success must create two physical provider_calls rows with the expected
+    semantic/physical indexes, provider events, and final artifact lineage."""
+    adapter = CompareAndClassifyOutOfCategoriesThenValidAdapter()
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session, fake_adapter=adapter)
+        # default_fake_provider_v1 allows 1 validation attempt / 1 physical call per action;
+        # widen both so the semantic retry this test drives can actually reach a 2nd
+        # physical call through the real ProviderGateway hard-limit check, not just PydanticAI.
+        executor = runner._executors["structured_llm"]
+        base_policy = executor._require_provider_policy("default_fake_provider_v1")
+        patched_policy = replace(
+            base_policy,
+            retry_policy=replace(
+                base_policy.retry_policy,
+                validation=ProviderValidationRetryPolicy(
+                    owner=base_policy.retry_policy.validation.owner,
+                    max_attempts=2,
+                ),
+                hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=2),
+            ),
+        )
+        executor._require_provider_policy = lambda _provider_policy_ref: patched_policy
+        executor._provider_gateway._policy_resolver.resolve = lambda _provider_policy_ref: patched_policy
+
+        result = asyncio.run(
+            runner.run(
+                "text.compare_and_classify",
+                "kernel_demo.compare_and_classify_v1",
+                {
+                    "subject_text": "Subject copy",
+                    "reference_text": "Reference copy",
+                    "categories": ["meets_bar", "below_bar"],
+                    "criteria": [{"id": "tone", "description": "Matches the reference tone."}],
+                },
+                _context(
+                    step_id="compare_and_classify",
+                    action_type="text.compare_and_classify",
+                    action_config_id="kernel_demo.compare_and_classify_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+        provider_calls = list(
+            session.execute(
+                sa.select(provider_calls_table).order_by(
+                    provider_calls_table.c.created_at, provider_calls_table.c.id
+                )
+            ).mappings()
+        )
+        events = _event_rows(session)
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {
+        "verdict": "meets_bar",
+        "confidence": 0.7,
+        "deltas": [{"criterion_id": "tone", "status": "match", "evidence": "e"}],
+        "rationale": "r",
+    }
+    assert result.output_artifact_id == artifact["id"]
+    assert adapter.call_count == 2
+    assert len(provider_calls) == 2
+    assert [row["semantic_attempt_index"] for row in provider_calls] == [1, 2]
+    # physical_call_index tracks the action-wide physical-call budget, not a per-semantic-
+    # attempt counter, so it keeps climbing across semantic attempts too.
+    assert [row["physical_call_index"] for row in provider_calls] == [1, 2]
+    assert all(row["action_run_id"] == action_run["id"] for row in provider_calls)
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 2,
+            "provider.request_succeeded": 2,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    artifact_created = _event_by_type(events, "artifact.created")
+    assert artifact_created["artifact_id"] == artifact["id"]
+
+
 def test_action_runner_marks_failed_on_provider_failure(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
@@ -1386,6 +1554,42 @@ def test_action_runner_rejects_duplicate_field_names_before_any_provider_call(
                         step_id="extract",
                         action_type="text.extract_structured_fields",
                         action_config_id="kernel_demo.extract_structured_fields_v1",
+                    ),
+                )
+            )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+
+    assert counting_adapter.call_count == 0
+    assert action_run["status"].value == "failed"
+    assert action_run["error_code"] == "action_input_validation_failed"
+
+
+def test_action_runner_rejects_duplicate_criteria_ids_before_any_provider_call(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    counting_adapter = CountingFakeAdapter(FakeProviderAdapter(FIXTURE_ROOT))
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session, fake_adapter=counting_adapter)
+        duplicate_criteria = [
+            {"id": "tone", "description": "Matches the reference tone."},
+            {"id": "tone", "description": "A conflicting second spec with the same id."},
+        ]
+
+        with pytest.raises(ActionInputValidationError):
+            asyncio.run(
+                runner.run(
+                    "text.compare_and_classify",
+                    "kernel_demo.compare_and_classify_v1",
+                    {
+                        "subject_text": "Subject copy",
+                        "reference_text": "Reference copy",
+                        "categories": ["meets_bar", "below_bar"],
+                        "criteria": duplicate_criteria,
+                    },
+                    _context(
+                        step_id="compare_and_classify",
+                        action_type="text.compare_and_classify",
+                        action_config_id="kernel_demo.compare_and_classify_v1",
                     ),
                 )
             )

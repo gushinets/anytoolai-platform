@@ -42,6 +42,7 @@ from anytoolai_platform_core.structured_output.errors import (
     StructuredOutputValidationError,
 )
 from anytoolai_platform_actions.structured_llm.cross_validation import (
+    CompareAndClassifyCrossValidator,
     ComposeReplyCrossValidator,
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
@@ -594,6 +595,75 @@ def test_structured_llm_executor_retries_on_generate_clarifying_questions_cross_
                 "source_issue_index": 0,
             }
         ]
+    }
+    assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
+        1,
+        2,
+    ]
+
+
+def test_structured_llm_executor_retries_on_compare_and_classify_cross_validation_failure() -> (
+    None
+):
+    """A11: an out-of-categories verdict must get the same semantic retry as a static schema
+    mismatch, with deterministic physical provider-call accounting."""
+    registry = build_config_registry(CONFIG_ROOT)
+    spy_gateway = _TwoAttemptSpyGateway(
+        '{"verdict": "not_a_category", "confidence": 0.7, '
+        '"deltas": [{"criterion_id": "tone", "status": "match", "evidence": "e"}], '
+        '"rationale": "r"}',
+        '{"verdict": "meets_bar", "confidence": 0.7, '
+        '"deltas": [{"criterion_id": "tone", "status": "match", "evidence": "e"}], '
+        '"rationale": "r"}',
+    )
+    executor = StructuredLlmActionExecutor(
+        config_registry=registry,
+        provider_gateway=spy_gateway,
+        output_cross_validators={
+            "text.compare_and_classify": CompareAndClassifyCrossValidator(),
+        },
+    )
+    base_policy = registry.get_provider_policy("default_fake_provider_v1")
+    assert base_policy is not None
+    executor._require_provider_policy = lambda _provider_policy_ref: replace(
+        base_policy,
+        retry_policy=replace(
+            base_policy.retry_policy,
+            validation=ProviderValidationRetryPolicy(
+                owner=base_policy.retry_policy.validation.owner,
+                max_attempts=2,
+            ),
+        ),
+    )
+    request = StructuredLlmActionRequest(
+        tenant_id="tenant_demo",
+        region="eu-central",
+        product_id="kernel_demo",
+        frontend_id="kernel_demo_ce",
+        scenario_session_id="scenario_session_demo",
+        job_id="job_demo",
+        workflow_id="kernel_demo.compare_and_classify_v1",
+        workflow_version=1,
+        step_id="compare_and_classify",
+        action_run_id="action_run_demo",
+        action_type="text.compare_and_classify",
+        action_config_id="kernel_demo.compare_and_classify_v1",
+        input_payload={
+            "subject_text": "Subject copy",
+            "reference_text": "Reference copy",
+            "categories": ["meets_bar", "below_bar"],
+            "criteria": [{"id": "tone", "description": "Matches the reference tone."}],
+        },
+    )
+    session = object()
+
+    response = asyncio.run(executor.execute(request, session=session))
+
+    assert response.structured_output == {
+        "verdict": "meets_bar",
+        "confidence": 0.7,
+        "deltas": [{"criterion_id": "tone", "status": "match", "evidence": "e"}],
+        "rationale": "r",
     }
     assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
         1,
