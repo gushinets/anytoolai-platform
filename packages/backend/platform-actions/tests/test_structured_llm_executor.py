@@ -143,121 +143,6 @@ class _InvalidThenValidGenerateDocumentAdapter:
         )
 
 
-class CrossValidationRetrySpyGateway:
-    """First reply violates the A04 taxonomy cross-validation rule; second is valid."""
-
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        if len(self.requests) == 1:
-            output_text = (
-                '{"issues": [{"category": "not_in_taxonomy", '
-                '"description": "d", "severity": "high"}]}'
-            )
-        else:
-            output_text = (
-                '{"issues": [{"category": "timeline", '
-                '"description": "d", "severity": "high"}]}'
-            )
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text=output_text,
-            status=ProviderCallStatus.succeeded,
-        )
-
-
-class CrossValidationAlwaysFailingSpyGateway:
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text=(
-                '{"issues": [{"category": "not_in_taxonomy", '
-                '"description": "d", "severity": "high"}]}'
-            ),
-            status=ProviderCallStatus.succeeded,
-        )
-
-
-class InvalidThenValidDateSpyGateway:
-    """First reply uses a non-ISO date string; second uses a valid ISO date."""
-
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        if len(self.requests) == 1:
-            output_text = '{"values": {"deadline": "next Friday"}, "missing_fields": []}'
-        else:
-            output_text = '{"values": {"deadline": "2026-08-14"}, "missing_fields": []}'
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text=output_text,
-            status=ProviderCallStatus.succeeded,
-        )
-
-
-class PersuasiveTextValidationRetrySpyGateway:
-    """First reply violates the A06 constraints.length cross-validation rule; second is
-    valid."""
-
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        if len(self.requests) == 1:
-            output_text = (
-                '{"text": "This reply is far longer than the ten character limit."}'
-            )
-        else:
-            output_text = '{"text": "Short."}'
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text=output_text,
-            status=ProviderCallStatus.succeeded,
-        )
-
-
-class ExhaustedValidationSpyGateway:
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text="not-json",
-            status=ProviderCallStatus.succeeded,
-        )
-
-
 def test_platform_actions_package_declares_runtime_dependencies() -> None:
     pyproject = tomllib.loads((PACKAGE_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     core_pyproject = tomllib.loads(
@@ -591,7 +476,10 @@ def test_structured_llm_executor_retries_compose_persuasive_text_on_cross_valida
     violation must get the same semantic retry as a static schema mismatch, with the physical
     provider-call count matching the number of semantic attempts."""
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = PersuasiveTextValidationRetrySpyGateway()
+    spy_gateway = _TwoAttemptSpyGateway(
+        '{"text": "This reply is far longer than the ten character limit."}',
+        '{"text": "Short."}',
+    )
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
         provider_gateway=spy_gateway,

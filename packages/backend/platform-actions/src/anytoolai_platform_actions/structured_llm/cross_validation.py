@@ -53,12 +53,6 @@ def _require_output(output: Mapping[str, Any] | None) -> Mapping[str, Any]:
     return output
 
 
-def _require_output(output: Mapping[str, Any] | None) -> Mapping[str, Any]:
-    if output is None:
-        raise _cross_validation_error("missing_output")
-    return output
-
-
 def _optional_membership_set(values: Any) -> set[Any] | None:
     """A non-empty list becomes an allow-set; a missing/empty list means "no constraint"."""
     if not isinstance(values, list) or not values:
@@ -288,131 +282,6 @@ class SynthesizeAngleCrossValidator:
             )
 
 
-# ponytail: allowlisted common HTML5 tag names, not a full tokenizer — a real tokenizer
-# would also accept "<a while longer>" as a start tag with boolean attributes, reintroducing
-# the false-positive class the `=`/`/>` requirement below guards against. Upgrade to
-# html.parser.HTMLParser + a real tag-name set only if callers need arbitrary/uncommon tags.
-_HTML_TAG_NAMES = (
-    "a|abbr|article|aside|b|blockquote|br|cite|code|dd|del|div|dl|dt|em|figcaption|figure|"
-    "footer|h[1-6]|header|hr|i|img|ins|kbd|li|mark|nav|ol|p|pre|q|s|samp|section|small|span|"
-    "strong|sub|summary|sup|table|tbody|td|tfoot|th|thead|time|tr|u|ul|var|wbr"
-)
-# ponytail: allowlisted HTML5 boolean-attribute names (disabled/checked/...), not arbitrary
-# bare words — "<img disabled>" is real markup but "<b careful>" (round-1 false positive) has
-# the same shape ("<tag> <one bare word> >"). Only a known attribute name distinguishes them.
-_HTML_BOOLEAN_ATTRS = (
-    "async|autofocus|autoplay|checked|compact|controls|default|defer|disabled|"
-    "formnovalidate|hidden|ismap|loop|multiple|muted|nohref|noresize|noshade|"
-    "novalidate|nowrap|open|readonly|required|reversed|scoped|selected"
-)
-# A short tag name (a/b/i/p/u) followed by ordinary bracketed words — e.g. "<a while longer>"
-# — is not markup: it has no "/>" close, no "=" attribute, and no known boolean attribute, so
-# require one of those after the tag name instead of accepting any `[^>]*` filler. The
-# lookahead only *checks* for "="; the actual span is consumed possessively (`*+`, no
-# backtracking into it), so this stays linear-time regardless of attribute length — unlike a
-# `pre=post>` split with two backtracking `[^>]*` groups (quadratic on adversarial input) or a
-# length-bounded split (wrongly rejects real long attributes, e.g. a long `<img src="...">` URL).
-_HTML_TAG_PATTERN = re.compile(
-    rf"</(?:{_HTML_TAG_NAMES})\b\s*>"
-    rf"|<(?:{_HTML_TAG_NAMES})\b(?:"
-    rf"\s*/?>"
-    rf"|\s+(?=[^>]*=)[^>]*+>"
-    rf"|(?:\s+(?:{_HTML_BOOLEAN_ATTRS})\b)+\s*/?>"
-    rf")",
-    re.IGNORECASE,
-)
-
-# Covers the common markdown constructs (bold, links, headings, lists, blockquotes, inline
-# code). Deliberately excludes single `*`/`_` italics — too common in plain English asides
-# ("the *actual* deadline") to blacklist without false-positiving on legitimate plain text.
-# Block markers (list/numbered-list/blockquote) only count at the very start of the text or
-# after a blank line (allowing trailing whitespace on that blank line — a common LLM
-# formatting artifact), matching real markdown block syntax — a stray "\n- " or "\n> " inside
-# an otherwise plain sentence is prose, not markdown (e.g. "Deal expires soon.\n- just a
-# dash-prefixed sentence"). The link pattern requires a URL- or mailto:/tel:-shaped target so
-# incidental "[word](word)" adjacency in prose doesn't count. Link *text* is bounded to 200
-# chars (real link labels are short phrases, unlike the URL) — same quadratic-backtracking
-# hazard as the earlier HTML-attribute regex: on input with many "[" and no "]", an unbounded
-# `[^\]\n]+` makes `.search()` retry an O(remaining-length) failed match at every "[".
-# Python dunder identifiers (__init__, __main__, ...) have the exact same shape as single-word
-# markdown bold (__word__) — exclude the common ones by name so "Configure __init__ before
-# shipping." isn't mistaken for bold, same allowlist tradeoff as the HTML tag names above.
-_PYTHON_DUNDER_NAMES = (
-    "init|main|str|repr|eq|ne|lt|le|gt|ge|hash|len|iter|next|enter|exit|call|new|del|"
-    "getitem|setitem|delitem|contains|add|sub|mul|truediv|name|all|file|doc|version|"
-    "dict|class|module|slots"
-)
-_MARKDOWN_BLOCK_START = r"(?:\A|\n[ \t]*\n)"
-_MARKDOWN_PATTERN = re.compile(
-    r"\*\*[^*\n]+\*\*"                                  # **bold**
-    rf"|__(?!(?:{_PYTHON_DUNDER_NAMES})__)[^_\n]+__"     # __bold__, not __dunder__
-    r"|\[[^\]\n]{1,200}\]\((?:https?://|mailto:|tel:|/|#)[^)\n]++\)"  # [text](url)
-    rf"|{_MARKDOWN_BLOCK_START}#{{1,6}}\s"                # # heading
-    rf"|{_MARKDOWN_BLOCK_START}[-*+]\s"                   # - bullet list item
-    rf"|{_MARKDOWN_BLOCK_START}\d+\.\s"                   # 1. numbered list item
-    rf"|{_MARKDOWN_BLOCK_START}>\s"                       # > blockquote
-    r"|`[^`\n]+`",                                        # `inline code`
-)
-
-
-def _has_html_markup(value: str) -> bool:
-    return _HTML_TAG_PATTERN.search(value) is not None
-
-
-def _has_markdown_markup(value: str) -> bool:
-    return _MARKDOWN_PATTERN.search(value) is not None
-
-
-class PersuasiveTextCrossValidator:
-    """Validates A06 output.text against the caller-supplied input.constraints
-    (length, format) that the static output schema cannot express because they vary per
-    call."""
-
-    def validate(
-        self,
-        *,
-        input_payload: Mapping[str, Any],
-        output: Mapping[str, Any] | None,
-    ) -> None:
-        output = _require_output(output)
-        text = output.get("text")
-        if not isinstance(text, str):
-            raise _cross_validation_error("malformed_compose_persuasive_text_output")
-        constraints = input_payload.get("constraints")
-        constraints = constraints if isinstance(constraints, Mapping) else {}
-
-        # JSON Schema `type: integer` also accepts integer-valued floats (10.0), so a plain
-        # `isinstance(length, int)` check silently drops the limit for those.
-        length = constraints.get("length")
-        if isinstance(length, bool):
-            length = None
-        elif isinstance(length, float) and length.is_integer():
-            length = int(length)
-        elif not isinstance(length, int):
-            length = None
-        if length is not None and len(text) > length:
-            raise _cross_validation_error(
-                f"text_exceeds_constraints_length:{len(text)}>{length}"
-            )
-
-        # Only run the detector(s) the requested format actually needs — `_has_markdown_markup`
-        # in particular can cost orders of magnitude more than `_has_html_markup` on the same
-        # input, and an "html"/"markdown" request only ever needs one of the two.
-        text_format = constraints.get("format")
-        # Prompt contract: "if it is plain_text or omitted, text must contain no markup".
-        if text_format in (None, "plain_text") and (
-            _has_html_markup(text) or _has_markdown_markup(text)
-        ):
-            raise _cross_validation_error("text_contains_markup_for_plain_text_format")
-        # Prompt contract: "if constraints.format is markdown or html, format text
-        # accordingly" — each format must show its *own* kind of markup, not either kind
-        # (plain markdown text shouldn't satisfy an html format request, and vice versa).
-        if text_format == "html" and not _has_html_markup(text):
-            raise _cross_validation_error("text_missing_markup_for_html_format")
-        if text_format == "markdown" and not _has_markdown_markup(text):
-            raise _cross_validation_error("text_missing_markup_for_markdown_format")
-
-
 # A hand-rolled tag-name allowlist keeps missing real constructs (svg/math, custom
 # elements like <x-card>, comments, doctypes) no matter how many names get added, and a
 # bare `<[a-zA-Z][^>]*>` regex over-matches non-markup bracketed text like "<Tuesday>". A
@@ -496,6 +365,49 @@ def _has_markdown(value: str) -> bool:
 
 def _has_markup(value: str) -> bool:
     return _has_html_tag(value) or _has_markdown(value)
+
+
+class PersuasiveTextCrossValidator:
+    """Validates A06 output.text against the caller-supplied input.constraints
+    (length, format) that the static output schema cannot express because they vary per
+    call."""
+
+    def validate(
+        self,
+        *,
+        input_payload: Mapping[str, Any],
+        output: Mapping[str, Any] | None,
+    ) -> None:
+        output = _require_output(output)
+        text = output.get("text")
+        if not isinstance(text, str):
+            raise _cross_validation_error("malformed_compose_persuasive_text_output")
+        constraints = input_payload.get("constraints")
+        constraints = constraints if isinstance(constraints, Mapping) else {}
+
+        # JSON Schema `type: integer` also accepts integer-valued floats (10.0), so a plain
+        # `isinstance(length, int)` check silently drops the limit for those.
+        length = constraints.get("length")
+        if isinstance(length, bool):
+            length = None
+        elif isinstance(length, float) and length.is_integer():
+            length = int(length)
+        elif not isinstance(length, int):
+            length = None
+        if length is not None and len(text) > length:
+            raise _cross_validation_error(
+                f"text_exceeds_constraints_length:{len(text)}>{length}"
+            )
+
+        # Prompt contract: "if it is plain_text or omitted, text must contain no markup".
+        text_format = constraints.get("format")
+        if text_format in (None, "plain_text") and _has_markup(text):
+            raise _cross_validation_error("text_contains_markup_for_plain_text_format")
+        # Markdown syntax alone doesn't satisfy "html" — it must contain an actual tag. Same
+        # as the sibling A07 validator: "markdown" is not required to prove itself with a
+        # decorative token (a plain paragraph is valid Markdown too).
+        if text_format == "html" and not _has_html_tag(text):
+            raise _cross_validation_error("text_missing_markup_for_html_format")
 
 
 class ComposeReplyCrossValidator:
