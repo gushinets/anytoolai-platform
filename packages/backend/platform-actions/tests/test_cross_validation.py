@@ -10,6 +10,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
     GenerateClarifyingQuestionsCrossValidator,
+    SynthesizeAngleCrossValidator,
     PersuasiveTextCrossValidator,
 )
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
@@ -250,6 +251,19 @@ class TestExtractStructuredFieldsCrossValidator:
                 output={"values": {"deliverables": "not a list"}, "missing_fields": []},
             )
 
+    def test_truncates_rejected_unrequested_field_name_in_error_reason(self) -> None:
+        overlong_name = "x" * 500
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            self.validator.validate(
+                input_payload={"fields": [_field("deadline", "string", required=True)]},
+                output={
+                    "values": {"deadline": "Friday", overlong_name: "anything"},
+                    "missing_fields": [],
+                },
+            )
+        assert len(exc_info.value.reason) < len(overlong_name)
+        assert exc_info.value.reason.endswith("...")
+
 
 class TestDetectIssuesByTaxonomyCrossValidator:
     def setup_method(self) -> None:
@@ -279,6 +293,87 @@ class TestDetectIssuesByTaxonomyCrossValidator:
             input_payload={"taxonomy": ["timeline"]},
             output={"issues": []},
         )
+
+    def test_truncates_rejected_category_in_error_reason(self) -> None:
+        overlong_category = "x" * 500
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            self.validator.validate(
+                input_payload={"taxonomy": ["timeline"]},
+                output={
+                    "issues": [
+                        {"category": overlong_category, "description": "d", "severity": "low"}
+                    ]
+                },
+            )
+        assert len(exc_info.value.reason) < len(overlong_category)
+        assert exc_info.value.reason.endswith("...")
+
+
+class TestSynthesizeAngleCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = SynthesizeAngleCrossValidator()
+
+    def test_allows_open_synthesis_when_options_omitted(self) -> None:
+        self.validator.validate(
+            input_payload={},
+            output={"angle": "Anything the model chooses", "rationale": "r"},
+        )
+
+    def test_allows_open_synthesis_when_options_empty(self) -> None:
+        self.validator.validate(
+            input_payload={"options": []},
+            output={"angle": "Anything the model chooses", "rationale": "r"},
+        )
+
+    def test_accepts_angle_within_options(self) -> None:
+        self.validator.validate(
+            input_payload={"options": ["Lead with urgency", "Lead with value"]},
+            output={"angle": "Lead with urgency", "rationale": "r"},
+        )
+
+    def test_rejects_angle_outside_options(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"options": ["Lead with urgency", "Lead with value"]},
+                output={"angle": "Something else entirely", "rationale": "r"},
+            )
+
+    def test_accepts_secondary_angle_within_options(self) -> None:
+        self.validator.validate(
+            input_payload={"options": ["Lead with urgency", "Lead with value"]},
+            output={
+                "angle": "Lead with urgency",
+                "rationale": "r",
+                "secondary_angle": "Lead with value",
+            },
+        )
+
+    def test_rejects_secondary_angle_outside_options(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"options": ["Lead with urgency", "Lead with value"]},
+                output={
+                    "angle": "Lead with urgency",
+                    "rationale": "r",
+                    "secondary_angle": "Something else entirely",
+                },
+            )
+
+    def test_ignores_missing_secondary_angle_when_options_supplied(self) -> None:
+        self.validator.validate(
+            input_payload={"options": ["Lead with urgency"]},
+            output={"angle": "Lead with urgency", "rationale": "r"},
+        )
+
+    def test_truncates_rejected_angle_in_error_reason(self) -> None:
+        overlong_angle = "x" * 500
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            self.validator.validate(
+                input_payload={"options": ["Lead with urgency"]},
+                output={"angle": overlong_angle, "rationale": "r"},
+            )
+        assert len(exc_info.value.reason) < len(overlong_angle)
+        assert exc_info.value.reason.endswith("...")
 
 
 class TestComposeReplyCrossValidator:

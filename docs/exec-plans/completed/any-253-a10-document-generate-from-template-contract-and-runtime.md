@@ -2,12 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-11
-- Last updated: 2026-08-11
-- Review date: 2026-08-11
-- Next action: none outstanding from review; keep in sync with any further review rounds.
+- Last updated: 2026-08-13
+- Review date: 2026-08-13
+- Next action: none; ANY-306 follow-up (whitespace-only hardening, action-model.md contract
+  shape, plan closeout) is complete.
 - Blocker: none
 
 ## Goal
@@ -41,6 +42,9 @@ toward 11/11 without a placeholder/smoke qualification.
   validation-retry proof through the real `ProviderGateway`/`ProviderCallRepository` DB ledger.
 - Focused platform-core/platform-actions test coverage plus config/architecture/docs/quick-check
   gates.
+- (ANY-306 follow-up) Reject whitespace-only strings for `template_ref` and the output
+  `sections[].id`/`title`/`content`/`summary` fields, and finalize the `action-model.md` contract
+  write-up.
 
 ### Out of scope
 
@@ -107,9 +111,12 @@ toward 11/11 without a placeholder/smoke qualification.
 - [x] Reconcile the stale `kernel_demo.report_output_v1` reference in the ANY-217 exec plan (this
       plan's own review finding).
 - [x] Add this execution plan (raised by team-lead review #1 — see decision log).
-- [ ] Update `docs/architecture/action-model.md` with the finalized A10 contract shape.
-- [ ] Final `python scripts/agent/runner.py generate-docs --check` / `quick-check` /
-      `postgresql-check` pass and PR.
+- [x] Update `docs/architecture/action-model.md` with the finalized A10 contract shape
+      (ANY-306).
+- [x] Reject whitespace-only values for `template_ref`, `sections[].id`, `sections[].title`,
+      `sections[].content`, and `summary` via `pattern: "\\S"` alongside the existing
+      `minLength: 1` (ANY-306 post-merge review follow-up).
+- [x] Final `python scripts/agent/runner.py generate-docs --check` / `quick-check` pass and PR.
 
 ## Validation
 
@@ -121,7 +128,14 @@ toward 11/11 without a placeholder/smoke qualification.
 - [x] `python scripts/agent/runner.py postgresql-check` (local Postgres 16 container; covers the
       real-ledger retry test)
 - [x] `pnpm -r --if-present generate-api-types:check` (after `openapi.json` regeneration)
-- [ ] `python scripts/agent/runner.py generate-docs --check` (final pass before PR)
+- [x] `python scripts/agent/runner.py generate-docs --check` (final pass before PR)
+- [x] `uv run pytest packages/backend/platform-actions/tests/test_generate_document_schema.py -q`
+      (ANY-306: whitespace-only fixtures for all 5 hardened fields; 20 passed)
+- [x] `python scripts/agent/runner.py quick-check` (ANY-306 final pass; 432 passed)
+- `python scripts/agent/runner.py postgresql-check` not run locally — no
+  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` is configured in this environment. Per ANY-306's Required
+  Evidence, PostgreSQL behavior is unchanged (schema `pattern` + docs only), so no PostgreSQL
+  re-run is required; this is not counted as a failed validation.
 
 ## Decision log
 
@@ -133,6 +147,8 @@ toward 11/11 without a placeholder/smoke qualification.
 | 2026-08-11 | Required `metadata.kind` (was previously optional inside an already-optional `metadata` object) | Review found an empty `metadata: {}` was valid, which is a no-op field with no bounded meaning; requiring `kind` whenever `metadata` is present closes that gap |
 | 2026-08-11 | Replaced the in-memory spy-gateway validation-retry test with one going through a real `ProviderGateway` + `ProviderCallRepository`, asserting on persisted `provider_calls` rows | Review found the original test used `session = object()` and a bespoke in-memory spy, so it could not catch missing/incorrect ledger rows or events — the same gap ANY-252's team-lead review #2 flagged for that sibling atom |
 | 2026-08-11 | Added this execution plan and reconciled the ANY-217 plan's stale `report_output_v1` references, rather than treating them as separate follow-ups | `AGENTS.md:71-78` requires an execution plan under `docs/exec-plans/active/` before non-trivial work; team-lead review #1 additionally flagged that ANY-217's plan still directs future work to preserve a schema this change deleted — fixing only one without the other would leave a second stale source of truth |
+| 2026-08-13 | (ANY-306) Added `"pattern": "\\S"` next to each `minLength: 1` on the 5 affected fields instead of refactoring to a shared `$defs` string type | JSON Schema has no `trim`; `pattern` is the minimal per-field fix and the issue does not ask for a shared-definition refactor |
+| 2026-08-13 | (ANY-306) Did not re-run `postgresql-check` locally (no `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` in this environment) | The change is schema `pattern` additions plus docs; Required Evidence explicitly states no PostgreSQL behavior change is required unless implementation expands beyond schema/docs, which it does not here |
 
 ## Progress log
 
@@ -142,6 +158,7 @@ toward 11/11 without a placeholder/smoke qualification.
 | 2026-08-11 | Dropped the duplicate `kernel_demo.report_output_v1` schema in favor of a direct `kernel.schemas.generate_document_output_v1` reference; fixed the stale OpenAPI doc-example; regenerated generated docs/API types | Address team-lead review #1 (missing execution plan, stale ANY-217 reference) |
 | 2026-08-11 | Required `metadata.kind`; replaced the in-memory spy validation-retry test with a real `ProviderGateway`/ledger-backed one (`ef4f101`) | Add the execution plan and reconcile ANY-217 (team-lead review #1) |
 | 2026-08-11 | Added this execution plan; reconciled the two stale `report_output_v1` references in `any-217-frontend-safe-result-artifact-api.md` | Update `docs/architecture/action-model.md` and run a final `generate-docs --check`/`quick-check` pass |
+| 2026-08-13 | (ANY-306 follow-up) Added `pattern: "\\S"` to reject whitespace-only `template_ref`/`sections[].id`/`sections[].title`/`sections[].content`/`summary`; added 5 whitespace-only schema tests (20 passed); wrote the finalized A10 contract shape into `docs/architecture/action-model.md`; ran `generate-docs --check` and `quick-check` (432 passed) | None — plan closed and moved to `docs/exec-plans/completed/` |
 
 ## Open questions
 
@@ -149,8 +166,6 @@ toward 11/11 without a placeholder/smoke qualification.
 
 ## Follow-up debt
 
-- `docs/architecture/action-model.md` has not yet been updated with the finalized A10 contract
-  shape.
 - `kernel_demo.extract_output_v1` remains open (`additionalProperties: true`) per ANY-217's
   handoff allowlist-mapping design decision; this plan only reconciled `report_output_v1`, which
   had become an exact duplicate rather than an intentionally softer schema. Revisiting
