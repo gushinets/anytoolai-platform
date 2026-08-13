@@ -243,9 +243,6 @@ class DetectIssuesByTaxonomyCrossValidator:
         allowed_categories = _optional_membership_set(input_payload.get("taxonomy"))
         if allowed_categories is None:
             return
-        taxonomy = input_payload.get("taxonomy")
-        if not isinstance(taxonomy, list) or not taxonomy:
-            return
         issues = output.get("issues")
         if not isinstance(issues, list):
             raise _cross_validation_error("malformed_issue_detection_output")

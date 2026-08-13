@@ -539,8 +539,8 @@ def test_action_runner_executes_compose_persuasive_text_atom_and_persists_event_
     assert result.status.value == "succeeded"
     assert result.output_payload == {
         "text": (
-            "Locking in the upgrade this quarter keeps your team on the discounted rate "
-            "and live well before the March rollout you flagged."
+            "Upgrading to Widget Pro now keeps you ahead of the March deadline you "
+            "flagged, so don't wait to make the move."
         ),
     }
     assert result.output_artifact_id == artifact["id"]
