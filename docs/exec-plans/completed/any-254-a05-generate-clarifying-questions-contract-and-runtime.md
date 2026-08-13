@@ -2,13 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-12 (retroactive — see decision log)
-- Last updated: 2026-08-12
-- Review date: 2026-08-12
-- Next action: none outstanding from this plan's own scope; one documented limitation left as
-  follow-up debt (see below). Ready for PR once reviewed.
+- Last updated: 2026-08-13
+- Review date: 2026-08-13
+- Next action: none; merged (`6927658`) and Done in Linear. Plan closed and moved to
+  `docs/exec-plans/completed/` (ANY-37 parent-DoD verification pass).
 - Blocker: none
 
 ## Goal
@@ -142,6 +142,7 @@ placeholder/smoke qualification.
 | 2026-08-12 | Registered `detect_questions_smoke_v1` in `product.yaml`, updated `test_runtime_config.py`'s hardcoded scenario list; while verifying, found and fixed 3 further silent regressions from the `main` merge (`composition.py` cross-validator wiring, both `test_action_runner.py` tests, `prompts.yaml` registry entry) | Address `/code-review` findings on the resulting diff |
 | 2026-08-12 | Removed dead/duplicate spy-gateway classes in `test_structured_llm_executor.py`; added this execution plan | Confirm `full-check` is green end-to-end and hand off remaining `issues: []` workflow gap as documented follow-up debt |
 | 2026-08-12 | Closed the `issues: []` follow-up debt: extended `output_mapping` to accept `literal:` sources and used it to seed a `{"questions": []}` default from `detect_issues`, added a `when:` skip guard on `generate_questions`, added coverage in `test_workflow_mappings.py` | None outstanding |
+| 2026-08-13 | Merged as `6927658`; ticket confirmed Done in Linear during the ANY-37 parent-DoD verification pass | None — plan closed and moved to `docs/exec-plans/completed/` |
 
 ## Open questions
 
