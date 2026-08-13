@@ -8,7 +8,6 @@ from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
-
 from action_runner import (
     AlwaysFailFakeAdapter,
     CancelledFakeAdapter,
@@ -25,18 +24,18 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
+    GapRewritesCrossValidator,
     GenerateClarifyingQuestionsCrossValidator,
     PersuasiveTextCrossValidator,
     SynthesizeAngleCrossValidator,
-    GapRewritesCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.actions.runner import (
     ActionInputValidationError,
-    ActionRunService,
     ActionRunner,
+    ActionRunService,
     _recover_action_events_after_rollback,
     _recover_failed_action_run_row_after_rollback,
 )
@@ -69,6 +68,7 @@ from anytoolai_platform_core.storage.transactions import (
     transaction_boundary,
 )
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
+
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
