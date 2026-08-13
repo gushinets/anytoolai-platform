@@ -114,11 +114,9 @@ placeholder/smoke qualification.
 - [x] `python scripts/agent/runner.py generate-docs --check`
 - [x] `python scripts/agent/runner.py full-check` (final pass: 424 passed / 352 deselected +
       vitest 216/216 + typecheck/build/generate-api-types:check)
-- [ ] `python scripts/agent/runner.py postgresql-check` — not run in this environment (no local
-      Postgres available); the Postgres-gated tests added by this ticket
-      (`test_action_runner.py`, `test_workflow_runner.py`, `test_structured_llm_executor.py`)
-      collect correctly and were spot-checked via direct `resolve_step_input()`/`jsonschema`
-      invocation instead. Same pre-existing sandbox limitation noted on ANY-252/ANY-253.
+- [x] `python scripts/agent/runner.py postgresql-check` (ANY-37 parent-DoD verification pass,
+      2026-08-13: local `infra/compose/docker-compose.agent.yml` Postgres 16 container,
+      `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL=postgresql+psycopg://...`; 357 passed)
 
 ## Decision log
 
@@ -142,7 +140,7 @@ placeholder/smoke qualification.
 | 2026-08-12 | Registered `detect_questions_smoke_v1` in `product.yaml`, updated `test_runtime_config.py`'s hardcoded scenario list; while verifying, found and fixed 3 further silent regressions from the `main` merge (`composition.py` cross-validator wiring, both `test_action_runner.py` tests, `prompts.yaml` registry entry) | Address `/code-review` findings on the resulting diff |
 | 2026-08-12 | Removed dead/duplicate spy-gateway classes in `test_structured_llm_executor.py`; added this execution plan | Confirm `full-check` is green end-to-end and hand off remaining `issues: []` workflow gap as documented follow-up debt |
 | 2026-08-12 | Closed the `issues: []` follow-up debt: extended `output_mapping` to accept `literal:` sources and used it to seed a `{"questions": []}` default from `detect_issues`, added a `when:` skip guard on `generate_questions`, added coverage in `test_workflow_mappings.py` | None outstanding |
-| 2026-08-13 | Merged as `6927658`; ticket confirmed Done in Linear during the ANY-37 parent-DoD verification pass | None — plan closed and moved to `docs/exec-plans/completed/` |
+| 2026-08-13 | Merged as `6927658`; ticket confirmed Done in Linear during the ANY-37 parent-DoD verification pass; ran the previously-skipped `postgresql-check` against a local `infra/compose/docker-compose.agent.yml` container (357 passed) and checked off the last open validation item | None — plan closed and moved to `docs/exec-plans/completed/` |
 
 ## Open questions
 
