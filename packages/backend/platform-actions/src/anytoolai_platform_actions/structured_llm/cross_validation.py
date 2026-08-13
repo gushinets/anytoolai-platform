@@ -47,6 +47,30 @@ def _cross_validation_error(reason: str) -> StructuredOutputValidationError:
     )
 
 
+def _require_output(output: Mapping[str, Any] | None) -> Mapping[str, Any]:
+    if output is None:
+        raise _cross_validation_error("missing_output")
+    return output
+
+
+def _optional_membership_set(values: Any) -> set[Any] | None:
+    """A non-empty list becomes an allow-set; a missing/empty list means "no constraint"."""
+    if not isinstance(values, list) or not values:
+        return None
+    return set(values)
+
+
+_TRUNCATED_REPR_LIMIT = 100
+
+
+def _truncated_repr(value: Any) -> str:
+    """Bounds free-form model text before it lands in exc.reason (retry prompt + debug artifact)."""
+    text = str(value)
+    if len(text) <= _TRUNCATED_REPR_LIMIT:
+        return text
+    return text[:_TRUNCATED_REPR_LIMIT] + "..."
+
+
 class ExtractStructuredFieldsInputValidator:
     """Rejects semantically ambiguous A01 input.fields before any provider call is made."""
 
@@ -77,8 +101,7 @@ class ExtractStructuredFieldsCrossValidator:
         input_payload: Mapping[str, Any],
         output: Mapping[str, Any] | None,
     ) -> None:
-        if output is None:
-            raise _cross_validation_error("missing_output")
+        output = _require_output(output)
         field_specs = input_payload.get("fields")
         if not isinstance(field_specs, list):
             return
@@ -114,15 +137,19 @@ class ExtractStructuredFieldsCrossValidator:
 
         for name in values:
             if name not in known_names:
-                raise _cross_validation_error(f"unrequested_field:{name}")
+                raise _cross_validation_error(f"unrequested_field:{_truncated_repr(name)}")
         seen_missing_names: set[str] = set()
         for name in missing_fields:
             if name not in known_names:
-                raise _cross_validation_error(f"unrequested_missing_field:{name}")
+                raise _cross_validation_error(
+                    f"unrequested_missing_field:{_truncated_repr(name)}"
+                )
             if name in values:
-                raise _cross_validation_error(f"field_marked_missing_but_present:{name}")
+                raise _cross_validation_error(
+                    f"field_marked_missing_but_present:{_truncated_repr(name)}"
+                )
             if name in seen_missing_names:
-                raise _cross_validation_error(f"duplicate_missing_field:{name}")
+                raise _cross_validation_error(f"duplicate_missing_field:{_truncated_repr(name)}")
             seen_missing_names.add(name)
 
         missing_field_set = set(missing_fields)
@@ -133,7 +160,9 @@ class ExtractStructuredFieldsCrossValidator:
         if isinstance(confidence, Mapping):
             for name in confidence:
                 if name not in values:
-                    raise _cross_validation_error(f"confidence_for_unpopulated_field:{name}")
+                    raise _cross_validation_error(
+                        f"confidence_for_unpopulated_field:{_truncated_repr(name)}"
+                    )
 
         strict = input_payload.get("strict") is True
         if strict:
@@ -210,12 +239,10 @@ class DetectIssuesByTaxonomyCrossValidator:
         input_payload: Mapping[str, Any],
         output: Mapping[str, Any] | None,
     ) -> None:
-        if output is None:
-            raise _cross_validation_error("missing_output")
-        taxonomy = input_payload.get("taxonomy")
-        if not isinstance(taxonomy, list) or not taxonomy:
+        output = _require_output(output)
+        allowed_categories = _optional_membership_set(input_payload.get("taxonomy"))
+        if allowed_categories is None:
             return
-        allowed_categories = set(taxonomy)
         issues = output.get("issues")
         if not isinstance(issues, list):
             raise _cross_validation_error("malformed_issue_detection_output")
@@ -224,7 +251,32 @@ class DetectIssuesByTaxonomyCrossValidator:
                 raise _cross_validation_error("malformed_issue_entry")
             category = issue.get("category")
             if category not in allowed_categories:
-                raise _cross_validation_error(f"category_not_in_taxonomy:{category}")
+                raise _cross_validation_error(
+                    f"category_not_in_taxonomy:{_truncated_repr(category)}"
+                )
+
+
+class SynthesizeAngleCrossValidator:
+    """Validates A09 output.angle/secondary_angle against the options from A09 input.options."""
+
+    def validate(
+        self,
+        *,
+        input_payload: Mapping[str, Any],
+        output: Mapping[str, Any] | None,
+    ) -> None:
+        output = _require_output(output)
+        allowed_options = _optional_membership_set(input_payload.get("options"))
+        if allowed_options is None:
+            return
+        angle = output.get("angle")
+        if angle not in allowed_options:
+            raise _cross_validation_error(f"angle_not_in_options:{_truncated_repr(angle)}")
+        secondary_angle = output.get("secondary_angle")
+        if secondary_angle is not None and secondary_angle not in allowed_options:
+            raise _cross_validation_error(
+                f"secondary_angle_not_in_options:{_truncated_repr(secondary_angle)}"
+            )
 
 
 # A hand-rolled tag-name allowlist keeps missing real constructs (svg/math, custom
@@ -251,7 +303,7 @@ _PLAIN_TEXT_TOKEN_TYPES = frozenset({"paragraph_open", "paragraph_close", "inlin
 # CommonMark's real emphasis rule allows an unspaced `*` to open/close emphasis intraword
 # (unlike `_`), so a parser alone flags plain arithmetic/dimension expressions - numeric
 # ("2*3*4"), variable ("a*b*c", "2*x*4"), symbolic ("L*W*H"), or localized (
-# "Д*Ш*В", "宽*高*深") - as italic. Escaping a `*` sitting directly between two alphanumeric
+# "Д*Ш*в", "宽*高*深") - as italic. Escaping a `*` sitting directly between two alphanumeric
 # characters makes CommonMark treat it as literal punctuation instead, while leaving
 # whitespace/punctuation-flanked emphasis (e.g. "*actual*") to the parser's real rules.
 # `str.isalnum()` is Unicode-aware (unlike an `[A-Za-z0-9]` character class), so this also
