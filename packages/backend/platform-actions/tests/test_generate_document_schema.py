@@ -37,6 +37,13 @@ class TestGenerateDocumentInputSchema:
                 schema=GENERATE_DOCUMENT_INPUT,
             )
 
+    def test_whitespace_only_template_ref_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={"template_ref": "   ", "data": {}},
+                schema=GENERATE_DOCUMENT_INPUT,
+            )
+
     def test_unexpected_property_rejected(self) -> None:
         with pytest.raises(ValidationError):
             validate(
@@ -141,5 +148,45 @@ class TestGenerateDocumentOutputSchema:
         with pytest.raises(ValidationError):
             validate(
                 instance={"sections": [{"id": "a", "title": "A", "content": ""}], "summary": "s"},
+                schema=GENERATE_DOCUMENT_OUTPUT,
+            )
+
+    def test_whitespace_only_section_id_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={
+                    "sections": [{"id": "   ", "title": "A", "content": "c"}],
+                    "summary": "s",
+                },
+                schema=GENERATE_DOCUMENT_OUTPUT,
+            )
+
+    def test_whitespace_only_section_title_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={
+                    "sections": [{"id": "a", "title": "   ", "content": "c"}],
+                    "summary": "s",
+                },
+                schema=GENERATE_DOCUMENT_OUTPUT,
+            )
+
+    def test_whitespace_only_section_content_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={
+                    "sections": [{"id": "a", "title": "A", "content": "   "}],
+                    "summary": "s",
+                },
+                schema=GENERATE_DOCUMENT_OUTPUT,
+            )
+
+    def test_whitespace_only_summary_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={
+                    "sections": [{"id": "a", "title": "A", "content": "c"}],
+                    "summary": "   ",
+                },
                 schema=GENERATE_DOCUMENT_OUTPUT,
             )
