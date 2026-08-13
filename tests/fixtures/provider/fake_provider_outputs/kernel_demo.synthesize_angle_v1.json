@@ -1,0 +1,14 @@
+{
+  "response_json": {
+    "angle": "Lead with the timeline risk to create urgency",
+    "rationale": "Signal timeline_gap shows the deadline is unconfirmed, which directly threatens the objective; surfacing it first motivates fast action.",
+    "secondary_angle": "Anchor on budget flexibility as a fallback"
+  },
+  "input_tokens": 150,
+  "output_tokens": 55,
+  "latency_ms": 12,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "kernel_demo.synthesize_angle_v1"
+  }
+}

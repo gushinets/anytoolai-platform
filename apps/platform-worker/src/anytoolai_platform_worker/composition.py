@@ -12,6 +12,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
     GenerateClarifyingQuestionsCrossValidator,
+    SynthesizeAngleCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.repository import ActionRunRepository
@@ -85,6 +86,7 @@ def build_worker(
                 "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
                 "text.compose_reply": ComposeReplyCrossValidator(),
                 "text.generate_clarifying_questions": GenerateClarifyingQuestionsCrossValidator(),
+                "text.synthesize_angle": SynthesizeAngleCrossValidator(),
             },
         )
         action_runner = ActionRunner(
