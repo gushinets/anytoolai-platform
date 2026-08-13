@@ -50,3 +50,21 @@ def _require_output(output: Mapping[str, Any] | None) -> Mapping[str, Any]:
     if output is None:
         raise _cross_validation_error("missing_output")
     return output
+
+
+def _optional_membership_set(values: Any) -> set[Any] | None:
+    """A non-empty list becomes an allow-set; a missing/empty list means "no constraint"."""
+    if not isinstance(values, list) or not values:
+        return None
+    return set(values)
+
+
+_TRUNCATED_REPR_LIMIT = 100
+
+
+def _truncated_repr(value: Any) -> str:
+    """Bounds free-form model text before it lands in exc.reason (retry prompt + debug artifact)."""
+    text = str(value)
+    if len(text) <= _TRUNCATED_REPR_LIMIT:
+        return text
+    return text[:_TRUNCATED_REPR_LIMIT] + "..."

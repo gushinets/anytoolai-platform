@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from ._shared import _cross_validation_error, _require_output
+from ._shared import (
+    _cross_validation_error,
+    _optional_membership_set,
+    _require_output,
+    _truncated_repr,
+)
 
 
 class DetectIssuesByTaxonomyCrossValidator:
@@ -15,10 +20,9 @@ class DetectIssuesByTaxonomyCrossValidator:
         output: Mapping[str, Any] | None,
     ) -> None:
         output = _require_output(output)
-        taxonomy = input_payload.get("taxonomy")
-        if not isinstance(taxonomy, list) or not taxonomy:
+        allowed_categories = _optional_membership_set(input_payload.get("taxonomy"))
+        if allowed_categories is None:
             return
-        allowed_categories = set(taxonomy)
         issues = output.get("issues")
         if not isinstance(issues, list):
             raise _cross_validation_error("malformed_issue_detection_output")
@@ -27,4 +31,6 @@ class DetectIssuesByTaxonomyCrossValidator:
                 raise _cross_validation_error("malformed_issue_entry")
             category = issue.get("category")
             if category not in allowed_categories:
-                raise _cross_validation_error(f"category_not_in_taxonomy:{category}")
+                raise _cross_validation_error(
+                    f"category_not_in_taxonomy:{_truncated_repr(category)}"
+                )

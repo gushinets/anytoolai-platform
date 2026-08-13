@@ -8,6 +8,8 @@ from .extract_structured_fields import (
 )
 from .generate_clarifying_questions import GenerateClarifyingQuestionsCrossValidator
 from .generate_gap_rewrites import GAP_REWRITES_DEFAULT_N, GapRewritesCrossValidator
+from .persuasive_text import PersuasiveTextCrossValidator
+from .synthesize_angle import SynthesizeAngleCrossValidator
 
 __all__ = [
     "GAP_REWRITES_DEFAULT_N",
@@ -17,4 +19,6 @@ __all__ = [
     "ExtractStructuredFieldsInputValidator",
     "GapRewritesCrossValidator",
     "GenerateClarifyingQuestionsCrossValidator",
+    "PersuasiveTextCrossValidator",
+    "SynthesizeAngleCrossValidator",
 ]
