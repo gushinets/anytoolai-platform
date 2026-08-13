@@ -2,13 +2,14 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: Codex
 - Created: 2026-07-31
-- Last updated: 2026-07-31
-- Review date: 2026-07-31
-- Next action: verify the current schema-error taxonomy, database-helper lifecycle, and idempotency coverage before making scoped changes.
-- Blocker: PostgreSQL-backed validation requires `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`; system-Python `doctor` is blocked by missing `pytest`, `yaml`, and `pydantic`.
+- Last updated: 2026-08-13
+- Review date: 2026-08-13
+- Next action: none; implementation is merged, focused regressions pass, and the production-dialect
+  cases remain owned by the required PostgreSQL CI gate.
+- Blocker: none
 
 ## Goal
 
@@ -50,17 +51,17 @@ and preserve idempotency router/OpenAPI coverage in the appropriate fast and Pos
 - [x] Add a distinct safe configuration error for malformed handoff target schemas and test it.
 - [x] Make disposable database cleanup cover failed setup and active-session teardown safely, with tests.
 - [x] Restore only missing idempotency API/OpenAPI coverage in the correct test gates.
-- [ ] Run targeted and repository validation; record unavailable PostgreSQL coverage accurately.
+- [x] Run targeted and repository validation; record unavailable local PostgreSQL coverage accurately.
 - [x] Create the requested task handoff document.
 
 ## Validation
 
-- [ ] Focused handoff, database-helper, and idempotency tests
-- [ ] `python scripts/agent/runner.py validate-configs`
-- [ ] `python scripts/agent/runner.py validate-architecture`
-- [ ] `python scripts/agent/runner.py validate-docs`
-- [ ] `python scripts/agent/runner.py generate-docs --check`
-- [ ] `python scripts/agent/runner.py quick-check`
+- [x] Focused handoff-schema, database-helper, and idempotency-router tests (`5 passed` on 2026-08-13)
+- [x] `python scripts/agent/runner.py validate-configs`
+- [x] `python scripts/agent/runner.py validate-architecture`
+- [x] `python scripts/agent/runner.py validate-docs`
+- [x] `python scripts/agent/runner.py generate-docs --check`
+- [x] `python scripts/agent/runner.py quick-check`
 
 ## Decision log
 
