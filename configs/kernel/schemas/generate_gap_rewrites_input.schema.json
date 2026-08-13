@@ -3,11 +3,13 @@
   "properties": {
     "source_text": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "\\S"
     },
     "gap": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "\\S"
     },
     "n": {
       "type": "integer",

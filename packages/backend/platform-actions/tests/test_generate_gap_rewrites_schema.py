@@ -68,6 +68,20 @@ class TestGenerateGapRewritesInputSchema:
                 schema=GENERATE_GAP_REWRITES_INPUT,
             )
 
+    def test_whitespace_only_source_text_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={"source_text": "   ", "gap": "gap", "style": "moderate"},
+                schema=GENERATE_GAP_REWRITES_INPUT,
+            )
+
+    def test_whitespace_only_gap_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={"source_text": "text", "gap": "   ", "style": "moderate"},
+                schema=GENERATE_GAP_REWRITES_INPUT,
+            )
+
     def test_unexpected_property_rejected(self) -> None:
         with pytest.raises(ValidationError):
             validate(
@@ -174,5 +188,13 @@ class TestGenerateGapRewritesOutputSchema:
         with pytest.raises(ValidationError):
             validate(
                 instance={"rewrites": [{**_REWRITE, "text": ""}], "best_pick": 0},
+                schema=GENERATE_GAP_REWRITES_OUTPUT,
+            )
+
+    @pytest.mark.parametrize("field", ["text", "explanation", "change_made"])
+    def test_rewrite_whitespace_only_field_rejected(self, field: str) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={"rewrites": [{**_REWRITE, field: "   "}], "best_pick": 0},
                 schema=GENERATE_GAP_REWRITES_OUTPUT,
             )

@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from ._shared import _coerce_integer_valued, _cross_validation_error, _require_output
+from ._shared import (
+    _coerce_integer_valued,
+    _cross_validation_error,
+    _require_output,
+    _truncated_repr,
+)
 
 # Must match the "default" declared in generate_gap_rewrites_input.schema.json's `n` property
 # (asserted by test_generate_gap_rewrites_schema.py) — jsonschema validation does not apply
@@ -53,4 +58,6 @@ class GapRewritesCrossValidator:
 
         best_pick = _coerce_integer_valued(output.get("best_pick"))
         if best_pick is None or not (0 <= best_pick < len(rewrites)):
-            raise _cross_validation_error(f"best_pick_out_of_bounds:{output.get('best_pick')}")
+            raise _cross_validation_error(
+                f"best_pick_out_of_bounds:{_truncated_repr(output.get('best_pick'))}"
+            )

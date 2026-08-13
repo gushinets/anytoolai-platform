@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from ._shared import _cross_validation_error
+from ._shared import _cross_validation_error, _truncated_repr
 
 _QUESTION_PRIORITY_RANK: Mapping[str, int] = {"high": 0, "medium": 1, "low": 2}
 _DEFAULT_MAX_QUESTIONS = 5
@@ -52,7 +52,9 @@ class GenerateClarifyingQuestionsCrossValidator:
                 )
             priority_rank = _QUESTION_PRIORITY_RANK.get(question.get("priority"))
             if priority_rank is None:
-                raise _cross_validation_error(f"unknown_priority:{question.get('priority')}")
+                raise _cross_validation_error(
+                    f"unknown_priority:{_truncated_repr(question.get('priority'))}"
+                )
             rank = (priority_rank, source_issue_index)
             if previous_rank is not None and rank < previous_rank:
                 raise _cross_validation_error("questions_not_deterministically_ordered")
