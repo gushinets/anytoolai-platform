@@ -101,8 +101,9 @@ independently runnable JSON-schema contract — `signals[]`/`objective`/optional
 - [x] Add this execution plan (raised as a non-blocking observation during the 2026-08-12 AC check,
       then confirmed as an actual per-ticket gap — not a repo-wide pattern — once the sibling
       ANY-253 branch, which added its own exec plan, merged into this one).
-- [ ] Update `docs/architecture/action-model.md` with the finalized A09 contract shape.
-- [ ] Final `python scripts/agent/runner.py generate-docs --check` / `full-check` pass and PR.
+- [x] Update `docs/architecture/action-model.md` with the finalized A09 contract shape (team lead #2
+      review, P3).
+- [x] Final `python scripts/agent/runner.py generate-docs --check` / `full-check` pass and PR.
 
 ## Validation
 
@@ -113,7 +114,8 @@ independently runnable JSON-schema contract — `signals[]`/`objective`/optional
 - [x] `uv run python scripts/agent/runner.py generate-docs --check`
 - [x] `uv run python scripts/agent/runner.py full-check` (after every review round, and again after
       merging `main`/ANY-253)
-- [ ] `python scripts/agent/runner.py postgresql-check` (not run in this sandbox — no local Postgres)
+- [x] `python scripts/agent/runner.py postgresql-check` — run against a throwaway Docker Postgres
+      container in this sandbox (no local Postgres by default); not run against CI's managed instance
 
 ## Decision log
 
@@ -134,6 +136,7 @@ independently runnable JSON-schema contract — `signals[]`/`objective`/optional
 | 2026-08-11 | Registered the cross-validator in production `composition.py`, extracted `_require_output`/`_optional_membership_set` helpers, added the missing trailing newline (review round 2) | Address round 4 (unbounded `exc.reason` text) |
 | 2026-08-11 | Added `_truncated_repr()` and applied it to `angle`/`secondary_angle` (`59deef3`); dropped its unused `limit` parameter (`3dea555`); extended it to `DetectIssuesByTaxonomyCrossValidator`/`ExtractStructuredFieldsCrossValidator` (`8091901`) | Merge `main` and re-verify |
 | 2026-08-12 | Merged `main` (pulls in ANY-253); resolved a `test_action_runner.py` conflict preserving both atoms' tests and the full cross-validator registry (`552123f`); re-ran `full-check` clean (358 backend + 216 frontend tests) | Add this execution plan; finish `docs/architecture/action-model.md` and push |
+| 2026-08-13 | Addressed team-lead #2 review (P3): documented the finalized A09 contract in `docs/architecture/action-model.md`; re-verified `generate-docs --check`, `full-check`, and `postgresql-check` (Docker Postgres) all clean | Push and open the PR |
 
 ## Open questions
 
@@ -141,7 +144,6 @@ independently runnable JSON-schema contract — `signals[]`/`objective`/optional
 
 ## Follow-up debt
 
-- `docs/architecture/action-model.md` has not yet been updated with the finalized A09 contract shape.
 - Unused module constants in `text_synthesize_angle.py` (5 of 6 module-level constants are never
   imported elsewhere) — pre-existing pattern shared by every sibling `definitions/*.py` file, not
   specific to this atom; not fixed here to avoid an unrelated repo-wide diff.
