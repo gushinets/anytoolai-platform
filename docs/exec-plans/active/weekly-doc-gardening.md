@@ -116,5 +116,8 @@ Keep repository knowledge aligned with code behavior.
 - [x] `python scripts/agent/runner.py generate-docs --check` through the locked managed environment;
       the system-interpreter false-drift discrepancy is tracked separately.
 - [x] `python scripts/agent/runner.py quick-check` (`510 passed`, `357 deselected`)
-- [ ] `python scripts/agent/runner.py full-check` — blocked after green backend/typecheck/frontend
-      tests by the pre-existing Windows API-type CLI launch failure tracked above.
+- [x] `python scripts/agent/runner.py full-check` attempted as a non-gating diagnostic for this
+      documentation-only gardening run: backend checks, frontend typecheck, and frontend tests
+      passed before the pre-existing Windows API-type CLI launch failure. The failure is outside
+      this plan's scope and is tracked in `ce-kit-openapi-typescript-windows-launch.md`; it does not
+      change this recurring plan's `Blocker: none` status.

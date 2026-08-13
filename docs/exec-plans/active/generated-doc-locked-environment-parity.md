@@ -17,10 +17,11 @@
 **Goal:** Make `python scripts/agent/runner.py generate-docs [--check]` render with repository-locked
 dependencies even when the caller's system Python has a different FastAPI version.
 
-**Architecture:** Keep the public runner command unchanged. When the command is not already inside
-the quick-check managed environment or its own locked re-exec, have it re-execute once through
-`uv run --locked`; the inner process performs the existing render/check logic. Preserve quick-check's
-current managed-environment path without a second bootstrap.
+**Architecture:** Keep the public runner command unchanged. Verify the resolved interpreter path
+before bypassing bootstrap: accept the quick-check interpreter, or the locked project interpreter
+for a generated-doc child carrying its dedicated recursion guard. Every other caller re-executes
+once through `uv run --locked`; a guard under the wrong interpreter fails explicitly instead of
+silently rendering with caller dependencies.
 
 **Tech stack:** Python 3.12, `uv`, FastAPI OpenAPI generation, pytest.
 
@@ -30,7 +31,8 @@ current managed-environment path without a second bootstrap.
 - Preserve `python scripts/agent/runner.py generate-docs [--check]` as the public cross-platform
   command.
 - Keep caller-provided `PYTHONPATH` out of the locked subprocess.
-- Avoid recursion by using one explicit bootstrap environment flag.
+- Avoid recursion with one generated-doc bootstrap flag plus resolved managed-interpreter checks;
+  an environment flag alone is never proof of the active interpreter.
 
 ---
 
@@ -67,15 +69,17 @@ current managed-environment path without a second bootstrap.
   ```
 
   Assert the child environment contains `ANYTOOLAI_GENERATE_DOCS_BOOTSTRAPPED=1` and excludes
-  `PYTHONPATH`. Add a second test proving `ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED=1` bypasses re-exec
-  and calls the existing document writer directly.
+  `PYTHONPATH`. Add tests proving that the resolved quick-check interpreter bypasses re-exec, while
+  a manually set `ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED=1` under system Python does not. Also cover a
+  generated-doc guard under the wrong interpreter and require an explicit failure rather than
+  recursion or rendering.
 
 - [ ] **Step 2: Run the focused tests and confirm the bootstrap assertion fails**
 
   Run:
 
   ```text
-  .quick-check-venv/Scripts/python -m pytest tests/test_runner.py -k generate_docs -q
+  uv run --locked python -m pytest tests/test_runner.py -k generate_docs -q
   ```
 
   Expected: the new outer-execution test fails because `generate_docs()` currently renders in the
@@ -83,17 +87,20 @@ current managed-environment path without a second bootstrap.
 
 - [ ] **Step 3: Add the single locked re-exec boundary**
 
-  In `scripts/agent/runner.py`, make `generate_docs()` check both bootstrap flags before importing
-  `docs_generation`. If neither is set, build a clean `baseline_env()`, set
+  In `scripts/agent/runner.py`, add resolved-path helpers for the quick-check interpreter and locked
+  project interpreter. `generate_docs()` may enter the existing write/check path only when the
+  current interpreter is the quick-check interpreter, or when both the generated-doc guard and the
+  locked project interpreter match. If a generated-doc guard is present under any other
+  interpreter, fail with a safe diagnostic. Otherwise build a clean `baseline_env()`, set
   `ANYTOOLAI_GENERATE_DOCS_BOOTSTRAPPED=1`, and return `run_with_env()` for the exact command asserted
-  above. The guarded inner path must retain the current write/check implementation unchanged.
+  above. Do not use `ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED` as environment proof.
 
 - [ ] **Step 4: Run focused runner and docs-generation tests**
 
   Run:
 
   ```text
-  .quick-check-venv/Scripts/python -m pytest tests/test_runner.py tests/test_docs_generation.py -q
+  uv run --locked python -m pytest tests/test_runner.py tests/test_docs_generation.py -q
   ```
 
   Expected: all selected tests pass.
@@ -137,6 +144,7 @@ current managed-environment path without a second bootstrap.
 |---|---|---|
 | 2026-08-13 | Re-execute standalone generation through locked `uv` instead of accepting system dependency drift. | The same tree passed in the locked quick-check environment with FastAPI 0.137.0 but produced stale `openapi.json` under system FastAPI 0.115.6. Generated output must be a function of the repository lock, not caller state. |
 | 2026-08-13 | Keep the fix out of the weekly documentation-only change. | The discovered issue changes runner behavior and needs its own regression and review boundary. |
+| 2026-08-13 | Require resolved managed-interpreter identity in addition to bootstrap flags. | Callers can set environment variables manually; the quick-check bootstrap contract itself treats a flag under the wrong interpreter as an error. |
 
 ## Progress log
 
