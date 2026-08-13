@@ -444,7 +444,7 @@ class TestComposeReplyCrossValidator:
             # both, not stop at the first one, to reach the alphanumeric base letter.
             ({}, {"text": "בָׁ*2*3"}),
             ({}, {"text": "Plain reply.", "call_to_action": "Book a call."}),
-            # Any real HTML5 construct - not just a fixed set of "common" tag names -
+            # Any real HTML5 element tag - not just a fixed set of "common" tag names -
             # satisfies "html", via a real tokenizer rather than a name allowlist.
             (
                 {"constraints": {"output_format": "html"}},
@@ -509,6 +509,17 @@ class TestComposeReplyCrossValidator:
             (
                 {"constraints": {"output_format": "html"}},
                 {"text": "Reply with **bold** text."},
+            ),
+            # A comment/doctype/CDATA is a real HTML5 construct but renders nothing, so it
+            # doesn't satisfy "html" formatting on its own — only an actual element tag does.
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "<!-- internal comment -->"},
+            ),
+            ({"constraints": {"output_format": "html"}}, {"text": "<!DOCTYPE html>"}),
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "<![CDATA[ some data ]]>"},
             ),
             ({}, None),
             ({}, {"text": 123}),
@@ -786,8 +797,8 @@ class TestPersuasiveTextCrossValidator:
             ({}, {"text": "L*W*H"}),
             # An integer-valued float length (schema `type: integer` allows 10.0) is honored.
             ({"constraints": {"length": 20.0}}, {"text": "Short persuasion."}),
-            # Any real HTML5 construct - not just a fixed set of "common" tag names - satisfies
-            # "html", via the same real tokenizer used by A07.
+            # Any real HTML5 element tag - not just a fixed set of "common" tag names -
+            # satisfies "html", via the same real tokenizer used by A07.
             (
                 {"constraints": {"format": "html"}},
                 {"text": "Use the <kbd>Enter</kbd> key."},
@@ -830,6 +841,11 @@ class TestPersuasiveTextCrossValidator:
             ({"constraints": {"length": 5.0}}, {"text": "This text is too long."}),
             # "html" must show its own markup kind: markdown-only text doesn't satisfy it.
             ({"constraints": {"format": "html"}}, {"text": "**Act now** and save."}),
+            # A comment/doctype/CDATA is a real HTML5 construct but renders nothing, so it
+            # doesn't satisfy "html" formatting on its own — only an actual element tag does.
+            ({"constraints": {"format": "html"}}, {"text": "<!-- internal note -->"}),
+            ({"constraints": {"format": "html"}}, {"text": "<!DOCTYPE html>"}),
+            ({"constraints": {"format": "html"}}, {"text": "<![CDATA[ some data ]]>"}),
             ({}, None),
             ({}, {"text": 123}),
         ],

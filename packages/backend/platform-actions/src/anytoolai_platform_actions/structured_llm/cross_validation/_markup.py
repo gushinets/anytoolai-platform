@@ -62,20 +62,45 @@ def _escape_alnum_flanked_asterisks(value: str) -> str:
     return _ASTERISK.sub(_escape, value)
 
 
-def _flatten_token_types(tokens: Any) -> Any:
+def _flatten_tokens(tokens: Any) -> Any:
     for token in tokens:
-        yield token.type
+        yield token
         for child in token.children or ():
-            yield child.type
+            yield child
 
 
-def _has_html_tag(value: str) -> bool:
+def _flatten_token_types(tokens: Any) -> Any:
+    for token in _flatten_tokens(tokens):
+        yield token.type
+
+
+def _has_html_construct(value: str) -> bool:
     # html_inline/html_block are the only token types the "html"-enabled parser adds on
     # top of the plain/markdown ones, so this is unaffected by any markdown syntax also
-    # present in the same text.
+    # present in the same text. This covers all six HTML5 constructs CommonMark's grammar
+    # recognizes (open tag, close tag, comment, processing instruction, declaration,
+    # CDATA) - none of them belong in text that's supposed to be plain, even the four that
+    # render nothing.
     return any(
         token_type.startswith("html_")
         for token_type in _flatten_token_types(_HTML_RENDERER.parse(value))
+    )
+
+
+# Of CommonMark's six HTML5 constructs, only open/close tags are actual elements; comments
+# ("<!--"), processing instructions ("<?"), declarations like doctype ("<!DOCTYPE"), and
+# CDATA ("<![CDATA[") render nothing and don't prove "html" formatting on their own - a
+# reply consisting solely of "<!-- note -->" is not meaningfully HTML output. All four of
+# those constructs start with "<!" or "<?", while an open tag starts "<" + letter and a
+# close tag starts "</" + letter, so that two-character prefix alone tells them apart
+# without needing to parse tag names or attributes.
+_NON_ELEMENT_HTML_PREFIXES = ("<!", "<?")
+
+
+def _has_html_tag(value: str) -> bool:
+    return any(
+        token.type.startswith("html_") and not token.content.startswith(_NON_ELEMENT_HTML_PREFIXES)
+        for token in _flatten_tokens(_HTML_RENDERER.parse(value))
     )
 
 
@@ -88,4 +113,4 @@ def _has_markdown(value: str) -> bool:
 
 
 def _has_markup(value: str) -> bool:
-    return _has_html_tag(value) or _has_markdown(value)
+    return _has_html_construct(value) or _has_markdown(value)
