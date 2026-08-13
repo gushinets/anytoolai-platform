@@ -5,6 +5,7 @@ import unicodedata
 from typing import Any
 
 from markdown_it import MarkdownIt
+from markdown_it.common.html_re import cdata, close_tag, comment, declaration, open_tag, processing
 
 # A hand-rolled tag-name allowlist keeps missing real constructs (svg/math, custom
 # elements like <x-card>, comments, doctypes) no matter how many names get added, and a
@@ -87,19 +88,49 @@ def _has_html_construct(value: str) -> bool:
     )
 
 
-# Of CommonMark's six HTML5 constructs, only open/close tags are actual elements; comments
-# ("<!--"), processing instructions ("<?"), declarations like doctype ("<!DOCTYPE"), and
-# CDATA ("<![CDATA[") render nothing and don't prove "html" formatting on their own - a
-# reply consisting solely of "<!-- note -->" is not meaningfully HTML output. All four of
-# those constructs start with "<!" or "<?", while an open tag starts "<" + letter and a
-# close tag starts "</" + letter, so that two-character prefix alone tells them apart
-# without needing to parse tag names or attributes.
-_NON_ELEMENT_HTML_PREFIXES = ("<!", "<?")
+# Of CommonMark's six HTML5 constructs, only open/close tags are actual elements; comments,
+# processing instructions, declarations like doctype, and CDATA render nothing and don't
+# prove "html" formatting on their own - a reply consisting solely of "<!-- note -->" is not
+# meaningfully HTML output. A prefix check on the whole token content isn't enough: when a
+# comment/PI/declaration/CDATA isn't followed by a blank line, markdown-it-py's block grammar
+# lumps it together with any real tag that follows into ONE html_block token (e.g.
+# "<!-- note --><p>real</p>"), and leading whitespace before a comment-only token also isn't
+# itself a "<!"/"<?" prefix. Reusing the same construct regexes the tokenizer itself uses
+# (rather than a hand-rolled prefix or tag-name check) keeps this in lockstep with whatever
+# CommonMark/GFM syntax markdown-it-py recognizes.
+_NON_ELEMENT_CONSTRUCT_RE = re.compile(f"(?:{comment}|{processing}|{declaration}|{cdata})")
+_ELEMENT_TAG_RE = re.compile(f"(?:{open_tag}|{close_tag})")
+
+
+def _starts_non_element_construct(content: str, index: int) -> bool:
+    if content.startswith(("<!--", "<![CDATA[", "<?"), index):
+        return True
+    return content.startswith("<!", index) and content[index + 2 : index + 3].isalpha()
+
+
+def _content_has_element_tag(content: str) -> bool:
+    index = 0
+    while True:
+        start = content.find("<", index)
+        if start == -1:
+            return False
+        if _starts_non_element_construct(content, start):
+            match = _NON_ELEMENT_CONSTRUCT_RE.match(content, start)
+            if match is None:
+                # An unterminated comment/PI/declaration/CDATA swallows the rest of the
+                # block verbatim (same as a real HTML parser would), so nothing after it
+                # can count as a live tag.
+                return False
+            index = match.end()
+            continue
+        if _ELEMENT_TAG_RE.match(content, start) is not None:
+            return True
+        index = start + 1
 
 
 def _has_html_tag(value: str) -> bool:
     return any(
-        token.type.startswith("html_") and not token.content.startswith(_NON_ELEMENT_HTML_PREFIXES)
+        token.type.startswith("html_") and _content_has_element_tag(token.content)
         for token in _flatten_tokens(_HTML_RENDERER.parse(value))
     )
 

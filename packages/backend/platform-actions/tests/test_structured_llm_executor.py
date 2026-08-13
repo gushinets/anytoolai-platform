@@ -145,78 +145,6 @@ class _InvalidThenValidGenerateDocumentAdapter:
         )
 
 
-class CrossValidationRetrySpyGateway:
-    """First reply violates the A04 taxonomy cross-validation rule; second is valid."""
-
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        if len(self.requests) == 1:
-            output_text = (
-                '{"issues": [{"category": "not_in_taxonomy", '
-                '"description": "d", "severity": "high"}]}'
-            )
-        else:
-            output_text = (
-                '{"issues": [{"category": "timeline", '
-                '"description": "d", "severity": "high"}]}'
-            )
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text=output_text,
-            status=ProviderCallStatus.succeeded,
-        )
-
-
-class CrossValidationAlwaysFailingSpyGateway:
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text=(
-                '{"issues": [{"category": "not_in_taxonomy", '
-                '"description": "d", "severity": "high"}]}'
-            ),
-            status=ProviderCallStatus.succeeded,
-        )
-
-
-class InvalidThenValidDateSpyGateway:
-    """First reply uses a non-ISO date string; second uses a valid ISO date."""
-
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        if len(self.requests) == 1:
-            output_text = '{"values": {"deadline": "next Friday"}, "missing_fields": []}'
-        else:
-            output_text = '{"values": {"deadline": "2026-08-14"}, "missing_fields": []}'
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text=output_text,
-            status=ProviderCallStatus.succeeded,
-        )
-
-
 class GapRewritesValidationRetrySpyGateway:
     """First reply violates the A08 rewrite-count cross-validation rule (requested n=2, only
     1 rewrite returned); second reply is valid."""
@@ -245,23 +173,6 @@ class GapRewritesValidationRetrySpyGateway:
             provider="fake",
             model="fake-json-v1",
             output_text=output_text,
-            status=ProviderCallStatus.succeeded,
-        )
-
-
-class ExhaustedValidationSpyGateway:
-    def __init__(self) -> None:
-        self.requests = []
-        self.sessions = []
-
-    async def request(self, request, *, session):
-        self.requests.append(request)
-        self.sessions.append(session)
-        return ProviderResponse(
-            provider_policy_ref=request.provider_policy_ref,
-            provider="fake",
-            model="fake-json-v1",
-            output_text="not-json",
             status=ProviderCallStatus.succeeded,
         )
 

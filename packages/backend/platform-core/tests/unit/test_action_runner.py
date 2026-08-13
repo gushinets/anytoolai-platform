@@ -14,6 +14,7 @@ from action_runner import (
     ComposeReplyOverLimitThenValidAdapter,
     CountingFakeAdapter,
     EmptyQuestionsFakeAdapter,
+    GapRewritesCountMismatchThenValidAdapter,
     GenericExecutor,
     InvalidStructuredOutputAdapter,
     SynthesizeAngleOutOfOptionsThenValidAdapter,
@@ -929,6 +930,95 @@ def test_action_runner_generate_gap_rewrites_fails_safely_for_non_default_n(
     assert exc_info.value.reason == "rewrite_count_mismatch:3!=2"
     assert action_run["status"].value == "failed"
     assert counting_adapter.call_count == 1
+
+
+def test_action_runner_retries_generate_gap_rewrites_cross_validation_through_real_ledger(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """A08: proves the rewrite-count cross-validation retry through the real
+    ProviderGateway/ActionRunner path (not an in-memory spy) - a rewrite-count mismatch
+    followed by a matching-count success must create two physical provider_calls rows with
+    the expected semantic/physical indexes, provider events, and final artifact lineage."""
+    adapter = GapRewritesCountMismatchThenValidAdapter()
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session, fake_adapter=adapter)
+        # default_fake_provider_v1 allows 1 validation attempt / 1 physical call per action;
+        # widen both so the semantic retry this test drives can actually reach a 2nd
+        # physical call through the real ProviderGateway hard-limit check, not just PydanticAI.
+        executor = runner._executors["structured_llm"]
+        base_policy = executor._require_provider_policy("default_fake_provider_v1")
+        patched_policy = replace(
+            base_policy,
+            retry_policy=replace(
+                base_policy.retry_policy,
+                validation=ProviderValidationRetryPolicy(
+                    owner=base_policy.retry_policy.validation.owner,
+                    max_attempts=2,
+                ),
+                hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=2),
+            ),
+        )
+        executor._require_provider_policy = lambda _provider_policy_ref: patched_policy
+        executor._provider_gateway._policy_resolver.resolve = lambda _provider_policy_ref: patched_policy
+
+        result = asyncio.run(
+            runner.run(
+                "text.generate_gap_rewrites",
+                "kernel_demo.generate_gap_rewrites_v1",
+                {
+                    "source_text": "We will deliver the project soon.",
+                    "gap": "No concrete delivery date is given.",
+                    "n": 2,
+                    "style": "moderate",
+                },
+                _context(
+                    step_id="generate_gap_rewrites",
+                    action_type="text.generate_gap_rewrites",
+                    action_config_id="kernel_demo.generate_gap_rewrites_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+        provider_calls = list(
+            session.execute(
+                sa.select(provider_calls_table).order_by(
+                    provider_calls_table.c.created_at, provider_calls_table.c.id
+                )
+            ).mappings()
+        )
+        events = _event_rows(session)
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {
+        "rewrites": [
+            {"text": "First rewrite.", "explanation": "e", "change_made": "c"},
+            {"text": "Second rewrite.", "explanation": "e", "change_made": "c"},
+        ],
+        "best_pick": 1,
+    }
+    assert result.output_artifact_id == artifact["id"]
+    assert adapter.call_count == 2
+    assert len(provider_calls) == 2
+    assert [row["semantic_attempt_index"] for row in provider_calls] == [1, 2]
+    # physical_call_index tracks the action-wide physical-call budget, not a per-semantic-
+    # attempt counter, so it keeps climbing across semantic attempts too.
+    assert [row["physical_call_index"] for row in provider_calls] == [1, 2]
+    assert all(row["action_run_id"] == action_run["id"] for row in provider_calls)
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 2,
+            "provider.request_succeeded": 2,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    artifact_created = _event_by_type(events, "artifact.created")
+    assert artifact_created["artifact_id"] == artifact["id"]
 
 
 def test_action_runner_executes_compose_reply_atom_and_persists_event_lineage(

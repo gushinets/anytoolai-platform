@@ -458,6 +458,17 @@ class TestComposeReplyCrossValidator:
                 {"constraints": {"output_format": "html"}},
                 {"text": "Custom <x-card>widget</x-card>."},
             ),
+            # markdown-it-py lumps a same-line comment and a following real tag into one
+            # html_block token when there's no blank line between them - the real tag must
+            # still be found even though it isn't at the start of that token's content.
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "<!-- note --><p>Real reply.</p>"},
+            ),
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "<!DOCTYPE html><html>Real reply.</html>"},
+            ),
         ],
     )
     def test_accepts(self, input_payload: dict, output: dict) -> None:
@@ -520,6 +531,12 @@ class TestComposeReplyCrossValidator:
             (
                 {"constraints": {"output_format": "html"}},
                 {"text": "<![CDATA[ some data ]]>"},
+            ),
+            # Leading whitespace before a comment-only block must not be mistaken for a
+            # missing "<!"/"<?" prefix - it's still just a comment, no real tag.
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "  <!-- internal comment -->"},
             ),
             ({}, None),
             ({}, {"text": 123}),
@@ -807,6 +824,17 @@ class TestPersuasiveTextCrossValidator:
                 {"constraints": {"format": "html"}},
                 {"text": "Custom <x-card>widget</x-card>."},
             ),
+            # markdown-it-py lumps a same-line comment and a following real tag into one
+            # html_block token when there's no blank line between them - the real tag must
+            # still be found even though it isn't at the start of that token's content.
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "<!-- note --><p>Real persuasion.</p>"},
+            ),
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "<!DOCTYPE html><html>Real persuasion.</html>"},
+            ),
         ],
     )
     def test_accepts(self, input_payload: dict, output: dict) -> None:
@@ -846,6 +874,12 @@ class TestPersuasiveTextCrossValidator:
             ({"constraints": {"format": "html"}}, {"text": "<!-- internal note -->"}),
             ({"constraints": {"format": "html"}}, {"text": "<!DOCTYPE html>"}),
             ({"constraints": {"format": "html"}}, {"text": "<![CDATA[ some data ]]>"}),
+            # Leading whitespace before a comment-only block must not be mistaken for a
+            # missing "<!"/"<?" prefix - it's still just a comment, no real tag.
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "  <!-- internal note -->"},
+            ),
             ({}, None),
             ({}, {"text": 123}),
         ],
