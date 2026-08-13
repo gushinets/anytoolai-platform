@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from ._markup import _has_html_tag, _has_markup
-from ._shared import _cross_validation_error
+from ._shared import _coerce_integer_valued, _cross_validation_error
 
 
 class ComposeReplyCrossValidator:
@@ -26,12 +26,8 @@ class ComposeReplyCrossValidator:
         constraints = input_payload.get("constraints")
         constraints = constraints if isinstance(constraints, Mapping) else {}
 
-        max_length = constraints.get("max_length")
-        if (
-            isinstance(max_length, int)
-            and not isinstance(max_length, bool)
-            and len(text) > max_length
-        ):
+        max_length = _coerce_integer_valued(constraints.get("max_length"))
+        if max_length is not None and len(text) > max_length:
             raise _cross_validation_error(
                 f"text_exceeds_constraints_max_length:{len(text)}>{max_length}"
             )
