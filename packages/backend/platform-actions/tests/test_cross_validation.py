@@ -11,6 +11,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     ExtractStructuredFieldsInputValidator,
     GenerateClarifyingQuestionsCrossValidator,
     SynthesizeAngleCrossValidator,
+    PersuasiveTextCrossValidator,
 )
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
@@ -629,3 +630,86 @@ class TestGenerateClarifyingQuestionsCrossValidator:
     def test_rejects_malformed_questions(self) -> None:
         with pytest.raises(StructuredOutputValidationError):
             self.validator.validate(input_payload={"issues": _ISSUES}, output={"questions": "nope"})
+
+
+class TestPersuasiveTextCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = PersuasiveTextCrossValidator()
+
+    @pytest.mark.parametrize(
+        ("input_payload", "output"),
+        [
+            ({}, {"text": "Plain persuasive text."}),
+            ({"constraints": {"length": 20}}, {"text": "Short persuasion."}),
+            (
+                {"constraints": {"length": True}},
+                {"text": "This text is longer than one character."},
+            ),
+            ({"constraints": {"format": "plain_text"}}, {"text": "Plain persuasive text."}),
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "Persuasive <b>markup</b>."},
+            ),
+            (
+                {"constraints": {"format": "markdown"}},
+                {"text": "**Bold** persuasion with *markdown* markers."},
+            ),
+            # Markdown is not required to prove itself with a decorative token — a plain
+            # paragraph is valid Markdown too, same as the sibling A07 validator.
+            ({"constraints": {"format": "markdown"}}, {"text": "Plain persuasive text."}),
+            # Unspaced arithmetic/dimension expressions aren't markdown italic (CommonMark's
+            # intraword-emphasis rule for `*` is escaped for alnum-flanked asterisks).
+            ({}, {"text": "L*W*H"}),
+            # An integer-valued float length (schema `type: integer` allows 10.0) is honored.
+            ({"constraints": {"length": 20.0}}, {"text": "Short persuasion."}),
+            # Any real HTML5 construct - not just a fixed set of "common" tag names - satisfies
+            # "html", via the same real tokenizer used by A07.
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "Use the <kbd>Enter</kbd> key."},
+            ),
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "Custom <x-card>widget</x-card>."},
+            ),
+        ],
+    )
+    def test_accepts(self, input_payload: dict, output: dict) -> None:
+        self.validator.validate(input_payload=input_payload, output=output)
+
+    @pytest.mark.parametrize(
+        ("input_payload", "output"),
+        [
+            ({"constraints": {"length": 5}}, {"text": "This text is too long."}),
+            (
+                {"constraints": {"format": "plain_text"}},
+                {"text": "Persuasive <b>markup</b>."},
+            ),
+            ({"constraints": {}}, {"text": "Persuasive <b>markup</b>."}),
+            ({}, {"text": "Persuasive <b>markup</b>."}),
+            # A lone closing tag is still markup.
+            ({}, {"text": "Act now.</p>"}),
+            ({"constraints": {"format": "html"}}, {"text": "Plain persuasive text."}),
+            # Markdown syntax is markup too, not just HTML tags.
+            ({}, {"text": "Act **now** to save."}),
+            ({}, {"text": "See [details](https://example.com)."}),
+            ({}, {"text": "# Heading\nBody."}),
+            # A well-formed "<word>" is a (possibly unknown) HTML tag to a real tokenizer.
+            ({}, {"text": "Offer expires <Tuesday>."}),
+            # "<email@domain>" is CommonMark autolink syntax, not just plain bracketed text.
+            ({}, {"text": "Reach me at <user@example.com>."}),
+            # Spaced single-asterisk emphasis is real markdown italic, unlike unspaced
+            # arithmetic/dimension expressions (e.g. "L*W*H").
+            ({}, {"text": "The *actual* deadline is Friday."}),
+            # An integer-valued float length (10.0) must still be enforced, not silently
+            # ignored because it isn't a plain int.
+            ({"constraints": {"length": 5.0}}, {"text": "This text is too long."}),
+            # "html" must show its own markup kind: markdown-only text doesn't satisfy it.
+            ({"constraints": {"format": "html"}}, {"text": "**Act now** and save."}),
+            ({}, None),
+            ({}, {"text": 123}),
+        ],
+    )
+    def test_rejects(self, input_payload: dict, output: dict | None) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(input_payload=input_payload, output=output)
