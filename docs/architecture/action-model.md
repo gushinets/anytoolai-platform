@@ -56,3 +56,10 @@ All physical provider attempts go through Provider Gateway so retry accounting a
 | A05 `generate_questions` | `text.generate_clarifying_questions` |
 
 `generate_proposal` must never become a platform action type. ProposalAI uses `text.compose_persuasive_text` through product-specific MVP-B action config.
+
+## A10 `document.generate_from_template` contract
+
+Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.generate_document_input_v1` / `kernel.schemas.generate_document_output_v1`:
+
+- Input: `template_ref` (required, non-empty and non-whitespace string) identifying the product-registered template; `data` (required object) holding the template's input fields; optional `style` enum (`professional | concise | detailed`, defaults to `professional`).
+- Output: `sections` (required, non-empty array of ordered document sections) and `summary` (required, non-empty and non-whitespace string). Each section is `{id, title, content}` (all required, non-empty and non-whitespace strings) plus an optional `metadata.kind` enum (`heading | paragraph | list | table | note`), required whenever `metadata` is present so an empty `metadata: {}` is rejected.
