@@ -27,6 +27,16 @@ class ScoreMatchByRubricInputValidator:
                     f"Action input validation failed: duplicate rubric[*].id '{criterion_id}'."
                 )
             seen_ids.add(criterion_id)
+            # Schema only enforces `weight > 0` with no upper bound, so a JSON literal like
+            # `1e309` parses to `inf` and passes schema validation. Reject it here, before any
+            # provider call, instead of only in ScoreMatchByRubricCrossValidator - otherwise
+            # every PydanticAI validation retry re-invokes the provider against the same
+            # unchanged input and fails identically, wasting real provider calls.
+            if not _is_finite_number(criterion.get("weight")):
+                raise ActionInputValidationError(
+                    f"Action input validation failed: rubric[*].weight for '{criterion_id}' "
+                    "must be a finite number."
+                )
 
 
 # No existing rubric-weighted-aggregate precedent in this module (every prior cross

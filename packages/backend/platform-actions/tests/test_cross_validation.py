@@ -1051,6 +1051,10 @@ class TestScoreMatchByRubricInputValidator:
     def test_ignores_non_list_rubric_payload(self) -> None:
         self.validator.validate(input_payload={"rubric": "not-a-list"})
 
+    def test_rejects_non_finite_rubric_weight(self) -> None:
+        with pytest.raises(ActionInputValidationError):
+            self.validator.validate(input_payload={"rubric": [_rubric_item("tone", float("inf"))]})
+
 
 class TestScoreMatchByRubricCrossValidator:
     def setup_method(self) -> None:
