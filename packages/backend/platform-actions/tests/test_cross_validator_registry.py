@@ -114,6 +114,7 @@ def test_real_config_registry_wiring_resolves_end_to_end() -> None:
     input_validators = build_input_validators(registry.action_definitions)
 
     assert set(cross_validators) == {
+        "text.compare_and_classify",
         "text.compose_persuasive_text",
         "text.compose_reply",
         "text.detect_issues_by_taxonomy",
@@ -122,4 +123,7 @@ def test_real_config_registry_wiring_resolves_end_to_end() -> None:
         "text.generate_gap_rewrites",
         "text.synthesize_angle",
     }
-    assert set(input_validators) == {"text.extract_structured_fields"}
+    assert set(input_validators) == {
+        "text.compare_and_classify",
+        "text.extract_structured_fields",
+    }

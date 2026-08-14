@@ -95,6 +95,27 @@ or worker startup) instead of silently running unvalidated.
     Fixed: added `test_build_worker_fails_closed_on_unresolvable_validator_ref` to
     `apps/platform-worker/tests/test_worker_boot.py`, mutating a real loaded registry's
     `cross_validator_ref` to an unknown value and asserting `ValidatorRefNotFoundError`.
+- [x] Post-merge verification (2026-08-14, after merging `main` which landed ANY-255's
+      `text.compare_and_classify` implementation) found the merge had silently reintroduced the
+      exact failure mode this issue targets, plus dead code from the 3-way merge:
+  - ANY-255 (merged separately into `main`) added real `CompareAndClassifyCrossValidator` /
+    `CompareAndClassifyInputValidator` classes, but `main`'s pre-ANY-305 `composition.py` still
+    wired them the old hardcoded way. The merge's textual 3-way resolution kept `composition.py`'s
+    import of those two classes but dropped their old dict-literal usage (superseded by this
+    branch's builder calls), leaving them imported-but-unused -- and, more importantly, leaving
+    `text.compare_and_classify`'s YAML at `cross_validator_ref: none` / `input_validator_ref: none`
+    and `registry.py`'s lookup dicts without an entry for it. The atom now has real validator
+    classes on `main` but silently runs unvalidated on this branch -- exactly the bug ANY-305
+    exists to prevent, reintroduced by the merge itself.
+    Fixed: added `text.compare_and_classify` to `_CROSS_VALIDATORS`/`_INPUT_VALIDATORS` in
+    `registry.py`, changed its YAML refs from `"none"` to `"text.compare_and_classify"`, updated
+    `test_cross_validator_registry.py`'s real-config-tree smoke test's expected sets.
+  - The same 3-way merge left 10 dead concrete-validator-class imports (all 8 pre-existing classes
+    plus the 2 new `CompareAndClassify*` ones) in both `composition.py` and
+    `test_action_runner.py` -- the merge re-added the whole old import block from `main`'s side
+    without noticing this branch had already replaced all direct-class usage with the
+    `build_output_cross_validators`/`build_input_validators` builder calls. Fixed: trimmed both
+    files' imports down to just the two builder functions.
 - [x] Code review round 3 (2026-08-14) found 2 more gaps, both addressed:
   - `build_output_cross_validators`/`build_input_validators` duplicated the same resolve-or-raise
     loop, risking behavior drift between the two if one were changed and not the other. Fixed:
@@ -135,6 +156,7 @@ or worker startup) instead of silently running unvalidated.
 | 2026-08-14 | Code review found 3 gaps (lazy startup resolution, missing symmetric test, no exec plan). Fixed all three: hoisted validator-map construction into `build_worker`, added the missing `input_validator_ref` loader test, filed this exec plan. | Re-run `quick-check` and targeted suite to confirm the fixes are green, then commit. |
 | 2026-08-14 | Rerun code review found 3 more gaps (overclaimed `provider_policy_ref` parity, misleading null-vs-missing loader error, no real fail-closed `build_worker` test). Fixed all three: corrected the decision log, added a targeted null-check with a clearer message in `loader.py`, added `test_build_worker_fails_closed_on_unresolvable_validator_ref`. | Re-run `quick-check` and targeted suite, commit. |
 | 2026-08-14 | Round-3 code review found 2 more gaps (duplicated resolve-or-raise loop across the two builders, missing `input_validator_ref` null-ref test). Fixed both: extracted `_resolve_validators` shared helper in `registry.py`, added the symmetric null-ref test. | Re-run `quick-check` and targeted suite, commit. |
+| 2026-08-14 | Merged `main` into `feature/ANY-305` to pick up ANY-255 (`text.compare_and_classify` A11 implementation). Merge silently reintroduced the "forgotten validator wiring" failure mode for `text.compare_and_classify` (new validator classes existed but weren't wired through `registry.py`/YAML) plus left 10 dead imports in `composition.py`/`test_action_runner.py`. Fixed both, updated the smoke-test expected sets. | Re-run `quick-check` and targeted suite, commit. |
 
 ## Open questions
 
@@ -142,7 +164,10 @@ or worker startup) instead of silently running unvalidated.
 
 ## Follow-up debt
 
-- TD-010: 4 action types (`document.generate_from_template`, `text.compare_and_classify`,
-  `text.score_match_by_rubric`, `text.score_multidimensional_axes`) have no validator class yet
-  and carry `"none"`/`"none"`. When a real validator is added for one, change its YAML ref from
-  `"none"` to the concrete ref — the loader/registry will then demand the class exist.
+- TD-010: 3 action types (`document.generate_from_template`, `text.score_match_by_rubric`,
+  `text.score_multidimensional_axes`) have no validator class yet and carry `"none"`/`"none"`.
+  `text.compare_and_classify` moved off this list on 2026-08-14 once ANY-255 landed real
+  `CompareAndClassifyCrossValidator`/`CompareAndClassifyInputValidator` classes and this branch
+  wired them through `registry.py`. When a real validator is added for one of the remaining 3,
+  change its YAML ref from `"none"` to the concrete ref — the loader/registry will then demand the
+  class exist.

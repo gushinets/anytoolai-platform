@@ -7,6 +7,7 @@ from anytoolai_platform_core.actions.input_validation import ActionInputValidato
 from anytoolai_platform_core.actions.models import ActionDefinition
 from anytoolai_platform_core.actions.output_validation import ActionOutputCrossValidator
 
+from .compare_and_classify import CompareAndClassifyCrossValidator, CompareAndClassifyInputValidator
 from .compose_reply import ComposeReplyCrossValidator
 from .detect_issues_by_taxonomy import DetectIssuesByTaxonomyCrossValidator
 from .extract_structured_fields import (
@@ -28,10 +29,12 @@ _CROSS_VALIDATORS: dict[str, type[ActionOutputCrossValidator]] = {
     "text.synthesize_angle": SynthesizeAngleCrossValidator,
     "text.compose_persuasive_text": PersuasiveTextCrossValidator,
     "text.generate_gap_rewrites": GapRewritesCrossValidator,
+    "text.compare_and_classify": CompareAndClassifyCrossValidator,
 }
 
 _INPUT_VALIDATORS: dict[str, type[ActionInputValidator]] = {
     "text.extract_structured_fields": ExtractStructuredFieldsInputValidator,
+    "text.compare_and_classify": CompareAndClassifyInputValidator,
 }
 
 
