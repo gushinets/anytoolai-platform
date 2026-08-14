@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from .compare_and_classify import (
+    CompareAndClassifyCrossValidator,
+    CompareAndClassifyInputValidator,
+)
 from .compose_reply import ComposeReplyCrossValidator
 from .detect_issues_by_taxonomy import DetectIssuesByTaxonomyCrossValidator
 from .extract_structured_fields import (
@@ -19,6 +23,8 @@ from .synthesize_angle import SynthesizeAngleCrossValidator
 
 __all__ = [
     "GAP_REWRITES_DEFAULT_N",
+    "CompareAndClassifyCrossValidator",
+    "CompareAndClassifyInputValidator",
     "NONE_REF",
     "ComposeReplyCrossValidator",
     "DetectIssuesByTaxonomyCrossValidator",
