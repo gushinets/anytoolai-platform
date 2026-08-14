@@ -7,7 +7,7 @@
 - Created: 2026-08-14
 - Last updated: 2026-08-14
 - Review date: 2026-08-14
-- Next action: none outstanding from the round-1 `/code-review` pass; keep in sync with any
+- Next action: none outstanding from the round-2 `/code-review` pass; keep in sync with any
   further review rounds.
 - Blocker: none
 
@@ -98,6 +98,18 @@ toward 11/11 without a placeholder/smoke qualification.
       existing rubric loop instead of re-summing `rubric_weights.values()`.
 - [x] Add this execution plan (round 1 review also flagged its absence, matching the same
       per-ticket gap ANY-259 hit first).
+- [x] `/code-review --high` round 2 (findings unverified, orchestrator stopped before Phase 2):
+      fix the `total_weight`/`rubric_weights` desync the round-1 in-loop-accumulate change
+      introduced — a duplicate rubric `id` inflated `total_weight` past what the deduplicated
+      `rubric_weights` numerator actually used. Reverted to summing `rubric_weights.values()` after
+      the loop and added a regression test exercising the cross-validator directly (bypassing
+      `ScoreMatchByRubricInputValidator`, which masks this in production wiring). Deleted
+      `TestRejectDuplicateIdsSharedHelper`, confirmed fully redundant with existing
+      `TestExtractStructuredFieldsInputValidator`/`TestScoreMatchByRubricInputValidator` coverage.
+      Declined the round-2 "reuse `_reject_duplicate_ids` in the cross-validator" suggestion: that
+      helper raises `ActionInputValidationError`, but the cross-validator must raise
+      `StructuredOutputValidationError` to trigger PydanticAI retries — reusing it as proposed would
+      swap exception types and break retry-on-duplicate-criterion-id.
 - [x] Final `python scripts/agent/runner.py generate-docs --check` / `quick-check` /
       `postgresql-check` pass.
 
@@ -124,6 +136,8 @@ toward 11/11 without a placeholder/smoke qualification.
 | 2026-08-14 | Aggregate rounding tolerance fixed at `0.5` points on the 0–100 scale | The ticket leaves the exact tolerance undefined; no prior numeric recompute/tolerance precedent exists in `cross_validation.py` (every earlier cross validator does membership/bounds/regex checks). `0.5` covers the model rounding a weighted average to the nearest whole point, matching the prompt's explicit rounding instruction — pinned by a dedicated test reading the prompt file so the two can't drift apart silently. |
 | 2026-08-14 | `rubric[*].weight` left with only `exclusiveMinimum: 0`, no upper bound in the schema | Round 1 review's critical finding (extreme weights overflowing float64 to `inf`/`NaN` and silently bypassing the aggregate check) was fixed at the arithmetic level instead — an explicit `math.isfinite(expected_score)` guard rejects any non-finite recomputed aggregate regardless of how it got there, which closes the hole without picking an arbitrary weight ceiling the ticket doesn't specify. |
 | 2026-08-14 | Extracted `_reject_duplicate_ids(items, id_field=..., error_label=...)` and had both `ExtractStructuredFieldsInputValidator` (A01) and `ScoreMatchByRubricInputValidator` (A02) call it | Round 1 review found the new A02 validator was a near line-for-line copy of the existing A01 one (same isinstance guards, seen-set, error-message shape, differing only in field names). Two call sites is the point this repo's own "three similar lines is better than a premature abstraction" guidance stops applying, since the duplicated surface is a multi-line control-flow rule, not a few standalone lines, and a third atom (A03 `score_multidimensional_axes`, ANY-257) is likely to want the same rule next. |
+| 2026-08-14 | Reverted `total_weight` to `sum(rubric_weights.values())` after the loop, undoing round 1's in-loop accumulation | Round 2 review (finder-only, unverified) caught that accumulating `total_weight` alongside `rubric_weights` inside the same loop double-counts a duplicate rubric `id` in the denominator while the dict numerator silently deduplicates it (last write wins) — a real desync, currently unreachable in prod only because `ScoreMatchByRubricInputValidator` always runs first and rejects duplicate ids, but not something the cross-validator class should rely on an external caller to prevent. |
+| 2026-08-14 | Did not reuse `_reject_duplicate_ids` inside `ScoreMatchByRubricCrossValidator`'s `criterion_scores` duplicate check, despite round 2 review suggesting it | The helper raises `ActionInputValidationError` (correct for a pre-provider-call input validator); this is a post-provider-call cross-validator, which must raise `StructuredOutputValidationError` so PydanticAI treats a duplicate `criterion_id` as retryable. Swapping in the shared helper as proposed would change the exception type and silently break that retry path. |
 
 ## Progress log
 
@@ -131,6 +145,7 @@ toward 11/11 without a placeholder/smoke qualification.
 |---|---|---|
 | 2026-08-14 | Implemented strict input/output schemas, both validators, prompt, config wiring, fake-provider fixture, and full test coverage; `quick-check`/`validate-configs`/`validate-architecture`/`validate-docs`/`generate-docs --check`/`postgresql-check` (Docker Postgres) all clean | Address round 1 `/code-review --high` findings |
 | 2026-08-14 | Fixed the critical `NaN`-overflow aggregate bypass, accumulated `total_weight` inline instead of re-summing, extracted the shared `_reject_duplicate_ids` helper, cross-referenced the tolerance constant with the prompt's rounding instruction plus a pinning test, added this execution plan | Re-run full validation suite and push |
+| 2026-08-14 | Round 2 `/code-review --high` (finder-only, orchestrator stopped before verify): fixed the `total_weight`/`rubric_weights` duplicate-id desync round 1's accumulate-in-loop change introduced (Angle A, confirmed real by independent read), deleted the fully redundant `TestRejectDuplicateIdsSharedHelper`, declined the unsafe "reuse `_reject_duplicate_ids`" suggestion (wrong exception type for a cross-validator), left the remaining cosmetic/debatable findings (schema weight ceiling, prompt-substring pinning-test brittleness, comment length, per-scenario test-class granularity, per-retry recompute cost) unaddressed by explicit user choice | None outstanding |
 
 ## Open questions
 
@@ -147,3 +162,13 @@ toward 11/11 without a placeholder/smoke qualification.
   `FAKE_PROVIDER_FIXTURE_ID`) are never imported elsewhere — shared by every sibling
   `definitions/*.py` file, not specific to this atom; not fixed here to avoid an unrelated
   repo-wide diff.
+- Round 2 review raised several unverified, debatable findings left unaddressed by explicit user
+  choice: no upper bound on `rubric[*].weight` in the schema (would let a schema `maximum` replace
+  the `math.isfinite` overflow guard, its comment, and its dedicated test, at the cost of an
+  equally arbitrary weight ceiling the ticket doesn't specify); `TestScoreMatchByRubricAggregateToleranceMatchesPrompt`
+  pins tolerance-to-prompt sync via a literal prose substring match, which is brittle to harmless
+  prompt copyedits and blind to a rounding-granularity change that keeps the same phrase; the
+  11-line derivation comment above `_SCORE_MATCH_AGGREGATE_TOLERANCE`; `rubric_weights`/`total_weight`
+  recomputed from scratch on every PydanticAI retry attempt against the same unchanged
+  `input_payload['rubric']`; and `TestScoreMatchByRubricCrossValidatorOverflow` living in its own
+  one-test class instead of a method on `TestScoreMatchByRubricCrossValidator`.

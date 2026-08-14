@@ -303,7 +303,6 @@ class ScoreMatchByRubricCrossValidator:
         if not isinstance(rubric, list):
             return
         rubric_weights: dict[str, float] = {}
-        total_weight = 0.0
         for criterion in rubric:
             if not isinstance(criterion, Mapping):
                 continue
@@ -311,9 +310,12 @@ class ScoreMatchByRubricCrossValidator:
             weight = criterion.get("weight")
             if isinstance(criterion_id, str) and _is_finite_number(weight):
                 rubric_weights[criterion_id] = float(weight)
-                total_weight += float(weight)
         if not rubric_weights:
             return
+        # Summed from the deduplicated dict, not accumulated alongside it - a duplicate
+        # rubric id must count once (last write wins, matching rubric_weights) rather than
+        # inflating the denominator against a numerator that only sees the deduped weight.
+        total_weight = sum(rubric_weights.values())
 
         criterion_scores = output.get("criterion_scores")
         if not isinstance(criterion_scores, list):

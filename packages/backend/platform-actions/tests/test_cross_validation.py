@@ -826,6 +826,26 @@ class TestScoreMatchByRubricCrossValidator:
     def test_ignores_when_rubric_missing_from_input(self) -> None:
         self.validator.validate(input_payload={}, output=self._output(0))
 
+    def test_duplicate_rubric_id_weight_counted_once_in_denominator(self) -> None:
+        """In production ScoreMatchByRubricInputValidator always rejects duplicate rubric
+        ids before this cross-validator runs, but the cross-validator must stay correct on
+        its own: a duplicate id must not inflate total_weight past what rubric_weights (the
+        deduplicated numerator source) actually uses."""
+        self.validator.validate(
+            input_payload={
+                "rubric": [_rubric_item("tone", 1), _rubric_item("tone", 3), _rubric_item("completeness", 1)]
+            },
+            output={
+                "criterion_scores": [
+                    {"criterion_id": "tone", "score": 100, "rationale": "r"},
+                    {"criterion_id": "completeness", "score": 0, "rationale": "r"},
+                ],
+                "score": 75,
+                "strengths": [],
+                "gaps": [],
+            },
+        )
+
     def test_truncates_rejected_criterion_id_in_error_reason(self) -> None:
         overlong_id = "x" * 500
         with pytest.raises(StructuredOutputValidationError) as exc_info:
@@ -887,24 +907,4 @@ class TestScoreMatchByRubricCrossValidatorOverflow:
                     "strengths": [],
                     "gaps": [],
                 },
-            )
-
-
-class TestRejectDuplicateIdsSharedHelper:
-    """Covers the `_reject_duplicate_ids` helper both A01 and A02 input validators share,
-    through the two public validators that call it."""
-
-    def test_extract_structured_fields_and_score_match_share_duplicate_rejection_behavior(
-        self,
-    ) -> None:
-        extract_validator = ExtractStructuredFieldsInputValidator()
-        score_match_validator = ScoreMatchByRubricInputValidator()
-
-        with pytest.raises(ActionInputValidationError):
-            extract_validator.validate(
-                input_payload={"fields": [_field("deadline", "string", required=True), _field("deadline", "number", required=False)]}
-            )
-        with pytest.raises(ActionInputValidationError):
-            score_match_validator.validate(
-                input_payload={"rubric": [_rubric_item("tone", 1), _rubric_item("tone", 2)]}
             )
