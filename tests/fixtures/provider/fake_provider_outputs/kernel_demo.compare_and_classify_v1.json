@@ -1,0 +1,26 @@
+{
+  "response_json": {
+    "verdict": "meets_bar",
+    "confidence": 0.82,
+    "deltas": [
+      {
+        "criterion_id": "tone",
+        "status": "match",
+        "evidence": "Subject uses the same professional, direct tone as the reference."
+      },
+      {
+        "criterion_id": "coverage",
+        "status": "partial",
+        "evidence": "Subject omits the pricing section that the reference includes."
+      }
+    ],
+    "rationale": "Subject matches the reference on tone and mostly covers the required topics, missing only pricing, which is enough to meet the bar."
+  },
+  "input_tokens": 180,
+  "output_tokens": 70,
+  "latency_ms": 12,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "kernel_demo.compare_and_classify_v1"
+  }
+}
