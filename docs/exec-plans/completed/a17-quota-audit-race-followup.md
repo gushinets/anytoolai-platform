@@ -2,15 +2,14 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-05
-- Last updated: 2026-08-05
-- Review date: 2026-08-05
-- Next action: run PostgreSQL and full-check validation in an environment with PostgreSQL, Docker,
-  and `pnpm`.
-- Blocker: PostgreSQL race tests require `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL`; local Docker is not
-  running and `pnpm` is not installed/enabled.
+- Last updated: 2026-08-13
+- Review date: 2026-08-13
+- Next action: none; implementation merged in PR #53 and current repository validation preserves
+  the documented contracts.
+- Blocker: none
 - Parent issue: ANY-20
 - Review source: PR #36
 
@@ -36,7 +35,9 @@ serialization and then observe `failed` with `error_code=quota_exhausted`.
 - [x] Add deterministic PostgreSQL coverage for accept-vs-decline, accept-vs-expiry, parallel
       exhausted accepts, retry/fallback idempotency.
 - [x] Update handoff/quota/event/runtime docs and generated docs if needed.
-- [ ] Run focused, PostgreSQL, docs, quick-check, and full-check validation.
+- [x] Run focused, PostgreSQL, docs, quick-check, and full-check validation. The original local
+      PostgreSQL/full-check limitations remain historical context below; required merge CI and the
+      2026-08-13 gardening validation provide the completion evidence.
 
 ## Validation notes
 

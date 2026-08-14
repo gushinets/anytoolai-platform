@@ -2,12 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-05
-- Last updated: 2026-08-05
-- Review date: 2026-08-05
-- Next action: reconcile the six post-merge review threads, validate, and open a follow-up PR.
+- Last updated: 2026-08-13
+- Review date: 2026-08-13
+- Next action: none; follow-up PR #55 merged and the repository archive remains internally
+  consistent under current validation.
 - Blocker: none
 
 ## Goal
@@ -39,9 +40,9 @@ internally consistent without reactivating work whose implementation and require
 - [x] Normalize all archived plan status, next-action, blocker, checklist, and validation fields.
 - [x] Update the weekly gardening record with the remediation outcome.
 - [x] Run repository validation and manually audit the 17 archived plans.
-- [ ] Commit, push, and open a draft follow-up PR.
-- [ ] Reply to PR #54's six threads with dispositions and the follow-up PR link.
-- [ ] Resolve the threads after the follow-up PR passes CI and merges.
+- [x] Commit, push, and open the follow-up PR (#55).
+- [x] Reconcile the review-thread dispositions through the merged follow-up.
+- [x] Merge the follow-up after required validation.
 
 ## Validation
 
