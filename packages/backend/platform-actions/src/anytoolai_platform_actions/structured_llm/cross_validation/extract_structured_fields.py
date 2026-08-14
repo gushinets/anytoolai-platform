@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from anytoolai_platform_core.actions.runner import ActionInputValidationError
-
 from ._shared import (
     _coerce_integer_valued,
     _cross_validation_error,
     _is_finite_number,
     _is_iso_date_string,
+    _reject_duplicate_ids,
     _require_output,
     _truncated_repr,
 )
@@ -28,21 +27,9 @@ class ExtractStructuredFieldsInputValidator:
     """Rejects semantically ambiguous A01 input.fields before any provider call is made."""
 
     def validate(self, *, input_payload: Mapping[str, Any]) -> None:
-        field_specs = input_payload.get("fields")
-        if not isinstance(field_specs, list):
-            return
-        seen_names: set[str] = set()
-        for spec in field_specs:
-            if not isinstance(spec, Mapping):
-                continue
-            name = spec.get("name")
-            if not isinstance(name, str):
-                continue
-            if name in seen_names:
-                raise ActionInputValidationError(
-                    f"Action input validation failed: duplicate fields[*].name '{name}'."
-                )
-            seen_names.add(name)
+        _reject_duplicate_ids(
+            input_payload.get("fields"), id_field="name", error_label="fields[*].name"
+        )
 
 
 class ExtractStructuredFieldsCrossValidator:
