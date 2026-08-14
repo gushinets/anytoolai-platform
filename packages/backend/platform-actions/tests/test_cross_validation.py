@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 from anytoolai_platform_actions.structured_llm.cross_validation import (
+    CompareAndClassifyCrossValidator,
+    CompareAndClassifyInputValidator,
     ComposeReplyCrossValidator,
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
@@ -396,6 +398,141 @@ class TestSynthesizeAngleCrossValidator:
             )
         assert len(exc_info.value.reason) < len(overlong_angle)
         assert exc_info.value.reason.endswith("...")
+
+
+class TestCompareAndClassifyInputValidator:
+    def setup_method(self) -> None:
+        self.validator = CompareAndClassifyInputValidator()
+
+    def test_accepts_unique_criteria_ids(self) -> None:
+        self.validator.validate(
+            input_payload={
+                "criteria": [
+                    {"id": "tone", "description": "d"},
+                    {"id": "coverage", "description": "d"},
+                ]
+            }
+        )
+
+    def test_rejects_duplicate_criteria_ids(self) -> None:
+        with pytest.raises(ActionInputValidationError):
+            self.validator.validate(
+                input_payload={
+                    "criteria": [
+                        {"id": "tone", "description": "d1"},
+                        {"id": "tone", "description": "d2"},
+                    ]
+                }
+            )
+
+    def test_ignores_non_list_criteria_payload(self) -> None:
+        self.validator.validate(input_payload={"criteria": "not-a-list"})
+
+
+class TestCompareAndClassifyCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = CompareAndClassifyCrossValidator()
+        self.input_payload = {
+            "categories": ["meets_bar", "below_bar"],
+            "criteria": [
+                {"id": "tone", "description": "d"},
+                {"id": "coverage", "description": "d"},
+            ],
+        }
+
+    def _deltas(self, *statuses: tuple[str, str]) -> list[dict]:
+        return [
+            {"criterion_id": criterion_id, "status": status, "evidence": "e"}
+            for criterion_id, status in statuses
+        ]
+
+    def test_accepts_verdict_in_categories_and_full_delta_coverage(self) -> None:
+        self.validator.validate(
+            input_payload=self.input_payload,
+            output={
+                "verdict": "meets_bar",
+                "confidence": 0.9,
+                "deltas": self._deltas(("tone", "match"), ("coverage", "partial")),
+                "rationale": "r",
+            },
+        )
+
+    def test_rejects_verdict_outside_categories(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload=self.input_payload,
+                output={
+                    "verdict": "not_a_category",
+                    "confidence": 0.9,
+                    "deltas": self._deltas(("tone", "match"), ("coverage", "partial")),
+                    "rationale": "r",
+                },
+            )
+
+    def test_rejects_delta_criterion_id_not_in_criteria(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload=self.input_payload,
+                output={
+                    "verdict": "meets_bar",
+                    "confidence": 0.9,
+                    "deltas": self._deltas(("tone", "match"), ("unknown", "match")),
+                    "rationale": "r",
+                },
+            )
+
+    def test_rejects_duplicate_delta_criterion_id(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload=self.input_payload,
+                output={
+                    "verdict": "meets_bar",
+                    "confidence": 0.9,
+                    "deltas": self._deltas(("tone", "match"), ("tone", "mismatch")),
+                    "rationale": "r",
+                },
+            )
+
+    def test_rejects_deltas_missing_a_criterion(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload=self.input_payload,
+                output={
+                    "verdict": "meets_bar",
+                    "confidence": 0.9,
+                    "deltas": self._deltas(("tone", "match")),
+                    "rationale": "r",
+                },
+            )
+
+    def test_truncates_rejected_verdict_in_error_reason(self) -> None:
+        overlong_verdict = "x" * 500
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            self.validator.validate(
+                input_payload=self.input_payload,
+                output={
+                    "verdict": overlong_verdict,
+                    "confidence": 0.9,
+                    "deltas": self._deltas(("tone", "match"), ("coverage", "partial")),
+                    "rationale": "r",
+                },
+            )
+        assert len(exc_info.value.reason) < len(overlong_verdict)
+        assert exc_info.value.reason.endswith("...")
+
+    def test_skips_deltas_validation_when_input_criteria_is_not_a_list(self) -> None:
+        """Malformed input.criteria (schema-conformant callers never send this) must not get
+        misattributed to output.deltas as a model defect - mirrors the early-return pattern
+        ExtractStructuredFieldsCrossValidator uses for malformed input.fields."""
+        self.validator.validate(
+            input_payload={"categories": ["meets_bar", "below_bar"], "criteria": "not-a-list"},
+            output={
+                "verdict": "meets_bar",
+                "confidence": 0.9,
+                "deltas": self._deltas(("tone", "match")),
+                "rationale": "r",
+            },
+        )
 
 
 class TestComposeReplyCrossValidator:

@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from anytoolai_platform_actions.structured_llm.cross_validation import (
+    CompareAndClassifyCrossValidator,
+    CompareAndClassifyInputValidator,
     ComposeReplyCrossValidator,
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
@@ -93,6 +95,7 @@ def build_worker(
                 "text.synthesize_angle": SynthesizeAngleCrossValidator(),
                 "text.compose_persuasive_text": PersuasiveTextCrossValidator(),
                 "text.generate_gap_rewrites": GapRewritesCrossValidator(),
+                "text.compare_and_classify": CompareAndClassifyCrossValidator(),
                 "text.score_match_by_rubric": ScoreMatchByRubricCrossValidator(),
             },
         )
@@ -107,6 +110,7 @@ def build_worker(
             artifact_repository=artifact_repository,
             input_validators={
                 "text.extract_structured_fields": ExtractStructuredFieldsInputValidator(),
+                "text.compare_and_classify": CompareAndClassifyInputValidator(),
                 "text.score_match_by_rubric": ScoreMatchByRubricInputValidator(),
             },
         )
