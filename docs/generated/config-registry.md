@@ -37,6 +37,7 @@ Canonical source: configs/kernel via ConfigLoader.
 - kernel_demo.detect_issues_v1
 - kernel_demo.extract_structured_fields_v1
 - kernel_demo.generate_clarifying_questions_v1
+- kernel_demo.generate_gap_rewrites_v1
 - kernel_demo.generate_report_v1
 - kernel_demo.score_match_by_rubric_v1
 - kernel_demo.synthesize_angle_v1
@@ -70,6 +71,7 @@ Canonical source: configs/kernel via ConfigLoader.
 - kernel_demo.detect_issues.v1
 - kernel_demo.extract_structured_fields.v1
 - kernel_demo.generate_clarifying_questions.v1
+- kernel_demo.generate_gap_rewrites.v1
 - kernel_demo.generate_report.v1
 - kernel_demo.score_match_by_rubric.v1
 - kernel_demo.synthesize_angle.v1
