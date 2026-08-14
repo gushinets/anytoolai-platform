@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-13 (retroactive — see decision log)
-- Last updated: 2026-08-13
+- Last updated: 2026-08-14
 - Review date: 2026-08-13
-- Next action: none outstanding from this plan's own scope; ready for PR.
+- Next action: none; PR #68 merged and no plan-scoped work remains.
 - Blocker: none
 
 ## Goal
