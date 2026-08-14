@@ -11,8 +11,9 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
-    PersuasiveTextCrossValidator,
+    GapRewritesCrossValidator,
     GenerateClarifyingQuestionsCrossValidator,
+    PersuasiveTextCrossValidator,
     SynthesizeAngleCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
@@ -89,6 +90,7 @@ def build_worker(
                 "text.generate_clarifying_questions": GenerateClarifyingQuestionsCrossValidator(),
                 "text.synthesize_angle": SynthesizeAngleCrossValidator(),
                 "text.compose_persuasive_text": PersuasiveTextCrossValidator(),
+                "text.generate_gap_rewrites": GapRewritesCrossValidator(),
             },
         )
         action_runner = ActionRunner(
