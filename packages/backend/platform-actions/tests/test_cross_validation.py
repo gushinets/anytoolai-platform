@@ -1275,3 +1275,41 @@ class TestScoreMatchByRubricCrossValidatorOverflow:
                     "gaps": [],
                 },
             )
+
+    def test_rejects_single_non_finite_rubric_weight(self) -> None:
+        """A weight of `inf` (e.g. from a JSON literal like `1e309` overflowing on parse)
+        must not be silently dropped from rubric_weights - that would validate output
+        against a rubric missing this criterion instead of rejecting the malformed input."""
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={
+                    "rubric": [
+                        _rubric_item("tone", float("inf")),
+                        _rubric_item("completeness", 1),
+                    ]
+                },
+                output={
+                    "criterion_scores": [
+                        {"criterion_id": "tone", "score": 100, "rationale": "r"},
+                        {"criterion_id": "completeness", "score": 0, "rationale": "r"},
+                    ],
+                    "score": 50,
+                    "strengths": [],
+                    "gaps": [],
+                },
+            )
+
+    def test_rejects_when_every_rubric_weight_is_non_finite(self) -> None:
+        """If every weight overflows, rubric_weights would be empty and the old code
+        returned early - skipping coverage/aggregate checks entirely instead of failing
+        closed."""
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"rubric": [_rubric_item("tone", float("inf"))]},
+                output={
+                    "criterion_scores": [{"criterion_id": "tone", "score": 100, "rationale": "r"}],
+                    "score": 999999,
+                    "strengths": [],
+                    "gaps": [],
+                },
+            )

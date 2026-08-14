@@ -174,3 +174,8 @@ toward 11/11 without a placeholder/smoke qualification.
   recomputed from scratch on every PydanticAI retry attempt against the same unchanged
   `input_payload['rubric']`; and `TestScoreMatchByRubricCrossValidatorOverflow` living in its own
   one-test class instead of a method on `TestScoreMatchByRubricCrossValidator`.
+
+## Code review findings (2026-08-14, round 3)
+
+1. **Non-finite rubric weight rejected post-call, not pre-call** (`packages/backend/platform-actions/src/anytoolai_platform_actions/structured_llm/cross_validation/score_match_by_rubric.py:74`) — a non-finite `weight` (e.g. `1e309` → `inf`) passes the input schema's `exclusiveMinimum: 0` check and `ScoreMatchByRubricInputValidator` (which only checks duplicate ids), so `ActionRunner` calls the provider. Only `ScoreMatchByRubricCrossValidator` catches it afterward, and since the failure depends solely on the unchanged input, every PydanticAI validation-retry attempt re-invokes the provider and fails identically — wasting N-1 real provider calls before the action fails anyway. The sibling duplicate-id check already avoids this cost by living in the input validator.
+2. **Exec plan drift** (this file, decision log line 137 / follow-up debt above) — the uncommitted diff adds exactly the per-item non-finite `weight` check the round-2 decision log said was deliberately *not* added ("fixed at the arithmetic level instead"), and follow-up debt above still frames "no upper bound on `rubric[*].weight`" as open/unaddressed. Needs a decision-log/follow-up-debt update reflecting the new check, or the plan will describe code that no longer matches it.

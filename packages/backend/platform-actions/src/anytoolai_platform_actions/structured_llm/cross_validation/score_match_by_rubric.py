@@ -63,9 +63,19 @@ class ScoreMatchByRubricCrossValidator:
             if not isinstance(criterion, Mapping):
                 continue
             criterion_id = criterion.get("id")
+            if not isinstance(criterion_id, str):
+                continue
             weight = criterion.get("weight")
-            if isinstance(criterion_id, str) and _is_finite_number(weight):
-                rubric_weights[criterion_id] = float(weight)
+            # Schema only enforces `weight > 0` with no upper bound, so a JSON literal like
+            # `1e309` parses to `inf` and passes schema validation. Silently dropping such
+            # entries here (instead of failing closed) would validate output against a
+            # truncated rubric - or, if every weight overflows, skip cross-validation for
+            # this call entirely via the `not rubric_weights` early return below.
+            if not _is_finite_number(weight):
+                raise _cross_validation_error(
+                    f"rubric_weight_not_finite:{criterion_id}:{_truncated_repr(weight)}"
+                )
+            rubric_weights[criterion_id] = float(weight)
         if not rubric_weights:
             return
         # Summed from the deduplicated dict, not accumulated alongside it - a duplicate
