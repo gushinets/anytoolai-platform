@@ -17,6 +17,8 @@ class ActionDefinition(ContractModel):
     input_schema_ref: str
     output_schema_ref: str
     executor: ActionExecutor
+    cross_validator_ref: str
+    input_validator_ref: str
     emits_events: list[str] = Field(default_factory=list)
     description: str | None = None
 

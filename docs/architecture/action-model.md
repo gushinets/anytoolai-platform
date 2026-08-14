@@ -37,7 +37,16 @@ All physical provider attempts go through Provider Gateway so retry accounting a
 - `input_schema_ref`
 - `output_schema_ref`
 - `executor`
+- `cross_validator_ref`
+- `input_validator_ref`
 - `emits_events`
+
+`cross_validator_ref` and `input_validator_ref` are opaque strings in `platform-core` —
+the loader requires them but does not resolve them. Use `"none"` as the explicit
+sentinel for an atom with no validator. `platform-actions` resolves non-`"none"` refs
+against its concrete validator classes at worker composition-root startup, failing
+closed if a declared ref has no matching class, since `platform-core` must not import
+`platform-actions` (see `docs/architecture/package-layering.md`).
 
 ## Wave 1 action types
 

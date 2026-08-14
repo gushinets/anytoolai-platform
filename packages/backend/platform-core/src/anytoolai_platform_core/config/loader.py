@@ -1180,6 +1180,19 @@ class ConfigLoader:
                 executor = data.get("executor")
                 input_schema_ref = data.get("input_schema_ref")
                 output_schema_ref = data.get("output_schema_ref")
+                cross_validator_ref = data.get("cross_validator_ref")
+                input_validator_ref = data.get("input_validator_ref")
+
+                for ref_field, ref_value in (
+                    ("cross_validator_ref", cross_validator_ref),
+                    ("input_validator_ref", input_validator_ref),
+                ):
+                    if ref_field in data and ref_value is None:
+                        raise InvalidConfigShapeError(
+                            path,
+                            f"{ref_field} is null. Atoms with no validator must set "
+                            f'{ref_field}: "none" explicitly, not null.',
+                        )
 
                 if not all(
                     [
@@ -1188,13 +1201,16 @@ class ConfigLoader:
                         executor,
                         input_schema_ref,
                         output_schema_ref,
+                        cross_validator_ref,
+                        input_validator_ref,
                     ]
                 ):
                     raise InvalidConfigShapeError(
                         path,
                         (
                             "Missing required fields: action_type, version, executor, "
-                            "input_schema_ref, output_schema_ref"
+                            "input_schema_ref, output_schema_ref, cross_validator_ref, "
+                            "input_validator_ref"
                         ),
                     )
 
@@ -1226,6 +1242,8 @@ class ConfigLoader:
                         file_path=path,
                         config_id=action_type,
                     ),
+                    cross_validator_ref=cross_validator_ref,
+                    input_validator_ref=input_validator_ref,
                     emits_events=data.get("emits_events", []),
                     description=data.get("description"),
                     metadata={"_file_path": str(path)},

@@ -9,10 +9,17 @@ from .extract_structured_fields import (
 from .generate_clarifying_questions import GenerateClarifyingQuestionsCrossValidator
 from .generate_gap_rewrites import GAP_REWRITES_DEFAULT_N, GapRewritesCrossValidator
 from .persuasive_text import PersuasiveTextCrossValidator
+from .registry import (
+    NONE_REF,
+    ValidatorRefNotFoundError,
+    build_input_validators,
+    build_output_cross_validators,
+)
 from .synthesize_angle import SynthesizeAngleCrossValidator
 
 __all__ = [
     "GAP_REWRITES_DEFAULT_N",
+    "NONE_REF",
     "ComposeReplyCrossValidator",
     "DetectIssuesByTaxonomyCrossValidator",
     "ExtractStructuredFieldsCrossValidator",
@@ -21,4 +28,7 @@ __all__ = [
     "GenerateClarifyingQuestionsCrossValidator",
     "PersuasiveTextCrossValidator",
     "SynthesizeAngleCrossValidator",
+    "ValidatorRefNotFoundError",
+    "build_input_validators",
+    "build_output_cross_validators",
 ]

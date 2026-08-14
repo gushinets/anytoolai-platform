@@ -679,6 +679,74 @@ def test_loader_rejects_duplicate_yaml_keys_in_provider_policy_file(
     )
 
 
+def test_loader_fails_on_missing_action_cross_validator_ref(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "action_definitions" / "text.extract_structured_fields.yaml"
+    data = _load_yaml(path)
+    del data["cross_validator_ref"]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, InvalidConfigShapeError) and "cross_validator_ref" in error.message
+        for error in exc_info.value.errors
+    )
+
+
+def test_loader_fails_on_missing_action_input_validator_ref(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "action_definitions" / "text.extract_structured_fields.yaml"
+    data = _load_yaml(path)
+    del data["input_validator_ref"]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, InvalidConfigShapeError) and "input_validator_ref" in error.message
+        for error in exc_info.value.errors
+    )
+
+
+def test_loader_gives_specific_error_for_explicit_null_validator_ref(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "action_definitions" / "text.extract_structured_fields.yaml"
+    data = _load_yaml(path)
+    data["cross_validator_ref"] = None
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, InvalidConfigShapeError)
+        and "cross_validator_ref is null" in error.message
+        and '"none"' in error.message
+        for error in exc_info.value.errors
+    )
+
+
+def test_loader_gives_specific_error_for_explicit_null_input_validator_ref(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "action_definitions" / "text.extract_structured_fields.yaml"
+    data = _load_yaml(path)
+    data["input_validator_ref"] = None
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, InvalidConfigShapeError)
+        and "input_validator_ref is null" in error.message
+        and '"none"' in error.message
+        for error in exc_info.value.errors
+    )
+
+
 def test_loader_fails_on_invalid_action_executor(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "action_definitions" / "text.extract_structured_fields.yaml"
