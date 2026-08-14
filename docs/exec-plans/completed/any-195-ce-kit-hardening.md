@@ -2,14 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-05
-- Last updated: 2026-08-06
-- Review date: 2026-08-06
-- Next action: fifth- and sixth-pass fixes are pushed (PR #56, head `c2b0adb`) and CI is green
-  (frontend, docs, Windows/Ubuntu baseline, PostgreSQL, smoke, full-check, CodeRabbit); awaiting
-  review sign-off/merge.
+- Last updated: 2026-08-13
+- Review date: 2026-08-13
+- Next action: none; PR #56 merged and its contracts remain covered by current frontend and
+  repository validation.
 - Blocker: none
 
 ## Goal

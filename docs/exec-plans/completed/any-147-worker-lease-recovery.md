@@ -2,14 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-03
-- Last updated: 2026-08-03
-- Review date: 2026-08-03
-- Next action: update the Linear ticket's acceptance wording to match the agreed terminal
-  outcome (`failed`/`worker_lease_lost`, no auto-retry) and replace the PR description's
-  `docs/exec-plans/active/...` placeholder with a link to this file.
+- Last updated: 2026-08-13
+- Review date: 2026-08-13
+- Next action: none; repository implementation and validation merged in PR #48. External metadata
+  reminders are not repository completion criteria.
 - Blocker: none
 
 ## Goal
@@ -93,11 +92,8 @@ for seconds or for a full day.
   recovery mechanism" line with a description of the advisory-lock lease and sweep.
 - [x] `infra/compose/docker-compose.yml`: `stop_grace_period` on `platform-worker` so Compose
   gives the graceful-drain path a realistic window before `SIGKILL`.
-- [ ] Replace the PR description's `docs/exec-plans/active/...` placeholder with a link to
-  this file (PR-description edit, not a repo file — done at PR-open/update time).
-- [ ] Align the Linear ANY-147 ticket's acceptance-criteria wording with the agreed terminal
-  outcome (`failed`/`worker_lease_lost`, no auto-retry) — this is a Linear-side edit, tracked
-  here as a reminder since it isn't a repo file.
+- [x] Reconcile repository completion after PR #48 merged; PR-description and Linear wording were
+      non-repo reminders and do not keep the implementation plan active.
 
 ## Validation
 
@@ -132,8 +128,7 @@ for seconds or for a full day.
 
 ## Open questions
 
-None repo-side. Linear ticket wording alignment and the PR description placeholder are
-non-repo follow-ups tracked above.
+None repo-side.
 
 ## Follow-up debt
 

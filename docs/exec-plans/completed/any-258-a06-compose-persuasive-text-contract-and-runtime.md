@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-13 (retroactive — see decision log)
 - Last updated: 2026-08-13
 - Review date: 2026-08-13
-- Next action: none outstanding from this plan's own scope; ready for PR once reviewed.
+- Next action: none; PR #66 merged and the atom remains covered by current repository validation.
 - Blocker: none
 
 ## Goal
@@ -109,9 +109,8 @@ platform-owned contracts.
 - [x] `uv run pytest packages/backend/platform-core/tests/unit/test_action_runner.py -q`
 - [x] `python scripts/agent/runner.py generate-docs --check`
 - [x] `python scripts/agent/runner.py quick-check`
-- [ ] `python scripts/agent/runner.py postgresql-check` — not run in this environment (no local
-      Postgres available); Postgres-gated tests collect correctly. Same pre-existing sandbox
-      limitation noted on ANY-252/ANY-253/ANY-254.
+- [x] `python scripts/agent/runner.py postgresql-check` — required merge CI supplied the
+      production-dialect evidence; the original local environment did not provide PostgreSQL.
 
 ## Decision log
 

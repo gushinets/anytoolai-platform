@@ -2,13 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-07
-- Last updated: 2026-08-07
-- Review date: 2026-08-07
-- Next action: none; implementation, review remediation, and validation are complete. Move to
-  `completed/` once the PR merges.
+- Last updated: 2026-08-13
+- Review date: 2026-08-13
+- Next action: none; PR #59 merged and implementation, review remediation, and validation are
+  complete.
 - Blocker: none
 
 ## Goal

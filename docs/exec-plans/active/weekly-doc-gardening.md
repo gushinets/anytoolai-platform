@@ -5,9 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-07-08
-- Last updated: 2026-08-05
-- Review date: 2026-08-05
-- Last run: 2026-08-05
+- Last updated: 2026-08-13
+- Review date: 2026-08-13
+- Last run: 2026-08-13
 - Next action: repeat the inventory and discrepancy review after the next MVP feature merge.
 - Blocker: none
 
@@ -81,3 +81,43 @@ Keep repository knowledge aligned with code behavior.
 - [x] `python scripts/agent/runner.py validate-docs`
 - [x] `python scripts/agent/runner.py generate-docs --check`
 - [x] `python scripts/agent/runner.py quick-check`
+
+## 2026-08-13 Run Notes
+
+- Rechecked indexed local links, architecture boundaries, generated documentation, and the current
+  DB-free regression surface through the canonical runner.
+- Inventoried 16 active and 113 completed plans against current code and merged history. Archived
+  ten merged or otherwise repository-complete plans after reconciling their status, next action,
+  blockers, checklists, and validation records.
+- Kept the recurring delivery map and gardening plan active alongside the genuinely unfinished
+  migration canonicalization, offline Alembic, production Compose cleanup, and SQLite-eradication
+  work.
+- Updated the quality score from two to seven strict product-configured atom paths, while preserving
+  the distinction between 11 registered action types and the unfinished aggregate 11/11 proof.
+- Corrected CE-kit and debt claims now that A15a-c and the frontend-safe result API are delivered
+  and fake-success deferred helpers have been removed.
+- Reused existing targeted plans for the remaining migration, Compose, and SQLite discrepancies.
+  Opened `generated-doc-locked-environment-parity.md` after reproducing false OpenAPI drift from
+  system FastAPI 0.115.6 while the locked FastAPI 0.137.0 environment remained current.
+- Opened `ce-kit-openapi-typescript-windows-launch.md` after `full-check` passed backend tests,
+  frontend typecheck, and 216 frontend tests but reproduced a Windows `ENOENT` launching the
+  extensionless pnpm CLI shim during generated API-type drift checking.
+- Opened `extension-boundary-generated-tree-exclusions.md` after the frontend install made the
+  extension boundary test scan linked `node_modules` fixtures. Removed only the ignored dependency
+  directories created by validation before the final source-tree check.
+
+## 2026-08-13 Validation
+
+- [x] `python scripts/agent/runner.py doctor`
+- [x] focused handoff-schema, disposable-database-support, and idempotency-router tests (`5 passed`)
+- [x] `python scripts/agent/runner.py validate-configs`
+- [x] `python scripts/agent/runner.py validate-architecture`
+- [x] `python scripts/agent/runner.py validate-docs`
+- [x] `python scripts/agent/runner.py generate-docs --check` through the locked managed environment;
+      the system-interpreter false-drift discrepancy is tracked separately.
+- [x] `python scripts/agent/runner.py quick-check` (`510 passed`, `357 deselected`)
+- [x] `python scripts/agent/runner.py full-check` attempted as a non-gating diagnostic for this
+      documentation-only gardening run: backend checks, frontend typecheck, and frontend tests
+      passed before the pre-existing Windows API-type CLI launch failure. The failure is outside
+      this plan's scope and is tracked in `ce-kit-openapi-typescript-windows-launch.md`; it does not
+      change this recurring plan's `Blocker: none` status.
