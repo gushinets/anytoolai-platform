@@ -1007,12 +1007,13 @@ class TestScoreMultidimensionalAxesCrossValidator:
                 output={"scores": ["nope"], "dominant_axes": ["clarity"], "weakest_axes": ["clarity"]},
             )
 
-    def test_rejects_invalid_axis_score(self) -> None:
+    @pytest.mark.parametrize("invalid_score", ["high", True, float("nan")])
+    def test_rejects_invalid_axis_score(self, invalid_score: object) -> None:
         with pytest.raises(StructuredOutputValidationError):
             self.validator.validate(
                 input_payload={"axes": [_axis("clarity")]},
                 output={
-                    "scores": [{"axis_id": "clarity", "score": "high", "commentary": "c"}],
+                    "scores": [{"axis_id": "clarity", "score": invalid_score, "commentary": "c"}],
                     "dominant_axes": ["clarity"],
                     "weakest_axes": ["clarity"],
                 },

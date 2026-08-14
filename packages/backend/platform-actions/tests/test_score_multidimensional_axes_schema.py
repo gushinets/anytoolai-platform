@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from jsonschema import ValidationError, validate
@@ -85,7 +86,11 @@ class TestScoreMultidimensionalAxesInputSchema:
 
 
 class TestScoreMultidimensionalAxesOutputSchema:
-    _SCORE = {"axis_id": "clarity", "score": 8, "commentary": "States its point directly."}
+    _SCORE: ClassVar[dict] = {
+        "axis_id": "clarity",
+        "score": 8,
+        "commentary": "States its point directly.",
+    }
 
     def test_minimal_valid_output(self) -> None:
         validate(
