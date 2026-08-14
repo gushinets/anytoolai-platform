@@ -190,6 +190,17 @@ class TestScoreMultidimensionalAxesOutputSchema:
                 schema=SCORE_MULTIDIM_OUTPUT,
             )
 
+    def test_commentary_over_max_length_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={
+                    "scores": [{**self._SCORE, "commentary": "x" * 501}],
+                    "dominant_axes": ["clarity"],
+                    "weakest_axes": ["clarity"],
+                },
+                schema=SCORE_MULTIDIM_OUTPUT,
+            )
+
     def test_score_entry_unexpected_property_rejected(self) -> None:
         with pytest.raises(ValidationError):
             validate(
