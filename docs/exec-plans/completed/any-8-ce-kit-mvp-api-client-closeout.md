@@ -2,13 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-07
-- Last updated: 2026-08-10
-- Review date: 2026-08-10
-- Next action: correct PR #61's description (backend-vs-client-helper wording, exec-plan link) per
-  team-lead review round 2, then merge and update Linear status.
+- Last updated: 2026-08-13
+- Review date: 2026-08-13
+- Next action: none; PR #61 merged and all A15a-c children are complete on `main`.
 - Blocker: none
 
 ## Goal

@@ -2,17 +2,14 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-07-30
-- Last updated: 2026-07-30
-- Review date: 2026-07-30
-- Next action: rerun the PostgreSQL-backed quota suites with a configured
-  `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` if local production-dialect proof is required; the code,
-  docs, and fast quota suites are already updated.
-- Blocker: no `ANYTOOLAI_POSTGRES_TEST_DATABASE_URL` is configured in this environment, so the
-  PostgreSQL quota/runtime-storage suites currently collect cleanly and skip instead of exercising a
-  live disposable database.
+- Last updated: 2026-08-13
+- Review date: 2026-08-13
+- Next action: none; the canonical PostgreSQL constraint, production conflict handling, docs, and
+  PostgreSQL-owned concurrency coverage are present and validated.
+- Blocker: none
 
 ## Goal
 
@@ -57,22 +54,25 @@ were production behavior.
 
 ## Implementation steps
 
-- [ ] Confirm all runtime quota conflict handling and classify remaining SQLite references.
-- [ ] Replace duplicated quota conflict-key definitions with one canonical PostgreSQL contract.
-- [ ] Remove SQLite-specific quota race emulation and retain only test-safe generic non-concurrent
+- [x] Confirm all runtime quota conflict handling and classify remaining SQLite references.
+- [x] Replace duplicated quota conflict-key definitions with one canonical PostgreSQL contract.
+- [x] Remove SQLite-specific quota race emulation and retain only test-safe generic non-concurrent
       inserts for lightweight harnesses.
-- [ ] Move quota concurrency assertions off SQLite and onto PostgreSQL-backed tests.
-- [ ] Update docs to state that PostgreSQL owns runtime quota concurrency semantics.
-- [ ] Run focused quota tests plus repo validation commands and record results.
+- [x] Move quota concurrency assertions off SQLite and onto PostgreSQL-backed tests.
+- [x] Update docs to state that PostgreSQL owns runtime quota concurrency semantics.
+- [x] Run focused quota tests plus repo validation commands and record results.
 
 ## Validation
 
-- [ ] `uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q`
-- [ ] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_runtime_storage.py -m "slow and postgresql" -q`
-- [ ] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_quota_service.py apps/platform-api/tests/test_identity_quota_api.py apps/platform-api/tests/test_scenario_runtime_api.py -q`
-- [ ] `python scripts/agent/runner.py validate-architecture`
-- [ ] `python scripts/agent/runner.py validate-docs`
-- [ ] `python scripts/agent/runner.py quick-check`
+- [x] `uv run python -m pytest apps/platform-api/tests/test_quota_concurrency_postgresql.py -m "slow and postgresql" -q`
+- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_runtime_storage.py -m "slow and postgresql" -q`
+- [x] `uv run python -m pytest packages/backend/platform-core/tests/unit/test_quota_service.py apps/platform-api/tests/test_identity_quota_api.py apps/platform-api/tests/test_scenario_runtime_api.py -q`
+- [x] `python scripts/agent/runner.py validate-architecture`
+- [x] `python scripts/agent/runner.py validate-docs`
+- [x] `python scripts/agent/runner.py quick-check`
+
+The PostgreSQL checks are supported by the repository's required merge gate; the 2026-08-13
+gardening run revalidated the current DB-free quota and documentation surface.
 
 ## Decision log
 
