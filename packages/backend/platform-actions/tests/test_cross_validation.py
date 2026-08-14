@@ -823,6 +823,62 @@ class TestScoreMatchByRubricCrossValidator:
                 output={"criterion_scores": "nope", "score": 80, "strengths": [], "gaps": []},
             )
 
+    def test_rejects_non_mapping_criterion_score_entry(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"rubric": [_rubric_item("tone", 1)]},
+                output={"criterion_scores": ["nope"], "score": 80, "strengths": [], "gaps": []},
+            )
+
+    def test_rejects_unhashable_criterion_id(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"rubric": [_rubric_item("tone", 1)]},
+                output={
+                    "criterion_scores": [{"criterion_id": ["tone"], "score": 80, "rationale": "r"}],
+                    "score": 80,
+                    "strengths": [],
+                    "gaps": [],
+                },
+            )
+
+    def test_rejects_non_finite_criterion_score(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"rubric": [_rubric_item("tone", 1)]},
+                output={
+                    "criterion_scores": [
+                        {"criterion_id": "tone", "score": float("nan"), "rationale": "r"}
+                    ],
+                    "score": 80,
+                    "strengths": [],
+                    "gaps": [],
+                },
+            )
+
+    def test_rejects_missing_aggregate_score(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"rubric": [_rubric_item("tone", 1)]},
+                output={
+                    "criterion_scores": [{"criterion_id": "tone", "score": 80, "rationale": "r"}],
+                    "strengths": [],
+                    "gaps": [],
+                },
+            )
+
+    def test_rejects_zero_total_weight(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"rubric": [_rubric_item("tone", 0)]},
+                output={
+                    "criterion_scores": [{"criterion_id": "tone", "score": 80, "rationale": "r"}],
+                    "score": 80,
+                    "strengths": [],
+                    "gaps": [],
+                },
+            )
+
     def test_ignores_when_rubric_missing_from_input(self) -> None:
         self.validator.validate(input_payload={}, output=self._output(0))
 

@@ -327,6 +327,10 @@ class ScoreMatchByRubricCrossValidator:
             if not isinstance(entry, Mapping):
                 raise _cross_validation_error("malformed_criterion_score_entry")
             criterion_id = entry.get("criterion_id")
+            if not isinstance(criterion_id, str):
+                raise _cross_validation_error(
+                    f"invalid_criterion_id:{_truncated_repr(criterion_id)}"
+                )
             weight = rubric_weights.get(criterion_id)
             if weight is None:
                 raise _cross_validation_error(
@@ -350,6 +354,11 @@ class ScoreMatchByRubricCrossValidator:
                 "rubric_criteria_missing_from_output:" + ",".join(sorted(missing_ids))
             )
 
+        # Schema enforces `weight > 0` per rubric item, but that only holds when validate()
+        # runs through the executor after schema validation - a direct caller (e.g. a test,
+        # or a future non-schema-gated wiring) could still reach total_weight == 0.
+        if total_weight == 0:
+            raise _cross_validation_error("aggregate_total_weight_is_zero")
         expected_score = weighted_sum / total_weight
         # Individually-finite weights can still overflow float64 to `inf` once summed/
         # multiplied (schema only enforces `weight > 0`, no upper bound), producing
