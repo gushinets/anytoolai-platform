@@ -34,6 +34,11 @@ prompts:
     template_path: prompts/compose_persuasive_text.v1.md
     input_variables: []
     output_schema_ref: kernel.schemas.compose_persuasive_text_output_v1
+  - prompt_ref: kernel_demo.generate_gap_rewrites.v1
+    version: 1
+    template_path: prompts/generate_gap_rewrites.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.generate_gap_rewrites_output_v1
   - prompt_ref: kernel_demo.compare_and_classify.v1
     version: 1
     template_path: prompts/compare_and_classify.v1.md

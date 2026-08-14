@@ -11,9 +11,10 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
+    GapRewritesCrossValidator,
     GenerateClarifyingQuestionsCrossValidator,
-    SynthesizeAngleCrossValidator,
     PersuasiveTextCrossValidator,
+    SynthesizeAngleCrossValidator,
 )
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
@@ -265,6 +266,24 @@ class TestExtractStructuredFieldsCrossValidator:
             )
         assert len(exc_info.value.reason) < len(overlong_name)
         assert exc_info.value.reason.endswith("...")
+
+    def test_integer_type_accepts_integer_valued_float(self) -> None:
+        # json.loads('{"budget": 500.0}') decodes to a Python float; that must still satisfy
+        # an "integer" field type, not be rejected as a type mismatch.
+        self.validator.validate(
+            input_payload={"fields": [_field("budget", "integer", required=False)]},
+            output={"values": {"budget": 500.0}, "missing_fields": []},
+        )
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"fields": [_field("budget", "integer", required=False)]},
+                output={"values": {"budget": 500.5}, "missing_fields": []},
+            )
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"fields": [_field("budget", "integer", required=False)]},
+                output={"values": {"budget": True}, "missing_fields": []},
+            )
 
 
 class TestDetectIssuesByTaxonomyCrossValidator:
@@ -562,7 +581,7 @@ class TestComposeReplyCrossValidator:
             # both, not stop at the first one, to reach the alphanumeric base letter.
             ({}, {"text": "בָׁ*2*3"}),
             ({}, {"text": "Plain reply.", "call_to_action": "Book a call."}),
-            # Any real HTML5 construct - not just a fixed set of "common" tag names -
+            # Any real HTML5 element tag - not just a fixed set of "common" tag names -
             # satisfies "html", via a real tokenizer rather than a name allowlist.
             (
                 {"constraints": {"output_format": "html"}},
@@ -575,6 +594,17 @@ class TestComposeReplyCrossValidator:
             (
                 {"constraints": {"output_format": "html"}},
                 {"text": "Custom <x-card>widget</x-card>."},
+            ),
+            # markdown-it-py lumps a same-line comment and a following real tag into one
+            # html_block token when there's no blank line between them - the real tag must
+            # still be found even though it isn't at the start of that token's content.
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "<!-- note --><p>Real reply.</p>"},
+            ),
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "<!DOCTYPE html><html>Real reply.</html>"},
             ),
         ],
     )
@@ -627,6 +657,23 @@ class TestComposeReplyCrossValidator:
             (
                 {"constraints": {"output_format": "html"}},
                 {"text": "Reply with **bold** text."},
+            ),
+            # A comment/doctype/CDATA is a real HTML5 construct but renders nothing, so it
+            # doesn't satisfy "html" formatting on its own — only an actual element tag does.
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "<!-- internal comment -->"},
+            ),
+            ({"constraints": {"output_format": "html"}}, {"text": "<!DOCTYPE html>"}),
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "<![CDATA[ some data ]]>"},
+            ),
+            # Leading whitespace before a comment-only block must not be mistaken for a
+            # missing "<!"/"<?" prefix - it's still just a comment, no real tag.
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "  <!-- internal comment -->"},
             ),
             ({}, None),
             ({}, {"text": 123}),
@@ -769,6 +816,111 @@ class TestGenerateClarifyingQuestionsCrossValidator:
             self.validator.validate(input_payload={"issues": _ISSUES}, output={"questions": "nope"})
 
 
+def _rewrite(text: str) -> dict:
+    return {"text": text, "explanation": "e", "change_made": "c"}
+
+
+class TestGapRewritesCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = GapRewritesCrossValidator()
+
+    def test_accepts_matching_count_and_distinct_rewrites(self) -> None:
+        self.validator.validate(
+            input_payload={"n": 2},
+            output={
+                "rewrites": [_rewrite("Alpha version."), _rewrite("Beta version.")],
+                "best_pick": 1,
+            },
+        )
+
+    def test_defaults_requested_count_to_three_when_n_omitted(self) -> None:
+        self.validator.validate(
+            input_payload={},
+            output={
+                "rewrites": [_rewrite("Alpha"), _rewrite("Beta"), _rewrite("Gamma")],
+                "best_pick": 0,
+            },
+        )
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={},
+                output={"rewrites": [_rewrite("Alpha"), _rewrite("Beta")], "best_pick": 0},
+            )
+
+    def test_rejects_rewrite_count_below_requested_n(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"n": 3},
+                output={
+                    "rewrites": [_rewrite("Alpha"), _rewrite("Beta")],
+                    "best_pick": 0,
+                },
+            )
+
+    def test_rejects_rewrite_count_above_requested_n(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"n": 1},
+                output={
+                    "rewrites": [_rewrite("Alpha"), _rewrite("Beta")],
+                    "best_pick": 0,
+                },
+            )
+
+    def test_accepts_integer_valued_float_n_from_json_schema_type_integer(self) -> None:
+        # JSON Schema `type: integer` also accepts integer-valued floats (2.0), so n=2.0 must
+        # be treated as n=2, not silently reset to the default.
+        self.validator.validate(
+            input_payload={"n": 2.0},
+            output={
+                "rewrites": [_rewrite("Alpha version."), _rewrite("Beta version.")],
+                "best_pick": 0,
+            },
+        )
+
+    def test_accepts_integer_valued_float_best_pick_from_json_decode(self) -> None:
+        # json.loads('{"best_pick": 1.0}') decodes to a Python float; that must still be
+        # treated as index 1, not rejected as out of bounds.
+        self.validator.validate(
+            input_payload={"n": 2},
+            output={
+                "rewrites": [_rewrite("Alpha version."), _rewrite("Beta version.")],
+                "best_pick": 1.0,
+            },
+        )
+
+    def test_rejects_duplicate_rewrites_differing_only_in_whitespace_and_case(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"n": 2},
+                output={
+                    "rewrites": [
+                        _rewrite("Deliver by March 15."),
+                        _rewrite("  deliver   by march 15.  "),
+                    ],
+                    "best_pick": 0,
+                },
+            )
+
+    def test_rejects_best_pick_out_of_bounds(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"n": 1},
+                output={"rewrites": [_rewrite("Alpha")], "best_pick": 1},
+            )
+
+    def test_rejects_negative_best_pick(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"n": 1},
+                output={"rewrites": [_rewrite("Alpha")], "best_pick": -1},
+            )
+
+    def test_rejects_missing_output(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(input_payload={"n": 1}, output=None)
+
+
 class TestPersuasiveTextCrossValidator:
     def setup_method(self) -> None:
         self.validator = PersuasiveTextCrossValidator()
@@ -799,8 +951,8 @@ class TestPersuasiveTextCrossValidator:
             ({}, {"text": "L*W*H"}),
             # An integer-valued float length (schema `type: integer` allows 10.0) is honored.
             ({"constraints": {"length": 20.0}}, {"text": "Short persuasion."}),
-            # Any real HTML5 construct - not just a fixed set of "common" tag names - satisfies
-            # "html", via the same real tokenizer used by A07.
+            # Any real HTML5 element tag - not just a fixed set of "common" tag names -
+            # satisfies "html", via the same real tokenizer used by A07.
             (
                 {"constraints": {"format": "html"}},
                 {"text": "Use the <kbd>Enter</kbd> key."},
@@ -808,6 +960,17 @@ class TestPersuasiveTextCrossValidator:
             (
                 {"constraints": {"format": "html"}},
                 {"text": "Custom <x-card>widget</x-card>."},
+            ),
+            # markdown-it-py lumps a same-line comment and a following real tag into one
+            # html_block token when there's no blank line between them - the real tag must
+            # still be found even though it isn't at the start of that token's content.
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "<!-- note --><p>Real persuasion.</p>"},
+            ),
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "<!DOCTYPE html><html>Real persuasion.</html>"},
             ),
         ],
     )
@@ -843,6 +1006,17 @@ class TestPersuasiveTextCrossValidator:
             ({"constraints": {"length": 5.0}}, {"text": "This text is too long."}),
             # "html" must show its own markup kind: markdown-only text doesn't satisfy it.
             ({"constraints": {"format": "html"}}, {"text": "**Act now** and save."}),
+            # A comment/doctype/CDATA is a real HTML5 construct but renders nothing, so it
+            # doesn't satisfy "html" formatting on its own — only an actual element tag does.
+            ({"constraints": {"format": "html"}}, {"text": "<!-- internal note -->"}),
+            ({"constraints": {"format": "html"}}, {"text": "<!DOCTYPE html>"}),
+            ({"constraints": {"format": "html"}}, {"text": "<![CDATA[ some data ]]>"}),
+            # Leading whitespace before a comment-only block must not be mistaken for a
+            # missing "<!"/"<?" prefix - it's still just a comment, no real tag.
+            (
+                {"constraints": {"format": "html"}},
+                {"text": "  <!-- internal note -->"},
+            ),
             ({}, None),
             ({}, {"text": 123}),
         ],

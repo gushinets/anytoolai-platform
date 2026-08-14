@@ -1,0 +1,29 @@
+{
+  "response_json": {
+    "rewrites": [
+      {
+        "text": "The proposal includes a fixed delivery date of March 15.",
+        "explanation": "States a concrete delivery date to close the timeline gap directly.",
+        "change_made": "Added an explicit delivery date."
+      },
+      {
+        "text": "Delivery is targeted for mid-March, with the final date confirmed within one week.",
+        "explanation": "Commits to a narrow window while flagging when the exact date follows.",
+        "change_made": "Added a target window and a confirmation deadline."
+      },
+      {
+        "text": "We will deliver by March 15, guaranteed, or issue a full refund for the delay.",
+        "explanation": "Backs the delivery date with a guarantee, removing any timeline ambiguity.",
+        "change_made": "Added a delivery date plus a guarantee clause."
+      }
+    ],
+    "best_pick": 2
+  },
+  "input_tokens": 96,
+  "output_tokens": 74,
+  "latency_ms": 11,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "kernel_demo.generate_gap_rewrites_v1"
+  }
+}

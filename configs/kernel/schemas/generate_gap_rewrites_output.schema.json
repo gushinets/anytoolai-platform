@@ -1,4 +1,38 @@
 {
   "type": "object",
-  "additionalProperties": true
+  "properties": {
+    "rewrites": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "explanation": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "change_made": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
+        "required": ["text", "explanation", "change_made"],
+        "additionalProperties": false
+      }
+    },
+    "best_pick": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": ["rewrites", "best_pick"],
+  "additionalProperties": false
 }

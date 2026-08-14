@@ -8,7 +8,6 @@ from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
-
 from action_runner import (
     AlwaysFailFakeAdapter,
     CancelledFakeAdapter,
@@ -16,6 +15,7 @@ from action_runner import (
     ComposeReplyOverLimitThenValidAdapter,
     CountingFakeAdapter,
     EmptyQuestionsFakeAdapter,
+    GapRewritesCountMismatchThenValidAdapter,
     GenericExecutor,
     InvalidStructuredOutputAdapter,
     SynthesizeAngleOutOfOptionsThenValidAdapter,
@@ -28,6 +28,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
+    GapRewritesCrossValidator,
     GenerateClarifyingQuestionsCrossValidator,
     PersuasiveTextCrossValidator,
     SynthesizeAngleCrossValidator,
@@ -37,8 +38,8 @@ from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunSta
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.actions.runner import (
     ActionInputValidationError,
-    ActionRunService,
     ActionRunner,
+    ActionRunService,
     _recover_action_events_after_rollback,
     _recover_failed_action_run_row_after_rollback,
 )
@@ -71,6 +72,7 @@ from anytoolai_platform_core.storage.transactions import (
     transaction_boundary,
 )
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
+
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -175,6 +177,7 @@ def _build_runner(
         output_cross_validators={
             "text.extract_structured_fields": ExtractStructuredFieldsCrossValidator(),
             "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
+            "text.generate_gap_rewrites": GapRewritesCrossValidator(),
             "text.compose_reply": ComposeReplyCrossValidator(),
             "text.generate_clarifying_questions": GenerateClarifyingQuestionsCrossValidator(),
             "text.synthesize_angle": SynthesizeAngleCrossValidator(),
@@ -784,6 +787,220 @@ def test_action_runner_retries_synthesize_angle_secondary_cross_validation_throu
         "angle": "Lead with urgency",
         "rationale": "r",
         "secondary_angle": "Anchor on budget",
+    }
+    assert result.output_artifact_id == artifact["id"]
+    assert adapter.call_count == 2
+    assert len(provider_calls) == 2
+    assert [row["semantic_attempt_index"] for row in provider_calls] == [1, 2]
+    # physical_call_index tracks the action-wide physical-call budget, not a per-semantic-
+    # attempt counter, so it keeps climbing across semantic attempts too.
+    assert [row["physical_call_index"] for row in provider_calls] == [1, 2]
+    assert all(row["action_run_id"] == action_run["id"] for row in provider_calls)
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 2,
+            "provider.request_succeeded": 2,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    artifact_created = _event_by_type(events, "artifact.created")
+    assert artifact_created["artifact_id"] == artifact["id"]
+
+
+def test_action_runner_executes_generate_gap_rewrites_atom_and_persists_event_lineage(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session)
+
+        result = asyncio.run(
+            runner.run(
+                "text.generate_gap_rewrites",
+                "kernel_demo.generate_gap_rewrites_v1",
+                {
+                    "source_text": "We will deliver the project soon.",
+                    "gap": "No concrete delivery date is given.",
+                    "style": "moderate",
+                },
+                _context(
+                    step_id="generate_gap_rewrites",
+                    action_type="text.generate_gap_rewrites",
+                    action_config_id="kernel_demo.generate_gap_rewrites_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
+        events = _event_rows(session)
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {
+        "rewrites": [
+            {
+                "text": "The proposal includes a fixed delivery date of March 15.",
+                "explanation": (
+                    "States a concrete delivery date to close the timeline gap directly."
+                ),
+                "change_made": "Added an explicit delivery date.",
+            },
+            {
+                "text": (
+                    "Delivery is targeted for mid-March, with the final date confirmed "
+                    "within one week."
+                ),
+                "explanation": (
+                    "Commits to a narrow window while flagging when the exact date follows."
+                ),
+                "change_made": "Added a target window and a confirmation deadline.",
+            },
+            {
+                "text": (
+                    "We will deliver by March 15, guaranteed, or issue a full refund for "
+                    "the delay."
+                ),
+                "explanation": (
+                    "Backs the delivery date with a guarantee, removing any timeline "
+                    "ambiguity."
+                ),
+                "change_made": "Added a delivery date plus a guarantee clause.",
+            },
+        ],
+        "best_pick": 2,
+    }
+    assert result.output_artifact_id == artifact["id"]
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert artifact["metadata"]["schema_ref"] == "kernel.schemas.generate_gap_rewrites_output_v1"
+    assert provider_call["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_succeeded": 1,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    action_started = _event_by_type(events, "action.started")
+    artifact_created = _event_by_type(events, "artifact.created")
+    action_succeeded = _event_by_type(events, "action.succeeded")
+    assert action_started["action_run_id"] == action_run["id"]
+    assert artifact_created["artifact_id"] == artifact["id"]
+    assert action_succeeded["action_run_id"] == action_run["id"]
+
+
+def test_action_runner_generate_gap_rewrites_fails_safely_for_non_default_n(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """A08: the kernel_demo fake-provider fixture always returns 3 rewrites (the schema's
+    declared default n), and no action_config/workflow pins n=3 — a caller is free to request
+    any n in the schema's 1-5 range. Against the demo fixture, any n other than 3 is
+    unsatisfiable, and default_fake_provider_v1 allows exactly 1 physical call
+    (hard_limits.max_physical_provider_calls_per_action: 1), so this must surface as a single
+    clean, safe StructuredOutputValidationError — the "define validation failure rather than
+    silently returning fewer alternatives" contract requirement — not a silent success, a
+    retry hang, or an unhandled crash."""
+    counting_adapter = CountingFakeAdapter(FakeProviderAdapter(FIXTURE_ROOT))
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session, fake_adapter=counting_adapter)
+
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            asyncio.run(
+                runner.run(
+                    "text.generate_gap_rewrites",
+                    "kernel_demo.generate_gap_rewrites_v1",
+                    {
+                        "source_text": "We will deliver the project soon.",
+                        "gap": "No concrete delivery date is given.",
+                        "n": 2,
+                        "style": "moderate",
+                    },
+                    _context(
+                        step_id="generate_gap_rewrites",
+                        action_type="text.generate_gap_rewrites",
+                        action_config_id="kernel_demo.generate_gap_rewrites_v1",
+                    ),
+                )
+            )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+
+    assert exc_info.value.code == "structured_output_validation_failed"
+    assert exc_info.value.reason == "rewrite_count_mismatch:3!=2"
+    assert action_run["status"].value == "failed"
+    assert counting_adapter.call_count == 1
+
+
+def test_action_runner_retries_generate_gap_rewrites_cross_validation_through_real_ledger(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """A08: proves the rewrite-count cross-validation retry through the real
+    ProviderGateway/ActionRunner path (not an in-memory spy) - a rewrite-count mismatch
+    followed by a matching-count success must create two physical provider_calls rows with
+    the expected semantic/physical indexes, provider events, and final artifact lineage."""
+    adapter = GapRewritesCountMismatchThenValidAdapter()
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session, fake_adapter=adapter)
+        # default_fake_provider_v1 allows 1 validation attempt / 1 physical call per action;
+        # widen both so the semantic retry this test drives can actually reach a 2nd
+        # physical call through the real ProviderGateway hard-limit check, not just PydanticAI.
+        executor = runner._executors["structured_llm"]
+        base_policy = executor._require_provider_policy("default_fake_provider_v1")
+        patched_policy = replace(
+            base_policy,
+            retry_policy=replace(
+                base_policy.retry_policy,
+                validation=ProviderValidationRetryPolicy(
+                    owner=base_policy.retry_policy.validation.owner,
+                    max_attempts=2,
+                ),
+                hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=2),
+            ),
+        )
+        executor._require_provider_policy = lambda _provider_policy_ref: patched_policy
+        executor._provider_gateway._policy_resolver.resolve = lambda _provider_policy_ref: patched_policy
+
+        result = asyncio.run(
+            runner.run(
+                "text.generate_gap_rewrites",
+                "kernel_demo.generate_gap_rewrites_v1",
+                {
+                    "source_text": "We will deliver the project soon.",
+                    "gap": "No concrete delivery date is given.",
+                    "n": 2,
+                    "style": "moderate",
+                },
+                _context(
+                    step_id="generate_gap_rewrites",
+                    action_type="text.generate_gap_rewrites",
+                    action_config_id="kernel_demo.generate_gap_rewrites_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+        provider_calls = list(
+            session.execute(
+                sa.select(provider_calls_table).order_by(
+                    provider_calls_table.c.created_at, provider_calls_table.c.id
+                )
+            ).mappings()
+        )
+        events = _event_rows(session)
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {
+        "rewrites": [
+            {"text": "First rewrite.", "explanation": "e", "change_made": "c"},
+            {"text": "Second rewrite.", "explanation": "e", "change_made": "c"},
+        ],
+        "best_pick": 1,
     }
     assert result.output_artifact_id == artifact["id"]
     assert adapter.call_count == 2
