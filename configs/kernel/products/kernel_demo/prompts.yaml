@@ -34,3 +34,8 @@ prompts:
     template_path: prompts/compose_persuasive_text.v1.md
     input_variables: []
     output_schema_ref: kernel.schemas.compose_persuasive_text_output_v1
+  - prompt_ref: kernel_demo.score_multidimensional_axes.v1
+    version: 1
+    template_path: prompts/score_multidimensional_axes.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.score_multidim_output_v1

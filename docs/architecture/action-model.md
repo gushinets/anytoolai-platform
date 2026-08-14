@@ -57,6 +57,17 @@ All physical provider attempts go through Provider Gateway so retry accounting a
 
 `generate_proposal` must never become a platform action type. ProposalAI uses `text.compose_persuasive_text` through product-specific MVP-B action config.
 
+## A03 `text.score_multidimensional_axes` contract
+
+Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.score_multidim_input_v1` / `kernel.schemas.score_multidim_output_v1`:
+
+- Input: `text` (required, non-empty string); `axes` (required, non-empty array of `{id, description, weight?}`; `id`/`description` non-empty strings, `weight` an optional positive number the platform never reads — v1 uses one fixed documented 1–10 numeric scale).
+- Output: `scores` (required, non-empty array of `{axis_id, score, commentary}`; `score` 1–10, `commentary` non-empty with `maxLength: 500`); `dominant_axes` and `weakest_axes` (required, non-empty arrays of axis ids).
+- `ScoreMultidimensionalAxesInputValidator` rejects duplicate `axes[*].id` before any provider call — JSON Schema cannot express partial-key uniqueness — sharing the `_reject_duplicate_ids` helper with `ExtractStructuredFieldsInputValidator`.
+- `ScoreMultidimensionalAxesCrossValidator` enforces that `scores` maps exactly once onto `axes` (exists, unique, exhaustive — every `axis_id` must be an axis id, no id repeats, and every axis id must appear), then recomputes `dominant_axes`/`weakest_axes` outside the model response as the tie-preserving, input-order set of axis ids at the max/min reported score and rejects a mismatch (missing tied entry, extra entry, or wrong order) exactly, with no numeric tolerance — unlike A02's weighted-aggregate recompute, these are direct equality checks against the model's own reported per-axis scores, not an independently-computed float. Rejected/oversized values are truncated (`_truncated_repr`) before flowing into the retry prompt and persisted debug-artifact metadata.
+- The chain-of-thought prohibition on `commentary` is a prompt instruction (`score_multidimensional_axes.v1.md`), not a runtime heuristic, matching the sibling A09 contract.
+- No product axis meaning (Ethos/Pathos/Logos, AI-cliché detection, or similar) is hardcoded in the platform contract — axes are entirely caller-supplied, per the parent ANY-49 issue.
+
 ## A09 `text.synthesize_angle` contract
 
 Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.synthesize_angle_input_v1` / `kernel.schemas.synthesize_angle_output_v1`:

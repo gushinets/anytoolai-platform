@@ -10,6 +10,8 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
     GenerateClarifyingQuestionsCrossValidator,
+    ScoreMultidimensionalAxesCrossValidator,
+    ScoreMultidimensionalAxesInputValidator,
     SynthesizeAngleCrossValidator,
     PersuasiveTextCrossValidator,
 )
@@ -713,3 +715,219 @@ class TestPersuasiveTextCrossValidator:
     def test_rejects(self, input_payload: dict, output: dict | None) -> None:
         with pytest.raises(StructuredOutputValidationError):
             self.validator.validate(input_payload=input_payload, output=output)
+
+
+def _axis(axis_id: str, **extra: object) -> dict:
+    return {"id": axis_id, "description": f"{axis_id} axis", **extra}
+
+
+class TestScoreMultidimensionalAxesInputValidator:
+    def setup_method(self) -> None:
+        self.validator = ScoreMultidimensionalAxesInputValidator()
+
+    def test_accepts_unique_axis_ids(self) -> None:
+        self.validator.validate(
+            input_payload={"axes": [_axis("clarity"), _axis("structure")]}
+        )
+
+    def test_rejects_duplicate_axis_ids(self) -> None:
+        with pytest.raises(ActionInputValidationError):
+            self.validator.validate(
+                input_payload={"axes": [_axis("clarity"), _axis("clarity")]}
+            )
+
+    def test_ignores_non_list_axes_payload(self) -> None:
+        self.validator.validate(input_payload={"axes": "not-a-list"})
+
+
+class TestScoreMultidimensionalAxesCrossValidator:
+    def setup_method(self) -> None:
+        self.validator = ScoreMultidimensionalAxesCrossValidator()
+
+    def _score(self, axis_id: str, score: float) -> dict:
+        return {"axis_id": axis_id, "score": score, "commentary": "c"}
+
+    def test_accepts_matching_scores_with_single_dominant_and_weakest(self) -> None:
+        self.validator.validate(
+            input_payload={"axes": [_axis("clarity"), _axis("structure")]},
+            output={
+                "scores": [self._score("clarity", 8), self._score("structure", 5)],
+                "dominant_axes": ["clarity"],
+                "weakest_axes": ["structure"],
+            },
+        )
+
+    def test_accepts_tied_dominant_axes_in_input_order(self) -> None:
+        self.validator.validate(
+            input_payload={"axes": [_axis("clarity"), _axis("structure"), _axis("tone")]},
+            output={
+                "scores": [
+                    self._score("clarity", 8),
+                    self._score("structure", 8),
+                    self._score("tone", 3),
+                ],
+                "dominant_axes": ["clarity", "structure"],
+                "weakest_axes": ["tone"],
+            },
+        )
+
+    def test_accepts_tied_weakest_axes_in_input_order(self) -> None:
+        self.validator.validate(
+            input_payload={"axes": [_axis("clarity"), _axis("structure"), _axis("tone")]},
+            output={
+                "scores": [
+                    self._score("clarity", 9),
+                    self._score("structure", 3),
+                    self._score("tone", 3),
+                ],
+                "dominant_axes": ["clarity"],
+                "weakest_axes": ["structure", "tone"],
+            },
+        )
+
+    def test_rejects_axis_id_not_in_axes(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"axes": [_axis("clarity")]},
+                output={
+                    "scores": [self._score("unknown", 8)],
+                    "dominant_axes": ["unknown"],
+                    "weakest_axes": ["unknown"],
+                },
+            )
+
+    def test_rejects_duplicate_axis_id_in_scores(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"axes": [_axis("clarity")]},
+                output={
+                    "scores": [self._score("clarity", 8), self._score("clarity", 5)],
+                    "dominant_axes": ["clarity"],
+                    "weakest_axes": ["clarity"],
+                },
+            )
+
+    def test_rejects_axis_missing_from_scores(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"axes": [_axis("clarity"), _axis("structure")]},
+                output={
+                    "scores": [self._score("clarity", 8)],
+                    "dominant_axes": ["clarity"],
+                    "weakest_axes": ["clarity"],
+                },
+            )
+
+    def test_rejects_malformed_scores_not_list(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"axes": [_axis("clarity")]},
+                output={"scores": "nope", "dominant_axes": ["clarity"], "weakest_axes": ["clarity"]},
+            )
+
+    def test_rejects_malformed_score_entry(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"axes": [_axis("clarity")]},
+                output={"scores": ["nope"], "dominant_axes": ["clarity"], "weakest_axes": ["clarity"]},
+            )
+
+    def test_rejects_invalid_axis_score(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"axes": [_axis("clarity")]},
+                output={
+                    "scores": [{"axis_id": "clarity", "score": "high", "commentary": "c"}],
+                    "dominant_axes": ["clarity"],
+                    "weakest_axes": ["clarity"],
+                },
+            )
+
+    def test_rejects_dominant_axes_mismatch(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"axes": [_axis("clarity"), _axis("structure")]},
+                output={
+                    "scores": [self._score("clarity", 8), self._score("structure", 5)],
+                    "dominant_axes": ["structure"],
+                    "weakest_axes": ["structure"],
+                },
+            )
+
+    def test_rejects_dominant_axes_missing_a_tied_entry(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"axes": [_axis("clarity"), _axis("structure")]},
+                output={
+                    "scores": [self._score("clarity", 8), self._score("structure", 8)],
+                    "dominant_axes": ["clarity"],
+                    "weakest_axes": ["clarity", "structure"],
+                },
+            )
+
+    def test_rejects_dominant_axes_wrong_order(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"axes": [_axis("clarity"), _axis("structure")]},
+                output={
+                    "scores": [self._score("clarity", 8), self._score("structure", 8)],
+                    "dominant_axes": ["structure", "clarity"],
+                    "weakest_axes": ["structure", "clarity"],
+                },
+            )
+
+    def test_rejects_weakest_axes_mismatch(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"axes": [_axis("clarity"), _axis("structure")]},
+                output={
+                    "scores": [self._score("clarity", 8), self._score("structure", 5)],
+                    "dominant_axes": ["clarity"],
+                    "weakest_axes": ["clarity"],
+                },
+            )
+
+    def test_ignores_when_axes_missing_from_input(self) -> None:
+        self.validator.validate(
+            input_payload={},
+            output={"scores": [self._score("clarity", 8)], "dominant_axes": [], "weakest_axes": []},
+        )
+
+    def test_truncates_rejected_axis_id_in_error_reason(self) -> None:
+        overlong_id = "x" * 500
+        with pytest.raises(StructuredOutputValidationError) as exc_info:
+            self.validator.validate(
+                input_payload={"axes": [_axis("clarity")]},
+                output={
+                    "scores": [self._score(overlong_id, 8)],
+                    "dominant_axes": [overlong_id],
+                    "weakest_axes": [overlong_id],
+                },
+            )
+        assert len(exc_info.value.reason) < len(overlong_id)
+        assert exc_info.value.reason.endswith("...")
+
+
+class TestRejectDuplicateIdsSharedHelper:
+    """Covers the `_reject_duplicate_ids` helper both A01 and A03 input validators share,
+    through the two public validators that call it."""
+
+    def test_extract_structured_fields_and_score_multidim_share_duplicate_rejection_behavior(
+        self,
+    ) -> None:
+        extract_validator = ExtractStructuredFieldsInputValidator()
+        score_multidim_validator = ScoreMultidimensionalAxesInputValidator()
+
+        with pytest.raises(ActionInputValidationError):
+            extract_validator.validate(
+                input_payload={
+                    "fields": [
+                        _field("deadline", "string", required=True),
+                        _field("deadline", "number", required=False),
+                    ]
+                }
+            )
+        with pytest.raises(ActionInputValidationError):
+            score_multidim_validator.validate(
+                input_payload={"axes": [_axis("clarity"), _axis("clarity")]}
+            )

@@ -1,0 +1,25 @@
+{
+  "response_json": {
+    "scores": [
+      {
+        "axis_id": "clarity",
+        "score": 8,
+        "commentary": "The text states its point directly with no ambiguous phrasing."
+      },
+      {
+        "axis_id": "structure",
+        "score": 5,
+        "commentary": "The text lacks clear paragraph breaks between its two ideas."
+      }
+    ],
+    "dominant_axes": ["clarity"],
+    "weakest_axes": ["structure"]
+  },
+  "input_tokens": 140,
+  "output_tokens": 50,
+  "latency_ms": 12,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "kernel_demo.score_multidimensional_axes_v1"
+  }
+}
