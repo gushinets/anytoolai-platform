@@ -157,6 +157,7 @@ or worker startup) instead of silently running unvalidated.
 | 2026-08-14 | Rerun code review found 3 more gaps (overclaimed `provider_policy_ref` parity, misleading null-vs-missing loader error, no real fail-closed `build_worker` test). Fixed all three: corrected the decision log, added a targeted null-check with a clearer message in `loader.py`, added `test_build_worker_fails_closed_on_unresolvable_validator_ref`. | Re-run `quick-check` and targeted suite, commit. |
 | 2026-08-14 | Round-3 code review found 2 more gaps (duplicated resolve-or-raise loop across the two builders, missing `input_validator_ref` null-ref test). Fixed both: extracted `_resolve_validators` shared helper in `registry.py`, added the symmetric null-ref test. | Re-run `quick-check` and targeted suite, commit. |
 | 2026-08-14 | Merged `main` into `feature/ANY-305` to pick up ANY-255 (`text.compare_and_classify` A11 implementation). Merge silently reintroduced the "forgotten validator wiring" failure mode for `text.compare_and_classify` (new validator classes existed but weren't wired through `registry.py`/YAML) plus left 10 dead imports in `composition.py`/`test_action_runner.py`. Fixed both, updated the smoke-test expected sets. | Re-run `quick-check` and targeted suite, commit. |
+| 2026-08-16 | Second `main` merge (bringing in ANY-256 `text.score_match_by_rubric`) reproduced the exact same wiring gap: `ScoreMatchByRubricCrossValidator`/`ScoreMatchByRubricInputValidator` existed and were exported from `cross_validation/__init__.py`, but `registry.py`'s lookup dicts and the YAML refs were left at `"none"`/`"none"`. This time `composition.py`/`test_action_runner.py` conflict resolution kept the builder-function imports cleanly (no dead imports). Wired the new atom through `registry.py` + YAML, updated `test_cross_validator_registry.py`'s expected sets. This confirms the wiring gap is a recurring merge hazard, not a one-off — every `main` merge that lands a new atom with real validator classes needs this check until validator wiring gets a fail-closed test that runs without a live Postgres DB (see note below). | Re-run `quick-check` and targeted suite, commit. |
 
 ## Open questions
 
@@ -164,10 +165,15 @@ or worker startup) instead of silently running unvalidated.
 
 ## Follow-up debt
 
-- TD-010: 3 action types (`document.generate_from_template`, `text.score_match_by_rubric`,
-  `text.score_multidimensional_axes`) have no validator class yet and carry `"none"`/`"none"`.
-  `text.compare_and_classify` moved off this list on 2026-08-14 once ANY-255 landed real
-  `CompareAndClassifyCrossValidator`/`CompareAndClassifyInputValidator` classes and this branch
-  wired them through `registry.py`. When a real validator is added for one of the remaining 3,
-  change its YAML ref from `"none"` to the concrete ref — the loader/registry will then demand the
-  class exist.
+- TD-010: 2 action types (`document.generate_from_template`, `text.score_multidimensional_axes`)
+  have no validator class yet and carry `"none"`/`"none"`. `text.compare_and_classify` moved off
+  this list on 2026-08-14 (ANY-255) and `text.score_match_by_rubric` moved off on 2026-08-16
+  (ANY-256), both once their branches landed real validator classes and this branch's merges wired
+  them through `registry.py`. When a real validator is added for one of the remaining 2, change its
+  YAML ref from `"none"` to the concrete ref — the loader/registry will then demand the class exist.
+- Every `main` merge that lands a new atom's validator classes has silently left them unwired
+  (`registry.py` dict + YAML ref) twice in a row (2026-08-14, 2026-08-16) — the passing test suite
+  didn't catch either because the decisive tests are `pytest.mark.postgresql`-gated and skip
+  without a live DB in sandboxed runs. Consider a DB-free unit test that asserts every atom whose
+  action definition ships alongside a same-named class in `cross_validation/` is actually present
+  in `_CROSS_VALIDATORS`/`_INPUT_VALIDATORS`, so this stops depending on manual post-merge review.

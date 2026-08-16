@@ -121,9 +121,11 @@ def test_real_config_registry_wiring_resolves_end_to_end() -> None:
         "text.extract_structured_fields",
         "text.generate_clarifying_questions",
         "text.generate_gap_rewrites",
+        "text.score_match_by_rubric",
         "text.synthesize_angle",
     }
     assert set(input_validators) == {
         "text.compare_and_classify",
         "text.extract_structured_fields",
+        "text.score_match_by_rubric",
     }
