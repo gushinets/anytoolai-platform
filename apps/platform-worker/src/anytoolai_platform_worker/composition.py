@@ -16,6 +16,8 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     GapRewritesCrossValidator,
     GenerateClarifyingQuestionsCrossValidator,
     PersuasiveTextCrossValidator,
+    ScoreMatchByRubricCrossValidator,
+    ScoreMatchByRubricInputValidator,
     SynthesizeAngleCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
@@ -94,6 +96,7 @@ def build_worker(
                 "text.compose_persuasive_text": PersuasiveTextCrossValidator(),
                 "text.generate_gap_rewrites": GapRewritesCrossValidator(),
                 "text.compare_and_classify": CompareAndClassifyCrossValidator(),
+                "text.score_match_by_rubric": ScoreMatchByRubricCrossValidator(),
             },
         )
         action_runner = ActionRunner(
@@ -108,6 +111,7 @@ def build_worker(
             input_validators={
                 "text.extract_structured_fields": ExtractStructuredFieldsInputValidator(),
                 "text.compare_and_classify": CompareAndClassifyInputValidator(),
+                "text.score_match_by_rubric": ScoreMatchByRubricInputValidator(),
             },
         )
         return SequentialWorkflowRunner(

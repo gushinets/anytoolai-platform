@@ -1,4 +1,38 @@
 {
   "type": "object",
-  "additionalProperties": true
+  "properties": {
+    "text_a": {
+      "type": "string",
+      "minLength": 1
+    },
+    "text_b": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rubric": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "weight": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": ["id", "description", "weight"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["text_a", "text_b", "rubric"],
+  "additionalProperties": false
 }
