@@ -54,7 +54,7 @@ class ScoreMultidimensionalAxesCrossValidator:
             if not isinstance(entry, Mapping):
                 raise _cross_validation_error("malformed_score_entry")
             axis_id = entry.get("axis_id")
-            if axis_id not in known_axis_ids:
+            if not isinstance(axis_id, str) or axis_id not in known_axis_ids:
                 raise _cross_validation_error(
                     f"axis_id_not_in_axes:{_truncated_repr(axis_id)}"
                 )

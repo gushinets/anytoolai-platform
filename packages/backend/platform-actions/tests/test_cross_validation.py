@@ -1111,6 +1111,17 @@ class TestScoreMultidimensionalAxesCrossValidator:
                 },
             )
 
+    def test_rejects_non_string_axis_id(self) -> None:
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"axes": [_axis("clarity")]},
+                output={
+                    "scores": [{"axis_id": ["clarity"], "score": 8, "commentary": "c"}],
+                    "dominant_axes": ["clarity"],
+                    "weakest_axes": ["clarity"],
+                },
+            )
+
     def test_rejects_duplicate_axis_id_in_scores(self) -> None:
         with pytest.raises(StructuredOutputValidationError):
             self.validator.validate(
