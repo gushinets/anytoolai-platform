@@ -17,6 +17,10 @@ from .score_multidimensional_axes import (
     ScoreMultidimensionalAxesCrossValidator,
     ScoreMultidimensionalAxesInputValidator,
 )
+from .score_match_by_rubric import (
+    ScoreMatchByRubricCrossValidator,
+    ScoreMatchByRubricInputValidator,
+)
 from .synthesize_angle import SynthesizeAngleCrossValidator
 
 __all__ = [
@@ -32,5 +36,7 @@ __all__ = [
     "PersuasiveTextCrossValidator",
     "ScoreMultidimensionalAxesCrossValidator",
     "ScoreMultidimensionalAxesInputValidator",
+    "ScoreMatchByRubricCrossValidator",
+    "ScoreMatchByRubricInputValidator",
     "SynthesizeAngleCrossValidator",
 ]

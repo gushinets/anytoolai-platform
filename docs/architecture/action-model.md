@@ -77,6 +77,16 @@ Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.synth
 - `SynthesizeAngleCrossValidator` enforces options-membership: when `options` is non-empty, `angle`/`secondary_angle` must each be one of them; when `options` is absent/empty, synthesis is open with no membership check. Rejected values are truncated (`_truncated_repr`) before flowing into the retry prompt and persisted debug-artifact metadata.
 - The chain-of-thought prohibition on `rationale` is a prompt instruction (`synthesize_angle.v1.md`), not a runtime heuristic — the ticket frames it as a validation/prompt requirement, not a strict contract.
 
+## A02 `text.score_match_by_rubric` contract
+
+Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.score_match_input_v1` / `kernel.schemas.score_match_output_v1`:
+
+- Input: `text_a` and `text_b` (required, non-empty strings); `rubric` (required, non-empty array of `{id, description, weight}`; `id`/`description` non-empty strings, `weight` a positive number).
+- Output: `criterion_scores` (required, non-empty array of `{criterion_id, score, rationale}`; `score` 0–100, `rationale` non-empty with `maxLength: 500`); `score` (required aggregate, 0–100); `strengths` and `gaps` (required arrays of non-empty strings, may be empty).
+- `ScoreMatchByRubricInputValidator` rejects duplicate `rubric[*].id` before any provider call — JSON Schema cannot express partial-key uniqueness, so this runs the same way as `ExtractStructuredFieldsInputValidator`. Non-positive `weight` and an empty `rubric` are rejected by the input schema itself (`exclusiveMinimum`/`minItems`), not by this validator.
+- `ScoreMatchByRubricCrossValidator` enforces that `criterion_scores` maps exactly once onto `rubric` (exists, unique, exhaustive — every `criterion_id` must be a rubric id, no id repeats, and every rubric id must appear), then recomputes the rubric-weighted average of `criterion_scores` outside the model response and rejects a `score` that disagrees by more than `0.5` points. That tolerance has no prior codebase precedent (every earlier cross validator does membership/bounds/regex checks, not arithmetic); `0.5` covers the model rounding the weighted average to the nearest whole point on the 0–100 scale. Rejected/oversized values are truncated (`_truncated_repr`) before flowing into the retry prompt and persisted debug-artifact metadata.
+- The chain-of-thought prohibition on `rationale` is a prompt instruction (`score_match_by_rubric.v1.md`), not a runtime heuristic, matching the sibling A09 contract.
+
 ## A10 `document.generate_from_template` contract
 
 Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.generate_document_input_v1` / `kernel.schemas.generate_document_output_v1`:

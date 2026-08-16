@@ -1,0 +1,26 @@
+{
+  "response_json": {
+    "criterion_scores": [
+      {
+        "criterion_id": "tone",
+        "score": 90,
+        "rationale": "text_b mirrors the warm, direct tone requested by the rubric."
+      },
+      {
+        "criterion_id": "completeness",
+        "score": 70,
+        "rationale": "text_b covers the deadline but omits the budget detail from text_a."
+      }
+    ],
+    "score": 80,
+    "strengths": ["Tone matches the source closely."],
+    "gaps": ["Budget detail from text_a is missing in text_b."]
+  },
+  "input_tokens": 160,
+  "output_tokens": 60,
+  "latency_ms": 12,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "kernel_demo.score_match_by_rubric_v1"
+  }
+}

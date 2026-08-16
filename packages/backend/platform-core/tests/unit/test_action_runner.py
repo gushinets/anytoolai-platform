@@ -19,6 +19,7 @@ from action_runner import (
     GenericExecutor,
     InvalidStructuredOutputAdapter,
     ScoreMultidimensionalAxesDominantMismatchThenValidAdapter,
+    ScoreMatchByRubricAggregateMismatchThenValidAdapter,
     SynthesizeAngleOutOfOptionsThenValidAdapter,
     SynthesizeAngleSecondaryOutOfOptionsThenValidAdapter,
 )
@@ -34,6 +35,8 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     PersuasiveTextCrossValidator,
     ScoreMultidimensionalAxesCrossValidator,
     ScoreMultidimensionalAxesInputValidator,
+    ScoreMatchByRubricCrossValidator,
+    ScoreMatchByRubricInputValidator,
     SynthesizeAngleCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
@@ -187,6 +190,7 @@ def _build_runner(
             "text.compose_persuasive_text": PersuasiveTextCrossValidator(),
             "text.compare_and_classify": CompareAndClassifyCrossValidator(),
             "text.score_multidimensional_axes": ScoreMultidimensionalAxesCrossValidator(),
+            "text.score_match_by_rubric": ScoreMatchByRubricCrossValidator(),
         },
     )
     return ActionRunner(
@@ -199,6 +203,7 @@ def _build_runner(
             "text.extract_structured_fields": ExtractStructuredFieldsInputValidator(),
             "text.compare_and_classify": CompareAndClassifyInputValidator(),
             "text.score_multidimensional_axes": ScoreMultidimensionalAxesInputValidator(),
+            "text.score_match_by_rubric": ScoreMatchByRubricInputValidator(),
         },
     )
 
@@ -2027,6 +2032,205 @@ def test_action_runner_rejects_duplicate_axes_ids_before_any_provider_call(
                         step_id="score_multidim",
                         action_type="text.score_multidimensional_axes",
                         action_config_id="kernel_demo.score_multidimensional_axes_v1",
+                    ),
+                )
+            )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+
+    assert counting_adapter.call_count == 0
+    assert action_run["status"].value == "failed"
+    assert action_run["error_code"] == "action_input_validation_failed"
+
+
+def test_action_runner_executes_score_match_by_rubric_atom_through_generic_path(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session)
+
+        result = asyncio.run(
+            runner.run(
+                "text.score_match_by_rubric",
+                "kernel_demo.score_match_by_rubric_v1",
+                {
+                    "text_a": "We need the deliverable by Friday with a $5k budget cap.",
+                    "text_b": "I can deliver a warm, on-brief draft by Friday.",
+                    "rubric": [
+                        {"id": "tone", "description": "Matches the requested tone.", "weight": 1},
+                        {
+                            "id": "completeness",
+                            "description": "Covers all key points from text_a.",
+                            "weight": 1,
+                        },
+                    ],
+                },
+                _context(
+                    step_id="score_match",
+                    action_type="text.score_match_by_rubric",
+                    action_config_id="kernel_demo.score_match_by_rubric_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+        provider_call = session.execute(sa.select(provider_calls_table)).mappings().one()
+        events = _event_rows(session)
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload == {
+        "criterion_scores": [
+            {
+                "criterion_id": "tone",
+                "score": 90,
+                "rationale": "text_b mirrors the warm, direct tone requested by the rubric.",
+            },
+            {
+                "criterion_id": "completeness",
+                "score": 70,
+                "rationale": "text_b covers the deadline but omits the budget detail from text_a.",
+            },
+        ],
+        "score": 80,
+        "strengths": ["Tone matches the source closely."],
+        "gaps": ["Budget detail from text_a is missing in text_b."],
+    }
+    assert result.output_artifact_id == artifact["id"]
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert artifact["metadata"]["schema_ref"] == "kernel.schemas.score_match_output_v1"
+    assert provider_call["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 1,
+            "provider.request_succeeded": 1,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    action_started = _event_by_type(events, "action.started")
+    artifact_created = _event_by_type(events, "artifact.created")
+    action_succeeded = _event_by_type(events, "action.succeeded")
+    assert action_started["action_run_id"] == action_run["id"]
+    assert artifact_created["artifact_id"] == artifact["id"]
+    assert action_succeeded["action_run_id"] == action_run["id"]
+
+
+def test_action_runner_retries_score_match_by_rubric_cross_validation_through_real_ledger(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    """A02: proves the rubric-weighted-aggregate recompute/tolerance cross-validation
+    retry through the real ProviderGateway/ActionRunner path - a mismatched aggregate
+    `score` followed by a compliant one must create two physical provider_calls rows with
+    the expected semantic/physical indexes, provider events, and final artifact lineage."""
+    adapter = ScoreMatchByRubricAggregateMismatchThenValidAdapter()
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session, fake_adapter=adapter)
+        # default_fake_provider_v1 allows 1 validation attempt / 1 physical call per action;
+        # widen both so the semantic retry this test drives can actually reach a 2nd
+        # physical call through the real ProviderGateway hard-limit check, not just PydanticAI.
+        executor = runner._executors["structured_llm"]
+        base_policy = executor._require_provider_policy("default_fake_provider_v1")
+        patched_policy = replace(
+            base_policy,
+            retry_policy=replace(
+                base_policy.retry_policy,
+                validation=ProviderValidationRetryPolicy(
+                    owner=base_policy.retry_policy.validation.owner,
+                    max_attempts=2,
+                ),
+                hard_limits=ProviderRetryHardLimits(max_physical_provider_calls_per_action=2),
+            ),
+        )
+        executor._require_provider_policy = lambda _provider_policy_ref: patched_policy
+        executor._provider_gateway._policy_resolver.resolve = lambda _provider_policy_ref: patched_policy
+
+        result = asyncio.run(
+            runner.run(
+                "text.score_match_by_rubric",
+                "kernel_demo.score_match_by_rubric_v1",
+                {
+                    "text_a": "Source text.",
+                    "text_b": "Candidate text.",
+                    "rubric": [
+                        {"id": "tone", "description": "Matches the requested tone.", "weight": 1},
+                        {
+                            "id": "completeness",
+                            "description": "Covers all key points from text_a.",
+                            "weight": 1,
+                        },
+                    ],
+                },
+                _context(
+                    step_id="score_match",
+                    action_type="text.score_match_by_rubric",
+                    action_config_id="kernel_demo.score_match_by_rubric_v1",
+                ),
+            )
+        )
+        action_run = session.execute(sa.select(action_runs_table)).mappings().one()
+        artifact = session.execute(sa.select(artifacts_table)).mappings().one()
+        provider_calls = list(
+            session.execute(
+                sa.select(provider_calls_table).order_by(
+                    provider_calls_table.c.created_at, provider_calls_table.c.id
+                )
+            ).mappings()
+        )
+        events = _event_rows(session)
+
+    assert result.status.value == "succeeded"
+    assert result.output_payload["score"] == 80
+    assert result.output_artifact_id == artifact["id"]
+    assert adapter.call_count == 2
+    assert len(provider_calls) == 2
+    assert [row["semantic_attempt_index"] for row in provider_calls] == [1, 2]
+    # physical_call_index tracks the action-wide physical-call budget, not a per-semantic-
+    # attempt counter, so it keeps climbing across semantic attempts too.
+    assert [row["physical_call_index"] for row in provider_calls] == [1, 2]
+    assert all(row["action_run_id"] == action_run["id"] for row in provider_calls)
+    assert action_run["status"].value == "succeeded"
+    assert action_run["output_artifact_id"] == artifact["id"]
+    assert artifact["action_run_id"] == action_run["id"]
+    assert _event_counts(events) == Counter(
+        {
+            "action.started": 1,
+            "provider.request_started": 2,
+            "provider.request_succeeded": 2,
+            "artifact.created": 1,
+            "action.succeeded": 1,
+        }
+    )
+    artifact_created = _event_by_type(events, "artifact.created")
+    assert artifact_created["artifact_id"] == artifact["id"]
+
+
+def test_action_runner_rejects_duplicate_rubric_ids_before_any_provider_call(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    counting_adapter = CountingFakeAdapter(FakeProviderAdapter(FIXTURE_ROOT))
+    with transaction_boundary(session_factory) as session:
+        runner = _build_runner(session, fake_adapter=counting_adapter)
+        duplicate_rubric = [
+            {"id": "tone", "description": "Matches the requested tone.", "weight": 1},
+            {"id": "tone", "description": "A conflicting second spec with the same id.", "weight": 2},
+        ]
+
+        with pytest.raises(ActionInputValidationError):
+            asyncio.run(
+                runner.run(
+                    "text.score_match_by_rubric",
+                    "kernel_demo.score_match_by_rubric_v1",
+                    {
+                        "text_a": "Source text.",
+                        "text_b": "Candidate text.",
+                        "rubric": duplicate_rubric,
+                    },
+                    _context(
+                        step_id="score_match",
+                        action_type="text.score_match_by_rubric",
+                        action_config_id="kernel_demo.score_match_by_rubric_v1",
                     ),
                 )
             )

@@ -18,6 +18,9 @@ from action_runner.invalid_structured_output_adapter import InvalidStructuredOut
 from action_runner.score_multidimensional_axes_dominant_mismatch_then_valid_adapter import (
     ScoreMultidimensionalAxesDominantMismatchThenValidAdapter,
 )
+from action_runner.score_match_by_rubric_aggregate_mismatch_then_valid_adapter import (
+    ScoreMatchByRubricAggregateMismatchThenValidAdapter,
+)
 from action_runner.synthesize_angle_out_of_options_then_valid_adapter import (
     SynthesizeAngleOutOfOptionsThenValidAdapter,
 )
@@ -36,6 +39,7 @@ __all__ = [
     "GenericExecutor",
     "InvalidStructuredOutputAdapter",
     "ScoreMultidimensionalAxesDominantMismatchThenValidAdapter",
+    "ScoreMatchByRubricAggregateMismatchThenValidAdapter",
     "SynthesizeAngleOutOfOptionsThenValidAdapter",
     "SynthesizeAngleSecondaryOutOfOptionsThenValidAdapter",
 ]

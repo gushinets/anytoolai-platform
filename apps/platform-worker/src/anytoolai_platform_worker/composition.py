@@ -18,6 +18,8 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     PersuasiveTextCrossValidator,
     ScoreMultidimensionalAxesCrossValidator,
     ScoreMultidimensionalAxesInputValidator,
+    ScoreMatchByRubricCrossValidator,
+    ScoreMatchByRubricInputValidator,
     SynthesizeAngleCrossValidator,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
@@ -97,6 +99,7 @@ def build_worker(
                 "text.generate_gap_rewrites": GapRewritesCrossValidator(),
                 "text.compare_and_classify": CompareAndClassifyCrossValidator(),
                 "text.score_multidimensional_axes": ScoreMultidimensionalAxesCrossValidator(),
+                "text.score_match_by_rubric": ScoreMatchByRubricCrossValidator(),
             },
         )
         action_runner = ActionRunner(
@@ -112,6 +115,7 @@ def build_worker(
                 "text.extract_structured_fields": ExtractStructuredFieldsInputValidator(),
                 "text.compare_and_classify": CompareAndClassifyInputValidator(),
                 "text.score_multidimensional_axes": ScoreMultidimensionalAxesInputValidator(),
+                "text.score_match_by_rubric": ScoreMatchByRubricInputValidator(),
             },
         )
         return SequentialWorkflowRunner(
