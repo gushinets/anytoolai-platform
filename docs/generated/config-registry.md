@@ -40,8 +40,8 @@ Canonical source: configs/kernel via ConfigLoader.
 - kernel_demo.generate_clarifying_questions_v1
 - kernel_demo.generate_gap_rewrites_v1
 - kernel_demo.generate_report_v1
-- kernel_demo.score_multidimensional_axes_v1
 - kernel_demo.score_match_by_rubric_v1
+- kernel_demo.score_multidimensional_axes_v1
 - kernel_demo.synthesize_angle_v1
 
 ## Workflows
@@ -76,8 +76,8 @@ Canonical source: configs/kernel via ConfigLoader.
 - kernel_demo.generate_clarifying_questions.v1
 - kernel_demo.generate_gap_rewrites.v1
 - kernel_demo.generate_report.v1
-- kernel_demo.score_multidimensional_axes.v1
 - kernel_demo.score_match_by_rubric.v1
+- kernel_demo.score_multidimensional_axes.v1
 - kernel_demo.synthesize_angle.v1
 
 ## Schemas
