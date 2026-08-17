@@ -3,11 +3,14 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 PRODUCT_PLATFORMS = ROOT / "packages" / "backend" / "product-platforms"
 
 
-def _load_validate_architecture():
+@pytest.fixture(scope="module")
+def validate_architecture_module():
     path = ROOT / "scripts" / "agent" / "validate_architecture.py"
     spec = importlib.util.spec_from_file_location("validate_architecture_module", path)
     assert spec is not None and spec.loader is not None
@@ -16,44 +19,78 @@ def _load_validate_architecture():
     return module
 
 
-def test_product_platforms_has_no_forbidden_imports() -> None:
-    module = _load_validate_architecture()
+def _check_over_tmp_path(module, tmp_path: Path, monkeypatch) -> list[str]:
+    # SKIP_PATH_PARTS excludes scratch/build directory names (e.g. "tmp", ".quick-check-tmp")
+    # that can also appear as ancestors of pytest's tmp_path, depending on where the test
+    # runner points --basetemp. Drop only the entries that actually collide with tmp_path's
+    # own location, so the real recursive walk and the other skip-dir filtering (node_modules,
+    # dist, ...) still run for real against the fixture tree underneath it.
+    colliding = {part for part in tmp_path.parts if part in module.SKIP_PATH_PARTS}
+    monkeypatch.setattr(module, "SKIP_PATH_PARTS", module.SKIP_PATH_PARTS - colliding)
+    return module.check_product_platforms_boundary(tmp_path)
 
-    errors = module.check_product_platforms_boundary(PRODUCT_PLATFORMS)
+
+def test_product_platforms_has_no_forbidden_imports(validate_architecture_module) -> None:
+    errors = validate_architecture_module.check_product_platforms_boundary(PRODUCT_PLATFORMS)
 
     assert errors == [], "product-platforms must depend on platform-sdk only: " + ", ".join(errors)
 
 
-def _check_fixture(monkeypatch, tmp_path: Path) -> list[str]:
-    # iter_code_files skips any path with a "tmp" path segment (scratch/build dirs),
-    # which always matches pytest's tmp_path. Point it at the fixture file directly so
-    # check_product_platforms_boundary's real import-detection and message-formatting
-    # logic still runs end-to-end.
-    module = _load_validate_architecture()
-    fixture_files = list(tmp_path.iterdir())
-    monkeypatch.setattr(module, "iter_code_files", lambda _root: iter(fixture_files))
-    return module.check_product_platforms_boundary(tmp_path)
-
-
-def test_forbidden_python_import_is_detected(monkeypatch, tmp_path: Path) -> None:
+def test_forbidden_python_import_is_detected(
+    validate_architecture_module, monkeypatch, tmp_path: Path
+) -> None:
     (tmp_path / "offending_module.py").write_text(
         "import anytoolai_platform_core\n", encoding="utf-8"
     )
 
-    errors = _check_fixture(monkeypatch, tmp_path)
+    errors = _check_over_tmp_path(validate_architecture_module, tmp_path, monkeypatch)
 
     assert len(errors) == 1
     assert errors[0].startswith("ATAI007 ")
     assert "anytoolai_platform_core" in errors[0]
 
 
-def test_forbidden_typescript_import_is_detected(monkeypatch, tmp_path: Path) -> None:
-    (tmp_path / "offending_module.ts").write_text(
-        'import { runAction } from "anytoolai_platform_actions";\n', encoding="utf-8"
+def test_forbidden_python_from_import_is_detected(
+    validate_architecture_module, monkeypatch, tmp_path: Path
+) -> None:
+    (tmp_path / "offending_from_import.py").write_text(
+        "from anytoolai_platform_actions import run_action\n", encoding="utf-8"
     )
 
-    errors = _check_fixture(monkeypatch, tmp_path)
+    errors = _check_over_tmp_path(validate_architecture_module, tmp_path, monkeypatch)
 
     assert len(errors) == 1
     assert errors[0].startswith("ATAI007 ")
     assert "anytoolai_platform_actions" in errors[0]
+
+
+def test_forbidden_typescript_import_is_detected(
+    validate_architecture_module, monkeypatch, tmp_path: Path
+) -> None:
+    (tmp_path / "offending_module.ts").write_text(
+        'import { runAction } from "anytoolai_platform_actions";\n', encoding="utf-8"
+    )
+
+    errors = _check_over_tmp_path(validate_architecture_module, tmp_path, monkeypatch)
+
+    assert len(errors) == 1
+    assert errors[0].startswith("ATAI007 ")
+    assert "anytoolai_platform_actions" in errors[0]
+
+
+def test_skip_path_parts_filters_vendored_directories(
+    validate_architecture_module, monkeypatch, tmp_path: Path
+) -> None:
+    (tmp_path / "offending_module.py").write_text(
+        "import anytoolai_platform_core\n", encoding="utf-8"
+    )
+    vendored = tmp_path / "node_modules" / "vendored"
+    vendored.mkdir(parents=True)
+    (vendored / "also_offending.py").write_text(
+        "import anytoolai_platform_core\n", encoding="utf-8"
+    )
+
+    errors = _check_over_tmp_path(validate_architecture_module, tmp_path, monkeypatch)
+
+    assert len(errors) == 1
+    assert "offending_module.py" in errors[0]
