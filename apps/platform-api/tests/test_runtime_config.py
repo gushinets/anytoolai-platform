@@ -61,6 +61,16 @@ def test_runtime_config_returns_frontend_safe_metadata() -> None:
         "kernel_demo.quota_exhausted_smoke_v1",
         "kernel_demo.handoff_smoke_source_v1",
         "kernel_demo.handoff_smoke_target_v1",
+        "kernel_demo.single_action_detect_issues_smoke_v1",
+        "kernel_demo.single_action_generate_report_smoke_v1",
+        "kernel_demo.single_action_compose_reply_smoke_v1",
+        "kernel_demo.single_action_generate_clarifying_questions_smoke_v1",
+        "kernel_demo.single_action_synthesize_angle_smoke_v1",
+        "kernel_demo.single_action_compose_persuasive_text_smoke_v1",
+        "kernel_demo.single_action_generate_gap_rewrites_smoke_v1",
+        "kernel_demo.single_action_compare_and_classify_smoke_v1",
+        "kernel_demo.single_action_score_match_by_rubric_smoke_v1",
+        "kernel_demo.single_action_score_multidimensional_axes_smoke_v1",
     ]
     assert data["quota_summary"] == {
         "quota_policy_id": "kernel_demo.guest_quota_v1",

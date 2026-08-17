@@ -29,25 +29,25 @@ def _sequenced_request(responses):
     return fake
 
 
-def test_run_reports_smoke001_when_guest_call_fails(monkeypatch, capsys) -> None:
+def test_run_one_case_reports_smoke001_when_guest_call_fails(monkeypatch) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(
         smoke, "_http_json_request", _sequenced_request([OSError("connection refused")])
     )
 
-    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
-    assert "SMOKE001" in capsys.readouterr().err
+    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
+    assert error is not None and "SMOKE001" in error
 
 
-def test_run_reports_smoke001_for_malformed_guest_response(monkeypatch, capsys) -> None:
+def test_run_one_case_reports_smoke001_for_malformed_guest_response(monkeypatch) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(smoke, "_http_json_request", _sequenced_request([None]))
 
-    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
-    assert "SMOKE001" in capsys.readouterr().err
+    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
+    assert error is not None and "SMOKE001" in error
 
 
-def test_run_reports_smoke001_for_malformed_start_response(monkeypatch, capsys) -> None:
+def test_run_one_case_reports_smoke001_for_malformed_start_response(monkeypatch) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(
         smoke,
@@ -55,11 +55,11 @@ def test_run_reports_smoke001_for_malformed_start_response(monkeypatch, capsys) 
         _sequenced_request([{"guest_id": "guest-1"}, ["not", "a", "dict"]]),
     )
 
-    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
-    assert "SMOKE001" in capsys.readouterr().err
+    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
+    assert error is not None and "SMOKE001" in error
 
 
-def test_run_reports_smoke002_when_polling_call_fails(monkeypatch, capsys) -> None:
+def test_run_one_case_reports_smoke002_when_polling_call_fails(monkeypatch) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(
         smoke,
@@ -73,11 +73,11 @@ def test_run_reports_smoke002_when_polling_call_fails(monkeypatch, capsys) -> No
         ),
     )
 
-    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
-    assert "SMOKE002" in capsys.readouterr().err
+    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
+    assert error is not None and "SMOKE002" in error
 
 
-def test_run_reports_smoke002_for_malformed_session_response(monkeypatch, capsys) -> None:
+def test_run_one_case_reports_smoke002_for_malformed_session_response(monkeypatch) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(
         smoke,
@@ -91,11 +91,11 @@ def test_run_reports_smoke002_for_malformed_session_response(monkeypatch, capsys
         ),
     )
 
-    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
-    assert "SMOKE002" in capsys.readouterr().err
+    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
+    assert error is not None and "SMOKE002" in error
 
 
-def test_run_reports_smoke003_when_completed_without_artifact(monkeypatch, capsys) -> None:
+def test_run_one_case_reports_smoke003_when_completed_without_artifact(monkeypatch) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(
         smoke,
@@ -109,11 +109,11 @@ def test_run_reports_smoke003_when_completed_without_artifact(monkeypatch, capsy
         ),
     )
 
-    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
-    assert "SMOKE003" in capsys.readouterr().err
+    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
+    assert error is not None and "SMOKE003" in error
 
 
-def test_run_succeeds_when_completed_with_artifact(monkeypatch, capsys) -> None:
+def test_run_one_case_succeeds_when_completed_with_artifact(monkeypatch) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(
         smoke,
@@ -127,11 +127,10 @@ def test_run_succeeds_when_completed_with_artifact(monkeypatch, capsys) -> None:
         ),
     )
 
-    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 0
-    assert "session-1" in capsys.readouterr().out
+    assert smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0) is None
 
 
-def test_run_reports_smoke004_when_session_failed(monkeypatch, capsys) -> None:
+def test_run_one_case_reports_smoke004_when_session_failed(monkeypatch) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(
         smoke,
@@ -145,12 +144,32 @@ def test_run_reports_smoke004_when_session_failed(monkeypatch, capsys) -> None:
         ),
     )
 
-    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
-    assert "SMOKE004" in capsys.readouterr().err
+    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
+    assert error is not None and "SMOKE004" in error
 
 
-def test_run_reports_smoke005_on_timeout(monkeypatch, capsys) -> None:
+def test_run_one_case_reports_smoke005_on_timeout(monkeypatch) -> None:
     smoke = load_smoke_module()
+    monkeypatch.setattr(
+        smoke,
+        "_http_json_request",
+        _sequenced_request([{"guest_id": "guest-1"}, {"scenario_session_id": "session-1"}]),
+    )
+
+    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 0.0)
+    assert error is not None and "SMOKE005" in error
+
+
+def test_run_reports_partial_pass_count_and_nonzero_exit(monkeypatch, capsys) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(
+        smoke,
+        "ATOM_SMOKE_CASES",
+        (
+            ("atom.one", "scenario-one", {}),
+            ("atom.two", "scenario-two", {}),
+        ),
+    )
     monkeypatch.setattr(
         smoke,
         "_http_json_request",
@@ -158,9 +177,39 @@ def test_run_reports_smoke005_on_timeout(monkeypatch, capsys) -> None:
             [
                 {"guest_id": "guest-1"},
                 {"scenario_session_id": "session-1"},
+                {"status": "completed", "result_artifact_id": "artifact-1"},
+                {"guest_id": "guest-2"},
+                {"scenario_session_id": "session-2"},
+                {"status": "failed", "error": "provider blew up"},
             ]
         ),
     )
 
-    assert smoke.run("http://127.0.0.1:8000", timeout=0.0) == 1
-    assert "SMOKE005" in capsys.readouterr().err
+    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
+    out, err = capsys.readouterr()
+    assert "atom.one: scenario-one -> ok" in out
+    assert "1/2 kernel_demo atoms passed" in out
+    assert "atom.two: scenario-two -> failed" in err
+
+
+def test_run_reports_full_pass_and_zero_exit(monkeypatch, capsys) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(
+        smoke,
+        "ATOM_SMOKE_CASES",
+        (("atom.one", "scenario-one", {}),),
+    )
+    monkeypatch.setattr(
+        smoke,
+        "_http_json_request",
+        _sequenced_request(
+            [
+                {"guest_id": "guest-1"},
+                {"scenario_session_id": "session-1"},
+                {"status": "completed", "result_artifact_id": "artifact-1"},
+            ]
+        ),
+    )
+
+    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 0
+    assert "1/1 kernel_demo atoms passed" in capsys.readouterr().out

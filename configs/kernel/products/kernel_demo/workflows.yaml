@@ -98,6 +98,125 @@ workflows:
         output_mapping:
           context.workflow_output: steps.generate_questions.output
 
+  - workflow_id: kernel_demo.single_action_detect_issues_v1
+    version: 1
+    input_schema_ref: kernel_demo.generic_text_input_v1
+    output_schema_ref: kernel.schemas.issue_detection_output_v1
+    steps:
+      - step_id: detect_issues
+        action_config_id: kernel_demo.detect_issues_v1
+        input_mapping:
+          source_text: scenario.input.source_text
+          taxonomy: '?scenario.input.taxonomy'
+          context: '?scenario.input.context'
+
+  - workflow_id: kernel_demo.single_action_generate_report_v1
+    version: 1
+    input_schema_ref: kernel_demo.generic_text_input_v1
+    output_schema_ref: kernel.schemas.generate_document_output_v1
+    steps:
+      - step_id: generate_report
+        action_config_id: kernel_demo.generate_report_v1
+        input_mapping:
+          template_ref: 'literal:"kernel_demo.report_v1"'
+          data.source_text: scenario.input.source_text
+          data.extracted: 'literal:{"values":{"deadline":"next Friday"},"missing_fields":[],"confidence":{"deadline":0.9}}'
+          data.issues: 'literal:{"issues":[]}'
+
+  - workflow_id: kernel_demo.single_action_compose_reply_v1
+    version: 1
+    input_schema_ref: kernel_demo.generic_text_input_v1
+    output_schema_ref: kernel.schemas.compose_reply_output_v1
+    steps:
+      - step_id: compose_reply
+        action_config_id: kernel_demo.compose_reply_v1
+        input_mapping:
+          situation: scenario.input.source_text
+          intent: 'literal:"Reassure the client and give a concrete next step."'
+          tone: 'literal:"warm"'
+
+  - workflow_id: kernel_demo.single_action_generate_clarifying_questions_v1
+    version: 1
+    input_schema_ref: kernel_demo.generic_text_input_v1
+    output_schema_ref: kernel.schemas.generate_questions_output_v1
+    steps:
+      - step_id: generate_questions
+        action_config_id: kernel_demo.generate_clarifying_questions_v1
+        input_mapping:
+          issues: 'literal:[{"category":"timeline","description":"Delivery date not specified.","severity":"high"}]'
+          context: scenario.input.source_text
+          target_audience: 'literal:"client stakeholder"'
+
+  - workflow_id: kernel_demo.single_action_synthesize_angle_v1
+    version: 1
+    input_schema_ref: kernel_demo.generic_text_input_v1
+    output_schema_ref: kernel.schemas.synthesize_angle_output_v1
+    steps:
+      - step_id: synthesize_angle
+        action_config_id: kernel_demo.synthesize_angle_v1
+        input_mapping:
+          signals: 'literal:[{"id":"s1","label":"Timeline gap","value":"unconfirmed deadline"}]'
+          objective: 'literal:"Win the deal"'
+
+  - workflow_id: kernel_demo.single_action_compose_persuasive_text_v1
+    version: 1
+    input_schema_ref: kernel_demo.generic_text_input_v1
+    output_schema_ref: kernel.schemas.compose_persuasive_text_output_v1
+    steps:
+      - step_id: compose_persuasive_text
+        action_config_id: kernel_demo.compose_persuasive_text_v1
+        input_mapping:
+          context: 'literal:{"product":"Widget Pro","deadline":"March"}'
+          objective: 'literal:"Convince the reader to upgrade before March."'
+
+  - workflow_id: kernel_demo.single_action_generate_gap_rewrites_v1
+    version: 1
+    input_schema_ref: kernel_demo.generic_text_input_v1
+    output_schema_ref: kernel.schemas.generate_gap_rewrites_output_v1
+    steps:
+      - step_id: generate_gap_rewrites
+        action_config_id: kernel_demo.generate_gap_rewrites_v1
+        input_mapping:
+          source_text: scenario.input.source_text
+          gap: 'literal:"No concrete delivery date is stated."'
+          style: 'literal:"moderate"'
+
+  - workflow_id: kernel_demo.single_action_compare_and_classify_v1
+    version: 1
+    input_schema_ref: kernel_demo.generic_text_input_v1
+    output_schema_ref: kernel.schemas.compare_classify_output_v1
+    steps:
+      - step_id: compare_and_classify
+        action_config_id: kernel_demo.compare_and_classify_v1
+        input_mapping:
+          subject_text: scenario.input.source_text
+          reference_text: 'literal:"Reference text for comparison."'
+          categories: 'literal:["meets_bar","below_bar"]'
+          criteria: 'literal:[{"id":"tone","description":"Matches the requested tone.","weight":1},{"id":"coverage","description":"Covers all key points.","weight":1}]'
+
+  - workflow_id: kernel_demo.single_action_score_match_by_rubric_v1
+    version: 1
+    input_schema_ref: kernel_demo.generic_text_input_v1
+    output_schema_ref: kernel.schemas.score_match_output_v1
+    steps:
+      - step_id: score_match_by_rubric
+        action_config_id: kernel_demo.score_match_by_rubric_v1
+        input_mapping:
+          text_a: scenario.input.source_text
+          text_b: 'literal:"Candidate text."'
+          rubric: 'literal:[{"id":"tone","description":"Matches the requested tone.","weight":1},{"id":"completeness","description":"Covers all key points.","weight":1}]'
+
+  - workflow_id: kernel_demo.single_action_score_multidimensional_axes_v1
+    version: 1
+    input_schema_ref: kernel_demo.generic_text_input_v1
+    output_schema_ref: kernel.schemas.score_multidim_output_v1
+    steps:
+      - step_id: score_multidimensional_axes
+        action_config_id: kernel_demo.score_multidimensional_axes_v1
+        input_mapping:
+          text: scenario.input.source_text
+          axes: 'literal:[{"id":"clarity","description":"How clear the text is.","weight":1},{"id":"structure","description":"How well organized the text is.","weight":1}]'
+
   - workflow_id: kernel_demo.retry_extract_v1
     version: 1
     input_schema_ref: kernel_demo.generic_text_input_v1

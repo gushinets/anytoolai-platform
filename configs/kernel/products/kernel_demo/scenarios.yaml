@@ -33,3 +33,63 @@ scenarios:
     workflow_id: kernel_demo.single_action_extract_v1
     allowed_next_actions:
       - copy_result
+  - scenario_id: kernel_demo.single_action_detect_issues_smoke_v1
+    version: 1
+    workflow_id: kernel_demo.single_action_detect_issues_v1
+    allowed_next_actions:
+      - copy_result
+      - create_handoff
+  - scenario_id: kernel_demo.single_action_generate_report_smoke_v1
+    version: 1
+    workflow_id: kernel_demo.single_action_generate_report_v1
+    allowed_next_actions:
+      - copy_result
+      - create_handoff
+  - scenario_id: kernel_demo.single_action_compose_reply_smoke_v1
+    version: 1
+    workflow_id: kernel_demo.single_action_compose_reply_v1
+    allowed_next_actions:
+      - copy_result
+      - create_handoff
+  - scenario_id: kernel_demo.single_action_generate_clarifying_questions_smoke_v1
+    version: 1
+    workflow_id: kernel_demo.single_action_generate_clarifying_questions_v1
+    allowed_next_actions:
+      - copy_result
+      - create_handoff
+  - scenario_id: kernel_demo.single_action_synthesize_angle_smoke_v1
+    version: 1
+    workflow_id: kernel_demo.single_action_synthesize_angle_v1
+    allowed_next_actions:
+      - copy_result
+      - create_handoff
+  - scenario_id: kernel_demo.single_action_compose_persuasive_text_smoke_v1
+    version: 1
+    workflow_id: kernel_demo.single_action_compose_persuasive_text_v1
+    allowed_next_actions:
+      - copy_result
+      - create_handoff
+  - scenario_id: kernel_demo.single_action_generate_gap_rewrites_smoke_v1
+    version: 1
+    workflow_id: kernel_demo.single_action_generate_gap_rewrites_v1
+    allowed_next_actions:
+      - copy_result
+      - create_handoff
+  - scenario_id: kernel_demo.single_action_compare_and_classify_smoke_v1
+    version: 1
+    workflow_id: kernel_demo.single_action_compare_and_classify_v1
+    allowed_next_actions:
+      - copy_result
+      - create_handoff
+  - scenario_id: kernel_demo.single_action_score_match_by_rubric_smoke_v1
+    version: 1
+    workflow_id: kernel_demo.single_action_score_match_by_rubric_v1
+    allowed_next_actions:
+      - copy_result
+      - create_handoff
+  - scenario_id: kernel_demo.single_action_score_multidimensional_axes_smoke_v1
+    version: 1
+    workflow_id: kernel_demo.single_action_score_multidimensional_axes_v1
+    allowed_next_actions:
+      - copy_result
+      - create_handoff
