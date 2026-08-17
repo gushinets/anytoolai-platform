@@ -4,8 +4,8 @@ description: "Score text across independent axes."
 input_schema_ref: kernel.schemas.score_multidim_input_v1
 output_schema_ref: kernel.schemas.score_multidim_output_v1
 executor: structured_llm
-cross_validator_ref: none
-input_validator_ref: none
+cross_validator_ref: text.score_multidimensional_axes
+input_validator_ref: text.score_multidimensional_axes
 emits_events:
   - action.started
   - action.succeeded

@@ -21,6 +21,10 @@ from .score_match_by_rubric import (
     ScoreMatchByRubricCrossValidator,
     ScoreMatchByRubricInputValidator,
 )
+from .score_multidimensional_axes import (
+    ScoreMultidimensionalAxesCrossValidator,
+    ScoreMultidimensionalAxesInputValidator,
+)
 from .synthesize_angle import SynthesizeAngleCrossValidator
 
 NONE_REF = "none"
@@ -35,12 +39,14 @@ _CROSS_VALIDATORS: dict[str, type[ActionOutputCrossValidator]] = {
     "text.generate_gap_rewrites": GapRewritesCrossValidator,
     "text.compare_and_classify": CompareAndClassifyCrossValidator,
     "text.score_match_by_rubric": ScoreMatchByRubricCrossValidator,
+    "text.score_multidimensional_axes": ScoreMultidimensionalAxesCrossValidator,
 }
 
 _INPUT_VALIDATORS: dict[str, type[ActionInputValidator]] = {
     "text.extract_structured_fields": ExtractStructuredFieldsInputValidator,
     "text.compare_and_classify": CompareAndClassifyInputValidator,
     "text.score_match_by_rubric": ScoreMatchByRubricInputValidator,
+    "text.score_multidimensional_axes": ScoreMultidimensionalAxesInputValidator,
 }
 
 
