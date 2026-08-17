@@ -15,6 +15,9 @@ from action_runner.gap_rewrites_count_mismatch_then_valid_adapter import (
 )
 from action_runner.generic_executor import GenericExecutor
 from action_runner.invalid_structured_output_adapter import InvalidStructuredOutputAdapter
+from action_runner.score_multidimensional_axes_dominant_mismatch_then_valid_adapter import (
+    ScoreMultidimensionalAxesDominantMismatchThenValidAdapter,
+)
 from action_runner.score_match_by_rubric_aggregate_mismatch_then_valid_adapter import (
     ScoreMatchByRubricAggregateMismatchThenValidAdapter,
 )
@@ -35,6 +38,7 @@ __all__ = [
     "GapRewritesCountMismatchThenValidAdapter",
     "GenericExecutor",
     "InvalidStructuredOutputAdapter",
+    "ScoreMultidimensionalAxesDominantMismatchThenValidAdapter",
     "ScoreMatchByRubricAggregateMismatchThenValidAdapter",
     "SynthesizeAngleOutOfOptionsThenValidAdapter",
     "SynthesizeAngleSecondaryOutOfOptionsThenValidAdapter",
