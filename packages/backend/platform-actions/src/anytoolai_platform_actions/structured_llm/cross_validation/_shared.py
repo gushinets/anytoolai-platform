@@ -5,6 +5,7 @@ import re
 from datetime import date
 from typing import Any, Mapping
 
+from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
 
 _ISO_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -68,3 +69,23 @@ def _truncated_repr(value: Any) -> str:
     if len(text) <= _TRUNCATED_REPR_LIMIT:
         return text
     return text[:_TRUNCATED_REPR_LIMIT] + "..."
+
+
+def _reject_duplicate_ids(items: Any, *, id_field: str, error_label: str) -> None:
+    """Raises ActionInputValidationError on the first repeated string `id_field` value
+    across `items`. Malformed entries are ignored here - the input JSON schema already
+    enforces their shape; this only adds the cross-item uniqueness a schema can't express."""
+    if not isinstance(items, list):
+        return
+    seen_ids: set[str] = set()
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+        item_id = item.get(id_field)
+        if not isinstance(item_id, str):
+            continue
+        if item_id in seen_ids:
+            raise ActionInputValidationError(
+                f"Action input validation failed: duplicate {error_label} '{item_id}'."
+            )
+        seen_ids.add(item_id)
