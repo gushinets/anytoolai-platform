@@ -159,6 +159,7 @@ or worker startup) instead of silently running unvalidated.
 | 2026-08-14 | Merged `main` into `feature/ANY-305` to pick up ANY-255 (`text.compare_and_classify` A11 implementation). Merge silently reintroduced the "forgotten validator wiring" failure mode for `text.compare_and_classify` (new validator classes existed but weren't wired through `registry.py`/YAML) plus left 10 dead imports in `composition.py`/`test_action_runner.py`. Fixed both, updated the smoke-test expected sets. | Re-run `quick-check` and targeted suite, commit. |
 | 2026-08-16 | Second `main` merge (bringing in ANY-256 `text.score_match_by_rubric`) reproduced the exact same wiring gap: `ScoreMatchByRubricCrossValidator`/`ScoreMatchByRubricInputValidator` existed and were exported from `cross_validation/__init__.py`, but `registry.py`'s lookup dicts and the YAML refs were left at `"none"`/`"none"`. This time `composition.py`/`test_action_runner.py` conflict resolution kept the builder-function imports cleanly (no dead imports). Wired the new atom through `registry.py` + YAML, updated `test_cross_validator_registry.py`'s expected sets. This confirms the wiring gap is a recurring merge hazard, not a one-off — every `main` merge that lands a new atom with real validator classes needs this check until validator wiring gets a fail-closed test that runs without a live Postgres DB (see note below). | Re-run `quick-check` and targeted suite, commit. |
 | 2026-08-17 | Third `main` merge (bringing in ANY-257 `text.score_multidimensional_axes`) reproduced the same wiring gap a third time: `ScoreMultidimensionalAxesCrossValidator`/`ScoreMultidimensionalAxesInputValidator` existed and were exported, but `registry.py`'s dicts and the YAML refs were left at `"none"`/`"none"`. `composition.py`/`test_action_runner.py` again merged cleanly with no dead imports — the ANY-257 branch itself had already fixed several other main-merge casualties upstream (dropped validator classes, dead `cross_validation.py` stub, stale generated docs) before this merge landed. Wired the new atom through `registry.py` + YAML, updated `test_cross_validator_registry.py`'s expected sets. TD-010 is down to 1 atom (`document.generate_from_template`) — every other atom shipped with a real validator class is wired. No leftover conflict markers found repo-wide (`grep <<<<<<<`). | Re-run `quick-check` and targeted suite, commit. |
+| 2026-08-17 | Added `test_every_validator_class_defined_in_cross_validation_is_registered`, a DB-free unit test that would have caught all three merge-hazard regressions above automatically. Verified it fails on the exact pattern (temporarily dropped one registry entry, confirmed failure, restored). `quick-check` green (697 passed). | Commit. |
 
 ## Open questions
 
@@ -173,10 +174,11 @@ or worker startup) instead of silently running unvalidated.
   validator classes and this branch's merges wired them through `registry.py`. When a real
   validator is added for the remaining atom, change its YAML ref from `"none"` to the concrete
   ref — the loader/registry will then demand the class exist.
-- Every `main` merge that lands a new atom's validator classes has silently left them unwired
-  (`registry.py` dict + YAML ref) three times in a row (2026-08-14, 2026-08-16, 2026-08-17) — the
-  passing test suite didn't catch any of them because the decisive tests are
-  `pytest.mark.postgresql`-gated and skip without a live DB in sandboxed runs. Consider a DB-free
-  unit test that asserts every atom whose action definition ships alongside a same-named class in
-  `cross_validation/` is actually present in `_CROSS_VALIDATORS`/`_INPUT_VALIDATORS`, so this stops
-  depending on manual post-merge review.
+- ~~Every `main` merge that lands a new atom's validator classes has silently left them unwired
+  three times in a row~~ — resolved 2026-08-17:
+  `test_every_validator_class_defined_in_cross_validation_is_registered` in
+  `test_cross_validator_registry.py` walks every module in the `cross_validation/` package,
+  finds every class ending in `CrossValidator`/`InputValidator` defined there, and asserts it's a
+  value in `registry.py`'s `_CROSS_VALIDATORS`/`_INPUT_VALIDATORS`. Runs without a DB. Verified it
+  fails on the exact regression pattern (temporarily dropped the `score_multidimensional_axes`
+  entry, test failed with a clear message; restored, test passed).

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import importlib
+import inspect
+import pkgutil
 from pathlib import Path
 
 import pytest
+from anytoolai_platform_actions.structured_llm import cross_validation
 from anytoolai_platform_actions.structured_llm.cross_validation import (
     ComposeReplyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
@@ -10,6 +14,9 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     ValidatorRefNotFoundError,
     build_input_validators,
     build_output_cross_validators,
+)
+from anytoolai_platform_actions.structured_llm.cross_validation import (
+    registry as cross_validator_registry,
 )
 from anytoolai_platform_core.actions.models import ActionDefinition, ActionExecutor
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
@@ -131,3 +138,32 @@ def test_real_config_registry_wiring_resolves_end_to_end() -> None:
         "text.score_match_by_rubric",
         "text.score_multidimensional_axes",
     }
+
+
+def test_every_validator_class_defined_in_cross_validation_is_registered() -> None:
+    """Guards against the recurring merge hazard where a new atom's validator module lands
+    (e.g. via a main merge) but registry.py's lookup dicts aren't updated to reference it -
+    the class exists and is importable, yet no action_type can ever resolve to it. Runs without
+    a DB, unlike the ActionRunner tests that would otherwise catch this end-to-end."""
+    registered_cross_validators = set(cross_validator_registry._CROSS_VALIDATORS.values())
+    registered_input_validators = set(cross_validator_registry._INPUT_VALIDATORS.values())
+
+    for module_info in pkgutil.iter_modules(cross_validation.__path__):
+        if module_info.name in {"registry", "_shared", "_markup"}:
+            continue
+        module = importlib.import_module(
+            f"{cross_validation.__name__}.{module_info.name}"
+        )
+        for _, cls in inspect.getmembers(module, inspect.isclass):
+            if cls.__module__ != module.__name__:
+                continue
+            if cls.__name__.endswith("CrossValidator"):
+                assert cls in registered_cross_validators, (
+                    f"{cls.__name__} in {module.__name__} is not wired into "
+                    "registry.py's _CROSS_VALIDATORS"
+                )
+            elif cls.__name__.endswith("InputValidator"):
+                assert cls in registered_input_validators, (
+                    f"{cls.__name__} in {module.__name__} is not wired into "
+                    "registry.py's _INPUT_VALIDATORS"
+                )
