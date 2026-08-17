@@ -2,13 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-13
-- Last updated: 2026-08-13
+- Last updated: 2026-08-17
 - Review date: 2026-08-13
-- Next action: commit and open PR; run `postgresql-check` against a real PostgreSQL instance
-  before merge (not run in this sandbox — see Follow-up debt).
+- Next action: none; PR #70 merged and no plan-scoped work remains.
 - Blocker: none
 
 ## Goal
