@@ -1229,6 +1229,9 @@ class ConfigLoader:
                             path,
                             f"{ref_field} is null. Atoms with no validator must set "
                             f'{ref_field}: "none" explicitly, not null.',
+                            config_id=action_type,
+                            ref_type=ref_field,
+                            ref_value="null",
                         )
                     if ref_value is not None and (
                         not isinstance(ref_value, str) or not ref_value.strip()
@@ -1236,26 +1239,30 @@ class ConfigLoader:
                         raise InvalidConfigShapeError(
                             path,
                             f"{ref_field} must be a non-empty string, got {ref_value!r}.",
+                            config_id=action_type,
+                            ref_type=ref_field,
+                            ref_value=_stringify_config_value(ref_value),
                         )
 
-                if not all(
-                    [
-                        action_type,
-                        version is not None,
-                        executor,
-                        input_schema_ref,
-                        output_schema_ref,
-                        cross_validator_ref,
-                        input_validator_ref,
-                    ]
-                ):
+                required_action_fields = {
+                    "action_type": action_type,
+                    "version": version is not None,
+                    "executor": executor,
+                    "input_schema_ref": input_schema_ref,
+                    "output_schema_ref": output_schema_ref,
+                    "cross_validator_ref": cross_validator_ref,
+                    "input_validator_ref": input_validator_ref,
+                }
+                missing_fields = [
+                    name for name, present in required_action_fields.items() if not present
+                ]
+                if missing_fields:
                     raise InvalidConfigShapeError(
                         path,
-                        (
-                            "Missing required fields: action_type, version, executor, "
-                            "input_schema_ref, output_schema_ref, cross_validator_ref, "
-                            "input_validator_ref"
-                        ),
+                        f"Missing required fields: {', '.join(missing_fields)}",
+                        config_id=action_type,
+                        ref_type=missing_fields[0],
+                        ref_value="<missing>",
                     )
 
                 self._check_duplicate(
