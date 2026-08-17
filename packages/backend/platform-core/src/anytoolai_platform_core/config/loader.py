@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -559,6 +560,41 @@ class ConfigLoader:
     def _append_error(self, error: ConfigError) -> None:
         self.errors.append(error)
 
+    def _check_duplicate(
+        self,
+        *,
+        id_type: str,
+        id_value: str,
+        registry: Mapping[str, Any],
+        source_kind: str,
+        path: Path,
+    ) -> None:
+        if id_value not in registry:
+            return
+        raise DuplicateConfigIdError(
+            id_type, id_value, self._source_for(source_kind, id_value, path), path
+        )
+
+    def _require_fields(
+        self,
+        data: dict[str, Any],
+        *,
+        required: Sequence[str],
+        not_none_fields: Sequence[str] = (),
+        noun: str,
+        path: Path,
+        config_id: str | None = None,
+    ) -> None:
+        for name in required:
+            value = data.get(name)
+            present = value is not None if name in not_none_fields else bool(value)
+            if not present:
+                raise InvalidConfigShapeError(
+                    path,
+                    f"{noun} missing required fields: {data}",
+                    config_id=config_id,
+                )
+
     def _preserved_config_errors_from_exception(
         self,
         exc: BaseException,
@@ -1033,19 +1069,20 @@ class ConfigLoader:
                 region = region_data.get("region")
                 display_name = region_data.get("display_name")
 
-                if not region or not display_name:
-                    raise InvalidConfigShapeError(
-                        path,
-                        f"Region entry missing required fields: {region_data}",
-                    )
+                self._require_fields(
+                    region_data,
+                    required=["region", "display_name"],
+                    noun="Region entry",
+                    path=path,
+                )
 
-                if region in self.regions:
-                    raise DuplicateConfigIdError(
-                        "region",
-                        region,
-                        self._source_for("region", region, path),
-                        path,
-                    )
+                self._check_duplicate(
+                    id_type="region",
+                    id_value=region,
+                    registry=self.regions,
+                    source_kind="region",
+                    path=path,
+                )
 
                 self.regions[region] = RegionDefinition(
                     region=region,
@@ -1103,13 +1140,13 @@ class ConfigLoader:
                         ref_value="<missing>" if missing_fields else None,
                     )
 
-                if policy_id in self.provider_policies:
-                    raise DuplicateConfigIdError(
-                        "provider_policy_ref",
-                        policy_id,
-                        self._source_for("provider_policy", policy_id, path),
-                        path,
-                    )
+                self._check_duplicate(
+                    id_type="provider_policy_ref",
+                    id_value=policy_id,
+                    registry=self.provider_policies,
+                    source_kind="provider_policy",
+                    path=path,
+                )
 
                 metadata = policy_data.get("metadata", {})
                 if not isinstance(metadata, dict):
@@ -1221,13 +1258,13 @@ class ConfigLoader:
                         ),
                     )
 
-                if action_type in self.action_definitions:
-                    raise DuplicateConfigIdError(
-                        "action_type",
-                        action_type,
-                        self._source_for("action_definition", action_type, path),
-                        path,
-                    )
+                self._check_duplicate(
+                    id_type="action_type",
+                    id_value=action_type,
+                    registry=self.action_definitions,
+                    source_kind="action_definition",
+                    path=path,
+                )
 
                 self._reject_forbidden_raw_llm_fields(
                     payload=data,
@@ -1297,13 +1334,13 @@ class ConfigLoader:
                     "Missing required fields: product_id, product_platform, display_name",
                 )
 
-            if product_id in self.products:
-                raise DuplicateConfigIdError(
-                    "product_id",
-                    product_id,
-                    self._source_for("product", product_id, product_file),
-                    product_file,
-                )
+            self._check_duplicate(
+                id_type="product_id",
+                id_value=product_id,
+                registry=self.products,
+                source_kind="product",
+                path=product_file,
+            )
 
             self._reject_forbidden_raw_llm_fields(
                 payload=product_data,
@@ -1399,12 +1436,13 @@ class ConfigLoader:
             )
             frontend_id = frontend_data.get("frontend_id")
             frontend_type = frontend_data.get("type")
-            if not frontend_id or not frontend_type:
-                raise InvalidConfigShapeError(
-                    path,
-                    f"Frontend missing required fields: {frontend_data}",
-                    config_id=product_id,
-                )
+            self._require_fields(
+                frontend_data,
+                required=["frontend_id", "type"],
+                noun="Frontend",
+                path=path,
+                config_id=product_id,
+            )
 
             self._reject_forbidden_raw_llm_fields(
                 payload=frontend_data,
@@ -1450,19 +1488,25 @@ class ConfigLoader:
                 prompt_ref = config_data.get("prompt_ref")
                 provider_policy_ref = config_data.get("provider_policy_ref")
 
-                if not all([config_id, action_type, prompt_ref, provider_policy_ref]):
-                    raise InvalidConfigShapeError(
-                        path,
-                        f"Action config missing required fields: {config_data}",
-                    )
-
-                if config_id in self.action_configurations:
-                    raise DuplicateConfigIdError(
+                self._require_fields(
+                    config_data,
+                    required=[
                         "action_config_id",
-                        config_id,
-                        self._source_for("action_config", config_id, path),
-                        path,
-                    )
+                        "action_type",
+                        "prompt_ref",
+                        "provider_policy_ref",
+                    ],
+                    noun="Action config",
+                    path=path,
+                )
+
+                self._check_duplicate(
+                    id_type="action_config_id",
+                    id_value=config_id,
+                    registry=self.action_configurations,
+                    source_kind="action_config",
+                    path=path,
+                )
 
                 self._reject_forbidden_raw_llm_fields(
                     payload=config_data,
@@ -1497,26 +1541,21 @@ class ConfigLoader:
                 input_schema_ref = workflow_data.get("input_schema_ref")
                 output_schema_ref = workflow_data.get("output_schema_ref")
 
-                if not all(
-                    [
-                        workflow_id,
-                        version is not None,
-                        input_schema_ref,
-                        output_schema_ref,
-                    ]
-                ):
-                    raise InvalidConfigShapeError(
-                        path,
-                        f"Workflow missing required fields: {workflow_data}",
-                    )
+                self._require_fields(
+                    workflow_data,
+                    required=["workflow_id", "version", "input_schema_ref", "output_schema_ref"],
+                    not_none_fields=["version"],
+                    noun="Workflow",
+                    path=path,
+                )
 
-                if workflow_id in self.workflows:
-                    raise DuplicateConfigIdError(
-                        "workflow_id",
-                        workflow_id,
-                        self._source_for("workflow", workflow_id, path),
-                        path,
-                    )
+                self._check_duplicate(
+                    id_type="workflow_id",
+                    id_value=workflow_id,
+                    registry=self.workflows,
+                    source_kind="workflow",
+                    path=path,
+                )
 
                 self._reject_forbidden_raw_llm_fields(
                     payload=workflow_data,
@@ -1530,12 +1569,13 @@ class ConfigLoader:
                 for step_data in workflow_data.get("steps", []):
                     step_id = step_data.get("step_id")
                     action_config_id = step_data.get("action_config_id")
-                    if not all([step_id, action_config_id]):
-                        raise InvalidConfigShapeError(
-                            path,
-                            f"Workflow step missing required fields: {step_data}",
-                            config_id=workflow_id,
-                        )
+                    self._require_fields(
+                        step_data,
+                        required=["step_id", "action_config_id"],
+                        noun="Workflow step",
+                        path=path,
+                        config_id=workflow_id,
+                    )
 
                     self._reject_forbidden_raw_llm_fields(
                         payload=step_data,
@@ -1610,19 +1650,21 @@ class ConfigLoader:
                 version = scenario_data.get("version")
                 workflow_id = scenario_data.get("workflow_id")
 
-                if not all([scenario_id, version is not None, workflow_id]):
-                    raise InvalidConfigShapeError(
-                        path,
-                        f"Scenario missing required fields: {scenario_data}",
-                    )
+                self._require_fields(
+                    scenario_data,
+                    required=["scenario_id", "version", "workflow_id"],
+                    not_none_fields=["version"],
+                    noun="Scenario",
+                    path=path,
+                )
 
-                if scenario_id in self.scenarios:
-                    raise DuplicateConfigIdError(
-                        "scenario_id",
-                        scenario_id,
-                        self._source_for("scenario", scenario_id, path),
-                        path,
-                    )
+                self._check_duplicate(
+                    id_type="scenario_id",
+                    id_value=scenario_id,
+                    registry=self.scenarios,
+                    source_kind="scenario",
+                    path=path,
+                )
 
                 self._reject_forbidden_raw_llm_fields(
                     payload=scenario_data,
@@ -1657,19 +1699,21 @@ class ConfigLoader:
                 period = quota_data.get("period")
                 dimension = quota_data.get("dimension")
 
-                if not all([quota_id, limit_count is not None, unit, period, dimension]):
-                    raise InvalidConfigShapeError(
-                        path,
-                        f"Quota policy missing required fields: {quota_data}",
-                    )
+                self._require_fields(
+                    quota_data,
+                    required=["quota_policy_id", "limit_count", "unit", "period", "dimension"],
+                    not_none_fields=["limit_count"],
+                    noun="Quota policy",
+                    path=path,
+                )
 
-                if quota_id in self.quotas:
-                    raise DuplicateConfigIdError(
-                        "quota_policy_id",
-                        quota_id,
-                        self._source_for("quota_policy", quota_id, path),
-                        path,
-                    )
+                self._check_duplicate(
+                    id_type="quota_policy_id",
+                    id_value=quota_id,
+                    registry=self.quotas,
+                    source_kind="quota_policy",
+                    path=path,
+                )
 
                 self.quotas[quota_id] = QuotaPolicy(
                     quota_policy_id=quota_id,
@@ -1722,21 +1766,20 @@ class ConfigLoader:
                 target_scenario_id = handoff_data.get("target_scenario_id")
                 target_start_policy = handoff_data.get("target_start_policy")
                 consent_required = handoff_data.get("consent_required")
-                if not all(
-                    [
-                        handoff_id,
-                        source_product_id,
-                        source_scenario_id,
-                        target_product_id,
-                        target_frontend_id,
-                        target_scenario_id,
-                        target_start_policy,
-                    ]
-                ):
-                    raise InvalidConfigShapeError(
-                        path,
-                        f"Handoff missing required fields: {handoff_data}",
-                    )
+                self._require_fields(
+                    handoff_data,
+                    required=[
+                        "handoff_id",
+                        "source_product_id",
+                        "source_scenario_id",
+                        "target_product_id",
+                        "target_frontend_id",
+                        "target_scenario_id",
+                        "target_start_policy",
+                    ],
+                    noun="Handoff",
+                    path=path,
+                )
                 context_mapping = _handoff_mapping(
                     handoff_data.get("context_mapping"),
                     field_name="context_mapping",
@@ -1767,13 +1810,13 @@ class ConfigLoader:
                         "Handoff context_mapping and preview_mapping must be non-empty",
                     )
 
-                if handoff_id in self.handoffs:
-                    raise DuplicateConfigIdError(
-                        "handoff_id",
-                        handoff_id,
-                        self._source_for("handoff", handoff_id, path),
-                        path,
-                    )
+                self._check_duplicate(
+                    id_type="handoff_id",
+                    id_value=handoff_id,
+                    registry=self.handoffs,
+                    source_kind="handoff",
+                    path=path,
+                )
 
                 self.handoffs[handoff_id] = HandoffDefinition(
                     handoff_id=handoff_id,
@@ -1824,28 +1867,28 @@ class ConfigLoader:
                     output_schema_ref = prompt_data.get("output_schema_ref")
                     input_variables = prompt_data.get("input_variables")
 
-                    if not all(
-                        [
-                            prompt_ref,
-                            template_path,
-                            version is not None,
-                            output_schema_ref,
-                            input_variables is not None,
-                        ]
-                    ):
-                        raise InvalidConfigShapeError(
-                            manifest_path,
-                            f"Prompt manifest entry missing required fields: {prompt_data}",
-                            config_id=prompt_ref or product_id,
-                        )
-
-                    if prompt_ref in self.prompts:
-                        raise DuplicateConfigIdError(
+                    self._require_fields(
+                        prompt_data,
+                        required=[
                             "prompt_ref",
-                            prompt_ref,
-                            self._source_for("prompt", prompt_ref, manifest_path),
-                            manifest_path,
-                        )
+                            "template_path",
+                            "version",
+                            "output_schema_ref",
+                            "input_variables",
+                        ],
+                        not_none_fields=["version", "input_variables"],
+                        noun="Prompt manifest entry",
+                        path=manifest_path,
+                        config_id=prompt_ref or product_id,
+                    )
+
+                    self._check_duplicate(
+                        id_type="prompt_ref",
+                        id_value=prompt_ref,
+                        registry=self.prompts,
+                        source_kind="prompt",
+                        path=manifest_path,
+                    )
 
                     input_variables = self._require_string_list_field(
                         input_variables,
@@ -1935,20 +1978,22 @@ class ConfigLoader:
                 version = schema_data.get("version")
                 file_path_value = schema_data.get("file_path")
 
-                if not all([schema_ref, version is not None, file_path_value]):
-                    raise InvalidConfigShapeError(
-                        manifest_path,
-                        f"Schema manifest entry missing required fields: {schema_data}",
-                        config_id=schema_ref or owner_id,
-                    )
+                self._require_fields(
+                    schema_data,
+                    required=["schema_ref", "version", "file_path"],
+                    not_none_fields=["version"],
+                    noun="Schema manifest entry",
+                    path=manifest_path,
+                    config_id=schema_ref or owner_id,
+                )
 
-                if schema_ref in self.schemas:
-                    raise DuplicateConfigIdError(
-                        "schema_ref",
-                        schema_ref,
-                        self._source_for("schema", schema_ref, manifest_path),
-                        manifest_path,
-                    )
+                self._check_duplicate(
+                    id_type="schema_ref",
+                    id_value=schema_ref,
+                    registry=self.schemas,
+                    source_kind="schema",
+                    path=manifest_path,
+                )
 
                 asset_path = base_dir / file_path_value
                 schema = self._require_json_file(
