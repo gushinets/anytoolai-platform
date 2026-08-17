@@ -1,45 +1,59 @@
 from __future__ import annotations
 
-import ast
+import importlib.util
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PRODUCT_PLATFORMS = ROOT / "packages" / "backend" / "product-platforms"
-FORBIDDEN_IMPORTS = {
-    "anytoolai_platform_core",
-    "anytoolai_platform_actions",
-    "anytoolai_platform_api",
-    "anytoolai_platform_worker",
-}
 
 
-def _imports_module(path: Path, module_name: str) -> bool:
-    tree = ast.parse(path.read_text(encoding="utf-8", errors="ignore"))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            if any(
-                alias.name == module_name or alias.name.startswith(f"{module_name}.")
-                for alias in node.names
-            ):
-                return True
-        if isinstance(node, ast.ImportFrom) and node.module is not None:
-            if node.module == module_name or node.module.startswith(f"{module_name}."):
-                return True
-    return False
+def _load_validate_architecture():
+    path = ROOT / "scripts" / "agent" / "validate_architecture.py"
+    spec = importlib.util.spec_from_file_location("validate_architecture_module", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_product_platforms_has_no_forbidden_imports() -> None:
-    offenders: list[str] = []
-    for path in PRODUCT_PLATFORMS.rglob("*.py"):
-        for module in FORBIDDEN_IMPORTS:
-            if _imports_module(path, module):
-                offenders.append(f"{path.relative_to(ROOT)} imports `{module}`")
+    module = _load_validate_architecture()
 
-    assert offenders == [], "product-platforms must depend on platform-sdk only: " + ", ".join(offenders)
+    errors = module.check_product_platforms_boundary(PRODUCT_PLATFORMS)
+
+    assert errors == [], "product-platforms must depend on platform-sdk only: " + ", ".join(errors)
 
 
-def test_forbidden_import_is_detected(tmp_path: Path) -> None:
-    fixture = tmp_path / "offending_module.py"
-    fixture.write_text("import anytoolai_platform_core\n", encoding="utf-8")
+def _check_fixture(monkeypatch, tmp_path: Path) -> list[str]:
+    # iter_code_files skips any path with a "tmp" path segment (scratch/build dirs),
+    # which always matches pytest's tmp_path. Point it at the fixture file directly so
+    # check_product_platforms_boundary's real import-detection and message-formatting
+    # logic still runs end-to-end.
+    module = _load_validate_architecture()
+    fixture_files = list(tmp_path.iterdir())
+    monkeypatch.setattr(module, "iter_code_files", lambda _root: iter(fixture_files))
+    return module.check_product_platforms_boundary(tmp_path)
 
-    assert _imports_module(fixture, "anytoolai_platform_core") is True
+
+def test_forbidden_python_import_is_detected(monkeypatch, tmp_path: Path) -> None:
+    (tmp_path / "offending_module.py").write_text(
+        "import anytoolai_platform_core\n", encoding="utf-8"
+    )
+
+    errors = _check_fixture(monkeypatch, tmp_path)
+
+    assert len(errors) == 1
+    assert errors[0].startswith("ATAI007 ")
+    assert "anytoolai_platform_core" in errors[0]
+
+
+def test_forbidden_typescript_import_is_detected(monkeypatch, tmp_path: Path) -> None:
+    (tmp_path / "offending_module.ts").write_text(
+        'import { runAction } from "anytoolai_platform_actions";\n', encoding="utf-8"
+    )
+
+    errors = _check_fixture(monkeypatch, tmp_path)
+
+    assert len(errors) == 1
+    assert errors[0].startswith("ATAI007 ")
+    assert "anytoolai_platform_actions" in errors[0]
