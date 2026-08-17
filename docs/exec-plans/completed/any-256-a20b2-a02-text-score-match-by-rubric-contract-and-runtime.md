@@ -2,13 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-14
-- Last updated: 2026-08-14
+- Last updated: 2026-08-17
 - Review date: 2026-08-14
-- Next action: none outstanding from the round-2 `/code-review` pass; keep in sync with any
-  further review rounds.
+- Next action: none; PR #72 merged and no plan-scoped work remains.
 - Blocker: none
 
 ## Goal
