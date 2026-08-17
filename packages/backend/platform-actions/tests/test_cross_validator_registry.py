@@ -79,13 +79,37 @@ def test_build_input_validators_resolves_known_ref() -> None:
 
 def test_build_output_cross_validators_skips_none_ref() -> None:
     definitions = {
-        "text.compare_and_classify": _definition(
-            "text.compare_and_classify", cross_validator_ref="none", input_validator_ref="none"
+        "document.generate_from_template": _definition(
+            "document.generate_from_template",
+            cross_validator_ref="none",
+            input_validator_ref="none",
         ),
     }
 
     assert build_output_cross_validators(definitions) == {}
     assert build_input_validators(definitions) == {}
+
+
+def test_build_output_cross_validators_raises_on_none_ref_with_registered_class() -> None:
+    definitions = {
+        "text.compare_and_classify": _definition(
+            "text.compare_and_classify", cross_validator_ref="none", input_validator_ref="none"
+        ),
+    }
+
+    with pytest.raises(ValidatorRefNotFoundError):
+        build_output_cross_validators(definitions)
+
+
+def test_build_input_validators_raises_on_none_ref_with_registered_class() -> None:
+    definitions = {
+        "text.compare_and_classify": _definition(
+            "text.compare_and_classify", cross_validator_ref="none", input_validator_ref="none"
+        ),
+    }
+
+    with pytest.raises(ValidatorRefNotFoundError):
+        build_input_validators(definitions)
 
 
 def test_build_output_cross_validators_raises_on_unknown_ref() -> None:
@@ -120,24 +144,14 @@ def test_real_config_registry_wiring_resolves_end_to_end() -> None:
     cross_validators = build_output_cross_validators(registry.action_definitions)
     input_validators = build_input_validators(registry.action_definitions)
 
-    assert set(cross_validators) == {
-        "text.compare_and_classify",
-        "text.compose_persuasive_text",
-        "text.compose_reply",
-        "text.detect_issues_by_taxonomy",
-        "text.extract_structured_fields",
-        "text.generate_clarifying_questions",
-        "text.generate_gap_rewrites",
-        "text.score_match_by_rubric",
-        "text.score_multidimensional_axes",
-        "text.synthesize_angle",
-    }
-    assert set(input_validators) == {
-        "text.compare_and_classify",
-        "text.extract_structured_fields",
-        "text.score_match_by_rubric",
-        "text.score_multidimensional_axes",
-    }
+    # Structural, not a frozen snapshot: every action_type with a registered class in
+    # registry.py's lookup dicts must resolve, and vice versa. If a merge lands a new
+    # validator class but leaves its YAML ref at "none", _resolve_validators now raises
+    # ValidatorRefNotFoundError instead of silently under-populating this set - so this
+    # assertion holding is itself proof the real config tree is fully wired, without
+    # needing a human to update a hardcoded expected list.
+    assert set(cross_validators) == set(cross_validator_registry._CROSS_VALIDATORS)
+    assert set(input_validators) == set(cross_validator_registry._INPUT_VALIDATORS)
 
 
 def test_every_validator_class_defined_in_cross_validation_is_registered() -> None:
