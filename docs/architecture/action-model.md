@@ -39,7 +39,8 @@ All physical provider attempts go through Provider Gateway so retry accounting a
 - `executor`
 - `cross_validator_ref`
 - `input_validator_ref`
-- `emits_events`
+
+`emits_events` is optional and defaults to `[]` when omitted.
 
 `cross_validator_ref` and `input_validator_ref` are opaque strings in `platform-core` —
 the loader requires them but does not resolve them. Use `"none"` as the explicit

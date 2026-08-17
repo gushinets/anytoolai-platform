@@ -1193,6 +1193,13 @@ class ConfigLoader:
                             f"{ref_field} is null. Atoms with no validator must set "
                             f'{ref_field}: "none" explicitly, not null.',
                         )
+                    if ref_value is not None and (
+                        not isinstance(ref_value, str) or not ref_value.strip()
+                    ):
+                        raise InvalidConfigShapeError(
+                            path,
+                            f"{ref_field} must be a non-empty string, got {ref_value!r}.",
+                        )
 
                 if not all(
                     [

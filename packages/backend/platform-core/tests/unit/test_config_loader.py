@@ -747,6 +747,31 @@ def test_loader_gives_specific_error_for_explicit_null_input_validator_ref(tmp_p
     )
 
 
+@pytest.mark.parametrize("ref_field", ["cross_validator_ref", "input_validator_ref"])
+@pytest.mark.parametrize(
+    "bad_value",
+    [123, True, {"nested": "mapping"}, "   "],
+    ids=["number", "boolean", "mapping", "whitespace_only"],
+)
+def test_loader_fails_on_non_string_validator_ref(
+    tmp_path: Path, ref_field: str, bad_value: object
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "action_definitions" / "text.extract_structured_fields.yaml"
+    data = _load_yaml(path)
+    data[ref_field] = bad_value
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, InvalidConfigShapeError)
+        and f"{ref_field} must be a non-empty string" in error.message
+        for error in exc_info.value.errors
+    )
+
+
 def test_loader_fails_on_invalid_action_executor(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "action_definitions" / "text.extract_structured_fields.yaml"
