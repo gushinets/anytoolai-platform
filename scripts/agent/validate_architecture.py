@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import ast
-from collections.abc import Iterator
-from pathlib import Path
 import re
 import sys
+from collections.abc import Iterator
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 TEXT_EXTS = {".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".md", ".yaml", ".yml", ".json"}
@@ -61,6 +61,16 @@ LLM_PROVIDER_IMPORTS = {
     "@google/genai",
     "cohere",
     "mistralai",
+}
+
+# pydantic_ai has its own boundary (structured LLM executor); the rest share the provider boundary.
+PROVIDER_SDK_IMPORTS = LLM_PROVIDER_IMPORTS - {"pydantic_ai"}
+
+PRODUCT_PLATFORMS_FORBIDDEN_IMPORTS = {
+    "anytoolai_platform_core",
+    "anytoolai_platform_actions",
+    "anytoolai_platform_api",
+    "anytoolai_platform_worker",
 }
 
 JS_MODULE_IMPORT_RE = re.compile(
@@ -177,14 +187,9 @@ def is_pydantic_ai_boundary(path: Path) -> bool:
     )
 
 
-def main() -> int:
-    """Validate product-domain and LLM/provider import architecture boundaries."""
+def check_platform_core_boundary(platform_core: Path) -> list[str]:
+    """ATAI001/002: platform-core must not import or reference product-platforms."""
     errors: list[str] = []
-
-    platform_core = ROOT / "packages" / "backend" / "platform-core"
-    platform_actions = ROOT / "packages" / "backend" / "platform-actions"
-    extensions = ROOT / "extensions"
-
     for path in iter_text_files(platform_core):
         text = path.read_text(encoding="utf-8", errors="ignore")
         if "product-platforms" in text or "anytoolai_freelancer" in text:
@@ -192,13 +197,23 @@ def main() -> int:
         for term in FORBIDDEN_PLATFORM_TERMS:
             if term in text:
                 errors.append(f"ATAI002 {path}: forbidden product term in platform-core: {term}")
+    return errors
 
+
+def check_platform_actions_boundary(platform_actions: Path) -> list[str]:
+    """ATAI004: platform-actions must not import or reference product-platforms."""
+    errors: list[str] = []
     for path in iter_text_files(platform_actions):
         text = path.read_text(encoding="utf-8", errors="ignore")
         if "product-platforms" in text or "anytoolai_freelancer" in text:
             errors.append(f"ATAI004 {path}: platform-actions must not import product-platforms")
+    return errors
 
-    for root in [ROOT / "apps", ROOT / "packages", ROOT / "extensions"]:
+
+def check_llm_provider_boundary(roots: list[Path]) -> list[str]:
+    """ATAI006: LLM/provider SDKs may only be imported inside their approved boundary."""
+    errors: list[str] = []
+    for root in roots:
         for path in iter_code_files(root):
             imports = imported_modules(path)
             for module in LLM_PROVIDER_IMPORTS:
@@ -208,20 +223,55 @@ def main() -> int:
                 if module == "pydantic_ai" and is_pydantic_ai_boundary(path):
                     continue
 
-                if module in {"litellm", "openai", "anthropic", "google.genai", "@google/genai", "cohere", "mistralai"} and is_provider_boundary(path):
+                if module in PROVIDER_SDK_IMPORTS and is_provider_boundary(path):
                     continue
 
                 errors.append(
                     "ATAI006 "
-                    f"{path}: forbidden direct LLM/provider import `{module}` outside approved provider boundary"
+                    f"{path}: forbidden direct LLM/provider import `{module}` "
+                    "outside approved provider boundary"
                 )
+    return errors
 
+
+def check_product_platforms_boundary(product_platforms: Path) -> list[str]:
+    """ATAI007: product-platforms must depend on platform-sdk public contracts only."""
+    errors: list[str] = []
+    for path in iter_code_files(product_platforms):
+        imports = imported_modules(path)
+        for module in PRODUCT_PLATFORMS_FORBIDDEN_IMPORTS:
+            if imports_module(imports, module):
+                errors.append(
+                    "ATAI007 "
+                    f"{path}: product-platforms must not import `{module}`; "
+                    "use platform-sdk public contracts instead"
+                )
+    return errors
+
+
+def check_extensions_boundary(extensions: Path) -> list[str]:
+    """ATAI005: extensions must not contain prompts or provider selection."""
+    errors: list[str] = []
     for path in iter_text_files(extensions):
         if path.name in {"AGENTS.md", "README.md"}:
             continue
         text = path.read_text(encoding="utf-8", errors="ignore").lower()
         if "system prompt" in text or "prompt_ref" in text or "provider_policy" in text:
-            errors.append(f"ATAI005 {path}: extensions must not contain prompts or provider selection")
+            errors.append(
+                f"ATAI005 {path}: extensions must not contain prompts or provider selection"
+            )
+    return errors
+
+
+def main() -> int:
+    """Validate product-domain and LLM/provider import architecture boundaries."""
+    errors: list[str] = []
+
+    errors += check_platform_core_boundary(ROOT / "packages" / "backend" / "platform-core")
+    errors += check_platform_actions_boundary(ROOT / "packages" / "backend" / "platform-actions")
+    errors += check_llm_provider_boundary([ROOT / "apps", ROOT / "packages", ROOT / "extensions"])
+    errors += check_product_platforms_boundary(ROOT / "packages" / "backend" / "product-platforms")
+    errors += check_extensions_boundary(ROOT / "extensions")
 
     if errors:
         for error in errors:
