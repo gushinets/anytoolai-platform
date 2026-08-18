@@ -1244,9 +1244,10 @@ class ConfigLoader:
                             ref_value=_stringify_config_value(ref_value),
                         )
 
+                not_none_action_fields = {"version"}
                 required_action_fields = {
                     "action_type": action_type,
-                    "version": version is not None,
+                    "version": version,
                     "executor": executor,
                     "input_schema_ref": input_schema_ref,
                     "output_schema_ref": output_schema_ref,
@@ -1254,7 +1255,9 @@ class ConfigLoader:
                     "input_validator_ref": input_validator_ref,
                 }
                 missing_fields = [
-                    name for name, present in required_action_fields.items() if not present
+                    name
+                    for name, value in required_action_fields.items()
+                    if (value is None if name in not_none_action_fields else not value)
                 ]
                 if missing_fields:
                     raise InvalidConfigShapeError(

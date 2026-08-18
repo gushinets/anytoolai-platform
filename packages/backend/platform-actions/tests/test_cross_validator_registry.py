@@ -182,8 +182,6 @@ def test_every_validator_class_defined_in_cross_validation_is_registered() -> No
     registered_input_validators = set(cross_validator_registry._INPUT_VALIDATORS.values())
 
     for module_info in pkgutil.iter_modules(cross_validation.__path__):
-        if module_info.name in {"registry", "_shared", "_markup"}:
-            continue
         module = importlib.import_module(
             f"{cross_validation.__name__}.{module_info.name}"
         )
