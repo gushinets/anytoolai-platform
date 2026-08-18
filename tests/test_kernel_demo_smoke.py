@@ -362,7 +362,7 @@ def test_composite_coverage_error_reports_missing_scenarios_config_file_distinct
 
     error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
 
-    assert error is not None and "not found" in error
+    assert error is not None and "SMOKE010" in error and "not found" in error
 
 
 def test_composite_coverage_error_reports_duplicate_scenario_id() -> None:
