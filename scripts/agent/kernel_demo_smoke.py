@@ -21,141 +21,96 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from dataclasses import dataclass
+from pathlib import Path
 
 FRONTEND_ID = "kernel_demo_ce"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ACTION_DEFINITIONS_ROOT = REPO_ROOT / "configs" / "kernel" / "action_definitions"
+ATOM_MATRIX_DATA_PATH = REPO_ROOT / "tests" / "fixtures" / "kernel_demo" / "atom_smoke_matrix.json"
 
-# One (action_type, scenario_id, start_input) tuple per generic action type -- the same 11
-# cases ATOM_MATRIX in apps/platform-api/tests/test_atom_runtime_matrix.py exercises over
-# pytest's in-process ASGI transport. Bounded duplication of these literals across that
-# pytest file and this stdlib-only script is deliberate: this script has no backend-package
-# imports so it can run against a container that only has the image's runtime dependencies,
-# not the test suite's.
-ATOM_SMOKE_CASES = (
-    (
-        "text.extract_structured_fields",
-        "kernel_demo.single_action_smoke_v1",
-        {
-            "source_text": "deadline budget deliverables",
-            "fields": [
-                {
-                    "name": "deadline",
-                    "type": "string",
-                    "description": "Project deadline mentioned in the text.",
-                    "required": True,
-                },
-                {
-                    "name": "budget",
-                    "type": "string",
-                    "description": "Budget mentioned in the text.",
-                    "required": False,
-                },
-                {
-                    "name": "deliverables",
-                    "type": "array_of_strings",
-                    "description": "Deliverables mentioned in the text.",
-                    "required": False,
-                },
-            ],
-            "strict": False,
-        },
-    ),
-    (
-        "text.detect_issues_by_taxonomy",
-        "kernel_demo.single_action_detect_issues_smoke_v1",
-        {"source_text": "We need this soon."},
-    ),
-    (
-        "document.generate_from_template",
-        "kernel_demo.single_action_generate_report_smoke_v1",
-        {"source_text": "The project is on track."},
-    ),
-    (
-        "text.compose_reply",
-        "kernel_demo.single_action_compose_reply_smoke_v1",
-        {"source_text": "Sorry about the delay, can you send an update?"},
-    ),
-    (
-        "text.generate_clarifying_questions",
-        "kernel_demo.single_action_generate_clarifying_questions_smoke_v1",
-        {"source_text": "We need this done soon, no date given."},
-    ),
-    (
-        "text.synthesize_angle",
-        "kernel_demo.single_action_synthesize_angle_smoke_v1",
-        {"source_text": "unused by this workflow, kept for input-shape parity"},
-    ),
-    (
-        "text.compose_persuasive_text",
-        "kernel_demo.single_action_compose_persuasive_text_smoke_v1",
-        {"source_text": "unused by this workflow, kept for input-shape parity"},
-    ),
-    (
-        "text.generate_gap_rewrites",
-        "kernel_demo.single_action_generate_gap_rewrites_smoke_v1",
-        {"source_text": "The proposal does not state a delivery date."},
-    ),
-    (
-        "text.compare_and_classify",
-        "kernel_demo.single_action_compare_and_classify_smoke_v1",
-        {"source_text": "Subject text for comparison."},
-    ),
-    (
-        "text.score_match_by_rubric",
-        "kernel_demo.single_action_score_match_by_rubric_smoke_v1",
-        {"source_text": "Reference text A for scoring."},
-    ),
-    (
-        "text.score_multidimensional_axes",
-        "kernel_demo.single_action_score_multidimensional_axes_smoke_v1",
-        {"source_text": "The proposal states its point directly."},
-    ),
-)
 
-# One (workflow_id, scenario_id, start_input) tuple per composite workflow -- proves the same
-# 11 action types compose across real multi-step workflows, not merely run independently.
-# Mirrors COMPOSITE_MATRIX in apps/platform-api/tests/test_composite_workflow_matrix.py (ANY-219).
-COMPOSITE_SMOKE_CASES = (
-    (
-        "kernel_demo.composite_analyze_and_clarify_v1",
-        "kernel_demo.composite_analyze_and_clarify_smoke_v1",
-        {
-            "source_text": "We need this soon.",
-            "fields": [
-                {
-                    "name": "deadline",
-                    "type": "string",
-                    "description": "Project deadline mentioned in the text.",
-                    "required": True,
-                },
-                {
-                    "name": "budget",
-                    "type": "string",
-                    "description": "Budget mentioned in the text.",
-                    "required": False,
-                },
-                {
-                    "name": "deliverables",
-                    "type": "array_of_strings",
-                    "description": "Deliverables mentioned in the text.",
-                    "required": False,
-                },
-            ],
-            "strict": False,
-        },
-    ),
-    (
-        "kernel_demo.composite_evaluate_match_v1",
-        "kernel_demo.composite_evaluate_match_smoke_v1",
-        {"source_text": "The proposal states its point directly."},
-    ),
-    (
-        "kernel_demo.composite_shape_and_write_v1",
-        "kernel_demo.composite_shape_and_write_smoke_v1",
-        {"source_text": "The proposal does not state a delivery date."},
-    ),
-)
+def _load_raw_atom_cases() -> list[dict]:
+    """Parses tests/fixtures/kernel_demo/atom_smoke_matrix.json once. Exposed as
+    _RAW_ATOM_CASES (not just consumed internally) so
+    apps/platform-api/tests/test_atom_runtime_matrix.py's ATOM_MATRIX can build its AtomCase
+    objects directly from this already-parsed list instead of independently re-opening and
+    re-parsing the same file with its own separate field-selection logic -- one parse, two
+    consumers, instead of two hand-written parsers that could each drop/rename a key
+    differently.
+    """
+    with ATOM_MATRIX_DATA_PATH.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+# Loaded once at import time, but guarded: a missing/corrupted data file must still let this
+# script run far enough to print a clear SMOKE00x error, not crash with a raw traceback before
+# argparse or main() ever runs.
+_ATOM_MATRIX_LOAD_ERROR: str | None = None
+try:
+    _RAW_ATOM_CASES: list[dict] = _load_raw_atom_cases()
+    ATOM_SMOKE_CASES: tuple[tuple[str, str, dict], ...] = tuple(
+        (case["action_type"], case["scenario_id"], case["start_input"]) for case in _RAW_ATOM_CASES
+    )
+    # scenario_id -> the schema_ref that scenario's produced artifact must have. The API's
+    # /v1/results/{id} exposes schema_ref but not action_type/action_config_id (those are
+    # internal, not part of the frontend-safe result surface, and this script has no DB access
+    # to check them directly) -- schema_ref is a reliable HTTP-visible fingerprint of "did this
+    # scenario actually run its own declared action", since every atom has a distinct output
+    # schema. Used by _run_one_case to catch a scenario wired to the wrong workflow/action.
+    _EXPECTED_SCHEMA_REF_BY_SCENARIO: dict[str, str] = {
+        case["scenario_id"]: case["expected_output_schema_ref"] for case in _RAW_ATOM_CASES
+    }
+except (OSError, ValueError, KeyError, TypeError) as exc:
+    _RAW_ATOM_CASES = []
+    ATOM_SMOKE_CASES = ()
+    _EXPECTED_SCHEMA_REF_BY_SCENARIO = {}
+    _ATOM_MATRIX_LOAD_ERROR = (
+        f"SMOKE008: could not load atom smoke case data from {ATOM_MATRIX_DATA_PATH}: {exc}"
+    )
+
+
+def _required_action_types() -> frozenset[str]:
+    """Derives required coverage from configs/kernel/action_definitions/*.yaml -- the source
+    of truth for "generic action type" -- instead of a hardcoded list that a newly added atom
+    wouldn't move, so this check keeps catching drift as the kernel grows.
+
+    ponytail: a raw filename glob, not the validated ConfigLoader registry the pytest matrix
+    uses (this script intentionally has no backend-package imports). A malformed/placeholder
+    file here would diverge between the two checks; validate-configs (the `baseline` CI job)
+    independently fails on that same file, but as a sibling job with no `needs:` ordering
+    against `compose-smoke-dev`/`compose-smoke-prod` (this script), not a gate strictly in
+    front of it -- so a malformed file could in principle fail this script's coverage check
+    before/concurrently with baseline's own failure. Upgrade to the validated registry if this
+    script ever needs a real ordering guarantee instead of two independent parallel checks.
+    """
+    return frozenset(path.stem for path in ACTION_DEFINITIONS_ROOT.glob("*.yaml"))
+
+
 POLL_INTERVAL_SECONDS = 0.5
 DEFAULT_TIMEOUT_SECONDS = 30.0
+
+
+def _atom_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None:
+    action_types = [action_type for action_type, _, _ in cases]
+    if len(action_types) != len(set(action_types)):
+        return "SMOKE007: ATOM_SMOKE_CASES has duplicate action_type entries"
+    if not ACTION_DEFINITIONS_ROOT.is_dir():
+        return (
+            f"SMOKE007: cannot verify required atom coverage -- {ACTION_DEFINITIONS_ROOT} "
+            "not found (expected a full repo checkout with configs/kernel/action_definitions/ "
+            "two levels above this script)"
+        )
+    covered = set(action_types)
+    required = _required_action_types()
+    if covered != required:
+        missing = sorted(required - covered)
+        extra = sorted(covered - required)
+        return (
+            f"SMOKE007: ATOM_SMOKE_CASES does not cover the required {len(required)} action "
+            f"types (missing={missing}, extra={extra})"
+        )
+    return None
 
 
 def _http_json_request(
@@ -170,13 +125,26 @@ def _http_json_request(
         return json.loads(response.read().decode("utf-8"))
 
 
-def _run_one_case(
-    api_url: str, scenario_id: str, scenario_input: dict, timeout: float
-) -> str | None:
+_TIMEOUT_ERROR_CODE = "SMOKE005"
+
+
+@dataclass(frozen=True)
+class CaseResult:
+    """session_id is populated as soon as it's known (even for a later-stage failure, so a
+    failing case can still be correlated back to its DB rows); error_code/error_message are
+    both None on success. error_code is a plain SMOKE0xx string compared by equality --
+    run()'s timeout-degrade decision checks this typed field, not a substring/prefix sniff on
+    error_message."""
+
+    session_id: str | None
+    error_code: str | None
+    error_message: str | None
+
+
+def _run_one_case(api_url: str, scenario_id: str, scenario_input: dict, timeout: float) -> CaseResult:
     """Runs one scenario to completion under its own fresh guest identity (kernel_demo's
     guest quota is a shared per-guest lifetime budget across scenarios, smaller than the
-    number of atoms in the matrix, so every case needs its own guest). Returns None on
-    success, else a SMOKE0xx error line."""
+    number of atoms in the matrix, so every case needs its own guest)."""
     try:
         guest = _http_json_request(f"{api_url}/v1/identity/guest", method="POST")
         guest_id = guest["guest_id"]
@@ -198,7 +166,11 @@ def _run_one_case(
         TypeError,
         AttributeError,
     ) as exc:
-        return f"SMOKE001: could not start scenario {scenario_id} against {api_url}: {exc}"
+        return CaseResult(
+            session_id=None,
+            error_code="SMOKE001",
+            error_message=f"SMOKE001: could not start scenario {scenario_id} against {api_url}: {exc}",
+        )
 
     session_url = f"{api_url}/v1/scenario-sessions/{session_id}"
     deadline = time.monotonic() + timeout
@@ -207,38 +179,111 @@ def _run_one_case(
             session = _http_json_request(session_url, timeout=5.0)
             status = session.get("status")
         except (OSError, urllib.error.URLError, ValueError, TypeError, AttributeError) as exc:
-            return (
-                f"SMOKE002: lost contact with {session_url} while polling for completion: {exc}"
+            return CaseResult(
+                session_id=session_id,
+                error_code="SMOKE002",
+                error_message=(
+                    f"SMOKE002: lost contact with {session_url} while polling for "
+                    f"completion: {exc}"
+                ),
             )
         if status == "completed":
-            if not session.get("result_artifact_id"):
-                return (
-                    f"SMOKE003: kernel_demo session {session_id} completed without a "
-                    "result artifact"
+            result_artifact_id = session.get("result_artifact_id")
+            if not result_artifact_id:
+                return CaseResult(
+                    session_id=session_id,
+                    error_code="SMOKE003",
+                    error_message=(
+                        f"SMOKE003: kernel_demo session {session_id} completed without a "
+                        "result artifact"
+                    ),
                 )
-            return None
+            expected_schema_ref = _EXPECTED_SCHEMA_REF_BY_SCENARIO.get(scenario_id)
+            if expected_schema_ref is not None:
+                try:
+                    result = _http_json_request(
+                        f"{api_url}/v1/results/{result_artifact_id}", timeout=5.0
+                    )
+                    actual_schema_ref = result.get("schema_ref")
+                except (
+                    OSError,
+                    urllib.error.URLError,
+                    ValueError,
+                    TypeError,
+                    AttributeError,
+                ) as exc:
+                    return CaseResult(
+                        session_id=session_id,
+                        error_code="SMOKE009",
+                        error_message=(
+                            f"SMOKE009: could not fetch result artifact {result_artifact_id} "
+                            f"to verify its schema_ref: {exc}"
+                        ),
+                    )
+                if actual_schema_ref != expected_schema_ref:
+                    return CaseResult(
+                        session_id=session_id,
+                        error_code="SMOKE009",
+                        error_message=(
+                            f"SMOKE009: kernel_demo session {session_id} (scenario "
+                            f"{scenario_id}) produced schema_ref {actual_schema_ref!r}, "
+                            f"expected {expected_schema_ref!r} -- scenario may be wired to "
+                            "the wrong workflow/action"
+                        ),
+                    )
+            return CaseResult(session_id=session_id, error_code=None, error_message=None)
         if status == "failed":
-            return f"SMOKE004: kernel_demo session {session_id} failed: {session}"
+            return CaseResult(
+                session_id=session_id,
+                error_code="SMOKE004",
+                error_message=f"SMOKE004: kernel_demo session {session_id} failed: {session}",
+            )
         time.sleep(POLL_INTERVAL_SECONDS)
 
-    return (
-        f"SMOKE005: kernel_demo smoke check timed out after {timeout:g}s waiting for session "
-        f"{session_id} (scenario {scenario_id}) to complete. Is platform-worker running and "
-        "healthy? Rerun with a longer --timeout/ANYTOOLAI_SMOKE_TIMEOUT if needed."
+    return CaseResult(
+        session_id=session_id,
+        error_code=_TIMEOUT_ERROR_CODE,
+        error_message=(
+            f"{_TIMEOUT_ERROR_CODE}: kernel_demo smoke check timed out after {timeout:g}s "
+            f"waiting for session {session_id} (scenario {scenario_id}) to complete. Is "
+            "platform-worker running and healthy? Rerun with a longer "
+            "--timeout/ANYTOOLAI_SMOKE_TIMEOUT if needed."
+        ),
     )
 
 
-def run(api_url: str, timeout: float) -> int:
-    passed = 0
-    for action_type, scenario_id, scenario_input in ATOM_SMOKE_CASES:
-        error = _run_one_case(api_url, scenario_id, scenario_input, timeout)
-        if error is None:
-            passed += 1
-            print(f"{action_type}: {scenario_id} -> ok")
-        else:
-            print(f"{action_type}: {scenario_id} -> failed ({error})", file=sys.stderr)
+DEGRADED_TIMEOUT_SECONDS = 5.0
 
+
+def run(api_url: str, timeout: float) -> int:
     total = len(ATOM_SMOKE_CASES)
+    if total == 0:
+        print("SMOKE007: ATOM_SMOKE_CASES is empty -- nothing to smoke-test", file=sys.stderr)
+        return 1
+
+    passed = 0
+    # A completion timeout usually means platform-worker itself isn't consuming jobs, in which
+    # case every remaining case would also time out -- but it could also be a genuine per-atom
+    # bug, so every case still runs (skipping would hide real regressions). What's bounded
+    # instead is the cost: right after a timeout, the next case gets a short probe timeout
+    # rather than the full budget. That degrade is NOT permanent -- any case that doesn't time
+    # out (success or a different failure) restores the full timeout for the cases after it, so
+    # one slow-but-legitimate atom can't silently cap every atom that follows it.
+    case_timeout = timeout
+    for action_type, scenario_id, scenario_input in ATOM_SMOKE_CASES:
+        result = _run_one_case(api_url, scenario_id, scenario_input, case_timeout)
+        if result.error_message is None:
+            passed += 1
+            print(f"{action_type}: {scenario_id} -> ok (session {result.session_id})")
+            case_timeout = timeout
+        else:
+            print(f"{action_type}: {scenario_id} -> failed ({result.error_message})", file=sys.stderr)
+            case_timeout = (
+                min(case_timeout, DEGRADED_TIMEOUT_SECONDS)
+                if result.error_code == _TIMEOUT_ERROR_CODE
+                else timeout
+            )
+
     print(f"{passed}/{total} kernel_demo atoms passed")
 
     composite_passed = 0
@@ -263,6 +308,10 @@ def _default_timeout() -> float:
 
 
 def main() -> int:
+    if _ATOM_MATRIX_LOAD_ERROR is not None:
+        print(_ATOM_MATRIX_LOAD_ERROR, file=sys.stderr)
+        return 1
+
     try:
         default_timeout = _default_timeout()
     except ValueError as exc:
@@ -281,6 +330,12 @@ def main() -> int:
         "also settable via ANYTOOLAI_SMOKE_TIMEOUT)",
     )
     args = parser.parse_args()
+
+    coverage_error = _atom_coverage_error(ATOM_SMOKE_CASES)
+    if coverage_error is not None:
+        print(coverage_error, file=sys.stderr)
+        return 1
+
     return run(args.api_url.rstrip("/"), args.timeout)
 
 
