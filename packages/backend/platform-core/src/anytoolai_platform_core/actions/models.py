@@ -29,6 +29,8 @@ class ActionDefinition:
     input_schema_ref: str
     output_schema_ref: str
     executor: ActionExecutor
+    cross_validator_ref: str
+    input_validator_ref: str
     emits_events: list[str] = field(default_factory=list)
     description: str | None = None
     schema_version: int = 1
