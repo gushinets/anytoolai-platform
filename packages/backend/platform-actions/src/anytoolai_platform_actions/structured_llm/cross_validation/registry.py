@@ -51,12 +51,21 @@ _INPUT_VALIDATORS: dict[str, type[ActionInputValidator]] = {
 
 
 class ValidatorRefNotFoundError(LookupError):
-    def __init__(self, *, ref: str, field_name: str, action_type: str) -> None:
+    def __init__(
+        self, *, ref: str, field_name: str, action_type: str, registered_for: str | None = None
+    ) -> None:
         if ref == NONE_REF:
             message = (
                 f"{field_name} is {ref!r} on action_type {action_type!r}, but a validator "
                 f"class is registered for it. Update the YAML ref instead of leaving it as "
                 f'"none".'
+            )
+        elif registered_for is not None:
+            message = (
+                f"{field_name} {ref!r} declared on action_type {action_type!r} is registered "
+                f"for {registered_for!r}, not {action_type!r}. Fix the YAML ref to point at "
+                f"{action_type}'s own validator, or use a separate canonical registry if "
+                "sharing validators across action types is intentional."
             )
         else:
             message = (
@@ -67,6 +76,7 @@ class ValidatorRefNotFoundError(LookupError):
         self.ref = ref
         self.field_name = field_name
         self.action_type = action_type
+        self.registered_for = registered_for
 
 
 _V = TypeVar("_V")
@@ -89,8 +99,12 @@ def _resolve_validators(
                 )
             continue
         validator_cls = lookup.get(ref)
-        if validator_cls is None or ref != action_type:
+        if validator_cls is None:
             raise ValidatorRefNotFoundError(ref=ref, field_name=field_name, action_type=action_type)
+        if ref != action_type:
+            raise ValidatorRefNotFoundError(
+                ref=ref, field_name=field_name, action_type=action_type, registered_for=ref
+            )
         validators[action_type] = validator_cls()
     return validators
 
