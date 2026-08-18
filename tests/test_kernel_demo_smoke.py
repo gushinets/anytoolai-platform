@@ -112,6 +112,86 @@ def test_run_one_case_succeeds_when_completed_with_artifact(monkeypatch) -> None
     assert result.session_id == "session-1"
 
 
+def test_run_one_case_skips_schema_ref_check_for_unknown_scenario(monkeypatch) -> None:
+    """A scenario_id absent from _EXPECTED_SCHEMA_REF_BY_SCENARIO (e.g. a synthetic id used by
+    other tests in this file) must not trigger the extra /v1/results/ fetch -- confirms the new
+    schema_ref cross-check doesn't change behavior for scenarios with no known expectation."""
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "_EXPECTED_SCHEMA_REF_BY_SCENARIO", {})
+    monkeypatch.setattr(
+        smoke,
+        "_http_json_request",
+        _sequenced_request(
+            [
+                {"guest_id": "guest-1"},
+                {"scenario_session_id": "session-1"},
+                {"status": "completed", "result_artifact_id": "artifact-1"},
+            ]
+        ),
+    )
+
+    result = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
+
+    assert result.error_code is None
+
+
+def test_run_one_case_succeeds_when_result_schema_ref_matches_expected(monkeypatch) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(
+        smoke, "_EXPECTED_SCHEMA_REF_BY_SCENARIO", {"scenario-1": "kernel.schemas.expected_v1"}
+    )
+    monkeypatch.setattr(
+        smoke,
+        "_http_json_request",
+        _sequenced_request(
+            [
+                {"guest_id": "guest-1"},
+                {"scenario_session_id": "session-1"},
+                {"status": "completed", "result_artifact_id": "artifact-1"},
+                {"schema_ref": "kernel.schemas.expected_v1"},
+            ]
+        ),
+    )
+
+    result = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
+
+    assert result.error_code is None
+    assert result.error_message is None
+
+
+def test_run_one_case_reports_smoke009_when_result_schema_ref_mismatches(monkeypatch) -> None:
+    """Catches a scenario wired to the wrong workflow/action (e.g. swapped scenario<->workflow
+    labels in config): the produced artifact's schema_ref won't match what this scenario_id is
+    declared to produce, even though the session completed with SOME artifact."""
+    smoke = load_smoke_module()
+    monkeypatch.setattr(
+        smoke, "_EXPECTED_SCHEMA_REF_BY_SCENARIO", {"scenario-1": "kernel.schemas.expected_v1"}
+    )
+    monkeypatch.setattr(
+        smoke,
+        "_http_json_request",
+        _sequenced_request(
+            [
+                {"guest_id": "guest-1"},
+                {"scenario_session_id": "session-1"},
+                {"status": "completed", "result_artifact_id": "artifact-1"},
+                {"schema_ref": "kernel.schemas.wrong_v1"},
+            ]
+        ),
+    )
+
+    result = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
+
+    assert result.error_code == "SMOKE009"
+    assert result.error_message is not None and "schema_ref" in result.error_message
+
+
+def test_expected_schema_ref_by_scenario_covers_every_real_smoke_case() -> None:
+    smoke = load_smoke_module()
+    for action_type, scenario_id, _ in smoke.ATOM_SMOKE_CASES:
+        assert scenario_id in smoke._EXPECTED_SCHEMA_REF_BY_SCENARIO, action_type
+
+
 def test_run_one_case_reports_smoke005_on_timeout(monkeypatch) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(

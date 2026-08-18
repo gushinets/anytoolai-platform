@@ -52,9 +52,19 @@ try:
     ATOM_SMOKE_CASES: tuple[tuple[str, str, dict], ...] = tuple(
         (case["action_type"], case["scenario_id"], case["start_input"]) for case in _RAW_ATOM_CASES
     )
+    # scenario_id -> the schema_ref that scenario's produced artifact must have. The API's
+    # /v1/results/{id} exposes schema_ref but not action_type/action_config_id (those are
+    # internal, not part of the frontend-safe result surface, and this script has no DB access
+    # to check them directly) -- schema_ref is a reliable HTTP-visible fingerprint of "did this
+    # scenario actually run its own declared action", since every atom has a distinct output
+    # schema. Used by _run_one_case to catch a scenario wired to the wrong workflow/action.
+    _EXPECTED_SCHEMA_REF_BY_SCENARIO: dict[str, str] = {
+        case["scenario_id"]: case["expected_output_schema_ref"] for case in _RAW_ATOM_CASES
+    }
 except (OSError, ValueError, KeyError, TypeError) as exc:
     _RAW_ATOM_CASES = []
     ATOM_SMOKE_CASES = ()
+    _EXPECTED_SCHEMA_REF_BY_SCENARIO = {}
     _ATOM_MATRIX_LOAD_ERROR = (
         f"SMOKE008: could not load atom smoke case data from {ATOM_MATRIX_DATA_PATH}: {exc}"
     )
@@ -178,7 +188,8 @@ def _run_one_case(api_url: str, scenario_id: str, scenario_input: dict, timeout:
                 ),
             )
         if status == "completed":
-            if not session.get("result_artifact_id"):
+            result_artifact_id = session.get("result_artifact_id")
+            if not result_artifact_id:
                 return CaseResult(
                     session_id=session_id,
                     error_code="SMOKE003",
@@ -187,6 +198,39 @@ def _run_one_case(api_url: str, scenario_id: str, scenario_input: dict, timeout:
                         "result artifact"
                     ),
                 )
+            expected_schema_ref = _EXPECTED_SCHEMA_REF_BY_SCENARIO.get(scenario_id)
+            if expected_schema_ref is not None:
+                try:
+                    result = _http_json_request(
+                        f"{api_url}/v1/results/{result_artifact_id}", timeout=5.0
+                    )
+                    actual_schema_ref = result.get("schema_ref")
+                except (
+                    OSError,
+                    urllib.error.URLError,
+                    ValueError,
+                    TypeError,
+                    AttributeError,
+                ) as exc:
+                    return CaseResult(
+                        session_id=session_id,
+                        error_code="SMOKE009",
+                        error_message=(
+                            f"SMOKE009: could not fetch result artifact {result_artifact_id} "
+                            f"to verify its schema_ref: {exc}"
+                        ),
+                    )
+                if actual_schema_ref != expected_schema_ref:
+                    return CaseResult(
+                        session_id=session_id,
+                        error_code="SMOKE009",
+                        error_message=(
+                            f"SMOKE009: kernel_demo session {session_id} (scenario "
+                            f"{scenario_id}) produced schema_ref {actual_schema_ref!r}, "
+                            f"expected {expected_schema_ref!r} -- scenario may be wired to "
+                            "the wrong workflow/action"
+                        ),
+                    )
             return CaseResult(session_id=session_id, error_code=None, error_message=None)
         if status == "failed":
             return CaseResult(
