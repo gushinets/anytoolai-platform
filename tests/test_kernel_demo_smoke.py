@@ -346,6 +346,21 @@ def test_composite_coverage_error_reports_missing_config_file_distinctly(monkeyp
     assert error is not None and "not found" in error
 
 
+def test_composite_coverage_error_reports_malformed_workflows_config_cleanly(
+    tmp_path, monkeypatch
+) -> None:
+    """A workflows.yaml that parses to something other than a mapping (e.g. a bare list) must
+    produce a clean SMOKE010 message, not an unhandled AttributeError/YAMLError traceback."""
+    smoke = load_smoke_module()
+    bad_path = tmp_path / "workflows.yaml"
+    bad_path.write_text("- just\n- a\n- list\n", encoding="utf-8")
+    monkeypatch.setattr(smoke, "WORKFLOWS_CONFIG_PATH", bad_path)
+
+    error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
+
+    assert error is not None and "SMOKE010" in error
+
+
 def test_composite_coverage_error_reports_partial_loss_not_just_empty() -> None:
     """A partial regression (2 of 3 composite entries survive) must be caught the same way full
     emptiness is -- this is the exact gap a bare `len(cases) == 0` check would miss."""
@@ -435,6 +450,28 @@ def test_run_degrades_timeout_after_a_timeout_but_not_permanently(monkeypatch) -
     smoke.run("http://127.0.0.1:8000", timeout=30.0)
 
     assert seen_timeouts == [30.0, smoke.DEGRADED_TIMEOUT_SECONDS, 30.0]
+
+
+def test_run_chains_degraded_timeout_from_atom_batch_into_composite_batch(monkeypatch) -> None:
+    """A worker outage detected during the atom batch must keep the composite batch cheap too --
+    case_timeout carries over between batches instead of resetting to the full budget for the
+    composite batch."""
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "ATOM_SMOKE_CASES", (("atom.one", "scenario-one", {}),))
+    monkeypatch.setattr(
+        smoke, "COMPOSITE_SMOKE_CASES", (("workflow.one", "scenario-composite", {}),)
+    )
+    seen_timeouts = []
+
+    def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
+        seen_timeouts.append(timeout)
+        return _fake_case_result(smoke, scenario_id, timed_out=(scenario_id == "scenario-one"))
+
+    monkeypatch.setattr(smoke, "_run_one_case", fake_run_one_case)
+
+    smoke.run("http://127.0.0.1:8000", timeout=30.0)
+
+    assert seen_timeouts == [30.0, smoke.DEGRADED_TIMEOUT_SECONDS]
 
 
 def test_run_timeout_degrade_is_driven_by_error_code_not_message_text(monkeypatch) -> None:

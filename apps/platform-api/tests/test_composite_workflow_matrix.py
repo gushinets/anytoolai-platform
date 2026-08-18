@@ -299,12 +299,13 @@ def _run_composite_scenario_and_assert_full_path(
 
     # scenario_session_id correlation: every action_run/provider_call/artifact row for this job
     # carries this run's scenario_session_id, not just job_id.
-    for run in action_runs:
-        assert run["scenario_session_id"] == started["scenario_session_id"]
-    for call in provider_calls:
-        assert call["scenario_session_id"] == started["scenario_session_id"]
-    for artifact in artifacts:
-        assert artifact["scenario_session_id"] == started["scenario_session_id"]
+    for label, rows in (
+        ("action_runs", action_runs),
+        ("provider_calls", provider_calls),
+        ("artifacts", artifacts),
+    ):
+        for row in rows:
+            assert row["scenario_session_id"] == started["scenario_session_id"], label
 
     # Provider-call correlation: exactly one provider_calls row per action_run.
     provider_calls_by_action_run: dict[str, list[dict[str, Any]]] = {}

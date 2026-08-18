@@ -214,8 +214,14 @@ def _composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str |
             f"SMOKE010: cannot verify required composite coverage -- {WORKFLOWS_CONFIG_PATH} "
             "not found"
         )
+    try:
+        required = _required_composite_workflow_ids()
+    except (OSError, yaml.YAMLError, AttributeError, TypeError) as exc:
+        return (
+            f"SMOKE010: could not parse {WORKFLOWS_CONFIG_PATH} to verify required composite "
+            f"coverage: {exc}"
+        )
     covered = set(workflow_ids)
-    required = _required_composite_workflow_ids()
     if covered != required:
         return _coverage_mismatch_error(
             covered,
@@ -382,6 +388,40 @@ def _empty_cases_error(
     return None
 
 
+def _run_case_batch(
+    api_url: str,
+    cases: tuple[tuple[str, str, dict], ...],
+    timeout: float,
+    case_timeout: float,
+) -> tuple[int, float]:
+    """Runs every case in cases sequentially, printing a pass/fail line per case, and returns
+    (passed_count, case_timeout). A completion timeout usually means platform-worker itself
+    isn't consuming jobs, in which case every remaining case would also time out -- but it could
+    also be a genuine per-case bug, so every case still runs (skipping would hide real
+    regressions). What's bounded instead is the cost: right after a timeout, the next case gets
+    a short probe timeout (DEGRADED_TIMEOUT_SECONDS) rather than the full budget. That degrade is
+    NOT permanent -- any case that doesn't time out (success or a different failure) restores the
+    full timeout for the cases after it, so one slow-but-legitimate case can't silently cap every
+    case that follows it. Callers chain the returned case_timeout into the next batch (atoms then
+    composites) so a worker outage detected during the atom batch keeps the composite batch cheap
+    too, instead of resetting to the full budget for it."""
+    passed = 0
+    for label, scenario_id, scenario_input in cases:
+        result = _run_one_case(api_url, scenario_id, scenario_input, case_timeout)
+        if result.error_message is None:
+            passed += 1
+            print(f"{label}: {scenario_id} -> ok (session {result.session_id})")
+            case_timeout = timeout
+        else:
+            print(f"{label}: {scenario_id} -> failed ({result.error_message})", file=sys.stderr)
+            case_timeout = (
+                min(case_timeout, DEGRADED_TIMEOUT_SECONDS)
+                if result.error_code == _TIMEOUT_ERROR_CODE
+                else timeout
+            )
+    return passed, case_timeout
+
+
 def run(api_url: str, timeout: float) -> int:
     total = len(ATOM_SMOKE_CASES)
     empty_error = _empty_cases_error(
@@ -391,29 +431,7 @@ def run(api_url: str, timeout: float) -> int:
         print(empty_error, file=sys.stderr)
         return 1
 
-    passed = 0
-    # A completion timeout usually means platform-worker itself isn't consuming jobs, in which
-    # case every remaining case would also time out -- but it could also be a genuine per-atom
-    # bug, so every case still runs (skipping would hide real regressions). What's bounded
-    # instead is the cost: right after a timeout, the next case gets a short probe timeout
-    # rather than the full budget. That degrade is NOT permanent -- any case that doesn't time
-    # out (success or a different failure) restores the full timeout for the cases after it, so
-    # one slow-but-legitimate atom can't silently cap every atom that follows it.
-    case_timeout = timeout
-    for action_type, scenario_id, scenario_input in ATOM_SMOKE_CASES:
-        result = _run_one_case(api_url, scenario_id, scenario_input, case_timeout)
-        if result.error_message is None:
-            passed += 1
-            print(f"{action_type}: {scenario_id} -> ok (session {result.session_id})")
-            case_timeout = timeout
-        else:
-            print(f"{action_type}: {scenario_id} -> failed ({result.error_message})", file=sys.stderr)
-            case_timeout = (
-                min(case_timeout, DEGRADED_TIMEOUT_SECONDS)
-                if result.error_code == _TIMEOUT_ERROR_CODE
-                else timeout
-            )
-
+    passed, case_timeout = _run_case_batch(api_url, ATOM_SMOKE_CASES, timeout, timeout)
     print(f"{passed}/{total} kernel_demo atoms passed")
 
     composite_total = len(COMPOSITE_SMOKE_CASES)
@@ -424,18 +442,9 @@ def run(api_url: str, timeout: float) -> int:
         print(empty_error, file=sys.stderr)
         return 1
 
-    composite_passed = 0
-    for workflow_id, scenario_id, scenario_input in COMPOSITE_SMOKE_CASES:
-        result = _run_one_case(api_url, scenario_id, scenario_input, timeout)
-        if result.error_message is None:
-            composite_passed += 1
-            print(f"{workflow_id}: {scenario_id} -> ok (session {result.session_id})")
-        else:
-            print(
-                f"{workflow_id}: {scenario_id} -> failed ({result.error_message})",
-                file=sys.stderr,
-            )
-
+    composite_passed, _case_timeout = _run_case_batch(
+        api_url, COMPOSITE_SMOKE_CASES, timeout, case_timeout
+    )
     print(f"{composite_passed}/{composite_total} kernel_demo composite workflows passed")
     return 0 if passed == total and composite_passed == composite_total else 1
 
