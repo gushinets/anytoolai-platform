@@ -340,6 +340,14 @@ def run(api_url: str, timeout: float) -> int:
 
     print(f"{passed}/{total} kernel_demo atoms passed")
 
+    composite_total = len(COMPOSITE_SMOKE_CASES)
+    if composite_total == 0:
+        print(
+            "SMOKE007: COMPOSITE_SMOKE_CASES is empty -- nothing to smoke-test",
+            file=sys.stderr,
+        )
+        return 1
+
     composite_passed = 0
     for workflow_id, scenario_id, scenario_input in COMPOSITE_SMOKE_CASES:
         result = _run_one_case(api_url, scenario_id, scenario_input, timeout)
@@ -352,7 +360,6 @@ def run(api_url: str, timeout: float) -> int:
                 file=sys.stderr,
             )
 
-    composite_total = len(COMPOSITE_SMOKE_CASES)
     print(f"{composite_passed}/{composite_total} kernel_demo composite workflows passed")
     return 0 if passed == total and composite_passed == composite_total else 1
 

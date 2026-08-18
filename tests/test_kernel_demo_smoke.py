@@ -429,6 +429,46 @@ def test_run_reports_full_pass_and_zero_exit(monkeypatch, capsys) -> None:
         "ATOM_SMOKE_CASES",
         (("atom.one", "scenario-one", {}),),
     )
+    monkeypatch.setattr(
+        smoke,
+        "COMPOSITE_SMOKE_CASES",
+        (("workflow.one", "scenario-composite", {}),),
+    )
+    monkeypatch.setattr(
+        smoke,
+        "_http_json_request",
+        _sequenced_request(
+            [
+                {"guest_id": "guest-1"},
+                {"scenario_session_id": "session-1"},
+                {"status": "completed", "result_artifact_id": "artifact-1"},
+                {"guest_id": "guest-2"},
+                {"scenario_session_id": "session-2"},
+                {"status": "completed", "result_artifact_id": "artifact-2"},
+            ]
+        ),
+    )
+
+    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 0
+    out = capsys.readouterr().out
+    assert "1/1 kernel_demo atoms passed" in out
+    assert "atom.one: scenario-one -> ok (session session-1)" in out
+    assert "1/1 kernel_demo composite workflows passed" in out
+
+
+def test_run_fails_instead_of_vacuous_success_on_empty_composite_case_list(
+    monkeypatch, capsys
+) -> None:
+    """Mirrors test_run_fails_instead_of_vacuous_success_on_empty_case_list for the composite
+    side -- an empty COMPOSITE_SMOKE_CASES must fail the run even when every atom case passes,
+    not silently report 0/0 composite workflows as a vacuous success (exactly the class of
+    regression a merge accidentally emptying COMPOSITE_SMOKE_CASES would otherwise hide)."""
+    smoke = load_smoke_module()
+    monkeypatch.setattr(
+        smoke,
+        "ATOM_SMOKE_CASES",
+        (("atom.one", "scenario-one", {}),),
+    )
     monkeypatch.setattr(smoke, "COMPOSITE_SMOKE_CASES", ())
     monkeypatch.setattr(
         smoke,
@@ -442,10 +482,10 @@ def test_run_reports_full_pass_and_zero_exit(monkeypatch, capsys) -> None:
         ),
     )
 
-    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 0
-    out = capsys.readouterr().out
+    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
+    out, err = capsys.readouterr()
     assert "1/1 kernel_demo atoms passed" in out
-    assert "atom.one: scenario-one -> ok (session session-1)" in out
+    assert "SMOKE007" in err and "COMPOSITE_SMOKE_CASES" in err
 
 
 def test_run_reports_smoke001_with_no_session_id_available(monkeypatch, capsys) -> None:
