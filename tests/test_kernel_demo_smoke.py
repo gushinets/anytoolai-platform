@@ -315,6 +315,57 @@ def test_atom_coverage_error_reports_missing_config_directory_distinctly(monkeyp
     assert error is not None and "not found" in error
 
 
+def test_composite_smoke_cases_cover_the_required_composite_workflows() -> None:
+    smoke = load_smoke_module()
+    assert smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES) is None
+    assert len(smoke.COMPOSITE_SMOKE_CASES) == len(smoke._required_composite_workflow_ids())
+
+
+def test_required_composite_workflow_ids_are_derived_from_workflows_config() -> None:
+    smoke = load_smoke_module()
+    required = smoke._required_composite_workflow_ids()
+    assert required == {workflow_id for workflow_id, _, _ in smoke.COMPOSITE_SMOKE_CASES}
+    assert "kernel_demo.composite_analyze_and_clarify_v1" in required
+
+
+def test_composite_coverage_error_reports_missing_workflow() -> None:
+    smoke = load_smoke_module()
+    cases = (("workflow.one", "scenario-one", {}),)
+
+    error = smoke._composite_coverage_error(cases)
+
+    assert error is not None and "SMOKE010" in error
+
+
+def test_composite_coverage_error_reports_missing_config_file_distinctly(monkeypatch) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "WORKFLOWS_CONFIG_PATH", Path("/no/such/file.yaml"))
+
+    error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
+
+    assert error is not None and "not found" in error
+
+
+def test_composite_coverage_error_reports_partial_loss_not_just_empty() -> None:
+    """A partial regression (2 of 3 composite entries survive) must be caught the same way full
+    emptiness is -- this is the exact gap a bare `len(cases) == 0` check would miss."""
+    smoke = load_smoke_module()
+    partial_cases = smoke.COMPOSITE_SMOKE_CASES[:-1]
+
+    error = smoke._composite_coverage_error(partial_cases)
+
+    assert error is not None and "SMOKE010" in error
+
+
+def test_main_fails_on_composite_coverage_mismatch(monkeypatch, capsys) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "COMPOSITE_SMOKE_CASES", smoke.COMPOSITE_SMOKE_CASES[:-1])
+    monkeypatch.setattr(sys, "argv", ["kernel_demo_smoke.py", "http://127.0.0.1:8000"])
+
+    assert smoke.main() == 1
+    assert "SMOKE010" in capsys.readouterr().err
+
+
 def test_run_fails_instead_of_vacuous_success_on_empty_case_list(monkeypatch, capsys) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(smoke, "ATOM_SMOKE_CASES", ())
@@ -485,7 +536,7 @@ def test_run_fails_instead_of_vacuous_success_on_empty_composite_case_list(
     assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
     out, err = capsys.readouterr()
     assert "1/1 kernel_demo atoms passed" in out
-    assert "SMOKE007" in err and "COMPOSITE_SMOKE_CASES" in err
+    assert "SMOKE010" in err and "COMPOSITE_SMOKE_CASES" in err
 
 
 def test_run_reports_smoke001_with_no_session_id_available(monkeypatch, capsys) -> None:

@@ -24,10 +24,16 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
+
 FRONTEND_ID = "kernel_demo_ce"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTION_DEFINITIONS_ROOT = REPO_ROOT / "configs" / "kernel" / "action_definitions"
 ATOM_MATRIX_DATA_PATH = REPO_ROOT / "tests" / "fixtures" / "kernel_demo" / "atom_smoke_matrix.json"
+WORKFLOWS_CONFIG_PATH = (
+    REPO_ROOT / "configs" / "kernel" / "products" / "kernel_demo" / "workflows.yaml"
+)
+_COMPOSITE_WORKFLOW_ID_PREFIX = "kernel_demo.composite_"
 
 
 def _load_raw_atom_cases() -> list[dict]:
@@ -85,6 +91,34 @@ def _required_action_types() -> frozenset[str]:
     script ever needs a real ordering guarantee instead of two independent parallel checks.
     """
     return frozenset(path.stem for path in ACTION_DEFINITIONS_ROOT.glob("*.yaml"))
+
+
+def _required_composite_workflow_ids() -> frozenset[str]:
+    """Derives required composite coverage from workflows.yaml's own declared workflow_ids,
+    filtered to the kernel_demo.composite_ naming convention -- the composite counterpart of
+    _required_action_types() above, adapted because all composite workflows share one YAML file
+    instead of one file per atom. Raw YAML parse, not the validated ConfigLoader registry (same
+    intentional no-backend-package-imports design as the rest of this script)."""
+    with WORKFLOWS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    return frozenset(
+        entry["workflow_id"]
+        for entry in data.get("workflows", [])
+        if isinstance(entry, dict)
+        and isinstance(entry.get("workflow_id"), str)
+        and entry["workflow_id"].startswith(_COMPOSITE_WORKFLOW_ID_PREFIX)
+    )
+
+
+def _coverage_mismatch_error(
+    covered: set[str], required: frozenset[str], *, error_code: str, tuple_name: str, kind: str
+) -> str:
+    missing = sorted(required - covered)
+    extra = sorted(covered - required)
+    return (
+        f"{error_code}: {tuple_name} does not cover the required {len(required)} {kind} "
+        f"(missing={missing}, extra={extra})"
+    )
 
 
 COMPOSITE_SMOKE_CASES: tuple[tuple[str, str, dict], ...] = (
@@ -158,11 +192,37 @@ def _atom_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None
     covered = set(action_types)
     required = _required_action_types()
     if covered != required:
-        missing = sorted(required - covered)
-        extra = sorted(covered - required)
+        return _coverage_mismatch_error(
+            covered,
+            required,
+            error_code="SMOKE007",
+            tuple_name="ATOM_SMOKE_CASES",
+            kind="action types",
+        )
+    return None
+
+
+def _composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None:
+    """Composite counterpart of _atom_coverage_error() -- catches not just an empty
+    COMPOSITE_SMOKE_CASES but also a partial one (e.g. a merge drops 1 of 3 entries), which a
+    bare emptiness check would miss."""
+    workflow_ids = [workflow_id for workflow_id, _, _ in cases]
+    if len(workflow_ids) != len(set(workflow_ids)):
+        return "SMOKE010: COMPOSITE_SMOKE_CASES has duplicate workflow_id entries"
+    if not WORKFLOWS_CONFIG_PATH.is_file():
         return (
-            f"SMOKE007: ATOM_SMOKE_CASES does not cover the required {len(required)} action "
-            f"types (missing={missing}, extra={extra})"
+            f"SMOKE010: cannot verify required composite coverage -- {WORKFLOWS_CONFIG_PATH} "
+            "not found"
+        )
+    covered = set(workflow_ids)
+    required = _required_composite_workflow_ids()
+    if covered != required:
+        return _coverage_mismatch_error(
+            covered,
+            required,
+            error_code="SMOKE010",
+            tuple_name="COMPOSITE_SMOKE_CASES",
+            kind="composite workflows",
         )
     return None
 
@@ -309,10 +369,26 @@ def _run_one_case(api_url: str, scenario_id: str, scenario_input: dict, timeout:
 DEGRADED_TIMEOUT_SECONDS = 5.0
 
 
+def _empty_cases_error(
+    cases: tuple[tuple[str, str, dict], ...], *, tuple_name: str, error_code: str
+) -> str | None:
+    """Shared by both run()-level empty-tuple guards below. A cheap non-emptiness check, distinct
+    from _atom_coverage_error()/_composite_coverage_error() (called from main(), and which also
+    validate real coverage against the kernel configs) -- this one exists so run() still fails
+    closed on a fully empty tuple even when called directly, bypassing main(), as several unit
+    tests do."""
+    if not cases:
+        return f"{error_code}: {tuple_name} is empty -- nothing to smoke-test"
+    return None
+
+
 def run(api_url: str, timeout: float) -> int:
     total = len(ATOM_SMOKE_CASES)
-    if total == 0:
-        print("SMOKE007: ATOM_SMOKE_CASES is empty -- nothing to smoke-test", file=sys.stderr)
+    empty_error = _empty_cases_error(
+        ATOM_SMOKE_CASES, tuple_name="ATOM_SMOKE_CASES", error_code="SMOKE007"
+    )
+    if empty_error is not None:
+        print(empty_error, file=sys.stderr)
         return 1
 
     passed = 0
@@ -341,11 +417,11 @@ def run(api_url: str, timeout: float) -> int:
     print(f"{passed}/{total} kernel_demo atoms passed")
 
     composite_total = len(COMPOSITE_SMOKE_CASES)
-    if composite_total == 0:
-        print(
-            "SMOKE007: COMPOSITE_SMOKE_CASES is empty -- nothing to smoke-test",
-            file=sys.stderr,
-        )
+    empty_error = _empty_cases_error(
+        COMPOSITE_SMOKE_CASES, tuple_name="COMPOSITE_SMOKE_CASES", error_code="SMOKE010"
+    )
+    if empty_error is not None:
+        print(empty_error, file=sys.stderr)
         return 1
 
     composite_passed = 0
@@ -398,6 +474,11 @@ def main() -> int:
     coverage_error = _atom_coverage_error(ATOM_SMOKE_CASES)
     if coverage_error is not None:
         print(coverage_error, file=sys.stderr)
+        return 1
+
+    composite_coverage_error = _composite_coverage_error(COMPOSITE_SMOKE_CASES)
+    if composite_coverage_error is not None:
+        print(composite_coverage_error, file=sys.stderr)
         return 1
 
     return run(args.api_url.rstrip("/"), args.timeout)
