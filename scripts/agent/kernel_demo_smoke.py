@@ -30,17 +30,17 @@ ACTION_DEFINITIONS_ROOT = REPO_ROOT / "configs" / "kernel" / "action_definitions
 ATOM_MATRIX_DATA_PATH = REPO_ROOT / "tests" / "fixtures" / "kernel_demo" / "atom_smoke_matrix.json"
 
 
-def _load_atom_smoke_cases() -> tuple[tuple[str, str, dict], ...]:
-    """Loads the (action_type, scenario_id, start_input) triples from the JSON file that is
-    also the source ATOM_MATRIX in apps/platform-api/tests/test_atom_runtime_matrix.py loads
-    -- one shared data file instead of two independently hand-maintained Python literals, so
-    a scenario_id rename or start_input change can't drift between the two consumers. Reading
-    plain JSON (not importing the pytest file) keeps this script's stdlib-only, no
-    backend-package-import constraint intact.
+def _load_raw_atom_cases() -> list[dict]:
+    """Parses tests/fixtures/kernel_demo/atom_smoke_matrix.json once. Exposed as
+    _RAW_ATOM_CASES (not just consumed internally) so
+    apps/platform-api/tests/test_atom_runtime_matrix.py's ATOM_MATRIX can build its AtomCase
+    objects directly from this already-parsed list instead of independently re-opening and
+    re-parsing the same file with its own separate field-selection logic -- one parse, two
+    consumers, instead of two hand-written parsers that could each drop/rename a key
+    differently.
     """
     with ATOM_MATRIX_DATA_PATH.open("r", encoding="utf-8") as handle:
-        cases = json.load(handle)
-    return tuple((case["action_type"], case["scenario_id"], case["start_input"]) for case in cases)
+        return json.load(handle)
 
 
 # Loaded once at import time, but guarded: a missing/corrupted data file must still let this
@@ -48,8 +48,12 @@ def _load_atom_smoke_cases() -> tuple[tuple[str, str, dict], ...]:
 # argparse or main() ever runs.
 _ATOM_MATRIX_LOAD_ERROR: str | None = None
 try:
-    ATOM_SMOKE_CASES: tuple[tuple[str, str, dict], ...] = _load_atom_smoke_cases()
+    _RAW_ATOM_CASES: list[dict] = _load_raw_atom_cases()
+    ATOM_SMOKE_CASES: tuple[tuple[str, str, dict], ...] = tuple(
+        (case["action_type"], case["scenario_id"], case["start_input"]) for case in _RAW_ATOM_CASES
+    )
 except (OSError, ValueError, KeyError, TypeError) as exc:
+    _RAW_ATOM_CASES = []
     ATOM_SMOKE_CASES = ()
     _ATOM_MATRIX_LOAD_ERROR = (
         f"SMOKE008: could not load atom smoke case data from {ATOM_MATRIX_DATA_PATH}: {exc}"
@@ -63,9 +67,12 @@ def _required_action_types() -> frozenset[str]:
 
     ponytail: a raw filename glob, not the validated ConfigLoader registry the pytest matrix
     uses (this script intentionally has no backend-package imports). A malformed/placeholder
-    file here would diverge between the two checks; validate-configs already fails on that
-    independently, so upgrade only if this script ever needs to run without a validate-configs
-    gate in front of it.
+    file here would diverge between the two checks; validate-configs (the `baseline` CI job)
+    independently fails on that same file, but as a sibling job with no `needs:` ordering
+    against `compose-smoke-dev`/`compose-smoke-prod` (this script), not a gate strictly in
+    front of it -- so a malformed file could in principle fail this script's coverage check
+    before/concurrently with baseline's own failure. Upgrade to the validated registry if this
+    script ever needs a real ordering guarantee instead of two independent parallel checks.
     """
     return frozenset(path.stem for path in ACTION_DEFINITIONS_ROOT.glob("*.yaml"))
 

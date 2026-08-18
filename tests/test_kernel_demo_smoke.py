@@ -317,7 +317,25 @@ def test_run_reports_full_pass_and_zero_exit(monkeypatch, capsys) -> None:
     )
 
     assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 0
-    assert "1/1 kernel_demo atoms passed" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "1/1 kernel_demo atoms passed" in out
+    assert "atom.one: scenario-one -> ok (session session-1)" in out
+
+
+def test_run_reports_smoke001_with_no_session_id_available(monkeypatch, capsys) -> None:
+    """SMOKE001 (guest/start call itself failed) is the only case where session_id is None --
+    exercised through run() itself, not just _run_one_case() directly, so a future change to
+    run()'s per-case print formatting that mis-handles a None session_id is caught here."""
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "ATOM_SMOKE_CASES", (("atom.one", "scenario-one", {}),))
+    monkeypatch.setattr(
+        smoke, "_http_json_request", _sequenced_request([OSError("connection refused")])
+    )
+
+    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
+    out, err = capsys.readouterr()
+    assert "0/1 kernel_demo atoms passed" in out
+    assert "atom.one: scenario-one -> failed (SMOKE001" in err
 
 
 def test_atom_matrix_load_error_reported_by_main_before_argparse(monkeypatch, capsys) -> None:

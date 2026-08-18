@@ -16,26 +16,17 @@ from dataclasses import dataclass
 from typing import Any, Iterator
 
 import pytest
-import sqlalchemy as sa
 from anytoolai_platform_core.config.loader import ConfigLoader
 from anytoolai_platform_core.identity.models import GuestIdentityRecord
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
-from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
-from anytoolai_platform_core.storage.db import (
-    action_runs_table,
-    artifacts_table,
-    event_log_table,
-    provider_calls_table,
-)
 from anytoolai_platform_core.storage.transactions import (
     SessionFactory,
     build_session_factory,
     transaction_boundary,
 )
 from anytoolai_platform_core.workflows.models import JobStatus
-from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
 from test_scenario_runtime_api import (
     CONFIG_ROOT,
@@ -45,7 +36,7 @@ from test_scenario_runtime_api import (
     _start_payload,
 )
 
-from tests.db_support import provision_database
+from tests.db_support import assert_scenario_runtime_correlation, provision_database
 from tests.test_kernel_demo_smoke import load_smoke_module
 
 # Single source for the shared atom-case JSON path: kernel_demo_smoke.py's own
@@ -110,13 +101,11 @@ class AtomCase:
     start_input: dict[str, Any]
 
 
-# Loaded from the same JSON file scripts/agent/kernel_demo_smoke.py's ATOM_SMOKE_CASES reads --
-# one shared source of the 11 (action_type, scenario_id, ...) cases instead of two independently
-# hand-maintained literals, so the two consumers structurally can't drift apart.
+# Built from kernel_demo_smoke.py's already-parsed _RAW_ATOM_CASES (not a second independent
+# json.load() of the same file with its own field-selection logic) -- one parser, two shapes
+# derived from it: ATOM_SMOKE_CASES's 3-tuples there, AtomCase objects here.
 def _load_atom_matrix() -> tuple[AtomCase, ...]:
-    with _SMOKE_MODULE.ATOM_MATRIX_DATA_PATH.open("r", encoding="utf-8") as handle:
-        raw_cases = json.load(handle)
-    return tuple(AtomCase(**raw_case) for raw_case in raw_cases)
+    return tuple(AtomCase(**raw_case) for raw_case in _SMOKE_MODULE._RAW_ATOM_CASES)
 
 
 ATOM_MATRIX: tuple[AtomCase, ...] = _load_atom_matrix()
@@ -178,58 +167,15 @@ def _run_single_action_scenario_and_assert_full_path(
     assert session_body["current_checkpoint_id"] == RESULT_READY_CHECKPOINT_ID
     assert session_body["result_artifact_id"] == processed.result_artifact_id
 
-    with transaction_boundary(session_factory) as session:
-        scenario = ScenarioSessionRepository(session).get_in_scope(
-            started["scenario_session_id"],
-            tenant_id="anytoolai",
-            region="default",
-        )
-        job = JobRepository(session).get(started["job_id"])
-        action_run = session.execute(
-            sa.select(action_runs_table).where(action_runs_table.c.job_id == started["job_id"])
-        ).mappings().one()
-        provider_call = session.execute(
-            sa.select(provider_calls_table).where(
-                provider_calls_table.c.job_id == started["job_id"]
-            )
-        ).mappings().one()
-        artifacts = list(
-            session.execute(
-                sa.select(artifacts_table).where(artifacts_table.c.job_id == started["job_id"])
-            ).mappings()
-        )
-        events = list(
-            session.execute(
-                sa.select(event_log_table).where(
-                    event_log_table.c.scenario_session_id == started["scenario_session_id"]
-                )
-            ).mappings()
-        )
-
-    assert scenario is not None
-    assert scenario.status.value == "completed"
-    assert job is not None
-    assert job.scenario_session_id == started["scenario_session_id"]
-    assert job.result_artifact_id == processed.result_artifact_id
-
-    assert action_run["scenario_session_id"] == started["scenario_session_id"]
-    assert action_run["action_type"] == case.action_type
-    assert action_run["action_config_id"] == case.action_config_id
-    assert provider_call["scenario_session_id"] == started["scenario_session_id"]
-    assert provider_call["job_id"] == started["job_id"]
-    assert provider_call["action_run_id"] == action_run["id"]
-    assert any(artifact["id"] == processed.result_artifact_id for artifact in artifacts)
-    result_artifact = next(
-        artifact for artifact in artifacts if artifact["id"] == processed.result_artifact_id
+    assert_scenario_runtime_correlation(
+        session_factory,
+        scenario_session_id=started["scenario_session_id"],
+        job_id=started["job_id"],
+        result_artifact_id=processed.result_artifact_id,
+        action_type=case.action_type,
+        action_config_id=case.action_config_id,
+        expected_event_types=_EXPECTED_EVENT_TYPES,
     )
-    assert result_artifact["job_id"] == started["job_id"]
-    assert result_artifact["scenario_session_id"] == started["scenario_session_id"]
-
-    event_types = {event_row["event_type"] for event_row in events}
-    assert _EXPECTED_EVENT_TYPES.issubset(event_types)
-    for event_row in events:
-        if event_row["job_id"] is not None:
-            assert event_row["job_id"] == started["job_id"]
 
     result_response = asyncio.run(
         _request(

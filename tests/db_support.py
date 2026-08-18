@@ -12,6 +12,16 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy.engine import URL, make_url
 
+from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
+from anytoolai_platform_core.storage.db import (
+    action_runs_table,
+    artifacts_table,
+    event_log_table,
+    provider_calls_table,
+)
+from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
+from anytoolai_platform_core.workflows.repository import JobRepository
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 POSTGRES_TEST_DATABASE_URL_ENV = "ANYTOOLAI_POSTGRES_TEST_DATABASE_URL"
 PLACEHOLDER_POSTGRESQL_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/postgres"
@@ -100,3 +110,78 @@ def provision_database(
         except Exception:
             if setup_error is None:
                 raise
+
+
+def assert_scenario_runtime_correlation(
+    session_factory: SessionFactory,
+    *,
+    scenario_session_id: str,
+    job_id: str,
+    result_artifact_id: str,
+    action_type: str,
+    action_config_id: str,
+    expected_event_types: set[str],
+) -> None:
+    """Asserts the full DB correlation a completed scenario run must leave behind: scenario
+    session status, job linkage, and that action_run/provider_call/artifact all scope back to
+    the same scenario_session_id/job_id, plus that expected_event_types is a subset of what was
+    logged. Shared by every test that drives a scenario through the real API -> worker -> DB
+    path and wants to assert this same shape, instead of each test re-querying the same six
+    tables by hand.
+    """
+    with transaction_boundary(session_factory) as session:
+        scenario = ScenarioSessionRepository(session).get_in_scope(
+            scenario_session_id,
+            tenant_id="anytoolai",
+            region="default",
+        )
+        job = JobRepository(session).get(job_id)
+        action_run = (
+            session.execute(sa.select(action_runs_table).where(action_runs_table.c.job_id == job_id))
+            .mappings()
+            .one()
+        )
+        provider_call = (
+            session.execute(
+                sa.select(provider_calls_table).where(provider_calls_table.c.job_id == job_id)
+            )
+            .mappings()
+            .one()
+        )
+        artifacts = list(
+            session.execute(
+                sa.select(artifacts_table).where(artifacts_table.c.job_id == job_id)
+            ).mappings()
+        )
+        events = list(
+            session.execute(
+                sa.select(event_log_table).where(
+                    event_log_table.c.scenario_session_id == scenario_session_id
+                )
+            ).mappings()
+        )
+
+    assert scenario is not None
+    assert scenario.status.value == "completed"
+    assert job is not None
+    assert job.scenario_session_id == scenario_session_id
+    assert job.result_artifact_id == result_artifact_id
+
+    assert action_run["scenario_session_id"] == scenario_session_id
+    assert action_run["action_type"] == action_type
+    assert action_run["action_config_id"] == action_config_id
+    assert provider_call["scenario_session_id"] == scenario_session_id
+    assert provider_call["job_id"] == job_id
+    assert provider_call["action_run_id"] == action_run["id"]
+    assert any(artifact["id"] == result_artifact_id for artifact in artifacts)
+    result_artifact = next(
+        artifact for artifact in artifacts if artifact["id"] == result_artifact_id
+    )
+    assert result_artifact["job_id"] == job_id
+    assert result_artifact["scenario_session_id"] == scenario_session_id
+
+    event_types = {event_row["event_type"] for event_row in events}
+    assert expected_event_types.issubset(event_types)
+    for event_row in events:
+        if event_row["job_id"] is not None:
+            assert event_row["job_id"] == job_id
