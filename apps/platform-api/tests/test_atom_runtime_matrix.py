@@ -11,15 +11,15 @@ not a refactor of it.
 from __future__ import annotations
 
 import asyncio
-import importlib.util
 import json
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
 from anytoolai_platform_core.config.loader import ConfigLoader
+from anytoolai_platform_core.identity.models import GuestIdentityRecord
+from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
@@ -37,9 +37,16 @@ from anytoolai_platform_core.storage.transactions import (
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
-from test_scenario_runtime_api import CONFIG_ROOT, FIXTURE_ROOT, _create_test_app, _request
+from test_scenario_runtime_api import (
+    CONFIG_ROOT,
+    FIXTURE_ROOT,
+    _create_test_app,
+    _request,
+    _start_payload,
+)
 
 from tests.db_support import provision_database
+from tests.test_kernel_demo_smoke import load_smoke_module
 
 # Deliberately NOT a module-level pytestmark: test_atom_runtime_matrix_reports_eleven_of_eleven
 # and test_atom_smoke_cases_match_atom_matrix below do no DB I/O and must keep running under
@@ -47,14 +54,31 @@ from tests.db_support import provision_database
 # postgresql/slow.
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def session_factory() -> Iterator[SessionFactory]:
+    # Module-scoped: one provision_database() (CREATE DATABASE + alembic upgrade) for the
+    # whole 11-case parametrize sweep, not once per case. Safe to share because every case
+    # uses its own guest_id (see _run_single_action_scenario_and_assert_full_path) and is
+    # scoped by its own scenario_session_id/job_id in every assertion.
     with provision_database(
         database_name_prefix="anytoolai_atom_runtime_matrix_test",
         skip_reason="PostgreSQL atom runtime matrix coverage",
     ) as (engine, _alembic_config, _database_url):
         yield build_session_factory(engine)
 
+
+@pytest.fixture(scope="module")
+def app(session_factory: SessionFactory) -> Any:
+    # Module-scoped to match session_factory: _create_test_app() seeds a "guest_demo" identity
+    # row unconditionally, so calling it once per parametrized case against the same shared DB
+    # would collide on a duplicate key from the second case onward.
+    return _create_test_app(session_factory)
+
+# ponytail: duplicates a literal inlined in test_scenario_runtime_api.py's
+# test_start_then_real_worker_execution_preserves_a12_runtime_correlation (no shared module
+# constant exists there to import instead). Not extracted to a shared helper: this file's own
+# docstring documents that it deliberately doesn't refactor that test/file. Extract to a
+# shared constant if a third consumer needs this event-type set.
 _EXPECTED_EVENT_TYPES = {
     "scenario.started",
     "workflow.started",
@@ -191,16 +215,21 @@ def _fixture_response_json(action_config_id: str) -> dict[str, Any]:
 def _run_single_action_scenario_and_assert_full_path(
     app: Any, session_factory: SessionFactory, case: AtomCase
 ) -> None:
+    # A distinct, DB-registered guest per case: session_factory is module-scoped (one DB for
+    # all 11 cases), and kernel_demo's guest quota is a shared per-guest lifetime budget
+    # smaller than 11, so reusing one guest_id here would exhaust it partway through.
+    guest_id = f"guest_atom_matrix_{case.action_type}"
+    with transaction_boundary(session_factory) as session:
+        GuestIdentityRepository(session).create(
+            GuestIdentityRecord(id=guest_id, tenant_id="anytoolai", region="default")
+        )
+
     started = asyncio.run(
         _request(
             app,
             "POST",
             f"/v1/products/kernel_demo/scenarios/{case.scenario_id}/start",
-            json={
-                "frontend_id": "kernel_demo_ce",
-                "guest_id": "guest_demo",
-                "input": case.start_input,
-            },
+            json=_start_payload(guest_id=guest_id, input=case.start_input),
         )
     ).json()
 
@@ -303,8 +332,7 @@ def _run_single_action_scenario_and_assert_full_path(
 @pytest.mark.postgresql
 @pytest.mark.slow
 @pytest.mark.parametrize("case", ATOM_MATRIX, ids=lambda c: c.action_type)
-def test_atom_runtime_matrix(session_factory: SessionFactory, case: AtomCase) -> None:
-    app = _create_test_app(session_factory)
+def test_atom_runtime_matrix(app: Any, session_factory: SessionFactory, case: AtomCase) -> None:
     _run_single_action_scenario_and_assert_full_path(app, session_factory, case)
 
 
@@ -377,16 +405,6 @@ def test_atom_runtime_matrix_reports_eleven_of_eleven() -> None:
         )
 
 
-def _load_kernel_demo_smoke_module() -> Any:
-    module_path = Path(__file__).resolve().parents[3] / "scripts" / "agent" / "kernel_demo_smoke.py"
-    spec = importlib.util.spec_from_file_location("kernel_demo_smoke_module", module_path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 def test_atom_smoke_cases_match_atom_matrix() -> None:
     """ATOM_MATRIX (this file) and ATOM_SMOKE_CASES (kernel_demo_smoke.py) are two
     independently hand-maintained lists of the same 11 cases -- kernel_demo_smoke.py
@@ -394,7 +412,7 @@ def test_atom_smoke_cases_match_atom_matrix() -> None:
     the image's runtime deps, so it can't just import ATOM_MATRIX directly. This locks the two
     lists together so a scenario_id rename or start_input change updated in only one of them
     fails here instead of passing both files' self-consistency checks silently."""
-    smoke = _load_kernel_demo_smoke_module()
+    smoke = load_smoke_module()
 
     smoke_cases = {
         action_type: (scenario_id, start_input)

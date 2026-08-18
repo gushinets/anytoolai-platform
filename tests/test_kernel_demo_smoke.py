@@ -214,7 +214,16 @@ def test_atom_coverage_error_reports_missing_action_type() -> None:
     assert error is not None and "SMOKE007" in error
 
 
-def test_run_skips_remaining_cases_after_a_timeout_to_fail_fast(monkeypatch, capsys) -> None:
+def test_atom_coverage_error_reports_missing_config_directory_distinctly(monkeypatch) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "ACTION_DEFINITIONS_ROOT", Path("/no/such/directory"))
+
+    error = smoke._atom_coverage_error(smoke.ATOM_SMOKE_CASES)
+
+    assert error is not None and "not found" in error
+
+
+def test_run_never_skips_a_case_but_degrades_timeout_after_a_real_timeout(monkeypatch, capsys) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(
         smoke,
@@ -225,20 +234,47 @@ def test_run_skips_remaining_cases_after_a_timeout_to_fail_fast(monkeypatch, cap
             ("atom.three", "scenario-three", {}),
         ),
     )
-    calls = []
+    seen_timeouts = []
 
     def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
-        calls.append(scenario_id)
+        seen_timeouts.append(timeout)
+        if scenario_id == "scenario-two":
+            return None
         return "SMOKE005: kernel_demo smoke check timed out after 30s"
 
     monkeypatch.setattr(smoke, "_run_one_case", fake_run_one_case)
 
-    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
-    assert calls == ["scenario-one"]
+    assert smoke.run("http://127.0.0.1:8000", timeout=30.0) == 1
+    # every case still ran (no skipping) despite the first timing out
+    assert seen_timeouts == [30.0, smoke.DEGRADED_TIMEOUT_SECONDS, smoke.DEGRADED_TIMEOUT_SECONDS]
     out, err = capsys.readouterr()
-    assert "0/3 kernel_demo atoms passed" in out
-    assert "atom.two: scenario-two -> failed (skipped" in err
-    assert "atom.three: scenario-three -> failed (skipped" in err
+    assert "atom.two: scenario-two -> ok" in out
+    assert "1/3 kernel_demo atoms passed" in out
+
+
+def test_run_does_not_misread_an_embedded_smoke005_substring_as_a_timeout(monkeypatch) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(
+        smoke,
+        "ATOM_SMOKE_CASES",
+        (
+            ("atom.one", "scenario-one", {}),
+            ("atom.two", "scenario-two", {}),
+        ),
+    )
+    seen_timeouts = []
+
+    def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
+        seen_timeouts.append(timeout)
+        if scenario_id == "scenario-one":
+            return "SMOKE004: kernel_demo session s1 failed: {'error': 'echoed SMOKE005 text'}"
+        return None
+
+    monkeypatch.setattr(smoke, "_run_one_case", fake_run_one_case)
+
+    smoke.run("http://127.0.0.1:8000", timeout=30.0)
+
+    assert seen_timeouts == [30.0, 30.0]
 
 
 def test_run_reports_full_pass_and_zero_exit(monkeypatch, capsys) -> None:

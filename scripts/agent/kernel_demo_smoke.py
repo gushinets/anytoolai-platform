@@ -116,7 +116,14 @@ ATOM_SMOKE_CASES = (
 def _required_action_types() -> frozenset[str]:
     """Derives required coverage from configs/kernel/action_definitions/*.yaml -- the source
     of truth for "generic action type" -- instead of a hardcoded list that a newly added atom
-    wouldn't move, so this check keeps catching drift as the kernel grows."""
+    wouldn't move, so this check keeps catching drift as the kernel grows.
+
+    ponytail: a raw filename glob, not the validated ConfigLoader registry the pytest matrix
+    uses (this script intentionally has no backend-package imports). A malformed/placeholder
+    file here would diverge between the two checks; validate-configs already fails on that
+    independently, so upgrade only if this script ever needs to run without a validate-configs
+    gate in front of it.
+    """
     return frozenset(path.stem for path in ACTION_DEFINITIONS_ROOT.glob("*.yaml"))
 
 
@@ -128,6 +135,12 @@ def _atom_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None
     action_types = [action_type for action_type, _, _ in cases]
     if len(action_types) != len(set(action_types)):
         return "SMOKE007: ATOM_SMOKE_CASES has duplicate action_type entries"
+    if not ACTION_DEFINITIONS_ROOT.is_dir():
+        return (
+            f"SMOKE007: cannot verify required atom coverage -- {ACTION_DEFINITIONS_ROOT} "
+            "not found (expected a full repo checkout with configs/kernel/action_definitions/ "
+            "two levels above this script)"
+        )
     covered = set(action_types)
     required = _required_action_types()
     if covered != required:
@@ -210,28 +223,28 @@ def _run_one_case(
     )
 
 
+DEGRADED_TIMEOUT_SECONDS = 5.0
+
+
 def run(api_url: str, timeout: float) -> int:
     passed = 0
-    # A completion timeout (SMOKE005) means platform-worker itself isn't consuming jobs, not
-    # that this one atom is broken -- every remaining case would time out the same way, so stop
-    # spending a full --timeout per case (11x stacking) and skip the rest instead of hanging.
-    worker_outage = False
+    # A completion timeout (SMOKE005) usually means platform-worker itself isn't consuming
+    # jobs, in which case every remaining case would also time out -- but it could also be a
+    # genuine per-atom bug, so every case still runs (skipping would hide real regressions).
+    # What's bounded instead is the cost: once a timeout is observed, remaining cases get a
+    # short probe timeout rather than the full budget, capping the 11x worst case without
+    # losing coverage. error.startswith (not "in") avoids misreading an echoed SMOKE005
+    # substring inside an unrelated SMOKE004 session-failure body as a real timeout.
+    case_timeout = timeout
     for action_type, scenario_id, scenario_input in ATOM_SMOKE_CASES:
-        if worker_outage:
-            print(
-                f"{action_type}: {scenario_id} -> failed (skipped: a prior case timed out, "
-                "platform-worker looks unhealthy)",
-                file=sys.stderr,
-            )
-            continue
-        error = _run_one_case(api_url, scenario_id, scenario_input, timeout)
+        error = _run_one_case(api_url, scenario_id, scenario_input, case_timeout)
         if error is None:
             passed += 1
             print(f"{action_type}: {scenario_id} -> ok")
         else:
             print(f"{action_type}: {scenario_id} -> failed ({error})", file=sys.stderr)
-            if "SMOKE005" in error:
-                worker_outage = True
+            if error.startswith("SMOKE005"):
+                case_timeout = min(case_timeout, DEGRADED_TIMEOUT_SECONDS)
 
     total = len(ATOM_SMOKE_CASES)
     print(f"{passed}/{total} kernel_demo atoms passed")
