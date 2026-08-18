@@ -328,6 +328,14 @@ def test_required_composite_workflow_ids_are_derived_from_workflows_config() -> 
     assert "kernel_demo.composite_analyze_and_clarify_v1" in required
 
 
+def test_required_composite_workflow_id_by_scenario_id_matches_real_config() -> None:
+    smoke = load_smoke_module()
+    binding = smoke._required_composite_workflow_id_by_scenario_id()
+    assert binding == {
+        scenario_id: workflow_id for workflow_id, scenario_id, _ in smoke.COMPOSITE_SMOKE_CASES
+    }
+
+
 def test_composite_coverage_error_reports_missing_workflow() -> None:
     smoke = load_smoke_module()
     cases = (("workflow.one", "scenario-one", {}),)
@@ -344,6 +352,74 @@ def test_composite_coverage_error_reports_missing_config_file_distinctly(monkeyp
     error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
 
     assert error is not None and "not found" in error
+
+
+def test_composite_coverage_error_reports_missing_scenarios_config_file_distinctly(
+    monkeypatch,
+) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "SCENARIOS_CONFIG_PATH", Path("/no/such/scenarios.yaml"))
+
+    error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
+
+    assert error is not None and "not found" in error
+
+
+def test_composite_coverage_error_reports_duplicate_scenario_id() -> None:
+    """A reused scenario_id under a second workflow label silently drops the workflow whose real
+    scenario got displaced -- each workflow_id and scenario_id can still individually be unique
+    per-field, so this must be checked as its own condition, not inferred from the workflow_id
+    duplicate check."""
+    smoke = load_smoke_module()
+    cases = (
+        (
+            "kernel_demo.composite_analyze_and_clarify_v1",
+            "kernel_demo.composite_analyze_and_clarify_smoke_v1",
+            {},
+        ),
+        (
+            "kernel_demo.composite_evaluate_match_v1",
+            "kernel_demo.composite_analyze_and_clarify_smoke_v1",
+            {},
+        ),
+        (
+            "kernel_demo.composite_shape_and_write_v1",
+            "kernel_demo.composite_shape_and_write_smoke_v1",
+            {},
+        ),
+    )
+
+    error = smoke._composite_coverage_error(cases)
+
+    assert error is not None and "SMOKE010" in error and "duplicate scenario_id" in error
+
+
+def test_composite_coverage_error_reports_scenario_workflow_mismatch() -> None:
+    """Two entries with scenario_ids swapped between workflow labels: workflow_id and
+    scenario_id sets are each still exactly the required 3, so only a real config-bound binding
+    check (not a duplicate check on either field) catches the mismatch."""
+    smoke = load_smoke_module()
+    cases = (
+        (
+            "kernel_demo.composite_analyze_and_clarify_v1",
+            "kernel_demo.composite_analyze_and_clarify_smoke_v1",
+            {},
+        ),
+        (
+            "kernel_demo.composite_evaluate_match_v1",
+            "kernel_demo.composite_shape_and_write_smoke_v1",
+            {},
+        ),
+        (
+            "kernel_demo.composite_shape_and_write_v1",
+            "kernel_demo.composite_evaluate_match_smoke_v1",
+            {},
+        ),
+    )
+
+    error = smoke._composite_coverage_error(cases)
+
+    assert error is not None and "SMOKE010" in error and "mismatch" in error
 
 
 def test_composite_coverage_error_reports_malformed_workflows_config_cleanly(

@@ -33,6 +33,9 @@ ATOM_MATRIX_DATA_PATH = REPO_ROOT / "tests" / "fixtures" / "kernel_demo" / "atom
 WORKFLOWS_CONFIG_PATH = (
     REPO_ROOT / "configs" / "kernel" / "products" / "kernel_demo" / "workflows.yaml"
 )
+SCENARIOS_CONFIG_PATH = (
+    REPO_ROOT / "configs" / "kernel" / "products" / "kernel_demo" / "scenarios.yaml"
+)
 _COMPOSITE_WORKFLOW_ID_PREFIX = "kernel_demo.composite_"
 
 
@@ -108,6 +111,26 @@ def _required_composite_workflow_ids() -> frozenset[str]:
         and isinstance(entry.get("workflow_id"), str)
         and entry["workflow_id"].startswith(_COMPOSITE_WORKFLOW_ID_PREFIX)
     )
+
+
+def _required_composite_workflow_id_by_scenario_id() -> dict[str, str]:
+    """Derives the real composite scenario_id -> workflow_id binding declared in
+    scenarios.yaml, filtered to composite workflows. Used to verify COMPOSITE_SMOKE_CASES'
+    (workflow_id, scenario_id) pairs match the actual config binding, not just that both sides
+    independently look plausible -- catches a scenario_id swapped between two composite entries,
+    which a duplicate-workflow_id or duplicate-scenario_id check alone would miss (each
+    workflow_id and scenario_id would still individually be unique, just paired with the wrong
+    partner)."""
+    with SCENARIOS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    return {
+        entry["scenario_id"]: entry["workflow_id"]
+        for entry in data.get("scenarios", [])
+        if isinstance(entry, dict)
+        and isinstance(entry.get("scenario_id"), str)
+        and isinstance(entry.get("workflow_id"), str)
+        and entry["workflow_id"].startswith(_COMPOSITE_WORKFLOW_ID_PREFIX)
+    }
 
 
 def _coverage_mismatch_error(
@@ -204,22 +227,27 @@ def _atom_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None
 
 def _composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None:
     """Composite counterpart of _atom_coverage_error() -- catches not just an empty
-    COMPOSITE_SMOKE_CASES but also a partial one (e.g. a merge drops 1 of 3 entries), which a
-    bare emptiness check would miss."""
+    COMPOSITE_SMOKE_CASES but also a partial one (e.g. a merge drops 1 of 3 entries), a reused
+    scenario_id (silently dropping the workflow whose scenario it displaced), and a scenario_id
+    swapped onto the wrong workflow_id label (each side would still individually be unique, just
+    paired with the wrong partner -- a bare duplicate check on either side alone would miss it)."""
     workflow_ids = [workflow_id for workflow_id, _, _ in cases]
-    if len(workflow_ids) != len(set(workflow_ids)):
-        return "SMOKE010: COMPOSITE_SMOKE_CASES has duplicate workflow_id entries"
-    if not WORKFLOWS_CONFIG_PATH.is_file():
-        return (
-            f"SMOKE010: cannot verify required composite coverage -- {WORKFLOWS_CONFIG_PATH} "
-            "not found"
-        )
+    scenario_ids = [scenario_id for _, scenario_id, _ in cases]
+    for field_name, ids in (("workflow_id", workflow_ids), ("scenario_id", scenario_ids)):
+        if len(ids) != len(set(ids)):
+            return f"SMOKE010: COMPOSITE_SMOKE_CASES has duplicate {field_name} entries"
+    for config_path in (WORKFLOWS_CONFIG_PATH, SCENARIOS_CONFIG_PATH):
+        if not config_path.is_file():
+            return (
+                f"SMOKE010: cannot verify required composite coverage -- {config_path} not found"
+            )
     try:
         required = _required_composite_workflow_ids()
+        workflow_id_by_scenario_id = _required_composite_workflow_id_by_scenario_id()
     except (OSError, yaml.YAMLError, AttributeError, TypeError) as exc:
         return (
-            f"SMOKE010: could not parse {WORKFLOWS_CONFIG_PATH} to verify required composite "
-            f"coverage: {exc}"
+            "SMOKE010: could not parse composite workflow/scenario config to verify required "
+            f"composite coverage: {exc}"
         )
     covered = set(workflow_ids)
     if covered != required:
@@ -230,6 +258,14 @@ def _composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str |
             tuple_name="COMPOSITE_SMOKE_CASES",
             kind="composite workflows",
         )
+    for workflow_id, scenario_id in zip(workflow_ids, scenario_ids, strict=True):
+        expected_workflow_id = workflow_id_by_scenario_id.get(scenario_id)
+        if expected_workflow_id != workflow_id:
+            return (
+                f"SMOKE010: COMPOSITE_SMOKE_CASES pairs scenario {scenario_id!r} with workflow "
+                f"{workflow_id!r}, but scenarios.yaml binds that scenario to "
+                f"{expected_workflow_id!r} -- scenario/workflow mismatch"
+            )
     return None
 
 
