@@ -121,8 +121,14 @@ def test_build_output_cross_validators_raises_on_ref_for_different_action_type()
         ),
     }
 
-    with pytest.raises(ValidatorRefNotFoundError):
+    with pytest.raises(ValidatorRefNotFoundError) as exc_info:
         build_output_cross_validators(definitions)
+
+    error = exc_info.value
+    assert error.mismatched_owner is True
+    assert "is registered for 'text.compose_reply', not 'text.extract_structured_fields'" in str(
+        error
+    )
 
 
 def test_build_output_cross_validators_raises_on_unknown_ref() -> None:
