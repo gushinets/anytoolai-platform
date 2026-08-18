@@ -101,7 +101,12 @@ def _required_composite_workflow_ids() -> frozenset[str]:
     filtered to the kernel_demo.composite_ naming convention -- the composite counterpart of
     _required_action_types() above, adapted because all composite workflows share one YAML file
     instead of one file per atom. Raw YAML parse, not the validated ConfigLoader registry (same
-    intentional no-backend-package-imports design as the rest of this script)."""
+    intentional no-backend-package-imports design as the rest of this script).
+
+    ponytail: shares _required_action_types()'s CI-ordering caveat -- this script and the
+    validate-configs baseline job are siblings with no `needs:` ordering, so a malformed
+    workflows.yaml could in principle fail this coverage check before/concurrently with
+    baseline's own failure, same trade-off documented there."""
     with WORKFLOWS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle)
     return frozenset(
@@ -411,19 +416,6 @@ def _run_one_case(api_url: str, scenario_id: str, scenario_input: dict, timeout:
 DEGRADED_TIMEOUT_SECONDS = 5.0
 
 
-def _empty_cases_error(
-    cases: tuple[tuple[str, str, dict], ...], *, tuple_name: str, error_code: str
-) -> str | None:
-    """Shared by both run()-level empty-tuple guards below. A cheap non-emptiness check, distinct
-    from _atom_coverage_error()/_composite_coverage_error() (called from main(), and which also
-    validate real coverage against the kernel configs) -- this one exists so run() still fails
-    closed on a fully empty tuple even when called directly, bypassing main(), as several unit
-    tests do."""
-    if not cases:
-        return f"{error_code}: {tuple_name} is empty -- nothing to smoke-test"
-    return None
-
-
 def _run_case_batch(
     api_url: str,
     cases: tuple[tuple[str, str, dict], ...],
@@ -460,22 +452,18 @@ def _run_case_batch(
 
 def run(api_url: str, timeout: float) -> int:
     total = len(ATOM_SMOKE_CASES)
-    empty_error = _empty_cases_error(
-        ATOM_SMOKE_CASES, tuple_name="ATOM_SMOKE_CASES", error_code="SMOKE007"
-    )
-    if empty_error is not None:
-        print(empty_error, file=sys.stderr)
+    if not ATOM_SMOKE_CASES:
+        print("SMOKE007: ATOM_SMOKE_CASES is empty -- nothing to smoke-test", file=sys.stderr)
         return 1
 
     passed, case_timeout = _run_case_batch(api_url, ATOM_SMOKE_CASES, timeout, timeout)
     print(f"{passed}/{total} kernel_demo atoms passed")
 
     composite_total = len(COMPOSITE_SMOKE_CASES)
-    empty_error = _empty_cases_error(
-        COMPOSITE_SMOKE_CASES, tuple_name="COMPOSITE_SMOKE_CASES", error_code="SMOKE010"
-    )
-    if empty_error is not None:
-        print(empty_error, file=sys.stderr)
+    if not COMPOSITE_SMOKE_CASES:
+        print(
+            "SMOKE010: COMPOSITE_SMOKE_CASES is empty -- nothing to smoke-test", file=sys.stderr
+        )
         return 1
 
     composite_passed, _case_timeout = _run_case_batch(
