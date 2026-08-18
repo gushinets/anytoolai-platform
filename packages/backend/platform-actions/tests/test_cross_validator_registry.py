@@ -112,6 +112,19 @@ def test_build_input_validators_raises_on_none_ref_with_registered_class() -> No
         build_input_validators(definitions)
 
 
+def test_build_output_cross_validators_raises_on_ref_for_different_action_type() -> None:
+    definitions = {
+        "text.extract_structured_fields": _definition(
+            "text.extract_structured_fields",
+            cross_validator_ref="text.compose_reply",
+            input_validator_ref="none",
+        ),
+    }
+
+    with pytest.raises(ValidatorRefNotFoundError):
+        build_output_cross_validators(definitions)
+
+
 def test_build_output_cross_validators_raises_on_unknown_ref() -> None:
     definitions = {
         "text.compose_reply": _definition(

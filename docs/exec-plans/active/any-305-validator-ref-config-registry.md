@@ -5,9 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-08-14
-- Last updated: 2026-08-14
-- Review date: 2026-08-14
-- Next action: none — implementation and two rounds of review-finding fixes landed; move to
+- Last updated: 2026-08-17
+- Review date: 2026-08-17
+- Next action: none — implementation and three rounds of review-finding fixes landed; move to
   `completed/` once merged.
 - Blocker: none
 
@@ -138,6 +138,9 @@ or worker startup) instead of silently running unvalidated.
       `build_worker` fail-closed test, decision-log correction) to confirm still green.
 - [x] Re-run `quick-check` after the third review round (shared `_resolve_validators` helper,
       `input_validator_ref` null-ref test) to confirm still green.
+- [x] `uv run pytest apps/platform-worker/tests/test_worker_boot.py::test_build_worker_fails_closed_on_unresolvable_validator_ref`
+      — run standalone (distinct from `quick-check`) to explicitly confirm worker-startup
+      fail-closed behavior: passed.
 
 ## Decision log
 
@@ -160,6 +163,7 @@ or worker startup) instead of silently running unvalidated.
 | 2026-08-16 | Second `main` merge (bringing in ANY-256 `text.score_match_by_rubric`) reproduced the exact same wiring gap: `ScoreMatchByRubricCrossValidator`/`ScoreMatchByRubricInputValidator` existed and were exported from `cross_validation/__init__.py`, but `registry.py`'s lookup dicts and the YAML refs were left at `"none"`/`"none"`. This time `composition.py`/`test_action_runner.py` conflict resolution kept the builder-function imports cleanly (no dead imports). Wired the new atom through `registry.py` + YAML, updated `test_cross_validator_registry.py`'s expected sets. This confirms the wiring gap is a recurring merge hazard, not a one-off — every `main` merge that lands a new atom with real validator classes needs this check until validator wiring gets a fail-closed test that runs without a live Postgres DB (see note below). | Re-run `quick-check` and targeted suite, commit. |
 | 2026-08-17 | Third `main` merge (bringing in ANY-257 `text.score_multidimensional_axes`) reproduced the same wiring gap a third time: `ScoreMultidimensionalAxesCrossValidator`/`ScoreMultidimensionalAxesInputValidator` existed and were exported, but `registry.py`'s dicts and the YAML refs were left at `"none"`/`"none"`. `composition.py`/`test_action_runner.py` again merged cleanly with no dead imports — the ANY-257 branch itself had already fixed several other main-merge casualties upstream (dropped validator classes, dead `cross_validation.py` stub, stale generated docs) before this merge landed. Wired the new atom through `registry.py` + YAML, updated `test_cross_validator_registry.py`'s expected sets. TD-010 is down to 1 atom (`document.generate_from_template`) — every other atom shipped with a real validator class is wired. No leftover conflict markers found repo-wide (`grep <<<<<<<`). | Re-run `quick-check` and targeted suite, commit. |
 | 2026-08-17 | Added `test_every_validator_class_defined_in_cross_validation_is_registered`, a DB-free unit test that would have caught all three merge-hazard regressions above automatically. Verified it fails on the exact pattern (temporarily dropped one registry entry, confirmed failure, restored). `quick-check` green (697 passed). | Commit. |
+| 2026-08-18 | Follow-up review found `_resolve_validators` looked a ref up in `lookup` without checking it matched its own `action_type`, so a misconfigured YAML ref borrowed from a different atom (e.g. `text.extract_structured_fields` set to `cross_validator_ref: text.compose_reply`) would silently wire the wrong validator instead of failing — violating this plan's own decision-log invariant that ref value is the action_type itself. Fixed: added `ref != action_type` to the reject condition in `_resolve_validators`, added `test_build_output_cross_validators_raises_on_ref_for_different_action_type`. Confirmed no real config YAML relies on a cross-atom ref (all 11 already satisfy `ref in (action_type, "none")`). Also fixed stale header dates/round count and added the standalone `test_build_worker_fails_closed_on_unresolvable_validator_ref` run to Validation. `quick-check` green (712 passed). | Commit. |
 
 ## Open questions
 

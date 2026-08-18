@@ -89,7 +89,7 @@ def _resolve_validators(
                 )
             continue
         validator_cls = lookup.get(ref)
-        if validator_cls is None:
+        if validator_cls is None or ref != action_type:
             raise ValidatorRefNotFoundError(ref=ref, field_name=field_name, action_type=action_type)
         validators[action_type] = validator_cls()
     return validators
