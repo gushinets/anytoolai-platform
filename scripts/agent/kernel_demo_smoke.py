@@ -21,8 +21,11 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 FRONTEND_ID = "kernel_demo_ce"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ACTION_DEFINITIONS_ROOT = REPO_ROOT / "configs" / "kernel" / "action_definitions"
 
 # One (action_type, scenario_id, start_input) tuple per generic action type -- the same 11
 # cases ATOM_MATRIX in apps/platform-api/tests/test_atom_runtime_matrix.py exercises over
@@ -110,24 +113,12 @@ ATOM_SMOKE_CASES = (
         {"source_text": "The proposal states its point directly."},
     ),
 )
-# The required action-type coverage from ANY-218's "Required matrix coverage" list -- kept
-# separate from ATOM_SMOKE_CASES so a case silently dropped from that tuple (e.g. during a
-# future edit) fails main() loudly instead of just shrinking the N/N total and staying green.
-REQUIRED_ACTION_TYPES = frozenset(
-    {
-        "text.extract_structured_fields",
-        "text.detect_issues_by_taxonomy",
-        "text.compose_reply",
-        "text.generate_clarifying_questions",
-        "text.synthesize_angle",
-        "text.compose_persuasive_text",
-        "text.generate_gap_rewrites",
-        "text.compare_and_classify",
-        "text.score_match_by_rubric",
-        "text.score_multidimensional_axes",
-        "document.generate_from_template",
-    }
-)
+def _required_action_types() -> frozenset[str]:
+    """Derives required coverage from configs/kernel/action_definitions/*.yaml -- the source
+    of truth for "generic action type" -- instead of a hardcoded list that a newly added atom
+    wouldn't move, so this check keeps catching drift as the kernel grows."""
+    return frozenset(path.stem for path in ACTION_DEFINITIONS_ROOT.glob("*.yaml"))
+
 
 POLL_INTERVAL_SECONDS = 0.5
 DEFAULT_TIMEOUT_SECONDS = 30.0
@@ -138,9 +129,10 @@ def _atom_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None
     if len(action_types) != len(set(action_types)):
         return "SMOKE007: ATOM_SMOKE_CASES has duplicate action_type entries"
     covered = set(action_types)
-    if covered != REQUIRED_ACTION_TYPES:
-        missing = sorted(REQUIRED_ACTION_TYPES - covered)
-        extra = sorted(covered - REQUIRED_ACTION_TYPES)
+    required = _required_action_types()
+    if covered != required:
+        missing = sorted(required - covered)
+        extra = sorted(covered - required)
         return (
             f"SMOKE007: ATOM_SMOKE_CASES does not cover the required 11 action types "
             f"(missing={missing}, extra={extra})"
@@ -220,13 +212,26 @@ def _run_one_case(
 
 def run(api_url: str, timeout: float) -> int:
     passed = 0
+    # A completion timeout (SMOKE005) means platform-worker itself isn't consuming jobs, not
+    # that this one atom is broken -- every remaining case would time out the same way, so stop
+    # spending a full --timeout per case (11x stacking) and skip the rest instead of hanging.
+    worker_outage = False
     for action_type, scenario_id, scenario_input in ATOM_SMOKE_CASES:
+        if worker_outage:
+            print(
+                f"{action_type}: {scenario_id} -> failed (skipped: a prior case timed out, "
+                "platform-worker looks unhealthy)",
+                file=sys.stderr,
+            )
+            continue
         error = _run_one_case(api_url, scenario_id, scenario_input, timeout)
         if error is None:
             passed += 1
             print(f"{action_type}: {scenario_id} -> ok")
         else:
             print(f"{action_type}: {scenario_id} -> failed ({error})", file=sys.stderr)
+            if "SMOKE005" in error:
+                worker_outage = True
 
     total = len(ATOM_SMOKE_CASES)
     print(f"{passed}/{total} kernel_demo atoms passed")

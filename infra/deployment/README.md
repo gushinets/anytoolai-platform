@@ -110,16 +110,18 @@ Compose config boots — not just that it's syntactically valid:
 
 - **`dev-ready` / `prod-ready`** poll `platform-api`'s `/health` endpoint. This proves
   `platform-api` itself came up and is answering HTTP requests — nothing more.
-- **`dev-smoke` / `prod-smoke`** drive a real job through the stack via
-  `scripts/agent/kernel_demo_smoke.py`: create a guest identity, start the
-  `kernel_demo.single_action_smoke_v1` scenario (its action config uses the fake provider, so
-  this makes no external calls and needs no API keys), then poll until it completes. This is the
-  only thing that proves **`platform-worker`** is actually healthy — it has no Docker healthcheck
-  and no HTTP surface of its own (`infra/docker/platform-worker.Dockerfile` is a plain DB-polling
-  loop with no `healthcheck:` in `docker-compose.yml`), so `docker compose ps` reporting it as
-  "running" only means the process hasn't crashed, not that it's consuming jobs from the queue.
-  A stopped or wedged `platform-worker` (`docker compose stop platform-worker`) makes `*-smoke`
-  fail with a clear `SMOKE00x` error instead of hanging or silently reporting success.
+- **`dev-smoke` / `prod-smoke`** drive real jobs through the stack via
+  `scripts/agent/kernel_demo_smoke.py`: for each of the 11 kernel_demo standalone atom
+  scenarios (`ATOM_SMOKE_CASES`, one per generic action type), create a fresh guest identity,
+  start the scenario (its action config uses the fake provider, so this makes no external calls
+  and needs no API keys), then poll until it completes, reporting an explicit `N/11` result. This
+  is the only thing that proves **`platform-worker`** is actually healthy — it has no Docker
+  healthcheck and no HTTP surface of its own (`infra/docker/platform-worker.Dockerfile` is a
+  plain DB-polling loop with no `healthcheck:` in `docker-compose.yml`), so `docker compose ps`
+  reporting it as "running" only means the process hasn't crashed, not that it's consuming jobs
+  from the queue. A stopped or wedged `platform-worker` (`docker compose stop platform-worker`)
+  makes `*-smoke` fail fast with a clear `SMOKE00x` error instead of hanging or silently
+  reporting success.
 
 `kernel_demo_smoke.py` is a standalone script (same `argparse`/`main()` convention as
 `validate_configs.py`), so it can also be run directly against any reachable `platform-api`:

@@ -198,6 +198,13 @@ def test_atom_smoke_cases_cover_the_required_eleven_action_types() -> None:
     assert len(smoke.ATOM_SMOKE_CASES) == 11
 
 
+def test_required_action_types_are_derived_from_action_definitions_config() -> None:
+    smoke = load_smoke_module()
+    required = smoke._required_action_types()
+    assert required == {action_type for action_type, _, _ in smoke.ATOM_SMOKE_CASES}
+    assert "text.extract_structured_fields" in required
+
+
 def test_atom_coverage_error_reports_missing_action_type() -> None:
     smoke = load_smoke_module()
     cases = (("atom.one", "scenario-one", {}),)
@@ -205,6 +212,33 @@ def test_atom_coverage_error_reports_missing_action_type() -> None:
     error = smoke._atom_coverage_error(cases)
 
     assert error is not None and "SMOKE007" in error
+
+
+def test_run_skips_remaining_cases_after_a_timeout_to_fail_fast(monkeypatch, capsys) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(
+        smoke,
+        "ATOM_SMOKE_CASES",
+        (
+            ("atom.one", "scenario-one", {}),
+            ("atom.two", "scenario-two", {}),
+            ("atom.three", "scenario-three", {}),
+        ),
+    )
+    calls = []
+
+    def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
+        calls.append(scenario_id)
+        return "SMOKE005: kernel_demo smoke check timed out after 30s"
+
+    monkeypatch.setattr(smoke, "_run_one_case", fake_run_one_case)
+
+    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
+    assert calls == ["scenario-one"]
+    out, err = capsys.readouterr()
+    assert "0/3 kernel_demo atoms passed" in out
+    assert "atom.two: scenario-two -> failed (skipped" in err
+    assert "atom.three: scenario-three -> failed (skipped" in err
 
 
 def test_run_reports_full_pass_and_zero_exit(monkeypatch, capsys) -> None:

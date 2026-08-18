@@ -11,8 +11,10 @@ not a refactor of it.
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterator
 
 import pytest
@@ -39,7 +41,10 @@ from test_scenario_runtime_api import CONFIG_ROOT, FIXTURE_ROOT, _create_test_ap
 
 from tests.db_support import provision_database
 
-pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
+# Deliberately NOT a module-level pytestmark: test_atom_runtime_matrix_reports_eleven_of_eleven
+# and test_atom_smoke_cases_match_atom_matrix below do no DB I/O and must keep running under
+# quick-check's "not slow" pytest subset -- only the parametrized DB-backed test needs
+# postgresql/slow.
 
 
 @pytest.fixture
@@ -176,21 +181,6 @@ ATOM_MATRIX: tuple[AtomCase, ...] = (
     ),
 )
 
-_EXPECTED_ACTION_TYPES = {
-    "text.extract_structured_fields",
-    "text.detect_issues_by_taxonomy",
-    "text.compose_reply",
-    "text.generate_clarifying_questions",
-    "text.synthesize_angle",
-    "text.compose_persuasive_text",
-    "text.generate_gap_rewrites",
-    "text.compare_and_classify",
-    "text.score_match_by_rubric",
-    "text.score_multidimensional_axes",
-    "document.generate_from_template",
-}
-
-
 def _fixture_response_json(action_config_id: str) -> dict[str, Any]:
     fixture_path = FIXTURE_ROOT / f"{action_config_id}.json"
     with fixture_path.open("r", encoding="utf-8") as handle:
@@ -310,6 +300,8 @@ def _run_single_action_scenario_and_assert_full_path(
     assert result_body["output"] == _fixture_response_json(case.action_config_id)
 
 
+@pytest.mark.postgresql
+@pytest.mark.slow
 @pytest.mark.parametrize("case", ATOM_MATRIX, ids=lambda c: c.action_type)
 def test_atom_runtime_matrix(session_factory: SessionFactory, case: AtomCase) -> None:
     app = _create_test_app(session_factory)
@@ -317,15 +309,19 @@ def test_atom_runtime_matrix(session_factory: SessionFactory, case: AtomCase) ->
 
 
 def test_atom_runtime_matrix_reports_eleven_of_eleven() -> None:
+    registry = ConfigLoader(CONFIG_ROOT).load()
+    # Derived from configs/kernel/action_definitions/*.yaml, the source of truth for "generic
+    # action type", instead of a hardcoded 11-item set that a newly added atom wouldn't move.
+    expected_action_types = set(registry.action_definitions.keys())
+
     covered_action_types = {case.action_type for case in ATOM_MATRIX}
-    assert covered_action_types == _EXPECTED_ACTION_TYPES
-    assert len(ATOM_MATRIX) == 11
-    assert len({case.scenario_id for case in ATOM_MATRIX}) == 11, (
+    assert covered_action_types == expected_action_types
+    assert len(ATOM_MATRIX) == len(expected_action_types)
+    assert len({case.scenario_id for case in ATOM_MATRIX}) == len(ATOM_MATRIX), (
         "ATOM_MATRIX scenario_ids must be unique; a duplicate would silently cover the "
         "same scenario twice instead of a distinct atom"
     )
 
-    registry = ConfigLoader(CONFIG_ROOT).load()
     for case in ATOM_MATRIX:
         # Binds the mapping end-to-end: scenario_id -> workflow's single step ->
         # action_config_id -> action_type, so a swapped action_type label on an otherwise
@@ -379,3 +375,30 @@ def test_atom_runtime_matrix_reports_eleven_of_eleven() -> None:
             f"{action_schema_ref} has no declared properties; a placeholder atom cannot "
             "count toward 11/11"
         )
+
+
+def _load_kernel_demo_smoke_module() -> Any:
+    module_path = Path(__file__).resolve().parents[3] / "scripts" / "agent" / "kernel_demo_smoke.py"
+    spec = importlib.util.spec_from_file_location("kernel_demo_smoke_module", module_path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_atom_smoke_cases_match_atom_matrix() -> None:
+    """ATOM_MATRIX (this file) and ATOM_SMOKE_CASES (kernel_demo_smoke.py) are two
+    independently hand-maintained lists of the same 11 cases -- kernel_demo_smoke.py
+    deliberately has no backend-package imports so it can run against a container with only
+    the image's runtime deps, so it can't just import ATOM_MATRIX directly. This locks the two
+    lists together so a scenario_id rename or start_input change updated in only one of them
+    fails here instead of passing both files' self-consistency checks silently."""
+    smoke = _load_kernel_demo_smoke_module()
+
+    smoke_cases = {
+        action_type: (scenario_id, start_input)
+        for action_type, scenario_id, start_input in smoke.ATOM_SMOKE_CASES
+    }
+    matrix_cases = {case.action_type: (case.scenario_id, case.start_input) for case in ATOM_MATRIX}
+    assert smoke_cases == matrix_cases
