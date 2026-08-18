@@ -256,6 +256,7 @@ workflows:
           data.source_text: scenario.input.source_text
           data.extracted: steps.extract.output
           data.issues: steps.detect_issues.output
+          data.questions: steps.generate_questions.output
         output_mapping:
           context.workflow_output: steps.generate_report.output
 
@@ -284,7 +285,7 @@ workflows:
       - step_id: score_multidimensional_axes
         action_config_id: kernel_demo.score_multidimensional_axes_v1
         input_mapping:
-          text: scenario.input.source_text
+          text: steps.compare_and_classify.output.rationale
           axes: 'literal:[{"id":"clarity","description":"How clear the text is.","weight":1},{"id":"structure","description":"How well organized the text is.","weight":1}]'
         output_mapping:
           context.workflow_output: steps.score_multidimensional_axes.output
