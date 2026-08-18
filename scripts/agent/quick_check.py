@@ -28,6 +28,7 @@ PYTEST_TARGETS = [
     "tests/test_docs_generation.py",
     "tests/test_validate_docs.py",
     "tests/test_collect_context.py",
+    "tests/test_kernel_demo_smoke.py",
     "packages/backend/platform-sdk/tests",
     "packages/backend/platform-core/tests",
     "packages/backend/platform-actions/tests",

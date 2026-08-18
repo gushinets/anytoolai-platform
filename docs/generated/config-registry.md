@@ -51,7 +51,17 @@ Canonical source: configs/kernel via ConfigLoader.
 - kernel_demo.extract_detect_report_v1
 - kernel_demo.handoff_smoke_source_extract_v1
 - kernel_demo.retry_extract_v1
+- kernel_demo.single_action_compare_and_classify_v1
+- kernel_demo.single_action_compose_persuasive_text_v1
+- kernel_demo.single_action_compose_reply_v1
+- kernel_demo.single_action_detect_issues_v1
 - kernel_demo.single_action_extract_v1
+- kernel_demo.single_action_generate_clarifying_questions_v1
+- kernel_demo.single_action_generate_gap_rewrites_v1
+- kernel_demo.single_action_generate_report_v1
+- kernel_demo.single_action_score_match_by_rubric_v1
+- kernel_demo.single_action_score_multidimensional_axes_v1
+- kernel_demo.single_action_synthesize_angle_v1
 
 ## Scenarios
 
@@ -60,7 +70,17 @@ Canonical source: configs/kernel via ConfigLoader.
 - kernel_demo.handoff_smoke_target_v1
 - kernel_demo.multi_step_workflow_smoke_v1
 - kernel_demo.quota_exhausted_smoke_v1
+- kernel_demo.single_action_compare_and_classify_smoke_v1
+- kernel_demo.single_action_compose_persuasive_text_smoke_v1
+- kernel_demo.single_action_compose_reply_smoke_v1
+- kernel_demo.single_action_detect_issues_smoke_v1
+- kernel_demo.single_action_generate_clarifying_questions_smoke_v1
+- kernel_demo.single_action_generate_gap_rewrites_smoke_v1
+- kernel_demo.single_action_generate_report_smoke_v1
+- kernel_demo.single_action_score_match_by_rubric_smoke_v1
+- kernel_demo.single_action_score_multidimensional_axes_smoke_v1
 - kernel_demo.single_action_smoke_v1
+- kernel_demo.single_action_synthesize_angle_smoke_v1
 
 ## Products
 
