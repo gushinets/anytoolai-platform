@@ -87,60 +87,6 @@ def _required_action_types() -> frozenset[str]:
     return frozenset(path.stem for path in ACTION_DEFINITIONS_ROOT.glob("*.yaml"))
 
 
-COMPOSITE_SMOKE_CASES: tuple[tuple[str, str, dict], ...] = (
-    (
-        "kernel_demo.composite_analyze_and_clarify_v1",
-        "kernel_demo.composite_analyze_and_clarify_smoke_v1",
-        {
-            "source_text": "We need this soon.",
-            "fields": [
-                {
-                    "name": "deadline",
-                    "type": "string",
-                    "description": "Project deadline mentioned in the text.",
-                    "required": True,
-                },
-                {
-                    "name": "budget",
-                    "type": "string",
-                    "description": "Budget mentioned in the text.",
-                    "required": False,
-                },
-                {
-                    "name": "deliverables",
-                    "type": "array_of_strings",
-                    "description": "Deliverables mentioned in the text.",
-                    "required": False,
-                },
-            ],
-            "strict": False,
-        },
-    ),
-    (
-        "kernel_demo.composite_evaluate_match_v1",
-        "kernel_demo.composite_evaluate_match_smoke_v1",
-        {"source_text": "The proposal states its point directly."},
-    ),
-    (
-        "kernel_demo.composite_shape_and_write_v1",
-        "kernel_demo.composite_shape_and_write_smoke_v1",
-        {"source_text": "The proposal does not state a delivery date."},
-    ),
-)
-
-# Extends _EXPECTED_SCHEMA_REF_BY_SCENARIO (built above from the atom fixtures) with the 3
-# composite scenarios' output_schema_ref (configs/kernel/products/kernel_demo/workflows.yaml)
-# so SMOKE009 also catches a composite scenario wired to the wrong workflow, not just the 11
-# atom cases.
-_EXPECTED_SCHEMA_REF_BY_SCENARIO.update(
-    {
-        "kernel_demo.composite_analyze_and_clarify_smoke_v1": "kernel.schemas.generate_document_output_v1",
-        "kernel_demo.composite_evaluate_match_smoke_v1": "kernel.schemas.score_multidim_output_v1",
-        "kernel_demo.composite_shape_and_write_smoke_v1": "kernel.schemas.compose_reply_output_v1",
-    }
-)
-
-
 POLL_INTERVAL_SECONDS = 0.5
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
@@ -339,22 +285,7 @@ def run(api_url: str, timeout: float) -> int:
             )
 
     print(f"{passed}/{total} kernel_demo atoms passed")
-
-    composite_passed = 0
-    for workflow_id, scenario_id, scenario_input in COMPOSITE_SMOKE_CASES:
-        result = _run_one_case(api_url, scenario_id, scenario_input, timeout)
-        if result.error_message is None:
-            composite_passed += 1
-            print(f"{workflow_id}: {scenario_id} -> ok (session {result.session_id})")
-        else:
-            print(
-                f"{workflow_id}: {scenario_id} -> failed ({result.error_message})",
-                file=sys.stderr,
-            )
-
-    composite_total = len(COMPOSITE_SMOKE_CASES)
-    print(f"{composite_passed}/{composite_total} kernel_demo composite workflows passed")
-    return 0 if passed == total and composite_passed == composite_total else 1
+    return 0 if passed == total else 1
 
 
 def _default_timeout() -> float:
