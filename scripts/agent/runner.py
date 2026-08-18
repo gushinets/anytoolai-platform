@@ -627,6 +627,17 @@ def dev_smoke() -> int:
     return run([sys.executable, "scripts/agent/kernel_demo_smoke.py", identity.api_url])
 
 
+def atoms_proof() -> int:
+    try:
+        identity = runtime_identity()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
+    return run(
+        [sys.executable, "scripts/agent/atoms_proof.py", identity.api_url, identity.database_url]
+    )
+
+
 def _prod_compose_command(*args: str) -> list[str]:
     env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
     return _docker_compose_command(
@@ -749,6 +760,7 @@ COMMANDS = {
     "dev-status": dev_status,
     "dev-down": dev_down,
     "dev-smoke": dev_smoke,
+    "atoms-proof": atoms_proof,
     "prod-up": prod_up,
     "prod-ready": prod_ready,
     "prod-status": prod_status,
