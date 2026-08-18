@@ -170,6 +170,7 @@ def test_run_reports_partial_pass_count_and_nonzero_exit(monkeypatch, capsys) ->
             ("atom.two", "scenario-two", {}),
         ),
     )
+    monkeypatch.setattr(smoke, "COMPOSITE_SMOKE_CASES", ())
     monkeypatch.setattr(
         smoke,
         "_http_json_request",
@@ -199,6 +200,7 @@ def test_run_reports_full_pass_and_zero_exit(monkeypatch, capsys) -> None:
         "ATOM_SMOKE_CASES",
         (("atom.one", "scenario-one", {}),),
     )
+    monkeypatch.setattr(smoke, "COMPOSITE_SMOKE_CASES", ())
     monkeypatch.setattr(
         smoke,
         "_http_json_request",
@@ -213,3 +215,37 @@ def test_run_reports_full_pass_and_zero_exit(monkeypatch, capsys) -> None:
 
     assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 0
     assert "1/1 kernel_demo atoms passed" in capsys.readouterr().out
+
+
+def test_run_fails_when_atoms_pass_but_a_composite_workflow_fails(monkeypatch, capsys) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(
+        smoke,
+        "ATOM_SMOKE_CASES",
+        (("atom.one", "scenario-one", {}),),
+    )
+    monkeypatch.setattr(
+        smoke,
+        "COMPOSITE_SMOKE_CASES",
+        (("workflow.one", "scenario-composite", {}),),
+    )
+    monkeypatch.setattr(
+        smoke,
+        "_http_json_request",
+        _sequenced_request(
+            [
+                {"guest_id": "guest-1"},
+                {"scenario_session_id": "session-1"},
+                {"status": "completed", "result_artifact_id": "artifact-1"},
+                {"guest_id": "guest-2"},
+                {"scenario_session_id": "session-2"},
+                {"status": "failed", "error": "provider blew up"},
+            ]
+        ),
+    )
+
+    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
+    out, err = capsys.readouterr()
+    assert "1/1 kernel_demo atoms passed" in out
+    assert "0/1 kernel_demo composite workflows passed" in out
+    assert "workflow.one: scenario-composite -> failed" in err
