@@ -110,8 +110,42 @@ ATOM_SMOKE_CASES = (
         {"source_text": "The proposal states its point directly."},
     ),
 )
+# The required action-type coverage from ANY-218's "Required matrix coverage" list -- kept
+# separate from ATOM_SMOKE_CASES so a case silently dropped from that tuple (e.g. during a
+# future edit) fails main() loudly instead of just shrinking the N/N total and staying green.
+REQUIRED_ACTION_TYPES = frozenset(
+    {
+        "text.extract_structured_fields",
+        "text.detect_issues_by_taxonomy",
+        "text.compose_reply",
+        "text.generate_clarifying_questions",
+        "text.synthesize_angle",
+        "text.compose_persuasive_text",
+        "text.generate_gap_rewrites",
+        "text.compare_and_classify",
+        "text.score_match_by_rubric",
+        "text.score_multidimensional_axes",
+        "document.generate_from_template",
+    }
+)
+
 POLL_INTERVAL_SECONDS = 0.5
 DEFAULT_TIMEOUT_SECONDS = 30.0
+
+
+def _atom_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None:
+    action_types = [action_type for action_type, _, _ in cases]
+    if len(action_types) != len(set(action_types)):
+        return "SMOKE007: ATOM_SMOKE_CASES has duplicate action_type entries"
+    covered = set(action_types)
+    if covered != REQUIRED_ACTION_TYPES:
+        missing = sorted(REQUIRED_ACTION_TYPES - covered)
+        extra = sorted(covered - REQUIRED_ACTION_TYPES)
+        return (
+            f"SMOKE007: ATOM_SMOKE_CASES does not cover the required 11 action types "
+            f"(missing={missing}, extra={extra})"
+        )
+    return None
 
 
 def _http_json_request(
@@ -225,6 +259,12 @@ def main() -> int:
         "also settable via ANYTOOLAI_SMOKE_TIMEOUT)",
     )
     args = parser.parse_args()
+
+    coverage_error = _atom_coverage_error(ATOM_SMOKE_CASES)
+    if coverage_error is not None:
+        print(coverage_error, file=sys.stderr)
+        return 1
+
     return run(args.api_url.rstrip("/"), args.timeout)
 
 

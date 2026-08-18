@@ -278,6 +278,8 @@ def _run_single_action_scenario_and_assert_full_path(
     assert job.result_artifact_id == processed.result_artifact_id
 
     assert action_run["scenario_session_id"] == started["scenario_session_id"]
+    assert action_run["action_type"] == case.action_type
+    assert action_run["action_config_id"] == case.action_config_id
     assert provider_call["scenario_session_id"] == started["scenario_session_id"]
     assert provider_call["job_id"] == started["job_id"]
     assert provider_call["action_run_id"] == action_run["id"]
@@ -318,9 +320,28 @@ def test_atom_runtime_matrix_reports_eleven_of_eleven() -> None:
     covered_action_types = {case.action_type for case in ATOM_MATRIX}
     assert covered_action_types == _EXPECTED_ACTION_TYPES
     assert len(ATOM_MATRIX) == 11
+    assert len({case.scenario_id for case in ATOM_MATRIX}) == 11, (
+        "ATOM_MATRIX scenario_ids must be unique; a duplicate would silently cover the "
+        "same scenario twice instead of a distinct atom"
+    )
 
     registry = ConfigLoader(CONFIG_ROOT).load()
     for case in ATOM_MATRIX:
+        # Binds the mapping end-to-end: scenario_id -> workflow's single step ->
+        # action_config_id -> action_type, so a swapped action_type label on an otherwise
+        # matching case is caught here instead of silently reporting 11/11.
+        scenario_definition = registry.get_scenario(case.scenario_id)
+        assert scenario_definition is not None, f"missing scenario definition for {case.scenario_id}"
+        workflow_definition = registry.get_workflow(scenario_definition.workflow_id)
+        assert workflow_definition is not None, (
+            f"missing workflow definition for {scenario_definition.workflow_id}"
+        )
+        assert len(workflow_definition.steps) == 1, (
+            f"{scenario_definition.workflow_id} must be a single-action workflow for the "
+            "standalone atom matrix"
+        )
+        assert workflow_definition.steps[0].action_config_id == case.action_config_id
+
         # result_body["schema_ref"] reflects the *workflow's* output_schema_ref, which for
         # the pre-existing extract workflow is a permissive pass-through wrapper -- the real
         # non-permissive contract enforced on every provider response is the *action's*
@@ -335,6 +356,7 @@ def test_atom_runtime_matrix_reports_eleven_of_eleven() -> None:
         assert action_configuration is not None, (
             f"missing action configuration for {case.action_config_id}"
         )
+        assert action_configuration.action_type == case.action_type
         prompt_definition = registry.get_prompt(action_configuration.prompt_ref)
         assert prompt_definition is not None, (
             f"missing prompt definition for {action_configuration.prompt_ref}"

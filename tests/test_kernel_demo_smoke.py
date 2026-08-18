@@ -192,6 +192,21 @@ def test_run_reports_partial_pass_count_and_nonzero_exit(monkeypatch, capsys) ->
     assert "atom.two: scenario-two -> failed" in err
 
 
+def test_atom_smoke_cases_cover_the_required_eleven_action_types() -> None:
+    smoke = load_smoke_module()
+    assert smoke._atom_coverage_error(smoke.ATOM_SMOKE_CASES) is None
+    assert len(smoke.ATOM_SMOKE_CASES) == 11
+
+
+def test_atom_coverage_error_reports_missing_action_type() -> None:
+    smoke = load_smoke_module()
+    cases = (("atom.one", "scenario-one", {}),)
+
+    error = smoke._atom_coverage_error(cases)
+
+    assert error is not None and "SMOKE007" in error
+
+
 def test_run_reports_full_pass_and_zero_exit(monkeypatch, capsys) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(
