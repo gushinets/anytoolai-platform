@@ -7,20 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from anytoolai_platform_actions.structured_llm.cross_validation import (
-    CompareAndClassifyCrossValidator,
-    CompareAndClassifyInputValidator,
-    ComposeReplyCrossValidator,
-    DetectIssuesByTaxonomyCrossValidator,
-    ExtractStructuredFieldsCrossValidator,
-    ExtractStructuredFieldsInputValidator,
-    GapRewritesCrossValidator,
-    GenerateClarifyingQuestionsCrossValidator,
-    PersuasiveTextCrossValidator,
-    ScoreMultidimensionalAxesCrossValidator,
-    ScoreMultidimensionalAxesInputValidator,
-    ScoreMatchByRubricCrossValidator,
-    ScoreMatchByRubricInputValidator,
-    SynthesizeAngleCrossValidator,
+    build_input_validators,
+    build_output_cross_validators,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.repository import ActionRunRepository
@@ -74,6 +62,11 @@ def build_worker(
 
     registry = config_registry or build_config_registry(config_root)
     adapters = dict(provider_adapters or build_default_provider_adapters(config_root))
+    # Resolved eagerly here (not inside runner_factory) so a bad cross_validator_ref/
+    # input_validator_ref raises ValidatorRefNotFoundError at worker startup, not on
+    # the first job of the affected action_type.
+    output_cross_validators = build_output_cross_validators(registry.action_definitions)
+    input_validators = build_input_validators(registry.action_definitions)
 
     def runner_factory(session: Session) -> SequentialWorkflowRunner:
         event_emitter = EventEmitter(EventLogRepository(session))
@@ -89,18 +82,7 @@ def build_worker(
             config_registry=registry,
             provider_gateway=provider_gateway,
             artifact_service=artifact_service,
-            output_cross_validators={
-                "text.extract_structured_fields": ExtractStructuredFieldsCrossValidator(),
-                "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
-                "text.compose_reply": ComposeReplyCrossValidator(),
-                "text.generate_clarifying_questions": GenerateClarifyingQuestionsCrossValidator(),
-                "text.synthesize_angle": SynthesizeAngleCrossValidator(),
-                "text.compose_persuasive_text": PersuasiveTextCrossValidator(),
-                "text.generate_gap_rewrites": GapRewritesCrossValidator(),
-                "text.compare_and_classify": CompareAndClassifyCrossValidator(),
-                "text.score_multidimensional_axes": ScoreMultidimensionalAxesCrossValidator(),
-                "text.score_match_by_rubric": ScoreMatchByRubricCrossValidator(),
-            },
+            output_cross_validators=output_cross_validators,
         )
         action_runner = ActionRunner(
             session=session,
@@ -111,12 +93,7 @@ def build_worker(
             ),
             executors={structured_executor.executor_id: structured_executor},
             artifact_repository=artifact_repository,
-            input_validators={
-                "text.extract_structured_fields": ExtractStructuredFieldsInputValidator(),
-                "text.compare_and_classify": CompareAndClassifyInputValidator(),
-                "text.score_multidimensional_axes": ScoreMultidimensionalAxesInputValidator(),
-                "text.score_match_by_rubric": ScoreMatchByRubricInputValidator(),
-            },
+            input_validators=input_validators,
         )
         return SequentialWorkflowRunner(
             session=session,

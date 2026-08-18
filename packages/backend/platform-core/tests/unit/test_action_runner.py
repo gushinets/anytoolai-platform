@@ -24,20 +24,8 @@ from action_runner import (
     SynthesizeAngleSecondaryOutOfOptionsThenValidAdapter,
 )
 from anytoolai_platform_actions.structured_llm.cross_validation import (
-    CompareAndClassifyCrossValidator,
-    CompareAndClassifyInputValidator,
-    ComposeReplyCrossValidator,
-    DetectIssuesByTaxonomyCrossValidator,
-    ExtractStructuredFieldsCrossValidator,
-    ExtractStructuredFieldsInputValidator,
-    GapRewritesCrossValidator,
-    GenerateClarifyingQuestionsCrossValidator,
-    PersuasiveTextCrossValidator,
-    ScoreMultidimensionalAxesCrossValidator,
-    ScoreMultidimensionalAxesInputValidator,
-    ScoreMatchByRubricCrossValidator,
-    ScoreMatchByRubricInputValidator,
-    SynthesizeAngleCrossValidator,
+    build_input_validators,
+    build_output_cross_validators,
 )
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
@@ -180,18 +168,7 @@ def _build_runner(
         config_registry=registry,
         provider_gateway=gateway,
         artifact_service=artifact_service,
-        output_cross_validators={
-            "text.extract_structured_fields": ExtractStructuredFieldsCrossValidator(),
-            "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator(),
-            "text.generate_gap_rewrites": GapRewritesCrossValidator(),
-            "text.compose_reply": ComposeReplyCrossValidator(),
-            "text.generate_clarifying_questions": GenerateClarifyingQuestionsCrossValidator(),
-            "text.synthesize_angle": SynthesizeAngleCrossValidator(),
-            "text.compose_persuasive_text": PersuasiveTextCrossValidator(),
-            "text.compare_and_classify": CompareAndClassifyCrossValidator(),
-            "text.score_multidimensional_axes": ScoreMultidimensionalAxesCrossValidator(),
-            "text.score_match_by_rubric": ScoreMatchByRubricCrossValidator(),
-        },
+        output_cross_validators=build_output_cross_validators(registry.action_definitions),
     )
     return ActionRunner(
         session=session,
@@ -199,12 +176,7 @@ def _build_runner(
         action_run_service=ActionRunService(ActionRunRepository(session), emitter),
         executors={executor.executor_id: executor},
         artifact_repository=ArtifactRepository(session),
-        input_validators={
-            "text.extract_structured_fields": ExtractStructuredFieldsInputValidator(),
-            "text.compare_and_classify": CompareAndClassifyInputValidator(),
-            "text.score_multidimensional_axes": ScoreMultidimensionalAxesInputValidator(),
-            "text.score_match_by_rubric": ScoreMatchByRubricInputValidator(),
-        },
+        input_validators=build_input_validators(registry.action_definitions),
     )
 
 

@@ -21,12 +21,19 @@ from .score_match_by_rubric import (
     ScoreMatchByRubricCrossValidator,
     ScoreMatchByRubricInputValidator,
 )
+from .registry import (
+    NONE_REF,
+    ValidatorRefNotFoundError,
+    build_input_validators,
+    build_output_cross_validators,
+)
 from .synthesize_angle import SynthesizeAngleCrossValidator
 
 __all__ = [
     "GAP_REWRITES_DEFAULT_N",
     "CompareAndClassifyCrossValidator",
     "CompareAndClassifyInputValidator",
+    "NONE_REF",
     "ComposeReplyCrossValidator",
     "DetectIssuesByTaxonomyCrossValidator",
     "ExtractStructuredFieldsCrossValidator",
@@ -39,4 +46,7 @@ __all__ = [
     "ScoreMatchByRubricCrossValidator",
     "ScoreMatchByRubricInputValidator",
     "SynthesizeAngleCrossValidator",
+    "ValidatorRefNotFoundError",
+    "build_input_validators",
+    "build_output_cross_validators",
 ]

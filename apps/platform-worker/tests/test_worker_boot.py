@@ -11,8 +11,10 @@ from typing import Any
 
 import pytest
 import sqlalchemy as sa
+from anytoolai_platform_actions.structured_llm.cross_validation import ValidatorRefNotFoundError
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
+from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
@@ -133,6 +135,28 @@ def test_production_composition_accepts_configured_psycopg_database_url() -> Non
 
     assert isinstance(worker, Worker)
     worker.dispose()
+
+
+def test_build_worker_fails_closed_on_unresolvable_validator_ref() -> None:
+    registry = build_config_registry(CONFIG_ROOT)
+    broken_definition = replace(
+        registry.action_definitions["text.extract_structured_fields"],
+        cross_validator_ref="text.does_not_exist",
+    )
+    broken_registry = replace(
+        registry,
+        action_definitions={
+            **registry.action_definitions,
+            "text.extract_structured_fields": broken_definition,
+        },
+    )
+
+    with pytest.raises(ValidatorRefNotFoundError):
+        build_worker(
+            database_url="postgresql+psycopg://anytoolai:anytoolai@postgres:5432/anytoolai",
+            config_registry=broken_registry,
+            provider_adapters={"fake": FakeProviderAdapter(FIXTURE_ROOT)},
+        )
 
 
 class RecordingRunner:
