@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 import urllib.error
 from pathlib import Path
+
+import pytest
 
 
 def load_smoke_module():
@@ -13,6 +16,11 @@ def load_smoke_module():
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    # kernel_demo_smoke.py defines a @dataclass under `from __future__ import annotations`,
+    # which needs to resolve its string annotations via sys.modules[cls.__module__] at class
+    # definition time -- without registering the module here first, that lookup returns None
+    # and dataclass field resolution raises AttributeError.
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -29,88 +37,58 @@ def _sequenced_request(responses):
     return fake
 
 
-def test_run_one_case_reports_smoke001_when_guest_call_fails(monkeypatch) -> None:
+SMOKE_CODE_CASES = (
+    pytest.param([OSError("connection refused")], "SMOKE001", id="guest_call_fails"),
+    pytest.param([None], "SMOKE001", id="malformed_guest_response"),
+    pytest.param(
+        [{"guest_id": "guest-1"}, ["not", "a", "dict"]],
+        "SMOKE001",
+        id="malformed_start_response",
+    ),
+    pytest.param(
+        [
+            {"guest_id": "guest-1"},
+            {"scenario_session_id": "session-1"},
+            urllib.error.URLError("boom"),
+        ],
+        "SMOKE002",
+        id="polling_call_fails",
+    ),
+    pytest.param(
+        [{"guest_id": "guest-1"}, {"scenario_session_id": "session-1"}, "not-a-dict"],
+        "SMOKE002",
+        id="malformed_session_response",
+    ),
+    pytest.param(
+        [
+            {"guest_id": "guest-1"},
+            {"scenario_session_id": "session-1"},
+            {"status": "completed", "result_artifact_id": None},
+        ],
+        "SMOKE003",
+        id="completed_without_artifact",
+    ),
+    pytest.param(
+        [
+            {"guest_id": "guest-1"},
+            {"scenario_session_id": "session-1"},
+            {"status": "failed", "error": "provider blew up"},
+        ],
+        "SMOKE004",
+        id="session_failed",
+    ),
+)
+
+
+@pytest.mark.parametrize("responses, expected_code", SMOKE_CODE_CASES)
+def test_run_one_case_reports_expected_error_code(monkeypatch, responses, expected_code) -> None:
     smoke = load_smoke_module()
-    monkeypatch.setattr(
-        smoke, "_http_json_request", _sequenced_request([OSError("connection refused")])
-    )
+    monkeypatch.setattr(smoke, "_http_json_request", _sequenced_request(responses))
 
-    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
-    assert error is not None and "SMOKE001" in error
+    result = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
 
-
-def test_run_one_case_reports_smoke001_for_malformed_guest_response(monkeypatch) -> None:
-    smoke = load_smoke_module()
-    monkeypatch.setattr(smoke, "_http_json_request", _sequenced_request([None]))
-
-    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
-    assert error is not None and "SMOKE001" in error
-
-
-def test_run_one_case_reports_smoke001_for_malformed_start_response(monkeypatch) -> None:
-    smoke = load_smoke_module()
-    monkeypatch.setattr(
-        smoke,
-        "_http_json_request",
-        _sequenced_request([{"guest_id": "guest-1"}, ["not", "a", "dict"]]),
-    )
-
-    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
-    assert error is not None and "SMOKE001" in error
-
-
-def test_run_one_case_reports_smoke002_when_polling_call_fails(monkeypatch) -> None:
-    smoke = load_smoke_module()
-    monkeypatch.setattr(
-        smoke,
-        "_http_json_request",
-        _sequenced_request(
-            [
-                {"guest_id": "guest-1"},
-                {"scenario_session_id": "session-1"},
-                urllib.error.URLError("boom"),
-            ]
-        ),
-    )
-
-    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
-    assert error is not None and "SMOKE002" in error
-
-
-def test_run_one_case_reports_smoke002_for_malformed_session_response(monkeypatch) -> None:
-    smoke = load_smoke_module()
-    monkeypatch.setattr(
-        smoke,
-        "_http_json_request",
-        _sequenced_request(
-            [
-                {"guest_id": "guest-1"},
-                {"scenario_session_id": "session-1"},
-                "not-a-dict",
-            ]
-        ),
-    )
-
-    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
-    assert error is not None and "SMOKE002" in error
-
-
-def test_run_one_case_reports_smoke003_when_completed_without_artifact(monkeypatch) -> None:
-    smoke = load_smoke_module()
-    monkeypatch.setattr(
-        smoke,
-        "_http_json_request",
-        _sequenced_request(
-            [
-                {"guest_id": "guest-1"},
-                {"scenario_session_id": "session-1"},
-                {"status": "completed", "result_artifact_id": None},
-            ]
-        ),
-    )
-
-    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
-    assert error is not None and "SMOKE003" in error
+    assert result.error_code == expected_code
+    assert result.error_message is not None and expected_code in result.error_message
 
 
 def test_run_one_case_succeeds_when_completed_with_artifact(monkeypatch) -> None:
@@ -127,25 +105,11 @@ def test_run_one_case_succeeds_when_completed_with_artifact(monkeypatch) -> None
         ),
     )
 
-    assert smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0) is None
+    result = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
 
-
-def test_run_one_case_reports_smoke004_when_session_failed(monkeypatch) -> None:
-    smoke = load_smoke_module()
-    monkeypatch.setattr(
-        smoke,
-        "_http_json_request",
-        _sequenced_request(
-            [
-                {"guest_id": "guest-1"},
-                {"scenario_session_id": "session-1"},
-                {"status": "failed", "error": "provider blew up"},
-            ]
-        ),
-    )
-
-    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 5.0)
-    assert error is not None and "SMOKE004" in error
+    assert result.error_code is None
+    assert result.error_message is None
+    assert result.session_id == "session-1"
 
 
 def test_run_one_case_reports_smoke005_on_timeout(monkeypatch) -> None:
@@ -156,11 +120,13 @@ def test_run_one_case_reports_smoke005_on_timeout(monkeypatch) -> None:
         _sequenced_request([{"guest_id": "guest-1"}, {"scenario_session_id": "session-1"}]),
     )
 
-    error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 0.0)
-    assert error is not None and "SMOKE005" in error
-    # _run_one_case's real generated message, not a hand-written stub -- catches a future
-    # reword of the error text silently breaking run()'s timeout-degrade detection.
-    assert smoke._is_timeout_error(error)
+    # A real generated result, not a hand-written stub -- catches a future reword of the error
+    # text or code silently breaking run()'s timeout-degrade detection.
+    result = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 0.0)
+
+    assert result.error_code == smoke._TIMEOUT_ERROR_CODE
+    assert result.error_message is not None and "SMOKE005" in result.error_message
+    assert result.session_id == "session-1"
 
 
 def test_run_reports_partial_pass_count_and_nonzero_exit(monkeypatch, capsys) -> None:
@@ -190,7 +156,7 @@ def test_run_reports_partial_pass_count_and_nonzero_exit(monkeypatch, capsys) ->
 
     assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
     out, err = capsys.readouterr()
-    assert "atom.one: scenario-one -> ok" in out
+    assert "atom.one: scenario-one -> ok (session session-1)" in out
     assert "1/2 kernel_demo atoms passed" in out
     assert "atom.two: scenario-two -> failed" in err
 
@@ -198,7 +164,7 @@ def test_run_reports_partial_pass_count_and_nonzero_exit(monkeypatch, capsys) ->
 def test_atom_smoke_cases_cover_the_required_eleven_action_types() -> None:
     smoke = load_smoke_module()
     assert smoke._atom_coverage_error(smoke.ATOM_SMOKE_CASES) is None
-    assert len(smoke.ATOM_SMOKE_CASES) == 11
+    assert len(smoke.ATOM_SMOKE_CASES) == len(smoke._required_action_types())
 
 
 def test_required_action_types_are_derived_from_action_definitions_config() -> None:
@@ -234,7 +200,44 @@ def test_run_fails_instead_of_vacuous_success_on_empty_case_list(monkeypatch, ca
     assert "SMOKE007" in capsys.readouterr().err
 
 
-def test_run_never_skips_a_case_but_degrades_timeout_after_a_real_timeout(monkeypatch, capsys) -> None:
+def _fake_case_result(smoke, scenario_id, *, timed_out):
+    if timed_out:
+        return smoke.CaseResult(
+            session_id=f"s-{scenario_id}",
+            error_code=smoke._TIMEOUT_ERROR_CODE,
+            error_message=f"{smoke._TIMEOUT_ERROR_CODE}: kernel_demo smoke check timed out",
+        )
+    return smoke.CaseResult(session_id=f"s-{scenario_id}", error_code=None, error_message=None)
+
+
+def test_run_never_skips_a_case_even_after_a_real_timeout(monkeypatch, capsys) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(
+        smoke,
+        "ATOM_SMOKE_CASES",
+        (
+            ("atom.one", "scenario-one", {}),
+            ("atom.two", "scenario-two", {}),
+            ("atom.three", "scenario-three", {}),
+        ),
+    )
+
+    def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
+        return _fake_case_result(smoke, scenario_id, timed_out=(scenario_id == "scenario-one"))
+
+    monkeypatch.setattr(smoke, "_run_one_case", fake_run_one_case)
+
+    assert smoke.run("http://127.0.0.1:8000", timeout=30.0) == 1
+    out, _ = capsys.readouterr()
+    assert "atom.two: scenario-two -> ok" in out
+    assert "atom.three: scenario-three -> ok" in out
+    assert "2/3 kernel_demo atoms passed" in out
+
+
+def test_run_degrades_timeout_after_a_timeout_but_not_permanently(monkeypatch) -> None:
+    """A single slow-but-legitimate atom must not permanently cap every atom that follows it
+    (round-2 follow-up review bug): the degrade only applies to the case immediately after a
+    timeout, and any non-timeout outcome (success here) restores the full budget."""
     smoke = load_smoke_module()
     monkeypatch.setattr(
         smoke,
@@ -249,21 +252,20 @@ def test_run_never_skips_a_case_but_degrades_timeout_after_a_real_timeout(monkey
 
     def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
         seen_timeouts.append(timeout)
-        if scenario_id == "scenario-two":
-            return None
-        return f"{smoke._TIMEOUT_ERROR_PREFIX}: kernel_demo smoke check timed out after 30s"
+        # only case one times out; case two succeeds, which must reset the budget for case three
+        return _fake_case_result(smoke, scenario_id, timed_out=(scenario_id == "scenario-one"))
 
     monkeypatch.setattr(smoke, "_run_one_case", fake_run_one_case)
 
-    assert smoke.run("http://127.0.0.1:8000", timeout=30.0) == 1
-    # every case still ran (no skipping) despite the first timing out
-    assert seen_timeouts == [30.0, smoke.DEGRADED_TIMEOUT_SECONDS, smoke.DEGRADED_TIMEOUT_SECONDS]
-    out, err = capsys.readouterr()
-    assert "atom.two: scenario-two -> ok" in out
-    assert "1/3 kernel_demo atoms passed" in out
+    smoke.run("http://127.0.0.1:8000", timeout=30.0)
+
+    assert seen_timeouts == [30.0, smoke.DEGRADED_TIMEOUT_SECONDS, 30.0]
 
 
-def test_run_does_not_misread_an_embedded_smoke005_substring_as_a_timeout(monkeypatch) -> None:
+def test_run_timeout_degrade_is_driven_by_error_code_not_message_text(monkeypatch) -> None:
+    """The degrade decision reads the typed error_code field, not the human-readable message
+    -- a SMOKE004 failure whose echoed body happens to contain the literal text "SMOKE005"
+    must not be misread as a timeout."""
     smoke = load_smoke_module()
     monkeypatch.setattr(
         smoke,
@@ -278,11 +280,15 @@ def test_run_does_not_misread_an_embedded_smoke005_substring_as_a_timeout(monkey
     def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
         seen_timeouts.append(timeout)
         if scenario_id == "scenario-one":
-            return (
-                "SMOKE004: kernel_demo session s1 failed: "
-                f"{{'error': 'echoed {smoke._TIMEOUT_ERROR_PREFIX} text'}}"
+            return smoke.CaseResult(
+                session_id="s1",
+                error_code="SMOKE004",
+                error_message=(
+                    "SMOKE004: kernel_demo session s1 failed: "
+                    f"{{'error': 'echoed {smoke._TIMEOUT_ERROR_CODE} text'}}"
+                ),
             )
-        return None
+        return smoke.CaseResult(session_id="s2", error_code=None, error_message=None)
 
     monkeypatch.setattr(smoke, "_run_one_case", fake_run_one_case)
 
@@ -312,3 +318,13 @@ def test_run_reports_full_pass_and_zero_exit(monkeypatch, capsys) -> None:
 
     assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 0
     assert "1/1 kernel_demo atoms passed" in capsys.readouterr().out
+
+
+def test_atom_matrix_load_error_reported_by_main_before_argparse(monkeypatch, capsys) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "_ATOM_MATRIX_LOAD_ERROR", "SMOKE008: could not load fixture")
+
+    # main() checks _ATOM_MATRIX_LOAD_ERROR and returns before ever calling
+    # parser.parse_args(), so no api_url argv needs to be supplied here.
+    assert smoke.main() == 1
+    assert "SMOKE008" in capsys.readouterr().err

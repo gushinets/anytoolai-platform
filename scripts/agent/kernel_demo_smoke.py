@@ -21,6 +21,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 
 FRONTEND_ID = "kernel_demo_ce"
@@ -42,7 +43,17 @@ def _load_atom_smoke_cases() -> tuple[tuple[str, str, dict], ...]:
     return tuple((case["action_type"], case["scenario_id"], case["start_input"]) for case in cases)
 
 
-ATOM_SMOKE_CASES = _load_atom_smoke_cases()
+# Loaded once at import time, but guarded: a missing/corrupted data file must still let this
+# script run far enough to print a clear SMOKE00x error, not crash with a raw traceback before
+# argparse or main() ever runs.
+_ATOM_MATRIX_LOAD_ERROR: str | None = None
+try:
+    ATOM_SMOKE_CASES: tuple[tuple[str, str, dict], ...] = _load_atom_smoke_cases()
+except (OSError, ValueError, KeyError, TypeError) as exc:
+    ATOM_SMOKE_CASES = ()
+    _ATOM_MATRIX_LOAD_ERROR = (
+        f"SMOKE008: could not load atom smoke case data from {ATOM_MATRIX_DATA_PATH}: {exc}"
+    )
 
 
 def _required_action_types() -> frozenset[str]:
@@ -79,8 +90,8 @@ def _atom_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None
         missing = sorted(required - covered)
         extra = sorted(covered - required)
         return (
-            f"SMOKE007: ATOM_SMOKE_CASES does not cover the required 11 action types "
-            f"(missing={missing}, extra={extra})"
+            f"SMOKE007: ATOM_SMOKE_CASES does not cover the required {len(required)} action "
+            f"types (missing={missing}, extra={extra})"
         )
     return None
 
@@ -97,20 +108,26 @@ def _http_json_request(
         return json.loads(response.read().decode("utf-8"))
 
 
-_TIMEOUT_ERROR_PREFIX = "SMOKE005"
+_TIMEOUT_ERROR_CODE = "SMOKE005"
 
 
-def _is_timeout_error(error: str) -> bool:
-    return error.startswith(_TIMEOUT_ERROR_PREFIX)
+@dataclass(frozen=True)
+class CaseResult:
+    """session_id is populated as soon as it's known (even for a later-stage failure, so a
+    failing case can still be correlated back to its DB rows); error_code/error_message are
+    both None on success. error_code is a plain SMOKE0xx string compared by equality --
+    run()'s timeout-degrade decision checks this typed field, not a substring/prefix sniff on
+    error_message."""
+
+    session_id: str | None
+    error_code: str | None
+    error_message: str | None
 
 
-def _run_one_case(
-    api_url: str, scenario_id: str, scenario_input: dict, timeout: float
-) -> str | None:
+def _run_one_case(api_url: str, scenario_id: str, scenario_input: dict, timeout: float) -> CaseResult:
     """Runs one scenario to completion under its own fresh guest identity (kernel_demo's
     guest quota is a shared per-guest lifetime budget across scenarios, smaller than the
-    number of atoms in the matrix, so every case needs its own guest). Returns None on
-    success, else a SMOKE0xx error line."""
+    number of atoms in the matrix, so every case needs its own guest)."""
     try:
         guest = _http_json_request(f"{api_url}/v1/identity/guest", method="POST")
         guest_id = guest["guest_id"]
@@ -132,7 +149,11 @@ def _run_one_case(
         TypeError,
         AttributeError,
     ) as exc:
-        return f"SMOKE001: could not start scenario {scenario_id} against {api_url}: {exc}"
+        return CaseResult(
+            session_id=None,
+            error_code="SMOKE001",
+            error_message=f"SMOKE001: could not start scenario {scenario_id} against {api_url}: {exc}",
+        )
 
     session_url = f"{api_url}/v1/scenario-sessions/{session_id}"
     deadline = time.monotonic() + timeout
@@ -141,25 +162,42 @@ def _run_one_case(
             session = _http_json_request(session_url, timeout=5.0)
             status = session.get("status")
         except (OSError, urllib.error.URLError, ValueError, TypeError, AttributeError) as exc:
-            return (
-                f"SMOKE002: lost contact with {session_url} while polling for completion: {exc}"
+            return CaseResult(
+                session_id=session_id,
+                error_code="SMOKE002",
+                error_message=(
+                    f"SMOKE002: lost contact with {session_url} while polling for "
+                    f"completion: {exc}"
+                ),
             )
         if status == "completed":
             if not session.get("result_artifact_id"):
-                return (
-                    f"SMOKE003: kernel_demo session {session_id} completed without a "
-                    "result artifact"
+                return CaseResult(
+                    session_id=session_id,
+                    error_code="SMOKE003",
+                    error_message=(
+                        f"SMOKE003: kernel_demo session {session_id} completed without a "
+                        "result artifact"
+                    ),
                 )
-            return None
+            return CaseResult(session_id=session_id, error_code=None, error_message=None)
         if status == "failed":
-            return f"SMOKE004: kernel_demo session {session_id} failed: {session}"
+            return CaseResult(
+                session_id=session_id,
+                error_code="SMOKE004",
+                error_message=f"SMOKE004: kernel_demo session {session_id} failed: {session}",
+            )
         time.sleep(POLL_INTERVAL_SECONDS)
 
-    return (
-        f"{_TIMEOUT_ERROR_PREFIX}: kernel_demo smoke check timed out after {timeout:g}s "
-        f"waiting for session {session_id} (scenario {scenario_id}) to complete. Is "
-        "platform-worker running and healthy? Rerun with a longer "
-        "--timeout/ANYTOOLAI_SMOKE_TIMEOUT if needed."
+    return CaseResult(
+        session_id=session_id,
+        error_code=_TIMEOUT_ERROR_CODE,
+        error_message=(
+            f"{_TIMEOUT_ERROR_CODE}: kernel_demo smoke check timed out after {timeout:g}s "
+            f"waiting for session {session_id} (scenario {scenario_id}) to complete. Is "
+            "platform-worker running and healthy? Rerun with a longer "
+            "--timeout/ANYTOOLAI_SMOKE_TIMEOUT if needed."
+        ),
     )
 
 
@@ -173,24 +211,27 @@ def run(api_url: str, timeout: float) -> int:
         return 1
 
     passed = 0
-    # A completion timeout (_TIMEOUT_ERROR_PREFIX) usually means platform-worker itself isn't
-    # consuming jobs, in which case every remaining case would also time out -- but it could
-    # also be a genuine per-atom bug, so every case still runs (skipping would hide real
-    # regressions). What's bounded instead is the cost: once a timeout is observed, remaining
-    # cases get a short probe timeout rather than the full budget, capping the 11x worst case
-    # without losing coverage. _is_timeout_error (a startswith check, not "in") avoids
-    # misreading an echoed prefix inside an unrelated SMOKE004 session-failure body as a real
-    # timeout.
+    # A completion timeout usually means platform-worker itself isn't consuming jobs, in which
+    # case every remaining case would also time out -- but it could also be a genuine per-atom
+    # bug, so every case still runs (skipping would hide real regressions). What's bounded
+    # instead is the cost: right after a timeout, the next case gets a short probe timeout
+    # rather than the full budget. That degrade is NOT permanent -- any case that doesn't time
+    # out (success or a different failure) restores the full timeout for the cases after it, so
+    # one slow-but-legitimate atom can't silently cap every atom that follows it.
     case_timeout = timeout
     for action_type, scenario_id, scenario_input in ATOM_SMOKE_CASES:
-        error = _run_one_case(api_url, scenario_id, scenario_input, case_timeout)
-        if error is None:
+        result = _run_one_case(api_url, scenario_id, scenario_input, case_timeout)
+        if result.error_message is None:
             passed += 1
-            print(f"{action_type}: {scenario_id} -> ok")
+            print(f"{action_type}: {scenario_id} -> ok (session {result.session_id})")
+            case_timeout = timeout
         else:
-            print(f"{action_type}: {scenario_id} -> failed ({error})", file=sys.stderr)
-            if _is_timeout_error(error):
-                case_timeout = min(case_timeout, DEGRADED_TIMEOUT_SECONDS)
+            print(f"{action_type}: {scenario_id} -> failed ({result.error_message})", file=sys.stderr)
+            case_timeout = (
+                min(case_timeout, DEGRADED_TIMEOUT_SECONDS)
+                if result.error_code == _TIMEOUT_ERROR_CODE
+                else timeout
+            )
 
     print(f"{passed}/{total} kernel_demo atoms passed")
     return 0 if passed == total else 1
@@ -204,6 +245,10 @@ def _default_timeout() -> float:
 
 
 def main() -> int:
+    if _ATOM_MATRIX_LOAD_ERROR is not None:
+        print(_ATOM_MATRIX_LOAD_ERROR, file=sys.stderr)
+        return 1
+
     try:
         default_timeout = _default_timeout()
     except ValueError as exc:

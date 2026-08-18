@@ -120,8 +120,11 @@ Compose config boots — not just that it's syntactically valid:
   plain DB-polling loop with no `healthcheck:` in `docker-compose.yml`), so `docker compose ps`
   reporting it as "running" only means the process hasn't crashed, not that it's consuming jobs
   from the queue. A stopped or wedged `platform-worker` (`docker compose stop platform-worker`)
-  makes `*-smoke` fail fast with a clear `SMOKE00x` error instead of hanging or silently
-  reporting success.
+  makes `*-smoke` fail with a clear `SMOKE00x` error instead of hanging or silently reporting
+  success -- every remaining case still runs rather than aborting on the first timeout (so a
+  genuinely broken single atom isn't hidden behind an unrelated outage), but the per-case
+  timeout degrades to a short probe after the first real timeout, so a full outage still
+  reports failure well before `N * --timeout`.
 
 `kernel_demo_smoke.py` is a standalone script (same `argparse`/`main()` convention as
 `validate_configs.py`), so it can also be run directly against any reachable `platform-api`:

@@ -13,7 +13,6 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Iterator
 
 import pytest
@@ -49,6 +48,11 @@ from test_scenario_runtime_api import (
 from tests.db_support import provision_database
 from tests.test_kernel_demo_smoke import load_smoke_module
 
+# Single source for the shared atom-case JSON path: kernel_demo_smoke.py's own
+# ATOM_MATRIX_DATA_PATH constant, not an independently recomputed parents[N] guess here (two
+# copies of that computation could silently diverge if either file moved a directory level).
+_SMOKE_MODULE = load_smoke_module()
+
 # Deliberately NOT a module-level pytestmark: test_atom_runtime_matrix_reports_eleven_of_eleven
 # and test_atom_smoke_cases_match_atom_matrix below do no DB I/O and must keep running under
 # quick-check's "not slow" pytest subset -- only the parametrized DB-backed test needs
@@ -75,11 +79,14 @@ def app(session_factory: SessionFactory) -> Any:
     # would collide on a duplicate key from the second case onward.
     return _create_test_app(session_factory)
 
-# ponytail: duplicates a literal inlined in test_scenario_runtime_api.py's
-# test_start_then_real_worker_execution_preserves_a12_runtime_correlation (no shared module
-# constant exists there to import instead). Not extracted to a shared helper: this file's own
-# docstring documents that it deliberately doesn't refactor that test/file. Extract to a
-# shared constant if a third consumer needs this event-type set.
+# ponytail: this constant, and the whole scenario/job/action_run/provider_call/artifacts/events
+# DB-query-and-assert block in _run_single_action_scenario_and_assert_full_path below, both
+# duplicate test_scenario_runtime_api.py's
+# test_start_then_real_worker_execution_preserves_a12_runtime_correlation (no shared helper
+# module exists there to import instead). Not extracted: this file's own module docstring
+# documents the deliberate decision not to refactor that test/file, to avoid touching a file
+# exercised by other in-flight work. Extract a shared helper if a third consumer needs this
+# same DB-assertion shape, or once that constraint no longer applies.
 _EXPECTED_EVENT_TYPES = {
     "scenario.started",
     "workflow.started",
@@ -106,13 +113,8 @@ class AtomCase:
 # Loaded from the same JSON file scripts/agent/kernel_demo_smoke.py's ATOM_SMOKE_CASES reads --
 # one shared source of the 11 (action_type, scenario_id, ...) cases instead of two independently
 # hand-maintained literals, so the two consumers structurally can't drift apart.
-_ATOM_MATRIX_DATA_PATH = (
-    Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "kernel_demo" / "atom_smoke_matrix.json"
-)
-
-
 def _load_atom_matrix() -> tuple[AtomCase, ...]:
-    with _ATOM_MATRIX_DATA_PATH.open("r", encoding="utf-8") as handle:
+    with _SMOKE_MODULE.ATOM_MATRIX_DATA_PATH.open("r", encoding="utf-8") as handle:
         raw_cases = json.load(handle)
     return tuple(AtomCase(**raw_case) for raw_case in raw_cases)
 
@@ -333,11 +335,9 @@ def test_atom_smoke_cases_match_atom_matrix() -> None:
     can't drift -- this is a regression check on the two loaders' field-selection logic (e.g.
     a typo'd JSON key silently dropping a field), not a lock between two hand-maintained
     lists."""
-    smoke = load_smoke_module()
-
     smoke_cases = {
         action_type: (scenario_id, start_input)
-        for action_type, scenario_id, start_input in smoke.ATOM_SMOKE_CASES
+        for action_type, scenario_id, start_input in _SMOKE_MODULE.ATOM_SMOKE_CASES
     }
     matrix_cases = {case.action_type: (case.scenario_id, case.start_input) for case in ATOM_MATRIX}
     assert smoke_cases == matrix_cases
