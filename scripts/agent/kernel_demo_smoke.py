@@ -26,93 +26,25 @@ from pathlib import Path
 FRONTEND_ID = "kernel_demo_ce"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTION_DEFINITIONS_ROOT = REPO_ROOT / "configs" / "kernel" / "action_definitions"
+ATOM_MATRIX_DATA_PATH = REPO_ROOT / "tests" / "fixtures" / "kernel_demo" / "atom_smoke_matrix.json"
 
-# One (action_type, scenario_id, start_input) tuple per generic action type -- the same 11
-# cases ATOM_MATRIX in apps/platform-api/tests/test_atom_runtime_matrix.py exercises over
-# pytest's in-process ASGI transport. Bounded duplication of these literals across that
-# pytest file and this stdlib-only script is deliberate: this script has no backend-package
-# imports so it can run against a container that only has the image's runtime dependencies,
-# not the test suite's.
-ATOM_SMOKE_CASES = (
-    (
-        "text.extract_structured_fields",
-        "kernel_demo.single_action_smoke_v1",
-        {
-            "source_text": "deadline budget deliverables",
-            "fields": [
-                {
-                    "name": "deadline",
-                    "type": "string",
-                    "description": "Project deadline mentioned in the text.",
-                    "required": True,
-                },
-                {
-                    "name": "budget",
-                    "type": "string",
-                    "description": "Budget mentioned in the text.",
-                    "required": False,
-                },
-                {
-                    "name": "deliverables",
-                    "type": "array_of_strings",
-                    "description": "Deliverables mentioned in the text.",
-                    "required": False,
-                },
-            ],
-            "strict": False,
-        },
-    ),
-    (
-        "text.detect_issues_by_taxonomy",
-        "kernel_demo.single_action_detect_issues_smoke_v1",
-        {"source_text": "We need this soon."},
-    ),
-    (
-        "document.generate_from_template",
-        "kernel_demo.single_action_generate_report_smoke_v1",
-        {"source_text": "The project is on track."},
-    ),
-    (
-        "text.compose_reply",
-        "kernel_demo.single_action_compose_reply_smoke_v1",
-        {"source_text": "Sorry about the delay, can you send an update?"},
-    ),
-    (
-        "text.generate_clarifying_questions",
-        "kernel_demo.single_action_generate_clarifying_questions_smoke_v1",
-        {"source_text": "We need this done soon, no date given."},
-    ),
-    (
-        "text.synthesize_angle",
-        "kernel_demo.single_action_synthesize_angle_smoke_v1",
-        {"source_text": "unused by this workflow, kept for input-shape parity"},
-    ),
-    (
-        "text.compose_persuasive_text",
-        "kernel_demo.single_action_compose_persuasive_text_smoke_v1",
-        {"source_text": "unused by this workflow, kept for input-shape parity"},
-    ),
-    (
-        "text.generate_gap_rewrites",
-        "kernel_demo.single_action_generate_gap_rewrites_smoke_v1",
-        {"source_text": "The proposal does not state a delivery date."},
-    ),
-    (
-        "text.compare_and_classify",
-        "kernel_demo.single_action_compare_and_classify_smoke_v1",
-        {"source_text": "Subject text for comparison."},
-    ),
-    (
-        "text.score_match_by_rubric",
-        "kernel_demo.single_action_score_match_by_rubric_smoke_v1",
-        {"source_text": "Reference text A for scoring."},
-    ),
-    (
-        "text.score_multidimensional_axes",
-        "kernel_demo.single_action_score_multidimensional_axes_smoke_v1",
-        {"source_text": "The proposal states its point directly."},
-    ),
-)
+
+def _load_atom_smoke_cases() -> tuple[tuple[str, str, dict], ...]:
+    """Loads the (action_type, scenario_id, start_input) triples from the JSON file that is
+    also the source ATOM_MATRIX in apps/platform-api/tests/test_atom_runtime_matrix.py loads
+    -- one shared data file instead of two independently hand-maintained Python literals, so
+    a scenario_id rename or start_input change can't drift between the two consumers. Reading
+    plain JSON (not importing the pytest file) keeps this script's stdlib-only, no
+    backend-package-import constraint intact.
+    """
+    with ATOM_MATRIX_DATA_PATH.open("r", encoding="utf-8") as handle:
+        cases = json.load(handle)
+    return tuple((case["action_type"], case["scenario_id"], case["start_input"]) for case in cases)
+
+
+ATOM_SMOKE_CASES = _load_atom_smoke_cases()
+
+
 def _required_action_types() -> frozenset[str]:
     """Derives required coverage from configs/kernel/action_definitions/*.yaml -- the source
     of truth for "generic action type" -- instead of a hardcoded list that a newly added atom
@@ -163,6 +95,13 @@ def _http_json_request(
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+_TIMEOUT_ERROR_PREFIX = "SMOKE005"
+
+
+def _is_timeout_error(error: str) -> bool:
+    return error.startswith(_TIMEOUT_ERROR_PREFIX)
 
 
 def _run_one_case(
@@ -217,9 +156,10 @@ def _run_one_case(
         time.sleep(POLL_INTERVAL_SECONDS)
 
     return (
-        f"SMOKE005: kernel_demo smoke check timed out after {timeout:g}s waiting for session "
-        f"{session_id} (scenario {scenario_id}) to complete. Is platform-worker running and "
-        "healthy? Rerun with a longer --timeout/ANYTOOLAI_SMOKE_TIMEOUT if needed."
+        f"{_TIMEOUT_ERROR_PREFIX}: kernel_demo smoke check timed out after {timeout:g}s "
+        f"waiting for session {session_id} (scenario {scenario_id}) to complete. Is "
+        "platform-worker running and healthy? Rerun with a longer "
+        "--timeout/ANYTOOLAI_SMOKE_TIMEOUT if needed."
     )
 
 
@@ -227,14 +167,20 @@ DEGRADED_TIMEOUT_SECONDS = 5.0
 
 
 def run(api_url: str, timeout: float) -> int:
+    total = len(ATOM_SMOKE_CASES)
+    if total == 0:
+        print("SMOKE007: ATOM_SMOKE_CASES is empty -- nothing to smoke-test", file=sys.stderr)
+        return 1
+
     passed = 0
-    # A completion timeout (SMOKE005) usually means platform-worker itself isn't consuming
-    # jobs, in which case every remaining case would also time out -- but it could also be a
-    # genuine per-atom bug, so every case still runs (skipping would hide real regressions).
-    # What's bounded instead is the cost: once a timeout is observed, remaining cases get a
-    # short probe timeout rather than the full budget, capping the 11x worst case without
-    # losing coverage. error.startswith (not "in") avoids misreading an echoed SMOKE005
-    # substring inside an unrelated SMOKE004 session-failure body as a real timeout.
+    # A completion timeout (_TIMEOUT_ERROR_PREFIX) usually means platform-worker itself isn't
+    # consuming jobs, in which case every remaining case would also time out -- but it could
+    # also be a genuine per-atom bug, so every case still runs (skipping would hide real
+    # regressions). What's bounded instead is the cost: once a timeout is observed, remaining
+    # cases get a short probe timeout rather than the full budget, capping the 11x worst case
+    # without losing coverage. _is_timeout_error (a startswith check, not "in") avoids
+    # misreading an echoed prefix inside an unrelated SMOKE004 session-failure body as a real
+    # timeout.
     case_timeout = timeout
     for action_type, scenario_id, scenario_input in ATOM_SMOKE_CASES:
         error = _run_one_case(api_url, scenario_id, scenario_input, case_timeout)
@@ -243,10 +189,9 @@ def run(api_url: str, timeout: float) -> int:
             print(f"{action_type}: {scenario_id} -> ok")
         else:
             print(f"{action_type}: {scenario_id} -> failed ({error})", file=sys.stderr)
-            if error.startswith("SMOKE005"):
+            if _is_timeout_error(error):
                 case_timeout = min(case_timeout, DEGRADED_TIMEOUT_SECONDS)
 
-    total = len(ATOM_SMOKE_CASES)
     print(f"{passed}/{total} kernel_demo atoms passed")
     return 0 if passed == total else 1
 

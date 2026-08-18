@@ -1,0 +1,102 @@
+[
+  {
+    "action_type": "text.extract_structured_fields",
+    "scenario_id": "kernel_demo.single_action_smoke_v1",
+    "action_config_id": "kernel_demo.extract_structured_fields_v1",
+    "expected_output_schema_ref": "kernel_demo.extract_output_v1",
+    "start_input": {
+      "source_text": "deadline budget deliverables",
+      "fields": [
+        {
+          "name": "deadline",
+          "type": "string",
+          "description": "Project deadline mentioned in the text.",
+          "required": true
+        },
+        {
+          "name": "budget",
+          "type": "string",
+          "description": "Budget mentioned in the text.",
+          "required": false
+        },
+        {
+          "name": "deliverables",
+          "type": "array_of_strings",
+          "description": "Deliverables mentioned in the text.",
+          "required": false
+        }
+      ],
+      "strict": false
+    }
+  },
+  {
+    "action_type": "text.detect_issues_by_taxonomy",
+    "scenario_id": "kernel_demo.single_action_detect_issues_smoke_v1",
+    "action_config_id": "kernel_demo.detect_issues_v1",
+    "expected_output_schema_ref": "kernel.schemas.issue_detection_output_v1",
+    "start_input": {"source_text": "We need this soon."}
+  },
+  {
+    "action_type": "document.generate_from_template",
+    "scenario_id": "kernel_demo.single_action_generate_report_smoke_v1",
+    "action_config_id": "kernel_demo.generate_report_v1",
+    "expected_output_schema_ref": "kernel.schemas.generate_document_output_v1",
+    "start_input": {"source_text": "The project is on track."}
+  },
+  {
+    "action_type": "text.compose_reply",
+    "scenario_id": "kernel_demo.single_action_compose_reply_smoke_v1",
+    "action_config_id": "kernel_demo.compose_reply_v1",
+    "expected_output_schema_ref": "kernel.schemas.compose_reply_output_v1",
+    "start_input": {"source_text": "Sorry about the delay, can you send an update?"}
+  },
+  {
+    "action_type": "text.generate_clarifying_questions",
+    "scenario_id": "kernel_demo.single_action_generate_clarifying_questions_smoke_v1",
+    "action_config_id": "kernel_demo.generate_clarifying_questions_v1",
+    "expected_output_schema_ref": "kernel.schemas.generate_questions_output_v1",
+    "start_input": {"source_text": "We need this done soon, no date given."}
+  },
+  {
+    "action_type": "text.synthesize_angle",
+    "scenario_id": "kernel_demo.single_action_synthesize_angle_smoke_v1",
+    "action_config_id": "kernel_demo.synthesize_angle_v1",
+    "expected_output_schema_ref": "kernel.schemas.synthesize_angle_output_v1",
+    "start_input": {"source_text": "unused by this workflow, kept for input-shape parity"}
+  },
+  {
+    "action_type": "text.compose_persuasive_text",
+    "scenario_id": "kernel_demo.single_action_compose_persuasive_text_smoke_v1",
+    "action_config_id": "kernel_demo.compose_persuasive_text_v1",
+    "expected_output_schema_ref": "kernel.schemas.compose_persuasive_text_output_v1",
+    "start_input": {"source_text": "unused by this workflow, kept for input-shape parity"}
+  },
+  {
+    "action_type": "text.generate_gap_rewrites",
+    "scenario_id": "kernel_demo.single_action_generate_gap_rewrites_smoke_v1",
+    "action_config_id": "kernel_demo.generate_gap_rewrites_v1",
+    "expected_output_schema_ref": "kernel.schemas.generate_gap_rewrites_output_v1",
+    "start_input": {"source_text": "The proposal does not state a delivery date."}
+  },
+  {
+    "action_type": "text.compare_and_classify",
+    "scenario_id": "kernel_demo.single_action_compare_and_classify_smoke_v1",
+    "action_config_id": "kernel_demo.compare_and_classify_v1",
+    "expected_output_schema_ref": "kernel.schemas.compare_classify_output_v1",
+    "start_input": {"source_text": "Subject text for comparison."}
+  },
+  {
+    "action_type": "text.score_match_by_rubric",
+    "scenario_id": "kernel_demo.single_action_score_match_by_rubric_smoke_v1",
+    "action_config_id": "kernel_demo.score_match_by_rubric_v1",
+    "expected_output_schema_ref": "kernel.schemas.score_match_output_v1",
+    "start_input": {"source_text": "Reference text A for scoring."}
+  },
+  {
+    "action_type": "text.score_multidimensional_axes",
+    "scenario_id": "kernel_demo.single_action_score_multidimensional_axes_smoke_v1",
+    "action_config_id": "kernel_demo.score_multidimensional_axes_v1",
+    "expected_output_schema_ref": "kernel.schemas.score_multidim_output_v1",
+    "start_input": {"source_text": "The proposal states its point directly."}
+  }
+]

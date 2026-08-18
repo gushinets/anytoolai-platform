@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterator
 
 import pytest
@@ -102,108 +103,21 @@ class AtomCase:
     start_input: dict[str, Any]
 
 
-ATOM_MATRIX: tuple[AtomCase, ...] = (
-    AtomCase(
-        action_type="text.extract_structured_fields",
-        scenario_id="kernel_demo.single_action_smoke_v1",
-        action_config_id="kernel_demo.extract_structured_fields_v1",
-        expected_output_schema_ref="kernel_demo.extract_output_v1",
-        start_input={
-            "source_text": "deadline budget deliverables",
-            "fields": [
-                {
-                    "name": "deadline",
-                    "type": "string",
-                    "description": "Project deadline mentioned in the text.",
-                    "required": True,
-                },
-                {
-                    "name": "budget",
-                    "type": "string",
-                    "description": "Budget mentioned in the text.",
-                    "required": False,
-                },
-                {
-                    "name": "deliverables",
-                    "type": "array_of_strings",
-                    "description": "Deliverables mentioned in the text.",
-                    "required": False,
-                },
-            ],
-            "strict": False,
-        },
-    ),
-    AtomCase(
-        action_type="text.detect_issues_by_taxonomy",
-        scenario_id="kernel_demo.single_action_detect_issues_smoke_v1",
-        action_config_id="kernel_demo.detect_issues_v1",
-        expected_output_schema_ref="kernel.schemas.issue_detection_output_v1",
-        start_input={"source_text": "We need this soon."},
-    ),
-    AtomCase(
-        action_type="document.generate_from_template",
-        scenario_id="kernel_demo.single_action_generate_report_smoke_v1",
-        action_config_id="kernel_demo.generate_report_v1",
-        expected_output_schema_ref="kernel.schemas.generate_document_output_v1",
-        start_input={"source_text": "The project is on track."},
-    ),
-    AtomCase(
-        action_type="text.compose_reply",
-        scenario_id="kernel_demo.single_action_compose_reply_smoke_v1",
-        action_config_id="kernel_demo.compose_reply_v1",
-        expected_output_schema_ref="kernel.schemas.compose_reply_output_v1",
-        start_input={"source_text": "Sorry about the delay, can you send an update?"},
-    ),
-    AtomCase(
-        action_type="text.generate_clarifying_questions",
-        scenario_id="kernel_demo.single_action_generate_clarifying_questions_smoke_v1",
-        action_config_id="kernel_demo.generate_clarifying_questions_v1",
-        expected_output_schema_ref="kernel.schemas.generate_questions_output_v1",
-        start_input={"source_text": "We need this done soon, no date given."},
-    ),
-    AtomCase(
-        action_type="text.synthesize_angle",
-        scenario_id="kernel_demo.single_action_synthesize_angle_smoke_v1",
-        action_config_id="kernel_demo.synthesize_angle_v1",
-        expected_output_schema_ref="kernel.schemas.synthesize_angle_output_v1",
-        start_input={"source_text": "unused by this workflow, kept for input-shape parity"},
-    ),
-    AtomCase(
-        action_type="text.compose_persuasive_text",
-        scenario_id="kernel_demo.single_action_compose_persuasive_text_smoke_v1",
-        action_config_id="kernel_demo.compose_persuasive_text_v1",
-        expected_output_schema_ref="kernel.schemas.compose_persuasive_text_output_v1",
-        start_input={"source_text": "unused by this workflow, kept for input-shape parity"},
-    ),
-    AtomCase(
-        action_type="text.generate_gap_rewrites",
-        scenario_id="kernel_demo.single_action_generate_gap_rewrites_smoke_v1",
-        action_config_id="kernel_demo.generate_gap_rewrites_v1",
-        expected_output_schema_ref="kernel.schemas.generate_gap_rewrites_output_v1",
-        start_input={"source_text": "The proposal does not state a delivery date."},
-    ),
-    AtomCase(
-        action_type="text.compare_and_classify",
-        scenario_id="kernel_demo.single_action_compare_and_classify_smoke_v1",
-        action_config_id="kernel_demo.compare_and_classify_v1",
-        expected_output_schema_ref="kernel.schemas.compare_classify_output_v1",
-        start_input={"source_text": "Subject text for comparison."},
-    ),
-    AtomCase(
-        action_type="text.score_match_by_rubric",
-        scenario_id="kernel_demo.single_action_score_match_by_rubric_smoke_v1",
-        action_config_id="kernel_demo.score_match_by_rubric_v1",
-        expected_output_schema_ref="kernel.schemas.score_match_output_v1",
-        start_input={"source_text": "Reference text A for scoring."},
-    ),
-    AtomCase(
-        action_type="text.score_multidimensional_axes",
-        scenario_id="kernel_demo.single_action_score_multidimensional_axes_smoke_v1",
-        action_config_id="kernel_demo.score_multidimensional_axes_v1",
-        expected_output_schema_ref="kernel.schemas.score_multidim_output_v1",
-        start_input={"source_text": "The proposal states its point directly."},
-    ),
+# Loaded from the same JSON file scripts/agent/kernel_demo_smoke.py's ATOM_SMOKE_CASES reads --
+# one shared source of the 11 (action_type, scenario_id, ...) cases instead of two independently
+# hand-maintained literals, so the two consumers structurally can't drift apart.
+_ATOM_MATRIX_DATA_PATH = (
+    Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "kernel_demo" / "atom_smoke_matrix.json"
 )
+
+
+def _load_atom_matrix() -> tuple[AtomCase, ...]:
+    with _ATOM_MATRIX_DATA_PATH.open("r", encoding="utf-8") as handle:
+        raw_cases = json.load(handle)
+    return tuple(AtomCase(**raw_case) for raw_case in raw_cases)
+
+
+ATOM_MATRIX: tuple[AtomCase, ...] = _load_atom_matrix()
 
 def _fixture_response_json(action_config_id: str) -> dict[str, Any]:
     fixture_path = FIXTURE_ROOT / f"{action_config_id}.json"
@@ -337,6 +251,14 @@ def test_atom_runtime_matrix(app: Any, session_factory: SessionFactory, case: At
 
 
 def test_atom_runtime_matrix_reports_eleven_of_eleven() -> None:
+    """One of two remaining independent atom-coverage guards (the third, cross-checking
+    ATOM_MATRIX against ATOM_SMOKE_CASES, was retired once both loaded from one shared JSON
+    file -- see test_atom_smoke_cases_match_atom_matrix). This one checks ATOM_MATRIX against
+    the validated ConfigLoader registry (scenario -> workflow -> step -> action_config_id ->
+    action_type); kernel_demo_smoke.py's own _atom_coverage_error (SMOKE007) separately checks
+    ATOM_SMOKE_CASES against a raw config-directory glob for its own live-HTTP run. Keep both
+    in sync when changing what "11/11 covered" means.
+    """
     registry = ConfigLoader(CONFIG_ROOT).load()
     # Derived from configs/kernel/action_definitions/*.yaml, the source of truth for "generic
     # action type", instead of a hardcoded 11-item set that a newly added atom wouldn't move.
@@ -406,12 +328,11 @@ def test_atom_runtime_matrix_reports_eleven_of_eleven() -> None:
 
 
 def test_atom_smoke_cases_match_atom_matrix() -> None:
-    """ATOM_MATRIX (this file) and ATOM_SMOKE_CASES (kernel_demo_smoke.py) are two
-    independently hand-maintained lists of the same 11 cases -- kernel_demo_smoke.py
-    deliberately has no backend-package imports so it can run against a container with only
-    the image's runtime deps, so it can't just import ATOM_MATRIX directly. This locks the two
-    lists together so a scenario_id rename or start_input change updated in only one of them
-    fails here instead of passing both files' self-consistency checks silently."""
+    """ATOM_MATRIX (this file) and ATOM_SMOKE_CASES (kernel_demo_smoke.py) both load from the
+    same tests/fixtures/kernel_demo/atom_smoke_matrix.json, so their case data structurally
+    can't drift -- this is a regression check on the two loaders' field-selection logic (e.g.
+    a typo'd JSON key silently dropping a field), not a lock between two hand-maintained
+    lists."""
     smoke = load_smoke_module()
 
     smoke_cases = {

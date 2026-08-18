@@ -158,6 +158,9 @@ def test_run_one_case_reports_smoke005_on_timeout(monkeypatch) -> None:
 
     error = smoke._run_one_case("http://127.0.0.1:8000", "scenario-1", {}, 0.0)
     assert error is not None and "SMOKE005" in error
+    # _run_one_case's real generated message, not a hand-written stub -- catches a future
+    # reword of the error text silently breaking run()'s timeout-degrade detection.
+    assert smoke._is_timeout_error(error)
 
 
 def test_run_reports_partial_pass_count_and_nonzero_exit(monkeypatch, capsys) -> None:
@@ -223,6 +226,14 @@ def test_atom_coverage_error_reports_missing_config_directory_distinctly(monkeyp
     assert error is not None and "not found" in error
 
 
+def test_run_fails_instead_of_vacuous_success_on_empty_case_list(monkeypatch, capsys) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "ATOM_SMOKE_CASES", ())
+
+    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
+    assert "SMOKE007" in capsys.readouterr().err
+
+
 def test_run_never_skips_a_case_but_degrades_timeout_after_a_real_timeout(monkeypatch, capsys) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(
@@ -240,7 +251,7 @@ def test_run_never_skips_a_case_but_degrades_timeout_after_a_real_timeout(monkey
         seen_timeouts.append(timeout)
         if scenario_id == "scenario-two":
             return None
-        return "SMOKE005: kernel_demo smoke check timed out after 30s"
+        return f"{smoke._TIMEOUT_ERROR_PREFIX}: kernel_demo smoke check timed out after 30s"
 
     monkeypatch.setattr(smoke, "_run_one_case", fake_run_one_case)
 
@@ -267,7 +278,10 @@ def test_run_does_not_misread_an_embedded_smoke005_substring_as_a_timeout(monkey
     def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
         seen_timeouts.append(timeout)
         if scenario_id == "scenario-one":
-            return "SMOKE004: kernel_demo session s1 failed: {'error': 'echoed SMOKE005 text'}"
+            return (
+                "SMOKE004: kernel_demo session s1 failed: "
+                f"{{'error': 'echoed {smoke._TIMEOUT_ERROR_PREFIX} text'}}"
+            )
         return None
 
     monkeypatch.setattr(smoke, "_run_one_case", fake_run_one_case)
