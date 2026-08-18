@@ -9,7 +9,8 @@ independently, and not as a single artificial 11-step chain.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 from typing import Any, Iterator
 
 import pytest
@@ -30,7 +31,7 @@ from anytoolai_platform_core.storage.transactions import (
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_worker.composition import build_worker
 from test_atom_runtime_matrix import (
-    _EXPECTED_ACTION_TYPES,
+    ATOM_MATRIX,
     _EXPECTED_EVENT_TYPES,
     _fixture_response_json,
 )
@@ -64,6 +65,21 @@ _EXTRACT_FIELDS = [
 _ACTION_EVENT_TYPES = ("action.started", "action.succeeded")
 
 
+class _RecordingFakeProviderAdapter(FakeProviderAdapter):
+    """Wraps FakeProviderAdapter to keep every resolved provider request it was asked to
+    complete, so a test can assert what a step's *actual* rendered prompt contained (proving a
+    mapped prior-step output really flowed into this step's request), not just that a
+    provider_calls row exists -- provider_calls_table has no request-payload column."""
+
+    def __init__(self, fixture_root: Any) -> None:
+        super().__init__(fixture_root)
+        self.requests: list[Any] = []
+
+    async def complete(self, request: Any) -> Any:
+        self.requests.append(request)
+        return await super().complete(request)
+
+
 @pytest.fixture
 def session_factory() -> Iterator[SessionFactory]:
     with provision_database(
@@ -81,6 +97,13 @@ class CompositeCase:
     start_input: dict[str, Any]
     # (step_id, action_type, action_config_id), in declared workflow order.
     expected_steps: tuple[tuple[str, str, str], ...]
+    # (dependent_step_id, source_step_id, field_path): proves the dependent step's provider
+    # request actually carries the source step's mapped output -- field_path is the field
+    # consumed from the source step's output (e.g. "rationale"), or None if the whole output
+    # object is consumed (e.g. context: steps.generate_gap_rewrites.output).
+    expected_step_dependencies: tuple[tuple[str, str, str | None], ...] = field(
+        default_factory=tuple
+    )
 
 
 COMPOSITE_MATRIX: tuple[CompositeCase, ...] = (
@@ -115,6 +138,11 @@ COMPOSITE_MATRIX: tuple[CompositeCase, ...] = (
                 "kernel_demo.generate_report_v1",
             ),
         ),
+        expected_step_dependencies=(
+            ("generate_questions", "detect_issues", "issues"),
+            ("generate_report", "extract", None),
+            ("generate_report", "detect_issues", None),
+        ),
     ),
     CompositeCase(
         workflow_id="kernel_demo.composite_evaluate_match_v1",
@@ -137,6 +165,9 @@ COMPOSITE_MATRIX: tuple[CompositeCase, ...] = (
                 "text.score_multidimensional_axes",
                 "kernel_demo.score_multidimensional_axes_v1",
             ),
+        ),
+        expected_step_dependencies=(
+            ("score_match_by_rubric", "compare_and_classify", "rationale"),
         ),
     ),
     CompositeCase(
@@ -166,6 +197,11 @@ COMPOSITE_MATRIX: tuple[CompositeCase, ...] = (
                 "kernel_demo.compose_reply_v1",
             ),
         ),
+        expected_step_dependencies=(
+            ("generate_gap_rewrites", "synthesize_angle", "rationale"),
+            ("compose_persuasive_text", "generate_gap_rewrites", None),
+            ("compose_reply", "compose_persuasive_text", "text"),
+        ),
     ),
 )
 
@@ -186,10 +222,11 @@ def _run_composite_scenario_and_assert_full_path(
         )
     ).json()
 
+    recording_adapter = _RecordingFakeProviderAdapter(FIXTURE_ROOT)
     worker = build_worker(
         session_factory=session_factory,
         config_root=CONFIG_ROOT,
-        provider_adapters={"fake": FakeProviderAdapter(FIXTURE_ROOT)},
+        provider_adapters={"fake": recording_adapter},
     )
     # A multi-step job completes in one process_next_job() call: SequentialWorkflowRunner
     # loops over every workflow step internally within a single run_claimed_job() invocation,
@@ -263,6 +300,26 @@ def _run_composite_scenario_and_assert_full_path(
         assert len(provider_calls_by_action_run.get(run["id"], [])) == 1
         assert provider_calls_by_action_run[run["id"]][0]["job_id"] == started["job_id"]
 
+    # Mapping proof: for every step whose input_mapping consumes a preceding step's output
+    # (steps.<id>.output[.field]), assert the *actual* rendered provider request for that step
+    # carries the preceding step's real fixture output -- not just that a provider_calls row
+    # exists. provider_calls_table has no request-payload column, so this reads from the
+    # recording fake adapter; StructuredLlmActionExecutor._render_prompt embeds
+    # json.dumps(dict(input_payload), sort_keys=True) verbatim in the rendered prompt.
+    action_config_id_by_step_id = {
+        step_id: action_config_id for step_id, _action_type, action_config_id in case.expected_steps
+    }
+    requests_by_step_id = {request.step_id: request for request in recording_adapter.requests}
+    for dependent_step_id, source_step_id, field_path in case.expected_step_dependencies:
+        source_output = _fixture_response_json(action_config_id_by_step_id[source_step_id])
+        expected_value = source_output if field_path is None else source_output[field_path]
+        expected_fragment = json.dumps(expected_value, sort_keys=True)
+        assert expected_fragment in requests_by_step_id[dependent_step_id].prompt, (
+            dependent_step_id,
+            source_step_id,
+            field_path,
+        )
+
     # Artifact lineage: every step has its own output artifact...
     step_output_artifact_ids = {run["id"]: run["output_artifact_id"] for run in action_runs}
     for artifact_id in step_output_artifact_ids.values():
@@ -290,14 +347,24 @@ def _run_composite_scenario_and_assert_full_path(
         if event_row["job_id"] is not None:
             assert event_row["job_id"] == started["job_id"]
 
+    # Flatten action.started/action.succeeded into a single trace ordered by timestamp (events
+    # is already ordered that way) and resolve each row to its step via action_run_id. This
+    # proves real interleaving -- started(step1), succeeded(step1), started(step2), ... -- not
+    # just that each event type's own sub-sequence independently matches step order (which
+    # would miss e.g. step2's action.started landing before step1's action.succeeded).
     step_id_by_action_run_id = {run["id"]: run["step_id"] for run in action_runs}
     expected_step_order = [step_id for step_id, _action_type, _config_id in case.expected_steps]
-    for event_type in _ACTION_EVENT_TYPES:
-        matching_events = [row for row in events if row["event_type"] == event_type]
-        step_ids_in_event_order = [
-            step_id_by_action_run_id[row["action_run_id"]] for row in matching_events
-        ]
-        assert step_ids_in_event_order == expected_step_order, (event_type, step_ids_in_event_order)
+    expected_trace = [
+        (step_id, event_type)
+        for step_id in expected_step_order
+        for event_type in _ACTION_EVENT_TYPES
+    ]
+    actual_trace = [
+        (step_id_by_action_run_id[row["action_run_id"]], row["event_type"])
+        for row in events
+        if row["event_type"] in _ACTION_EVENT_TYPES
+    ]
+    assert actual_trace == expected_trace
 
     result_response = asyncio.run(
         _request(
@@ -327,4 +394,4 @@ def test_composite_workflow_matrix_reports_three_of_three() -> None:
         for case in COMPOSITE_MATRIX
         for _step_id, action_type, _action_config_id in case.expected_steps
     }
-    assert covered_action_types == _EXPECTED_ACTION_TYPES
+    assert covered_action_types == {case.action_type for case in ATOM_MATRIX}

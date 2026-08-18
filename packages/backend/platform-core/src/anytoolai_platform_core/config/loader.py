@@ -585,15 +585,19 @@ class ConfigLoader:
         path: Path,
         config_id: str | None = None,
     ) -> None:
-        for name in required:
-            value = data.get(name)
-            present = value is not None if name in not_none_fields else bool(value)
-            if not present:
-                raise InvalidConfigShapeError(
-                    path,
-                    f"{noun} missing required fields: {data}",
-                    config_id=config_id,
-                )
+        missing = [
+            name
+            for name in required
+            if not (
+                data.get(name) is not None if name in not_none_fields else bool(data.get(name))
+            )
+        ]
+        if missing:
+            raise InvalidConfigShapeError(
+                path,
+                f"{noun} missing required fields: {', '.join(missing)}",
+                config_id=config_id,
+            )
 
     def _preserved_config_errors_from_exception(
         self,
@@ -1244,29 +1248,22 @@ class ConfigLoader:
                             ref_value=_stringify_config_value(ref_value),
                         )
 
-                not_none_action_fields = {"version"}
-                required_action_fields = {
-                    "action_type": action_type,
-                    "version": version,
-                    "executor": executor,
-                    "input_schema_ref": input_schema_ref,
-                    "output_schema_ref": output_schema_ref,
-                    "cross_validator_ref": cross_validator_ref,
-                    "input_validator_ref": input_validator_ref,
-                }
-                missing_fields = [
-                    name
-                    for name, value in required_action_fields.items()
-                    if (value is None if name in not_none_action_fields else not value)
-                ]
-                if missing_fields:
-                    raise InvalidConfigShapeError(
-                        path,
-                        f"Missing required fields: {', '.join(missing_fields)}",
-                        config_id=action_type,
-                        ref_type=missing_fields[0],
-                        ref_value="<missing>",
-                    )
+                self._require_fields(
+                    data,
+                    required=[
+                        "action_type",
+                        "version",
+                        "executor",
+                        "input_schema_ref",
+                        "output_schema_ref",
+                        "cross_validator_ref",
+                        "input_validator_ref",
+                    ],
+                    not_none_fields=["version"],
+                    noun="Action definition",
+                    path=path,
+                    config_id=action_type,
+                )
 
                 self._check_duplicate(
                     id_type="action_type",
@@ -1338,11 +1335,13 @@ class ConfigLoader:
             product_platform = product_data.get("product_platform")
             display_name = product_data.get("display_name")
 
-            if not all([product_id, product_platform, display_name]):
-                raise InvalidConfigShapeError(
-                    product_file,
-                    "Missing required fields: product_id, product_platform, display_name",
-                )
+            self._require_fields(
+                product_data,
+                required=["product_id", "product_platform", "display_name"],
+                noun="Product definition",
+                path=product_file,
+                config_id=product_id,
+            )
 
             self._check_duplicate(
                 id_type="product_id",

@@ -27,12 +27,10 @@ from anytoolai_platform_core.scenarios.checkpoints import (
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.scenarios.service import ScenarioSessionService
 from anytoolai_platform_core.storage.db import (
-    action_runs_table,
     artifacts_table,
     event_log_table,
     guest_quota_usage_table,
     jobs_table,
-    provider_calls_table,
     scenario_sessions_table,
 )
 from anytoolai_platform_core.storage.transactions import (
@@ -44,7 +42,7 @@ from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
 
-from tests.db_support import provision_database
+from tests.db_support import assert_scenario_runtime_correlation, provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
@@ -702,6 +700,29 @@ def test_start_then_real_worker_execution_preserves_a12_runtime_correlation(
         "result_artifact_id": processed.result_artifact_id,
     }
 
+    assert_scenario_runtime_correlation(
+        session_factory,
+        scenario_session_id=started["scenario_session_id"],
+        job_id=started["job_id"],
+        result_artifact_id=processed.result_artifact_id,
+        action_type="text.extract_structured_fields",
+        action_config_id="kernel_demo.extract_structured_fields_v1",
+        expected_event_types={
+            "scenario.started",
+            "workflow.started",
+            "action.started",
+            "provider.request_started",
+            "provider.request_succeeded",
+            "artifact.created",
+            "action.succeeded",
+            "workflow.succeeded",
+            "scenario.checkpoint_reached",
+            "scenario.completed",
+        },
+    )
+
+    # Checks beyond the shared helper's scope: checkpoint/product/frontend cross-references
+    # and that every artifact (not just the result artifact) carries this scenario_session_id.
     with transaction_boundary(session_factory) as session:
         scenario = ScenarioSessionRepository(session).get_in_scope(
             started["scenario_session_id"],
@@ -709,66 +730,23 @@ def test_start_then_real_worker_execution_preserves_a12_runtime_correlation(
             region="default",
         )
         job = JobRepository(session).get(started["job_id"])
-        action_run = session.execute(
-            sa.select(action_runs_table).where(action_runs_table.c.job_id == started["job_id"])
-        ).mappings().one()
-        provider_call = session.execute(
-            sa.select(provider_calls_table).where(
-                provider_calls_table.c.job_id == started["job_id"]
-            )
-        ).mappings().one()
         artifacts = list(
             session.execute(
-                sa.select(artifacts_table)
-                .where(artifacts_table.c.job_id == started["job_id"])
-                .order_by(artifacts_table.c.created_at, artifacts_table.c.id)
-            ).mappings()
-        )
-        events = list(
-            session.execute(
-                sa.select(event_log_table)
-                .where(event_log_table.c.scenario_session_id == started["scenario_session_id"])
-                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+                sa.select(artifacts_table).where(artifacts_table.c.job_id == started["job_id"])
             ).mappings()
         )
 
     assert scenario is not None
-    assert scenario.status.value == "completed"
     assert scenario.current_checkpoint_id == RESULT_READY_CHECKPOINT_ID
     assert job is not None
-    assert job.scenario_session_id == started["scenario_session_id"]
     assert job.product_id == scenario.product_id
     assert job.frontend_id == scenario.frontend_id
-    assert job.result_artifact_id == processed.result_artifact_id
-
-    assert action_run["scenario_session_id"] == started["scenario_session_id"]
-    assert provider_call["scenario_session_id"] == started["scenario_session_id"]
-    assert provider_call["job_id"] == started["job_id"]
-    assert provider_call["action_run_id"] == action_run["id"]
-    assert all(artifact["scenario_session_id"] == started["scenario_session_id"] for artifact in artifacts)
-    assert any(artifact["id"] == processed.result_artifact_id for artifact in artifacts)
+    assert all(
+        artifact["scenario_session_id"] == started["scenario_session_id"] for artifact in artifacts
+    )
     result_artifact = next(
         artifact for artifact in artifacts if artifact["id"] == processed.result_artifact_id
     )
-    assert result_artifact["job_id"] == started["job_id"]
-    assert result_artifact["scenario_session_id"] == started["scenario_session_id"]
-
-    event_types = [event_row["event_type"] for event_row in events]
-    assert {
-        "scenario.started",
-        "workflow.started",
-        "action.started",
-        "provider.request_started",
-        "provider.request_succeeded",
-        "artifact.created",
-        "action.succeeded",
-        "workflow.succeeded",
-        "scenario.checkpoint_reached",
-        "scenario.completed",
-    }.issubset(event_types)
-    for event_row in events:
-        if event_row["job_id"] is not None:
-            assert event_row["job_id"] == started["job_id"]
 
     # ANY-217: the API-hand-seeded results tests can drift from what the real worker actually
     # persists via WorkflowRunner._create_final_artifact. Prove a genuine worker-produced

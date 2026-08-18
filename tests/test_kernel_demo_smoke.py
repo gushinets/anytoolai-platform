@@ -192,6 +192,48 @@ def test_expected_schema_ref_by_scenario_covers_every_real_smoke_case() -> None:
         assert scenario_id in smoke._EXPECTED_SCHEMA_REF_BY_SCENARIO, action_type
 
 
+def test_expected_schema_ref_by_scenario_covers_every_composite_smoke_case() -> None:
+    smoke = load_smoke_module()
+    for workflow_id, scenario_id, _ in smoke.COMPOSITE_SMOKE_CASES:
+        assert scenario_id in smoke._EXPECTED_SCHEMA_REF_BY_SCENARIO, workflow_id
+
+
+def test_run_reports_smoke009_when_a_composite_scenario_produces_the_wrong_schema_ref(
+    monkeypatch, capsys
+) -> None:
+    """Proves SMOKE009 (schema_ref cross-check) fires for a composite scenario wired to the
+    wrong workflow, not just the 11 atom cases -- would previously report "ok" because
+    composite scenario_ids had no entry in _EXPECTED_SCHEMA_REF_BY_SCENARIO."""
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "ATOM_SMOKE_CASES", (("atom.one", "scenario-one", {}),))
+    monkeypatch.setattr(
+        smoke,
+        "COMPOSITE_SMOKE_CASES",
+        (("workflow.one", "kernel_demo.composite_analyze_and_clarify_smoke_v1", {}),),
+    )
+    monkeypatch.setattr(
+        smoke,
+        "_http_json_request",
+        _sequenced_request(
+            [
+                {"guest_id": "guest-1"},
+                {"scenario_session_id": "session-1"},
+                {"status": "completed", "result_artifact_id": "artifact-1"},
+                {"guest_id": "guest-2"},
+                {"scenario_session_id": "session-2"},
+                {"status": "completed", "result_artifact_id": "artifact-2"},
+                {"schema_ref": "kernel.schemas.wrong_v1"},
+            ]
+        ),
+    )
+
+    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
+    out, err = capsys.readouterr()
+    assert "1/1 kernel_demo atoms passed" in out
+    assert "0/1 kernel_demo composite workflows passed" in out
+    assert "SMOKE009" in err and "schema_ref" in err
+
+
 def test_run_one_case_reports_smoke005_on_timeout(monkeypatch) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(
@@ -329,6 +371,7 @@ def test_run_degrades_timeout_after_a_timeout_but_not_permanently(monkeypatch) -
             ("atom.three", "scenario-three", {}),
         ),
     )
+    monkeypatch.setattr(smoke, "COMPOSITE_SMOKE_CASES", ())
     seen_timeouts = []
 
     def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
@@ -356,6 +399,7 @@ def test_run_timeout_degrade_is_driven_by_error_code_not_message_text(monkeypatc
             ("atom.two", "scenario-two", {}),
         ),
     )
+    monkeypatch.setattr(smoke, "COMPOSITE_SMOKE_CASES", ())
     seen_timeouts = []
 
     def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
@@ -410,6 +454,7 @@ def test_run_reports_smoke001_with_no_session_id_available(monkeypatch, capsys) 
     run()'s per-case print formatting that mis-handles a None session_id is caught here."""
     smoke = load_smoke_module()
     monkeypatch.setattr(smoke, "ATOM_SMOKE_CASES", (("atom.one", "scenario-one", {}),))
+    monkeypatch.setattr(smoke, "COMPOSITE_SMOKE_CASES", ())
     monkeypatch.setattr(
         smoke, "_http_json_request", _sequenced_request([OSError("connection refused")])
     )
