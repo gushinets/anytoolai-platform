@@ -53,3 +53,58 @@ action_configs:
     action_type: text.score_match_by_rubric
     prompt_ref: kernel_demo.score_match_by_rubric.v1
     provider_policy_ref: default_fake_provider_v1
+
+  - action_config_id: kernel_demo.extract_structured_fields_live_v1
+    action_type: text.extract_structured_fields
+    prompt_ref: kernel_demo.extract_structured_fields.v1
+    provider_policy_ref: default_text_generation_v1
+
+  - action_config_id: kernel_demo.detect_issues_live_v1
+    action_type: text.detect_issues_by_taxonomy
+    prompt_ref: kernel_demo.detect_issues.v1
+    provider_policy_ref: default_text_generation_v1
+
+  - action_config_id: kernel_demo.generate_report_live_v1
+    action_type: document.generate_from_template
+    prompt_ref: kernel_demo.generate_report.v1
+    provider_policy_ref: default_text_generation_v1
+
+  - action_config_id: kernel_demo.compose_reply_live_v1
+    action_type: text.compose_reply
+    prompt_ref: kernel_demo.compose_reply.v1
+    provider_policy_ref: default_text_generation_v1
+
+  - action_config_id: kernel_demo.generate_clarifying_questions_live_v1
+    action_type: text.generate_clarifying_questions
+    prompt_ref: kernel_demo.generate_clarifying_questions.v1
+    provider_policy_ref: default_text_generation_v1
+
+  - action_config_id: kernel_demo.synthesize_angle_live_v1
+    action_type: text.synthesize_angle
+    prompt_ref: kernel_demo.synthesize_angle.v1
+    provider_policy_ref: default_text_generation_v1
+
+  - action_config_id: kernel_demo.compose_persuasive_text_live_v1
+    action_type: text.compose_persuasive_text
+    prompt_ref: kernel_demo.compose_persuasive_text.v1
+    provider_policy_ref: default_text_generation_v1
+
+  - action_config_id: kernel_demo.generate_gap_rewrites_live_v1
+    action_type: text.generate_gap_rewrites
+    prompt_ref: kernel_demo.generate_gap_rewrites.v1
+    provider_policy_ref: default_text_generation_v1
+
+  - action_config_id: kernel_demo.compare_and_classify_live_v1
+    action_type: text.compare_and_classify
+    prompt_ref: kernel_demo.compare_and_classify.v1
+    provider_policy_ref: default_text_generation_v1
+
+  - action_config_id: kernel_demo.score_multidimensional_axes_live_v1
+    action_type: text.score_multidimensional_axes
+    prompt_ref: kernel_demo.score_multidimensional_axes.v1
+    provider_policy_ref: default_text_generation_v1
+
+  - action_config_id: kernel_demo.score_match_by_rubric_live_v1
+    action_type: text.score_match_by_rubric
+    prompt_ref: kernel_demo.score_match_by_rubric.v1
+    provider_policy_ref: default_text_generation_v1

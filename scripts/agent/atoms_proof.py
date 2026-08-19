@@ -103,12 +103,18 @@ class StepEvidence:
     step_id: str
     action_type: str
     action_config_id: str
+    latency_ms: int | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+    estimated_cost: float | None = None
 
 
 @dataclass(frozen=True)
 class EvidenceCase:
-    """Privacy-safe by construction: only ids/labels/booleans, no fixture payload bodies, no
-    prompts, no PII -- exactly what gets serialized into the evidence report."""
+    """Privacy-safe by construction: only ids/labels/booleans and numeric ledger metrics
+    (latency, token counts, estimated cost) -- no fixture payload bodies, no prompts, no
+    generated text, no PII -- exactly what gets serialized into the evidence report."""
 
     label: str
     scenario_id: str
@@ -191,10 +197,12 @@ def _classify_ledger(
         )
 
     provider_call_counts: dict[str, int] = {}
+    provider_call_by_action_run_id: dict[str, dict] = {}
     for call in provider_calls:
         provider_call_counts[call["action_run_id"]] = (
             provider_call_counts.get(call["action_run_id"], 0) + 1
         )
+        provider_call_by_action_run_id[call["action_run_id"]] = call
     for action_run in action_runs:
         count = provider_call_counts.get(action_run["id"], 0)
         if count != 1:
@@ -267,6 +275,11 @@ def _classify_ledger(
             step_id=row["step_id"],
             action_type=row["action_type"],
             action_config_id=row["action_config_id"],
+            latency_ms=provider_call_by_action_run_id[row["id"]]["latency_ms"],
+            input_tokens=provider_call_by_action_run_id[row["id"]]["input_tokens"],
+            output_tokens=provider_call_by_action_run_id[row["id"]]["output_tokens"],
+            total_tokens=provider_call_by_action_run_id[row["id"]]["total_tokens"],
+            estimated_cost=provider_call_by_action_run_id[row["id"]]["estimated_cost"],
         )
         for row in action_runs
     )
