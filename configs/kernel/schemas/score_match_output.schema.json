@@ -44,8 +44,13 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "overall_rationale": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
     }
   },
-  "required": ["criterion_scores", "score", "strengths", "gaps"],
+  "required": ["criterion_scores", "score", "strengths", "gaps", "overall_rationale"],
   "additionalProperties": false
 }

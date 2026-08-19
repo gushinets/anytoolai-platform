@@ -14,7 +14,8 @@
     ],
     "score": 80,
     "strengths": ["Tone matches the source closely."],
-    "gaps": ["Budget detail from text_a is missing in text_b."]
+    "gaps": ["Budget detail from text_a is missing in text_b."],
+    "overall_rationale": "text_b lands close to text_a on tone but only partially covers its content, driven mainly by the missing budget detail."
   },
   "input_tokens": 160,
   "output_tokens": 60,
