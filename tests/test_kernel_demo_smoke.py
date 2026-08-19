@@ -479,6 +479,41 @@ def test_composite_coverage_error_reports_missing_output_schema_ref(tmp_path, mo
     )
 
 
+def test_composite_workflow_config_parses_workflows_yaml_exactly_once(monkeypatch) -> None:
+    """_composite_workflow_config() must derive required workflow_ids and
+    output_schema_ref_by_workflow_id from a single _composite_workflow_entries() call, not by
+    calling _required_composite_workflow_ids() and _composite_output_schema_ref_by_workflow_id()
+    separately (each of which parses workflows.yaml on its own) -- a prior round regressed this
+    into two reads per _composite_coverage_error() call."""
+    smoke = load_smoke_module()
+    real_entries = smoke._composite_workflow_entries
+    calls = []
+
+    def counting_entries():
+        calls.append(1)
+        return real_entries()
+
+    monkeypatch.setattr(smoke, "_composite_workflow_entries", counting_entries)
+
+    smoke._composite_workflow_config()
+
+    assert len(calls) == 1
+
+
+def test_composite_workflow_config_returns_a_plain_tuple_on_success() -> None:
+    """_composite_workflow_config() raises on parse failure instead of returning a
+    tuple-or-error-string union -- its success return is always a plain 3-tuple, matching every
+    other data-returning helper in this module (error signaling is str | None, done by its one
+    caller, not by this function itself)."""
+    smoke = load_smoke_module()
+
+    config = smoke._composite_workflow_config()
+    required, workflow_id_by_scenario_id, output_schema_ref_by_workflow_id = config
+
+    assert isinstance(config, tuple)
+    assert required and workflow_id_by_scenario_id and output_schema_ref_by_workflow_id
+
+
 def test_composite_coverage_error_reports_empty_output_schema_ref_as_missing(
     tmp_path, monkeypatch
 ) -> None:

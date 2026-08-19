@@ -127,6 +127,28 @@ def _composite_workflow_entries() -> list[dict]:
     ]
 
 
+def _composite_required_ids_and_schema_refs(
+    entries: list[dict],
+) -> tuple[frozenset[str], dict[str, str]]:
+    """Pure derivation (no I/O -- entries is already-parsed) shared by
+    _required_composite_workflow_ids(), _composite_output_schema_ref_by_workflow_id(), and
+    _composite_workflow_config() below, so all three agree on exactly one rule for "required
+    workflow_ids" and "workflow_id -> output_schema_ref" instead of three near-identical
+    comprehensions that could drift. Each caller supplies its own already-parsed entries (from
+    _composite_workflow_entries()), so this function itself never re-reads workflows.yaml --
+    callers control how many times the file gets parsed. An output_schema_ref of "" is excluded,
+    not just a non-string: isinstance(entry.get(...), str) alone would let output_schema_ref: ""
+    through as if it were a real ref, so the workflow's key would never land in required - this
+    dict's keys and a missing-ref check downstream would miss it."""
+    required = frozenset(entry["workflow_id"] for entry in entries)
+    output_schema_ref_by_workflow_id = {
+        entry["workflow_id"]: entry["output_schema_ref"]
+        for entry in entries
+        if isinstance(entry.get("output_schema_ref"), str) and entry["output_schema_ref"]
+    }
+    return required, output_schema_ref_by_workflow_id
+
+
 def _required_composite_workflow_ids() -> frozenset[str]:
     """Derives required composite coverage from workflows.yaml's own declared workflow_ids,
     filtered to the kernel_demo.composite_ naming convention -- the composite counterpart of
@@ -138,7 +160,10 @@ def _required_composite_workflow_ids() -> frozenset[str]:
     validate-configs baseline job are siblings with no `needs:` ordering, so a malformed
     workflows.yaml could in principle fail this coverage check before/concurrently with
     baseline's own failure, same trade-off documented there."""
-    return frozenset(entry["workflow_id"] for entry in _composite_workflow_entries())
+    required, _output_schema_ref_by_workflow_id = _composite_required_ids_and_schema_refs(
+        _composite_workflow_entries()
+    )
+    return required
 
 
 def _required_composite_workflow_id_by_scenario_id() -> dict[str, str]:
@@ -218,15 +243,11 @@ def _composite_output_schema_ref_by_workflow_id() -> dict[str, str]:
     """workflow_id -> output_schema_ref for composite workflows -- shared by
     _composite_workflow_config() (to fail SMOKE010 loudly on a missing/invalid output_schema_ref
     instead of silently dropping the workflow's scenario from schema_ref coverage) and
-    _composite_expected_schema_ref_by_scenario_id() below (to build the scenario_id lookup). An
-    empty string is excluded, not just a non-string: isinstance(entry.get(...), str) alone would
-    let output_schema_ref: "" through as if it were a real ref, so the workflow's key would never
-    land in required - this dict's keys and the missing-ref check below would miss it."""
-    return {
-        entry["workflow_id"]: entry["output_schema_ref"]
-        for entry in _composite_workflow_entries()
-        if isinstance(entry.get("output_schema_ref"), str) and entry["output_schema_ref"]
-    }
+    _composite_expected_schema_ref_by_scenario_id() below (to build the scenario_id lookup)."""
+    _required, output_schema_ref_by_workflow_id = _composite_required_ids_and_schema_refs(
+        _composite_workflow_entries()
+    )
+    return output_schema_ref_by_workflow_id
 
 
 def _composite_expected_schema_ref_by_scenario_id() -> dict[str, str]:
@@ -297,27 +318,20 @@ def _composite_case_shape_error(cases: tuple[tuple[str, str, dict], ...]) -> str
     return None
 
 
-def _composite_workflow_config() -> tuple[frozenset[str], dict[str, str], dict[str, str]] | str:
-    """Parses workflows.yaml/scenarios.yaml and derives (required_workflow_ids,
-    workflow_id_by_scenario_id, output_schema_ref_by_workflow_id) for _composite_coverage_error(),
-    or a SMOKE010 error string if a required composite workflow is missing/invalid
-    output_schema_ref or the files can't be parsed at all -- one call+return site instead of a
-    dedicated exception class raised only to be caught by the same function."""
-    try:
-        required = _required_composite_workflow_ids()
-        workflow_id_by_scenario_id = _required_composite_workflow_id_by_scenario_id()
-        output_schema_ref_by_workflow_id = _composite_output_schema_ref_by_workflow_id()
-    except _COMPOSITE_CONFIG_PARSE_ERRORS as exc:
-        return (
-            "SMOKE010: could not parse composite workflow/scenario config to verify required "
-            f"composite coverage: {exc}"
-        )
-    missing_schema_ref = sorted(required - output_schema_ref_by_workflow_id.keys())
-    if missing_schema_ref:
-        return (
-            "SMOKE010: composite workflow config validation failed: missing/invalid "
-            f"output_schema_ref for workflow(s): {missing_schema_ref}"
-        )
+def _composite_workflow_config() -> tuple[frozenset[str], dict[str, str], dict[str, str]]:
+    """Parses workflows.yaml/scenarios.yaml exactly once each and derives
+    (required_workflow_ids, workflow_id_by_scenario_id, output_schema_ref_by_workflow_id) for
+    _composite_coverage_error(). Raises (doesn't catch) any of _COMPOSITE_CONFIG_PARSE_ERRORS on
+    a parse failure -- that's the caller's job, so this function's return type stays a plain
+    success-only tuple instead of a tuple-or-error-string union that would invert the str | None
+    (None-means-success) convention every other coverage function in this module follows.
+    Computes required/output_schema_ref_by_workflow_id from a single _composite_workflow_entries()
+    call via the shared pure helper, not by calling _required_composite_workflow_ids() and
+    _composite_output_schema_ref_by_workflow_id() (each of which parses workflows.yaml on its own)
+    -- avoids re-reading the same file twice per call."""
+    entries = _composite_workflow_entries()
+    required, output_schema_ref_by_workflow_id = _composite_required_ids_and_schema_refs(entries)
+    workflow_id_by_scenario_id = _required_composite_workflow_id_by_scenario_id()
     return required, workflow_id_by_scenario_id, output_schema_ref_by_workflow_id
 
 
@@ -330,10 +344,21 @@ def _composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str |
     shape_error = _composite_case_shape_error(cases)
     if shape_error is not None:
         return shape_error
-    config = _composite_workflow_config()
-    if isinstance(config, str):
-        return config
-    required, workflow_id_by_scenario_id, _output_schema_ref_by_workflow_id = config
+    try:
+        required, workflow_id_by_scenario_id, output_schema_ref_by_workflow_id = (
+            _composite_workflow_config()
+        )
+    except _COMPOSITE_CONFIG_PARSE_ERRORS as exc:
+        return (
+            "SMOKE010: could not parse composite workflow/scenario config to verify required "
+            f"composite coverage: {exc}"
+        )
+    missing_schema_ref = sorted(required - output_schema_ref_by_workflow_id.keys())
+    if missing_schema_ref:
+        return (
+            "SMOKE010: composite workflow config validation failed: missing/invalid "
+            f"output_schema_ref for workflow(s): {missing_schema_ref}"
+        )
     workflow_ids = [workflow_id for workflow_id, _, _ in cases]
     scenario_ids = [scenario_id for _, scenario_id, _ in cases]
     covered = set(workflow_ids)
