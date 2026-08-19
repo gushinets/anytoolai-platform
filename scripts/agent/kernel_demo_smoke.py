@@ -54,6 +54,15 @@ _COMPOSITE_CONFIG_PARSE_ERRORS: tuple[type[Exception], ...] = (
 )
 
 
+class _CompositeConfigValidationError(ValueError):
+    """Raised internally by _composite_coverage_error() to flag a validation gap (e.g. a
+    required composite workflow missing output_schema_ref) as opposed to a parse failure --
+    a dedicated subclass, not bare ValueError, so its except clause can pick the accurate
+    message prefix by exception type without also mislabeling some unrelated future ValueError
+    (e.g. a stray int() conversion added to the same try block later) as a validation gap
+    instead of a parse failure."""
+
+
 def _load_raw_atom_cases() -> list[dict]:
     """Parses tests/fixtures/kernel_demo/atom_smoke_matrix.json once. Exposed as
     _RAW_ATOM_CASES (not just consumed internally) so
@@ -315,17 +324,16 @@ def _composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str |
         if missing_schema_ref:
             # ponytail: raised (not returned directly) so this reuses the except clause's
             # message template below and stays within PLR0911's 6-return budget for this
-            # function -- ValueError is caught by the same _COMPOSITE_CONFIG_PARSE_ERRORS tuple
-            # the rest of this function's malformed-config handling already uses. The except
-            # clause below distinguishes this from a real parse failure by exception type, so
-            # the reported message stays accurate.
-            raise ValueError(
+            # function -- _CompositeConfigValidationError is a ValueError subclass, so it's
+            # still caught by the same _COMPOSITE_CONFIG_PARSE_ERRORS tuple the rest of this
+            # function's malformed-config handling already uses.
+            raise _CompositeConfigValidationError(
                 f"missing/invalid output_schema_ref for workflow(s): {missing_schema_ref}"
             )
     except _COMPOSITE_CONFIG_PARSE_ERRORS as exc:
         prefix = (
             "SMOKE010: composite workflow config validation failed"
-            if isinstance(exc, ValueError)
+            if isinstance(exc, _CompositeConfigValidationError)
             else "SMOKE010: could not parse composite workflow/scenario config to verify "
             "required composite coverage"
         )

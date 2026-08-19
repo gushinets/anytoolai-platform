@@ -479,6 +479,33 @@ def test_composite_coverage_error_reports_missing_output_schema_ref(tmp_path, mo
     )
 
 
+def test_composite_coverage_error_reports_unrelated_value_error_as_parse_failure(
+    monkeypatch,
+) -> None:
+    """A ValueError from anywhere else in _composite_coverage_error()'s try block (not our own
+    deliberate missing-output_schema_ref check) must still report "could not parse", not
+    "validation failed" -- proves the except clause distinguishes by the dedicated
+    _CompositeConfigValidationError subclass, not by bare `isinstance(exc, ValueError)`, which
+    would mislabel any unrelated future ValueError-raising code added to the same try block."""
+    smoke = load_smoke_module()
+
+    def _raise_unrelated_value_error() -> dict[str, str]:
+        raise ValueError("some unrelated coercion error")
+
+    monkeypatch.setattr(
+        smoke, "_required_composite_workflow_id_by_scenario_id", _raise_unrelated_value_error
+    )
+
+    error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
+
+    assert (
+        error is not None
+        and "SMOKE010" in error
+        and "could not parse" in error
+        and "validation failed" not in error
+    )
+
+
 def test_composite_coverage_error_reports_partial_loss_not_just_empty() -> None:
     """A partial regression (2 of 3 composite entries survive) must be caught the same way full
     emptiness is -- this is the exact gap a bare `len(cases) == 0` check would miss."""
