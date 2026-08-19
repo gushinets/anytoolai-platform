@@ -500,6 +500,26 @@ def test_composite_workflow_config_parses_workflows_yaml_exactly_once(monkeypatc
     assert len(calls) == 1
 
 
+def test_composite_coverage_error_derives_case_ids_exactly_once(monkeypatch) -> None:
+    """_composite_coverage_error() must unzip COMPOSITE_SMOKE_CASES into (workflow_ids,
+    scenario_ids) exactly once via _composite_case_ids(), not once for the duplicate-id check
+    (_composite_case_shape_error()) and again for coverage/binding -- two independent copies of
+    this unzip could silently drift if the cases shape ever changed."""
+    smoke = load_smoke_module()
+    real_case_ids = smoke._composite_case_ids
+    calls = []
+
+    def counting_case_ids(cases):
+        calls.append(1)
+        return real_case_ids(cases)
+
+    monkeypatch.setattr(smoke, "_composite_case_ids", counting_case_ids)
+
+    smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
+
+    assert len(calls) == 1
+
+
 def test_composite_workflow_config_returns_a_plain_tuple_on_success() -> None:
     """_composite_workflow_config() raises on parse failure instead of returning a
     tuple-or-error-string union -- its success return is always a plain 3-tuple, matching every
