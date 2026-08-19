@@ -139,6 +139,30 @@ def collect(*, failure_file: Path | None = None, log_lines: int = 100) -> dict[s
     return sanitize(payload)
 
 
+TIMESTAMP_FORMAT = "%Y%m%dT%H%M%SZ"
+
+
+def write_timestamped_json_bundle(
+    target_root: Path, prefix: str, payload: dict, *, timestamp: str | None = None
+) -> Path:
+    """Shared ignored-diagnostics-path convention: `{target_root}/{prefix}-{UTC timestamp}.json`,
+    pretty-printed and key-sorted. Used by both this module's own write_bundle() and
+    scripts/agent/atoms_proof.py's write_evidence_report() so the two don't drift independently.
+
+    `timestamp` lets a caller whose payload takes a while to build (e.g. write_bundle()'s own
+    collect(), which shells out to `docker compose logs/ps` with ~20s timeouts) stamp the
+    filename with when it was *called*, not when the slow payload finished -- matching this
+    function's default (generate-now) behavior for a caller with no such delay."""
+    target_root.mkdir(parents=True, exist_ok=True)
+    timestamp = timestamp or datetime.now(tz=UTC).strftime(TIMESTAMP_FORMAT)
+    target = target_root / f"{prefix}-{timestamp}.json"
+    target.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return target
+
+
 def write_bundle(
     *,
     output_root: Path | None = None,
@@ -146,19 +170,9 @@ def write_bundle(
     log_lines: int = 100,
 ) -> Path:
     target_root = output_root or ROOT / ".agent" / "context"
-    target_root.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
-    target = target_root / f"context-{timestamp}.json"
-    target.write_text(
-        json.dumps(
-            collect(failure_file=failure_file, log_lines=log_lines),
-            indent=2,
-            sort_keys=True,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    return target
+    timestamp = datetime.now(tz=UTC).strftime(TIMESTAMP_FORMAT)
+    payload = collect(failure_file=failure_file, log_lines=log_lines)
+    return write_timestamped_json_bundle(target_root, "context", payload, timestamp=timestamp)
 
 
 def main() -> int:
