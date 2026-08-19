@@ -15,8 +15,8 @@ Do **not**:
 - start a mass lint cleanup, enum migration, or loader rewrite because a rule exists here;
 - add a root `rules.md` or copy this text into scoped `AGENTS.md` files.
 
-Mass cleanup needs its own execution plan. Feature PRs own tests and docs for the behavior they
-introduce.
+Mass cleanup needs its own execution plan and ticket. Feature PRs own tests and docs for the
+behavior they introduce.
 
 ## Shared
 
