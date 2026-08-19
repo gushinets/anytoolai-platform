@@ -774,11 +774,11 @@ def test_start_then_real_worker_execution_preserves_a12_runtime_correlation(
         "output": {
             "values": {
                 "deadline": "next Friday",
-                "budget": "$5,000",
                 "deliverables": ["logo", "landing page"],
             },
-            "missing_fields": [],
-            "confidence": {"deadline": 0.9, "budget": 0.8, "deliverables": 0.7},
+            "missing_fields": ["budget"],
+            "confidence": {"deadline": 0.9, "deliverables": 0.7},
+            "notes": "Deadline and deliverables were found in the text; budget was not mentioned.",
         },
     }
 

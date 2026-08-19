@@ -71,8 +71,13 @@ class TestExtractInputSchema:
 
 
 class TestExtractOutputSchema:
+    _NOTES = "No requested fields were found in the text."
+
     def test_minimal_valid_output(self) -> None:
-        validate(instance={"values": {}, "missing_fields": ["deadline"]}, schema=EXTRACT_OUTPUT)
+        validate(
+            instance={"values": {}, "missing_fields": ["deadline"], "notes": self._NOTES},
+            schema=EXTRACT_OUTPUT,
+        )
 
     def test_full_valid_output(self) -> None:
         validate(
@@ -80,6 +85,7 @@ class TestExtractOutputSchema:
                 "values": {"deadline": "Friday"},
                 "missing_fields": [],
                 "confidence": {"deadline": 0.8},
+                "notes": self._NOTES,
             },
             schema=EXTRACT_OUTPUT,
         )
@@ -88,17 +94,38 @@ class TestExtractOutputSchema:
         with pytest.raises(ValidationError):
             validate(instance={"values": {}}, schema=EXTRACT_OUTPUT)
 
+    def test_missing_notes_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(instance={"values": {}, "missing_fields": ["deadline"]}, schema=EXTRACT_OUTPUT)
+
+    def test_empty_notes_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={"values": {}, "missing_fields": ["deadline"], "notes": ""},
+                schema=EXTRACT_OUTPUT,
+            )
+
     def test_unexpected_property_rejected(self) -> None:
         with pytest.raises(ValidationError):
             validate(
-                instance={"values": {}, "missing_fields": [], "title": "not allowed"},
+                instance={
+                    "values": {},
+                    "missing_fields": [],
+                    "notes": self._NOTES,
+                    "title": "not allowed",
+                },
                 schema=EXTRACT_OUTPUT,
             )
 
     def test_confidence_out_of_range_rejected(self) -> None:
         with pytest.raises(ValidationError):
             validate(
-                instance={"values": {}, "missing_fields": [], "confidence": {"deadline": 1.5}},
+                instance={
+                    "values": {},
+                    "missing_fields": [],
+                    "confidence": {"deadline": 1.5},
+                    "notes": self._NOTES,
+                },
                 schema=EXTRACT_OUTPUT,
             )
 

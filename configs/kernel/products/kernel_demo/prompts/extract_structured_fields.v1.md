@@ -23,5 +23,8 @@ Rules:
   required field, still report it in `missing_fields` so the caller can retry.
 - Only include a `confidence` entry for a field if you populated a value for it. Confidence is a
   number between 0 and 1 expressing how certain you are that the extracted value is correct.
+- `notes`: one or two plain-language sentences summarizing what was found and what was not — for
+  example which fields were populated and which were reported missing. This is read by a
+  downstream step, not the end user, so keep it factual and free of chain-of-thought.
 - Do not include chain-of-thought or explanations — return only the JSON fields defined by the
   output schema.

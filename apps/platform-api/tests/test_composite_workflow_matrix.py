@@ -142,7 +142,7 @@ COMPOSITE_MATRIX: tuple[CompositeCase, ...] = (
             ),
         ),
         expected_step_dependencies=(
-            ("detect_issues", "extract", "missing_fields"),
+            ("detect_issues", "extract", "notes"),
             ("generate_questions", "detect_issues", "issues"),
             ("generate_report", "extract", None),
             ("generate_report", "detect_issues", None),
