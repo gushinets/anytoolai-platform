@@ -112,4 +112,26 @@ Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.compa
 - Output: `verdict` (required, non-empty category value), `confidence` (required number, `0`–`1`), `deltas` (required, non-empty array of `{criterion_id, status, evidence}` — `status` is the closed enum `match | partial | mismatch`, `evidence` a non-empty string), `rationale` (required, non-empty, `maxLength: 500` concise summary).
 - `CompareAndClassifyInputValidator` rejects duplicate `criteria[*].id` before any provider call, mirroring `ExtractStructuredFieldsInputValidator` (A01) — a duplicate id would make the output's per-criterion coverage check ambiguous.
 - `CompareAndClassifyCrossValidator` enforces: `verdict` must be one of `categories`; every `deltas[*].criterion_id` must exist in `criteria`, must not repeat, and `deltas` must cover every `criteria[*].id` exactly once (full coverage, not a partial subset — this was an explicit open contract question resolved as mandatory coverage so `verdict` always rests on a complete evidence set). Rejected values are truncated (`_truncated_repr`) before flowing into the retry prompt and persisted debug-artifact metadata.
+
+## kernel_demo composite workflow mapping notes
+
+The workflow mapping DSL (`packages/backend/platform-core/.../workflows/mappings.py`) only
+supports plain dotted paths — no array indexing, no string formatting/concatenation. Two places
+in `kernel_demo`'s composite workflows hit this limitation directly:
+
+- `composite_evaluate_match_v1`'s `score_multidimensional_axes` step needs a plain-string `text`
+  input. `score_match_by_rubric`'s output has no top-level string — the only per-item rationale
+  lives inside `criterion_scores[*].rationale`, which the DSL cannot reach. Fixed by adding a new
+  top-level `overall_rationale` string to `score_match_output.schema.json` (a synthesis across all
+  criteria, not a duplicate of any single `criterion_scores[*].rationale`) purely so this chain has
+  a mapping-DSL-reachable field to consume.
+- `composite_analyze_and_clarify_v1`'s `detect_issues` step stays order-only after `extract`, by
+  contrast — `extract`'s output has no usable field either (`values` is an untyped,
+  caller-controlled bag with no guaranteed field names; `missing_fields` is field names, not
+  issue-taxonomy categories). A schema-extension fix was tried and reverted: it silently dropped
+  `scenario.input.context` for this one workflow, forced every other caller of
+  `extract_structured_fields_v1` to generate an unused field, and gave `retry_extract_v1` an extra
+  way to burn its single retry slot on that field. Order-only here is the deliberate outcome, not
+  an oversight — see `plans/ANY-219.md`'s team-lead-3/seventeenth/eighteenth review passes for the
+  full history of what was tried.
 - `confidence` is a relative signal, not a calibrated probability — that constraint is a prompt instruction (`compare_and_classify.v1.md`), not a runtime heuristic, matching the `rationale` chain-of-thought prohibition pattern used elsewhere in this doc.

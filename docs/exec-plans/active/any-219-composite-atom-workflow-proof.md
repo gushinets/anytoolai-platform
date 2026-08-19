@@ -1,0 +1,134 @@
+# Execution Plan: ANY-219 Composite Atom Workflow Proof
+
+## Status
+
+- State: active
+- Owner: agent
+- Created: 2026-08-19
+- Last updated: 2026-08-19
+- Review date: 2026-08-19
+- Next action: none — implementation and 19 rounds of review-finding fixes have landed on
+  `feature/ANY-219` (PR #81, open); continue addressing review passes as they arrive, move to
+  `completed/` once merged.
+- Blocker: none
+
+## Goal
+
+Prove that MVP-A1's generic action types compose through real, config-declared multi-step
+workflows over the production-shaped API -> session -> job -> worker path — not merely run
+independently (that's ANY-218's 11/11 standalone proof) and not as one artificial 11-step chain.
+Deliver 3 composite `kernel_demo` workflows that together cover all 11 atom action types, each
+proven end-to-end (real DB, real artifact/event-log lineage, real per-step provider-request
+dependency proofs) and live-smoke-tested via `dev-smoke`.
+
+## Scope
+
+### In scope
+
+- 3 composite workflow configs in `configs/kernel/products/kernel_demo/workflows.yaml`:
+  `composite_analyze_and_clarify_v1`, `composite_evaluate_match_v1`,
+  `composite_shape_and_write_v1` — covering all 11 atom action types across their steps, no
+  action type repeated across workflows — plus their corresponding `scenarios.yaml` entries.
+- `apps/platform-api/tests/test_composite_workflow_matrix.py` — DB-backed matrix proof (sibling of
+  ANY-218's `test_atom_runtime_matrix.py`): step order, artifact/event-log lineage,
+  `scenario_session_id` correlation, and per-step provider-request dependency proofs (does a
+  dependent step's *actual rendered prompt* carry the source step's real mapped output, not just
+  that both steps ran).
+- `scripts/agent/kernel_demo_smoke.py` / `tests/test_kernel_demo_smoke.py` — composite coverage
+  checks wired into `dev-smoke`/`prod-smoke`, alongside ANY-218's atom coverage checks.
+
+### Out of scope
+
+- Adding array-indexing (or any other structural extension) to the workflow mapping DSL
+  (`packages/backend/platform-core/.../workflows/mappings.py`) — considered and explicitly
+  declined (see Decision log); out of scope for a composite-workflow-*config* ticket.
+- Freelancer/MVP-B product-specific workflows.
+- Web mirror, Chrome Extension, or browser automation — this ticket is backend/CLI proof only
+  (MVP-A1), same boundary as ANY-218.
+
+## Relevant docs
+
+- `docs/product-specs/mvp-a-platform-kernel.md`
+- `docs/architecture/action-model.md` (Wave 1 action types table + the "kernel_demo composite
+  workflow mapping notes" section added by this ticket's review passes)
+- `plans/ANY-219.md` — gitignored local working file; the authoritative, complete record of every
+  code-review pass on this ticket (team-lead reviews #1-#3 plus 19 numbered `/code-review` passes
+  as of this update), each with verified/declined findings and the reasoning for each. This exec
+  plan intentionally does not duplicate that detail — see it for full history.
+
+## Contracts touched
+
+- Config: 3 new composite `workflow_id`s + matching `scenario_id`s in `kernel_demo`.
+- Schema: `kernel.schemas.score_match_output_v1` gained a required `overall_rationale` field (see
+  Decision log) — the only schema change; no other action's input/output contract changed.
+- Tests: `test_composite_workflow_matrix.py` (new), `test_kernel_demo_smoke.py` (extended),
+  targeted regression tests across `platform-core`/`platform-actions`/`platform-api` wherever a
+  hand-built fixture/literal needed to track the `overall_rationale` schema change.
+
+## Implementation steps
+
+- [x] 3 composite workflow + scenario configs covering all 11 atom action types.
+- [x] `test_composite_workflow_matrix.py`: step order, lineage, correlation, and per-step
+      dependency proofs against a real Postgres instance.
+- [x] `kernel_demo_smoke.py` / `test_kernel_demo_smoke.py`: composite coverage checks, wired into
+      `dev-smoke`.
+- [x] 19 rounds of `/code-review` passes plus 3 team-lead reviews addressed — see
+      `plans/ANY-219.md` for the full per-pass findings and resolutions. Notable architectural
+      outcomes surfaced across those passes (full reasoning in `plans/ANY-219.md` and this doc's
+      Decision log):
+  - `score_match_by_rubric -> score_multidimensional_axes` couldn't chain through the mapping DSL
+    (no array indexing) — resolved by adding a top-level `overall_rationale` synthesis field to
+    `score_match_output.schema.json` (team-lead-3 review, user-approved via explicit choice
+    between that and a DSL extension).
+  - `extract -> detect_issues` has the same DSL-reachability gap, but every schema-extension
+    attempt traded one regression for another (corrupted `detect_issues` category semantics,
+    dropped `scenario.input.context`, extra unused-field generation cost on 6 other workflows,
+    extra retry-budget risk on `retry_extract_v1`) — resolved by leaving it order-only,
+    intentionally, with the reasoning documented in `docs/architecture/action-model.md`'s
+    "kernel_demo composite workflow mapping notes" section (18th/19th passes).
+  - A schema `description` field is serialized verbatim into every LLM provider call's system
+    message (`_schema_guidance_message` in `litellm.py` does not strip it) — engineering-only
+    rationale must live in docs, not in a schema `description` or a permanent workflow-config
+    comment describing a reverted attempt (19th pass).
+- [x] This exec plan filed, per CLAUDE.md's "before coding" requirement for non-trivial work —
+      filed retroactively (19th review pass flagged its absence); the branch's actual design/review
+      record lives in `plans/ANY-219.md` and is not duplicated here.
+
+## Validation
+
+- [x] `python scripts/agent/runner.py quick-check` — green after every review-pass fix.
+- [x] `python scripts/agent/runner.py validate-configs` / `validate-architecture`.
+- [x] `python scripts/agent/runner.py postgresql-check` — green after every review-pass fix
+      touching DB-backed tests.
+- [x] Live `dev-up` -> `dev-smoke` -> `dev-down`: 11/11 `kernel_demo` atoms + 3/3 composite
+      workflows passing, re-run after every change to `kernel_demo_smoke.py` or the composite
+      workflow configs.
+
+## Decision log
+
+| Date | Decision | Why |
+|---|---|---|
+| 2026-08-18 | `score_match_by_rubric` gets a new required `overall_rationale` output field so `score_multidimensional_axes` can chain a real synthesis string, instead of bypassing it and chaining `compare_and_classify.rationale` directly. | The mapping DSL cannot index into `criterion_scores[*].rationale`; the atom's output otherwise has no top-level string. User explicitly chose this over extending the DSL when presented with both options (AskUserQuestion, team-lead-3 review). |
+| 2026-08-18 | `extract -> detect_issues` in `composite_analyze_and_clarify_v1` stays order-only (`?scenario.input.taxonomy` / `?scenario.input.context`), not chained through a synthetic field. | Every synthesis-field attempt (`notes` on `extract`'s output) regressed something else: `detect_issues`' category-must-be-in-taxonomy contract when fed field names, `scenario.input.context` support, generation cost on 6 unrelated workflows, and `retry_extract_v1`'s single retry slot. Reverted after landing (17th/18th review passes) once the full cost was visible; documented as the ticket's own stated fallback ("clarify if adjacent consumption is not intended") rather than re-attempted a fourth time. |
+| 2026-08-19 | Engineering rationale for why `overall_rationale` exists lives in `docs/architecture/action-model.md`, not in the JSON schema's `description` keyword. | `description` is serialized verbatim into the LLM system message on every provider call (`_schema_guidance_message` doesn't strip it) — internal engineering context there is a permanent token-cost regression, not documentation. |
+
+## Progress log
+
+| Date | Progress | Next |
+|---|---|---|
+| 2026-08-18 | Composite workflow configs, matrix test, and smoke-check coverage implemented and merged onto `feature/ANY-219`; 15+ `/code-review` passes and 2 team-lead reviews addressed iteratively (dead-code removal, PLR0911 lint-budget refactors, coverage-check hardening, docstring accuracy — full detail in `plans/ANY-219.md`). | Await further review. |
+| 2026-08-18 | Team-lead-3 review found the two composite workflows didn't prove real adjacent-artifact consumption for two step pairs; resolved `score_match_by_rubric -> score_multidimensional_axes` via the `overall_rationale` schema addition (user-approved), attempted the same pattern for `extract -> detect_issues`. | Await further review. |
+| 2026-08-18 | Seventeenth pass found the `extract -> detect_issues` fix (a `taxonomy` mapping from `missing_fields`) was semantically wrong — it forced `detect_issues`' `category` field to a raw field name — and the composite matrix's dependency proof for it was vacuous (empty-array fixture). Replaced with a new `notes` field on `extract`'s output instead. | Await further review. |
+| 2026-08-18 | Eighteenth pass found the `notes` field itself regressed `scenario.input.context` support, added unused-field generation cost to 6 other workflows, and added retry risk to `retry_extract_v1`. Reverted `notes` entirely; `extract -> detect_issues` returned to order-only with an inline comment explaining why. | Await further review. |
+| 2026-08-19 | Nineteenth pass found the `overall_rationale` schema `description` gets serialized into every LLM call (permanent token-cost regression), the order-only comment had grown into permanent change-history prose describing an already-reverted attempt, and no exec plan existed for this non-trivial ticket. Fixed: removed the schema `description`, trimmed the workflow comment to a one-line pointer, added the "kernel_demo composite workflow mapping notes" section to `docs/architecture/action-model.md` as the durable, non-serialized home for the reasoning, and filed this exec plan. | Await further review. |
+
+## Open questions
+
+- None.
+
+## Follow-up debt
+
+- None tracked. If a future workflow needs to chain an array-element field through the mapping
+  DSL, the two documented workarounds in `docs/architecture/action-model.md`'s "kernel_demo
+  composite workflow mapping notes" (a top-level synthesis scalar, or staying order-only) are not
+  a substitute for real DSL array-indexing support if the need becomes recurring.

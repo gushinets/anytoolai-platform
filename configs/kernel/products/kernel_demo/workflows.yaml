@@ -233,18 +233,8 @@ workflows:
           strict: '?scenario.input.strict'
         output_mapping:
           context.extracted: steps.extract.output
-      # extract's output has no top-level string field usable by detect_issues' context/taxonomy:
-      # values is an untyped, caller-controlled bag with no field-name guarantee (fields is
-      # scenario-start input, unconstrained by kernel_demo.generic_text_input_v1), and
-      # missing_fields is field names, not issue-taxonomy categories -- mapping it into taxonomy
-      # forces detect_issues.v1.md's contract (category must be one of taxonomy when non-empty)
-      # to report every issue's category as a field name instead of a real issue-type label.
-      # A prior pass added a synthetic top-level `notes` string to extract's output to make this
-      # chain provable, but that traded in a caller-input regression (silently dropped
-      # scenario.input.context), added a required-field generation cost to the other 6 workflows
-      # that call this action and never read it, and gave retry_extract_v1 an extra way to burn
-      # its single retry slot on an unused field -- reverted. Order-only is intentional here, not
-      # order-only because nobody noticed.
+      # extract -> detect_issues is intentionally order-only, not an oversight -- see
+      # docs/architecture/action-model.md's "kernel_demo composite workflow mapping notes".
       - step_id: detect_issues
         action_config_id: kernel_demo.detect_issues_v1
         input_mapping:
@@ -294,11 +284,8 @@ workflows:
           rubric: 'literal:[{"id":"tone","description":"Matches the requested tone.","weight":1},{"id":"completeness","description":"Covers all key points.","weight":1}]'
         output_mapping:
           context.scored_match: steps.score_match_by_rubric.output
-      # text is score_match_by_rubric's overall_rationale, not its criterion_scores[*].rationale:
-      # the mapping DSL cannot index into an array, so a per-criterion rationale can't be chained
-      # into a downstream step's plain-string input. overall_rationale is a top-level synthesis
-      # scalar added to the atom's own output schema specifically to make this chain
-      # mapping-DSL-reachable (see its schema description in score_match_output.schema.json).
+      # text is score_match_by_rubric's overall_rationale, not its criterion_scores[*].rationale --
+      # see docs/architecture/action-model.md's "kernel_demo composite workflow mapping notes".
       - step_id: score_multidimensional_axes
         action_config_id: kernel_demo.score_multidimensional_axes_v1
         input_mapping:
