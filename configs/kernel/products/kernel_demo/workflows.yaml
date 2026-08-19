@@ -256,6 +256,7 @@ workflows:
           data.source_text: scenario.input.source_text
           data.extracted: steps.extract.output
           data.issues: steps.detect_issues.output
+          data.questions: steps.generate_questions.output
         output_mapping:
           context.workflow_output: steps.generate_report.output
 
@@ -273,6 +274,11 @@ workflows:
           criteria: 'literal:[{"id":"tone","description":"Matches the requested tone.","weight":1},{"id":"coverage","description":"Covers all key points.","weight":1}]'
         output_mapping:
           context.compared: steps.compare_and_classify.output
+      # score_match_by_rubric runs for atom action-type coverage but is intentionally not
+      # chained into score_multidimensional_axes or the workflow output: the mapping DSL only
+      # supports plain dotted paths (no array indexing), so its criterion_scores[].rationale
+      # can't be reached -- score_multidimensional_axes chains compare_and_classify's rationale
+      # instead.
       - step_id: score_match_by_rubric
         action_config_id: kernel_demo.score_match_by_rubric_v1
         input_mapping:
@@ -284,7 +290,7 @@ workflows:
       - step_id: score_multidimensional_axes
         action_config_id: kernel_demo.score_multidimensional_axes_v1
         input_mapping:
-          text: scenario.input.source_text
+          text: steps.compare_and_classify.output.rationale
           axes: 'literal:[{"id":"clarity","description":"How clear the text is.","weight":1},{"id":"structure","description":"How well organized the text is.","weight":1}]'
         output_mapping:
           context.workflow_output: steps.score_multidimensional_axes.output

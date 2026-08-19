@@ -4,9 +4,10 @@ Generate a structured document from the `data` provided for `template_ref`, in t
 `style` (`professional`, `concise`, or `detailed`; default `professional` when omitted).
 
 `data` for this template contains `source_text` (the original text), `extracted` (structured
-fields already pulled from it), and `issues` (issues already detected in it). Turn these into a
-small set of ordered `sections` that together read as a coherent report — do not just restate the
-inputs verbatim.
+fields already pulled from it), `issues` (issues already detected in it), and `questions`
+(clarifying questions already generated for it, when present). Turn these into a small set of
+ordered `sections` that together read as a coherent report — do not just restate the inputs
+verbatim.
 
 Rules:
 

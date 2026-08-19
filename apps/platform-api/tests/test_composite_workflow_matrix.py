@@ -15,6 +15,7 @@ from typing import Any, Iterator
 
 import pytest
 import sqlalchemy as sa
+from anytoolai_platform_core.config.loader import ConfigLoader
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
 from anytoolai_platform_core.storage.db import (
@@ -39,7 +40,9 @@ from test_scenario_runtime_api import CONFIG_ROOT, FIXTURE_ROOT, _create_test_ap
 
 from tests.db_support import provision_database
 
-pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
+# Deliberately NOT a module-level pytestmark: test_composite_workflow_matrix_reports_three_of_three
+# below does no DB I/O and must keep running under quick-check's "not slow" pytest subset -- only
+# the parametrized DB-backed test needs postgresql/slow (mirrors test_atom_runtime_matrix.py).
 
 _EXTRACT_FIELDS = [
     {
@@ -142,6 +145,7 @@ COMPOSITE_MATRIX: tuple[CompositeCase, ...] = (
             ("generate_questions", "detect_issues", "issues"),
             ("generate_report", "extract", None),
             ("generate_report", "detect_issues", None),
+            ("generate_report", "generate_questions", None),
         ),
     ),
     CompositeCase(
@@ -168,6 +172,7 @@ COMPOSITE_MATRIX: tuple[CompositeCase, ...] = (
         ),
         expected_step_dependencies=(
             ("score_match_by_rubric", "compare_and_classify", "rationale"),
+            ("score_multidimensional_axes", "compare_and_classify", "rationale"),
         ),
     ),
     CompositeCase(
@@ -292,6 +297,16 @@ def _run_composite_scenario_and_assert_full_path(
     )
     assert actual_steps == case.expected_steps
 
+    # scenario_session_id correlation: every action_run/provider_call/artifact row for this job
+    # carries this run's scenario_session_id, not just job_id.
+    for label, rows in (
+        ("action_runs", action_runs),
+        ("provider_calls", provider_calls),
+        ("artifacts", artifacts),
+    ):
+        for row in rows:
+            assert row["scenario_session_id"] == started["scenario_session_id"], label
+
     # Provider-call correlation: exactly one provider_calls row per action_run.
     provider_calls_by_action_run: dict[str, list[dict[str, Any]]] = {}
     for call in provider_calls:
@@ -380,6 +395,8 @@ def _run_composite_scenario_and_assert_full_path(
     assert result_body["output"] == _fixture_response_json(last_step_action_config_id)
 
 
+@pytest.mark.postgresql
+@pytest.mark.slow
 @pytest.mark.parametrize("case", COMPOSITE_MATRIX, ids=lambda c: c.workflow_id)
 def test_composite_workflow_matrix(session_factory: SessionFactory, case: CompositeCase) -> None:
     app = _create_test_app(session_factory)
@@ -387,6 +404,12 @@ def test_composite_workflow_matrix(session_factory: SessionFactory, case: Compos
 
 
 def test_composite_workflow_matrix_reports_three_of_three() -> None:
+    """Binds COMPOSITE_MATRIX to the real ConfigLoader registry (scenario -> workflow -> step
+    -> action_config_id -> action_type), not just the in-file literal, so a YAML/scenario
+    mismatch fails this instead of silently reporting 3/3 -- mirrors
+    test_atom_runtime_matrix.py::test_atom_runtime_matrix_reports_eleven_of_eleven. No DB I/O,
+    so (like that sibling) this is deliberately not postgresql/slow-marked and keeps running
+    under quick-check's "not slow" pytest subset."""
     assert len(COMPOSITE_MATRIX) == 3
 
     covered_action_types = {
@@ -395,3 +418,22 @@ def test_composite_workflow_matrix_reports_three_of_three() -> None:
         for _step_id, action_type, _action_config_id in case.expected_steps
     }
     assert covered_action_types == {case.action_type for case in ATOM_MATRIX}
+
+    registry = ConfigLoader(CONFIG_ROOT).load()
+    for case in COMPOSITE_MATRIX:
+        scenario_definition = registry.get_scenario(case.scenario_id)
+        assert scenario_definition is not None, f"missing scenario definition for {case.scenario_id}"
+        assert scenario_definition.workflow_id == case.workflow_id
+
+        workflow_definition = registry.get_workflow(case.workflow_id)
+        assert workflow_definition is not None, f"missing workflow definition for {case.workflow_id}"
+        assert workflow_definition.output_schema_ref == case.expected_output_schema_ref
+
+        actual_steps = []
+        for step in workflow_definition.steps:
+            action_configuration = registry.get_action_configuration(step.action_config_id)
+            assert action_configuration is not None, (
+                f"missing action configuration for {step.action_config_id}"
+            )
+            actual_steps.append((step.step_id, action_configuration.action_type, step.action_config_id))
+        assert tuple(actual_steps) == case.expected_steps

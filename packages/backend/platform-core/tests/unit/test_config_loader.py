@@ -711,6 +711,46 @@ def test_loader_fails_on_missing_action_input_validator_ref(tmp_path: Path) -> N
     )
 
 
+def test_loader_aggregates_multiple_missing_action_fields_into_one_error(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "action_definitions" / "text.extract_structured_fields.yaml"
+    data = _load_yaml(path)
+    del data["input_schema_ref"]
+    del data["output_schema_ref"]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    shape_errors = [
+        error for error in exc_info.value.errors if isinstance(error, InvalidConfigShapeError)
+    ]
+    assert any(
+        "input_schema_ref" in error.message and "output_schema_ref" in error.message
+        for error in shape_errors
+    )
+
+
+def test_loader_aggregates_multiple_missing_product_fields_into_one_error(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "product.yaml"
+    data = _load_yaml(path)
+    del data["product_platform"]
+    del data["display_name"]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    shape_errors = [
+        error for error in exc_info.value.errors if isinstance(error, InvalidConfigShapeError)
+    ]
+    assert any(
+        "product_platform" in error.message and "display_name" in error.message
+        for error in shape_errors
+    )
+
+
 def test_loader_gives_specific_error_for_explicit_null_validator_ref(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "action_definitions" / "text.extract_structured_fields.yaml"

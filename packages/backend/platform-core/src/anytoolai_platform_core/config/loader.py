@@ -585,6 +585,9 @@ class ConfigLoader:
         path: Path,
         config_id: str | None = None,
     ) -> None:
+        """Raises one InvalidConfigShapeError listing every missing field, not one error per
+        field -- callers get the full set of gaps in a single pass instead of fixing and
+        re-running once per field."""
         missing = [
             name
             for name in required
