@@ -274,6 +274,11 @@ workflows:
           criteria: 'literal:[{"id":"tone","description":"Matches the requested tone.","weight":1},{"id":"coverage","description":"Covers all key points.","weight":1}]'
         output_mapping:
           context.compared: steps.compare_and_classify.output
+      # score_match_by_rubric runs for atom action-type coverage but is intentionally not
+      # chained into score_multidimensional_axes or the workflow output: the mapping DSL only
+      # supports plain dotted paths (no array indexing), so its criterion_scores[].rationale
+      # can't be reached -- score_multidimensional_axes chains compare_and_classify's rationale
+      # instead.
       - step_id: score_match_by_rubric
         action_config_id: kernel_demo.score_match_by_rubric_v1
         input_mapping:

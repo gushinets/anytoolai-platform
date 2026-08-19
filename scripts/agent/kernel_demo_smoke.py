@@ -190,17 +190,37 @@ COMPOSITE_SMOKE_CASES: tuple[tuple[str, str, dict], ...] = (
     ),
 )
 
-# Extends _EXPECTED_SCHEMA_REF_BY_SCENARIO (built above from the atom fixtures) with the 3
-# composite scenarios' output_schema_ref (configs/kernel/products/kernel_demo/workflows.yaml)
-# so SMOKE009 also catches a composite scenario wired to the wrong workflow, not just the 11
-# atom cases.
-_EXPECTED_SCHEMA_REF_BY_SCENARIO.update(
-    {
-        "kernel_demo.composite_analyze_and_clarify_smoke_v1": "kernel.schemas.generate_document_output_v1",
-        "kernel_demo.composite_evaluate_match_smoke_v1": "kernel.schemas.score_multidim_output_v1",
-        "kernel_demo.composite_shape_and_write_smoke_v1": "kernel.schemas.compose_reply_output_v1",
+def _composite_expected_schema_ref_by_scenario_id() -> dict[str, str]:
+    """Derives scenario_id -> output_schema_ref for composite scenarios from workflows.yaml's
+    own output_schema_ref field, joined through the real scenario_id -> workflow_id binding in
+    scenarios.yaml -- avoids 3 hardcoded literal schema refs drifting from workflows.yaml, the
+    same risk _required_composite_workflow_ids() above already guards against for coverage."""
+    with WORKFLOWS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
+        workflows_data = yaml.safe_load(handle)
+    output_schema_ref_by_workflow_id = {
+        entry["workflow_id"]: entry["output_schema_ref"]
+        for entry in workflows_data.get("workflows", [])
+        if isinstance(entry, dict)
+        and isinstance(entry.get("workflow_id"), str)
+        and isinstance(entry.get("output_schema_ref"), str)
     }
-)
+    return {
+        scenario_id: output_schema_ref_by_workflow_id[workflow_id]
+        for scenario_id, workflow_id in _required_composite_workflow_id_by_scenario_id().items()
+        if workflow_id in output_schema_ref_by_workflow_id
+    }
+
+
+# Extends _EXPECTED_SCHEMA_REF_BY_SCENARIO (built above from the atom fixtures) with the
+# composite scenarios' output_schema_ref so SMOKE009 also catches a composite scenario wired to
+# the wrong workflow, not just the 11 atom cases. Failures here are swallowed: main() runs
+# _composite_coverage_error() (SMOKE010) before run() ever needs this dict, so a malformed
+# workflows.yaml/scenarios.yaml is reported there with a clear error instead of an import-time
+# traceback.
+try:
+    _EXPECTED_SCHEMA_REF_BY_SCENARIO.update(_composite_expected_schema_ref_by_scenario_id())
+except (OSError, yaml.YAMLError, AttributeError, TypeError, KeyError):
+    pass
 
 
 POLL_INTERVAL_SECONDS = 0.5

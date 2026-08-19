@@ -336,6 +336,19 @@ def test_required_composite_workflow_id_by_scenario_id_matches_real_config() -> 
     }
 
 
+def test_expected_schema_ref_by_scenario_matches_real_composite_config() -> None:
+    smoke = load_smoke_module()
+    expected = {
+        "kernel_demo.composite_analyze_and_clarify_smoke_v1": (
+            "kernel.schemas.generate_document_output_v1"
+        ),
+        "kernel_demo.composite_evaluate_match_smoke_v1": "kernel.schemas.score_multidim_output_v1",
+        "kernel_demo.composite_shape_and_write_smoke_v1": "kernel.schemas.compose_reply_output_v1",
+    }
+    for scenario_id, schema_ref in expected.items():
+        assert smoke._EXPECTED_SCHEMA_REF_BY_SCENARIO[scenario_id] == schema_ref
+
+
 def test_composite_coverage_error_reports_missing_workflow() -> None:
     smoke = load_smoke_module()
     cases = (("workflow.one", "scenario-one", {}),)
@@ -351,7 +364,7 @@ def test_composite_coverage_error_reports_missing_config_file_distinctly(monkeyp
 
     error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
 
-    assert error is not None and "not found" in error
+    assert error is not None and "SMOKE010" in error and "not found" in error
 
 
 def test_composite_coverage_error_reports_missing_scenarios_config_file_distinctly(
