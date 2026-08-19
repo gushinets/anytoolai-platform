@@ -2065,6 +2065,10 @@ def test_action_runner_executes_score_match_by_rubric_atom_through_generic_path(
         "score": 80,
         "strengths": ["Tone matches the source closely."],
         "gaps": ["Budget detail from text_a is missing in text_b."],
+        "overall_rationale": (
+            "text_b lands close to text_a on tone but only partially covers its content, "
+            "driven mainly by the missing budget detail."
+        ),
     }
     assert result.output_artifact_id == artifact["id"]
     assert action_run["status"].value == "succeeded"

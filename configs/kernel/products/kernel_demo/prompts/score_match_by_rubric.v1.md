@@ -16,6 +16,8 @@ Score how well `text_b` matches `text_a` against the caller-supplied `rubric` (e
   empty array if there is nothing notable to report.
 - `gaps`: concrete, non-empty statements of where `text_b` falls short of `text_a`. Use an empty
   array if there is nothing notable to report.
+- `overall_rationale`: one or two sentences synthesizing the match across every criterion, not a
+  repeat of any single `criterion_scores[*].rationale`.
 
 Do not invent rubric criteria beyond the ones given, and do not include chain-of-thought or
 explanations outside the schema fields.
