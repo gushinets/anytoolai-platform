@@ -121,7 +121,7 @@ supports plain dotted paths — no array indexing, no string formatting/concaten
 in `kernel_demo`'s composite workflows hit this limitation directly:
 
 - `composite_evaluate_match_v1`'s `score_multidimensional_axes` step needs a plain-string `text`
-  input. `score_match_by_rubric`'s output has no top-level string — the only per-item rationale
+  input. `score_match_by_rubric`'s output had no top-level string — the only per-item rationale
   lives inside `criterion_scores[*].rationale`, which the DSL cannot reach. Fixed by adding a new
   top-level `overall_rationale` string to `score_match_output.schema.json` (a synthesis across all
   criteria, not a duplicate of any single `criterion_scores[*].rationale`) purely so this chain has

@@ -7,7 +7,7 @@
 - Created: 2026-08-19
 - Last updated: 2026-08-19
 - Review date: 2026-08-19
-- Next action: none — implementation and 19 rounds of review-finding fixes have landed on
+- Next action: none — implementation and 20 rounds of review-finding fixes have landed on
   `feature/ANY-219` (PR #81, open); continue addressing review passes as they arrive, move to
   `completed/` once merged.
 - Blocker: none
