@@ -7,6 +7,12 @@
 - [ ] No prompts in extensions.
 - [ ] No direct provider calls outside Provider Gateway.
 
+## Code quality
+
+- [ ] New and changed code follows `docs/agent/coding-conventions.md`.
+- [ ] Closed sets stay typed; generated unions are not weakened to `string`.
+- [ ] Boundary parsers reject unknown closed-set values.
+
 ## Contracts
 
 - [ ] Input/output schemas updated.
