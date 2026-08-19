@@ -118,6 +118,8 @@ class TestScoreMatchByRubricInputSchema:
 class TestScoreMatchByRubricOutputSchema:
     _CRITERION_SCORE = {"criterion_id": "tone", "score": 80, "rationale": "Matches well."}
 
+    _OVERALL_RATIONALE = "Overall, text_b tracks text_a closely on tone but misses a key detail."
+
     def test_minimal_valid_output(self) -> None:
         validate(
             instance={
@@ -125,6 +127,7 @@ class TestScoreMatchByRubricOutputSchema:
                 "score": 80,
                 "strengths": [],
                 "gaps": [],
+                "overall_rationale": self._OVERALL_RATIONALE,
             },
             schema=SCORE_MATCH_OUTPUT,
         )
@@ -136,6 +139,7 @@ class TestScoreMatchByRubricOutputSchema:
                 "score": 80,
                 "strengths": ["Tone matches closely."],
                 "gaps": ["Missing budget detail."],
+                "overall_rationale": self._OVERALL_RATIONALE,
             },
             schema=SCORE_MATCH_OUTPUT,
         )
@@ -143,6 +147,31 @@ class TestScoreMatchByRubricOutputSchema:
     def test_missing_required_property_rejected(self) -> None:
         with pytest.raises(ValidationError):
             validate(instance={"criterion_scores": [self._CRITERION_SCORE], "score": 80}, schema=SCORE_MATCH_OUTPUT)
+
+    def test_missing_overall_rationale_property_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={
+                    "criterion_scores": [self._CRITERION_SCORE],
+                    "score": 80,
+                    "strengths": [],
+                    "gaps": [],
+                },
+                schema=SCORE_MATCH_OUTPUT,
+            )
+
+    def test_empty_overall_rationale_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={
+                    "criterion_scores": [self._CRITERION_SCORE],
+                    "score": 80,
+                    "strengths": [],
+                    "gaps": [],
+                    "overall_rationale": "",
+                },
+                schema=SCORE_MATCH_OUTPUT,
+            )
 
     def test_unexpected_property_rejected(self) -> None:
         with pytest.raises(ValidationError):
@@ -152,6 +181,7 @@ class TestScoreMatchByRubricOutputSchema:
                     "score": 80,
                     "strengths": [],
                     "gaps": [],
+                    "overall_rationale": self._OVERALL_RATIONALE,
                     "confidence": 0.9,
                 },
                 schema=SCORE_MATCH_OUTPUT,
@@ -160,7 +190,13 @@ class TestScoreMatchByRubricOutputSchema:
     def test_empty_criterion_scores_rejected(self) -> None:
         with pytest.raises(ValidationError):
             validate(
-                instance={"criterion_scores": [], "score": 80, "strengths": [], "gaps": []},
+                instance={
+                    "criterion_scores": [],
+                    "score": 80,
+                    "strengths": [],
+                    "gaps": [],
+                    "overall_rationale": self._OVERALL_RATIONALE,
+                },
                 schema=SCORE_MATCH_OUTPUT,
             )
 
@@ -172,6 +208,7 @@ class TestScoreMatchByRubricOutputSchema:
                     "score": 80,
                     "strengths": [],
                     "gaps": [],
+                    "overall_rationale": self._OVERALL_RATIONALE,
                 },
                 schema=SCORE_MATCH_OUTPUT,
             )
@@ -184,6 +221,7 @@ class TestScoreMatchByRubricOutputSchema:
                     "score": -1,
                     "strengths": [],
                     "gaps": [],
+                    "overall_rationale": self._OVERALL_RATIONALE,
                 },
                 schema=SCORE_MATCH_OUTPUT,
             )
@@ -196,6 +234,7 @@ class TestScoreMatchByRubricOutputSchema:
                     "score": 80,
                     "strengths": [""],
                     "gaps": [],
+                    "overall_rationale": self._OVERALL_RATIONALE,
                 },
                 schema=SCORE_MATCH_OUTPUT,
             )
@@ -208,6 +247,7 @@ class TestScoreMatchByRubricOutputSchema:
                     "score": 80,
                     "strengths": [],
                     "gaps": [],
+                    "overall_rationale": self._OVERALL_RATIONALE,
                 },
                 schema=SCORE_MATCH_OUTPUT,
             )

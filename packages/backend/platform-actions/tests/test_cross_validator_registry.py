@@ -8,9 +8,20 @@ from pathlib import Path
 import pytest
 from anytoolai_platform_actions.structured_llm import cross_validation
 from anytoolai_platform_actions.structured_llm.cross_validation import (
+    CompareAndClassifyCrossValidator,
+    CompareAndClassifyInputValidator,
     ComposeReplyCrossValidator,
+    DetectIssuesByTaxonomyCrossValidator,
     ExtractStructuredFieldsCrossValidator,
     ExtractStructuredFieldsInputValidator,
+    GapRewritesCrossValidator,
+    GenerateClarifyingQuestionsCrossValidator,
+    PersuasiveTextCrossValidator,
+    ScoreMatchByRubricCrossValidator,
+    ScoreMatchByRubricInputValidator,
+    ScoreMultidimensionalAxesCrossValidator,
+    ScoreMultidimensionalAxesInputValidator,
+    SynthesizeAngleCrossValidator,
     ValidatorRefNotFoundError,
     build_input_validators,
     build_output_cross_validators,
@@ -155,6 +166,41 @@ def test_build_input_validators_raises_on_unknown_ref() -> None:
 
     with pytest.raises(ValidatorRefNotFoundError):
         build_input_validators(definitions)
+
+
+_EXPECTED_CROSS_VALIDATORS_BY_ACTION_TYPE = {
+    "text.extract_structured_fields": ExtractStructuredFieldsCrossValidator,
+    "text.detect_issues_by_taxonomy": DetectIssuesByTaxonomyCrossValidator,
+    "text.compose_reply": ComposeReplyCrossValidator,
+    "text.generate_clarifying_questions": GenerateClarifyingQuestionsCrossValidator,
+    "text.synthesize_angle": SynthesizeAngleCrossValidator,
+    "text.compose_persuasive_text": PersuasiveTextCrossValidator,
+    "text.generate_gap_rewrites": GapRewritesCrossValidator,
+    "text.compare_and_classify": CompareAndClassifyCrossValidator,
+    "text.score_match_by_rubric": ScoreMatchByRubricCrossValidator,
+    "text.score_multidimensional_axes": ScoreMultidimensionalAxesCrossValidator,
+}
+
+_EXPECTED_INPUT_VALIDATORS_BY_ACTION_TYPE = {
+    "text.extract_structured_fields": ExtractStructuredFieldsInputValidator,
+    "text.compare_and_classify": CompareAndClassifyInputValidator,
+    "text.score_match_by_rubric": ScoreMatchByRubricInputValidator,
+    "text.score_multidimensional_axes": ScoreMultidimensionalAxesInputValidator,
+}
+
+
+def test_cross_validators_registry_binds_each_class_to_its_declared_action_type() -> None:
+    """Dict EQUALITY against a hand-authored expected mapping, not set(values())/set(keys())
+    -- a merge conflict that swaps two adjacent entries in registry.py's _CROSS_VALIDATORS
+    (e.g. text.compose_reply <-> text.compose_persuasive_text) leaves every key still
+    resolving to *some* registered class and both classes still present as values, so the
+    existing set-based checks would miss it. This fails on that exact swap. Matches the bug
+    class ANY-305's exec plan documents recurring three times via merge conflicts."""
+    assert cross_validator_registry._CROSS_VALIDATORS == _EXPECTED_CROSS_VALIDATORS_BY_ACTION_TYPE
+
+
+def test_input_validators_registry_binds_each_class_to_its_declared_action_type() -> None:
+    assert cross_validator_registry._INPUT_VALIDATORS == _EXPECTED_INPUT_VALIDATORS_BY_ACTION_TYPE
 
 
 def test_real_config_registry_wiring_resolves_end_to_end() -> None:

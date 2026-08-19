@@ -19,7 +19,8 @@ class ScoreMatchByRubricAggregateMismatchThenValidAdapter:
             '{"criterion_scores": ['
             '{"criterion_id": "tone", "score": 90, "rationale": "r"}, '
             '{"criterion_id": "completeness", "score": 70, "rationale": "r"}], '
-            f'"score": {aggregate_score}, "strengths": [], "gaps": []}}'
+            f'"score": {aggregate_score}, "strengths": [], "gaps": [], '
+            '"overall_rationale": "Overall summary."}'
         )
         return ProviderResponse(
             provider_policy_ref=request.provider_policy_ref,

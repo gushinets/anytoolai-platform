@@ -46,6 +46,9 @@ Canonical source: configs/kernel via ConfigLoader.
 
 ## Workflows
 
+- kernel_demo.composite_analyze_and_clarify_v1
+- kernel_demo.composite_evaluate_match_v1
+- kernel_demo.composite_shape_and_write_v1
 - kernel_demo.conditional_skip_extract_v1
 - kernel_demo.detect_questions_v1
 - kernel_demo.extract_detect_report_v1
@@ -65,6 +68,9 @@ Canonical source: configs/kernel via ConfigLoader.
 
 ## Scenarios
 
+- kernel_demo.composite_analyze_and_clarify_smoke_v1
+- kernel_demo.composite_evaluate_match_smoke_v1
+- kernel_demo.composite_shape_and_write_smoke_v1
 - kernel_demo.detect_questions_smoke_v1
 - kernel_demo.handoff_smoke_source_v1
 - kernel_demo.handoff_smoke_target_v1

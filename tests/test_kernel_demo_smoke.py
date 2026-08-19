@@ -192,6 +192,48 @@ def test_expected_schema_ref_by_scenario_covers_every_real_smoke_case() -> None:
         assert scenario_id in smoke._EXPECTED_SCHEMA_REF_BY_SCENARIO, action_type
 
 
+def test_expected_schema_ref_by_scenario_covers_every_composite_smoke_case() -> None:
+    smoke = load_smoke_module()
+    for workflow_id, scenario_id, _ in smoke.COMPOSITE_SMOKE_CASES:
+        assert scenario_id in smoke._EXPECTED_SCHEMA_REF_BY_SCENARIO, workflow_id
+
+
+def test_run_reports_smoke009_when_a_composite_scenario_produces_the_wrong_schema_ref(
+    monkeypatch, capsys
+) -> None:
+    """Proves SMOKE009 (schema_ref cross-check) fires for a composite scenario wired to the
+    wrong workflow, not just the 11 atom cases -- would previously report "ok" because
+    composite scenario_ids had no entry in _EXPECTED_SCHEMA_REF_BY_SCENARIO."""
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "ATOM_SMOKE_CASES", (("atom.one", "scenario-one", {}),))
+    monkeypatch.setattr(
+        smoke,
+        "COMPOSITE_SMOKE_CASES",
+        (("workflow.one", "kernel_demo.composite_analyze_and_clarify_smoke_v1", {}),),
+    )
+    monkeypatch.setattr(
+        smoke,
+        "_http_json_request",
+        _sequenced_request(
+            [
+                {"guest_id": "guest-1"},
+                {"scenario_session_id": "session-1"},
+                {"status": "completed", "result_artifact_id": "artifact-1"},
+                {"guest_id": "guest-2"},
+                {"scenario_session_id": "session-2"},
+                {"status": "completed", "result_artifact_id": "artifact-2"},
+                {"schema_ref": "kernel.schemas.wrong_v1"},
+            ]
+        ),
+    )
+
+    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
+    out, err = capsys.readouterr()
+    assert "1/1 kernel_demo atoms passed" in out
+    assert "0/1 kernel_demo composite workflows passed" in out
+    assert "SMOKE009" in err and "schema_ref" in err
+
+
 def test_run_one_case_reports_smoke005_on_timeout(monkeypatch) -> None:
     smoke = load_smoke_module()
     monkeypatch.setattr(
@@ -219,6 +261,7 @@ def test_run_reports_partial_pass_count_and_nonzero_exit(monkeypatch, capsys) ->
             ("atom.two", "scenario-two", {}),
         ),
     )
+    monkeypatch.setattr(smoke, "COMPOSITE_SMOKE_CASES", ())
     monkeypatch.setattr(
         smoke,
         "_http_json_request",
@@ -270,6 +313,300 @@ def test_atom_coverage_error_reports_missing_config_directory_distinctly(monkeyp
     error = smoke._atom_coverage_error(smoke.ATOM_SMOKE_CASES)
 
     assert error is not None and "not found" in error
+
+
+def _required_composite_workflow_ids(smoke):
+    return smoke._composite_required_ids(smoke._composite_workflow_entries())
+
+
+def test_composite_smoke_cases_cover_the_required_composite_workflows() -> None:
+    smoke = load_smoke_module()
+    assert smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES) is None
+    assert len(smoke.COMPOSITE_SMOKE_CASES) == len(_required_composite_workflow_ids(smoke))
+
+
+def test_required_composite_workflow_ids_are_derived_from_workflows_config() -> None:
+    smoke = load_smoke_module()
+    required = _required_composite_workflow_ids(smoke)
+    assert required == {workflow_id for workflow_id, _, _ in smoke.COMPOSITE_SMOKE_CASES}
+    assert "kernel_demo.composite_analyze_and_clarify_v1" in required
+
+
+def test_required_composite_workflow_id_by_scenario_id_matches_real_config() -> None:
+    smoke = load_smoke_module()
+    binding = smoke._required_composite_workflow_id_by_scenario_id()
+    assert binding == {
+        scenario_id: workflow_id for workflow_id, scenario_id, _ in smoke.COMPOSITE_SMOKE_CASES
+    }
+
+
+def test_expected_schema_ref_by_scenario_matches_real_composite_config() -> None:
+    smoke = load_smoke_module()
+    expected = {
+        "kernel_demo.composite_analyze_and_clarify_smoke_v1": (
+            "kernel.schemas.generate_document_output_v1"
+        ),
+        "kernel_demo.composite_evaluate_match_smoke_v1": "kernel.schemas.score_multidim_output_v1",
+        "kernel_demo.composite_shape_and_write_smoke_v1": "kernel.schemas.compose_reply_output_v1",
+    }
+    for scenario_id, schema_ref in expected.items():
+        assert smoke._EXPECTED_SCHEMA_REF_BY_SCENARIO[scenario_id] == schema_ref
+
+
+def test_composite_coverage_error_reports_missing_workflow() -> None:
+    smoke = load_smoke_module()
+    cases = (("workflow.one", "scenario-one", {}),)
+
+    error = smoke._composite_coverage_error(cases)
+
+    assert error is not None and "SMOKE010" in error
+
+
+def test_composite_coverage_error_reports_missing_config_file_distinctly(monkeypatch) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "WORKFLOWS_CONFIG_PATH", Path("/no/such/file.yaml"))
+
+    error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
+
+    assert error is not None and "SMOKE010" in error and "not found" in error
+
+
+def test_composite_coverage_error_reports_missing_scenarios_config_file_distinctly(
+    monkeypatch,
+) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "SCENARIOS_CONFIG_PATH", Path("/no/such/scenarios.yaml"))
+
+    error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
+
+    assert error is not None and "SMOKE010" in error and "not found" in error
+
+
+def test_composite_coverage_error_reports_duplicate_scenario_id() -> None:
+    """A reused scenario_id under a second workflow label silently drops the workflow whose real
+    scenario got displaced -- each workflow_id and scenario_id can still individually be unique
+    per-field, so this must be checked as its own condition, not inferred from the workflow_id
+    duplicate check."""
+    smoke = load_smoke_module()
+    cases = (
+        (
+            "kernel_demo.composite_analyze_and_clarify_v1",
+            "kernel_demo.composite_analyze_and_clarify_smoke_v1",
+            {},
+        ),
+        (
+            "kernel_demo.composite_evaluate_match_v1",
+            "kernel_demo.composite_analyze_and_clarify_smoke_v1",
+            {},
+        ),
+        (
+            "kernel_demo.composite_shape_and_write_v1",
+            "kernel_demo.composite_shape_and_write_smoke_v1",
+            {},
+        ),
+    )
+
+    error = smoke._composite_coverage_error(cases)
+
+    assert error is not None and "SMOKE010" in error and "duplicate scenario_id" in error
+
+
+def test_composite_coverage_error_reports_scenario_workflow_mismatch() -> None:
+    """Two entries with scenario_ids swapped between workflow labels: workflow_id and
+    scenario_id sets are each still exactly the required 3, so only a real config-bound binding
+    check (not a duplicate check on either field) catches the mismatch."""
+    smoke = load_smoke_module()
+    cases = (
+        (
+            "kernel_demo.composite_analyze_and_clarify_v1",
+            "kernel_demo.composite_analyze_and_clarify_smoke_v1",
+            {},
+        ),
+        (
+            "kernel_demo.composite_evaluate_match_v1",
+            "kernel_demo.composite_shape_and_write_smoke_v1",
+            {},
+        ),
+        (
+            "kernel_demo.composite_shape_and_write_v1",
+            "kernel_demo.composite_evaluate_match_smoke_v1",
+            {},
+        ),
+    )
+
+    error = smoke._composite_coverage_error(cases)
+
+    assert error is not None and "SMOKE010" in error and "mismatch" in error
+
+
+def test_composite_coverage_error_reports_malformed_workflows_config_cleanly(
+    tmp_path, monkeypatch
+) -> None:
+    """A workflows.yaml that parses to something other than a mapping (e.g. a bare list) must
+    produce a clean SMOKE010 message, not an unhandled AttributeError/YAMLError traceback."""
+    smoke = load_smoke_module()
+    bad_path = tmp_path / "workflows.yaml"
+    bad_path.write_text("- just\n- a\n- list\n", encoding="utf-8")
+    monkeypatch.setattr(smoke, "WORKFLOWS_CONFIG_PATH", bad_path)
+
+    error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
+
+    assert error is not None and "SMOKE010" in error
+
+
+def test_composite_coverage_error_reports_missing_output_schema_ref(tmp_path, monkeypatch) -> None:
+    """A required composite workflow with no (or non-string) output_schema_ref must fail
+    SMOKE010 loudly -- previously it was silently dropped from
+    _EXPECTED_SCHEMA_REF_BY_SCENARIO, so a composite scenario bound to the wrong workflow would
+    pass SMOKE009's schema_ref check by omission instead of by actually matching."""
+    smoke = load_smoke_module()
+    bad_path = tmp_path / "workflows.yaml"
+    bad_path.write_text(
+        "workflows:\n"
+        "  - workflow_id: kernel_demo.composite_analyze_and_clarify_v1\n"
+        "  - workflow_id: kernel_demo.composite_evaluate_match_v1\n"
+        "    output_schema_ref: kernel.schemas.score_multidim_output_v1\n"
+        "  - workflow_id: kernel_demo.composite_shape_and_write_v1\n"
+        "    output_schema_ref: kernel.schemas.compose_reply_output_v1\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(smoke, "WORKFLOWS_CONFIG_PATH", bad_path)
+
+    error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
+
+    assert (
+        error is not None
+        and "SMOKE010" in error
+        and "kernel_demo.composite_analyze_and_clarify_v1" in error
+        and "validation failed" in error
+        and "could not parse" not in error
+    )
+
+
+def test_composite_workflow_config_parses_workflows_yaml_exactly_once(monkeypatch) -> None:
+    """_composite_workflow_config() must derive required workflow_ids and
+    output_schema_ref_by_workflow_id from a single _composite_workflow_entries() call, not by
+    calling standalone wrapper functions that each independently re-parse workflows.yaml -- a
+    prior round regressed this into two reads per _composite_coverage_error() call."""
+    smoke = load_smoke_module()
+    real_entries = smoke._composite_workflow_entries
+    calls = []
+
+    def counting_entries():
+        calls.append(1)
+        return real_entries()
+
+    monkeypatch.setattr(smoke, "_composite_workflow_entries", counting_entries)
+
+    smoke._composite_workflow_config()
+
+    assert len(calls) == 1
+
+
+def test_composite_coverage_error_derives_case_ids_exactly_once(monkeypatch) -> None:
+    """_composite_coverage_error() must unzip COMPOSITE_SMOKE_CASES into (workflow_ids,
+    scenario_ids) exactly once via _composite_case_ids(), not once for the duplicate-id check
+    (_composite_case_shape_error()) and again for coverage/binding -- two independent copies of
+    this unzip could silently drift if the cases shape ever changed."""
+    smoke = load_smoke_module()
+    real_case_ids = smoke._composite_case_ids
+    calls = []
+
+    def counting_case_ids(cases):
+        calls.append(1)
+        return real_case_ids(cases)
+
+    monkeypatch.setattr(smoke, "_composite_case_ids", counting_case_ids)
+
+    smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
+
+    assert len(calls) == 1
+
+
+def test_composite_workflow_config_returns_a_plain_tuple_on_success() -> None:
+    """_composite_workflow_config() raises on parse failure instead of returning a
+    tuple-or-error-string union -- its success return is always a plain 3-tuple, matching every
+    other data-returning helper in this module (error signaling is str | None, done by its one
+    caller, not by this function itself)."""
+    smoke = load_smoke_module()
+
+    config = smoke._composite_workflow_config()
+    required, workflow_id_by_scenario_id, output_schema_ref_by_workflow_id = config
+
+    assert isinstance(config, tuple)
+    assert required and workflow_id_by_scenario_id and output_schema_ref_by_workflow_id
+
+
+def test_composite_coverage_error_reports_empty_output_schema_ref_as_missing(
+    tmp_path, monkeypatch
+) -> None:
+    """An empty-string output_schema_ref must be treated the same as a missing/non-string one --
+    isinstance(entry.get(...), str) alone lets "" through, so a required workflow with an empty
+    output_schema_ref would silently pass SMOKE010's coverage check, land in
+    _EXPECTED_SCHEMA_REF_BY_SCENARIO as "", and only surface later as a confusing SMOKE009
+    schema_ref mismatch instead of a clean upfront config-validation error."""
+    smoke = load_smoke_module()
+    bad_path = tmp_path / "workflows.yaml"
+    bad_path.write_text(
+        "workflows:\n"
+        "  - workflow_id: kernel_demo.composite_analyze_and_clarify_v1\n"
+        "    output_schema_ref: ''\n"
+        "  - workflow_id: kernel_demo.composite_evaluate_match_v1\n"
+        "    output_schema_ref: kernel.schemas.score_multidim_output_v1\n"
+        "  - workflow_id: kernel_demo.composite_shape_and_write_v1\n"
+        "    output_schema_ref: kernel.schemas.compose_reply_output_v1\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(smoke, "WORKFLOWS_CONFIG_PATH", bad_path)
+
+    error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
+
+    assert (
+        error is not None
+        and "SMOKE010" in error
+        and "kernel_demo.composite_analyze_and_clarify_v1" in error
+        and "validation failed" in error
+    )
+
+
+def test_composite_coverage_error_reports_parse_error_from_scenario_binding_lookup(
+    monkeypatch,
+) -> None:
+    """A parse/shape error surfacing from _required_composite_workflow_id_by_scenario_id() (not
+    just from the workflows.yaml-derived helpers) is still reported as "could not parse" --
+    _composite_workflow_config() wraps all three derivations in one try block, not just some."""
+    smoke = load_smoke_module()
+
+    def _raise_unrelated_value_error() -> dict[str, str]:
+        raise ValueError("some unrelated coercion error")
+
+    monkeypatch.setattr(
+        smoke, "_required_composite_workflow_id_by_scenario_id", _raise_unrelated_value_error
+    )
+
+    error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
+
+    assert error is not None and "SMOKE010" in error and "could not parse" in error
+
+
+def test_composite_coverage_error_reports_partial_loss_not_just_empty() -> None:
+    """A partial regression (2 of 3 composite entries survive) must be caught the same way full
+    emptiness is -- this is the exact gap a bare `len(cases) == 0` check would miss."""
+    smoke = load_smoke_module()
+    partial_cases = smoke.COMPOSITE_SMOKE_CASES[:-1]
+
+    error = smoke._composite_coverage_error(partial_cases)
+
+    assert error is not None and "SMOKE010" in error
+
+
+def test_main_fails_on_composite_coverage_mismatch(monkeypatch, capsys) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "COMPOSITE_SMOKE_CASES", smoke.COMPOSITE_SMOKE_CASES[:-1])
+    monkeypatch.setattr(sys, "argv", ["kernel_demo_smoke.py", "http://127.0.0.1:8000"])
+
+    assert smoke.main() == 1
+    assert "SMOKE010" in capsys.readouterr().err
 
 
 def test_run_fails_instead_of_vacuous_success_on_empty_case_list(monkeypatch, capsys) -> None:
@@ -328,6 +665,7 @@ def test_run_degrades_timeout_after_a_timeout_but_not_permanently(monkeypatch) -
             ("atom.three", "scenario-three", {}),
         ),
     )
+    monkeypatch.setattr(smoke, "COMPOSITE_SMOKE_CASES", ())
     seen_timeouts = []
 
     def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
@@ -340,6 +678,28 @@ def test_run_degrades_timeout_after_a_timeout_but_not_permanently(monkeypatch) -
     smoke.run("http://127.0.0.1:8000", timeout=30.0)
 
     assert seen_timeouts == [30.0, smoke.DEGRADED_TIMEOUT_SECONDS, 30.0]
+
+
+def test_run_chains_degraded_timeout_from_atom_batch_into_composite_batch(monkeypatch) -> None:
+    """A worker outage detected during the atom batch must keep the composite batch cheap too --
+    case_timeout carries over between batches instead of resetting to the full budget for the
+    composite batch."""
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "ATOM_SMOKE_CASES", (("atom.one", "scenario-one", {}),))
+    monkeypatch.setattr(
+        smoke, "COMPOSITE_SMOKE_CASES", (("workflow.one", "scenario-composite", {}),)
+    )
+    seen_timeouts = []
+
+    def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
+        seen_timeouts.append(timeout)
+        return _fake_case_result(smoke, scenario_id, timed_out=(scenario_id == "scenario-one"))
+
+    monkeypatch.setattr(smoke, "_run_one_case", fake_run_one_case)
+
+    smoke.run("http://127.0.0.1:8000", timeout=30.0)
+
+    assert seen_timeouts == [30.0, smoke.DEGRADED_TIMEOUT_SECONDS]
 
 
 def test_run_timeout_degrade_is_driven_by_error_code_not_message_text(monkeypatch) -> None:
@@ -355,6 +715,7 @@ def test_run_timeout_degrade_is_driven_by_error_code_not_message_text(monkeypatc
             ("atom.two", "scenario-two", {}),
         ),
     )
+    monkeypatch.setattr(smoke, "COMPOSITE_SMOKE_CASES", ())
     seen_timeouts = []
 
     def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
@@ -386,6 +747,47 @@ def test_run_reports_full_pass_and_zero_exit(monkeypatch, capsys) -> None:
     )
     monkeypatch.setattr(
         smoke,
+        "COMPOSITE_SMOKE_CASES",
+        (("workflow.one", "scenario-composite", {}),),
+    )
+    monkeypatch.setattr(
+        smoke,
+        "_http_json_request",
+        _sequenced_request(
+            [
+                {"guest_id": "guest-1"},
+                {"scenario_session_id": "session-1"},
+                {"status": "completed", "result_artifact_id": "artifact-1"},
+                {"guest_id": "guest-2"},
+                {"scenario_session_id": "session-2"},
+                {"status": "completed", "result_artifact_id": "artifact-2"},
+            ]
+        ),
+    )
+
+    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 0
+    out = capsys.readouterr().out
+    assert "1/1 kernel_demo atoms passed" in out
+    assert "atom.one: scenario-one -> ok (session session-1)" in out
+    assert "1/1 kernel_demo composite workflows passed" in out
+
+
+def test_run_fails_instead_of_vacuous_success_on_empty_composite_case_list(
+    monkeypatch, capsys
+) -> None:
+    """Mirrors test_run_fails_instead_of_vacuous_success_on_empty_case_list for the composite
+    side -- an empty COMPOSITE_SMOKE_CASES must fail the run even when every atom case passes,
+    not silently report 0/0 composite workflows as a vacuous success (exactly the class of
+    regression a merge accidentally emptying COMPOSITE_SMOKE_CASES would otherwise hide)."""
+    smoke = load_smoke_module()
+    monkeypatch.setattr(
+        smoke,
+        "ATOM_SMOKE_CASES",
+        (("atom.one", "scenario-one", {}),),
+    )
+    monkeypatch.setattr(smoke, "COMPOSITE_SMOKE_CASES", ())
+    monkeypatch.setattr(
+        smoke,
         "_http_json_request",
         _sequenced_request(
             [
@@ -396,10 +798,10 @@ def test_run_reports_full_pass_and_zero_exit(monkeypatch, capsys) -> None:
         ),
     )
 
-    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 0
-    out = capsys.readouterr().out
+    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
+    out, err = capsys.readouterr()
     assert "1/1 kernel_demo atoms passed" in out
-    assert "atom.one: scenario-one -> ok (session session-1)" in out
+    assert "SMOKE010" in err and "COMPOSITE_SMOKE_CASES" in err
 
 
 def test_run_reports_smoke001_with_no_session_id_available(monkeypatch, capsys) -> None:
@@ -408,6 +810,7 @@ def test_run_reports_smoke001_with_no_session_id_available(monkeypatch, capsys) 
     run()'s per-case print formatting that mis-handles a None session_id is caught here."""
     smoke = load_smoke_module()
     monkeypatch.setattr(smoke, "ATOM_SMOKE_CASES", (("atom.one", "scenario-one", {}),))
+    monkeypatch.setattr(smoke, "COMPOSITE_SMOKE_CASES", ())
     monkeypatch.setattr(
         smoke, "_http_json_request", _sequenced_request([OSError("connection refused")])
     )
@@ -426,3 +829,37 @@ def test_atom_matrix_load_error_reported_by_main_before_argparse(monkeypatch, ca
     # parser.parse_args(), so no api_url argv needs to be supplied here.
     assert smoke.main() == 1
     assert "SMOKE008" in capsys.readouterr().err
+
+
+def test_run_fails_when_atoms_pass_but_a_composite_workflow_fails(monkeypatch, capsys) -> None:
+    smoke = load_smoke_module()
+    monkeypatch.setattr(
+        smoke,
+        "ATOM_SMOKE_CASES",
+        (("atom.one", "scenario-one", {}),),
+    )
+    monkeypatch.setattr(
+        smoke,
+        "COMPOSITE_SMOKE_CASES",
+        (("workflow.one", "scenario-composite", {}),),
+    )
+    monkeypatch.setattr(
+        smoke,
+        "_http_json_request",
+        _sequenced_request(
+            [
+                {"guest_id": "guest-1"},
+                {"scenario_session_id": "session-1"},
+                {"status": "completed", "result_artifact_id": "artifact-1"},
+                {"guest_id": "guest-2"},
+                {"scenario_session_id": "session-2"},
+                {"status": "failed", "error": "provider blew up"},
+            ]
+        ),
+    )
+
+    assert smoke.run("http://127.0.0.1:8000", timeout=5.0) == 1
+    out, err = capsys.readouterr()
+    assert "1/1 kernel_demo atoms passed" in out
+    assert "0/1 kernel_demo composite workflows passed" in out
+    assert "workflow.one: scenario-composite -> failed" in err

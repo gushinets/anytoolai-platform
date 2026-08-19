@@ -92,7 +92,7 @@ Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.synth
 Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.score_match_input_v1` / `kernel.schemas.score_match_output_v1`:
 
 - Input: `text_a` and `text_b` (required, non-empty strings); `rubric` (required, non-empty array of `{id, description, weight}`; `id`/`description` non-empty strings, `weight` a positive number).
-- Output: `criterion_scores` (required, non-empty array of `{criterion_id, score, rationale}`; `score` 0–100, `rationale` non-empty with `maxLength: 500`); `score` (required aggregate, 0–100); `strengths` and `gaps` (required arrays of non-empty strings, may be empty).
+- Output: `criterion_scores` (required, non-empty array of `{criterion_id, score, rationale}`; `score` 0–100, `rationale` non-empty with `maxLength: 500`); `score` (required aggregate, 0–100); `strengths` and `gaps` (required arrays of non-empty strings, may be empty); `overall_rationale` (required, non-empty, `maxLength: 500` synthesis across all criteria).
 - `ScoreMatchByRubricInputValidator` rejects duplicate `rubric[*].id` before any provider call — JSON Schema cannot express partial-key uniqueness, so this runs the same way as `ExtractStructuredFieldsInputValidator`. Non-positive `weight` and an empty `rubric` are rejected by the input schema itself (`exclusiveMinimum`/`minItems`), not by this validator.
 - `ScoreMatchByRubricCrossValidator` enforces that `criterion_scores` maps exactly once onto `rubric` (exists, unique, exhaustive — every `criterion_id` must be a rubric id, no id repeats, and every rubric id must appear), then recomputes the rubric-weighted average of `criterion_scores` outside the model response and rejects a `score` that disagrees by more than `0.5` points. That tolerance has no prior codebase precedent (every earlier cross validator does membership/bounds/regex checks, not arithmetic); `0.5` covers the model rounding the weighted average to the nearest whole point on the 0–100 scale. Rejected/oversized values are truncated (`_truncated_repr`) before flowing into the retry prompt and persisted debug-artifact metadata.
 - The chain-of-thought prohibition on `rationale` is a prompt instruction (`score_match_by_rubric.v1.md`), not a runtime heuristic, matching the sibling A09 contract.
@@ -113,3 +113,25 @@ Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.compa
 - `CompareAndClassifyInputValidator` rejects duplicate `criteria[*].id` before any provider call, mirroring `ExtractStructuredFieldsInputValidator` (A01) — a duplicate id would make the output's per-criterion coverage check ambiguous.
 - `CompareAndClassifyCrossValidator` enforces: `verdict` must be one of `categories`; every `deltas[*].criterion_id` must exist in `criteria`, must not repeat, and `deltas` must cover every `criteria[*].id` exactly once (full coverage, not a partial subset — this was an explicit open contract question resolved as mandatory coverage so `verdict` always rests on a complete evidence set). Rejected values are truncated (`_truncated_repr`) before flowing into the retry prompt and persisted debug-artifact metadata.
 - `confidence` is a relative signal, not a calibrated probability — that constraint is a prompt instruction (`compare_and_classify.v1.md`), not a runtime heuristic, matching the `rationale` chain-of-thought prohibition pattern used elsewhere in this doc.
+
+## kernel_demo composite workflow mapping notes
+
+The workflow mapping DSL (`packages/backend/platform-core/.../workflows/mappings.py`) only
+supports plain dotted paths — no array indexing, no string formatting/concatenation. Two places
+in `kernel_demo`'s composite workflows hit this limitation directly:
+
+- `composite_evaluate_match_v1`'s `score_multidimensional_axes` step needs a plain-string `text`
+  input. `score_match_by_rubric`'s output had no top-level string — the only per-item rationale
+  lives inside `criterion_scores[*].rationale`, which the DSL cannot reach. Fixed by adding a new
+  top-level `overall_rationale` string to `score_match_output.schema.json` (a synthesis across all
+  criteria, not a duplicate of any single `criterion_scores[*].rationale`) purely so this chain has
+  a mapping-DSL-reachable field to consume.
+- `composite_analyze_and_clarify_v1`'s `detect_issues` step stays order-only after `extract`, by
+  contrast — `extract`'s output has no usable field either (`values` is an untyped,
+  caller-controlled bag with no guaranteed field names; `missing_fields` is field names, not
+  issue-taxonomy categories). A schema-extension fix was tried and reverted: it silently dropped
+  `scenario.input.context` for this one workflow, forced every other caller of
+  `extract_structured_fields_v1` to generate an unused field, and gave `retry_extract_v1` an extra
+  way to burn its single retry slot on that field. Order-only here is the deliberate outcome, not
+  an oversight — see `plans/ANY-219.md`'s team-lead-3/seventeenth/eighteenth review passes for the
+  full history of what was tried.
