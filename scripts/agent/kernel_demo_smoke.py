@@ -40,27 +40,18 @@ SCENARIOS_CONFIG_PATH = (
 _COMPOSITE_WORKFLOW_ID_PREFIX = "kernel_demo.composite_"
 
 # Every place that raw-parses workflows.yaml/scenarios.yaml for composite coverage (the
-# import-time _EXPECTED_SCHEMA_REF_BY_SCENARIO update and _composite_coverage_error()'s SMOKE010
-# check) must swallow/catch the exact same exception types -- a single shared tuple instead of
-# two independently maintained lists, so the two can't drift out of sync (e.g. one gaining
-# ValueError or KeyError without the other).
+# import-time _EXPECTED_SCHEMA_REF_BY_SCENARIO update and _composite_workflow_config()'s parse
+# handling) must swallow/catch the exact same exception types -- a single shared tuple instead of
+# two independently maintained lists, so the two can't drift out of sync. No KeyError: every
+# dict/list access in those code paths is already guarded by an isinstance/containment check
+# first, so a bare KeyError here would only ever mask a real future bug as a clean parse error.
 _COMPOSITE_CONFIG_PARSE_ERRORS: tuple[type[Exception], ...] = (
     OSError,
     yaml.YAMLError,
     AttributeError,
     TypeError,
-    KeyError,
     ValueError,
 )
-
-
-class _CompositeConfigValidationError(ValueError):
-    """Raised internally by _composite_coverage_error() to flag a validation gap (e.g. a
-    required composite workflow missing output_schema_ref) as opposed to a parse failure --
-    a dedicated subclass, not bare ValueError, so its except clause can pick the accurate
-    message prefix by exception type without also mislabeling some unrelated future ValueError
-    (e.g. a stray int() conversion added to the same try block later) as a validation gap
-    instead of a parse failure."""
 
 
 def _load_raw_atom_cases() -> list[dict]:
@@ -136,24 +127,18 @@ def _composite_workflow_entries() -> list[dict]:
     ]
 
 
-def _required_composite_workflow_ids(entries: list[dict] | None = None) -> frozenset[str]:
+def _required_composite_workflow_ids() -> frozenset[str]:
     """Derives required composite coverage from workflows.yaml's own declared workflow_ids,
     filtered to the kernel_demo.composite_ naming convention -- the composite counterpart of
     _required_action_types() above, adapted because all composite workflows share one YAML file
     instead of one file per atom. Raw YAML parse, not the validated ConfigLoader registry (same
     intentional no-backend-package-imports design as the rest of this script).
 
-    entries: pass an already-parsed _composite_workflow_entries() result to avoid re-reading
-    workflows.yaml when the caller (_composite_coverage_error()) needs it for more than one
-    derivation in the same call; omit to parse fresh (the default for standalone callers/tests).
-
     ponytail: shares _required_action_types()'s CI-ordering caveat -- this script and the
     validate-configs baseline job are siblings with no `needs:` ordering, so a malformed
     workflows.yaml could in principle fail this coverage check before/concurrently with
     baseline's own failure, same trade-off documented there."""
-    if entries is None:
-        entries = _composite_workflow_entries()
-    return frozenset(entry["workflow_id"] for entry in entries)
+    return frozenset(entry["workflow_id"] for entry in _composite_workflow_entries())
 
 
 def _required_composite_workflow_id_by_scenario_id() -> dict[str, str]:
@@ -229,20 +214,18 @@ COMPOSITE_SMOKE_CASES: tuple[tuple[str, str, dict], ...] = (
 )
 
 
-def _composite_output_schema_ref_by_workflow_id(
-    entries: list[dict] | None = None,
-) -> dict[str, str]:
-    """workflow_id -> output_schema_ref for composite workflows, from the same parsed entries as
-    _required_composite_workflow_ids() -- shared by _composite_coverage_error() (to fail SMOKE010
-    loudly on a missing/invalid output_schema_ref instead of silently dropping the workflow's
-    scenario from schema_ref coverage) and _composite_expected_schema_ref_by_scenario_id() below
-    (to build the scenario_id lookup). entries: see _required_composite_workflow_ids()."""
-    if entries is None:
-        entries = _composite_workflow_entries()
+def _composite_output_schema_ref_by_workflow_id() -> dict[str, str]:
+    """workflow_id -> output_schema_ref for composite workflows -- shared by
+    _composite_workflow_config() (to fail SMOKE010 loudly on a missing/invalid output_schema_ref
+    instead of silently dropping the workflow's scenario from schema_ref coverage) and
+    _composite_expected_schema_ref_by_scenario_id() below (to build the scenario_id lookup). An
+    empty string is excluded, not just a non-string: isinstance(entry.get(...), str) alone would
+    let output_schema_ref: "" through as if it were a real ref, so the workflow's key would never
+    land in required - this dict's keys and the missing-ref check below would miss it."""
     return {
         entry["workflow_id"]: entry["output_schema_ref"]
-        for entry in entries
-        if isinstance(entry.get("output_schema_ref"), str)
+        for entry in _composite_workflow_entries()
+        if isinstance(entry.get("output_schema_ref"), str) and entry["output_schema_ref"]
     }
 
 
@@ -296,12 +279,11 @@ def _atom_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None
     return None
 
 
-def _composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None:
-    """Composite counterpart of _atom_coverage_error() -- catches not just an empty
-    COMPOSITE_SMOKE_CASES but also a partial one (e.g. a merge drops 1 of 3 entries), a reused
-    scenario_id (silently dropping the workflow whose scenario it displaced), and a scenario_id
-    swapped onto the wrong workflow_id label (each side would still individually be unique, just
-    paired with the wrong partner -- a bare duplicate check on either side alone would miss it)."""
+def _composite_case_shape_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None:
+    """Checks COMPOSITE_SMOKE_CASES itself (duplicate ids) and that the config files needed to
+    verify it even exist -- split out of _composite_coverage_error() so both checks fold into one
+    call+return there, alongside _composite_workflow_config()'s own single call+return, keeping
+    that function within PLR0911's 6-return budget without a raise-to-catch workaround."""
     workflow_ids = [workflow_id for workflow_id, _, _ in cases]
     scenario_ids = [scenario_id for _, scenario_id, _ in cases]
     for field_name, ids in (("workflow_id", workflow_ids), ("scenario_id", scenario_ids)):
@@ -312,32 +294,48 @@ def _composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str |
             return (
                 f"SMOKE010: cannot verify required composite coverage -- {config_path} not found"
             )
+    return None
+
+
+def _composite_workflow_config() -> tuple[frozenset[str], dict[str, str], dict[str, str]] | str:
+    """Parses workflows.yaml/scenarios.yaml and derives (required_workflow_ids,
+    workflow_id_by_scenario_id, output_schema_ref_by_workflow_id) for _composite_coverage_error(),
+    or a SMOKE010 error string if a required composite workflow is missing/invalid
+    output_schema_ref or the files can't be parsed at all -- one call+return site instead of a
+    dedicated exception class raised only to be caught by the same function."""
     try:
-        # Parsed once and threaded into both derivations below -- _composite_workflow_entries()
-        # itself re-reads workflows.yaml on every call, so calling it twice here (once per
-        # derivation) would parse the same file twice per _composite_coverage_error() call.
-        entries = _composite_workflow_entries()
-        required = _required_composite_workflow_ids(entries)
+        required = _required_composite_workflow_ids()
         workflow_id_by_scenario_id = _required_composite_workflow_id_by_scenario_id()
-        output_schema_ref_by_workflow_id = _composite_output_schema_ref_by_workflow_id(entries)
-        missing_schema_ref = sorted(required - output_schema_ref_by_workflow_id.keys())
-        if missing_schema_ref:
-            # ponytail: raised (not returned directly) so this reuses the except clause's
-            # message template below and stays within PLR0911's 6-return budget for this
-            # function -- _CompositeConfigValidationError is a ValueError subclass, so it's
-            # still caught by the same _COMPOSITE_CONFIG_PARSE_ERRORS tuple the rest of this
-            # function's malformed-config handling already uses.
-            raise _CompositeConfigValidationError(
-                f"missing/invalid output_schema_ref for workflow(s): {missing_schema_ref}"
-            )
+        output_schema_ref_by_workflow_id = _composite_output_schema_ref_by_workflow_id()
     except _COMPOSITE_CONFIG_PARSE_ERRORS as exc:
-        prefix = (
-            "SMOKE010: composite workflow config validation failed"
-            if isinstance(exc, _CompositeConfigValidationError)
-            else "SMOKE010: could not parse composite workflow/scenario config to verify "
-            "required composite coverage"
+        return (
+            "SMOKE010: could not parse composite workflow/scenario config to verify required "
+            f"composite coverage: {exc}"
         )
-        return f"{prefix}: {exc}"
+    missing_schema_ref = sorted(required - output_schema_ref_by_workflow_id.keys())
+    if missing_schema_ref:
+        return (
+            "SMOKE010: composite workflow config validation failed: missing/invalid "
+            f"output_schema_ref for workflow(s): {missing_schema_ref}"
+        )
+    return required, workflow_id_by_scenario_id, output_schema_ref_by_workflow_id
+
+
+def _composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None:
+    """Composite counterpart of _atom_coverage_error() -- catches not just an empty
+    COMPOSITE_SMOKE_CASES but also a partial one (e.g. a merge drops 1 of 3 entries), a reused
+    scenario_id (silently dropping the workflow whose scenario it displaced), and a scenario_id
+    swapped onto the wrong workflow_id label (each side would still individually be unique, just
+    paired with the wrong partner -- a bare duplicate check on either side alone would miss it)."""
+    shape_error = _composite_case_shape_error(cases)
+    if shape_error is not None:
+        return shape_error
+    config = _composite_workflow_config()
+    if isinstance(config, str):
+        return config
+    required, workflow_id_by_scenario_id, _output_schema_ref_by_workflow_id = config
+    workflow_ids = [workflow_id for workflow_id, _, _ in cases]
+    scenario_ids = [scenario_id for _, scenario_id, _ in cases]
     covered = set(workflow_ids)
     if covered != required:
         return _coverage_mismatch_error(

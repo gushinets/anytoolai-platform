@@ -479,14 +479,44 @@ def test_composite_coverage_error_reports_missing_output_schema_ref(tmp_path, mo
     )
 
 
-def test_composite_coverage_error_reports_unrelated_value_error_as_parse_failure(
+def test_composite_coverage_error_reports_empty_output_schema_ref_as_missing(
+    tmp_path, monkeypatch
+) -> None:
+    """An empty-string output_schema_ref must be treated the same as a missing/non-string one --
+    isinstance(entry.get(...), str) alone lets "" through, so a required workflow with an empty
+    output_schema_ref would silently pass SMOKE010's coverage check, land in
+    _EXPECTED_SCHEMA_REF_BY_SCENARIO as "", and only surface later as a confusing SMOKE009
+    schema_ref mismatch instead of a clean upfront config-validation error."""
+    smoke = load_smoke_module()
+    bad_path = tmp_path / "workflows.yaml"
+    bad_path.write_text(
+        "workflows:\n"
+        "  - workflow_id: kernel_demo.composite_analyze_and_clarify_v1\n"
+        "    output_schema_ref: ''\n"
+        "  - workflow_id: kernel_demo.composite_evaluate_match_v1\n"
+        "    output_schema_ref: kernel.schemas.score_multidim_output_v1\n"
+        "  - workflow_id: kernel_demo.composite_shape_and_write_v1\n"
+        "    output_schema_ref: kernel.schemas.compose_reply_output_v1\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(smoke, "WORKFLOWS_CONFIG_PATH", bad_path)
+
+    error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
+
+    assert (
+        error is not None
+        and "SMOKE010" in error
+        and "kernel_demo.composite_analyze_and_clarify_v1" in error
+        and "validation failed" in error
+    )
+
+
+def test_composite_coverage_error_reports_parse_error_from_scenario_binding_lookup(
     monkeypatch,
 ) -> None:
-    """A ValueError from anywhere else in _composite_coverage_error()'s try block (not our own
-    deliberate missing-output_schema_ref check) must still report "could not parse", not
-    "validation failed" -- proves the except clause distinguishes by the dedicated
-    _CompositeConfigValidationError subclass, not by bare `isinstance(exc, ValueError)`, which
-    would mislabel any unrelated future ValueError-raising code added to the same try block."""
+    """A parse/shape error surfacing from _required_composite_workflow_id_by_scenario_id() (not
+    just from the workflows.yaml-derived helpers) is still reported as "could not parse" --
+    _composite_workflow_config() wraps all three derivations in one try block, not just some."""
     smoke = load_smoke_module()
 
     def _raise_unrelated_value_error() -> dict[str, str]:
@@ -498,12 +528,7 @@ def test_composite_coverage_error_reports_unrelated_value_error_as_parse_failure
 
     error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
 
-    assert (
-        error is not None
-        and "SMOKE010" in error
-        and "could not parse" in error
-        and "validation failed" not in error
-    )
+    assert error is not None and "SMOKE010" in error and "could not parse" in error
 
 
 def test_composite_coverage_error_reports_partial_loss_not_just_empty() -> None:
