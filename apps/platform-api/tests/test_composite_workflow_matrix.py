@@ -172,7 +172,7 @@ COMPOSITE_MATRIX: tuple[CompositeCase, ...] = (
         ),
         expected_step_dependencies=(
             ("score_match_by_rubric", "compare_and_classify", "rationale"),
-            ("score_multidimensional_axes", "compare_and_classify", "rationale"),
+            ("score_multidimensional_axes", "score_match_by_rubric", "overall_rationale"),
         ),
     ),
     CompositeCase(

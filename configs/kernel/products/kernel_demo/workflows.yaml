@@ -233,6 +233,8 @@ workflows:
           strict: '?scenario.input.strict'
         output_mapping:
           context.extracted: steps.extract.output
+      # extract -> detect_issues is intentionally order-only, not an oversight -- see
+      # docs/architecture/action-model.md's "kernel_demo composite workflow mapping notes".
       - step_id: detect_issues
         action_config_id: kernel_demo.detect_issues_v1
         input_mapping:
@@ -274,11 +276,6 @@ workflows:
           criteria: 'literal:[{"id":"tone","description":"Matches the requested tone.","weight":1},{"id":"coverage","description":"Covers all key points.","weight":1}]'
         output_mapping:
           context.compared: steps.compare_and_classify.output
-      # score_match_by_rubric runs for atom action-type coverage but is intentionally not
-      # chained into score_multidimensional_axes or the workflow output: the mapping DSL only
-      # supports plain dotted paths (no array indexing), so its criterion_scores[].rationale
-      # can't be reached -- score_multidimensional_axes chains compare_and_classify's rationale
-      # instead.
       - step_id: score_match_by_rubric
         action_config_id: kernel_demo.score_match_by_rubric_v1
         input_mapping:
@@ -287,10 +284,12 @@ workflows:
           rubric: 'literal:[{"id":"tone","description":"Matches the requested tone.","weight":1},{"id":"completeness","description":"Covers all key points.","weight":1}]'
         output_mapping:
           context.scored_match: steps.score_match_by_rubric.output
+      # text is score_match_by_rubric's overall_rationale, not its criterion_scores[*].rationale --
+      # see docs/architecture/action-model.md's "kernel_demo composite workflow mapping notes".
       - step_id: score_multidimensional_axes
         action_config_id: kernel_demo.score_multidimensional_axes_v1
         input_mapping:
-          text: steps.compare_and_classify.output.rationale
+          text: steps.score_match_by_rubric.output.overall_rationale
           axes: 'literal:[{"id":"clarity","description":"How clear the text is.","weight":1},{"id":"structure","description":"How well organized the text is.","weight":1}]'
         output_mapping:
           context.workflow_output: steps.score_multidimensional_axes.output
