@@ -39,6 +39,20 @@ SCENARIOS_CONFIG_PATH = (
 )
 _COMPOSITE_WORKFLOW_ID_PREFIX = "kernel_demo.composite_"
 
+# Every place that raw-parses workflows.yaml/scenarios.yaml for composite coverage (the
+# import-time _EXPECTED_SCHEMA_REF_BY_SCENARIO update and _composite_coverage_error()'s SMOKE010
+# check) must swallow/catch the exact same exception types -- a single shared tuple instead of
+# two independently maintained lists, so the two can't drift out of sync (e.g. one gaining
+# ValueError or KeyError without the other).
+_COMPOSITE_CONFIG_PARSE_ERRORS: tuple[type[Exception], ...] = (
+    OSError,
+    yaml.YAMLError,
+    AttributeError,
+    TypeError,
+    KeyError,
+    ValueError,
+)
+
 
 def _load_raw_atom_cases() -> list[dict]:
     """Parses tests/fixtures/kernel_demo/atom_smoke_matrix.json once. Exposed as
@@ -97,6 +111,22 @@ def _required_action_types() -> frozenset[str]:
     return frozenset(path.stem for path in ACTION_DEFINITIONS_ROOT.glob("*.yaml"))
 
 
+def _composite_workflow_entries() -> list[dict]:
+    """Parses workflows.yaml once and filters to composite-prefixed workflow entries -- shared
+    by _required_composite_workflow_ids() and _composite_output_schema_ref_by_workflow_id() so
+    the open+parse+filter logic lives in one place instead of two near-identical copies that
+    could drift if the filtering rule ever changes."""
+    with WORKFLOWS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    return [
+        entry
+        for entry in data.get("workflows", [])
+        if isinstance(entry, dict)
+        and isinstance(entry.get("workflow_id"), str)
+        and entry["workflow_id"].startswith(_COMPOSITE_WORKFLOW_ID_PREFIX)
+    ]
+
+
 def _required_composite_workflow_ids() -> frozenset[str]:
     """Derives required composite coverage from workflows.yaml's own declared workflow_ids,
     filtered to the kernel_demo.composite_ naming convention -- the composite counterpart of
@@ -108,15 +138,7 @@ def _required_composite_workflow_ids() -> frozenset[str]:
     validate-configs baseline job are siblings with no `needs:` ordering, so a malformed
     workflows.yaml could in principle fail this coverage check before/concurrently with
     baseline's own failure, same trade-off documented there."""
-    with WORKFLOWS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
-        data = yaml.safe_load(handle)
-    return frozenset(
-        entry["workflow_id"]
-        for entry in data.get("workflows", [])
-        if isinstance(entry, dict)
-        and isinstance(entry.get("workflow_id"), str)
-        and entry["workflow_id"].startswith(_COMPOSITE_WORKFLOW_ID_PREFIX)
-    )
+    return frozenset(entry["workflow_id"] for entry in _composite_workflow_entries())
 
 
 def _required_composite_workflow_id_by_scenario_id() -> dict[str, str]:
@@ -193,18 +215,15 @@ COMPOSITE_SMOKE_CASES: tuple[tuple[str, str, dict], ...] = (
 
 
 def _composite_output_schema_ref_by_workflow_id() -> dict[str, str]:
-    """Parses workflows.yaml's own output_schema_ref per composite workflow_id -- shared by
-    _composite_coverage_error() (to fail SMOKE010 loudly on a missing/invalid output_schema_ref
-    instead of silently dropping the workflow's scenario from schema_ref coverage) and
-    _composite_expected_schema_ref_by_scenario_id() below (to build the scenario_id lookup)."""
-    with WORKFLOWS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
-        workflows_data = yaml.safe_load(handle)
+    """workflow_id -> output_schema_ref for composite workflows, from the same parsed entries as
+    _required_composite_workflow_ids() -- shared by _composite_coverage_error() (to fail SMOKE010
+    loudly on a missing/invalid output_schema_ref instead of silently dropping the workflow's
+    scenario from schema_ref coverage) and _composite_expected_schema_ref_by_scenario_id() below
+    (to build the scenario_id lookup)."""
     return {
         entry["workflow_id"]: entry["output_schema_ref"]
-        for entry in workflows_data.get("workflows", [])
-        if isinstance(entry, dict)
-        and isinstance(entry.get("workflow_id"), str)
-        and isinstance(entry.get("output_schema_ref"), str)
+        for entry in _composite_workflow_entries()
+        if isinstance(entry.get("output_schema_ref"), str)
     }
 
 
@@ -227,7 +246,7 @@ def _composite_expected_schema_ref_by_scenario_id() -> dict[str, str]:
 # _composite_coverage_error() (SMOKE010) before run() ever needs this dict, so a malformed
 # workflows.yaml/scenarios.yaml is reported there with a clear error instead of an import-time
 # traceback.
-with contextlib.suppress(OSError, yaml.YAMLError, AttributeError, TypeError, KeyError):
+with contextlib.suppress(*_COMPOSITE_CONFIG_PARSE_ERRORS):
     _EXPECTED_SCHEMA_REF_BY_SCENARIO.update(_composite_expected_schema_ref_by_scenario_id())
 
 
@@ -280,10 +299,14 @@ def _composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str |
         output_schema_ref_by_workflow_id = _composite_output_schema_ref_by_workflow_id()
         missing_schema_ref = sorted(required - output_schema_ref_by_workflow_id.keys())
         if missing_schema_ref:
+            # ponytail: raised (not returned directly) so this reuses the except clause's
+            # message template below and stays within PLR0911's 6-return budget for this
+            # function -- ValueError is caught by the same _COMPOSITE_CONFIG_PARSE_ERRORS tuple
+            # the rest of this function's malformed-config handling already uses.
             raise ValueError(
                 f"missing/invalid output_schema_ref for workflow(s): {missing_schema_ref}"
             )
-    except (OSError, yaml.YAMLError, AttributeError, TypeError, ValueError) as exc:
+    except _COMPOSITE_CONFIG_PARSE_ERRORS as exc:
         return (
             "SMOKE010: could not parse composite workflow/scenario config to verify required "
             f"composite coverage: {exc}"
@@ -485,6 +508,15 @@ def _run_case_batch(
 
 
 def run(api_url: str, timeout: float) -> int:
+    """Runs ATOM_SMOKE_CASES then COMPOSITE_SMOKE_CASES against a live api_url.
+
+    Precondition owned by the caller, not enforced here: main() must call
+    _atom_coverage_error()/_composite_coverage_error() first. Without that, a composite
+    scenario_id missing from _EXPECTED_SCHEMA_REF_BY_SCENARIO (e.g. workflows.yaml briefly
+    malformed) makes SMOKE009's schema_ref cross-check silently pass instead of catching a
+    scenario wired to the wrong workflow. run() itself doesn't re-check coverage so that tests
+    can call it directly to exercise per-case behavior in isolation from the coverage guard.
+    """
     total = len(ATOM_SMOKE_CASES)
     if not ATOM_SMOKE_CASES:
         print("SMOKE007: ATOM_SMOKE_CASES is empty -- nothing to smoke-test", file=sys.stderr)
