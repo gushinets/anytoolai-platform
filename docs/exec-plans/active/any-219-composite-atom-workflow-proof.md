@@ -73,23 +73,11 @@ dependency proofs) and live-smoke-tested via `dev-smoke`.
 - [x] `kernel_demo_smoke.py` / `test_kernel_demo_smoke.py`: composite coverage checks, wired into
       `dev-smoke`.
 - [x] 19 rounds of `/code-review` passes plus 3 team-lead reviews addressed — see
-      `plans/ANY-219.md` for the full per-pass findings and resolutions. Notable architectural
-      outcomes surfaced across those passes (full reasoning in `plans/ANY-219.md` and this doc's
-      Decision log):
-  - `score_match_by_rubric -> score_multidimensional_axes` couldn't chain through the mapping DSL
-    (no array indexing) — resolved by adding a top-level `overall_rationale` synthesis field to
-    `score_match_output.schema.json` (team-lead-3 review, user-approved via explicit choice
-    between that and a DSL extension).
-  - `extract -> detect_issues` has the same DSL-reachability gap, but every schema-extension
-    attempt traded one regression for another (corrupted `detect_issues` category semantics,
-    dropped `scenario.input.context`, extra unused-field generation cost on 6 other workflows,
-    extra retry-budget risk on `retry_extract_v1`) — resolved by leaving it order-only,
-    intentionally, with the reasoning documented in `docs/architecture/action-model.md`'s
-    "kernel_demo composite workflow mapping notes" section (18th/19th passes).
-  - A schema `description` field is serialized verbatim into every LLM provider call's system
-    message (`_schema_guidance_message` in `litellm.py` does not strip it) — engineering-only
-    rationale must live in docs, not in a schema `description` or a permanent workflow-config
-    comment describing a reverted attempt (19th pass).
+      `plans/ANY-219.md` for the full per-pass findings and resolutions. The two mapping-DSL
+      workarounds those passes converged on (`overall_rationale` on `score_match_by_rubric`, and
+      leaving `extract -> detect_issues` order-only) and why are documented once, in
+      `docs/architecture/action-model.md`'s "kernel_demo composite workflow mapping notes" section
+      — not repeated here.
 - [x] This exec plan filed, per CLAUDE.md's "before coding" requirement for non-trivial work —
       filed retroactively (19th review pass flagged its absence); the branch's actual design/review
       record lives in `plans/ANY-219.md` and is not duplicated here.
@@ -108,7 +96,7 @@ dependency proofs) and live-smoke-tested via `dev-smoke`.
 
 | Date | Decision | Why |
 |---|---|---|
-| 2026-08-18 | `score_match_by_rubric` gets a new required `overall_rationale` output field so `score_multidimensional_axes` can chain a real synthesis string, instead of bypassing it and chaining `compare_and_classify.rationale` directly. | The mapping DSL cannot index into `criterion_scores[*].rationale`; the atom's output otherwise has no top-level string. User explicitly chose this over extending the DSL when presented with both options (AskUserQuestion, team-lead-3 review). |
+| 2026-08-18 | `score_match_by_rubric` gets a new required `overall_rationale` output field so `score_multidimensional_axes` can chain a real synthesis string, instead of bypassing it and chaining `compare_and_classify.rationale` directly. | See `docs/architecture/action-model.md`'s "kernel_demo composite workflow mapping notes" for the mapping-DSL reasoning. User explicitly chose this over extending the DSL when presented with both options (AskUserQuestion, team-lead-3 review). |
 | 2026-08-18 | `extract -> detect_issues` in `composite_analyze_and_clarify_v1` stays order-only (`?scenario.input.taxonomy` / `?scenario.input.context`), not chained through a synthetic field. | Every synthesis-field attempt (`notes` on `extract`'s output) regressed something else: `detect_issues`' category-must-be-in-taxonomy contract when fed field names, `scenario.input.context` support, generation cost on 6 unrelated workflows, and `retry_extract_v1`'s single retry slot. Reverted after landing (17th/18th review passes) once the full cost was visible; documented as the ticket's own stated fallback ("clarify if adjacent consumption is not intended") rather than re-attempted a fourth time. |
 | 2026-08-19 | Engineering rationale for why `overall_rationale` exists lives in `docs/architecture/action-model.md`, not in the JSON schema's `description` keyword. | `description` is serialized verbatim into the LLM system message on every provider call (`_schema_guidance_message` doesn't strip it) — internal engineering context there is a permanent token-cost regression, not documentation. |
 
@@ -121,6 +109,7 @@ dependency proofs) and live-smoke-tested via `dev-smoke`.
 | 2026-08-18 | Seventeenth pass found the `extract -> detect_issues` fix (a `taxonomy` mapping from `missing_fields`) was semantically wrong — it forced `detect_issues`' `category` field to a raw field name — and the composite matrix's dependency proof for it was vacuous (empty-array fixture). Replaced with a new `notes` field on `extract`'s output instead. | Await further review. |
 | 2026-08-18 | Eighteenth pass found the `notes` field itself regressed `scenario.input.context` support, added unused-field generation cost to 6 other workflows, and added retry risk to `retry_extract_v1`. Reverted `notes` entirely; `extract -> detect_issues` returned to order-only with an inline comment explaining why. | Await further review. |
 | 2026-08-19 | Nineteenth pass found the `overall_rationale` schema `description` gets serialized into every LLM call (permanent token-cost regression), the order-only comment had grown into permanent change-history prose describing an already-reverted attempt, and no exec plan existed for this non-trivial ticket. Fixed: removed the schema `description`, trimmed the workflow comment to a one-line pointer, added the "kernel_demo composite workflow mapping notes" section to `docs/architecture/action-model.md` as the durable, non-serialized home for the reasoning, and filed this exec plan. | Await further review. |
+| 2026-08-19 | Twentieth pass found 5 gaps in the docs added by the nineteenth pass: a markdown heading inserted mid-section (an A11 bullet ended up under the new H2 instead of under A11), a "Follow-up debt" entry that said "None tracked." while describing real debt in the same breath, and the DSL-array-indexing reasoning restated in 3 places with no single source of truth. Fixed 3 of 5: reordered the misplaced A11 bullet, rewrote the debt entry without the self-contradicting prefix, and trimmed this file's Implementation-steps bullet and first Decision-log row to point at `action-model.md` instead of restating its reasoning. Declined 2 — see `plans/ANY-219.md`'s twentieth-pass entry for why: filing this plan retroactively can't be undone into "before coding," and `overall_rationale`'s required-not-optional cost tradeoff was already explicitly decided (AskUserQuestion, team-lead-3) with no new alternative offered here. | Await further review. |
 
 ## Open questions
 
@@ -128,7 +117,8 @@ dependency proofs) and live-smoke-tested via `dev-smoke`.
 
 ## Follow-up debt
 
-- None tracked. If a future workflow needs to chain an array-element field through the mapping
-  DSL, the two documented workarounds in `docs/architecture/action-model.md`'s "kernel_demo
-  composite workflow mapping notes" (a top-level synthesis scalar, or staying order-only) are not
-  a substitute for real DSL array-indexing support if the need becomes recurring.
+- The mapping DSL still cannot index into an array (`docs/architecture/action-model.md`'s
+  "kernel_demo composite workflow mapping notes" has the detail). The two workarounds landed by
+  this ticket — a top-level synthesis scalar, or staying order-only — are not a substitute for
+  real DSL array-indexing support if a future workflow hits the same gap and the need becomes
+  recurring rather than a one-off.

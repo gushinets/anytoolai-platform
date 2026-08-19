@@ -112,6 +112,7 @@ Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.compa
 - Output: `verdict` (required, non-empty category value), `confidence` (required number, `0`–`1`), `deltas` (required, non-empty array of `{criterion_id, status, evidence}` — `status` is the closed enum `match | partial | mismatch`, `evidence` a non-empty string), `rationale` (required, non-empty, `maxLength: 500` concise summary).
 - `CompareAndClassifyInputValidator` rejects duplicate `criteria[*].id` before any provider call, mirroring `ExtractStructuredFieldsInputValidator` (A01) — a duplicate id would make the output's per-criterion coverage check ambiguous.
 - `CompareAndClassifyCrossValidator` enforces: `verdict` must be one of `categories`; every `deltas[*].criterion_id` must exist in `criteria`, must not repeat, and `deltas` must cover every `criteria[*].id` exactly once (full coverage, not a partial subset — this was an explicit open contract question resolved as mandatory coverage so `verdict` always rests on a complete evidence set). Rejected values are truncated (`_truncated_repr`) before flowing into the retry prompt and persisted debug-artifact metadata.
+- `confidence` is a relative signal, not a calibrated probability — that constraint is a prompt instruction (`compare_and_classify.v1.md`), not a runtime heuristic, matching the `rationale` chain-of-thought prohibition pattern used elsewhere in this doc.
 
 ## kernel_demo composite workflow mapping notes
 
@@ -134,4 +135,3 @@ in `kernel_demo`'s composite workflows hit this limitation directly:
   way to burn its single retry slot on that field. Order-only here is the deliberate outcome, not
   an oversight — see `plans/ANY-219.md`'s team-lead-3/seventeenth/eighteenth review passes for the
   full history of what was tried.
-- `confidence` is a relative signal, not a calibrated probability — that constraint is a prompt instruction (`compare_and_classify.v1.md`), not a runtime heuristic, matching the `rationale` chain-of-thought prohibition pattern used elsewhere in this doc.
