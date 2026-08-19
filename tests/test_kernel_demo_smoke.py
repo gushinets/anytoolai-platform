@@ -450,6 +450,33 @@ def test_composite_coverage_error_reports_malformed_workflows_config_cleanly(
     assert error is not None and "SMOKE010" in error
 
 
+def test_composite_coverage_error_reports_missing_output_schema_ref(tmp_path, monkeypatch) -> None:
+    """A required composite workflow with no (or non-string) output_schema_ref must fail
+    SMOKE010 loudly -- previously it was silently dropped from
+    _EXPECTED_SCHEMA_REF_BY_SCENARIO, so a composite scenario bound to the wrong workflow would
+    pass SMOKE009's schema_ref check by omission instead of by actually matching."""
+    smoke = load_smoke_module()
+    bad_path = tmp_path / "workflows.yaml"
+    bad_path.write_text(
+        "workflows:\n"
+        "  - workflow_id: kernel_demo.composite_analyze_and_clarify_v1\n"
+        "  - workflow_id: kernel_demo.composite_evaluate_match_v1\n"
+        "    output_schema_ref: kernel.schemas.score_multidim_output_v1\n"
+        "  - workflow_id: kernel_demo.composite_shape_and_write_v1\n"
+        "    output_schema_ref: kernel.schemas.compose_reply_output_v1\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(smoke, "WORKFLOWS_CONFIG_PATH", bad_path)
+
+    error = smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES)
+
+    assert (
+        error is not None
+        and "SMOKE010" in error
+        and "kernel_demo.composite_analyze_and_clarify_v1" in error
+    )
+
+
 def test_composite_coverage_error_reports_partial_loss_not_just_empty() -> None:
     """A partial regression (2 of 3 composite entries survive) must be caught the same way full
     emptiness is -- this is the exact gap a bare `len(cases) == 0` check would miss."""

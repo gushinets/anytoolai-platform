@@ -15,6 +15,7 @@ validate_configs.py/quick_check.py), parameterized only by --api-url.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import sys
@@ -190,20 +191,29 @@ COMPOSITE_SMOKE_CASES: tuple[tuple[str, str, dict], ...] = (
     ),
 )
 
-def _composite_expected_schema_ref_by_scenario_id() -> dict[str, str]:
-    """Derives scenario_id -> output_schema_ref for composite scenarios from workflows.yaml's
-    own output_schema_ref field, joined through the real scenario_id -> workflow_id binding in
-    scenarios.yaml -- avoids 3 hardcoded literal schema refs drifting from workflows.yaml, the
-    same risk _required_composite_workflow_ids() above already guards against for coverage."""
+
+def _composite_output_schema_ref_by_workflow_id() -> dict[str, str]:
+    """Parses workflows.yaml's own output_schema_ref per composite workflow_id -- shared by
+    _composite_coverage_error() (to fail SMOKE010 loudly on a missing/invalid output_schema_ref
+    instead of silently dropping the workflow's scenario from schema_ref coverage) and
+    _composite_expected_schema_ref_by_scenario_id() below (to build the scenario_id lookup)."""
     with WORKFLOWS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
         workflows_data = yaml.safe_load(handle)
-    output_schema_ref_by_workflow_id = {
+    return {
         entry["workflow_id"]: entry["output_schema_ref"]
         for entry in workflows_data.get("workflows", [])
         if isinstance(entry, dict)
         and isinstance(entry.get("workflow_id"), str)
         and isinstance(entry.get("output_schema_ref"), str)
     }
+
+
+def _composite_expected_schema_ref_by_scenario_id() -> dict[str, str]:
+    """Derives scenario_id -> output_schema_ref for composite scenarios from workflows.yaml's
+    own output_schema_ref field, joined through the real scenario_id -> workflow_id binding in
+    scenarios.yaml -- avoids 3 hardcoded literal schema refs drifting from workflows.yaml, the
+    same risk _required_composite_workflow_ids() above already guards against for coverage."""
+    output_schema_ref_by_workflow_id = _composite_output_schema_ref_by_workflow_id()
     return {
         scenario_id: output_schema_ref_by_workflow_id[workflow_id]
         for scenario_id, workflow_id in _required_composite_workflow_id_by_scenario_id().items()
@@ -217,10 +227,8 @@ def _composite_expected_schema_ref_by_scenario_id() -> dict[str, str]:
 # _composite_coverage_error() (SMOKE010) before run() ever needs this dict, so a malformed
 # workflows.yaml/scenarios.yaml is reported there with a clear error instead of an import-time
 # traceback.
-try:
+with contextlib.suppress(OSError, yaml.YAMLError, AttributeError, TypeError, KeyError):
     _EXPECTED_SCHEMA_REF_BY_SCENARIO.update(_composite_expected_schema_ref_by_scenario_id())
-except (OSError, yaml.YAMLError, AttributeError, TypeError, KeyError):
-    pass
 
 
 POLL_INTERVAL_SECONDS = 0.5
@@ -269,7 +277,13 @@ def _composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str |
     try:
         required = _required_composite_workflow_ids()
         workflow_id_by_scenario_id = _required_composite_workflow_id_by_scenario_id()
-    except (OSError, yaml.YAMLError, AttributeError, TypeError) as exc:
+        output_schema_ref_by_workflow_id = _composite_output_schema_ref_by_workflow_id()
+        missing_schema_ref = sorted(required - output_schema_ref_by_workflow_id.keys())
+        if missing_schema_ref:
+            raise ValueError(
+                f"missing/invalid output_schema_ref for workflow(s): {missing_schema_ref}"
+            )
+    except (OSError, yaml.YAMLError, AttributeError, TypeError, ValueError) as exc:
         return (
             "SMOKE010: could not parse composite workflow/scenario config to verify required "
             f"composite coverage: {exc}"
