@@ -474,6 +474,8 @@ def test_composite_coverage_error_reports_missing_output_schema_ref(tmp_path, mo
         error is not None
         and "SMOKE010" in error
         and "kernel_demo.composite_analyze_and_clarify_v1" in error
+        and "validation failed" in error
+        and "could not parse" not in error
     )
 
 
