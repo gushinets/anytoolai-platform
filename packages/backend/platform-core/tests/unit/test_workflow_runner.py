@@ -404,11 +404,11 @@ def test_workflow_runner_executes_single_step_workflow_and_creates_final_artifac
     assert result.output_payload == {
         "values": {
             "deadline": "next Friday",
+            "budget": "$5,000",
             "deliverables": ["logo", "landing page"],
         },
-        "missing_fields": ["budget"],
-        "confidence": {"deadline": 0.9, "deliverables": 0.7},
-        "notes": "Deadline and deliverables were found in the text; budget was not mentioned.",
+        "missing_fields": [],
+        "confidence": {"deadline": 0.9, "budget": 0.8, "deliverables": 0.7},
     }
     assert job["status"].value == "succeeded"
     assert job["result_artifact_id"] == result.result_artifact_id
@@ -1499,11 +1499,11 @@ def test_workflow_runner_recovers_consistent_failed_state_after_multi_step_rollb
     assert workflow_state["context"]["extracted"] == {
         "values": {
             "deadline": "next Friday",
+            "budget": "$5,000",
             "deliverables": ["logo", "landing page"],
         },
-        "missing_fields": ["budget"],
-        "confidence": {"deadline": 0.9, "deliverables": 0.7},
-        "notes": "Deadline and deliverables were found in the text; budget was not mentioned.",
+        "missing_fields": [],
+        "confidence": {"deadline": 0.9, "budget": 0.8, "deliverables": 0.7},
     }
     assert workflow_state["steps"]["extract"]["status"] == "succeeded"
     assert workflow_state["steps"]["extract"]["last_action_run_id"] == action_runs[0]["id"]

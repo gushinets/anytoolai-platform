@@ -46,6 +46,7 @@
       }
     },
     "overall_rationale": {
+      "description": "Synthesis across all criteria, not a duplicate of any single criterion_scores[*].rationale. Exists as a top-level scalar because the workflow mapping DSL cannot index into criterion_scores[] to chain a per-criterion rationale into a downstream step's plain-string input.",
       "type": "string",
       "minLength": 1,
       "maxLength": 500

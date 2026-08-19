@@ -19,13 +19,8 @@
         "minimum": 0,
         "maximum": 1
       }
-    },
-    "notes": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 500
     }
   },
-  "required": ["values", "missing_fields", "notes"],
+  "required": ["values", "missing_fields"],
   "additionalProperties": false
 }

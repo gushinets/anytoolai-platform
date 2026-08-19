@@ -206,8 +206,7 @@ def test_platform_actions_package_declares_runtime_dependencies() -> None:
 def test_structured_llm_executor_routes_calls_through_provider_gateway() -> None:
     registry = build_config_registry(CONFIG_ROOT)
     spy_gateway = _FixedResponseSpyGateway(
-        '{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": [], '
-        '"notes": "Budget and timeline were found."}'
+        '{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": []}'
     )
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
@@ -238,7 +237,6 @@ def test_structured_llm_executor_routes_calls_through_provider_gateway() -> None
     assert response.structured_output == {
         "values": {"budget": "5000", "timeline": "Q1"},
         "missing_fields": [],
-        "notes": "Budget and timeline were found.",
     }
     assert response.provider_call is not None
     assert response.provider_call.provider == "fake"
@@ -265,8 +263,7 @@ def test_structured_llm_executor_owns_validation_retries_through_gateway_dtos() 
     registry = build_config_registry(CONFIG_ROOT)
     spy_gateway = _TwoAttemptSpyGateway(
         "not-json",
-        '{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": [], '
-        '"notes": "Budget and timeline were found."}',
+        '{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": []}',
     )
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
@@ -305,7 +302,6 @@ def test_structured_llm_executor_owns_validation_retries_through_gateway_dtos() 
     assert response.structured_output == {
         "values": {"budget": "5000", "timeline": "Q1"},
         "missing_fields": [],
-        "notes": "Budget and timeline were found.",
     }
     assert response.provider_call is not None
     assert spy_gateway.sessions == [session, session]
@@ -780,8 +776,8 @@ def test_structured_llm_executor_retries_on_invalid_date_with_actionable_feedbac
     message), so the model can self-correct."""
     registry = build_config_registry(CONFIG_ROOT)
     spy_gateway = _TwoAttemptSpyGateway(
-        '{"values": {"deadline": "next Friday"}, "missing_fields": [], "notes": "Deadline found."}',
-        '{"values": {"deadline": "2026-08-14"}, "missing_fields": [], "notes": "Deadline found."}',
+        '{"values": {"deadline": "next Friday"}, "missing_fields": []}',
+        '{"values": {"deadline": "2026-08-14"}, "missing_fields": []}',
     )
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
@@ -833,7 +829,6 @@ def test_structured_llm_executor_retries_on_invalid_date_with_actionable_feedbac
     assert response.structured_output == {
         "values": {"deadline": "2026-08-14"},
         "missing_fields": [],
-        "notes": "Deadline found.",
     }
     assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
         1,
@@ -982,8 +977,7 @@ def test_structured_llm_executor_finalizes_and_persists_structured_artifact(
 ) -> None:
     registry = build_config_registry(CONFIG_ROOT)
     spy_gateway = _FixedResponseSpyGateway(
-        '{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": [], '
-        '"notes": "Budget and timeline were found."}'
+        '{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": []}'
     )
     with transaction_boundary(session_factory) as session:
         artifact_service = ArtifactService(
@@ -1043,7 +1037,6 @@ def test_structured_llm_executor_finalizes_and_persists_structured_artifact(
     assert response.structured_output == {
         "values": {"budget": "5000", "timeline": "Q1"},
         "missing_fields": [],
-        "notes": "Budget and timeline were found.",
     }
     assert response.provider_call is not None
     assert response.metadata["structured_output_artifact_id"].startswith("artifact_")
@@ -1052,7 +1045,6 @@ def test_structured_llm_executor_finalizes_and_persists_structured_artifact(
     assert artifact_rows[0]["content_json"] == {
         "values": {"budget": "5000", "timeline": "Q1"},
         "missing_fields": [],
-        "notes": "Budget and timeline were found.",
     }
     # ANY-251 regression: persisted metadata must reflect the resolved action_config's
     # action_type ("text.extract_structured_fields"), not request.action_type, which this
@@ -1066,8 +1058,7 @@ def test_structured_llm_executor_skips_schema_less_finalization_with_artifact_se
 ) -> None:
     registry = build_config_registry(CONFIG_ROOT)
     spy_gateway = _FixedResponseSpyGateway(
-        '{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": [], '
-        '"notes": "Budget and timeline were found."}'
+        '{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": []}'
     )
     with transaction_boundary(session_factory) as session:
         artifact_service = ArtifactService(
