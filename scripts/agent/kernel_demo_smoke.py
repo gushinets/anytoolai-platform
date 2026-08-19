@@ -113,9 +113,9 @@ def _required_action_types() -> frozenset[str]:
 
 def _composite_workflow_entries() -> list[dict]:
     """Parses workflows.yaml once and filters to composite-prefixed workflow entries -- shared
-    by _required_composite_workflow_ids() and _composite_output_schema_ref_by_workflow_id() so
-    the open+parse+filter logic lives in one place instead of two near-identical copies that
-    could drift if the filtering rule ever changes."""
+    by _composite_output_schema_ref_by_workflow_id() and _composite_workflow_config() so the
+    open+parse+filter logic lives in one place instead of near-identical copies that could drift
+    if the filtering rule ever changes."""
     with WORKFLOWS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle)
     return [
@@ -129,9 +129,7 @@ def _composite_workflow_entries() -> list[dict]:
 
 def _composite_required_ids(entries: list[dict]) -> frozenset[str]:
     """Pure derivation (no I/O -- entries is already-parsed) of the required composite
-    workflow_id set, shared by _required_composite_workflow_ids() and
-    _composite_workflow_config() below so both agree on exactly one rule instead of two
-    near-identical comprehensions that could drift. Split from
+    workflow_id set, used by _composite_workflow_config() below. Split from
     _composite_schema_ref_by_workflow_id() (not one combined helper returning both) so neither
     caller computes a value it then discards -- each needs only one of the two."""
     return frozenset(entry["workflow_id"] for entry in entries)
@@ -150,20 +148,6 @@ def _composite_schema_ref_by_workflow_id(entries: list[dict]) -> dict[str, str]:
         for entry in entries
         if isinstance(entry.get("output_schema_ref"), str) and entry["output_schema_ref"]
     }
-
-
-def _required_composite_workflow_ids() -> frozenset[str]:
-    """Derives required composite coverage from workflows.yaml's own declared workflow_ids,
-    filtered to the kernel_demo.composite_ naming convention -- the composite counterpart of
-    _required_action_types() above, adapted because all composite workflows share one YAML file
-    instead of one file per atom. Raw YAML parse, not the validated ConfigLoader registry (same
-    intentional no-backend-package-imports design as the rest of this script).
-
-    ponytail: shares _required_action_types()'s CI-ordering caveat -- this script and the
-    validate-configs baseline job are siblings with no `needs:` ordering, so a malformed
-    workflows.yaml could in principle fail this coverage check before/concurrently with
-    baseline's own failure, same trade-off documented there."""
-    return _composite_required_ids(_composite_workflow_entries())
 
 
 def _required_composite_workflow_id_by_scenario_id() -> dict[str, str]:
@@ -240,10 +224,11 @@ COMPOSITE_SMOKE_CASES: tuple[tuple[str, str, dict], ...] = (
 
 
 def _composite_output_schema_ref_by_workflow_id() -> dict[str, str]:
-    """workflow_id -> output_schema_ref for composite workflows -- shared by
-    _composite_workflow_config() (to fail SMOKE010 loudly on a missing/invalid output_schema_ref
-    instead of silently dropping the workflow's scenario from schema_ref coverage) and
-    _composite_expected_schema_ref_by_scenario_id() below (to build the scenario_id lookup)."""
+    """workflow_id -> output_schema_ref for composite workflows -- standalone entry point used by
+    _composite_expected_schema_ref_by_scenario_id() below (the import-time
+    _EXPECTED_SCHEMA_REF_BY_SCENARIO bootstrap). _composite_workflow_config() does NOT call this;
+    it calls the lower-level _composite_schema_ref_by_workflow_id(entries) directly against its
+    own already-parsed entries, to avoid this function's independent re-parse of workflows.yaml."""
     return _composite_schema_ref_by_workflow_id(_composite_workflow_entries())
 
 
@@ -251,7 +236,7 @@ def _composite_expected_schema_ref_by_scenario_id() -> dict[str, str]:
     """Derives scenario_id -> output_schema_ref for composite scenarios from workflows.yaml's
     own output_schema_ref field, joined through the real scenario_id -> workflow_id binding in
     scenarios.yaml -- avoids 3 hardcoded literal schema refs drifting from workflows.yaml, the
-    same risk _required_composite_workflow_ids() above already guards against for coverage."""
+    same risk _composite_required_ids() above already guards against for coverage."""
     output_schema_ref_by_workflow_id = _composite_output_schema_ref_by_workflow_id()
     return {
         scenario_id: output_schema_ref_by_workflow_id[workflow_id]
@@ -301,9 +286,11 @@ def _composite_case_ids(
     cases: tuple[tuple[str, str, dict], ...],
 ) -> tuple[list[str], list[str]]:
     """Extracts (workflow_ids, scenario_ids) from COMPOSITE_SMOKE_CASES-shaped cases -- the one
-    place this unzip happens, shared by _composite_case_shape_error() (duplicate check) and
-    _composite_coverage_error() (coverage/binding checks) so a future change to the cases shape
-    (e.g. an added field) can't leave one of them silently reading stale positions."""
+    place this composite-case unzip happens (the atom side has its own single unzip in
+    _atom_coverage_error(), not shared with this one -- the two case shapes aren't the same
+    fields), shared by _composite_case_shape_error() (duplicate check) and
+    _composite_coverage_error() (coverage/binding checks) so a future change to the composite
+    cases shape (e.g. an added field) can't leave one of them silently reading stale positions."""
     return (
         [workflow_id for workflow_id, _, _ in cases],
         [scenario_id for _, scenario_id, _ in cases],
@@ -334,9 +321,10 @@ def _composite_workflow_config() -> tuple[frozenset[str], dict[str, str], dict[s
     success-only tuple instead of a tuple-or-error-string union that would invert the str | None
     (None-means-success) convention every other coverage function in this module follows.
     Computes required/output_schema_ref_by_workflow_id from a single _composite_workflow_entries()
-    call via the shared pure helpers, not by calling _required_composite_workflow_ids() and
-    _composite_output_schema_ref_by_workflow_id() (each of which parses workflows.yaml on its own)
-    -- avoids re-reading the same file twice per call."""
+    call via the shared pure helpers (_composite_required_ids(),
+    _composite_schema_ref_by_workflow_id()), not by calling
+    _composite_output_schema_ref_by_workflow_id() (which parses workflows.yaml on its own) --
+    avoids re-reading the same file twice per call."""
     entries = _composite_workflow_entries()
     required = _composite_required_ids(entries)
     output_schema_ref_by_workflow_id = _composite_schema_ref_by_workflow_id(entries)

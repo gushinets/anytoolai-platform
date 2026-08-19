@@ -315,15 +315,19 @@ def test_atom_coverage_error_reports_missing_config_directory_distinctly(monkeyp
     assert error is not None and "not found" in error
 
 
+def _required_composite_workflow_ids(smoke):
+    return smoke._composite_required_ids(smoke._composite_workflow_entries())
+
+
 def test_composite_smoke_cases_cover_the_required_composite_workflows() -> None:
     smoke = load_smoke_module()
     assert smoke._composite_coverage_error(smoke.COMPOSITE_SMOKE_CASES) is None
-    assert len(smoke.COMPOSITE_SMOKE_CASES) == len(smoke._required_composite_workflow_ids())
+    assert len(smoke.COMPOSITE_SMOKE_CASES) == len(_required_composite_workflow_ids(smoke))
 
 
 def test_required_composite_workflow_ids_are_derived_from_workflows_config() -> None:
     smoke = load_smoke_module()
-    required = smoke._required_composite_workflow_ids()
+    required = _required_composite_workflow_ids(smoke)
     assert required == {workflow_id for workflow_id, _, _ in smoke.COMPOSITE_SMOKE_CASES}
     assert "kernel_demo.composite_analyze_and_clarify_v1" in required
 
@@ -482,9 +486,8 @@ def test_composite_coverage_error_reports_missing_output_schema_ref(tmp_path, mo
 def test_composite_workflow_config_parses_workflows_yaml_exactly_once(monkeypatch) -> None:
     """_composite_workflow_config() must derive required workflow_ids and
     output_schema_ref_by_workflow_id from a single _composite_workflow_entries() call, not by
-    calling _required_composite_workflow_ids() and _composite_output_schema_ref_by_workflow_id()
-    separately (each of which parses workflows.yaml on its own) -- a prior round regressed this
-    into two reads per _composite_coverage_error() call."""
+    calling standalone wrapper functions that each independently re-parse workflows.yaml -- a
+    prior round regressed this into two reads per _composite_coverage_error() call."""
     smoke = load_smoke_module()
     real_entries = smoke._composite_workflow_entries
     calls = []
