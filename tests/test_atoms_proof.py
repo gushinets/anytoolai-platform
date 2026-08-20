@@ -287,6 +287,28 @@ def test_run_case_with_ledger_check_reports_http_failure_without_touching_db(mon
     assert case.error_code == "SMOKE001"
 
 
+def test_check_ledger_reports_proof000_without_leaking_raw_exception_text() -> None:
+    """Fourteenth-round finding: database_url isn't guaranteed to be the fixed dev-only default
+    (ANYTOOLAI_POSTGRES_PASSWORD is overridable), so a driver exception's free-form message must
+    not flow into the persisted evidence report -- only PROOF000 plus the exception class name,
+    which is still enough to tell e.g. an auth/connection failure from a bad-query error."""
+    module = load_atoms_proof_module()
+
+    class _FailingEngine:
+        def connect(self):
+            raise module.sa.exc.SQLAlchemyError("connection string had secret-looking-detail")
+
+    case = module._check_ledger(
+        _FailingEngine(), label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF000"
+    assert "SQLAlchemyError" in case.error_message
+    assert "secret-looking-detail" not in case.error_message
+
+
 def test_write_evidence_report_is_privacy_safe_and_shaped_correctly(tmp_path) -> None:
     module = load_atoms_proof_module()
 

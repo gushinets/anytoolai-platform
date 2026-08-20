@@ -319,13 +319,18 @@ def _check_ledger(
                 ).mappings()
             )
     except sa.exc.SQLAlchemyError as exc:
+        # Exception class name only, not str(exc) -- database_url (and therefore this
+        # connection's credentials) isn't guaranteed to be the fixed dev-only default; a driver
+        # error message is free-form text this script doesn't control, so it doesn't belong in a
+        # persisted "privacy-safe" evidence artifact. The class name is still enough to tell
+        # e.g. OperationalError (connection/auth) from ProgrammingError (bad query) at a glance.
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=None,
             error_code="PROOF000",
             error_message=(
                 f"PROOF000: database ledger check failed for scenario_session_id "
-                f"{scenario_session_id}: {exc}"
+                f"{scenario_session_id}: {type(exc).__name__}"
             ),
         )
 
