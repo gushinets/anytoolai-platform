@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.module_loading import load_cached_module
+
 
 def load_runner_module():
     module_path = Path(__file__).resolve().parents[1] / "scripts" / "agent" / "runner.py"
@@ -502,27 +504,51 @@ def test_database_url_percent_encodes_reserved_characters_in_credentials(monkeyp
 def test_database_url_survives_the_real_sqlalchemy_consumer_path_for_reserved_db_name_chars(
     monkeypatch,
 ) -> None:
-    """Sixteenth code review pass finding: the fifteenth round's fix percent-encoded the db name
-    the same way as user/password, but sqlalchemy's make_url() only percent-decodes userinfo --
-    it leaves the path segment (URL.database) as the literal string found after the last "/".
-    Percent-encoding it therefore breaks the real consumer (_build_engine() -> make_url() ->
-    dialect create_connect_args(), the only place this DSN is actually parsed), which a
-    string-level urlsplit()/unquote() check (the fifteenth round's test) can't catch. Exercise
-    the real consumer path instead."""
-    import sqlalchemy as sa
-    from sqlalchemy.engine import make_url
+    """Seventeenth code review pass finding: an un-encoded reserved character in the db name
+    (e.g. "?") is parsed by sqlalchemy's make_url() as the start of a query string, not part of
+    the path -- letting ANYTOOLAI_POSTGRES_DB inject arbitrary extra psycopg connect_args (not
+    just truncate the name, as the sixteenth round's "#" case did). The fix spans both files:
+    RuntimeIdentity.database_url (runner.py) percent-encodes the db-name path segment -- the one
+    DSN component make_url() does not auto-decode, unlike userinfo -- and atoms_proof.py's real
+    _build_engine() decodes it back after make_url() before handing it to psycopg. Exercise both
+    halves together through the real consumer (not string parsing): sixteenth round's "#" case
+    plus every other previously-fixed reserved credential character, and this round's "?" case,
+    asserting no extra connect_args got injected."""
+    atoms_proof_module_path = (
+        Path(__file__).resolve().parents[1] / "scripts" / "agent" / "atoms_proof.py"
+    )
+    atoms_proof = load_cached_module("atoms_proof_module_for_runner_tests", atoms_proof_module_path)
 
     runner = load_runner_module()
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
     monkeypatch.setenv("ANYTOOLAI_POSTGRES_USER", "devuser")
     monkeypatch.setenv("ANYTOOLAI_POSTGRES_PASSWORD", "devpassword")
-    monkeypatch.setenv("ANYTOOLAI_POSTGRES_DB", "mydb#frag")
 
-    url = make_url(identity.database_url).set(drivername="postgresql+psycopg")
-    engine = sa.create_engine(url, future=True)
-    connect_args = engine.dialect.create_connect_args(url)[1]
+    reserved_db_names = [
+        "mydb#frag",
+        "my db",
+        "my@db",
+        "my:db",
+        "my/db",
+        "my%db",
+        "mydb?sslmode=disable",
+        "plaindb",
+    ]
+    for db_name in reserved_db_names:
+        monkeypatch.setenv("ANYTOOLAI_POSTGRES_DB", db_name)
 
-    assert connect_args["dbname"] == "mydb#frag"
+        engine = atoms_proof._build_engine(identity.database_url)
+        connect_args = engine.dialect.create_connect_args(engine.url)[1]
+
+        assert connect_args["dbname"] == db_name, db_name
+        assert connect_args["host"] == "127.0.0.1"
+        assert connect_args["port"] == 15555
+        assert connect_args["user"] == "devuser"
+        assert connect_args["password"] == "devpassword"
+        non_connection_keys = set(connect_args) - {
+            "host", "port", "user", "password", "dbname", "context",
+        }
+        assert not non_connection_keys, f"{db_name!r} injected extra connect_args: {non_connection_keys}"
 
 
 def test_prod_compose_command_uses_fixed_project_and_prod_files(monkeypatch, tmp_path) -> None:

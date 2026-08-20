@@ -450,21 +450,31 @@ class RuntimeIdentity(NamedTuple):
         # Masking it (tried once) broke that without eliminating the underlying exposure —
         # an operator who exported real prod credentials into this shell already has them
         # in their own environment/history regardless of what this prints.
-        # Percent-encode user/password (stdlib urllib, not a new sqlalchemy import into this
-        # otherwise dependency-light bootstrap script): an unescaped password containing a
-        # reserved URL character (@, :, /, %, #) parses into the wrong host/user, breaking
-        # atoms-proof against an otherwise-healthy stack. See storage/db.py's
-        # build_postgres_url_from_env for the same fix applied to the app's own internal DSN.
-        user = quote(os.environ.get("ANYTOOLAI_POSTGRES_USER", DEV_DEFAULT_POSTGRES_USER), safe="")
-        password = quote(
-            os.environ.get("ANYTOOLAI_POSTGRES_PASSWORD", DEV_DEFAULT_POSTGRES_PASSWORD), safe=""
-        )
-        # The db name is NOT percent-encoded, unlike user/password above: sqlalchemy's
-        # make_url() percent-decodes userinfo but leaves the path segment (URL.database) as
-        # the literal string it finds after the last "/", so quoting it here would just hand
-        # psycopg the wrong (still-encoded) db name -- sixteenth code review pass finding.
+        # Built via sqlalchemy.engine.URL.create() (sqlalchemy is already a root runtime
+        # dependency, and atoms_proof.py -- invoked by this script in the same venv -- already
+        # imports it, so this isn't a new dependency for the bootstrap path). URL.create()
+        # percent-encodes user/password automatically because make_url() percent-decodes
+        # userinfo on parse. It does NOT do the same for the database path segment, because
+        # make_url() does not decode that segment back on parse -- so an un-encoded reserved
+        # character there (#, ?, ...) is misread as a URL delimiter by any later make_url()
+        # call, letting ANYTOOLAI_POSTGRES_DB inject query-string connect_args (seventeenth
+        # code review pass finding, "?"; sixteenth found "#" the same way). Percent-encode the
+        # database segment ourselves to close that gap; atoms_proof.py's _build_engine(), the
+        # sole real consumer, decodes it back after make_url() for the matching reason.
+        from sqlalchemy.engine import URL
+
+        user = os.environ.get("ANYTOOLAI_POSTGRES_USER", DEV_DEFAULT_POSTGRES_USER)
+        password = os.environ.get("ANYTOOLAI_POSTGRES_PASSWORD", DEV_DEFAULT_POSTGRES_PASSWORD)
         db = resolve_postgres_db()
-        return f"postgresql://{user}:{password}@127.0.0.1:{self.postgres_port}/{db}"
+        url = URL.create(
+            drivername="postgresql",
+            username=user,
+            password=password,
+            host="127.0.0.1",
+            port=self.postgres_port,
+            database=quote(db, safe=""),
+        )
+        return url.render_as_string(hide_password=False)
 
 
 def normalized_repo_path(path: Path = ROOT) -> str:

@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import urllib.parse
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -119,8 +120,15 @@ def _build_engine(database_url: str) -> "sa.engine.Engine":
     repo only installs psycopg v3 (no psycopg2), so SQLAlchemy's bare-scheme default dialect
     would fail at engine-creation time. Coerce the driver explicitly, matching every other
     engine/URL construction site in the codebase (storage/db.py's build_postgres_url_from_env,
-    CI's ANYTOOLAI_POSTGRES_TEST_DATABASE_URL)."""
+    CI's ANYTOOLAI_POSTGRES_TEST_DATABASE_URL).
+
+    RuntimeIdentity.database_url percent-encodes the database-name path segment (the one DSN
+    component make_url() does not auto-decode -- it decodes userinfo but leaves the path
+    segment exactly as found). Decode it back here, the matching half of that encoding, before
+    handing the name to psycopg -- otherwise a reserved character there (e.g. "?") would still
+    be misread as a URL delimiter by make_url() above."""
     url = make_url(database_url)
+    url = url.set(database=urllib.parse.unquote(url.database))
     if url.drivername == "postgresql":
         url = url.set(drivername="postgresql+psycopg")
     return sa.create_engine(url, future=True)
