@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import importlib.util
 import json
 from pathlib import Path
+
+from tests.module_loading import load_cached_module
 
 
 def load_module():
     path = Path(__file__).resolve().parents[1] / "scripts" / "agent" / "collect_context.py"
-    spec = importlib.util.spec_from_file_location("collect_context_module", path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return load_cached_module("collect_context_module", path)
 
 
 def test_sanitize_text_removes_assignments_bearer_tokens_and_emails() -> None:
@@ -89,3 +86,32 @@ def test_write_bundle_uses_repository_local_output(monkeypatch, tmp_path) -> Non
 
     assert target.parent == tmp_path
     assert json.loads(target.read_text(encoding="utf-8")) == {"safe": True}
+
+
+def test_write_bundle_captures_timestamp_before_calling_collect(monkeypatch, tmp_path) -> None:
+    """The filename's timestamp must reflect when write_bundle() was called, not when collect()
+    (which can take ~20s via docker compose logs/ps) finished -- regression coverage for the
+    ordering fix in docs/exec-plans/active/any-220-atom-runtime-proof-cli.md's decision log
+    (third code review pass): a prior refactor had silently moved the timestamp to after
+    collect()."""
+    module = load_module()
+    call_order: list[str] = []
+
+    class _FakeDatetime:
+        @staticmethod
+        def now(tz=None):
+            call_order.append("now")
+            import datetime as real_datetime
+
+            return real_datetime.datetime(2026, 1, 1, tzinfo=tz)
+
+    def _fake_collect(**kwargs):
+        call_order.append("collect")
+        return {"safe": True}
+
+    monkeypatch.setattr(module, "datetime", _FakeDatetime)
+    monkeypatch.setattr(module, "collect", _fake_collect)
+
+    module.write_bundle(output_root=tmp_path)
+
+    assert call_order == ["now", "collect"]

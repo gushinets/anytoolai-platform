@@ -141,6 +141,9 @@ COMPOSITE_MATRIX: tuple[CompositeCase, ...] = (
                 "kernel_demo.generate_report_v1",
             ),
         ),
+        # No ("detect_issues", "extract", ...) entry: intentional, not an omission -- see
+        # docs/architecture/action-model.md's "kernel_demo composite workflow mapping notes".
+        # extract's output still composes downstream, via generate_report below.
         expected_step_dependencies=(
             ("generate_questions", "detect_issues", "issues"),
             ("generate_report", "extract", None),

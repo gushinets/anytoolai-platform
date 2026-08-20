@@ -14,42 +14,28 @@ atoms_proof.py drives every case over live HTTP (reusing kernel_demo_smoke.py's
 guest/start/poll/schema_ref logic verbatim) and then, on HTTP success, opens a short-lived
 read-only DB connection to confirm the action_run/provider_call/artifact/event ledger this run
 actually left behind -- the "ledger/event mismatch" failure category the ticket requires, which
-neither existing mechanism proves for a live run. See plans/ANY-220.md's Design section for the
-full rationale (job_id resolution via jobs_table, the postgresql+psycopg driver requirement,
-and why "last step's artifact" is not the same row as result_artifact_id).
+neither existing mechanism proves for a live run. See _build_engine()'s and _classify_ledger()'s
+own docstrings/comments below for the job_id resolution, postgresql+psycopg driver, and
+result_artifact_id rationale.
 
-Invoked by scripts/agent/runner.py's atoms-proof command, parameterized by api_url and
-database_url (same subprocess pattern as dev-smoke/prod-smoke).
+Invoked by scripts/agent/runner.py's atoms-proof command, parameterized by api_url (positional
+argv, not a secret) and --database-url-env (the *name* of an environment variable holding the
+database URL, not the URL itself) -- the URL can embed credentials
+(ANYTOOLAI_POSTGRES_PASSWORD), so it's kept off argv/process listings.
 """
 
 from __future__ import annotations
 
 import argparse
-import importlib.util
-import json
 import os
 import sys
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from types import ModuleType
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_DIR = Path(__file__).resolve().parent
 PLATFORM_API_TESTS_ROOT = REPO_ROOT / "apps" / "platform-api" / "tests"
-
-
-def _load_module_from_path(name: str, path: Path) -> ModuleType:
-    """Same load-by-path technique tests/test_kernel_demo_smoke.py's load_smoke_module() uses:
-    registers the module in sys.modules before exec_module() so a `from __future__ import
-    annotations` dataclass in the loaded file can resolve its string annotations."""
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
 
 
 # Loaded once at import time, guarded like kernel_demo_smoke.py's own _ATOM_MATRIX_LOAD_ERROR:
@@ -59,6 +45,10 @@ _MODULE_LOAD_ERROR: str | None = None
 try:
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
+    if str(SCRIPT_DIR) not in sys.path:
+        sys.path.insert(0, str(SCRIPT_DIR))
+    import collect_context
+    from tests.module_loading import load_cached_module
     from tests.test_kernel_demo_smoke import load_smoke_module
 
     smoke = load_smoke_module()
@@ -69,7 +59,11 @@ try:
     # for test collection.
     if str(PLATFORM_API_TESTS_ROOT) not in sys.path:
         sys.path.insert(0, str(PLATFORM_API_TESTS_ROOT))
-    _atom_runtime_matrix_module = _load_module_from_path(
+    # test_atom_runtime_matrix.py itself does `_SMOKE_MODULE = load_smoke_module()` at module
+    # level; load_smoke_module() is cached (see its docstring), so this resolves to the same
+    # module object already loaded as `smoke` above instead of a second, independently re-parsed
+    # module -- no monkeypatch/sys.modules juggling needed here.
+    _atom_runtime_matrix_module = load_cached_module(
         "atom_runtime_matrix_module", PLATFORM_API_TESTS_ROOT / "test_atom_runtime_matrix.py"
     )
     _EXPECTED_EVENT_TYPES: frozenset[str] = frozenset(
@@ -94,7 +88,6 @@ COMPOSITE_SMOKE_CASES = (
     getattr(smoke, "COMPOSITE_SMOKE_CASES", ()) if _MODULE_LOAD_ERROR is None else ()
 )
 
-DEGRADED_TIMEOUT_SECONDS = 5.0
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
 
@@ -170,8 +163,8 @@ def _classify_ledger(
     expected_event_types: frozenset[str],
 ) -> EvidenceCase:
     """Pure pass/fail classification over already-fetched rows -- no DB access. Split out from
-    _check_ledger so the PROOF00x branches are unit-testable with fake dict rows (no real
-    Postgres), per plans/ANY-220.md's test strategy."""
+    _check_ledger so the PROOF00x branches are unit-testable with fake dict rows, no real
+    Postgres needed."""
     if job_row is None:
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
@@ -232,7 +225,7 @@ def _classify_ledger(
             )
     # result_artifact_id is a separate artifact row (action_run_id=None), never a step's own
     # output_artifact_id -- workflows/runner.py's _create_final_artifact always creates a fresh
-    # row from the final workflow_output. See plans/ANY-220.md's Design section.
+    # row from the final workflow_output.
     if result_artifact_id not in artifact_ids:
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
@@ -339,13 +332,18 @@ def _check_ledger(
                 ).mappings()
             )
     except sa.exc.SQLAlchemyError as exc:
+        # Exception class name only, not str(exc) -- database_url (and therefore this
+        # connection's credentials) isn't guaranteed to be the fixed dev-only default; a driver
+        # error message is free-form text this script doesn't control, so it doesn't belong in a
+        # persisted "privacy-safe" evidence artifact. The class name is still enough to tell
+        # e.g. OperationalError (connection/auth) from ProgrammingError (bad query) at a glance.
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=None,
             error_code="PROOF000",
             error_message=(
                 f"PROOF000: database ledger check failed for scenario_session_id "
-                f"{scenario_session_id}: {exc}"
+                f"{scenario_session_id}: {type(exc).__name__}"
             ),
         )
 
@@ -387,71 +385,103 @@ def _run_case_with_ledger_check(
     )
 
 
-def run(api_url: str, database_url: str, timeout: float) -> tuple[list[EvidenceCase], int]:
-    engine = _build_engine(database_url)
-    cases: list[EvidenceCase] = []
-
-    atom_total = len(ATOM_SMOKE_CASES)
-    atom_passed = 0
-    # Same degraded-timeout convention as kernel_demo_smoke.run(): a completion timeout
-    # usually means platform-worker isn't consuming jobs at all, in which case every
-    # remaining case would also time out, but every case still runs (skipping would hide
-    # real per-atom regressions) -- only the *cost* of a stuck case is bounded.
-    case_timeout = timeout
-    for action_type, scenario_id, scenario_input in ATOM_SMOKE_CASES:
+def _run_case_group(
+    api_url: str,
+    engine: "sa.engine.Engine",
+    cases_spec: tuple[tuple[str, str, dict], ...],
+    *,
+    kind: str,
+    timeout: float,
+    case_timeout: float,
+) -> tuple[list[EvidenceCase], int, float]:
+    """Runs one group (atom or composite) of cases, threading the degraded case_timeout through
+    via smoke._next_case_timeout() -- the same shared chaining rule kernel_demo_smoke.py's own
+    _run_case_batch() uses, so a stuck platform-worker detected in the atom group doesn't make
+    the composite group wait a full timeout per case all over again."""
+    results: list[EvidenceCase] = []
+    for label, scenario_id, scenario_input in cases_spec:
         case = _run_case_with_ledger_check(
-            api_url, engine, kind="atom", label=action_type, scenario_id=scenario_id,
+            api_url, engine, kind=kind, label=label, scenario_id=scenario_id,
             scenario_input=scenario_input, timeout=case_timeout,
         )
-        cases.append(case)
+        results.append(case)
         if case.status == "pass":
-            atom_passed += 1
-            print(f"PASS {action_type}: {scenario_id} (session {case.session_id})")
-            case_timeout = timeout
+            print(f"PASS {label}: {scenario_id} (session {case.session_id})")
         else:
-            print(f"FAIL {action_type}: {scenario_id} -> {case.error_message}", file=sys.stderr)
-            case_timeout = (
-                min(case_timeout, DEGRADED_TIMEOUT_SECONDS)
-                if case.error_code == smoke._TIMEOUT_ERROR_CODE
-                else timeout
-            )
-    print(f"{atom_passed}/{atom_total} kernel_demo atoms passed")
-
-    composite_total = len(COMPOSITE_SMOKE_CASES)
-    composite_passed = 0
-    for workflow_id, scenario_id, scenario_input in COMPOSITE_SMOKE_CASES:
-        case = _run_case_with_ledger_check(
-            api_url, engine, kind="composite", label=workflow_id, scenario_id=scenario_id,
-            scenario_input=scenario_input, timeout=timeout,
+            print(f"FAIL {label}: {scenario_id} -> {case.error_message}", file=sys.stderr)
+        case_timeout = smoke._next_case_timeout(
+            case_timeout, timeout, timed_out=case.error_code == smoke._TIMEOUT_ERROR_CODE
         )
-        cases.append(case)
-        if case.status == "pass":
-            composite_passed += 1
-            print(f"PASS {workflow_id}: {scenario_id} (session {case.session_id})")
-        else:
-            print(f"FAIL {workflow_id}: {scenario_id} -> {case.error_message}", file=sys.stderr)
-    print(f"{composite_passed}/{composite_total} kernel_demo composite workflows passed")
-
-    engine.dispose()
-
-    coverage_error = smoke._atom_coverage_error(ATOM_SMOKE_CASES)
-    if coverage_error is not None:
-        print(coverage_error, file=sys.stderr)
-
-    exit_code = 0
-    if atom_passed != atom_total or composite_passed != composite_total:
-        exit_code = 1
-    if coverage_error is not None:
-        exit_code = 1
-    return cases, exit_code
+    passed = sum(1 for case in results if case.status == "pass")
+    return results, passed, case_timeout
 
 
-def write_evidence_report(cases: list[EvidenceCase], *, output_root: Path | None = None) -> Path:
+def run(api_url: str, database_url: str, timeout: float) -> tuple[list[EvidenceCase], int]:
+    """Runs ATOM_SMOKE_CASES then COMPOSITE_SMOKE_CASES against a live api_url/database_url.
+
+    Precondition owned by the caller, not enforced here: main() must call
+    smoke._coverage_gate_error() first -- same contract as kernel_demo_smoke.py's own run().
+    run() doesn't re-check coverage so tests can call it directly to exercise per-case behavior
+    in isolation from the coverage guard.
+    """
+    # Same vacuous-success guard as kernel_demo_smoke.py's run(): an empty ATOM_SMOKE_CASES/
+    # COMPOSITE_SMOKE_CASES (e.g. a caller-supplied monkeypatch, per this function's own
+    # "callable directly, bypassing main()'s coverage guard" contract above) must not read as
+    # "0/0 passed" success -- 0 == 0 would otherwise report exit 0.
+    atom_total = len(ATOM_SMOKE_CASES)
+    empty_error = smoke._empty_cases_error(
+        ATOM_SMOKE_CASES, error_code="PROOF008", tuple_name="ATOM_SMOKE_CASES", purpose="prove"
+    )
+    if empty_error is not None:
+        print(empty_error, file=sys.stderr)
+        return [], 1
+
+    engine = _build_engine(database_url)
+    cases: list[EvidenceCase] = []
+    try:
+        atom_cases, atom_passed, case_timeout = _run_case_group(
+            api_url, engine, ATOM_SMOKE_CASES, kind="atom", timeout=timeout, case_timeout=timeout,
+        )
+        cases.extend(atom_cases)
+        print(f"{atom_passed}/{atom_total} kernel_demo atoms passed")
+
+        composite_total = len(COMPOSITE_SMOKE_CASES)
+        empty_error = smoke._empty_cases_error(
+            COMPOSITE_SMOKE_CASES, error_code="PROOF009", tuple_name="COMPOSITE_SMOKE_CASES",
+            purpose="prove",
+        )
+        if empty_error is not None:
+            print(empty_error, file=sys.stderr)
+            return cases, 1
+
+        composite_cases, composite_passed, _case_timeout = _run_case_group(
+            api_url, engine, COMPOSITE_SMOKE_CASES, kind="composite", timeout=timeout,
+            case_timeout=case_timeout,
+        )
+        cases.extend(composite_cases)
+        print(f"{composite_passed}/{composite_total} kernel_demo composite workflows passed")
+
+        exit_code = 0 if atom_passed == atom_total and composite_passed == composite_total else 1
+        return cases, exit_code
+    finally:
+        engine.dispose()
+
+
+def write_evidence_report(
+    cases: list[EvidenceCase], exit_code: int, *, output_root: Path | None = None
+) -> Path:
+    # A caller passing exit_code=0 alongside a `cases` list that actually contains a failure
+    # would make the payload's own "all_passed": true contradict its own "cases" detail below --
+    # exactly the class of drift the fifth-pass fix (exit_code-derived all_passed) was meant to
+    # prevent. Only this direction is checked: exit_code=1 with all-passing `cases` is the
+    # legitimate PROOF008/PROOF009 empty-case-guard shape, not a caller bug.
+    # A bare `assert` here would be compiled out under `python -O`/PYTHONOPTIMIZE, silently
+    # disabling the invariant; `raise` isn't.
+    if exit_code == 0 and any(case.status == "fail" for case in cases):
+        raise ValueError(
+            "write_evidence_report called with exit_code=0 but `cases` contains a failing case"
+        )
     target_root = output_root or REPO_ROOT / ".agent" / "atoms-proof"
-    target_root.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
-    target = target_root / f"evidence-{timestamp}.json"
-    passed = [case for case in cases if case.status == "pass"]
     atom_cases = [case for case in cases if case.kind == "atom"]
     composite_cases = [case for case in cases if case.kind == "composite"]
     payload = {
@@ -460,11 +490,13 @@ def write_evidence_report(cases: list[EvidenceCase], *, output_root: Path | None
         "atoms_total": len(atom_cases),
         "composite_passed": sum(1 for case in composite_cases if case.status == "pass"),
         "composite_total": len(composite_cases),
-        "all_passed": len(passed) == len(cases),
+        # Derived from run()'s own exit_code, not re-derived from `cases` here -- an empty
+        # `cases` (PROOF008/PROOF009's empty-case guards) would otherwise read as vacuous
+        # 0-passed-of-0 "success" even though run() itself returned a non-zero exit_code.
+        "all_passed": exit_code == 0,
         "cases": [asdict(case) for case in cases],
     }
-    target.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return target
+    return collect_context.write_timestamped_json_bundle(target_root, "evidence", payload)
 
 
 def _default_timeout() -> float:
@@ -490,8 +522,13 @@ def main() -> int:
         "api_url", help="Base URL of a live platform-api, e.g. http://127.0.0.1:8000"
     )
     parser.add_argument(
-        "database_url", help="PostgreSQL URL for the same stack's database, e.g. "
-        "postgresql://user:pass@127.0.0.1:5432/anytoolai"
+        "--database-url-env",
+        required=True,
+        metavar="ENV_VAR",
+        help="Name of an environment variable holding the PostgreSQL URL for the same stack's "
+        "database, e.g. ANYTOOLAI_ATOMS_PROOF_DATABASE_URL -- the URL itself is read from the "
+        "environment, not passed here, since it can embed credentials that argv/process "
+        "listings would otherwise expose.",
     )
     parser.add_argument(
         "--timeout",
@@ -502,8 +539,27 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    cases, exit_code = run(args.api_url.rstrip("/"), args.database_url, args.timeout)
-    report_path = write_evidence_report(cases)
+    database_url = os.environ.get(args.database_url_env)
+    if not database_url:
+        print(
+            f"PROOF010: environment variable {args.database_url_env!r} (--database-url-env) "
+            "is not set or empty",
+            file=sys.stderr,
+        )
+        return 2
+
+    coverage_error = smoke._coverage_gate_error(ATOM_SMOKE_CASES, COMPOSITE_SMOKE_CASES)
+    if coverage_error is not None:
+        print(coverage_error, file=sys.stderr)
+        # Persisting an evidence report is this script's whole point (module docstring); a
+        # coverage-gate failure is one of the ticket's required non-zero-exit failure categories
+        # too, so it must leave the same kind of inspectable artifact behind as a live-case
+        # failure does, instead of silently exiting with nothing written.
+        cases, exit_code = [], 1
+    else:
+        cases, exit_code = run(args.api_url.rstrip("/"), database_url, args.timeout)
+
+    report_path = write_evidence_report(cases, exit_code)
     print(f"Evidence report: {report_path}")
     return exit_code
 

@@ -1,28 +1,23 @@
 from __future__ import annotations
 
-import importlib.util
 import sys
 import urllib.error
 from pathlib import Path
 
 import pytest
 
+from tests.module_loading import load_cached_module
+
 
 def load_smoke_module():
     module_path = (
         Path(__file__).resolve().parents[1] / "scripts" / "agent" / "kernel_demo_smoke.py"
     )
-    spec = importlib.util.spec_from_file_location("kernel_demo_smoke_module", module_path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    # kernel_demo_smoke.py defines a @dataclass under `from __future__ import annotations`,
-    # which needs to resolve its string annotations via sys.modules[cls.__module__] at class
-    # definition time -- without registering the module here first, that lookup returns None
-    # and dataclass field resolution raises AttributeError.
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    return load_cached_module("kernel_demo_smoke_module", module_path)
+
+
+def test_load_smoke_module_returns_the_same_cached_module_on_repeat_calls() -> None:
+    assert load_smoke_module() is load_smoke_module()
 
 
 def _sequenced_request(responses):
@@ -600,13 +595,70 @@ def test_composite_coverage_error_reports_partial_loss_not_just_empty() -> None:
     assert error is not None and "SMOKE010" in error
 
 
+def test_empty_cases_error_reports_nothing_for_a_nonempty_tuple() -> None:
+    smoke = load_smoke_module()
+
+    error = smoke._empty_cases_error(
+        (("atom.one", "scenario-one", {}),), error_code="SMOKE007",
+        tuple_name="ATOM_SMOKE_CASES", purpose="smoke-test",
+    )
+
+    assert error is None
+
+
+def test_empty_cases_error_reports_the_given_code_and_purpose_for_an_empty_tuple() -> None:
+    """Shared by this module's own run() (SMOKE007/SMOKE010) and atoms_proof.py's run()
+    (PROOF008/PROOF009) -- each keeps its own error_code/purpose wording through these kwargs."""
+    smoke = load_smoke_module()
+
+    error = smoke._empty_cases_error(
+        (), error_code="PROOF008", tuple_name="ATOM_SMOKE_CASES", purpose="prove"
+    )
+
+    assert error == "PROOF008: ATOM_SMOKE_CASES is empty -- nothing to prove"
+
+
+def assert_main_fails_on_coverage_mismatch(
+    module, *, monkeypatch, capsys, mismatched_attr, argv, expected_error_code
+) -> None:
+    """Shared by this module's own coverage-gate regression tests and atoms_proof.py's
+    (tests/test_atoms_proof.py imports this) -- both main()s share the exact
+    _coverage_gate_error() contract: reject a coverage mismatch before run() is ever called.
+    Drops the last case of `mismatched_attr` to produce the mismatch."""
+    module_mismatched_cases = getattr(module, mismatched_attr)[:-1]
+    monkeypatch.setattr(module, mismatched_attr, module_mismatched_cases)
+    monkeypatch.setattr(
+        module,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("run() must not be called")),
+    )
+    monkeypatch.setattr(sys, "argv", argv)
+
+    assert module.main() == 1
+    assert expected_error_code in capsys.readouterr().err
+
+
 def test_main_fails_on_composite_coverage_mismatch(monkeypatch, capsys) -> None:
     smoke = load_smoke_module()
-    monkeypatch.setattr(smoke, "COMPOSITE_SMOKE_CASES", smoke.COMPOSITE_SMOKE_CASES[:-1])
-    monkeypatch.setattr(sys, "argv", ["kernel_demo_smoke.py", "http://127.0.0.1:8000"])
+    assert_main_fails_on_coverage_mismatch(
+        smoke, monkeypatch=monkeypatch, capsys=capsys,
+        mismatched_attr="COMPOSITE_SMOKE_CASES",
+        argv=["kernel_demo_smoke.py", "http://127.0.0.1:8000"],
+        expected_error_code="SMOKE010",
+    )
 
-    assert smoke.main() == 1
-    assert "SMOKE010" in capsys.readouterr().err
+
+def test_main_fails_on_atom_coverage_mismatch_before_running_any_case(monkeypatch, capsys) -> None:
+    """Sixth code review pass finding: _coverage_gate_error() (which this diff extracted and
+    both this module's and atoms_proof.py's main() now call) had a regression test for its
+    composite half here but not its atom half."""
+    smoke = load_smoke_module()
+    assert_main_fails_on_coverage_mismatch(
+        smoke, monkeypatch=monkeypatch, capsys=capsys,
+        mismatched_attr="ATOM_SMOKE_CASES",
+        argv=["kernel_demo_smoke.py", "http://127.0.0.1:8000"],
+        expected_error_code="SMOKE007",
+    )
 
 
 def test_run_fails_instead_of_vacuous_success_on_empty_case_list(monkeypatch, capsys) -> None:
