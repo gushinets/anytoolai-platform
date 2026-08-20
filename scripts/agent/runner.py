@@ -459,7 +459,11 @@ class RuntimeIdentity(NamedTuple):
         password = quote(
             os.environ.get("ANYTOOLAI_POSTGRES_PASSWORD", DEV_DEFAULT_POSTGRES_PASSWORD), safe=""
         )
-        db = quote(resolve_postgres_db(), safe="")
+        # The db name is NOT percent-encoded, unlike user/password above: sqlalchemy's
+        # make_url() percent-decodes userinfo but leaves the path segment (URL.database) as
+        # the literal string it finds after the last "/", so quoting it here would just hand
+        # psycopg the wrong (still-encoded) db name -- sixteenth code review pass finding.
+        db = resolve_postgres_db()
         return f"postgresql://{user}:{password}@127.0.0.1:{self.postgres_port}/{db}"
 
 

@@ -499,22 +499,30 @@ def test_database_url_percent_encodes_reserved_characters_in_credentials(monkeyp
     assert parsed.path == "/devdb"
 
 
-def test_database_url_percent_encodes_reserved_characters_in_db_name(monkeypatch) -> None:
-    """Fifteenth code review pass finding: ANYTOOLAI_POSTGRES_DB was interpolated unescaped, so
-    a value like "mydb#frag" got silently truncated to "mydb" by urlsplit() treating "#frag" as
-    a URL fragment -- the same reserved-character DSN bug the user/password fix above already
-    closed, just left open for the db name."""
+def test_database_url_survives_the_real_sqlalchemy_consumer_path_for_reserved_db_name_chars(
+    monkeypatch,
+) -> None:
+    """Sixteenth code review pass finding: the fifteenth round's fix percent-encoded the db name
+    the same way as user/password, but sqlalchemy's make_url() only percent-decodes userinfo --
+    it leaves the path segment (URL.database) as the literal string found after the last "/".
+    Percent-encoding it therefore breaks the real consumer (_build_engine() -> make_url() ->
+    dialect create_connect_args(), the only place this DSN is actually parsed), which a
+    string-level urlsplit()/unquote() check (the fifteenth round's test) can't catch. Exercise
+    the real consumer path instead."""
+    import sqlalchemy as sa
+    from sqlalchemy.engine import make_url
+
     runner = load_runner_module()
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
     monkeypatch.setenv("ANYTOOLAI_POSTGRES_USER", "devuser")
     monkeypatch.setenv("ANYTOOLAI_POSTGRES_PASSWORD", "devpassword")
     monkeypatch.setenv("ANYTOOLAI_POSTGRES_DB", "mydb#frag")
 
-    url = identity.database_url
+    url = make_url(identity.database_url).set(drivername="postgresql+psycopg")
+    engine = sa.create_engine(url, future=True)
+    connect_args = engine.dialect.create_connect_args(url)[1]
 
-    parsed = urllib.parse.urlsplit(url)
-    assert parsed.fragment == ""
-    assert urllib.parse.unquote(parsed.path) == "/mydb#frag"
+    assert connect_args["dbname"] == "mydb#frag"
 
 
 def test_prod_compose_command_uses_fixed_project_and_prod_files(monkeypatch, tmp_path) -> None:

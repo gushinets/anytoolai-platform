@@ -380,6 +380,56 @@ def test_classify_ledger_reports_proof015_when_provider_event_is_orphaned() -> N
     assert case.error_code == "PROOF015"
 
 
+def test_classify_ledger_reports_proof014_when_orphan_action_event_has_null_run_id() -> None:
+    """Sixteenth code review pass finding: action_run_id is a nullable event_log column, so an
+    orphan action.started row can have action_run_id=None alongside another orphan row with a
+    string id -- sorted({None, "run-bogus"}) raises TypeError, so this must still fail cleanly
+    with PROOF014 instead of a raw traceback."""
+    module = load_atoms_proof_module()
+
+    events = _all_expected_events() + [
+        {"event_type": "action.started", "action_run_id": None},
+        {"event_type": "action.started", "action_run_id": "run-bogus"},
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF014"
+
+
+def test_classify_ledger_reports_proof015_when_orphan_provider_event_has_null_call_id() -> None:
+    """Sixteenth code review pass finding: same null-id sort hazard as PROOF014, mirrored for
+    provider_call_id."""
+    module = load_atoms_proof_module()
+
+    events = _all_expected_events() + [
+        {"event_type": "provider.request_started", "provider_call_id": None},
+        {"event_type": "provider.request_started", "provider_call_id": "call-bogus"},
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF015"
+
+
 def test_classify_ledger_passes_for_multi_step_composite_workflow() -> None:
     module = load_atoms_proof_module()
 
