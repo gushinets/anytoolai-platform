@@ -167,7 +167,10 @@ def test_classify_ledger_reports_proof003_when_provider_call_is_duplicated() -> 
         scenario_session_id="session-1",
         job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
         action_runs=[_one_step_row()],
-        provider_calls=[{"action_run_id": "run-1"}, {"action_run_id": "run-1"}],
+        provider_calls=[
+            _one_provider_call(id="call-1", action_run_id="run-1"),
+            _one_provider_call(id="call-2", action_run_id="run-1"),
+        ],
         artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
         events=_all_expected_events(),
         expected_event_types=EXPECTED_EVENT_TYPES,
@@ -185,7 +188,7 @@ def test_classify_ledger_reports_proof004_when_step_artifact_missing() -> None:
         scenario_session_id="session-1",
         job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
         action_runs=[_one_step_row()],
-        provider_calls=[{"action_run_id": "run-1"}],
+        provider_calls=[_one_provider_call()],
         artifacts=[{"id": "artifact-result"}],
         events=_all_expected_events(),
         expected_event_types=EXPECTED_EVENT_TYPES,
@@ -205,7 +208,7 @@ def test_classify_ledger_reports_proof004_when_result_artifact_missing() -> None
         scenario_session_id="session-1",
         job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
         action_runs=[_one_step_row()],
-        provider_calls=[{"action_run_id": "run-1"}],
+        provider_calls=[_one_provider_call()],
         artifacts=[{"id": "artifact-step-1"}],
         events=_all_expected_events(),
         expected_event_types=EXPECTED_EVENT_TYPES,
@@ -341,7 +344,8 @@ def test_classify_ledger_reports_proof014_when_action_event_is_orphaned() -> Non
     # run-1 gets its normal, correctly-counted started/succeeded pair (so the per-run PROOF006
     # loop passes) plus one extra action.started row misattributed to a run_id that doesn't
     # belong to this session's action_runs -- must not be silently invisible.
-    events = _all_expected_events() + [
+    events = [
+        *_all_expected_events(),
         {"event_type": "action.started", "action_run_id": "run-bogus"},
     ]
     case = module._classify_ledger(
@@ -362,7 +366,8 @@ def test_classify_ledger_reports_proof014_when_action_event_is_orphaned() -> Non
 def test_classify_ledger_reports_proof015_when_provider_event_is_orphaned() -> None:
     module = load_atoms_proof_module()
 
-    events = _all_expected_events() + [
+    events = [
+        *_all_expected_events(),
         {"event_type": "provider.request_started", "provider_call_id": "call-bogus"},
     ]
     case = module._classify_ledger(
@@ -387,7 +392,8 @@ def test_classify_ledger_reports_proof014_when_orphan_action_event_has_null_run_
     with PROOF014 instead of a raw traceback."""
     module = load_atoms_proof_module()
 
-    events = _all_expected_events() + [
+    events = [
+        *_all_expected_events(),
         {"event_type": "action.started", "action_run_id": None},
         {"event_type": "action.started", "action_run_id": "run-bogus"},
     ]
@@ -411,7 +417,8 @@ def test_classify_ledger_reports_proof015_when_orphan_provider_event_has_null_ca
     provider_call_id."""
     module = load_atoms_proof_module()
 
-    events = _all_expected_events() + [
+    events = [
+        *_all_expected_events(),
         {"event_type": "provider.request_started", "provider_call_id": None},
         {"event_type": "provider.request_started", "provider_call_id": "call-bogus"},
     ]
@@ -786,6 +793,51 @@ def test_main_fails_when_database_url_env_is_unset(monkeypatch, capsys) -> None:
 
     assert module.main() == 2
     assert "PROOF010" in capsys.readouterr().err
+
+
+def _run_main_capturing_decode_database_name(module, monkeypatch, argv) -> bool:
+    captured = {}
+
+    def fake_run(*args, **kwargs):
+        captured["decode_database_name"] = kwargs["decode_database_name"]
+        return [], 0
+
+    monkeypatch.setattr(module, "run", fake_run)
+    monkeypatch.setattr(
+        module,
+        "write_evidence_report",
+        lambda cases, exit_code, **kwargs: Path("evidence-fake.json"),
+    )
+    monkeypatch.setattr(sys, "argv", argv)
+
+    assert module.main() == 0
+    return captured["decode_database_name"]
+
+
+def test_main_forwards_database_url_is_percent_encoded_flag_when_set(monkeypatch, capsys) -> None:
+    """Nineteenth code review pass finding (inline comments): --database-url-is-percent-encoded
+    had no regression coverage proving it actually reaches run()'s decode_database_name -- only
+    _build_engine() (further downstream) was tested directly."""
+    module = load_atoms_proof_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
+
+    decode_database_name = _run_main_capturing_decode_database_name(
+        module, monkeypatch, [*_TEST_MAIN_ARGV, "--database-url-is-percent-encoded"]
+    )
+
+    assert decode_database_name is True
+
+
+def test_main_forwards_database_url_is_percent_encoded_flag_when_unset(monkeypatch, capsys) -> None:
+    """Mirror of the above for the flag's unset (default) case."""
+    module = load_atoms_proof_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
+
+    decode_database_name = _run_main_capturing_decode_database_name(
+        module, monkeypatch, _TEST_MAIN_ARGV
+    )
+
+    assert decode_database_name is False
 
 
 def test_main_writes_evidence_report_on_coverage_gate_failure(monkeypatch, capsys) -> None:

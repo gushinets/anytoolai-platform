@@ -134,7 +134,7 @@ def _build_engine(database_url: str, *, decode_database_name: bool = False) -> "
     RuntimeIdentity.database_url in scripts/agent/runner.py); leave False for a hand-written or
     otherwise arbitrary DSN, whose database name is used exactly as given."""
     url = make_url(database_url)
-    if decode_database_name:
+    if decode_database_name and url.database is not None:
         url = url.set(database=urllib.parse.unquote(url.database))
     if url.drivername == "postgresql":
         url = url.set(drivername="postgresql+psycopg")
