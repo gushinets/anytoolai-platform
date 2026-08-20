@@ -6,7 +6,7 @@
 - Owner: agent
 - Created: 2026-08-18
 - Last updated: 2026-08-20
-- Review date: 2026-08-20 (thirteenth code review pass)
+- Review date: 2026-08-20 (fourteenth round: user-supplied inline review comments)
 - Next action: push `feature/ANY-220` so PR #82 picks up the fixed commit; merge once green.
 - Blocker: none.
 
@@ -14,9 +14,13 @@
 
 One reproducible command, `python scripts/agent/runner.py atoms-proof`, that drives all 11
 standalone atoms and all 3 composite kernel_demo workflows over live HTTP against a running
-dev/prod compose stack, verifies the DB ledger/event correlation each run actually left behind,
+dev compose stack, verifies the DB ledger/event correlation each run actually left behind,
 prints per-case PASS/FAIL evidence plus an 11/11 + 3/3 summary, and persists a privacy-safe JSON
-evidence report to `.agent/atoms-proof/`.
+evidence report to `.agent/atoms-proof/`. Dev-only: unlike `dev-smoke`/`prod-smoke`, there is no
+`prod-atoms-proof` counterpart -- `runner.py`'s `atoms_proof()` only calls `runtime_identity()`
+(the per-worktree dev stack resolver), and `prod_smoke()`'s pattern (an `api_url`-only reach into
+the prod compose stack) doesn't extend cleanly here since this command also needs a database URL,
+which the prod path has no established resolution mechanism for.
 
 Full design rationale is captured in this file's Decision log below.
 
@@ -57,11 +61,13 @@ Full design rationale is captured in this file's Decision log below.
       function + `_check_ledger` DB wrapper), evidence report writer, CLI entrypoint.
 - [x] Wire `atoms-proof` into `scripts/agent/runner.py` (function + `COMMANDS` registration).
 - [x] `tests/test_atoms_proof.py` (15 cases, no DB/network) + register in `quick_check.py`.
-- [x] `validate-configs` / `validate-architecture` / `quick-check` all pass (760 tests).
+- [x] `validate-configs` / `validate-architecture` / `quick-check` all pass (801 tests as of the
+      fourteenth code review pass; 760 at initial implementation, see Progress log for the
+      count at each intermediate pass).
 - [x] Live proof: `dev-up` -> `atoms-proof` (11/11 + 3/3, exit 0, evidence JSON written and
       inspected) -> `dev-down`. Ran twice to confirm determinism.
 - [x] `full-check` (baseline + frontend typecheck/test/build/generate-api-types + freelancer-suite).
-- [ ] PR opened.
+- [x] PR opened (`#82`).
 
 ## Validation
 
@@ -122,12 +128,16 @@ Full design rationale is captured in this file's Decision log below.
 | 2026-08-20 | User feedback (not a code-review pass): removed all "`/code-review`" phrasing (a local skill name unknown outside this environment) in favor of plain "code review", and removed all references to the gitignored `plans/ANY-220.md` from tracked files/comments, replacing them with either an inline summary or a pointer to this doc's own Decision log where the same content already lives. Touched this doc, `scripts/agent/atoms_proof.py`, and 3 test files. Re-ran `validate-configs`/`validate-architecture`/`validate-docs`, `quick-check` (798 passed, unchanged -- pure docs/comments), and a live `dev-up`/`atoms-proof`/`dev-down` cycle, all green. | Push the fixed commit and merge PR #82. |
 | 2026-08-20 | Twelfth code review pass found no correctness bugs and 4 cleanup findings: the empty-case guards were the last un-unified duplication class (unlike `_next_case_timeout()`/`_coverage_gate_error()`/`write_timestamped_json_bundle()`), a duplicated timestamp format string, a missing defensive check for `write_evidence_report()`'s `exit_code`/`cases` consistency, and `lru_cache(maxsize=None)` where `@functools.cache` is more direct. Fixed all 4 (`_empty_cases_error()`, `TIMESTAMP_FORMAT`, an assert, `@functools.cache`). Re-ran `validate-configs`/`validate-architecture`/`validate-docs`, `quick-check` (801 passed, +3 new tests), and a live `dev-up`/`atoms-proof`/`dev-smoke`/`collect-context`/`dev-down` cycle, all green. | Push the fixed commit and merge PR #82. |
 | 2026-08-20 | Thirteenth code review pass (tail of a 12-pass chain, 7 of 8 finder angles empty) found 2 findings: the twelfth pass's new `assert` in `write_evidence_report()` is compiled out under `-O`/`PYTHONOPTIMIZE`, and `main()` still duplicated the "write report, print path" pattern across its two branches. Fixed both (`raise ValueError` instead of `assert`; both branches now converge on one `write_evidence_report()` call). Two candidates declined as already-settled in earlier decision-log rows (further test-helper parameterization; unifying `_run_case_group`/`_run_case_batch`). Re-ran `validate-configs`/`validate-architecture`/`validate-docs`, `quick-check` (801 passed, unchanged -- pure refactor), and a live `dev-up`/`atoms-proof`/`dev-down` cycle, all green. | Push the fixed commit and merge PR #82. |
+| 2026-08-20 | Fourteenth round: user-supplied inline review comments (explicitly flagged as untrusted data to verify, not follow blindly). Verified each against current code/schema; 4 of 6 confirmed and fixed (stale `plans/ANY-219.md`/`/code-review` bullet removed from the ANY-219 exec-plan doc; this doc's Implementation-steps test count and "PR opened" checkbox brought current, plus the "dev/prod" Goal-section overclaim narrowed to "dev" since there's no `prod-atoms-proof`; `database_url` moved from `atoms_proof.py`'s argv to an env-var reference so a real `ANYTOOLAI_POSTGRES_PASSWORD` override can't leak via `ps`), 2 declined after verification (provider-event counting -- redundant with `PROOF003`'s direct table check and absent from the ticket's own named DB-check reference patterns; allowlisting `EvidenceCase.error_message` -- the claimed leak doesn't exist, `ScenarioSessionResponse` is `extra="forbid"`-locked to ids/enums even on failure). Re-ran `validate-configs`/`validate-architecture`/`validate-docs`, `quick-check` (804 passed, +3 new tests), and a live `dev-up`/`atoms-proof`/`dev-down` cycle -- confirmed the printed subprocess command line no longer contains the database URL. | Push the fixed commit and merge PR #82. |
 | 2026-08-20 | Extracted `kernel_demo_smoke._empty_cases_error()`; both scripts' `run()`s call it instead of two structurally identical empty-tuple guards | Twelfth code review pass found the vacuous-success guards (SMOKE007/SMOKE010 vs PROOF008/PROOF009) were the one thing this PR's dedup pass hadn't yet unified, unlike `_next_case_timeout()`/`_coverage_gate_error()`/`write_timestamped_json_bundle()`. |
 | 2026-08-20 | Extracted `collect_context.TIMESTAMP_FORMAT`; both `write_timestamped_json_bundle()`'s default and `write_bundle()`'s own timestamp calculation reference it | Twelfth code review pass found the UTC timestamp format string `"%Y%m%dT%H%M%SZ"` was duplicated once in the same file. |
 | 2026-08-20 | `write_evidence_report()` asserts `exit_code == 0` never coincides with a failing case in `cases` | Twelfth code review pass found nothing caught a caller passing mismatched `exit_code`/`cases`, which would make the payload's own `all_passed: true` contradict its own per-case detail. |
 | 2026-08-20 | `tests/module_loading.py`'s `@functools.lru_cache(maxsize=None)` replaced with `@functools.cache` | Twelfth code review pass found the repo requires Python >=3.12, where `@functools.cache` is the more direct spelling of the same unbounded cache. |
 | 2026-08-20 | `write_evidence_report()`'s `exit_code`/`cases` consistency check changed from a bare `assert` to `if ...: raise ValueError(...)` | Thirteenth code review pass found a bare `assert` is compiled out entirely under `python -O`/`PYTHONOPTIMIZE`, silently disabling the invariant it exists to enforce. |
 | 2026-08-20 | `main()`'s coverage-gate-failure branch now sets `cases, exit_code = [], 1` instead of returning early; both it and the normal `run()` path converge on one `write_evidence_report()`/print/`return exit_code` | Thirteenth code review pass found the last remaining instance of a duplication class this PR fixed repeatedly elsewhere -- the same two-line "write report, print path" pattern was copy-pasted across both branches. |
+| 2026-08-20 | `atoms_proof.py`'s CLI takes `--database-url-env ENV_VAR` instead of a `database_url` positional; `runner.py`'s `atoms_proof()` sets that env var via `run_with_env()` instead of passing the URL on argv | Fourteenth-round inline review comment (verified, not assumed): `RuntimeIdentity.database_url` can embed a real `ANYTOOLAI_POSTGRES_PASSWORD` override, which an argv value would expose via `ps`/process listings; `dev_smoke()` (the pattern `atoms_proof()` was modeled on) never had this problem since it only passes a non-secret `api_url`. |
+| 2026-08-20 | Declined: counting `provider.request_started`/`provider.request_succeeded` events in `_classify_ledger()` | Fourteenth-round inline review comment raised it, but `PROOF003` already checks "exactly one `provider_calls` row per `action_run`" directly against the table (a stronger signal than event-log counting), and neither `tests/db_support.assert_scenario_runtime_correlation` nor `test_composite_workflow_matrix.py` -- both explicitly named as this ticket's DB-check reference pattern -- do this count either. |
+| 2026-08-20 | Declined: replacing `EvidenceCase.error_message`/`_check_ledger`'s `SQLAlchemyError` text with an allowlisted message | Fourteenth-round inline review comment raised it; verified `ScenarioSessionResponse` (`apps/platform-api/.../schemas.py`, `extra="forbid"`) exposes only ids/enum/label fields even on a "failed" session (no prompt/user-input/provider content), and the only DSN a `SQLAlchemyError` could embed here is the dev-only, already-printed-on-every-`dev-up` `postgresql://anytoolai:anytoolai@...` default -- the claimed leak doesn't exist against the actual schema/code. |
 
 ## Open questions
 

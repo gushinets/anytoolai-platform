@@ -393,14 +393,21 @@ def test_loading_does_not_reload_kernel_demo_smoke_a_second_time() -> None:
     assert module._atom_runtime_matrix_module._SMOKE_MODULE is module.smoke
 
 
+_TEST_DATABASE_URL_ENV = "TEST_ATOMS_PROOF_DATABASE_URL"
+_TEST_MAIN_ARGV = [
+    "atoms_proof.py", "http://127.0.0.1:8000", "--database-url-env", _TEST_DATABASE_URL_ENV,
+]
+
+
 def test_main_fails_on_composite_coverage_mismatch_before_running_any_case(
     monkeypatch, capsys
 ) -> None:
     module = load_atoms_proof_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
     assert_main_fails_on_coverage_mismatch(
         module, monkeypatch=monkeypatch, capsys=capsys,
         mismatched_attr="COMPOSITE_SMOKE_CASES",
-        argv=["atoms_proof.py", "http://127.0.0.1:8000", "postgresql://u:p@127.0.0.1:5432/db"],
+        argv=_TEST_MAIN_ARGV,
         expected_error_code="SMOKE010",
     )
 
@@ -410,12 +417,30 @@ def test_main_fails_on_atom_coverage_mismatch_before_running_any_case(monkeypatc
     regression coverage; the atom half (checked first, via the shared
     smoke._coverage_gate_error()) had none."""
     module = load_atoms_proof_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
     assert_main_fails_on_coverage_mismatch(
         module, monkeypatch=monkeypatch, capsys=capsys,
         mismatched_attr="ATOM_SMOKE_CASES",
-        argv=["atoms_proof.py", "http://127.0.0.1:8000", "postgresql://u:p@127.0.0.1:5432/db"],
+        argv=_TEST_MAIN_ARGV,
         expected_error_code="SMOKE007",
     )
+
+
+def test_main_fails_when_database_url_env_is_unset(monkeypatch, capsys) -> None:
+    """Fourteenth code review pass finding: database_url now flows through an env var named by
+    --database-url-env, not argv, so a caller that names an unset/empty env var must fail
+    clearly instead of e.g. crashing on a None database_url later."""
+    module = load_atoms_proof_module()
+    monkeypatch.delenv(_TEST_DATABASE_URL_ENV, raising=False)
+    monkeypatch.setattr(
+        module,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("run() must not be called")),
+    )
+    monkeypatch.setattr(sys, "argv", _TEST_MAIN_ARGV)
+
+    assert module.main() == 2
+    assert "PROOF010" in capsys.readouterr().err
 
 
 def test_main_writes_evidence_report_on_coverage_gate_failure(monkeypatch, capsys) -> None:
@@ -431,11 +456,8 @@ def test_main_writes_evidence_report_on_coverage_gate_failure(monkeypatch, capsy
         lambda cases, exit_code, **kwargs: calls.append((cases, exit_code))
         or Path("evidence-fake.json"),
     )
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["atoms_proof.py", "http://127.0.0.1:8000", "postgresql://u:p@127.0.0.1:5432/db"],
-    )
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
+    monkeypatch.setattr(sys, "argv", _TEST_MAIN_ARGV)
 
     assert module.main() == 1
 

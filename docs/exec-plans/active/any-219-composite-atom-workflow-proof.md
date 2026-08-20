@@ -51,10 +51,6 @@ dependency proofs) and live-smoke-tested via `dev-smoke`.
 - `docs/product-specs/mvp-a-platform-kernel.md`
 - `docs/architecture/action-model.md` (Wave 1 action types table + the "kernel_demo composite
   workflow mapping notes" section added by this ticket's review passes)
-- `plans/ANY-219.md` — gitignored local working file; the authoritative, complete record of every
-  code-review pass on this ticket (team-lead reviews #1-#3 plus 19 numbered `/code-review` passes
-  as of this update), each with verified/declined findings and the reasoning for each. This exec
-  plan intentionally does not duplicate that detail — see it for full history.
 
 ## Contracts touched
 

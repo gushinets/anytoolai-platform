@@ -633,8 +633,18 @@ def atoms_proof() -> int:
     except ValueError as exc:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
-    return run(
-        [sys.executable, "scripts/agent/atoms_proof.py", identity.api_url, identity.database_url]
+    # identity.database_url can embed a real ANYTOOLAI_POSTGRES_PASSWORD override; passed via
+    # env instead of argv so it doesn't show up in `ps`/process-listing output the way an argv
+    # value would. atoms_proof.py only ever sees this env var's *name* on its own command line.
+    database_url_env = "ANYTOOLAI_ATOMS_PROOF_DATABASE_URL"
+    env = runner_env()
+    env[database_url_env] = identity.database_url
+    return run_with_env(
+        [
+            sys.executable, "scripts/agent/atoms_proof.py", identity.api_url,
+            "--database-url-env", database_url_env,
+        ],
+        env,
     )
 
 

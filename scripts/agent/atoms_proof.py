@@ -18,8 +18,10 @@ neither existing mechanism proves for a live run. See _build_engine()'s and _cla
 own docstrings/comments below for the job_id resolution, postgresql+psycopg driver, and
 result_artifact_id rationale.
 
-Invoked by scripts/agent/runner.py's atoms-proof command, parameterized by api_url and
-database_url (same subprocess pattern as dev-smoke/prod-smoke).
+Invoked by scripts/agent/runner.py's atoms-proof command, parameterized by api_url (positional
+argv, not a secret) and --database-url-env (the *name* of an environment variable holding the
+database URL, not the URL itself) -- the URL can embed credentials
+(ANYTOOLAI_POSTGRES_PASSWORD), so it's kept off argv/process listings.
 """
 
 from __future__ import annotations
@@ -502,8 +504,13 @@ def main() -> int:
         "api_url", help="Base URL of a live platform-api, e.g. http://127.0.0.1:8000"
     )
     parser.add_argument(
-        "database_url", help="PostgreSQL URL for the same stack's database, e.g. "
-        "postgresql://user:pass@127.0.0.1:5432/anytoolai"
+        "--database-url-env",
+        required=True,
+        metavar="ENV_VAR",
+        help="Name of an environment variable holding the PostgreSQL URL for the same stack's "
+        "database, e.g. ANYTOOLAI_ATOMS_PROOF_DATABASE_URL -- the URL itself is read from the "
+        "environment, not passed here, since it can embed credentials that argv/process "
+        "listings would otherwise expose.",
     )
     parser.add_argument(
         "--timeout",
@@ -514,6 +521,15 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    database_url = os.environ.get(args.database_url_env)
+    if not database_url:
+        print(
+            f"PROOF010: environment variable {args.database_url_env!r} (--database-url-env) "
+            "is not set or empty",
+            file=sys.stderr,
+        )
+        return 2
+
     coverage_error = smoke._coverage_gate_error(ATOM_SMOKE_CASES, COMPOSITE_SMOKE_CASES)
     if coverage_error is not None:
         print(coverage_error, file=sys.stderr)
@@ -523,7 +539,7 @@ def main() -> int:
         # failure does, instead of silently exiting with nothing written.
         cases, exit_code = [], 1
     else:
-        cases, exit_code = run(args.api_url.rstrip("/"), args.database_url, args.timeout)
+        cases, exit_code = run(args.api_url.rstrip("/"), database_url, args.timeout)
 
     report_path = write_evidence_report(cases, exit_code)
     print(f"Evidence report: {report_path}")
