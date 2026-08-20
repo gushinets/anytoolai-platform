@@ -63,6 +63,9 @@ services:
       dockerfile: infra/docker/platform-worker.Dockerfile
     environment:
       <<: *postgres-credentials
+      # Only the worker calls ProviderGateway; unset by default so normal dev-up/quick-check stays
+      # credential-free -- only live-canary (ANY-221) needs a real key.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
