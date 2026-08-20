@@ -459,7 +459,8 @@ class RuntimeIdentity(NamedTuple):
         password = quote(
             os.environ.get("ANYTOOLAI_POSTGRES_PASSWORD", DEV_DEFAULT_POSTGRES_PASSWORD), safe=""
         )
-        return f"postgresql://{user}:{password}@127.0.0.1:{self.postgres_port}/{resolve_postgres_db()}"
+        db = quote(resolve_postgres_db(), safe="")
+        return f"postgresql://{user}:{password}@127.0.0.1:{self.postgres_port}/{db}"
 
 
 def normalized_repo_path(path: Path = ROOT) -> str:

@@ -499,6 +499,24 @@ def test_database_url_percent_encodes_reserved_characters_in_credentials(monkeyp
     assert parsed.path == "/devdb"
 
 
+def test_database_url_percent_encodes_reserved_characters_in_db_name(monkeypatch) -> None:
+    """Fifteenth code review pass finding: ANYTOOLAI_POSTGRES_DB was interpolated unescaped, so
+    a value like "mydb#frag" got silently truncated to "mydb" by urlsplit() treating "#frag" as
+    a URL fragment -- the same reserved-character DSN bug the user/password fix above already
+    closed, just left open for the db name."""
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_USER", "devuser")
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_PASSWORD", "devpassword")
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_DB", "mydb#frag")
+
+    url = identity.database_url
+
+    parsed = urllib.parse.urlsplit(url)
+    assert parsed.fragment == ""
+    assert urllib.parse.unquote(parsed.path) == "/mydb#frag"
+
+
 def test_prod_compose_command_uses_fixed_project_and_prod_files(monkeypatch, tmp_path) -> None:
     runner = load_runner_module()
     monkeypatch.setattr(runner, "PROD_ENV_FILE", tmp_path / "does-not-exist.env")

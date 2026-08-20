@@ -302,7 +302,26 @@ def _classify_ledger(
                     f"{action_run['step_id']}), found {started} and {succeeded}"
                 ),
             )
+    # The per-run loop above only walks known action_runs, so an orphan event_log row (same
+    # scenario_session_id, but an action_run_id not among this session's action_runs -- e.g.
+    # misattributed to another session's run) would never surface, mirroring the PROOF012 gap
+    # this same check class already closed for provider_calls.
+    orphan_action_event_ids = (
+        set(action_started_counts) | set(action_succeeded_counts)
+    ) - action_run_ids
+    if orphan_action_event_ids:
+        return _fail(
+            label=label, scenario_id=scenario_id, kind=kind,
+            session_id=scenario_session_id, job_id=job_id,
+            error_code="PROOF014",
+            error_message=(
+                f"PROOF014: event_log has action.started/action.succeeded rows for "
+                f"action_run_id(s) {sorted(orphan_action_event_ids)}, not among this "
+                f"session's action_runs"
+            ),
+        )
 
+    provider_call_ids = {call["id"] for call in provider_calls}
     provider_started_counts: dict[str, int] = {}
     provider_succeeded_counts: dict[str, int] = {}
     for event in events:
@@ -329,6 +348,21 @@ def _classify_ledger(
                     f"(action_run {call['action_run_id']}), found {started} and {succeeded}"
                 ),
             )
+    orphan_provider_event_ids = (
+        set(provider_started_counts) | set(provider_succeeded_counts)
+    ) - provider_call_ids
+    if orphan_provider_event_ids:
+        return _fail(
+            label=label, scenario_id=scenario_id, kind=kind,
+            session_id=scenario_session_id, job_id=job_id,
+            error_code="PROOF015",
+            error_message=(
+                f"PROOF015: event_log has provider.request_started/"
+                f"provider.request_succeeded rows for provider_call_id(s) "
+                f"{sorted(orphan_provider_event_ids)}, not among this session's "
+                f"provider_calls"
+            ),
+        )
 
     steps = tuple(
         StepEvidence(

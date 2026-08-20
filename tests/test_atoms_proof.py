@@ -335,6 +335,51 @@ def test_classify_ledger_reports_proof013_when_provider_event_count_is_wrong() -
     assert case.error_code == "PROOF013"
 
 
+def test_classify_ledger_reports_proof014_when_action_event_is_orphaned() -> None:
+    module = load_atoms_proof_module()
+
+    # run-1 gets its normal, correctly-counted started/succeeded pair (so the per-run PROOF006
+    # loop passes) plus one extra action.started row misattributed to a run_id that doesn't
+    # belong to this session's action_runs -- must not be silently invisible.
+    events = _all_expected_events() + [
+        {"event_type": "action.started", "action_run_id": "run-bogus"},
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF014"
+
+
+def test_classify_ledger_reports_proof015_when_provider_event_is_orphaned() -> None:
+    module = load_atoms_proof_module()
+
+    events = _all_expected_events() + [
+        {"event_type": "provider.request_started", "provider_call_id": "call-bogus"},
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF015"
+
+
 def test_classify_ledger_passes_for_multi_step_composite_workflow() -> None:
     module = load_atoms_proof_module()
 
