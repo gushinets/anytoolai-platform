@@ -54,6 +54,19 @@ def _one_step_row(**overrides) -> dict:
     return row
 
 
+def _one_provider_call(**overrides) -> dict:
+    row = {
+        "action_run_id": "run-1",
+        "latency_ms": 123,
+        "input_tokens": 10,
+        "output_tokens": 20,
+        "total_tokens": 30,
+        "estimated_cost": 0.001,
+    }
+    row.update(overrides)
+    return row
+
+
 def test_classify_ledger_passes_with_full_correlation() -> None:
     module = load_atoms_proof_module()
 
@@ -64,7 +77,7 @@ def test_classify_ledger_passes_with_full_correlation() -> None:
         scenario_session_id="session-1",
         job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
         action_runs=[_one_step_row()],
-        provider_calls=[{"action_run_id": "run-1"}],
+        provider_calls=[_one_provider_call()],
         artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
         events=_all_expected_events(action_run_count=1),
         expected_event_types=EXPECTED_EVENT_TYPES,
@@ -79,6 +92,11 @@ def test_classify_ledger_passes_with_full_correlation() -> None:
             step_id="extract",
             action_type="text.extract_structured_fields",
             action_config_id="kernel_demo.extract_structured_fields_v1",
+            latency_ms=123,
+            input_tokens=10,
+            output_tokens=20,
+            total_tokens=30,
+            estimated_cost=0.001,
         ),
     )
 
@@ -252,7 +270,11 @@ def test_classify_ledger_passes_for_multi_step_composite_workflow() -> None:
         scenario_session_id="session-1",
         job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
         action_runs=action_runs,
-        provider_calls=[{"action_run_id": "run-1"}, {"action_run_id": "run-2"}],
+        provider_calls=[
+            _one_provider_call(),
+            _one_provider_call(action_run_id="run-2", latency_ms=456, input_tokens=11,
+                                output_tokens=21, total_tokens=32, estimated_cost=0.002),
+        ],
         artifacts=[
             {"id": "artifact-step-1"},
             {"id": "artifact-step-2"},
@@ -264,6 +286,8 @@ def test_classify_ledger_passes_for_multi_step_composite_workflow() -> None:
 
     assert case.status == "pass"
     assert len(case.steps) == 2
+    assert case.steps[0].latency_ms == 123
+    assert case.steps[1].latency_ms == 456
 
 
 def test_run_case_with_ledger_check_reports_http_failure_without_touching_db(monkeypatch) -> None:

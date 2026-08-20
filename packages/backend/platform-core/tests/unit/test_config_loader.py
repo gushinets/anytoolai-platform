@@ -916,7 +916,12 @@ def test_loader_rejects_negative_workflow_step_retry_count(tmp_path: Path) -> No
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "products" / "kernel_demo" / "workflows.yaml"
     data = _load_yaml(path)
-    data["workflows"][-1]["steps"][0]["retry_count"] = -1
+    retry_workflow = next(
+        workflow
+        for workflow in data["workflows"]
+        if workflow["workflow_id"] == "kernel_demo.retry_extract_v1"
+    )
+    retry_workflow["steps"][0]["retry_count"] = -1
     _write_yaml(path, data)
 
     with pytest.raises(RegistryLoadError) as exc_info:

@@ -74,6 +74,17 @@ def test_runtime_config_returns_frontend_safe_metadata() -> None:
         "kernel_demo.composite_analyze_and_clarify_smoke_v1",
         "kernel_demo.composite_evaluate_match_smoke_v1",
         "kernel_demo.composite_shape_and_write_smoke_v1",
+        "kernel_demo.single_action_live_smoke_v1",
+        "kernel_demo.single_action_detect_issues_live_smoke_v1",
+        "kernel_demo.single_action_generate_report_live_smoke_v1",
+        "kernel_demo.single_action_compose_reply_live_smoke_v1",
+        "kernel_demo.single_action_generate_clarifying_questions_live_smoke_v1",
+        "kernel_demo.single_action_synthesize_angle_live_smoke_v1",
+        "kernel_demo.single_action_compose_persuasive_text_live_smoke_v1",
+        "kernel_demo.single_action_generate_gap_rewrites_live_smoke_v1",
+        "kernel_demo.single_action_compare_and_classify_live_smoke_v1",
+        "kernel_demo.single_action_score_match_by_rubric_live_smoke_v1",
+        "kernel_demo.single_action_score_multidimensional_axes_live_smoke_v1",
     ]
     assert data["quota_summary"] == {
         "quota_policy_id": "kernel_demo.guest_quota_v1",
