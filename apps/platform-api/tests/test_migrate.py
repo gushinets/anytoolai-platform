@@ -79,6 +79,30 @@ def test_resolve_database_url_falls_back_to_postgres_components(monkeypatch) -> 
     )
 
 
+def test_resolve_database_url_keeps_a_reserved_character_db_name_percent_encoded(
+    monkeypatch,
+) -> None:
+    """Eighteenth code review pass finding: build_postgres_url_from_env() now percent-encodes
+    the database segment, and migrate.py has no hook to decode it back the way
+    create_sync_engine() does (Alembic builds its own engine internally from this string). The
+    DSN must therefore stay percent-encoded end-to-end here -- a reserved character in
+    POSTGRES_DB_ENV no longer gets misread by make_url() as a query-string delimiter (the
+    silent connect_args-injection bug this round closed for storage/db.py), even though it also
+    doesn't resolve to the real database name through this particular path. Verified through
+    the real sqlalchemy.engine.make_url() consumer, not string parsing."""
+    monkeypatch.delenv(migrate.PROJECT_DATABASE_URL_ENV, raising=False)
+    monkeypatch.delenv(migrate.GENERIC_DATABASE_URL_ENV, raising=False)
+    monkeypatch.setenv(migrate.POSTGRES_USER_ENV, "produser")
+    monkeypatch.setenv(migrate.POSTGRES_PASSWORD_ENV, "prodpassword")
+    monkeypatch.setenv(migrate.POSTGRES_DB_ENV, "mydb?sslmode=disable")
+
+    resolved = migrate._resolve_database_url()
+
+    url = sa.engine.make_url(resolved)
+    assert url.database == "mydb%3Fsslmode%3Ddisable"
+    assert dict(url.query) == {}
+
+
 def _expected_head_revision() -> str:
     config = build_alembic_config(PLACEHOLDER_POSTGRESQL_URL)
     return ScriptDirectory.from_config(config).get_current_head()

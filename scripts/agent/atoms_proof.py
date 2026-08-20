@@ -115,20 +115,27 @@ class EvidenceCase:
     steps: tuple[StepEvidence, ...]
 
 
-def _build_engine(database_url: str) -> "sa.engine.Engine":
+def _build_engine(database_url: str, *, decode_database_name: bool = False) -> "sa.engine.Engine":
     """RuntimeIdentity.database_url is a bare postgresql:// URL with no driver suffix; this
     repo only installs psycopg v3 (no psycopg2), so SQLAlchemy's bare-scheme default dialect
     would fail at engine-creation time. Coerce the driver explicitly, matching every other
     engine/URL construction site in the codebase (storage/db.py's build_postgres_url_from_env,
     CI's ANYTOOLAI_POSTGRES_TEST_DATABASE_URL).
 
-    RuntimeIdentity.database_url percent-encodes the database-name path segment (the one DSN
-    component make_url() does not auto-decode -- it decodes userinfo but leaves the path
-    segment exactly as found). Decode it back here, the matching half of that encoding, before
-    handing the name to psycopg -- otherwise a reserved character there (e.g. "?") would still
-    be misread as a URL delimiter by make_url() above."""
+    This function is a general, independently-invocable interface -- --database-url-env reads
+    an arbitrary env var name and hands whatever DSN string it holds straight here, and it's
+    unit-tested directly with hand-written DSN strings -- not restricted to DSNs produced by
+    RuntimeIdentity.database_url's matching quote(). make_url() decodes userinfo but leaves the
+    database path segment exactly as found, so a blind, unconditional unquote() would silently
+    corrupt a database name from any other source that legitimately contains a "%"-looking
+    substring not meant as encoding (eighteenth code review pass finding). decode_database_name
+    is therefore an explicit, caller-declared contract: pass True only when the caller knows
+    database_url's database-name segment was percent-encoded by its producer (e.g.
+    RuntimeIdentity.database_url in scripts/agent/runner.py); leave False for a hand-written or
+    otherwise arbitrary DSN, whose database name is used exactly as given."""
     url = make_url(database_url)
-    url = url.set(database=urllib.parse.unquote(url.database))
+    if decode_database_name:
+        url = url.set(database=urllib.parse.unquote(url.database))
     if url.drivername == "postgresql":
         url = url.set(drivername="postgresql+psycopg")
     return sa.create_engine(url, future=True)
@@ -541,13 +548,17 @@ def _run_case_group(
     return results, passed, case_timeout
 
 
-def run(api_url: str, database_url: str, timeout: float) -> tuple[list[EvidenceCase], int]:
+def run(
+    api_url: str, database_url: str, timeout: float, *, decode_database_name: bool = False
+) -> tuple[list[EvidenceCase], int]:
     """Runs ATOM_SMOKE_CASES then COMPOSITE_SMOKE_CASES against a live api_url/database_url.
 
     Precondition owned by the caller, not enforced here: main() must call
     smoke._coverage_gate_error() first -- same contract as kernel_demo_smoke.py's own run().
     run() doesn't re-check coverage so tests can call it directly to exercise per-case behavior
     in isolation from the coverage guard.
+
+    decode_database_name is forwarded to _build_engine() verbatim -- see its own docstring.
     """
     # Same vacuous-success guard as kernel_demo_smoke.py's run(): an empty ATOM_SMOKE_CASES/
     # COMPOSITE_SMOKE_CASES (e.g. a caller-supplied monkeypatch, per this function's own
@@ -561,7 +572,7 @@ def run(api_url: str, database_url: str, timeout: float) -> tuple[list[EvidenceC
         print(empty_error, file=sys.stderr)
         return [], 1
 
-    engine = _build_engine(database_url)
+    engine = _build_engine(database_url, decode_database_name=decode_database_name)
     cases: list[EvidenceCase] = []
     try:
         atom_cases, atom_passed, case_timeout = _run_case_group(
@@ -662,6 +673,14 @@ def main() -> int:
         help="Seconds to wait for each scenario to complete (default: %(default)s, "
         "also settable via ANYTOOLAI_SMOKE_TIMEOUT)",
     )
+    parser.add_argument(
+        "--database-url-is-percent-encoded",
+        action="store_true",
+        help="Set when the DSN in --database-url-env's env var had its database-name path "
+        "segment percent-encoded by its producer (e.g. scripts/agent/runner.py's "
+        "RuntimeIdentity.database_url) -- decodes it back before connecting. Leave unset for a "
+        "hand-written or otherwise arbitrary DSN, whose database name is used exactly as given.",
+    )
     args = parser.parse_args()
 
     database_url = os.environ.get(args.database_url_env)
@@ -682,7 +701,10 @@ def main() -> int:
         # failure does, instead of silently exiting with nothing written.
         cases, exit_code = [], 1
     else:
-        cases, exit_code = run(args.api_url.rstrip("/"), database_url, args.timeout)
+        cases, exit_code = run(
+            args.api_url.rstrip("/"), database_url, args.timeout,
+            decode_database_name=args.database_url_is_percent_encoded,
+        )
 
     report_path = write_evidence_report(cases, exit_code)
     print(f"Evidence report: {report_path}")

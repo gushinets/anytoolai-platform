@@ -44,24 +44,30 @@ def build_runtime(
 
 
 def _build_storage_dependencies(database_url: str | None) -> RuntimeStorageDependencies:
-    resolved_database_url = _resolve_database_url(database_url)
+    resolved_database_url, decode_database_name = _resolve_database_url(database_url)
     if not resolved_database_url:
         return RuntimeStorageDependencies()
 
-    engine = create_sync_engine(resolved_database_url)
+    engine = create_sync_engine(
+        resolved_database_url, decode_database_name=decode_database_name
+    )
     return RuntimeStorageDependencies(session_factory=build_session_factory(engine))
 
 
-def _resolve_database_url(database_url: str | None) -> str | None:
+def _resolve_database_url(database_url: str | None) -> tuple[str | None, bool]:
+    """Second element is create_sync_engine()'s decode_database_name: True only for the
+    build_postgres_url_from_env() fallback, which percent-encodes its database segment --
+    every other source here is an already-final, operator- or caller-supplied DSN whose
+    database name must be used exactly as given (eighteenth code review pass finding)."""
     if database_url is not None:
-        return database_url
+        return database_url, False
 
     project_database_url = os.getenv(PROJECT_DATABASE_URL_ENV)
     if project_database_url:
-        return project_database_url
+        return project_database_url, False
 
     generic_database_url = os.getenv(GENERIC_DATABASE_URL_ENV)
     if generic_database_url:
-        return generic_database_url
+        return generic_database_url, False
 
-    return build_postgres_url_from_env()
+    return build_postgres_url_from_env(), True

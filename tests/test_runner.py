@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tests.module_loading import load_cached_module
+from tests.test_atoms_proof import load_atoms_proof_module
 
 
 def load_runner_module():
@@ -510,19 +510,19 @@ def test_database_url_survives_the_real_sqlalchemy_consumer_path_for_reserved_db
     just truncate the name, as the sixteenth round's "#" case did). The fix spans both files:
     RuntimeIdentity.database_url (runner.py) percent-encodes the db-name path segment -- the one
     DSN component make_url() does not auto-decode, unlike userinfo -- and atoms_proof.py's real
-    _build_engine() decodes it back after make_url() before handing it to psycopg. Exercise both
-    halves together through the real consumer (not string parsing): sixteenth round's "#" case
-    plus every other previously-fixed reserved credential character, and this round's "?" case,
-    asserting no extra connect_args got injected."""
-    atoms_proof_module_path = (
-        Path(__file__).resolve().parents[1] / "scripts" / "agent" / "atoms_proof.py"
-    )
-    atoms_proof = load_cached_module("atoms_proof_module_for_runner_tests", atoms_proof_module_path)
+    _build_engine() decodes it back after make_url() before handing it to psycopg (as of the
+    eighteenth round, only when told to via decode_database_name=True -- see _build_engine()'s
+    own docstring for why this is no longer an unconditional guess). Exercise both halves
+    together through the real consumer (not string parsing): sixteenth round's "#" case plus
+    every other previously-fixed reserved credential character, and this round's "?" case,
+    asserting no extra connect_args got injected. Also covers the eighteenth round's own
+    password-space finding (finding 3): a literal space in ANYTOOLAI_POSTGRES_PASSWORD must
+    survive the real consumer path unmangled."""
+    atoms_proof = load_atoms_proof_module()
 
     runner = load_runner_module()
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
     monkeypatch.setenv("ANYTOOLAI_POSTGRES_USER", "devuser")
-    monkeypatch.setenv("ANYTOOLAI_POSTGRES_PASSWORD", "devpassword")
 
     reserved_db_names = [
         "mydb#frag",
@@ -534,21 +534,25 @@ def test_database_url_survives_the_real_sqlalchemy_consumer_path_for_reserved_db
         "mydb?sslmode=disable",
         "plaindb",
     ]
-    for db_name in reserved_db_names:
-        monkeypatch.setenv("ANYTOOLAI_POSTGRES_DB", db_name)
+    for password in ("devpassword", "pass word"):
+        monkeypatch.setenv("ANYTOOLAI_POSTGRES_PASSWORD", password)
+        for db_name in reserved_db_names:
+            monkeypatch.setenv("ANYTOOLAI_POSTGRES_DB", db_name)
 
-        engine = atoms_proof._build_engine(identity.database_url)
-        connect_args = engine.dialect.create_connect_args(engine.url)[1]
+            engine = atoms_proof._build_engine(identity.database_url, decode_database_name=True)
+            connect_args = engine.dialect.create_connect_args(engine.url)[1]
 
-        assert connect_args["dbname"] == db_name, db_name
-        assert connect_args["host"] == "127.0.0.1"
-        assert connect_args["port"] == 15555
-        assert connect_args["user"] == "devuser"
-        assert connect_args["password"] == "devpassword"
-        non_connection_keys = set(connect_args) - {
-            "host", "port", "user", "password", "dbname", "context",
-        }
-        assert not non_connection_keys, f"{db_name!r} injected extra connect_args: {non_connection_keys}"
+            assert connect_args["dbname"] == db_name, db_name
+            assert connect_args["password"] == password, password
+            assert connect_args["host"] == "127.0.0.1"
+            assert connect_args["port"] == 15555
+            assert connect_args["user"] == "devuser"
+            non_connection_keys = set(connect_args) - {
+                "host", "port", "user", "password", "dbname", "context",
+            }
+            assert not non_connection_keys, (
+                f"{db_name!r} injected extra connect_args: {non_connection_keys}"
+            )
 
 
 def test_prod_compose_command_uses_fixed_project_and_prod_files(monkeypatch, tmp_path) -> None:

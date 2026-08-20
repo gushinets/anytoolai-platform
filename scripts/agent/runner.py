@@ -450,31 +450,32 @@ class RuntimeIdentity(NamedTuple):
         # Masking it (tried once) broke that without eliminating the underlying exposure —
         # an operator who exported real prod credentials into this shell already has them
         # in their own environment/history regardless of what this prints.
-        # Built via sqlalchemy.engine.URL.create() (sqlalchemy is already a root runtime
-        # dependency, and atoms_proof.py -- invoked by this script in the same venv -- already
-        # imports it, so this isn't a new dependency for the bootstrap path). URL.create()
-        # percent-encodes user/password automatically because make_url() percent-decodes
-        # userinfo on parse. It does NOT do the same for the database path segment, because
-        # make_url() does not decode that segment back on parse -- so an un-encoded reserved
-        # character there (#, ?, ...) is misread as a URL delimiter by any later make_url()
-        # call, letting ANYTOOLAI_POSTGRES_DB inject query-string connect_args (seventeenth
-        # code review pass finding, "?"; sixteenth found "#" the same way). Percent-encode the
-        # database segment ourselves to close that gap; atoms_proof.py's _build_engine(), the
-        # sole real consumer, decodes it back after make_url() for the matching reason.
-        from sqlalchemy.engine import URL
-
+        # Built by hand with quote(..., safe="") on every component, not via
+        # sqlalchemy.engine.URL.create(): URL.create()'s own render_as_string() already
+        # percent-encodes username/password internally (confirmed against every RFC 3986
+        # sub-delim except a literal space, which it passes through unencoded -- eighteenth
+        # code review pass finding, invalid per RFC 3986 and can break stricter external
+        # parsers like psql), so quote()-ing username/password ourselves *and* handing them to
+        # URL.create() double-encodes (e.g. a literal "%" from our own quote() gets re-escaped
+        # to "%25" by URL.create()'s encoder). One explicit quote() pass here, with no second
+        # encoding pass downstream, avoids that. URL.create() does NOT encode the database path
+        # segment at all (verified: a raw "?" placed there round-trips through
+        # render_as_string() unescaped), and make_url() does NOT decode that segment back on
+        # parse either -- so an un-encoded reserved character there (#, ?, ...) is misread as a
+        # URL delimiter by any later make_url() call, letting ANYTOOLAI_POSTGRES_DB inject
+        # query-string connect_args (seventeenth code review pass finding, "?"; sixteenth found
+        # "#" the same way). quote()-ing the database segment here closes that gap the same way.
+        # make_url() percent-decodes userinfo automatically on parse (username/password need no
+        # further help), but not the database path segment -- atoms_proof.py's _build_engine(),
+        # the sole real consumer, is told via --database-url-is-percent-encoded to unquote just
+        # that segment back after make_url().
         user = os.environ.get("ANYTOOLAI_POSTGRES_USER", DEV_DEFAULT_POSTGRES_USER)
         password = os.environ.get("ANYTOOLAI_POSTGRES_PASSWORD", DEV_DEFAULT_POSTGRES_PASSWORD)
         db = resolve_postgres_db()
-        url = URL.create(
-            drivername="postgresql",
-            username=user,
-            password=password,
-            host="127.0.0.1",
-            port=self.postgres_port,
-            database=quote(db, safe=""),
+        return (
+            f"postgresql://{quote(user, safe='')}:{quote(password, safe='')}"
+            f"@127.0.0.1:{self.postgres_port}/{quote(db, safe='')}"
         )
-        return url.render_as_string(hide_password=False)
 
 
 def normalized_repo_path(path: Path = ROOT) -> str:
@@ -666,6 +667,7 @@ def atoms_proof() -> int:
         [
             sys.executable, "scripts/agent/atoms_proof.py", identity.api_url,
             "--database-url-env", database_url_env,
+            "--database-url-is-percent-encoded",
         ],
         env,
     )

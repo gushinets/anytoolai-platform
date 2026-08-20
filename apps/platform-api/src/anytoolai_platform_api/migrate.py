@@ -24,7 +24,15 @@ MIGRATIONS_SCRIPT_LOCATION = REPO_ROOT / "migrations" / "platform"
 
 
 def _resolve_database_url() -> str:
-    database_url = _bootstrap_database_url(None)
+    # _bootstrap_database_url's second element (decode_database_name) is deliberately unused
+    # here: Alembic (migrations/platform/env.py's engine_from_config) builds its own engine
+    # internally from this string, with no hook for us to decode the database segment after its
+    # own make_url() call the way create_sync_engine() does -- so the DSN is kept consistently
+    # percent-encoded end-to-end instead. A database name with a reserved character (?, #, /)
+    # therefore still won't resolve correctly through this path, but it now fails loudly
+    # (connecting to a nonexistent, still-encoded name) instead of the pre-eighteenth-round
+    # silent connect_args-injection bug.
+    database_url, _decode_database_name = _bootstrap_database_url(None)
     if not database_url:
         raise RuntimeError(
             f"Set {PROJECT_DATABASE_URL_ENV} or {GENERIC_DATABASE_URL_ENV}, or all of "

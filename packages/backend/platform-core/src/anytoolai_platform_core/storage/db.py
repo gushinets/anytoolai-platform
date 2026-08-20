@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote, unquote
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -49,6 +50,16 @@ def build_postgres_url_from_env() -> str | None:
     (e.g. in a compose file) breaks silently when a password contains a reserved URL
     character (@, :, /, %, #) -- see e.g. `postgresql://u:p@ss@host/db`, which parses as
     password "p" and host "ss@host". `URL.create` percent-encodes each component instead.
+
+    URL.create()/render_as_string() percent-encodes username/password itself but does NOT do
+    the same for the database path segment (verified: a raw "?" placed there round-trips
+    through render_as_string() unescaped) -- so an un-encoded reserved character in the
+    database name (e.g. "?") is misread as the start of a query string by any later
+    sqlalchemy.engine.make_url() call, silently injecting extra connect_args (eighteenth code
+    review pass finding; the exact bug class scripts/agent/runner.py's RuntimeIdentity.
+    database_url already guards against for the dev/CLI path). Percent-encode the database
+    segment ourselves to close that gap; create_sync_engine()'s decode_database_name=True
+    decodes it back after make_url() for the matching reason.
     """
     user = os.getenv(POSTGRES_USER_ENV)
     password = os.getenv(POSTGRES_PASSWORD_ENV)
@@ -64,7 +75,7 @@ def build_postgres_url_from_env() -> str | None:
         password=password,
         host=host,
         port=port,
-        database=database,
+        database=quote(database, safe=""),
     ).render_as_string(hide_password=False)
 
 
@@ -87,9 +98,21 @@ class UtcDateTime(sa.TypeDecorator[datetime]):
         return value.astimezone(UTC)
 
 
-def create_sync_engine(database_url: str, **kwargs: Any) -> Engine:
-    require_postgresql_url(database_url, context="Runtime storage")
-    return sa.create_engine(database_url, future=True, **kwargs)
+def create_sync_engine(
+    database_url: str, *, decode_database_name: bool = False, **kwargs: Any
+) -> Engine:
+    """decode_database_name is an explicit, caller-declared contract, not a guess: pass True
+    only when database_url's database-name path segment was percent-encoded by its producer
+    (build_postgres_url_from_env() above); leave False for an operator-supplied DSN
+    (ANYTOOLAI_DATABASE_URL/DATABASE_URL), whose database name must be used exactly as given --
+    make_url() does not decode that segment on parse, so a blind, unconditional unquote() here
+    would silently corrupt an operator-supplied database name that legitimately contains a
+    "%"-looking substring not meant as encoding (eighteenth code review pass finding, same
+    class as scripts/agent/atoms_proof.py's _build_engine())."""
+    url = require_postgresql_url(database_url, context="Runtime storage")
+    if decode_database_name:
+        url = url.set(database=unquote(url.database))
+    return sa.create_engine(url, future=True, **kwargs)
 
 
 def _json_document_type() -> sa.TypeEngine[Any]:
