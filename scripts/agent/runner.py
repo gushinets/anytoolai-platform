@@ -17,6 +17,7 @@ import urllib.request
 from collections.abc import Sequence
 from pathlib import Path
 from typing import NamedTuple
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[2]
 QUICK_CHECK_VENV = ROOT / ".quick-check-venv"
@@ -449,8 +450,15 @@ class RuntimeIdentity(NamedTuple):
         # Masking it (tried once) broke that without eliminating the underlying exposure —
         # an operator who exported real prod credentials into this shell already has them
         # in their own environment/history regardless of what this prints.
-        user = os.environ.get("ANYTOOLAI_POSTGRES_USER", DEV_DEFAULT_POSTGRES_USER)
-        password = os.environ.get("ANYTOOLAI_POSTGRES_PASSWORD", DEV_DEFAULT_POSTGRES_PASSWORD)
+        # Percent-encode user/password (stdlib urllib, not a new sqlalchemy import into this
+        # otherwise dependency-light bootstrap script): an unescaped password containing a
+        # reserved URL character (@, :, /, %, #) parses into the wrong host/user, breaking
+        # atoms-proof against an otherwise-healthy stack. See storage/db.py's
+        # build_postgres_url_from_env for the same fix applied to the app's own internal DSN.
+        user = quote(os.environ.get("ANYTOOLAI_POSTGRES_USER", DEV_DEFAULT_POSTGRES_USER), safe="")
+        password = quote(
+            os.environ.get("ANYTOOLAI_POSTGRES_PASSWORD", DEV_DEFAULT_POSTGRES_PASSWORD), safe=""
+        )
         return f"postgresql://{user}:{password}@127.0.0.1:{self.postgres_port}/{resolve_postgres_db()}"
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import urllib.parse
 from pathlib import Path
 
 import pytest
@@ -473,6 +474,29 @@ def test_database_url_falls_back_to_dev_defaults(monkeypatch) -> None:
     monkeypatch.delenv("ANYTOOLAI_POSTGRES_DB", raising=False)
 
     assert identity.database_url == "postgresql://anytoolai:anytoolai@127.0.0.1:15555/anytoolai"
+
+
+def test_database_url_percent_encodes_reserved_characters_in_credentials(monkeypatch) -> None:
+    """Team-lead review finding: a password containing a reserved URL character (@, :, /, %, #)
+    must not silently parse into the wrong host/user -- see storage/db.py's
+    build_postgres_url_from_env for the same fix applied to the app's own internal DSN."""
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_USER", "devuser")
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_PASSWORD", "p@ss:w/rd%20#1")
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_DB", "devdb")
+
+    url = identity.database_url
+
+    # urlsplit() doesn't unquote netloc components -- confirm the raw URL parses into the right
+    # host/user/db (proving the reserved chars didn't corrupt netloc parsing), then unquote the
+    # password back to its original value to confirm nothing was lost or mangled.
+    parsed = urllib.parse.urlsplit(url)
+    assert parsed.hostname == "127.0.0.1"
+    assert parsed.port == 15555
+    assert parsed.username == "devuser"
+    assert urllib.parse.unquote(parsed.password) == "p@ss:w/rd%20#1"
+    assert parsed.path == "/devdb"
 
 
 def test_prod_compose_command_uses_fixed_project_and_prod_files(monkeypatch, tmp_path) -> None:

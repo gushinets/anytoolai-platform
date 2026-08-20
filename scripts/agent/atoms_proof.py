@@ -183,6 +183,22 @@ def _classify_ledger(
             ),
         )
 
+    # scenario_session_id alone doesn't guarantee an action_run actually belongs to this job --
+    # both columns are filtered independently at query time (see _check_ledger), so a mislinked
+    # row would otherwise pass every downstream check silently.
+    for action_run in action_runs:
+        if action_run["job_id"] != job_id:
+            return _fail(
+                label=label, scenario_id=scenario_id, kind=kind,
+                session_id=scenario_session_id, job_id=job_id,
+                error_code="PROOF011",
+                error_message=(
+                    f"PROOF011: action_run {action_run['id']} (step {action_run['step_id']}) "
+                    f"has job_id {action_run['job_id']!r}, expected {job_id!r}"
+                ),
+            )
+
+    action_run_ids = {action_run["id"] for action_run in action_runs}
     provider_call_counts: dict[str, int] = {}
     for call in provider_calls:
         provider_call_counts[call["action_run_id"]] = (
@@ -199,6 +215,20 @@ def _classify_ledger(
                     f"PROOF003: expected exactly one provider_calls row for "
                     f"action_run {action_run['id']} (step {action_run['step_id']}), "
                     f"found {count}"
+                ),
+            )
+    # An orphan provider_calls row (right scenario_session_id, action_run_id pointing outside
+    # this session's own action_runs) would never surface above -- the count loop only walks
+    # known action_runs, so it can't detect an extra row keyed to nothing real.
+    for call in provider_calls:
+        if call["action_run_id"] not in action_run_ids:
+            return _fail(
+                label=label, scenario_id=scenario_id, kind=kind,
+                session_id=scenario_session_id, job_id=job_id,
+                error_code="PROOF012",
+                error_message=(
+                    f"PROOF012: provider_calls row {call['id']} references action_run_id "
+                    f"{call['action_run_id']!r}, which is not among this session's action_runs"
                 ),
             )
 
@@ -241,19 +271,64 @@ def _classify_ledger(
                 f"scenario_session_id {scenario_session_id}"
             ),
         )
-    started_count = sum(1 for event in events if event["event_type"] == "action.started")
-    succeeded_count = sum(1 for event in events if event["event_type"] == "action.succeeded")
-    if started_count != len(action_runs) or succeeded_count != len(action_runs):
-        return _fail(
-            label=label, scenario_id=scenario_id, kind=kind,
-            session_id=scenario_session_id, job_id=job_id,
-            error_code="PROOF006",
-            error_message=(
-                f"PROOF006: expected {len(action_runs)} action.started and "
-                f"{len(action_runs)} action.succeeded events, found {started_count} and "
-                f"{succeeded_count}"
-            ),
-        )
+
+    # PROOF005 above only checks the *set* of event types seen anywhere in the session -- it
+    # would pass even if every action.started/succeeded event were misattributed to one
+    # action_run and none to another (counts still sum right), or duplicated once and missing
+    # once. Correlate by action_run_id/provider_call_id, not just event_type, to catch that.
+    action_started_counts: dict[str, int] = {}
+    action_succeeded_counts: dict[str, int] = {}
+    for event in events:
+        if event["event_type"] == "action.started":
+            action_started_counts[event["action_run_id"]] = (
+                action_started_counts.get(event["action_run_id"], 0) + 1
+            )
+        elif event["event_type"] == "action.succeeded":
+            action_succeeded_counts[event["action_run_id"]] = (
+                action_succeeded_counts.get(event["action_run_id"], 0) + 1
+            )
+    for action_run in action_runs:
+        run_id = action_run["id"]
+        started = action_started_counts.get(run_id, 0)
+        succeeded = action_succeeded_counts.get(run_id, 0)
+        if started != 1 or succeeded != 1:
+            return _fail(
+                label=label, scenario_id=scenario_id, kind=kind,
+                session_id=scenario_session_id, job_id=job_id,
+                error_code="PROOF006",
+                error_message=(
+                    f"PROOF006: expected exactly one action.started and one "
+                    f"action.succeeded event_log row for action_run {run_id} (step "
+                    f"{action_run['step_id']}), found {started} and {succeeded}"
+                ),
+            )
+
+    provider_started_counts: dict[str, int] = {}
+    provider_succeeded_counts: dict[str, int] = {}
+    for event in events:
+        if event["event_type"] == "provider.request_started":
+            provider_started_counts[event["provider_call_id"]] = (
+                provider_started_counts.get(event["provider_call_id"], 0) + 1
+            )
+        elif event["event_type"] == "provider.request_succeeded":
+            provider_succeeded_counts[event["provider_call_id"]] = (
+                provider_succeeded_counts.get(event["provider_call_id"], 0) + 1
+            )
+    for call in provider_calls:
+        call_id = call["id"]
+        started = provider_started_counts.get(call_id, 0)
+        succeeded = provider_succeeded_counts.get(call_id, 0)
+        if started != 1 or succeeded != 1:
+            return _fail(
+                label=label, scenario_id=scenario_id, kind=kind,
+                session_id=scenario_session_id, job_id=job_id,
+                error_code="PROOF013",
+                error_message=(
+                    f"PROOF013: expected exactly one provider.request_started and one "
+                    f"provider.request_succeeded event_log row for provider_call {call_id} "
+                    f"(action_run {call['action_run_id']}), found {started} and {succeeded}"
+                ),
+            )
 
     steps = tuple(
         StepEvidence(
@@ -360,11 +435,20 @@ def _run_case_with_ledger_check(
 ) -> EvidenceCase:
     result = smoke._run_one_case(api_url, scenario_id, scenario_input, timeout)
     if result.error_message is not None:
+        # result.error_message is free-form text this script doesn't control (e.g. SMOKE004
+        # embeds the whole raw scenario-session response body) -- print it once here for a human
+        # to read, but don't let it flow into EvidenceCase, which is persisted to disk and
+        # documented as privacy-safe-by-construction (ids/labels/booleans only).
+        print(f"{label} ({scenario_id}): {result.error_message}", file=sys.stderr)
+        error_code = result.error_code or "PROOF000"
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=result.session_id, job_id=None,
-            error_code=result.error_code or "PROOF000",
-            error_message=result.error_message,
+            error_code=error_code,
+            error_message=(
+                f"{error_code}: HTTP-layer case failed for scenario_id {scenario_id} "
+                "(see stderr for full diagnostic)"
+            ),
         )
     return _check_ledger(
         engine, label=label, scenario_id=scenario_id, kind=kind,
