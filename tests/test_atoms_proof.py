@@ -944,12 +944,12 @@ def test_build_engine_labels_its_own_errors_as_atoms_proof_not_runtime_storage()
     own context."""
     module = load_atoms_proof_module()
 
-    with pytest.raises(RuntimeError, match="^atoms-proof:"):
+    with pytest.raises(RuntimeError, match=r"^atoms-proof:"):
         module._build_engine(
             "postgresql+psycopg://user:pass@127.0.0.1:5432", decode_database_name=True
         )
 
-    with pytest.raises(RuntimeError, match="^atoms-proof "):
+    with pytest.raises(RuntimeError, match=r"^atoms-proof "):
         module._build_engine("sqlite:///tmp.db")
 
 
