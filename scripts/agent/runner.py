@@ -673,34 +673,6 @@ def atoms_proof() -> int:
     )
 
 
-def live_canary() -> int:
-    # Fail fast, before touching Docker/DB -- same precedent as postgresql_check(): a clear code
-    # is better than a live_canary.py subprocess failing deep inside ProviderGateway/LiteLLM once
-    # OPENAI_API_KEY turns out to be unset.
-    if not os.environ.get("OPENAI_API_KEY", "").strip():
-        print(
-            "LIVE000: live-canary requires OPENAI_API_KEY to be set (it costs real money and "
-            "calls a real provider -- never part of quick-check/full-check/postgresql-check).",
-            file=sys.stderr,
-        )
-        return 2
-    try:
-        identity = runtime_identity()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
-    database_url_env = "ANYTOOLAI_LIVE_CANARY_DATABASE_URL"
-    env = runner_env()
-    env[database_url_env] = identity.database_url
-    return run_with_env(
-        [
-            sys.executable, "scripts/agent/live_canary.py", identity.api_url,
-            "--database-url-env", database_url_env,
-        ],
-        env,
-    )
-
-
 def _prod_compose_command(*args: str) -> list[str]:
     env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
     return _docker_compose_command(
@@ -824,7 +796,6 @@ COMMANDS = {
     "dev-down": dev_down,
     "dev-smoke": dev_smoke,
     "atoms-proof": atoms_proof,
-    "live-canary": live_canary,
     "prod-up": prod_up,
     "prod-ready": prod_ready,
     "prod-status": prod_status,

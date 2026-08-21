@@ -30,7 +30,6 @@ PYTEST_TARGETS = [
     "tests/test_collect_context.py",
     "tests/test_kernel_demo_smoke.py",
     "tests/test_atoms_proof.py",
-    "tests/test_live_canary.py",
     "packages/backend/platform-sdk/tests",
     "packages/backend/platform-core/tests",
     "packages/backend/platform-actions/tests",

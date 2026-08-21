@@ -937,56 +937,6 @@ def test_atoms_proof_reports_dev001_for_invalid_port_override(monkeypatch, capsy
     assert "DEV001" in capsys.readouterr().err
 
 
-def test_live_canary_fails_without_openai_api_key(monkeypatch, capsys) -> None:
-    runner = load_runner_module()
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.setattr(
-        runner,
-        "runtime_identity",
-        lambda: pytest.fail("live_canary must not touch Docker/DB without OPENAI_API_KEY"),
-    )
-
-    assert runner.live_canary() == 2
-    assert "LIVE000" in capsys.readouterr().err
-
-
-def test_live_canary_reports_dev001_for_invalid_port_override(monkeypatch, capsys) -> None:
-    runner = load_runner_module()
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-
-    def fake_runtime_identity():
-        raise ValueError("ANYTOOLAI_API_PORT must be an integer port")
-
-    monkeypatch.setattr(runner, "runtime_identity", fake_runtime_identity)
-
-    assert runner.live_canary() == 2
-    assert "DEV001" in capsys.readouterr().err
-
-
-def test_live_canary_passes_database_url_via_env_not_argv(monkeypatch) -> None:
-    runner = load_runner_module()
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
-    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
-    calls: list[tuple[list[str], dict[str, str]]] = []
-    monkeypatch.setattr(
-        runner,
-        "run_with_env",
-        lambda command, env: calls.append((list(command), dict(env))) or 0,
-    )
-
-    assert runner.live_canary() == 0
-
-    assert len(calls) == 1
-    command, env = calls[0]
-    assert identity.database_url not in command
-    assert command[:2] == [runner.sys.executable, "scripts/agent/live_canary.py"]
-    assert command[2] == identity.api_url
-    assert command[3] == "--database-url-env"
-    env_var_name = command[4]
-    assert env[env_var_name] == identity.database_url
-
-
 def test_prod_smoke_invokes_kernel_demo_smoke_against_prod_port(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.setenv("ANYTOOLAI_PROD_API_PORT", "18900")
