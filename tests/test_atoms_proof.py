@@ -314,6 +314,48 @@ def test_classify_ledger_reports_proof023_when_an_extra_unreferenced_artifact_is
     assert case.error_code == "PROOF023"
 
 
+def test_classify_ledger_reports_proof023_when_step_artifact_has_wrong_job_id() -> None:
+    """Twenty-third code review pass finding: the only prior PROOF023 regression case used an
+    extra, unreferenced artifact -- nothing proved the full scan also catches a wrong, non-null
+    job_id on a *referenced* row (action_run.output_artifact_id) now that PROOF023 runs before
+    PROOF017. Correct by code inspection, but a future reorder or a _first_job_id_mismatch()
+    change that skipped referenced rows would have gone uncaught."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[_one_step_artifact(job_id="job-other"), _one_result_artifact()],
+        events=_all_expected_events(),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF023"
+
+
+def test_classify_ledger_reports_proof023_when_result_artifact_has_wrong_job_id() -> None:
+    """Mirrors the step-artifact case above for the job's own result_artifact_id."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[_one_step_artifact(), _one_result_artifact(job_id="job-other")],
+        events=_all_expected_events(),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF023"
+
+
 def test_classify_ledger_reports_proof005_when_event_type_missing() -> None:
     module = load_atoms_proof_module()
 
