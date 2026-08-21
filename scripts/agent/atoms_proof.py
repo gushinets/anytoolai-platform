@@ -29,7 +29,6 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-import urllib.parse
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -76,6 +75,7 @@ try:
     from anytoolai_platform_core.storage.db import (
         action_runs_table,
         artifacts_table,
+        create_sync_engine,
         event_log_table,
         jobs_table,
         provider_calls_table,
@@ -125,32 +125,16 @@ def _build_engine(database_url: str, *, decode_database_name: bool = False) -> "
     This function is a general, independently-invocable interface -- --database-url-env reads
     an arbitrary env var name and hands whatever DSN string it holds straight here, and it's
     unit-tested directly with hand-written DSN strings -- not restricted to DSNs produced by
-    RuntimeIdentity.database_url's matching quote(). make_url() decodes userinfo but leaves the
-    database path segment exactly as found, so a blind, unconditional unquote() would silently
-    corrupt a database name from any other source that legitimately contains a "%"-looking
-    substring not meant as encoding (eighteenth code review pass finding). decode_database_name
-    is therefore an explicit, caller-declared contract: pass True only when the caller knows
-    database_url's database-name segment was percent-encoded by its producer (e.g.
-    RuntimeIdentity.database_url in scripts/agent/runner.py); leave False for a hand-written or
-    otherwise arbitrary DSN, whose database name is used exactly as given."""
+    RuntimeIdentity.database_url's matching quote(). Everything past the driver coercion above
+    -- the percent-decode contract, and raising instead of silently connecting with no database
+    name when decode_database_name=True finds nothing to decode -- is delegated to
+    storage/db.py's create_sync_engine(), the same function platform-api/platform-worker's boot
+    path uses, instead of a second, independently-maintained copy of that contract (a prior
+    round of this review found the two copies had already drifted)."""
     url = make_url(database_url)
-    if decode_database_name:
-        if url.database is None:
-            # Silently skipping the decode here (the prior fix for unquote(None) raising
-            # TypeError) left create_engine() to omit the database name entirely; libpq then
-            # connects to its own default database (commonly the connecting username) instead
-            # of the one the caller actually meant, which is worse than failing loudly -- the
-            # caller declared this DSN's database segment is encoded, so a DSN with no segment
-            # to decode is a configuration error, not something to tolerate (team-lead-#2
-            # review, mirrored in storage/db.py's create_sync_engine()).
-            raise RuntimeError(
-                "--database-url-is-percent-encoded was set but the DSN has no database path "
-                "segment to decode"
-            )
-        url = url.set(database=urllib.parse.unquote(url.database))
     if url.drivername == "postgresql":
         url = url.set(drivername="postgresql+psycopg")
-    return sa.create_engine(url, future=True)
+    return create_sync_engine(url, decode_database_name=decode_database_name)
 
 
 def _orphan_ids(*count_dicts: dict, known_ids: set) -> list:
@@ -163,6 +147,38 @@ def _orphan_ids(*count_dicts: dict, known_ids: set) -> list:
         orphans |= set(counts)
     orphans -= known_ids
     return sorted(orphans, key=lambda orphan_id: (orphan_id is None, orphan_id))
+
+
+def _first_job_id_mismatch(
+    rows: list[dict], *, job_id: str, error_code: str, describe, allow_none: bool = False
+) -> str | None:
+    """Shared by the PROOF011 (action_runs)/PROOF016 (provider_calls)/PROOF019 (event_log)
+    ownership checks below: rows filtered independently by scenario_session_id (see
+    _check_ledger) must also carry the resolved job's own job_id -- three near-identical loops
+    otherwise, differing only in field name and (for event_log) whether a null job_id is
+    tolerated. Returns an error_message for the first mismatch, or None if every row agrees.
+    describe() renders one row for the message; allow_none skips rows whose job_id is None
+    instead of treating None as a mismatch (event_log's job_id is nullable -- some
+    session-scoped events, e.g. scenario.started, are emitted before a job exists)."""
+    for row in rows:
+        row_job_id = row.get("job_id") if allow_none else row["job_id"]
+        if allow_none and row_job_id is None:
+            continue
+        if row_job_id != job_id:
+            return f"{error_code}: {describe(row)} has job_id {row_job_id!r}, expected {job_id!r}"
+    return None
+
+
+def _correlate_events_by_id(events: list[dict], *, event_type: str, id_field: str) -> dict:
+    """Counts of `events` rows with event_type `event_type`, keyed by row[id_field]. Shared by
+    the PROOF006/013/020 count checks and their PROOF014/015/021 orphan checks below -- five
+    near-identical counting loops otherwise (action.started, action.succeeded,
+    provider.request_started, provider.request_succeeded, artifact.created)."""
+    counts: dict = {}
+    for event in events:
+        if event["event_type"] == event_type:
+            counts[event.get(id_field)] = counts.get(event.get(id_field), 0) + 1
+    return counts
 
 
 def _fail(
@@ -225,17 +241,16 @@ def _classify_ledger(
     # scenario_session_id alone doesn't guarantee an action_run actually belongs to this job --
     # both columns are filtered independently at query time (see _check_ledger), so a mislinked
     # row would otherwise pass every downstream check silently.
-    for action_run in action_runs:
-        if action_run["job_id"] != job_id:
-            return _fail(
-                label=label, scenario_id=scenario_id, kind=kind,
-                session_id=scenario_session_id, job_id=job_id,
-                error_code="PROOF011",
-                error_message=(
-                    f"PROOF011: action_run {action_run['id']} (step {action_run['step_id']}) "
-                    f"has job_id {action_run['job_id']!r}, expected {job_id!r}"
-                ),
-            )
+    mismatch = _first_job_id_mismatch(
+        action_runs, job_id=job_id, error_code="PROOF011",
+        describe=lambda run: f"action_run {run['id']} (step {run['step_id']})",
+    )
+    if mismatch is not None:
+        return _fail(
+            label=label, scenario_id=scenario_id, kind=kind,
+            session_id=scenario_session_id, job_id=job_id,
+            error_code="PROOF011", error_message=mismatch,
+        )
 
     action_run_ids = {action_run["id"] for action_run in action_runs}
 
@@ -243,18 +258,17 @@ def _classify_ledger(
     # scenario_session_id only (see _check_ledger) -- action_run_id membership (PROOF012 below)
     # already implies a provider_calls row belongs to *an* action_run of this job, but not that
     # the row's own job_id column agrees. Check it directly so a mislinked row can't pass
-    # silently (team-lead-#2 review).
-    for call in provider_calls:
-        if call["job_id"] != job_id:
-            return _fail(
-                label=label, scenario_id=scenario_id, kind=kind,
-                session_id=scenario_session_id, job_id=job_id,
-                error_code="PROOF016",
-                error_message=(
-                    f"PROOF016: provider_calls row {call['id']} has job_id {call['job_id']!r}, "
-                    f"expected {job_id!r}"
-                ),
-            )
+    # silently.
+    mismatch = _first_job_id_mismatch(
+        provider_calls, job_id=job_id, error_code="PROOF016",
+        describe=lambda call: f"provider_calls row {call['id']}",
+    )
+    if mismatch is not None:
+        return _fail(
+            label=label, scenario_id=scenario_id, kind=kind,
+            session_id=scenario_session_id, job_id=job_id,
+            error_code="PROOF016", error_message=mismatch,
+        )
 
     provider_call_counts: dict[str, int] = {}
     for call in provider_calls:
@@ -305,7 +319,7 @@ def _classify_ledger(
             )
         # A row can exist under output_artifact_id yet belong to a different job/action_run
         # (e.g. copy-paste of another session's artifact id) -- artifact_ids membership alone
-        # can't catch that, so check lineage directly (team-lead-#2 review).
+        # can't catch that, so check lineage directly.
         if artifact["job_id"] != job_id or artifact["action_run_id"] != action_run["id"]:
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
@@ -359,31 +373,25 @@ def _classify_ledger(
         )
 
     # job_id is nullable on event_log (some session-scoped events, e.g. scenario.started, are
-    # emitted before a job exists), so only a *non-null* mismatch is a real ownership defect
-    # (team-lead-#2 review).
-    for event in events:
-        event_job_id = event.get("job_id")
-        if event_job_id is not None and event_job_id != job_id:
-            return _fail(
-                label=label, scenario_id=scenario_id, kind=kind,
-                session_id=scenario_session_id, job_id=job_id,
-                error_code="PROOF019",
-                error_message=(
-                    f"PROOF019: event_log row (event_type {event['event_type']!r}) has job_id "
-                    f"{event_job_id!r}, expected {job_id!r}"
-                ),
-            )
+    # emitted before a job exists), so only a *non-null* mismatch is a real ownership defect.
+    mismatch = _first_job_id_mismatch(
+        events, job_id=job_id, error_code="PROOF019", allow_none=True,
+        describe=lambda event: f"event_log row (event_type {event['event_type']!r})",
+    )
+    if mismatch is not None:
+        return _fail(
+            label=label, scenario_id=scenario_id, kind=kind,
+            session_id=scenario_session_id, job_id=job_id,
+            error_code="PROOF019", error_message=mismatch,
+        )
 
     # PROOF005 above only checks the *type* is present anywhere in the session, so one
     # artifact.created row can satisfy a multi-artifact workflow with several artifacts_table
     # rows. Correlate by artifact_id, matching the same per-entity correlation this check class
-    # already does for action_run_id/provider_call_id below (team-lead-#2 review).
-    artifact_created_counts: dict[str, int] = {}
-    for event in events:
-        if event["event_type"] == "artifact.created":
-            artifact_created_counts[event.get("artifact_id")] = (
-                artifact_created_counts.get(event.get("artifact_id"), 0) + 1
-            )
+    # already does for action_run_id/provider_call_id below.
+    artifact_created_counts = _correlate_events_by_id(
+        events, event_type="artifact.created", id_field="artifact_id"
+    )
     for artifact_id in artifacts_by_id:
         count = artifact_created_counts.get(artifact_id, 0)
         if count != 1:
@@ -414,17 +422,12 @@ def _classify_ledger(
     # would pass even if every action.started/succeeded event were misattributed to one
     # action_run and none to another (counts still sum right), or duplicated once and missing
     # once. Correlate by action_run_id/provider_call_id, not just event_type, to catch that.
-    action_started_counts: dict[str, int] = {}
-    action_succeeded_counts: dict[str, int] = {}
-    for event in events:
-        if event["event_type"] == "action.started":
-            action_started_counts[event["action_run_id"]] = (
-                action_started_counts.get(event["action_run_id"], 0) + 1
-            )
-        elif event["event_type"] == "action.succeeded":
-            action_succeeded_counts[event["action_run_id"]] = (
-                action_succeeded_counts.get(event["action_run_id"], 0) + 1
-            )
+    action_started_counts = _correlate_events_by_id(
+        events, event_type="action.started", id_field="action_run_id"
+    )
+    action_succeeded_counts = _correlate_events_by_id(
+        events, event_type="action.succeeded", id_field="action_run_id"
+    )
     for action_run in action_runs:
         run_id = action_run["id"]
         started = action_started_counts.get(run_id, 0)
@@ -460,17 +463,12 @@ def _classify_ledger(
         )
 
     provider_call_ids = {call["id"] for call in provider_calls}
-    provider_started_counts: dict[str, int] = {}
-    provider_succeeded_counts: dict[str, int] = {}
-    for event in events:
-        if event["event_type"] == "provider.request_started":
-            provider_started_counts[event["provider_call_id"]] = (
-                provider_started_counts.get(event["provider_call_id"], 0) + 1
-            )
-        elif event["event_type"] == "provider.request_succeeded":
-            provider_succeeded_counts[event["provider_call_id"]] = (
-                provider_succeeded_counts.get(event["provider_call_id"], 0) + 1
-            )
+    provider_started_counts = _correlate_events_by_id(
+        events, event_type="provider.request_started", id_field="provider_call_id"
+    )
+    provider_succeeded_counts = _correlate_events_by_id(
+        events, event_type="provider.request_succeeded", id_field="provider_call_id"
+    )
     for call in provider_calls:
         call_id = call["id"]
         started = provider_started_counts.get(call_id, 0)
@@ -683,7 +681,16 @@ def run(
         print(empty_error, file=sys.stderr)
         return [], 1
 
-    engine = _build_engine(database_url, decode_database_name=decode_database_name)
+    # _build_engine() can now raise RuntimeError (a caller-declared decode contract that finds
+    # nothing to decode -- see its own docstring); left uncaught, that propagated as a raw
+    # traceback instead of the PROOF0xx failure category the module docstring promises for
+    # every category of failure, and skipped write_evidence_report() entirely.
+    try:
+        engine = _build_engine(database_url, decode_database_name=decode_database_name)
+    except RuntimeError as exc:
+        print(f"PROOF022: {exc}", file=sys.stderr)
+        return [], 1
+
     cases: list[EvidenceCase] = []
     try:
         atom_cases, atom_passed, case_timeout = _run_case_group(

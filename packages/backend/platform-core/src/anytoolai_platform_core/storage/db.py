@@ -113,11 +113,16 @@ def create_sync_engine(
     decode_database_name=True with a DSN that has no database path segment at all is a
     configuration error, not something to tolerate: skipping the decode there would leave
     create_engine() to omit the database name, and libpq would silently connect to its own
-    default database (commonly the connecting username) instead of the one the caller meant
-    (team-lead-#2 review, mirrored in scripts/agent/atoms_proof.py's _build_engine())."""
+    default database (commonly the connecting username) instead of the one the caller meant.
+    `not url.database`, not `url.database is None`: a DSN with a trailing slash and nothing
+    after it (e.g. "postgresql://u:p@host:5432/") parses to database="" (empty string), not
+    None -- verified directly against make_url() -- and reachable in production, since
+    build_postgres_url_from_env() only treats POSTGRES_DB_ENV as absent when it's unset, not
+    merely empty (mirrored in scripts/agent/atoms_proof.py's _build_engine(), which delegates
+    here for exactly this reason)."""
     url = require_postgresql_url(database_url, context="Runtime storage")
     if decode_database_name:
-        if url.database is None:
+        if not url.database:
             raise RuntimeError(
                 "Runtime storage: decode_database_name=True but the DSN has no database path "
                 "segment to decode"
