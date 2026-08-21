@@ -240,7 +240,7 @@ def test_classify_ledger_reports_proof004_when_result_artifact_missing() -> None
 
 
 def test_classify_ledger_reports_proof017_when_step_artifact_lineage_mismatches() -> None:
-    """Team-lead-#2 review: an artifacts_table row can exist under the step's
+    """An artifacts_table row can exist under the step's
     output_artifact_id (so PROOF004's membership check passes) while belonging to a different
     job/action_run -- e.g. a copy-pasted artifact id from another session."""
     module = load_atoms_proof_module()
@@ -305,7 +305,7 @@ def test_classify_ledger_reports_proof005_when_event_type_missing() -> None:
 
 
 def test_classify_ledger_reports_proof019_when_event_job_id_mismatches() -> None:
-    """Team-lead-#2 review: job_id is nullable on event_log (some session-scoped events are
+    """job_id is nullable on event_log (some session-scoped events are
     emitted before a job exists), but a *non-null* mismatch must still fail -- e.g. a row
     misattributed to another job in the same scenario_session_id."""
     module = load_atoms_proof_module()
@@ -330,7 +330,7 @@ def test_classify_ledger_reports_proof019_when_event_job_id_mismatches() -> None
 
 
 def test_classify_ledger_reports_proof020_when_artifact_created_event_is_missing() -> None:
-    """Team-lead-#2 review: PROOF005 only checks the artifact.created *type* is present
+    """PROOF005 only checks the artifact.created *type* is present
     somewhere in the session, so a composite workflow with 2 artifacts could pass with only 1
     artifact.created row. Correlate by artifact_id."""
     module = load_atoms_proof_module()
@@ -473,7 +473,7 @@ def test_classify_ledger_reports_proof012_when_provider_call_is_orphaned() -> No
 
 
 def test_classify_ledger_reports_proof016_when_provider_call_job_id_mismatches() -> None:
-    """Team-lead-#2 review: a provider_calls row can carry the right action_run_id (so PROOF012
+    """A provider_calls row can carry the right action_run_id (so PROOF012
     passes) while its own job_id column is mislinked to a different job -- action_run_id
     membership alone can't catch that."""
     module = load_atoms_proof_module()
@@ -913,7 +913,7 @@ def test_build_engine_leaves_an_explicit_driver_untouched() -> None:
 
 
 def test_build_engine_fails_fast_when_decode_flag_set_on_a_dsn_with_no_database_segment() -> None:
-    """Team-lead-#2 review: silently skipping the decode left create_engine() to omit the
+    """Silently skipping the decode left create_engine() to omit the
     database name, so libpq would connect to its own default database (commonly the connecting
     username) instead of failing -- mirrors storage/db.py's create_sync_engine() guard."""
     module = load_atoms_proof_module()
@@ -921,6 +921,18 @@ def test_build_engine_fails_fast_when_decode_flag_set_on_a_dsn_with_no_database_
     with pytest.raises(RuntimeError, match="database"):
         module._build_engine(
             "postgresql+psycopg://user:pass@127.0.0.1:5432", decode_database_name=True
+        )
+
+
+def test_build_engine_fails_fast_when_decode_flag_set_on_a_dsn_with_empty_database_segment() -> None:
+    """Twentieth code review pass finding: a trailing-slash DSN with nothing after it parses to
+    database="" (empty string), not None -- mirrors storage/db.py's create_sync_engine() guard,
+    which _build_engine() now delegates to."""
+    module = load_atoms_proof_module()
+
+    with pytest.raises(RuntimeError, match="database"):
+        module._build_engine(
+            "postgresql+psycopg://user:pass@127.0.0.1:5432/", decode_database_name=True
         )
 
 
@@ -1095,7 +1107,7 @@ def test_run_chains_degraded_timeout_from_atom_batch_into_composite_batch(monkey
 
 
 def test_run_reports_full_success_when_every_case_passes(monkeypatch, capsys) -> None:
-    """Team-lead-#2 review: existing run() coverage only exercises mixed failure and empty-case
+    """Existing run() coverage only exercises mixed failure and empty-case
     exits, never proving the primary contract -- that a fully-passing atom and composite batch
     returns exit_code == 0 with every case marked "pass", mirroring
     kernel_demo_smoke.py's own full-pass regression test."""
@@ -1125,6 +1137,28 @@ def test_run_reports_full_success_when_every_case_passes(monkeypatch, capsys) ->
     out = capsys.readouterr().out
     assert "2/2 kernel_demo atoms passed" in out
     assert "1/1 kernel_demo composite workflows passed" in out
+
+
+def test_run_reports_proof022_instead_of_a_raw_traceback_on_engine_configuration_error(
+    monkeypatch, capsys
+) -> None:
+    """Twentieth code review pass finding: _build_engine() can raise RuntimeError (a
+    caller-declared decode contract with nothing to decode) -- previously uncaught here, so it
+    propagated as a raw traceback instead of the PROOF0xx failure category the module docstring
+    promises for every failure category, and never reached write_evidence_report()."""
+    module = load_atoms_proof_module()
+    monkeypatch.setattr(module, "ATOM_SMOKE_CASES", (("atom.one", "scenario-one", {}),))
+
+    cases, exit_code = module.run(
+        "http://127.0.0.1:8000",
+        "postgresql+psycopg://user:pass@127.0.0.1:5432/",
+        timeout=5.0,
+        decode_database_name=True,
+    )
+
+    assert cases == []
+    assert exit_code == 1
+    assert "PROOF022" in capsys.readouterr().err
 
 
 def test_run_case_group_derives_passed_count_from_results(monkeypatch, capsys) -> None:

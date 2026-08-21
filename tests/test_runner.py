@@ -908,7 +908,7 @@ def test_atoms_proof_passes_database_url_via_env_not_argv(monkeypatch) -> None:
     env_var_name = command[4]
     # Full argv, not just the database-url-env prefix: deleting --database-url-is-percent-
     # encoded would silently leave a reserved-character database name encoded on the wire, and
-    # would have stayed green under the prior prefix-only assertion (team-lead-#2 review).
+    # would have stayed green under the prior prefix-only assertion.
     assert command == [
         runner.sys.executable, "scripts/agent/atoms_proof.py", identity.api_url,
         "--database-url-env", env_var_name,
@@ -918,7 +918,7 @@ def test_atoms_proof_passes_database_url_via_env_not_argv(monkeypatch) -> None:
 
 
 def test_atoms_proof_is_registered_in_commands() -> None:
-    """Team-lead-#2 review: cheap regression against COMMANDS["atoms-proof"] silently pointing
+    """Cheap regression against COMMANDS["atoms-proof"] silently pointing
     at the wrong function."""
     runner = load_runner_module()
 
