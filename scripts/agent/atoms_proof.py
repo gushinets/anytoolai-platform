@@ -358,6 +358,23 @@ def _classify_ledger(
                 "action_run_id None"
             ),
         )
+    # PROOF017/PROOF018 above only validate the artifact rows action_runs/job actually
+    # reference -- artifacts is filtered independently by scenario_session_id only (see
+    # _check_ledger), so an extra, unreferenced row for a different job could still be present.
+    # If that row happens to carry exactly one matching artifact.created event, PROOF020/021's
+    # per-artifact_id correlation below would never notice either, since it only asks "does this
+    # id have exactly one creation event", not "does this id belong here at all" (team-lead-#3
+    # review).
+    mismatch = _first_job_id_mismatch(
+        artifacts, job_id=job_id, error_code="PROOF023",
+        describe=lambda artifact: f"artifacts_table row {artifact['id']}",
+    )
+    if mismatch is not None:
+        return _fail(
+            label=label, scenario_id=scenario_id, kind=kind,
+            session_id=scenario_session_id, job_id=job_id,
+            error_code="PROOF023", error_message=mismatch,
+        )
 
     observed_event_types = {event["event_type"] for event in events}
     if not expected_event_types.issubset(observed_event_types):

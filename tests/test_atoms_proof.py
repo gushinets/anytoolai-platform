@@ -280,6 +280,36 @@ def test_classify_ledger_reports_proof018_when_result_artifact_lineage_mismatche
     assert case.error_code == "PROOF018"
 
 
+def test_classify_ledger_reports_proof023_when_an_extra_unreferenced_artifact_is_misowned() -> None:
+    """Team-lead-#3 review: an extra artifacts_table row for a different job -- not referenced
+    by any action_run.output_artifact_id or the job's result_artifact_id -- is invisible to
+    PROOF017/018 (they only check the rows they reference), and to PROOF020/021 as long as the
+    extra row has exactly one matching artifact.created event of its own (which it does here),
+    since that correlation only asks "does this id have exactly one creation event", not "does
+    this id belong here at all"."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[
+            _one_step_artifact(),
+            _one_result_artifact(),
+            _one_step_artifact(id="artifact-extra", job_id="job-other", action_run_id=None),
+        ],
+        events=_all_expected_events(
+            artifact_ids=("artifact-step-1", "artifact-result", "artifact-extra")
+        ),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF023"
+
+
 def test_classify_ledger_reports_proof005_when_event_type_missing() -> None:
     module = load_atoms_proof_module()
 
