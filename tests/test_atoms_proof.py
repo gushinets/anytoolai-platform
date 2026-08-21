@@ -1048,7 +1048,12 @@ def test_build_engine_labels_its_own_errors_as_atoms_proof_not_runtime_storage()
     create_sync_engine(), whose errors default to a "Runtime storage" label describing
     platform-api/platform-worker's boot path -- misleading for this CLI's own operator-facing
     configuration errors (e.g. a bad --database-url-env DSN). _build_engine() now passes its
-    own context."""
+    own context. The second case here used to reach create_sync_engine()'s
+    require_postgresql_url() (context threaded through); as of the team-lead-#6 driver
+    allowlist below, a non-"postgresql+psycopg" driver is rejected directly inside
+    _build_engine() before create_sync_engine() is ever called, so it's now covered by
+    test_build_engine_rejects_a_driver_other_than_the_installed_one instead -- kept here only
+    to prove that path also still says "atoms-proof", not "Runtime storage"."""
     module = load_atoms_proof_module()
 
     with pytest.raises(RuntimeError, match=r"^atoms-proof:"):
@@ -1056,7 +1061,7 @@ def test_build_engine_labels_its_own_errors_as_atoms_proof_not_runtime_storage()
             "postgresql+psycopg://user:pass@127.0.0.1:5432", decode_database_name=True
         )
 
-    with pytest.raises(RuntimeError, match=r"^atoms-proof "):
+    with pytest.raises(RuntimeError, match=r"^atoms-proof:"):
         module._build_engine("sqlite:///tmp.db")
 
 
@@ -1070,15 +1075,26 @@ def test_build_engine_converts_a_malformed_dsn_into_a_runtime_error() -> None:
         module._build_engine("not a url at all")
 
 
-def test_build_engine_converts_an_unsupported_dialect_into_a_runtime_error() -> None:
-    """Team-lead-#5 review: require_postgresql_url() only checks the drivername *prefix*, so
-    "postgresql+unknown://..." passes it -- create_engine()'s dialect-loading step is what
-    actually fails, with sqlalchemy.exc.NoSuchModuleError (an ArgumentError subclass), which
-    run()'s except RuntimeError/PROOF022 handling wouldn't otherwise catch either."""
+def test_build_engine_rejects_a_driver_other_than_the_installed_one() -> None:
+    """Team-lead-#6 review: require_postgresql_url() only checks the drivername *prefix*, so
+    any "postgresql+<anything>" passes it -- this repo installs psycopg[binary] v3 only, no
+    other DBAPI driver. Without an explicit allowlist, a wrong-but-plausible suffix reaches
+    SQLAlchemy's dialect-loading machinery and fails with whatever exception that specific
+    driver's import path happens to produce: sqlalchemy.exc.NoSuchModuleError (an ArgumentError
+    subclass) for a dialect SQLAlchemy has never heard of ("postgresql+unknown"), or a bare
+    ModuleNotFoundError (NOT an ArgumentError subclass -- team-lead-#5's ArgumentError-catching
+    fix didn't cover this one) for a real dialect whose DBAPI package isn't installed here
+    ("postgresql+psycopg2", the exact driver storage/db.py's own module docstring calls out as
+    absent). Chasing each newly-discovered exception type doesn't converge, so _build_engine()
+    now rejects any driver but postgresql+psycopg directly, before ever attempting engine
+    construction -- both cases below never reach create_engine() at all."""
     module = load_atoms_proof_module()
 
-    with pytest.raises(RuntimeError, match="database"):
+    with pytest.raises(RuntimeError, match="postgresql\\+unknown"):
         module._build_engine("postgresql+unknown://user:pass@127.0.0.1:5432/anytoolai")
+
+    with pytest.raises(RuntimeError, match="postgresql\\+psycopg2"):
+        module._build_engine("postgresql+psycopg2://user:pass@127.0.0.1:5432/anytoolai")
 
 
 def test_module_exposes_eleven_atom_and_three_composite_cases() -> None:
