@@ -120,6 +120,15 @@ def test_create_sync_engine_rejects_non_postgresql_urls() -> None:
         create_sync_engine("sqlite:///tmp.db")
 
 
+def test_create_sync_engine_with_decode_flag_tolerates_a_dsn_with_no_database_segment() -> None:
+    """A DSN missing its database path segment leaves url.database as None; unquote(None) raises
+    TypeError, so decode_database_name=True must skip the decode instead of blindly unquoting."""
+    engine = create_sync_engine(
+        "postgresql+psycopg://user:pass@localhost:5432", decode_database_name=True
+    )
+    assert engine.url.database is None
+
+
 @pytest.mark.parametrize(
     "db_name", ["proddb", "my?db=x", "my#db", "my db", "my%db", "my/db", "my@db"]
 )

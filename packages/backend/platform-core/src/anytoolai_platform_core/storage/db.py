@@ -110,7 +110,7 @@ def create_sync_engine(
     "%"-looking substring not meant as encoding (eighteenth code review pass finding, same
     class as scripts/agent/atoms_proof.py's _build_engine())."""
     url = require_postgresql_url(database_url, context="Runtime storage")
-    if decode_database_name:
+    if decode_database_name and url.database is not None:
         url = url.set(database=unquote(url.database))
     return sa.create_engine(url, future=True, **kwargs)
 
