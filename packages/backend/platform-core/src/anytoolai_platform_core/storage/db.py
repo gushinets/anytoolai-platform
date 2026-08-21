@@ -31,9 +31,21 @@ POSTGRES_INTERNAL_PORT_ENV = "ANYTOOLAI_POSTGRES_INTERNAL_PORT"
 _DEFAULT_POSTGRES_INTERNAL_HOST = "postgres"
 _DEFAULT_POSTGRES_INTERNAL_PORT = 5432
 
+# The only synchronous PostgreSQL DBAPI driver this repo installs (psycopg[binary] v3, no
+# psycopg2) -- see create_sync_engine()'s driver-allowlist check below.
+_SUPPORTED_POSTGRESQL_DRIVER = "postgresql+psycopg"
+
 
 def require_postgresql_url(database_url: str | URL, *, context: str) -> URL:
-    url = database_url if isinstance(database_url, URL) else make_url(database_url)
+    """Raises RuntimeError, not the underlying sqlalchemy.exc.ArgumentError, for a DSN that
+    isn't a URL at all -- a caller checking for this contract's own RuntimeError (or any
+    generic exception handler expecting one exception family for "bad configuration") would
+    otherwise miss a malformed database_url string here. ArgumentError's own message never
+    echoes the input string, so nothing from database_url leaks."""
+    try:
+        url = database_url if isinstance(database_url, URL) else make_url(database_url)
+    except sa.exc.ArgumentError as exc:
+        raise RuntimeError(f"{context}: could not parse database URL: {exc}") from exc
     if not url.drivername.startswith("postgresql"):
         raise RuntimeError(f"{context} requires a PostgreSQL database URL")
     return url
@@ -125,16 +137,35 @@ def create_sync_engine(
     merely empty (mirrored in scripts/agent/atoms_proof.py's _build_engine(), which delegates
     here for exactly this reason).
 
-    database_url accepts an already-parsed URL, not just a str: atoms_proof.py's _build_engine()
-    hands one straight through after its own driver coercion, relying on
+    database_url accepts an already-parsed URL, not just a str -- callers like
+    scripts/agent/atoms_proof.py's _build_engine() can hand one straight through, relying on
     require_postgresql_url()'s isinstance(URL) branch -- reflected here rather than left as an
-    undeclared runtime accident. context labels both the non-PostgreSQL-scheme error
-    (require_postgresql_url) and the decode-fail-fast error below; it defaults to this module's
-    own "Runtime storage" label but is a real parameter (not hardcoded) so a caller in a
-    different subsystem -- e.g. atoms_proof.py's CLI, where "Runtime storage" would mislabel an
-    operator-facing configuration error -- can supply its own (twenty-first code review pass
-    finding)."""
+    undeclared runtime accident. context labels every RuntimeError this function and
+    require_postgresql_url() raise; it defaults to this module's own "Runtime storage" label
+    but is a real parameter (not hardcoded) so a caller in a different subsystem -- e.g.
+    atoms_proof.py's CLI, where "Runtime storage" would mislabel an operator-facing
+    configuration error -- can supply its own (twenty-first code review pass finding).
+
+    Driver handling closes a class of bug found piecemeal across several review rounds
+    (team-lead-#5, team-lead-#6): require_postgresql_url() above only checks the drivername
+    *prefix*, so any "postgresql+<anything>" -- or, coerced below, a bare "postgresql://" with
+    no suffix at all -- would otherwise reach sa.create_engine()'s dialect-loading step, which
+    raises whatever exception that specific driver's import path happens to produce
+    (ModuleNotFoundError for a real dialect whose DBAPI package isn't installed -- including the
+    *default* dialect a bare "postgresql://" resolves to, psycopg2, which this repo has never
+    installed -- NoSuchModuleError for a dialect SQLAlchemy has never heard of, and potentially
+    others). Rather than catch each newly-discovered exception type, both the coercion and the
+    allowlist happen deterministically before engine construction is ever attempted, so every
+    caller (this repo installs exactly one driver, psycopg[binary] v3) is protected the same way
+    without needing its own copy of this contract."""
     url = require_postgresql_url(database_url, context=context)
+    if url.drivername == "postgresql":
+        url = url.set(drivername=_SUPPORTED_POSTGRESQL_DRIVER)
+    if url.drivername != _SUPPORTED_POSTGRESQL_DRIVER:
+        raise RuntimeError(
+            f"{context}: unsupported database driver {url.drivername!r} (this repo only "
+            f"installs the {_SUPPORTED_POSTGRESQL_DRIVER!r} driver)"
+        )
     if decode_database_name:
         if not url.database:
             raise RuntimeError(
@@ -142,7 +173,10 @@ def create_sync_engine(
                 "segment to decode"
             )
         url = url.set(database=unquote(url.database))
-    return sa.create_engine(url, future=True, **kwargs)
+    try:
+        return sa.create_engine(url, future=True, **kwargs)
+    except sa.exc.ArgumentError as exc:
+        raise RuntimeError(f"{context}: could not construct database engine: {exc}") from exc
 
 
 def _json_document_type() -> sa.TypeEngine[Any]:

@@ -72,7 +72,6 @@ try:
     )
 
     import sqlalchemy as sa
-    from sqlalchemy.engine import make_url
     from anytoolai_platform_core.storage.db import (
         action_runs_table,
         artifacts_table,
@@ -98,18 +97,12 @@ class StepEvidence:
     step_id: str
     action_type: str
     action_config_id: str
-    latency_ms: int | None = None
-    input_tokens: int | None = None
-    output_tokens: int | None = None
-    total_tokens: int | None = None
-    estimated_cost: float | None = None
 
 
 @dataclass(frozen=True)
 class EvidenceCase:
-    """Privacy-safe by construction: only ids/labels/booleans and numeric ledger metrics
-    (latency, token counts, estimated cost) -- no fixture payload bodies, no prompts, no
-    generated text, no PII -- exactly what gets serialized into the evidence report."""
+    """Privacy-safe by construction: only ids/labels/booleans, no fixture payload bodies, no
+    prompts, no PII -- exactly what gets serialized into the evidence report."""
 
     label: str
     scenario_id: str
@@ -123,28 +116,22 @@ class EvidenceCase:
 
 
 def _build_engine(database_url: str, *, decode_database_name: bool = False) -> "sa.engine.Engine":
-    """RuntimeIdentity.database_url is a bare postgresql:// URL with no driver suffix; this
-    repo only installs psycopg v3 (no psycopg2), so SQLAlchemy's bare-scheme default dialect
-    would fail at engine-creation time. Coerce the driver explicitly, matching every other
-    engine/URL construction site in the codebase (storage/db.py's build_postgres_url_from_env,
-    CI's ANYTOOLAI_POSTGRES_TEST_DATABASE_URL).
+    """A thin context="atoms-proof" wrapper -- storage/db.py's create_sync_engine() now owns
+    the whole contract directly: DSN parsing, bare "postgresql://" driver coercion, rejecting
+    any driver but the one this repo installs (postgresql+psycopg), the decode_database_name
+    percent-decode rule, and engine construction, all raising RuntimeError instead of a raw
+    sqlalchemy.exc.ArgumentError/ModuleNotFoundError/etc. This function used to keep its own
+    copy of the coercion+allowlist logic; three separate review rounds each found a new
+    exception type escaping through that duplicate before it was moved here for good (a prior
+    round of this review found the sibling decode_database_name contract had already drifted
+    the same way) -- one implementation now, not two to keep in sync.
 
-    This function is a general, independently-invocable interface -- --database-url-env reads
-    an arbitrary env var name and hands whatever DSN string it holds straight here, and it's
-    unit-tested directly with hand-written DSN strings -- not restricted to DSNs produced by
-    RuntimeIdentity.database_url's matching quote(). Everything past the driver coercion above
-    -- the percent-decode contract, and raising instead of silently connecting with no database
-    name when decode_database_name=True finds nothing to decode -- is delegated to
-    storage/db.py's create_sync_engine(), the same function platform-api/platform-worker's boot
-    path uses, instead of a second, independently-maintained copy of that contract (a prior
-    round of this review found the two copies had already drifted)."""
-    url = make_url(database_url)
-    if url.drivername == "postgresql":
-        url = url.set(drivername="postgresql+psycopg")
-    # context="atoms-proof": create_sync_engine()'s default "Runtime storage" label describes
-    # platform-api/platform-worker's boot path, not this CLI's operator-facing configuration
-    # errors (e.g. a bad --database-url-env DSN) -- twenty-first code review pass finding.
-    return create_sync_engine(url, decode_database_name=decode_database_name, context="atoms-proof")
+    context="atoms-proof": create_sync_engine()'s default "Runtime storage" label describes
+    platform-api/platform-worker's boot path, not this CLI's operator-facing configuration
+    errors (e.g. a bad --database-url-env DSN) -- twenty-first code review pass finding."""
+    return create_sync_engine(
+        database_url, decode_database_name=decode_database_name, context="atoms-proof"
+    )
 
 
 def _orphan_ids(*count_dicts: dict, known_ids: set) -> list:
@@ -277,12 +264,10 @@ def _classify_ledger(
         )
 
     provider_call_counts: dict[str, int] = {}
-    provider_call_by_action_run_id: dict[str, dict] = {}
     for call in provider_calls:
         provider_call_counts[call["action_run_id"]] = (
             provider_call_counts.get(call["action_run_id"], 0) + 1
         )
-        provider_call_by_action_run_id[call["action_run_id"]] = call
     for action_run in action_runs:
         count = provider_call_counts.get(action_run["id"], 0)
         if count != 1:
@@ -312,6 +297,32 @@ def _classify_ledger(
             )
 
     artifacts_by_id = {artifact["id"]: artifact for artifact in artifacts}
+    # artifacts is filtered independently by scenario_session_id only (see _check_ledger), so an
+    # extra, unreferenced row for a different job could be present alongside the rows
+    # action_runs/job actually reference. If that row happens to carry exactly one matching
+    # artifact.created event, PROOF020/021's per-artifact_id correlation below would never
+    # notice either, since it only asks "does this id have exactly one creation event", not
+    # "does this id belong here at all". Scanned here, before the PROOF004/017/018
+    # reference-specific checks below -- mirroring PROOF016's placement before PROOF003/012 for
+    # provider_calls -- rather than as an ad hoc fourth check appended after them.
+    # No allow_none here, unlike PROOF019's event_log scan: event_log.job_id has a genuine,
+    # reachable null case (scenario.started is emitted before a job exists), but no current
+    # ArtifactService caller ever creates a job-less artifact -- tolerating job_id=None here
+    # would let an unowned artifact (and its own job-less artifact.created event, which PROOF019
+    # would also tolerate) pass this entire proof as a PASS with an artifact nothing actually
+    # claims. If job-less artifacts become a real, intentional state, restrict the tolerance to
+    # that specific role rather than every fetched session row (team-lead-#5 review).
+    mismatch = _first_job_id_mismatch(
+        artifacts, job_id=job_id, error_code="PROOF023",
+        describe=lambda artifact: f"artifacts_table row {artifact['id']}",
+    )
+    if mismatch is not None:
+        return _fail(
+            label=label, scenario_id=scenario_id, kind=kind,
+            session_id=scenario_session_id, job_id=job_id,
+            error_code="PROOF023", error_message=mismatch,
+        )
+
     for action_run in action_runs:
         output_artifact_id = action_run["output_artifact_id"]
         artifact = artifacts_by_id.get(output_artifact_id)
@@ -325,19 +336,19 @@ def _classify_ledger(
                     f"{action_run['step_id']}) has no matching artifacts_table row"
                 ),
             )
-        # A row can exist under output_artifact_id yet belong to a different job/action_run
-        # (e.g. copy-paste of another session's artifact id) -- artifact_ids membership alone
-        # can't catch that, so check lineage directly.
-        if artifact["job_id"] != job_id or artifact["action_run_id"] != action_run["id"]:
+        # PROOF023 above already guarantees every fetched artifact's job_id is exactly job_id
+        # (no tolerance), so only the action_run_id lineage PROOF023's row-level scan can't
+        # express is left to check here -- mirrors provider_calls' PROOF012, which likewise
+        # never re-touches job_id after PROOF016.
+        if artifact["action_run_id"] != action_run["id"]:
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
                 error_code="PROOF017",
                 error_message=(
                     f"PROOF017: artifact {output_artifact_id} for action_run "
-                    f"{action_run['id']} (step {action_run['step_id']}) has job_id "
-                    f"{artifact['job_id']!r}/action_run_id {artifact['action_run_id']!r}, "
-                    f"expected job_id {job_id!r}/action_run_id {action_run['id']!r}"
+                    f"{action_run['id']} (step {action_run['step_id']}) has action_run_id "
+                    f"{artifact['action_run_id']!r}, expected {action_run['id']!r}"
                 ),
             )
     # result_artifact_id is a separate artifact row (action_run_id=None), never a step's own
@@ -354,16 +365,16 @@ def _classify_ledger(
                 f"artifacts_table rows for scenario_session_id {scenario_session_id}"
             ),
         )
-    if result_artifact["job_id"] != job_id or result_artifact["action_run_id"] is not None:
+    # Same reasoning as PROOF017 above: PROOF023 already guarantees job_id, only action_run_id
+    # lineage remains to check.
+    if result_artifact["action_run_id"] is not None:
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
             error_code="PROOF018",
             error_message=(
-                f"PROOF018: job result_artifact_id {result_artifact_id} has job_id "
-                f"{result_artifact['job_id']!r}/action_run_id "
-                f"{result_artifact['action_run_id']!r}, expected job_id {job_id!r}/"
-                "action_run_id None"
+                f"PROOF018: job result_artifact_id {result_artifact_id} has action_run_id "
+                f"{result_artifact['action_run_id']!r}, expected None"
             ),
         )
 
@@ -513,11 +524,6 @@ def _classify_ledger(
             step_id=row["step_id"],
             action_type=row["action_type"],
             action_config_id=row["action_config_id"],
-            latency_ms=provider_call_by_action_run_id[row["id"]]["latency_ms"],
-            input_tokens=provider_call_by_action_run_id[row["id"]]["input_tokens"],
-            output_tokens=provider_call_by_action_run_id[row["id"]]["output_tokens"],
-            total_tokens=provider_call_by_action_run_id[row["id"]]["total_tokens"],
-            estimated_cost=provider_call_by_action_run_id[row["id"]]["estimated_cost"],
         )
         for row in action_runs
     )

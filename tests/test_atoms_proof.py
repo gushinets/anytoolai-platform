@@ -101,19 +101,6 @@ def _one_result_artifact(**overrides) -> dict:
     return row
 
 
-def _one_provider_call(**overrides) -> dict:
-    row = {
-        "action_run_id": "run-1",
-        "latency_ms": 123,
-        "input_tokens": 10,
-        "output_tokens": 20,
-        "total_tokens": 30,
-        "estimated_cost": 0.001,
-    }
-    row.update(overrides)
-    return row
-
-
 def test_classify_ledger_passes_with_full_correlation() -> None:
     module = load_atoms_proof_module()
 
@@ -139,11 +126,6 @@ def test_classify_ledger_passes_with_full_correlation() -> None:
             step_id="extract",
             action_type="text.extract_structured_fields",
             action_config_id="kernel_demo.extract_structured_fields_v1",
-            latency_ms=123,
-            input_tokens=10,
-            output_tokens=20,
-            total_tokens=30,
-            estimated_cost=0.001,
         ),
     )
 
@@ -279,8 +261,115 @@ def test_classify_ledger_reports_proof017_when_step_artifact_lineage_mismatches(
 
 
 def test_classify_ledger_reports_proof018_when_result_artifact_lineage_mismatches() -> None:
-    """Mirrors PROOF017 for the job's own result_artifact_id: must belong to this job and carry
-    no action_run_id (workflows/runner.py's _create_final_artifact always creates it that way)."""
+    """Mirrors PROOF017 for the job's own result_artifact_id: must carry no action_run_id
+    (workflows/runner.py's _create_final_artifact always creates it that way). Team-lead-#5
+    review: PROOF023's full ownership scan (strict, no allow_none -- unlike event_log.job_id,
+    no ArtifactService caller ever creates a job-less artifact) now runs before this check and
+    already guarantees job_id is exactly right for every row, so only the action_run_id lineage
+    remains for this check to catch."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[_one_step_artifact(), _one_result_artifact(action_run_id="run-1")],
+        events=_all_expected_events(),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF018"
+
+
+def test_classify_ledger_reports_proof023_when_an_extra_unreferenced_artifact_is_misowned() -> None:
+    """Team-lead-#3 review: an extra artifacts_table row for a different job -- not referenced
+    by any action_run.output_artifact_id or the job's result_artifact_id -- is invisible to
+    PROOF017/018 (they only check the rows they reference), and to PROOF020/021 as long as the
+    extra row has exactly one matching artifact.created event of its own (which it does here),
+    since that correlation only asks "does this id have exactly one creation event", not "does
+    this id belong here at all"."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[
+            _one_step_artifact(),
+            _one_result_artifact(),
+            _one_step_artifact(id="artifact-extra", job_id="job-other", action_run_id=None),
+        ],
+        events=_all_expected_events(
+            artifact_ids=("artifact-step-1", "artifact-result", "artifact-extra")
+        ),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF023"
+
+
+def test_classify_ledger_reports_proof023_when_an_extra_artifact_has_a_null_job_id() -> None:
+    """Team-lead-#5 review: no ArtifactService caller ever creates a job-less artifact (unlike
+    event_log.job_id, which PROOF019 legitimately tolerates as null since scenario.started is
+    emitted before a job exists), so tolerating job_id=None here would let an unowned extra
+    artifact -- with its own job-less artifact.created event, which PROOF019 would also
+    tolerate -- pass this entire proof as PASS with an artifact nothing actually claims.
+    PROOF023 must reject a null job_id, not just a wrong non-null one."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[
+            _one_step_artifact(),
+            _one_result_artifact(),
+            _one_step_artifact(id="artifact-extra", job_id=None, action_run_id=None),
+        ],
+        events=[
+            *_all_expected_events(),
+            {"event_type": "artifact.created", "artifact_id": "artifact-extra"},
+        ],
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF023"
+
+
+def test_classify_ledger_reports_proof023_when_step_artifact_has_wrong_job_id() -> None:
+    """Twenty-third code review pass finding: the only prior PROOF023 regression case used an
+    extra, unreferenced artifact -- nothing proved the full scan also catches a wrong, non-null
+    job_id on a *referenced* row (action_run.output_artifact_id) now that PROOF023 runs before
+    PROOF017. Correct by code inspection, but a future reorder or a _first_job_id_mismatch()
+    change that skipped referenced rows would have gone uncaught."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[_one_step_artifact(job_id="job-other"), _one_result_artifact()],
+        events=_all_expected_events(),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF023"
+
+
+def test_classify_ledger_reports_proof023_when_result_artifact_has_wrong_job_id() -> None:
+    """Mirrors the step-artifact case above for the job's own result_artifact_id."""
     module = load_atoms_proof_module()
 
     case = module._classify_ledger(
@@ -295,7 +384,7 @@ def test_classify_ledger_reports_proof018_when_result_artifact_lineage_mismatche
     )
 
     assert case.status == "fail"
-    assert case.error_code == "PROOF018"
+    assert case.error_code == "PROOF023"
 
 
 def test_classify_ledger_reports_proof005_when_event_type_missing() -> None:
@@ -650,9 +739,8 @@ def test_classify_ledger_passes_for_multi_step_composite_workflow() -> None:
         job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
         action_runs=action_runs,
         provider_calls=[
-            _one_provider_call(),
-            _one_provider_call(action_run_id="run-2", latency_ms=456, input_tokens=11,
-                                output_tokens=21, total_tokens=32, estimated_cost=0.002),
+            _one_provider_call(id="call-1", action_run_id="run-1"),
+            _one_provider_call(id="call-2", action_run_id="run-2"),
         ],
         artifacts=[
             _one_step_artifact(),
@@ -669,8 +757,6 @@ def test_classify_ledger_passes_for_multi_step_composite_workflow() -> None:
 
     assert case.status == "pass"
     assert len(case.steps) == 2
-    assert case.steps[0].latency_ms == 123
-    assert case.steps[1].latency_ms == 456
 
 
 def test_run_case_with_ledger_check_reports_http_failure_without_touching_db(
@@ -958,11 +1044,15 @@ def test_build_engine_fails_fast_when_decode_flag_set_on_a_dsn_with_empty_databa
 
 
 def test_build_engine_labels_its_own_errors_as_atoms_proof_not_runtime_storage() -> None:
-    """Twenty-first code review pass finding: _build_engine() delegates to
-    create_sync_engine(), whose errors default to a "Runtime storage" label describing
-    platform-api/platform-worker's boot path -- misleading for this CLI's own operator-facing
-    configuration errors (e.g. a bad --database-url-env DSN). _build_engine() now passes its
-    own context."""
+    """Twenty-first code review pass finding: create_sync_engine()'s errors default to a
+    "Runtime storage" label describing platform-api/platform-worker's boot path -- misleading
+    for this CLI's own operator-facing configuration errors (e.g. a bad --database-url-env
+    DSN). _build_engine() passes its own context through to create_sync_engine(), which now
+    owns the whole DSN-parsing/driver/decode/construction contract directly (team-lead-#6
+    review: this function used to keep a second, independently-maintained copy of the driver
+    coercion+allowlist logic, which is exactly the kind of duplicate contract that let three
+    separate rounds each find a new exception type escaping through one copy but not the
+    other)."""
     module = load_atoms_proof_module()
 
     with pytest.raises(RuntimeError, match=r"^atoms-proof:"):
@@ -972,6 +1062,38 @@ def test_build_engine_labels_its_own_errors_as_atoms_proof_not_runtime_storage()
 
     with pytest.raises(RuntimeError, match=r"^atoms-proof "):
         module._build_engine("sqlite:///tmp.db")
+
+
+def test_build_engine_converts_a_malformed_dsn_into_a_runtime_error() -> None:
+    """Team-lead-#5 review: make_url() raises sqlalchemy.exc.ArgumentError, not RuntimeError,
+    for a DSN that isn't a URL at all -- left uncaught, run()'s except RuntimeError/PROOF022
+    handling never sees it, so it propagates as a raw traceback."""
+    module = load_atoms_proof_module()
+
+    with pytest.raises(RuntimeError, match="database"):
+        module._build_engine("not a url at all")
+
+
+def test_build_engine_rejects_a_driver_other_than_the_installed_one() -> None:
+    """Team-lead-#6 review: require_postgresql_url() only checks the drivername *prefix*, so
+    any "postgresql+<anything>" passes it -- this repo installs psycopg[binary] v3 only, no
+    other DBAPI driver. Without an explicit allowlist, a wrong-but-plausible suffix reaches
+    SQLAlchemy's dialect-loading machinery and fails with whatever exception that specific
+    driver's import path happens to produce: sqlalchemy.exc.NoSuchModuleError (an ArgumentError
+    subclass) for a dialect SQLAlchemy has never heard of ("postgresql+unknown"), or a bare
+    ModuleNotFoundError (NOT an ArgumentError subclass -- team-lead-#5's ArgumentError-catching
+    fix didn't cover this one) for a real dialect whose DBAPI package isn't installed here
+    ("postgresql+psycopg2", the exact driver storage/db.py's own module docstring calls out as
+    absent). Chasing each newly-discovered exception type doesn't converge, so _build_engine()
+    now rejects any driver but postgresql+psycopg directly, before ever attempting engine
+    construction -- both cases below never reach create_engine() at all."""
+    module = load_atoms_proof_module()
+
+    with pytest.raises(RuntimeError, match="postgresql\\+unknown"):
+        module._build_engine("postgresql+unknown://user:pass@127.0.0.1:5432/anytoolai")
+
+    with pytest.raises(RuntimeError, match="postgresql\\+psycopg2"):
+        module._build_engine("postgresql+psycopg2://user:pass@127.0.0.1:5432/anytoolai")
 
 
 def test_module_exposes_eleven_atom_and_three_composite_cases() -> None:
@@ -1192,6 +1314,19 @@ def test_run_reports_proof022_instead_of_a_raw_traceback_on_engine_configuration
         "postgresql+psycopg://user:pass@127.0.0.1:5432/",
         timeout=5.0,
         decode_database_name=True,
+    )
+
+    assert cases == []
+    assert exit_code == 1
+    assert "PROOF022" in capsys.readouterr().err
+
+    # Twenty-fourth code review pass: PROOF022 is deliberately broad (see run()'s own comment),
+    # covering any RuntimeError _build_engine()/create_sync_engine() raises -- not just the
+    # decode-fail-fast case above. A non-PostgreSQL DSN raises via require_postgresql_url()
+    # instead, a different call site entirely; nothing at the run() level proved that one also
+    # reaches PROOF022 rather than a raw traceback.
+    cases, exit_code = module.run(
+        "http://127.0.0.1:8000", "sqlite:///tmp.db", timeout=5.0, decode_database_name=True,
     )
 
     assert cases == []
