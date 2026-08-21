@@ -1044,16 +1044,15 @@ def test_build_engine_fails_fast_when_decode_flag_set_on_a_dsn_with_empty_databa
 
 
 def test_build_engine_labels_its_own_errors_as_atoms_proof_not_runtime_storage() -> None:
-    """Twenty-first code review pass finding: _build_engine() delegates to
-    create_sync_engine(), whose errors default to a "Runtime storage" label describing
-    platform-api/platform-worker's boot path -- misleading for this CLI's own operator-facing
-    configuration errors (e.g. a bad --database-url-env DSN). _build_engine() now passes its
-    own context. The second case here used to reach create_sync_engine()'s
-    require_postgresql_url() (context threaded through); as of the team-lead-#6 driver
-    allowlist below, a non-"postgresql+psycopg" driver is rejected directly inside
-    _build_engine() before create_sync_engine() is ever called, so it's now covered by
-    test_build_engine_rejects_a_driver_other_than_the_installed_one instead -- kept here only
-    to prove that path also still says "atoms-proof", not "Runtime storage"."""
+    """Twenty-first code review pass finding: create_sync_engine()'s errors default to a
+    "Runtime storage" label describing platform-api/platform-worker's boot path -- misleading
+    for this CLI's own operator-facing configuration errors (e.g. a bad --database-url-env
+    DSN). _build_engine() passes its own context through to create_sync_engine(), which now
+    owns the whole DSN-parsing/driver/decode/construction contract directly (team-lead-#6
+    review: this function used to keep a second, independently-maintained copy of the driver
+    coercion+allowlist logic, which is exactly the kind of duplicate contract that let three
+    separate rounds each find a new exception type escaping through one copy but not the
+    other)."""
     module = load_atoms_proof_module()
 
     with pytest.raises(RuntimeError, match=r"^atoms-proof:"):
@@ -1061,7 +1060,7 @@ def test_build_engine_labels_its_own_errors_as_atoms_proof_not_runtime_storage()
             "postgresql+psycopg://user:pass@127.0.0.1:5432", decode_database_name=True
         )
 
-    with pytest.raises(RuntimeError, match=r"^atoms-proof:"):
+    with pytest.raises(RuntimeError, match=r"^atoms-proof "):
         module._build_engine("sqlite:///tmp.db")
 
 

@@ -72,7 +72,6 @@ try:
     )
 
     import sqlalchemy as sa
-    from sqlalchemy.engine import make_url
     from anytoolai_platform_core.storage.db import (
         action_runs_table,
         artifacts_table,
@@ -91,10 +90,6 @@ COMPOSITE_SMOKE_CASES = (
 )
 
 DEFAULT_TIMEOUT_SECONDS = 30.0
-
-# The only synchronous PostgreSQL DBAPI driver this repo installs (psycopg[binary] v3, no
-# psycopg2) -- see _build_engine()'s driver-allowlist check below.
-_SUPPORTED_POSTGRESQL_DRIVER = "postgresql+psycopg"
 
 
 @dataclass(frozen=True)
@@ -121,61 +116,22 @@ class EvidenceCase:
 
 
 def _build_engine(database_url: str, *, decode_database_name: bool = False) -> "sa.engine.Engine":
-    """RuntimeIdentity.database_url is a bare postgresql:// URL with no driver suffix; this
-    repo only installs psycopg v3 (no psycopg2), so SQLAlchemy's bare-scheme default dialect
-    would fail at engine-creation time. Coerce the driver explicitly, matching every other
-    engine/URL construction site in the codebase (storage/db.py's build_postgres_url_from_env,
-    CI's ANYTOOLAI_POSTGRES_TEST_DATABASE_URL).
+    """A thin context="atoms-proof" wrapper -- storage/db.py's create_sync_engine() now owns
+    the whole contract directly: DSN parsing, bare "postgresql://" driver coercion, rejecting
+    any driver but the one this repo installs (postgresql+psycopg), the decode_database_name
+    percent-decode rule, and engine construction, all raising RuntimeError instead of a raw
+    sqlalchemy.exc.ArgumentError/ModuleNotFoundError/etc. This function used to keep its own
+    copy of the coercion+allowlist logic; three separate review rounds each found a new
+    exception type escaping through that duplicate before it was moved here for good (a prior
+    round of this review found the sibling decode_database_name contract had already drifted
+    the same way) -- one implementation now, not two to keep in sync.
 
-    This function is a general, independently-invocable interface -- --database-url-env reads
-    an arbitrary env var name and hands whatever DSN string it holds straight here, and it's
-    unit-tested directly with hand-written DSN strings -- not restricted to DSNs produced by
-    RuntimeIdentity.database_url's matching quote(). Everything past the driver coercion above
-    -- the percent-decode contract, and raising instead of silently connecting with no database
-    name when decode_database_name=True finds nothing to decode -- is delegated to
-    storage/db.py's create_sync_engine(), the same function platform-api/platform-worker's boot
-    path uses, instead of a second, independently-maintained copy of that contract (a prior
-    round of this review found the two copies had already drifted)."""
-    # make_url() raises sqlalchemy.exc.ArgumentError, not RuntimeError, for a DSN that isn't a
-    # URL at all. Left uncaught, that's the same raw-traceback-instead-of-PROOF0xx failure mode
-    # the run()-level except RuntimeError/PROOF022 handling exists to prevent (twentieth round),
-    # just for an exception type that handling doesn't catch. Re-raised as RuntimeError so it
-    # reaches that same handling; ArgumentError's own message never echoes the input string
-    # (verified), so nothing from database_url leaks.
-    try:
-        url = make_url(database_url)
-    except sa.exc.ArgumentError as exc:
-        raise RuntimeError(f"atoms-proof: could not parse database URL: {exc}") from exc
-    if url.drivername == "postgresql":
-        url = url.set(drivername="postgresql+psycopg")
-    # require_postgresql_url() (reached via create_sync_engine() below) only checks the
-    # drivername *prefix* -- any "postgresql+<anything>" passes it. This repo installs
-    # psycopg[binary] v3 only, no other DBAPI driver, so a wrong-but-plausible-looking suffix
-    # (a typo'd "postgresql+psycopg2", an old-driver DSN copied from another project, a
-    # nonexistent dialect like "postgresql+unknown") would otherwise reach SQLAlchemy's
-    # dialect-loading machinery, which raises whatever exception that specific driver's import
-    # path happens to produce -- NoSuchModuleError for a dialect SQLAlchemy has never heard of,
-    # a bare ModuleNotFoundError for a real dialect whose DBAPI package (e.g. psycopg2) just
-    # isn't installed here, and potentially others. Chasing each newly-discovered exception type
-    # with another except clause doesn't converge (team-lead-#5 found NoSuchModuleError;
-    # team-lead-#6 found ModuleNotFoundError isn't even an ArgumentError subclass, so it slipped
-    # past that fix too). Reject any driver but the one this repo actually supports up front,
-    # deterministically, before ever attempting engine construction -- closes the whole class at
-    # once instead of one exception type at a time.
-    if url.drivername != _SUPPORTED_POSTGRESQL_DRIVER:
-        raise RuntimeError(
-            f"atoms-proof: unsupported database driver {url.drivername!r} (this repo only "
-            f"installs the {_SUPPORTED_POSTGRESQL_DRIVER!r} driver)"
-        )
-    # context="atoms-proof": create_sync_engine()'s default "Runtime storage" label describes
-    # platform-api/platform-worker's boot path, not this CLI's operator-facing configuration
-    # errors (e.g. a bad --database-url-env DSN) -- twenty-first code review pass finding.
-    try:
-        return create_sync_engine(
-            url, decode_database_name=decode_database_name, context="atoms-proof"
-        )
-    except sa.exc.ArgumentError as exc:
-        raise RuntimeError(f"atoms-proof: could not construct database engine: {exc}") from exc
+    context="atoms-proof": create_sync_engine()'s default "Runtime storage" label describes
+    platform-api/platform-worker's boot path, not this CLI's operator-facing configuration
+    errors (e.g. a bad --database-url-env DSN) -- twenty-first code review pass finding."""
+    return create_sync_engine(
+        database_url, decode_database_name=decode_database_name, context="atoms-proof"
+    )
 
 
 def _orphan_ids(*count_dicts: dict, known_ids: set) -> list:
