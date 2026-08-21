@@ -47,18 +47,26 @@ from anytoolai_platform_worker.worker import Worker
 def build_worker(
     *,
     database_url: str | None = None,
+    decode_database_name: bool = False,
     session_factory: sessionmaker[Session] | None = None,
     config_root: Path | None = None,
     config_registry: ConfigRegistry | None = None,
     provider_adapters: Mapping[str, Any] | None = None,
     poll_interval_seconds: float = 1.0,
 ) -> Worker:
-    """Build the production graph, with explicit test seams for DB and provider adapters."""
+    """Build the production graph, with explicit test seams for DB and provider adapters.
+
+    decode_database_name is forwarded to create_sync_engine() verbatim -- see its own
+    docstring; it must be True only when database_url came from
+    anytoolai_platform_core.storage.db.build_postgres_url_from_env().
+    """
 
     if session_factory is None:
         if not database_url:
             raise ValueError("database_url is required when session_factory is not provided")
-        session_factory = build_session_factory(create_sync_engine(database_url))
+        session_factory = build_session_factory(
+            create_sync_engine(database_url, decode_database_name=decode_database_name)
+        )
 
     registry = config_registry or build_config_registry(config_root)
     adapters = dict(provider_adapters or build_default_provider_adapters(config_root))

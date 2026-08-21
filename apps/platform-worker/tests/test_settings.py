@@ -94,3 +94,20 @@ def test_worker_settings_build_database_url_from_postgres_components(
     assert settings.database_url == (
         "postgresql+psycopg://produser:p%40ss%3Aw%2Frd%231%252@postgres:5432/proddb"
     )
+    assert settings.decode_database_name is True
+
+
+def test_worker_settings_does_not_decode_database_name_for_an_explicit_database_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Eighteenth code review pass finding: only the POSTGRES_*_ENV fallback's DSN has a
+    percent-encoded database segment -- an explicit ANYTOOLAI_DATABASE_URL/DATABASE_URL override
+    must be used exactly as given."""
+    monkeypatch.setenv(
+        GENERIC_DATABASE_URL_ENV,
+        "postgresql+psycopg://worker:worker@postgres:5432/anytoolai",
+    )
+
+    settings = WorkerSettings.from_env()
+
+    assert settings.decode_database_name is False

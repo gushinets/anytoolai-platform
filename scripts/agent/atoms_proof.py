@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import urllib.parse
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -120,16 +121,42 @@ class EvidenceCase:
     steps: tuple[StepEvidence, ...]
 
 
-def _build_engine(database_url: str) -> "sa.engine.Engine":
+def _build_engine(database_url: str, *, decode_database_name: bool = False) -> "sa.engine.Engine":
     """RuntimeIdentity.database_url is a bare postgresql:// URL with no driver suffix; this
     repo only installs psycopg v3 (no psycopg2), so SQLAlchemy's bare-scheme default dialect
     would fail at engine-creation time. Coerce the driver explicitly, matching every other
     engine/URL construction site in the codebase (storage/db.py's build_postgres_url_from_env,
-    CI's ANYTOOLAI_POSTGRES_TEST_DATABASE_URL)."""
+    CI's ANYTOOLAI_POSTGRES_TEST_DATABASE_URL).
+
+    This function is a general, independently-invocable interface -- --database-url-env reads
+    an arbitrary env var name and hands whatever DSN string it holds straight here, and it's
+    unit-tested directly with hand-written DSN strings -- not restricted to DSNs produced by
+    RuntimeIdentity.database_url's matching quote(). make_url() decodes userinfo but leaves the
+    database path segment exactly as found, so a blind, unconditional unquote() would silently
+    corrupt a database name from any other source that legitimately contains a "%"-looking
+    substring not meant as encoding (eighteenth code review pass finding). decode_database_name
+    is therefore an explicit, caller-declared contract: pass True only when the caller knows
+    database_url's database-name segment was percent-encoded by its producer (e.g.
+    RuntimeIdentity.database_url in scripts/agent/runner.py); leave False for a hand-written or
+    otherwise arbitrary DSN, whose database name is used exactly as given."""
     url = make_url(database_url)
+    if decode_database_name and url.database is not None:
+        url = url.set(database=urllib.parse.unquote(url.database))
     if url.drivername == "postgresql":
         url = url.set(drivername="postgresql+psycopg")
     return sa.create_engine(url, future=True)
+
+
+def _orphan_ids(*count_dicts: dict, known_ids: set) -> list:
+    """Sorted, None-safe list of ids seen as keys in any of count_dicts but absent from
+    known_ids. Shared by the PROOF014/PROOF015 orphan-event checks below: action_run_id and
+    provider_call_id are nullable event_log columns (storage/db.py), so an orphan row's id can
+    be None, and plain sorted() raises TypeError comparing None to a str."""
+    orphans: set = set()
+    for counts in count_dicts:
+        orphans |= set(counts)
+    orphans -= known_ids
+    return sorted(orphans, key=lambda orphan_id: (orphan_id is None, orphan_id))
 
 
 def _fail(
@@ -189,6 +216,22 @@ def _classify_ledger(
             ),
         )
 
+    # scenario_session_id alone doesn't guarantee an action_run actually belongs to this job --
+    # both columns are filtered independently at query time (see _check_ledger), so a mislinked
+    # row would otherwise pass every downstream check silently.
+    for action_run in action_runs:
+        if action_run["job_id"] != job_id:
+            return _fail(
+                label=label, scenario_id=scenario_id, kind=kind,
+                session_id=scenario_session_id, job_id=job_id,
+                error_code="PROOF011",
+                error_message=(
+                    f"PROOF011: action_run {action_run['id']} (step {action_run['step_id']}) "
+                    f"has job_id {action_run['job_id']!r}, expected {job_id!r}"
+                ),
+            )
+
+    action_run_ids = {action_run["id"] for action_run in action_runs}
     provider_call_counts: dict[str, int] = {}
     provider_call_by_action_run_id: dict[str, dict] = {}
     for call in provider_calls:
@@ -207,6 +250,20 @@ def _classify_ledger(
                     f"PROOF003: expected exactly one provider_calls row for "
                     f"action_run {action_run['id']} (step {action_run['step_id']}), "
                     f"found {count}"
+                ),
+            )
+    # An orphan provider_calls row (right scenario_session_id, action_run_id pointing outside
+    # this session's own action_runs) would never surface above -- the count loop only walks
+    # known action_runs, so it can't detect an extra row keyed to nothing real.
+    for call in provider_calls:
+        if call["action_run_id"] not in action_run_ids:
+            return _fail(
+                label=label, scenario_id=scenario_id, kind=kind,
+                session_id=scenario_session_id, job_id=job_id,
+                error_code="PROOF012",
+                error_message=(
+                    f"PROOF012: provider_calls row {call['id']} references action_run_id "
+                    f"{call['action_run_id']!r}, which is not among this session's action_runs"
                 ),
             )
 
@@ -249,17 +306,96 @@ def _classify_ledger(
                 f"scenario_session_id {scenario_session_id}"
             ),
         )
-    started_count = sum(1 for event in events if event["event_type"] == "action.started")
-    succeeded_count = sum(1 for event in events if event["event_type"] == "action.succeeded")
-    if started_count != len(action_runs) or succeeded_count != len(action_runs):
+
+    # PROOF005 above only checks the *set* of event types seen anywhere in the session -- it
+    # would pass even if every action.started/succeeded event were misattributed to one
+    # action_run and none to another (counts still sum right), or duplicated once and missing
+    # once. Correlate by action_run_id/provider_call_id, not just event_type, to catch that.
+    action_started_counts: dict[str, int] = {}
+    action_succeeded_counts: dict[str, int] = {}
+    for event in events:
+        if event["event_type"] == "action.started":
+            action_started_counts[event["action_run_id"]] = (
+                action_started_counts.get(event["action_run_id"], 0) + 1
+            )
+        elif event["event_type"] == "action.succeeded":
+            action_succeeded_counts[event["action_run_id"]] = (
+                action_succeeded_counts.get(event["action_run_id"], 0) + 1
+            )
+    for action_run in action_runs:
+        run_id = action_run["id"]
+        started = action_started_counts.get(run_id, 0)
+        succeeded = action_succeeded_counts.get(run_id, 0)
+        if started != 1 or succeeded != 1:
+            return _fail(
+                label=label, scenario_id=scenario_id, kind=kind,
+                session_id=scenario_session_id, job_id=job_id,
+                error_code="PROOF006",
+                error_message=(
+                    f"PROOF006: expected exactly one action.started and one "
+                    f"action.succeeded event_log row for action_run {run_id} (step "
+                    f"{action_run['step_id']}), found {started} and {succeeded}"
+                ),
+            )
+    # The per-run loop above only walks known action_runs, so an orphan event_log row (same
+    # scenario_session_id, but an action_run_id not among this session's action_runs -- e.g.
+    # misattributed to another session's run) would never surface, mirroring the PROOF012 gap
+    # this same check class already closed for provider_calls.
+    orphan_action_event_ids = _orphan_ids(
+        action_started_counts, action_succeeded_counts, known_ids=action_run_ids
+    )
+    if orphan_action_event_ids:
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
-            error_code="PROOF006",
+            error_code="PROOF014",
             error_message=(
-                f"PROOF006: expected {len(action_runs)} action.started and "
-                f"{len(action_runs)} action.succeeded events, found {started_count} and "
-                f"{succeeded_count}"
+                f"PROOF014: event_log has action.started/action.succeeded rows for "
+                f"action_run_id(s) {orphan_action_event_ids}, not among this "
+                f"session's action_runs"
+            ),
+        )
+
+    provider_call_ids = {call["id"] for call in provider_calls}
+    provider_started_counts: dict[str, int] = {}
+    provider_succeeded_counts: dict[str, int] = {}
+    for event in events:
+        if event["event_type"] == "provider.request_started":
+            provider_started_counts[event["provider_call_id"]] = (
+                provider_started_counts.get(event["provider_call_id"], 0) + 1
+            )
+        elif event["event_type"] == "provider.request_succeeded":
+            provider_succeeded_counts[event["provider_call_id"]] = (
+                provider_succeeded_counts.get(event["provider_call_id"], 0) + 1
+            )
+    for call in provider_calls:
+        call_id = call["id"]
+        started = provider_started_counts.get(call_id, 0)
+        succeeded = provider_succeeded_counts.get(call_id, 0)
+        if started != 1 or succeeded != 1:
+            return _fail(
+                label=label, scenario_id=scenario_id, kind=kind,
+                session_id=scenario_session_id, job_id=job_id,
+                error_code="PROOF013",
+                error_message=(
+                    f"PROOF013: expected exactly one provider.request_started and one "
+                    f"provider.request_succeeded event_log row for provider_call {call_id} "
+                    f"(action_run {call['action_run_id']}), found {started} and {succeeded}"
+                ),
+            )
+    orphan_provider_event_ids = _orphan_ids(
+        provider_started_counts, provider_succeeded_counts, known_ids=provider_call_ids
+    )
+    if orphan_provider_event_ids:
+        return _fail(
+            label=label, scenario_id=scenario_id, kind=kind,
+            session_id=scenario_session_id, job_id=job_id,
+            error_code="PROOF015",
+            error_message=(
+                f"PROOF015: event_log has provider.request_started/"
+                f"provider.request_succeeded rows for provider_call_id(s) "
+                f"{orphan_provider_event_ids}, not among this session's "
+                f"provider_calls"
             ),
         )
 
@@ -373,11 +509,20 @@ def _run_case_with_ledger_check(
 ) -> EvidenceCase:
     result = smoke._run_one_case(api_url, scenario_id, scenario_input, timeout)
     if result.error_message is not None:
+        # result.error_message is free-form text this script doesn't control (e.g. SMOKE004
+        # embeds the whole raw scenario-session response body) -- print it once here for a human
+        # to read, but don't let it flow into EvidenceCase, which is persisted to disk and
+        # documented as privacy-safe-by-construction (ids/labels/booleans only).
+        print(f"{label} ({scenario_id}): {result.error_message}", file=sys.stderr)
+        error_code = result.error_code or "PROOF000"
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=result.session_id, job_id=None,
-            error_code=result.error_code or "PROOF000",
-            error_message=result.error_message,
+            error_code=error_code,
+            error_message=(
+                f"{error_code}: HTTP-layer case failed for scenario_id {scenario_id} "
+                "(see stderr for full diagnostic)"
+            ),
         )
     return _check_ledger(
         engine, label=label, scenario_id=scenario_id, kind=kind,
@@ -416,13 +561,17 @@ def _run_case_group(
     return results, passed, case_timeout
 
 
-def run(api_url: str, database_url: str, timeout: float) -> tuple[list[EvidenceCase], int]:
+def run(
+    api_url: str, database_url: str, timeout: float, *, decode_database_name: bool = False
+) -> tuple[list[EvidenceCase], int]:
     """Runs ATOM_SMOKE_CASES then COMPOSITE_SMOKE_CASES against a live api_url/database_url.
 
     Precondition owned by the caller, not enforced here: main() must call
     smoke._coverage_gate_error() first -- same contract as kernel_demo_smoke.py's own run().
     run() doesn't re-check coverage so tests can call it directly to exercise per-case behavior
     in isolation from the coverage guard.
+
+    decode_database_name is forwarded to _build_engine() verbatim -- see its own docstring.
     """
     # Same vacuous-success guard as kernel_demo_smoke.py's run(): an empty ATOM_SMOKE_CASES/
     # COMPOSITE_SMOKE_CASES (e.g. a caller-supplied monkeypatch, per this function's own
@@ -436,7 +585,7 @@ def run(api_url: str, database_url: str, timeout: float) -> tuple[list[EvidenceC
         print(empty_error, file=sys.stderr)
         return [], 1
 
-    engine = _build_engine(database_url)
+    engine = _build_engine(database_url, decode_database_name=decode_database_name)
     cases: list[EvidenceCase] = []
     try:
         atom_cases, atom_passed, case_timeout = _run_case_group(
@@ -537,6 +686,14 @@ def main() -> int:
         help="Seconds to wait for each scenario to complete (default: %(default)s, "
         "also settable via ANYTOOLAI_SMOKE_TIMEOUT)",
     )
+    parser.add_argument(
+        "--database-url-is-percent-encoded",
+        action="store_true",
+        help="Set when the DSN in --database-url-env's env var had its database-name path "
+        "segment percent-encoded by its producer (e.g. scripts/agent/runner.py's "
+        "RuntimeIdentity.database_url) -- decodes it back before connecting. Leave unset for a "
+        "hand-written or otherwise arbitrary DSN, whose database name is used exactly as given.",
+    )
     args = parser.parse_args()
 
     database_url = os.environ.get(args.database_url_env)
@@ -557,7 +714,10 @@ def main() -> int:
         # failure does, instead of silently exiting with nothing written.
         cases, exit_code = [], 1
     else:
-        cases, exit_code = run(args.api_url.rstrip("/"), database_url, args.timeout)
+        cases, exit_code = run(
+            args.api_url.rstrip("/"), database_url, args.timeout,
+            decode_database_name=args.database_url_is_percent_encoded,
+        )
 
     report_path = write_evidence_report(cases, exit_code)
     print(f"Evidence report: {report_path}")

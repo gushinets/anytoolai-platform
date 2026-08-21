@@ -35,21 +35,48 @@ EXPECTED_EVENT_TYPES = frozenset(
 )
 
 
-def _all_expected_events(*, action_run_count: int) -> list[dict]:
-    events = [{"event_type": event_type} for event_type in EXPECTED_EVENT_TYPES]
-    events += [{"event_type": "action.started"} for _ in range(action_run_count - 1)]
-    events += [{"event_type": "action.succeeded"} for _ in range(action_run_count - 1)]
+_SESSION_SCOPED_EVENT_TYPES = EXPECTED_EVENT_TYPES - {
+    "action.started",
+    "action.succeeded",
+    "provider.request_started",
+    "provider.request_succeeded",
+}
+
+
+def _all_expected_events(
+    *,
+    action_run_ids: tuple[str, ...] = ("run-1",),
+    provider_call_ids: tuple[str, ...] = ("call-1",),
+) -> list[dict]:
+    """One event per session-scoped expected type, plus one action.started/action.succeeded pair
+    per action_run_id and one provider.request_started/succeeded pair per provider_call_id --
+    matching the per-row action_run_id/provider_call_id correlation _classify_ledger requires.
+    Defaults match _one_step_row()'s "run-1" and _one_provider_call()'s "call-1"."""
+    events = [{"event_type": event_type} for event_type in _SESSION_SCOPED_EVENT_TYPES]
+    for run_id in action_run_ids:
+        events.append({"event_type": "action.started", "action_run_id": run_id})
+        events.append({"event_type": "action.succeeded", "action_run_id": run_id})
+    for call_id in provider_call_ids:
+        events.append({"event_type": "provider.request_started", "provider_call_id": call_id})
+        events.append({"event_type": "provider.request_succeeded", "provider_call_id": call_id})
     return events
 
 
 def _one_step_row(**overrides) -> dict:
     row = {
         "id": "run-1",
+        "job_id": "job-1",
         "step_id": "extract",
         "action_type": "text.extract_structured_fields",
         "action_config_id": "kernel_demo.extract_structured_fields_v1",
         "output_artifact_id": "artifact-step-1",
     }
+    row.update(overrides)
+    return row
+
+
+def _one_provider_call(**overrides) -> dict:
+    row = {"id": "call-1", "action_run_id": "run-1"}
     row.update(overrides)
     return row
 
@@ -79,7 +106,7 @@ def test_classify_ledger_passes_with_full_correlation() -> None:
         action_runs=[_one_step_row()],
         provider_calls=[_one_provider_call()],
         artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
-        events=_all_expected_events(action_run_count=1),
+        events=_all_expected_events(),
         expected_event_types=EXPECTED_EVENT_TYPES,
     )
 
@@ -142,7 +169,7 @@ def test_classify_ledger_reports_proof003_when_provider_call_count_is_wrong() ->
         action_runs=[_one_step_row()],
         provider_calls=[],
         artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
-        events=_all_expected_events(action_run_count=1),
+        events=_all_expected_events(),
         expected_event_types=EXPECTED_EVENT_TYPES,
     )
 
@@ -158,9 +185,12 @@ def test_classify_ledger_reports_proof003_when_provider_call_is_duplicated() -> 
         scenario_session_id="session-1",
         job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
         action_runs=[_one_step_row()],
-        provider_calls=[{"action_run_id": "run-1"}, {"action_run_id": "run-1"}],
+        provider_calls=[
+            _one_provider_call(id="call-1", action_run_id="run-1"),
+            _one_provider_call(id="call-2", action_run_id="run-1"),
+        ],
         artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
-        events=_all_expected_events(action_run_count=1),
+        events=_all_expected_events(),
         expected_event_types=EXPECTED_EVENT_TYPES,
     )
 
@@ -176,9 +206,9 @@ def test_classify_ledger_reports_proof004_when_step_artifact_missing() -> None:
         scenario_session_id="session-1",
         job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
         action_runs=[_one_step_row()],
-        provider_calls=[{"action_run_id": "run-1"}],
+        provider_calls=[_one_provider_call()],
         artifacts=[{"id": "artifact-result"}],
-        events=_all_expected_events(action_run_count=1),
+        events=_all_expected_events(),
         expected_event_types=EXPECTED_EVENT_TYPES,
     )
 
@@ -196,9 +226,9 @@ def test_classify_ledger_reports_proof004_when_result_artifact_missing() -> None
         scenario_session_id="session-1",
         job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
         action_runs=[_one_step_row()],
-        provider_calls=[{"action_run_id": "run-1"}],
+        provider_calls=[_one_provider_call()],
         artifacts=[{"id": "artifact-step-1"}],
-        events=_all_expected_events(action_run_count=1),
+        events=_all_expected_events(),
         expected_event_types=EXPECTED_EVENT_TYPES,
     )
 
@@ -212,7 +242,7 @@ def test_classify_ledger_reports_proof005_when_event_type_missing() -> None:
 
     events = [
         event
-        for event in _all_expected_events(action_run_count=1)
+        for event in _all_expected_events()
         if event["event_type"] != "scenario.completed"
     ]
     case = module._classify_ledger(
@@ -220,7 +250,7 @@ def test_classify_ledger_reports_proof005_when_event_type_missing() -> None:
         scenario_session_id="session-1",
         job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
         action_runs=[_one_step_row()],
-        provider_calls=[{"action_run_id": "run-1"}],
+        provider_calls=[_one_provider_call()],
         artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
         events=events,
         expected_event_types=EXPECTED_EVENT_TYPES,
@@ -234,17 +264,19 @@ def test_classify_ledger_reports_proof005_when_event_type_missing() -> None:
 def test_classify_ledger_reports_proof006_when_action_event_count_is_wrong() -> None:
     module = load_atoms_proof_module()
 
-    events = list(EXPECTED_EVENT_TYPES)
-    events = [{"event_type": event_type} for event_type in events]
-    # Only one action.started/action.succeeded pair total is already present via
-    # EXPECTED_EVENT_TYPES; two action_runs requires two of each -- deliberately not adding the
-    # second pair here to trigger PROOF006.
+    # Only run-1 gets an action.started/action.succeeded pair; run-2 gets none -- deliberately
+    # not adding it to trigger PROOF006. Both provider calls get their event pair so this
+    # doesn't also (incidentally) trigger PROOF013.
+    events = _all_expected_events(action_run_ids=("run-1",), provider_call_ids=("call-1", "call-2"))
     case = module._classify_ledger(
         label="workflow.one", scenario_id="scenario-composite", kind="composite",
         scenario_session_id="session-1",
         job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
         action_runs=[_one_step_row(), _one_step_row(id="run-2", step_id="detect_issues")],
-        provider_calls=[{"action_run_id": "run-1"}, {"action_run_id": "run-2"}],
+        provider_calls=[
+            _one_provider_call(id="call-1", action_run_id="run-1"),
+            _one_provider_call(id="call-2", action_run_id="run-2"),
+        ],
         artifacts=[
             {"id": "artifact-step-1"},
             {"id": "artifact-step-2"},
@@ -256,6 +288,171 @@ def test_classify_ledger_reports_proof006_when_action_event_count_is_wrong() -> 
 
     assert case.status == "fail"
     assert case.error_code == "PROOF006"
+
+
+def test_classify_ledger_reports_proof011_when_action_run_job_id_mismatches() -> None:
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row(job_id="job-other")],
+        provider_calls=[_one_provider_call()],
+        artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
+        events=_all_expected_events(),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF011"
+
+
+def test_classify_ledger_reports_proof012_when_provider_call_is_orphaned() -> None:
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[
+            _one_provider_call(),
+            _one_provider_call(id="call-orphan", action_run_id="run-does-not-exist"),
+        ],
+        artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
+        events=_all_expected_events(),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF012"
+
+
+def test_classify_ledger_reports_proof013_when_provider_event_count_is_wrong() -> None:
+    module = load_atoms_proof_module()
+
+    # provider.request_started/succeeded are present in the session-wide type set (satisfies
+    # PROOF005) but tagged with a provider_call_id that doesn't match call-1, so PROOF013 must
+    # still catch it.
+    events = [
+        event for event in _all_expected_events() if event.get("provider_call_id") != "call-1"
+    ] + [
+        {"event_type": "provider.request_started", "provider_call_id": "call-other"},
+        {"event_type": "provider.request_succeeded", "provider_call_id": "call-other"},
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF013"
+
+
+def test_classify_ledger_reports_proof014_when_action_event_is_orphaned() -> None:
+    module = load_atoms_proof_module()
+
+    # run-1 gets its normal, correctly-counted started/succeeded pair (so the per-run PROOF006
+    # loop passes) plus one extra action.started row misattributed to a run_id that doesn't
+    # belong to this session's action_runs -- must not be silently invisible.
+    events = [
+        *_all_expected_events(),
+        {"event_type": "action.started", "action_run_id": "run-bogus"},
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF014"
+
+
+def test_classify_ledger_reports_proof015_when_provider_event_is_orphaned() -> None:
+    module = load_atoms_proof_module()
+
+    events = [
+        *_all_expected_events(),
+        {"event_type": "provider.request_started", "provider_call_id": "call-bogus"},
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF015"
+
+
+def test_classify_ledger_reports_proof014_when_orphan_action_event_has_null_run_id() -> None:
+    """Sixteenth code review pass finding: action_run_id is a nullable event_log column, so an
+    orphan action.started row can have action_run_id=None alongside another orphan row with a
+    string id -- sorted({None, "run-bogus"}) raises TypeError, so this must still fail cleanly
+    with PROOF014 instead of a raw traceback."""
+    module = load_atoms_proof_module()
+
+    events = [
+        *_all_expected_events(),
+        {"event_type": "action.started", "action_run_id": None},
+        {"event_type": "action.started", "action_run_id": "run-bogus"},
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF014"
+
+
+def test_classify_ledger_reports_proof015_when_orphan_provider_event_has_null_call_id() -> None:
+    """Sixteenth code review pass finding: same null-id sort hazard as PROOF014, mirrored for
+    provider_call_id."""
+    module = load_atoms_proof_module()
+
+    events = [
+        *_all_expected_events(),
+        {"event_type": "provider.request_started", "provider_call_id": None},
+        {"event_type": "provider.request_started", "provider_call_id": "call-bogus"},
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[{"id": "artifact-step-1"}, {"id": "artifact-result"}],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF015"
 
 
 def test_classify_ledger_passes_for_multi_step_composite_workflow() -> None:
@@ -280,7 +477,9 @@ def test_classify_ledger_passes_for_multi_step_composite_workflow() -> None:
             {"id": "artifact-step-2"},
             {"id": "artifact-result"},
         ],
-        events=_all_expected_events(action_run_count=2),
+        events=_all_expected_events(
+            action_run_ids=("run-1", "run-2"), provider_call_ids=("call-1", "call-2")
+        ),
         expected_event_types=EXPECTED_EVENT_TYPES,
     )
 
@@ -290,7 +489,9 @@ def test_classify_ledger_passes_for_multi_step_composite_workflow() -> None:
     assert case.steps[1].latency_ms == 456
 
 
-def test_run_case_with_ledger_check_reports_http_failure_without_touching_db(monkeypatch) -> None:
+def test_run_case_with_ledger_check_reports_http_failure_without_touching_db(
+    monkeypatch, capsys
+) -> None:
     """A case that fails during the HTTP/poll phase must short-circuit before any DB
     connection is attempted -- exercised by never providing a real engine here."""
     module = load_atoms_proof_module()
@@ -298,7 +499,8 @@ def test_run_case_with_ledger_check_reports_http_failure_without_touching_db(mon
         module.smoke,
         "_run_one_case",
         lambda api_url, scenario_id, scenario_input, timeout: module.smoke.CaseResult(
-            session_id=None, error_code="SMOKE001", error_message="SMOKE001: boom"
+            session_id=None, error_code="SMOKE001",
+            error_message="SMOKE001: boom (contains raw upstream detail)",
         ),
     )
 
@@ -309,6 +511,131 @@ def test_run_case_with_ledger_check_reports_http_failure_without_touching_db(mon
 
     assert case.status == "fail"
     assert case.error_code == "SMOKE001"
+    # team-lead review finding: the raw CaseResult.error_message must not flow verbatim into the
+    # persisted EvidenceCase -- only the safe, allowlisted error_code/scenario_id. The raw text is
+    # still surfaced, but only on stderr for a human, never in the persisted evidence.
+    assert "boom" not in case.error_message
+    assert "SMOKE001" in case.error_message
+    assert "boom (contains raw upstream detail)" in capsys.readouterr().err
+
+
+def test_run_case_with_ledger_check_dispatches_a_passing_http_result_into_check_ledger(
+    monkeypatch,
+) -> None:
+    """Team-lead review finding: no prior test proved an HTTP-success CaseResult forwards its
+    session_id and the same engine into _check_ledger."""
+    module = load_atoms_proof_module()
+    sentinel_engine = object()
+    monkeypatch.setattr(
+        module.smoke,
+        "_run_one_case",
+        lambda api_url, scenario_id, scenario_input, timeout: module.smoke.CaseResult(
+            session_id="session-1", error_code=None, error_message=None
+        ),
+    )
+    captured: dict = {}
+
+    def _fake_check_ledger(engine, *, label, scenario_id, kind, scenario_session_id):
+        captured.update(
+            engine=engine, label=label, scenario_id=scenario_id, kind=kind,
+            scenario_session_id=scenario_session_id,
+        )
+        return module.EvidenceCase(
+            label=label, scenario_id=scenario_id, kind=kind, status="pass",
+            session_id=scenario_session_id, job_id="job-1", error_code=None,
+            error_message=None, steps=(),
+        )
+
+    monkeypatch.setattr(module, "_check_ledger", _fake_check_ledger)
+
+    case = module._run_case_with_ledger_check(
+        "http://127.0.0.1:8000", sentinel_engine, kind="atom", label="atom.one",
+        scenario_id="scenario-1", scenario_input={}, timeout=5.0,
+    )
+
+    assert case.status == "pass"
+    assert captured == {
+        "engine": sentinel_engine,
+        "label": "atom.one",
+        "scenario_id": "scenario-1",
+        "kind": "atom",
+        "scenario_session_id": "session-1",
+    }
+
+
+def test_check_ledger_wires_all_five_query_results_into_classify_ledger(monkeypatch) -> None:
+    """Team-lead review finding: a focused fake-connection test proving all five DB results
+    (job/action_runs/provider_calls/artifacts/events) reach _classify_ledger, along with the
+    real module's own _EXPECTED_EVENT_TYPES rather than a test-local stand-in."""
+    module = load_atoms_proof_module()
+
+    job_row = {"id": "job-1", "result_artifact_id": "artifact-result"}
+    action_runs = [{"id": "run-1", "job_id": "job-1"}]
+    provider_calls = [{"id": "call-1", "action_run_id": "run-1"}]
+    artifacts = [{"id": "artifact-step-1"}, {"id": "artifact-result"}]
+    events = [{"event_type": "action.started", "action_run_id": "run-1"}]
+
+    class _FakeResult:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def mappings(self):
+            return self
+
+        def __iter__(self):
+            return iter(self._rows)
+
+        def one_or_none(self):
+            return self._rows[0] if self._rows else None
+
+    class _FakeConnection:
+        def __init__(self, results):
+            self._results = list(results)
+
+        def execute(self, _stmt):
+            return self._results.pop(0)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc_info):
+            return False
+
+    class _FakeEngine:
+        def connect(self):
+            return _FakeConnection(
+                [
+                    _FakeResult([job_row]),
+                    _FakeResult(action_runs),
+                    _FakeResult(provider_calls),
+                    _FakeResult(artifacts),
+                    _FakeResult(events),
+                ]
+            )
+
+    captured: dict = {}
+
+    def _fake_classify_ledger(**kwargs):
+        captured.update(kwargs)
+        return module.EvidenceCase(
+            label=kwargs["label"], scenario_id=kwargs["scenario_id"], kind=kwargs["kind"],
+            status="pass", session_id=kwargs["scenario_session_id"], job_id="job-1",
+            error_code=None, error_message=None, steps=(),
+        )
+
+    monkeypatch.setattr(module, "_classify_ledger", _fake_classify_ledger)
+
+    module._check_ledger(
+        _FakeEngine(), label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+    )
+
+    assert captured["job_row"] == job_row
+    assert captured["action_runs"] == action_runs
+    assert captured["provider_calls"] == provider_calls
+    assert captured["artifacts"] == artifacts
+    assert captured["events"] == events
+    assert captured["expected_event_types"] is module._EXPECTED_EVENT_TYPES
 
 
 def test_check_ledger_reports_proof000_without_leaking_raw_exception_text() -> None:
@@ -487,6 +814,51 @@ def test_main_fails_when_database_url_env_is_unset(monkeypatch, capsys) -> None:
 
     assert module.main() == 2
     assert "PROOF010" in capsys.readouterr().err
+
+
+def _run_main_capturing_decode_database_name(module, monkeypatch, argv) -> bool:
+    captured = {}
+
+    def fake_run(*args, **kwargs):
+        captured["decode_database_name"] = kwargs["decode_database_name"]
+        return [], 0
+
+    monkeypatch.setattr(module, "run", fake_run)
+    monkeypatch.setattr(
+        module,
+        "write_evidence_report",
+        lambda cases, exit_code, **kwargs: Path("evidence-fake.json"),
+    )
+    monkeypatch.setattr(sys, "argv", argv)
+
+    assert module.main() == 0
+    return captured["decode_database_name"]
+
+
+def test_main_forwards_database_url_is_percent_encoded_flag_when_set(monkeypatch, capsys) -> None:
+    """Nineteenth code review pass finding (inline comments): --database-url-is-percent-encoded
+    had no regression coverage proving it actually reaches run()'s decode_database_name -- only
+    _build_engine() (further downstream) was tested directly."""
+    module = load_atoms_proof_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
+
+    decode_database_name = _run_main_capturing_decode_database_name(
+        module, monkeypatch, [*_TEST_MAIN_ARGV, "--database-url-is-percent-encoded"]
+    )
+
+    assert decode_database_name is True
+
+
+def test_main_forwards_database_url_is_percent_encoded_flag_when_unset(monkeypatch, capsys) -> None:
+    """Mirror of the above for the flag's unset (default) case."""
+    module = load_atoms_proof_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
+
+    decode_database_name = _run_main_capturing_decode_database_name(
+        module, monkeypatch, _TEST_MAIN_ARGV
+    )
+
+    assert decode_database_name is False
 
 
 def test_main_writes_evidence_report_on_coverage_gate_failure(monkeypatch, capsys) -> None:

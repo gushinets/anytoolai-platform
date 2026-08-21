@@ -4,17 +4,25 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
 from alembic import command
 from alembic.script import ScriptDirectory
 from anytoolai_platform_api import migrate
+from anytoolai_platform_core.storage.db import (
+    POSTGRES_INTERNAL_HOST_ENV,
+    POSTGRES_INTERNAL_PORT_ENV,
+)
 
 from tests.db_support import (
     PLACEHOLDER_POSTGRESQL_URL,
     build_alembic_config,
+    create_database,
+    drop_database,
     provision_database,
+    require_postgres_test_url,
 )
 
 
@@ -79,6 +87,31 @@ def test_resolve_database_url_falls_back_to_postgres_components(monkeypatch) -> 
     )
 
 
+def test_resolve_database_url_keeps_a_reserved_character_db_name_percent_encoded(
+    monkeypatch,
+) -> None:
+    """Eighteenth code review pass finding: build_postgres_url_from_env() now percent-encodes
+    the database segment, so a reserved character in POSTGRES_DB_ENV no longer gets misread by
+    make_url() as a query-string delimiter (the silent connect_args-injection bug this round
+    closed for storage/db.py). _resolve_database_url() itself intentionally still returns this
+    string percent-encoded as-is -- it feeds Alembic's offline-mode-only "sqlalchemy.url" option,
+    not a live engine -- see test_main_upgrades_a_real_postgresql_database_to_head and
+    test_main_resolves_a_reserved_character_database_name (nineteenth code review pass) for
+    proof that main()'s actual online engine path decodes this correctly. Verified through the
+    real sqlalchemy.engine.make_url() consumer, not string parsing."""
+    monkeypatch.delenv(migrate.PROJECT_DATABASE_URL_ENV, raising=False)
+    monkeypatch.delenv(migrate.GENERIC_DATABASE_URL_ENV, raising=False)
+    monkeypatch.setenv(migrate.POSTGRES_USER_ENV, "produser")
+    monkeypatch.setenv(migrate.POSTGRES_PASSWORD_ENV, "prodpassword")
+    monkeypatch.setenv(migrate.POSTGRES_DB_ENV, "mydb?sslmode=disable")
+
+    resolved = migrate._resolve_database_url()
+
+    url = sa.engine.make_url(resolved)
+    assert url.database == "mydb%3Fsslmode%3Ddisable"
+    assert dict(url.query) == {}
+
+
 def _expected_head_revision() -> str:
     config = build_alembic_config(PLACEHOLDER_POSTGRESQL_URL)
     return ScriptDirectory.from_config(config).get_current_head()
@@ -103,6 +136,45 @@ def test_main_upgrades_a_real_postgresql_database_to_head(monkeypatch) -> None:
                 sa.text("SELECT version_num FROM alembic_version")
             ).scalar_one()
         assert version == _expected_head_revision()
+
+
+@pytest.mark.postgresql
+@pytest.mark.slow
+def test_main_resolves_a_reserved_character_database_name(monkeypatch) -> None:
+    """Nineteenth code review pass finding (inline comments): migrate.main() must resolve to
+    the real database when its name has a reserved character, not merely avoid the earlier
+    connect_args-injection bug -- a live counterpart to
+    test_resolve_database_url_keeps_a_reserved_character_db_name_percent_encoded, which only
+    proves the intermediate DSN string is safe, not that migrations actually land in the
+    intended database. Exercises the POSTGRES_*_ENV fallback (build_postgres_url_from_env(),
+    decode_database_name=True), not an explicit URL override."""
+    maintenance_url = require_postgres_test_url(
+        "migrate.main() reserved-character database name coverage"
+    )
+    database_name = f"anytoolai_migrate_reserved_{uuid4().hex[:8]}?x"
+    create_database(maintenance_url, database_name)
+    try:
+        monkeypatch.delenv(migrate.PROJECT_DATABASE_URL_ENV, raising=False)
+        monkeypatch.delenv(migrate.GENERIC_DATABASE_URL_ENV, raising=False)
+        monkeypatch.setenv(migrate.POSTGRES_USER_ENV, maintenance_url.username or "")
+        monkeypatch.setenv(migrate.POSTGRES_PASSWORD_ENV, maintenance_url.password or "")
+        monkeypatch.setenv(migrate.POSTGRES_DB_ENV, database_name)
+        monkeypatch.setenv(POSTGRES_INTERNAL_HOST_ENV, maintenance_url.host or "")
+        monkeypatch.setenv(POSTGRES_INTERNAL_PORT_ENV, str(maintenance_url.port or 5432))
+
+        migrate.main()
+
+        verify_engine = sa.create_engine(maintenance_url.set(database=database_name), future=True)
+        try:
+            with verify_engine.connect() as connection:
+                version = connection.execute(
+                    sa.text("SELECT version_num FROM alembic_version")
+                ).scalar_one()
+        finally:
+            verify_engine.dispose()
+        assert version == _expected_head_revision()
+    finally:
+        drop_database(maintenance_url, database_name)
 
 
 @pytest.mark.postgresql

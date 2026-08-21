@@ -118,3 +118,47 @@ def test_build_postgres_url_from_env_supports_host_and_port_override(
 def test_create_sync_engine_rejects_non_postgresql_urls() -> None:
     with pytest.raises(RuntimeError, match="PostgreSQL"):
         create_sync_engine("sqlite:///tmp.db")
+
+
+def test_create_sync_engine_with_decode_flag_tolerates_a_dsn_with_no_database_segment() -> None:
+    """A DSN missing its database path segment leaves url.database as None; unquote(None) raises
+    TypeError, so decode_database_name=True must skip the decode instead of blindly unquoting."""
+    engine = create_sync_engine(
+        "postgresql+psycopg://user:pass@localhost:5432", decode_database_name=True
+    )
+    assert engine.url.database is None
+
+
+@pytest.mark.parametrize(
+    "db_name", ["proddb", "my?db=x", "my#db", "my db", "my%db", "my/db", "my@db"]
+)
+def test_build_postgres_url_from_env_survives_the_real_sqlalchemy_consumer_path_for_reserved_db_name_chars(
+    monkeypatch: pytest.MonkeyPatch, db_name: str
+) -> None:
+    """Eighteenth code review pass finding: build_postgres_url_from_env() is the production DSN
+    builder (platform-api/platform-worker boot path) -- an un-encoded reserved character in
+    POSTGRES_DB_ENV (e.g. "?") is parsed by sqlalchemy's make_url() as the start of a query
+    string, not part of the path, letting it silently inject extra psycopg connect_args (the
+    same bug class scripts/agent/runner.py's RuntimeIdentity.database_url already guards
+    against). Exercise the real consumer (create_sync_engine's decode_database_name=True), not
+    string parsing: the dsn must decode back to db_name with no extra connect_args."""
+    _clear(monkeypatch)
+    monkeypatch.setenv(POSTGRES_USER_ENV, "produser")
+    monkeypatch.setenv(POSTGRES_PASSWORD_ENV, "prodpassword")
+    monkeypatch.setenv(POSTGRES_DB_ENV, db_name)
+
+    dsn = build_postgres_url_from_env()
+    assert dsn is not None
+
+    engine = create_sync_engine(dsn, decode_database_name=True)
+    connect_args = engine.dialect.create_connect_args(engine.url)[1]
+
+    assert connect_args["dbname"] == db_name
+    assert connect_args["host"] == "postgres"
+    assert connect_args["port"] == 5432
+    assert connect_args["user"] == "produser"
+    assert connect_args["password"] == "prodpassword"
+    non_connection_keys = set(connect_args) - {
+        "host", "port", "user", "password", "dbname", "context",
+    }
+    assert not non_connection_keys, f"{db_name!r} injected extra connect_args: {non_connection_keys}"
