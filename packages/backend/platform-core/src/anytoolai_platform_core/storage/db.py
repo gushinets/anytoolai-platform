@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote, unquote
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -30,9 +31,21 @@ POSTGRES_INTERNAL_PORT_ENV = "ANYTOOLAI_POSTGRES_INTERNAL_PORT"
 _DEFAULT_POSTGRES_INTERNAL_HOST = "postgres"
 _DEFAULT_POSTGRES_INTERNAL_PORT = 5432
 
+# The only synchronous PostgreSQL DBAPI driver this repo installs (psycopg[binary] v3, no
+# psycopg2) -- see create_sync_engine()'s driver-allowlist check below.
+_SUPPORTED_POSTGRESQL_DRIVER = "postgresql+psycopg"
+
 
 def require_postgresql_url(database_url: str | URL, *, context: str) -> URL:
-    url = database_url if isinstance(database_url, URL) else make_url(database_url)
+    """Raises RuntimeError, not the underlying sqlalchemy.exc.ArgumentError, for a DSN that
+    isn't a URL at all -- a caller checking for this contract's own RuntimeError (or any
+    generic exception handler expecting one exception family for "bad configuration") would
+    otherwise miss a malformed database_url string here. ArgumentError's own message never
+    echoes the input string, so nothing from database_url leaks."""
+    try:
+        url = database_url if isinstance(database_url, URL) else make_url(database_url)
+    except sa.exc.ArgumentError as exc:
+        raise RuntimeError(f"{context}: could not parse database URL: {exc}") from exc
     if not url.drivername.startswith("postgresql"):
         raise RuntimeError(f"{context} requires a PostgreSQL database URL")
     return url
@@ -49,6 +62,16 @@ def build_postgres_url_from_env() -> str | None:
     (e.g. in a compose file) breaks silently when a password contains a reserved URL
     character (@, :, /, %, #) -- see e.g. `postgresql://u:p@ss@host/db`, which parses as
     password "p" and host "ss@host". `URL.create` percent-encodes each component instead.
+
+    URL.create()/render_as_string() percent-encodes username/password itself but does NOT do
+    the same for the database path segment (verified: a raw "?" placed there round-trips
+    through render_as_string() unescaped) -- so an un-encoded reserved character in the
+    database name (e.g. "?") is misread as the start of a query string by any later
+    sqlalchemy.engine.make_url() call, silently injecting extra connect_args (eighteenth code
+    review pass finding; the exact bug class scripts/agent/runner.py's RuntimeIdentity.
+    database_url already guards against for the dev/CLI path). Percent-encode the database
+    segment ourselves to close that gap; create_sync_engine()'s decode_database_name=True
+    decodes it back after make_url() for the matching reason.
     """
     user = os.getenv(POSTGRES_USER_ENV)
     password = os.getenv(POSTGRES_PASSWORD_ENV)
@@ -64,7 +87,7 @@ def build_postgres_url_from_env() -> str | None:
         password=password,
         host=host,
         port=port,
-        database=database,
+        database=quote(database, safe=""),
     ).render_as_string(hide_password=False)
 
 
@@ -87,9 +110,73 @@ class UtcDateTime(sa.TypeDecorator[datetime]):
         return value.astimezone(UTC)
 
 
-def create_sync_engine(database_url: str, **kwargs: Any) -> Engine:
-    require_postgresql_url(database_url, context="Runtime storage")
-    return sa.create_engine(database_url, future=True, **kwargs)
+def create_sync_engine(
+    database_url: str | URL,
+    *,
+    decode_database_name: bool = False,
+    context: str = "Runtime storage",
+    **kwargs: Any,
+) -> Engine:
+    """decode_database_name is an explicit, caller-declared contract, not a guess: pass True
+    only when database_url's database-name path segment was percent-encoded by its producer
+    (build_postgres_url_from_env() above); leave False for an operator-supplied DSN
+    (ANYTOOLAI_DATABASE_URL/DATABASE_URL), whose database name must be used exactly as given --
+    make_url() does not decode that segment on parse, so a blind, unconditional unquote() here
+    would silently corrupt an operator-supplied database name that legitimately contains a
+    "%"-looking substring not meant as encoding (eighteenth code review pass finding, same
+    class as scripts/agent/atoms_proof.py's _build_engine()).
+
+    decode_database_name=True with a DSN that has no database path segment at all is a
+    configuration error, not something to tolerate: skipping the decode there would leave
+    create_engine() to omit the database name, and libpq would silently connect to its own
+    default database (commonly the connecting username) instead of the one the caller meant.
+    `not url.database`, not `url.database is None`: a DSN with a trailing slash and nothing
+    after it (e.g. "postgresql://u:p@host:5432/") parses to database="" (empty string), not
+    None -- verified directly against make_url() -- and reachable in production, since
+    build_postgres_url_from_env() only treats POSTGRES_DB_ENV as absent when it's unset, not
+    merely empty (mirrored in scripts/agent/atoms_proof.py's _build_engine(), which delegates
+    here for exactly this reason).
+
+    database_url accepts an already-parsed URL, not just a str -- callers like
+    scripts/agent/atoms_proof.py's _build_engine() can hand one straight through, relying on
+    require_postgresql_url()'s isinstance(URL) branch -- reflected here rather than left as an
+    undeclared runtime accident. context labels every RuntimeError this function and
+    require_postgresql_url() raise; it defaults to this module's own "Runtime storage" label
+    but is a real parameter (not hardcoded) so a caller in a different subsystem -- e.g.
+    atoms_proof.py's CLI, where "Runtime storage" would mislabel an operator-facing
+    configuration error -- can supply its own (twenty-first code review pass finding).
+
+    Driver handling closes a class of bug found piecemeal across several review rounds
+    (team-lead-#5, team-lead-#6): require_postgresql_url() above only checks the drivername
+    *prefix*, so any "postgresql+<anything>" -- or, coerced below, a bare "postgresql://" with
+    no suffix at all -- would otherwise reach sa.create_engine()'s dialect-loading step, which
+    raises whatever exception that specific driver's import path happens to produce
+    (ModuleNotFoundError for a real dialect whose DBAPI package isn't installed -- including the
+    *default* dialect a bare "postgresql://" resolves to, psycopg2, which this repo has never
+    installed -- NoSuchModuleError for a dialect SQLAlchemy has never heard of, and potentially
+    others). Rather than catch each newly-discovered exception type, both the coercion and the
+    allowlist happen deterministically before engine construction is ever attempted, so every
+    caller (this repo installs exactly one driver, psycopg[binary] v3) is protected the same way
+    without needing its own copy of this contract."""
+    url = require_postgresql_url(database_url, context=context)
+    if url.drivername == "postgresql":
+        url = url.set(drivername=_SUPPORTED_POSTGRESQL_DRIVER)
+    if url.drivername != _SUPPORTED_POSTGRESQL_DRIVER:
+        raise RuntimeError(
+            f"{context}: unsupported database driver {url.drivername!r} (this repo only "
+            f"installs the {_SUPPORTED_POSTGRESQL_DRIVER!r} driver)"
+        )
+    if decode_database_name:
+        if not url.database:
+            raise RuntimeError(
+                f"{context}: decode_database_name=True but the DSN has no database path "
+                "segment to decode"
+            )
+        url = url.set(database=unquote(url.database))
+    try:
+        return sa.create_engine(url, future=True, **kwargs)
+    except sa.exc.ArgumentError as exc:
+        raise RuntimeError(f"{context}: could not construct database engine: {exc}") from exc
 
 
 def _json_document_type() -> sa.TypeEngine[Any]:

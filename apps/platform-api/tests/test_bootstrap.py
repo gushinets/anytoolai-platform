@@ -27,7 +27,7 @@ def _patch_storage_builders(
     engine = object()
     session_factory = object()
 
-    def fake_create_sync_engine(database_url: str) -> object:
+    def fake_create_sync_engine(database_url: str, *, decode_database_name: bool = False) -> object:
         calls.append(("database_url", database_url))
         return engine
 
@@ -100,6 +100,36 @@ def test_storage_dependencies_build_url_from_postgres_components(monkeypatch: An
     assert built_url == (
         "postgresql+psycopg://produser:p%40ss%3Aw%2Frd%231%252@postgres:5432/proddb"
     )
+
+
+def test_storage_dependencies_only_decode_database_name_for_the_postgres_components_fallback(
+    monkeypatch: Any,
+) -> None:
+    """Eighteenth code review pass finding: only build_postgres_url_from_env()'s output has a
+    percent-encoded database segment -- an operator-supplied ANYTOOLAI_DATABASE_URL/DATABASE_URL
+    must be used exactly as given, so create_sync_engine()'s decode_database_name must be True
+    only for the POSTGRES_*_ENV fallback, never for an explicit override."""
+    captured: list[bool] = []
+
+    def fake_create_sync_engine(database_url: str, *, decode_database_name: bool = False) -> object:
+        captured.append(decode_database_name)
+        return object()
+
+    monkeypatch.setattr(bootstrap, "create_sync_engine", fake_create_sync_engine)
+    monkeypatch.setattr(bootstrap, "build_session_factory", lambda engine: object())
+
+    monkeypatch.delenv(bootstrap.PROJECT_DATABASE_URL_ENV, raising=False)
+    monkeypatch.setenv(bootstrap.GENERIC_DATABASE_URL_ENV, "postgresql://compose")
+    bootstrap._build_storage_dependencies(database_url=None)
+    assert captured == [False]
+
+    captured.clear()
+    monkeypatch.delenv(bootstrap.GENERIC_DATABASE_URL_ENV, raising=False)
+    monkeypatch.setenv(POSTGRES_USER_ENV, "produser")
+    monkeypatch.setenv(POSTGRES_PASSWORD_ENV, "prodpassword")
+    monkeypatch.setenv(POSTGRES_DB_ENV, "proddb")
+    bootstrap._build_storage_dependencies(database_url=None)
+    assert captured == [True]
 
 
 def test_storage_dependencies_prefer_project_database_url_env(monkeypatch: Any) -> None:

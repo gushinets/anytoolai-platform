@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import urllib.parse
 from pathlib import Path
 
 import pytest
 import yaml
+
+from tests.test_atoms_proof import load_atoms_proof_module
 
 
 def load_runner_module():
@@ -475,6 +478,83 @@ def test_database_url_falls_back_to_dev_defaults(monkeypatch) -> None:
     assert identity.database_url == "postgresql://anytoolai:anytoolai@127.0.0.1:15555/anytoolai"
 
 
+def test_database_url_percent_encodes_reserved_characters_in_credentials(monkeypatch) -> None:
+    """Team-lead review finding: a password containing a reserved URL character (@, :, /, %, #)
+    must not silently parse into the wrong host/user -- see storage/db.py's
+    build_postgres_url_from_env for the same fix applied to the app's own internal DSN."""
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_USER", "devuser")
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_PASSWORD", "p@ss:w/rd%20#1")
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_DB", "devdb")
+
+    url = identity.database_url
+
+    # urlsplit() doesn't unquote netloc components -- confirm the raw URL parses into the right
+    # host/user/db (proving the reserved chars didn't corrupt netloc parsing), then unquote the
+    # password back to its original value to confirm nothing was lost or mangled.
+    parsed = urllib.parse.urlsplit(url)
+    assert parsed.hostname == "127.0.0.1"
+    assert parsed.port == 15555
+    assert parsed.username == "devuser"
+    assert urllib.parse.unquote(parsed.password) == "p@ss:w/rd%20#1"
+    assert parsed.path == "/devdb"
+
+
+def test_database_url_survives_the_real_sqlalchemy_consumer_path_for_reserved_db_name_chars(
+    monkeypatch,
+) -> None:
+    """Seventeenth code review pass finding: an un-encoded reserved character in the db name
+    (e.g. "?") is parsed by sqlalchemy's make_url() as the start of a query string, not part of
+    the path -- letting ANYTOOLAI_POSTGRES_DB inject arbitrary extra psycopg connect_args (not
+    just truncate the name, as the sixteenth round's "#" case did). The fix spans both files:
+    RuntimeIdentity.database_url (runner.py) percent-encodes the db-name path segment -- the one
+    DSN component make_url() does not auto-decode, unlike userinfo -- and atoms_proof.py's real
+    _build_engine() decodes it back after make_url() before handing it to psycopg (as of the
+    eighteenth round, only when told to via decode_database_name=True -- see _build_engine()'s
+    own docstring for why this is no longer an unconditional guess). Exercise both halves
+    together through the real consumer (not string parsing): sixteenth round's "#" case plus
+    every other previously-fixed reserved credential character, and this round's "?" case,
+    asserting no extra connect_args got injected. Also covers the eighteenth round's own
+    password-space finding (finding 3): a literal space in ANYTOOLAI_POSTGRES_PASSWORD must
+    survive the real consumer path unmangled."""
+    atoms_proof = load_atoms_proof_module()
+
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setenv("ANYTOOLAI_POSTGRES_USER", "devuser")
+
+    reserved_db_names = [
+        "mydb#frag",
+        "my db",
+        "my@db",
+        "my:db",
+        "my/db",
+        "my%db",
+        "mydb?sslmode=disable",
+        "plaindb",
+    ]
+    for password in ("devpassword", "pass word"):
+        monkeypatch.setenv("ANYTOOLAI_POSTGRES_PASSWORD", password)
+        for db_name in reserved_db_names:
+            monkeypatch.setenv("ANYTOOLAI_POSTGRES_DB", db_name)
+
+            engine = atoms_proof._build_engine(identity.database_url, decode_database_name=True)
+            connect_args = engine.dialect.create_connect_args(engine.url)[1]
+
+            assert connect_args["dbname"] == db_name, db_name
+            assert connect_args["password"] == password, password
+            assert connect_args["host"] == "127.0.0.1"
+            assert connect_args["port"] == 15555
+            assert connect_args["user"] == "devuser"
+            non_connection_keys = set(connect_args) - {
+                "host", "port", "user", "password", "dbname", "context",
+            }
+            assert not non_connection_keys, (
+                f"{db_name!r} injected extra connect_args: {non_connection_keys}"
+            )
+
+
 def test_prod_compose_command_uses_fixed_project_and_prod_files(monkeypatch, tmp_path) -> None:
     runner = load_runner_module()
     monkeypatch.setattr(runner, "PROD_ENV_FILE", tmp_path / "does-not-exist.env")
@@ -802,6 +882,58 @@ def test_dev_smoke_reports_dev001_for_invalid_port_override(monkeypatch, capsys)
     monkeypatch.setattr(runner, "runtime_identity", fake_runtime_identity)
 
     assert runner.dev_smoke() == 2
+    assert "DEV001" in capsys.readouterr().err
+
+
+def test_atoms_proof_passes_database_url_via_env_not_argv(monkeypatch) -> None:
+    """Fourteenth code review pass finding: identity.database_url can embed a real
+    ANYTOOLAI_POSTGRES_PASSWORD override, so it must reach atoms_proof.py through the
+    subprocess's environment (invisible to `ps`/process listings), not as a literal argv value
+    -- the child only ever sees the *name* of the env var on its own command line."""
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    calls: list[tuple[list[str], dict[str, str]]] = []
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env: calls.append((list(command), dict(env))) or 0,
+    )
+
+    assert runner.atoms_proof() == 0
+
+    assert len(calls) == 1
+    command, env = calls[0]
+    assert identity.database_url not in command
+    env_var_name = command[4]
+    # Full argv, not just the database-url-env prefix: deleting --database-url-is-percent-
+    # encoded would silently leave a reserved-character database name encoded on the wire, and
+    # would have stayed green under the prior prefix-only assertion.
+    assert command == [
+        runner.sys.executable, "scripts/agent/atoms_proof.py", identity.api_url,
+        "--database-url-env", env_var_name,
+        "--database-url-is-percent-encoded",
+    ]
+    assert env[env_var_name] == identity.database_url
+
+
+def test_atoms_proof_is_registered_in_commands() -> None:
+    """Cheap regression against COMMANDS["atoms-proof"] silently pointing
+    at the wrong function."""
+    runner = load_runner_module()
+
+    assert runner.COMMANDS["atoms-proof"] is runner.atoms_proof
+
+
+def test_atoms_proof_reports_dev001_for_invalid_port_override(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+
+    def fake_runtime_identity():
+        raise ValueError("ANYTOOLAI_API_PORT must be an integer port")
+
+    monkeypatch.setattr(runner, "runtime_identity", fake_runtime_identity)
+
+    assert runner.atoms_proof() == 2
     assert "DEV001" in capsys.readouterr().err
 
 
