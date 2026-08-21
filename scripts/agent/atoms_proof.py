@@ -132,22 +132,30 @@ def _build_engine(database_url: str, *, decode_database_name: bool = False) -> "
     storage/db.py's create_sync_engine(), the same function platform-api/platform-worker's boot
     path uses, instead of a second, independently-maintained copy of that contract (a prior
     round of this review found the two copies had already drifted)."""
-    # make_url() raises sqlalchemy.exc.ArgumentError (not RuntimeError) for a malformed DSN --
-    # e.g. a --database-url-env value that isn't a URL at all. Left uncaught, that's exactly the
-    # raw-traceback-instead-of-PROOF0xx failure mode the run()-level except RuntimeError/PROOF022
-    # handling exists to prevent (twentieth round), just for a different exception type it
-    # doesn't catch. Re-raised as RuntimeError so it reaches that same handling; ArgumentError's
-    # own message never echoes the input string (verified), so nothing from database_url leaks.
+    # Both make_url() and create_engine() (reached via create_sync_engine() below) raise
+    # sqlalchemy.exc.ArgumentError variants, not RuntimeError, for a bad DSN -- a malformed
+    # string (make_url() itself) or an unsupported/misspelled dialect, e.g.
+    # "postgresql+unknown://..." (require_postgresql_url() only checks the drivername *prefix*,
+    # so "postgresql+unknown" passes it; create_engine()'s dialect-loading step is what actually
+    # fails, with NoSuchModuleError -- itself an ArgumentError subclass). Left uncaught, either
+    # is the same raw-traceback-instead-of-PROOF0xx failure mode the run()-level
+    # except RuntimeError/PROOF022 handling exists to prevent (twentieth round), just for
+    # exception types that handling doesn't catch (team-lead-#5 review). Re-raised as
+    # RuntimeError so both reach that same handling; ArgumentError's own message never echoes
+    # the input string (verified), so nothing from database_url leaks.
     try:
         url = make_url(database_url)
+        if url.drivername == "postgresql":
+            url = url.set(drivername="postgresql+psycopg")
+        # context="atoms-proof": create_sync_engine()'s default "Runtime storage" label
+        # describes platform-api/platform-worker's boot path, not this CLI's operator-facing
+        # configuration errors (e.g. a bad --database-url-env DSN) -- twenty-first code review
+        # pass finding.
+        return create_sync_engine(
+            url, decode_database_name=decode_database_name, context="atoms-proof"
+        )
     except sa.exc.ArgumentError as exc:
-        raise RuntimeError(f"atoms-proof: could not parse database URL: {exc}") from exc
-    if url.drivername == "postgresql":
-        url = url.set(drivername="postgresql+psycopg")
-    # context="atoms-proof": create_sync_engine()'s default "Runtime storage" label describes
-    # platform-api/platform-worker's boot path, not this CLI's operator-facing configuration
-    # errors (e.g. a bad --database-url-env DSN) -- twenty-first code review pass finding.
-    return create_sync_engine(url, decode_database_name=decode_database_name, context="atoms-proof")
+        raise RuntimeError(f"atoms-proof: could not construct database engine: {exc}") from exc
 
 
 def _orphan_ids(*count_dicts: dict, known_ids: set) -> list:
@@ -321,15 +329,15 @@ def _classify_ledger(
     # "does this id belong here at all". Scanned here, before the PROOF004/017/018
     # reference-specific checks below -- mirroring PROOF016's placement before PROOF003/012 for
     # provider_calls -- rather than as an ad hoc fourth check appended after them.
-    # allow_none=True: unlike provider_calls_table.job_id (nullable=False, so PROOF016 needs no
-    # tolerance and downstream provider_calls checks never re-touch job_id at all),
-    # artifacts_table.job_id is nullable -- ArtifactRecord.job_id: str | None, and both
-    # ArtifactService creation methods accept job_id=None (no current caller does, but the model
-    # supports it, same as event_log.job_id's PROOF019 check above). A job-less artifact is a
-    # legitimate row, not an ownership defect, so this scan only rejects a *wrong*, non-null
-    # job_id.
+    # No allow_none here, unlike PROOF019's event_log scan: event_log.job_id has a genuine,
+    # reachable null case (scenario.started is emitted before a job exists), but no current
+    # ArtifactService caller ever creates a job-less artifact -- tolerating job_id=None here
+    # would let an unowned artifact (and its own job-less artifact.created event, which PROOF019
+    # would also tolerate) pass this entire proof as a PASS with an artifact nothing actually
+    # claims. If job-less artifacts become a real, intentional state, restrict the tolerance to
+    # that specific role rather than every fetched session row (team-lead-#5 review).
     mismatch = _first_job_id_mismatch(
-        artifacts, job_id=job_id, error_code="PROOF023", allow_none=True,
+        artifacts, job_id=job_id, error_code="PROOF023",
         describe=lambda artifact: f"artifacts_table row {artifact['id']}",
     )
     if mismatch is not None:
@@ -352,20 +360,19 @@ def _classify_ledger(
                     f"{action_run['step_id']}) has no matching artifacts_table row"
                 ),
             )
-        # PROOF023 above already rejects a *wrong* job_id for every row, including this one, but
-        # tolerates a *null* job_id -- a step's own output artifact must not be job-less, so
-        # this still checks job_id (now only reachable via the null case) alongside the
-        # action_run_id lineage PROOF023's row-level scan can't express.
-        if artifact["job_id"] != job_id or artifact["action_run_id"] != action_run["id"]:
+        # PROOF023 above already guarantees every fetched artifact's job_id is exactly job_id
+        # (no tolerance), so only the action_run_id lineage PROOF023's row-level scan can't
+        # express is left to check here -- mirrors provider_calls' PROOF012, which likewise
+        # never re-touches job_id after PROOF016.
+        if artifact["action_run_id"] != action_run["id"]:
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
                 error_code="PROOF017",
                 error_message=(
                     f"PROOF017: artifact {output_artifact_id} for action_run "
-                    f"{action_run['id']} (step {action_run['step_id']}) has job_id "
-                    f"{artifact['job_id']!r}/action_run_id {artifact['action_run_id']!r}, "
-                    f"expected job_id {job_id!r}/action_run_id {action_run['id']!r}"
+                    f"{action_run['id']} (step {action_run['step_id']}) has action_run_id "
+                    f"{artifact['action_run_id']!r}, expected {action_run['id']!r}"
                 ),
             )
     # result_artifact_id is a separate artifact row (action_run_id=None), never a step's own
@@ -382,17 +389,16 @@ def _classify_ledger(
                 f"artifacts_table rows for scenario_session_id {scenario_session_id}"
             ),
         )
-    # Same null-job_id residual as PROOF017 above: PROOF023 already rejected a wrong job_id.
-    if result_artifact["job_id"] != job_id or result_artifact["action_run_id"] is not None:
+    # Same reasoning as PROOF017 above: PROOF023 already guarantees job_id, only action_run_id
+    # lineage remains to check.
+    if result_artifact["action_run_id"] is not None:
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
             error_code="PROOF018",
             error_message=(
-                f"PROOF018: job result_artifact_id {result_artifact_id} has job_id "
-                f"{result_artifact['job_id']!r}/action_run_id "
-                f"{result_artifact['action_run_id']!r}, expected job_id {job_id!r}/"
-                "action_run_id None"
+                f"PROOF018: job result_artifact_id {result_artifact_id} has action_run_id "
+                f"{result_artifact['action_run_id']!r}, expected None"
             ),
         )
 
