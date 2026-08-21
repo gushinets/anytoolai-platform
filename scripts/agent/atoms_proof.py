@@ -132,7 +132,16 @@ def _build_engine(database_url: str, *, decode_database_name: bool = False) -> "
     storage/db.py's create_sync_engine(), the same function platform-api/platform-worker's boot
     path uses, instead of a second, independently-maintained copy of that contract (a prior
     round of this review found the two copies had already drifted)."""
-    url = make_url(database_url)
+    # make_url() raises sqlalchemy.exc.ArgumentError (not RuntimeError) for a malformed DSN --
+    # e.g. a --database-url-env value that isn't a URL at all. Left uncaught, that's exactly the
+    # raw-traceback-instead-of-PROOF0xx failure mode the run()-level except RuntimeError/PROOF022
+    # handling exists to prevent (twentieth round), just for a different exception type it
+    # doesn't catch. Re-raised as RuntimeError so it reaches that same handling; ArgumentError's
+    # own message never echoes the input string (verified), so nothing from database_url leaks.
+    try:
+        url = make_url(database_url)
+    except sa.exc.ArgumentError as exc:
+        raise RuntimeError(f"atoms-proof: could not parse database URL: {exc}") from exc
     if url.drivername == "postgresql":
         url = url.set(drivername="postgresql+psycopg")
     # context="atoms-proof": create_sync_engine()'s default "Runtime storage" label describes

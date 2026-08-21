@@ -1253,6 +1253,19 @@ def test_run_reports_proof022_instead_of_a_raw_traceback_on_engine_configuration
     assert exit_code == 1
     assert "PROOF022" in capsys.readouterr().err
 
+    # Twenty-fourth code review pass: PROOF022 is deliberately broad (see run()'s own comment),
+    # covering any RuntimeError _build_engine()/create_sync_engine() raises -- not just the
+    # decode-fail-fast case above. A non-PostgreSQL DSN raises via require_postgresql_url()
+    # instead, a different call site entirely; nothing at the run() level proved that one also
+    # reaches PROOF022 rather than a raw traceback.
+    cases, exit_code = module.run(
+        "http://127.0.0.1:8000", "sqlite:///tmp.db", timeout=5.0, decode_database_name=True,
+    )
+
+    assert cases == []
+    assert exit_code == 1
+    assert "PROOF022" in capsys.readouterr().err
+
 
 def test_run_case_group_derives_passed_count_from_results(monkeypatch, capsys) -> None:
     """Eleventh code review pass finding: _run_case_group()'s `passed` count is derived from
