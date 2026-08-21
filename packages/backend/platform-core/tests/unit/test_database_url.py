@@ -118,3 +118,111 @@ def test_build_postgres_url_from_env_supports_host_and_port_override(
 def test_create_sync_engine_rejects_non_postgresql_urls() -> None:
     with pytest.raises(RuntimeError, match="PostgreSQL"):
         create_sync_engine("sqlite:///tmp.db")
+
+
+def test_create_sync_engine_converts_a_malformed_dsn_into_a_runtime_error() -> None:
+    """make_url() (inside require_postgresql_url()) raises sqlalchemy.exc.ArgumentError, not
+    RuntimeError, for a DSN that isn't a URL at all -- a caller catching RuntimeError for
+    "bad configuration" would otherwise miss this. Verified ArgumentError's own message never
+    echoes the input string, so nothing from database_url leaks into the RuntimeError text."""
+    with pytest.raises(RuntimeError, match="database"):
+        create_sync_engine("not a url at all")
+
+
+def test_create_sync_engine_coerces_bare_postgresql_scheme_to_psycopg() -> None:
+    """A bare "postgresql://" DSN (no driver suffix -- the natural, most common way to write a
+    Postgres connection string, e.g. a hand-typed DATABASE_URL) defaults to SQLAlchemy's
+    psycopg2 dialect, which this repo has never installed (only psycopg[binary] v3) -- every
+    caller of create_sync_engine() (platform-api/platform-worker boot, atoms_proof.py's CLI)
+    needs this coercion, so it lives here once instead of duplicated per caller."""
+    engine = create_sync_engine("postgresql://user:pass@127.0.0.1:5432/anytoolai")
+
+    assert engine.url.drivername == "postgresql+psycopg"
+
+
+def test_create_sync_engine_leaves_an_explicit_driver_untouched() -> None:
+    engine = create_sync_engine("postgresql+psycopg://user:pass@127.0.0.1:5432/anytoolai")
+
+    assert engine.url.drivername == "postgresql+psycopg"
+
+
+@pytest.mark.parametrize(
+    "database_url",
+    [
+        "postgresql+psycopg2://user:pass@127.0.0.1:5432/anytoolai",
+        "postgresql+unknown://user:pass@127.0.0.1:5432/anytoolai",
+    ],
+)
+def test_create_sync_engine_rejects_a_driver_other_than_the_installed_one(
+    database_url: str,
+) -> None:
+    """require_postgresql_url() only checks the drivername *prefix*, so both a real dialect
+    whose DBAPI package isn't installed here (psycopg2 -- this repo only ships
+    psycopg[binary] v3) and a dialect SQLAlchemy has never heard of ("unknown") would otherwise
+    reach sa.create_engine()'s dialect-loading step and raise whatever exception that specific
+    import path happens to produce (a bare ModuleNotFoundError for the former, which isn't even
+    an ArgumentError subclass; NoSuchModuleError, which is, for the latter) -- three separate
+    review rounds each found a different one of these escaping uncaught. Both are now rejected
+    deterministically before engine construction is ever attempted."""
+    with pytest.raises(RuntimeError, match="database driver"):
+        create_sync_engine(database_url)
+
+
+def test_create_sync_engine_with_decode_flag_fails_fast_on_a_dsn_with_no_database_segment() -> None:
+    """Silently skipping the decode (the prior fix for unquote(None)
+    raising TypeError) left create_engine() to omit the database name entirely, so libpq would
+    connect to its own default database (commonly the connecting username) instead of the one
+    the caller meant -- decode_database_name=True must raise instead of tolerating a DSN with no
+    database segment to decode."""
+    with pytest.raises(RuntimeError, match="database"):
+        create_sync_engine(
+            "postgresql+psycopg://user:pass@localhost:5432", decode_database_name=True
+        )
+
+
+def test_create_sync_engine_with_decode_flag_fails_fast_on_a_dsn_with_empty_database_segment() -> None:
+    """Twentieth code review pass finding: a DSN with a trailing slash and nothing after it
+    (e.g. "...@host:5432/") parses to database="" (empty string), not None -- the `is None`
+    guard missed this, and create_engine() would build with an empty dbname, which libpq
+    resolves the same silently-wrong way as a missing one. Reachable in production:
+    build_postgres_url_from_env() only treats POSTGRES_DB_ENV as absent when unset, not merely
+    empty."""
+    with pytest.raises(RuntimeError, match="database"):
+        create_sync_engine(
+            "postgresql+psycopg://user:pass@localhost:5432/", decode_database_name=True
+        )
+
+
+@pytest.mark.parametrize(
+    "db_name", ["proddb", "my?db=x", "my#db", "my db", "my%db", "my/db", "my@db"]
+)
+def test_build_postgres_url_from_env_survives_the_real_sqlalchemy_consumer_path_for_reserved_db_name_chars(
+    monkeypatch: pytest.MonkeyPatch, db_name: str
+) -> None:
+    """Eighteenth code review pass finding: build_postgres_url_from_env() is the production DSN
+    builder (platform-api/platform-worker boot path) -- an un-encoded reserved character in
+    POSTGRES_DB_ENV (e.g. "?") is parsed by sqlalchemy's make_url() as the start of a query
+    string, not part of the path, letting it silently inject extra psycopg connect_args (the
+    same bug class scripts/agent/runner.py's RuntimeIdentity.database_url already guards
+    against). Exercise the real consumer (create_sync_engine's decode_database_name=True), not
+    string parsing: the dsn must decode back to db_name with no extra connect_args."""
+    _clear(monkeypatch)
+    monkeypatch.setenv(POSTGRES_USER_ENV, "produser")
+    monkeypatch.setenv(POSTGRES_PASSWORD_ENV, "prodpassword")
+    monkeypatch.setenv(POSTGRES_DB_ENV, db_name)
+
+    dsn = build_postgres_url_from_env()
+    assert dsn is not None
+
+    engine = create_sync_engine(dsn, decode_database_name=True)
+    connect_args = engine.dialect.create_connect_args(engine.url)[1]
+
+    assert connect_args["dbname"] == db_name
+    assert connect_args["host"] == "postgres"
+    assert connect_args["port"] == 5432
+    assert connect_args["user"] == "produser"
+    assert connect_args["password"] == "prodpassword"
+    non_connection_keys = set(connect_args) - {
+        "host", "port", "user", "password", "dbname", "context",
+    }
+    assert not non_connection_keys, f"{db_name!r} injected extra connect_args: {non_connection_keys}"

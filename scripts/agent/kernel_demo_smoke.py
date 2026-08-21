@@ -259,6 +259,18 @@ POLL_INTERVAL_SECONDS = 0.5
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
 
+def _empty_cases_error(
+    cases: tuple[tuple[str, str, dict], ...], *, error_code: str, tuple_name: str, purpose: str
+) -> str | None:
+    """Shared vacuous-success guard: an empty case tuple must not read as "0/0 passed" success.
+    Used by this module's own run() and scripts/agent/atoms_proof.py's run() -- each keeps its
+    own error_code family (SMOKE0xx vs PROOF0xx) and wording (`purpose`), but the check and
+    message shape are the same, so they can't drift independently."""
+    if not cases:
+        return f"{error_code}: {tuple_name} is empty -- nothing to {purpose}"
+    return None
+
+
 def _atom_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None:
     action_types = [action_type for action_type, _, _ in cases]
     if len(action_types) != len(set(action_types)):
@@ -519,6 +531,19 @@ def _run_one_case(api_url: str, scenario_id: str, scenario_input: dict, timeout:
 DEGRADED_TIMEOUT_SECONDS = 5.0
 
 
+def _next_case_timeout(case_timeout: float, timeout: float, *, timed_out: bool) -> float:
+    """Shared degraded-timeout chaining rule: a case that didn't time out (pass or a different
+    failure) restores the full budget for the case after it; a timeout caps the next case's
+    budget at DEGRADED_TIMEOUT_SECONDS so a stuck worker doesn't make every remaining case wait
+    the full timeout all over again. That degrade is NOT permanent -- it only ever applies to the
+    single case immediately following a timeout. Shared by this module's own _run_case_batch()
+    and scripts/agent/atoms_proof.py's _run_case_group() so the two proof scripts can't drift on
+    this convention independently."""
+    if timed_out:
+        return min(case_timeout, DEGRADED_TIMEOUT_SECONDS)
+    return timeout
+
+
 def _run_case_batch(
     api_url: str,
     cases: tuple[tuple[str, str, dict], ...],
@@ -529,27 +554,21 @@ def _run_case_batch(
     (passed_count, case_timeout). A completion timeout usually means platform-worker itself
     isn't consuming jobs, in which case every remaining case would also time out -- but it could
     also be a genuine per-case bug, so every case still runs (skipping would hide real
-    regressions). What's bounded instead is the cost: right after a timeout, the next case gets
-    a short probe timeout (DEGRADED_TIMEOUT_SECONDS) rather than the full budget. That degrade is
-    NOT permanent -- any case that doesn't time out (success or a different failure) restores the
-    full timeout for the cases after it, so one slow-but-legitimate case can't silently cap every
-    case that follows it. Callers chain the returned case_timeout into the next batch (atoms then
-    composites) so a worker outage detected during the atom batch keeps the composite batch cheap
-    too, instead of resetting to the full budget for it."""
+    regressions). What's bounded instead is the cost, via _next_case_timeout() above. Callers
+    chain the returned case_timeout into the next batch (atoms then composites) so a worker
+    outage detected during the atom batch keeps the composite batch cheap too, instead of
+    resetting to the full budget for it."""
     passed = 0
     for label, scenario_id, scenario_input in cases:
         result = _run_one_case(api_url, scenario_id, scenario_input, case_timeout)
         if result.error_message is None:
             passed += 1
             print(f"{label}: {scenario_id} -> ok (session {result.session_id})")
-            case_timeout = timeout
         else:
             print(f"{label}: {scenario_id} -> failed ({result.error_message})", file=sys.stderr)
-            case_timeout = (
-                min(case_timeout, DEGRADED_TIMEOUT_SECONDS)
-                if result.error_code == _TIMEOUT_ERROR_CODE
-                else timeout
-            )
+        case_timeout = _next_case_timeout(
+            case_timeout, timeout, timed_out=result.error_code == _TIMEOUT_ERROR_CODE
+        )
     return passed, case_timeout
 
 
@@ -557,25 +576,31 @@ def run(api_url: str, timeout: float) -> int:
     """Runs ATOM_SMOKE_CASES then COMPOSITE_SMOKE_CASES against a live api_url.
 
     Precondition owned by the caller, not enforced here: main() must call
-    _atom_coverage_error()/_composite_coverage_error() first. Without that, a composite
-    scenario_id missing from _EXPECTED_SCHEMA_REF_BY_SCENARIO (e.g. workflows.yaml briefly
-    malformed) makes SMOKE009's schema_ref cross-check silently pass instead of catching a
-    scenario wired to the wrong workflow. run() itself doesn't re-check coverage so that tests
-    can call it directly to exercise per-case behavior in isolation from the coverage guard.
+    _coverage_gate_error() first. Without that, a composite scenario_id missing from
+    _EXPECTED_SCHEMA_REF_BY_SCENARIO (e.g. workflows.yaml briefly malformed) makes SMOKE009's
+    schema_ref cross-check silently pass instead of catching a scenario wired to the wrong
+    workflow. run() itself doesn't re-check coverage so that tests can call it directly to
+    exercise per-case behavior in isolation from the coverage guard.
     """
     total = len(ATOM_SMOKE_CASES)
-    if not ATOM_SMOKE_CASES:
-        print("SMOKE007: ATOM_SMOKE_CASES is empty -- nothing to smoke-test", file=sys.stderr)
+    empty_error = _empty_cases_error(
+        ATOM_SMOKE_CASES, error_code="SMOKE007", tuple_name="ATOM_SMOKE_CASES",
+        purpose="smoke-test",
+    )
+    if empty_error is not None:
+        print(empty_error, file=sys.stderr)
         return 1
 
     passed, case_timeout = _run_case_batch(api_url, ATOM_SMOKE_CASES, timeout, timeout)
     print(f"{passed}/{total} kernel_demo atoms passed")
 
     composite_total = len(COMPOSITE_SMOKE_CASES)
-    if not COMPOSITE_SMOKE_CASES:
-        print(
-            "SMOKE010: COMPOSITE_SMOKE_CASES is empty -- nothing to smoke-test", file=sys.stderr
-        )
+    empty_error = _empty_cases_error(
+        COMPOSITE_SMOKE_CASES, error_code="SMOKE010", tuple_name="COMPOSITE_SMOKE_CASES",
+        purpose="smoke-test",
+    )
+    if empty_error is not None:
+        print(empty_error, file=sys.stderr)
         return 1
 
     composite_passed, _case_timeout = _run_case_batch(
@@ -590,6 +615,21 @@ def _default_timeout() -> float:
     if raw is None:
         return DEFAULT_TIMEOUT_SECONDS
     return float(raw)
+
+
+def _coverage_gate_error(
+    atom_cases: tuple[tuple[str, str, dict], ...],
+    composite_cases: tuple[tuple[str, str, dict], ...],
+) -> str | None:
+    """Runs the atom then composite coverage checks main() needs before any live case runs.
+    Shared by this module's own main() and scripts/agent/atoms_proof.py's main() so the two
+    proof scripts' coverage-gate contract (checked before HTTP/DB work starts, not after) can't
+    drift independently -- the same class of duplication already fixed once for degraded-timeout
+    chaining (_next_case_timeout) and timestamped JSON bundles (collect_context)."""
+    coverage_error = _atom_coverage_error(atom_cases)
+    if coverage_error is not None:
+        return coverage_error
+    return _composite_coverage_error(composite_cases)
 
 
 def main() -> int:
@@ -616,14 +656,9 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    coverage_error = _atom_coverage_error(ATOM_SMOKE_CASES)
+    coverage_error = _coverage_gate_error(ATOM_SMOKE_CASES, COMPOSITE_SMOKE_CASES)
     if coverage_error is not None:
         print(coverage_error, file=sys.stderr)
-        return 1
-
-    composite_coverage_error = _composite_coverage_error(COMPOSITE_SMOKE_CASES)
-    if composite_coverage_error is not None:
-        print(composite_coverage_error, file=sys.stderr)
         return 1
 
     return run(args.api_url.rstrip("/"), args.timeout)
