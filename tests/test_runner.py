@@ -905,11 +905,24 @@ def test_atoms_proof_passes_database_url_via_env_not_argv(monkeypatch) -> None:
     assert len(calls) == 1
     command, env = calls[0]
     assert identity.database_url not in command
-    assert command[:2] == [runner.sys.executable, "scripts/agent/atoms_proof.py"]
-    assert command[2] == identity.api_url
-    assert command[3] == "--database-url-env"
     env_var_name = command[4]
+    # Full argv, not just the database-url-env prefix: deleting --database-url-is-percent-
+    # encoded would silently leave a reserved-character database name encoded on the wire, and
+    # would have stayed green under the prior prefix-only assertion.
+    assert command == [
+        runner.sys.executable, "scripts/agent/atoms_proof.py", identity.api_url,
+        "--database-url-env", env_var_name,
+        "--database-url-is-percent-encoded",
+    ]
     assert env[env_var_name] == identity.database_url
+
+
+def test_atoms_proof_is_registered_in_commands() -> None:
+    """Cheap regression against COMMANDS["atoms-proof"] silently pointing
+    at the wrong function."""
+    runner = load_runner_module()
+
+    assert runner.COMMANDS["atoms-proof"] is runner.atoms_proof
 
 
 def test_atoms_proof_reports_dev001_for_invalid_port_override(monkeypatch, capsys) -> None:

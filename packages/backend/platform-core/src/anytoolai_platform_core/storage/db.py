@@ -99,7 +99,11 @@ class UtcDateTime(sa.TypeDecorator[datetime]):
 
 
 def create_sync_engine(
-    database_url: str, *, decode_database_name: bool = False, **kwargs: Any
+    database_url: str | URL,
+    *,
+    decode_database_name: bool = False,
+    context: str = "Runtime storage",
+    **kwargs: Any,
 ) -> Engine:
     """decode_database_name is an explicit, caller-declared contract, not a guess: pass True
     only when database_url's database-name path segment was percent-encoded by its producer
@@ -108,9 +112,35 @@ def create_sync_engine(
     make_url() does not decode that segment on parse, so a blind, unconditional unquote() here
     would silently corrupt an operator-supplied database name that legitimately contains a
     "%"-looking substring not meant as encoding (eighteenth code review pass finding, same
-    class as scripts/agent/atoms_proof.py's _build_engine())."""
-    url = require_postgresql_url(database_url, context="Runtime storage")
-    if decode_database_name and url.database is not None:
+    class as scripts/agent/atoms_proof.py's _build_engine()).
+
+    decode_database_name=True with a DSN that has no database path segment at all is a
+    configuration error, not something to tolerate: skipping the decode there would leave
+    create_engine() to omit the database name, and libpq would silently connect to its own
+    default database (commonly the connecting username) instead of the one the caller meant.
+    `not url.database`, not `url.database is None`: a DSN with a trailing slash and nothing
+    after it (e.g. "postgresql://u:p@host:5432/") parses to database="" (empty string), not
+    None -- verified directly against make_url() -- and reachable in production, since
+    build_postgres_url_from_env() only treats POSTGRES_DB_ENV as absent when it's unset, not
+    merely empty (mirrored in scripts/agent/atoms_proof.py's _build_engine(), which delegates
+    here for exactly this reason).
+
+    database_url accepts an already-parsed URL, not just a str: atoms_proof.py's _build_engine()
+    hands one straight through after its own driver coercion, relying on
+    require_postgresql_url()'s isinstance(URL) branch -- reflected here rather than left as an
+    undeclared runtime accident. context labels both the non-PostgreSQL-scheme error
+    (require_postgresql_url) and the decode-fail-fast error below; it defaults to this module's
+    own "Runtime storage" label but is a real parameter (not hardcoded) so a caller in a
+    different subsystem -- e.g. atoms_proof.py's CLI, where "Runtime storage" would mislabel an
+    operator-facing configuration error -- can supply its own (twenty-first code review pass
+    finding)."""
+    url = require_postgresql_url(database_url, context=context)
+    if decode_database_name:
+        if not url.database:
+            raise RuntimeError(
+                f"{context}: decode_database_name=True but the DSN has no database path "
+                "segment to decode"
+            )
         url = url.set(database=unquote(url.database))
     return sa.create_engine(url, future=True, **kwargs)
 

@@ -120,13 +120,29 @@ def test_create_sync_engine_rejects_non_postgresql_urls() -> None:
         create_sync_engine("sqlite:///tmp.db")
 
 
-def test_create_sync_engine_with_decode_flag_tolerates_a_dsn_with_no_database_segment() -> None:
-    """A DSN missing its database path segment leaves url.database as None; unquote(None) raises
-    TypeError, so decode_database_name=True must skip the decode instead of blindly unquoting."""
-    engine = create_sync_engine(
-        "postgresql+psycopg://user:pass@localhost:5432", decode_database_name=True
-    )
-    assert engine.url.database is None
+def test_create_sync_engine_with_decode_flag_fails_fast_on_a_dsn_with_no_database_segment() -> None:
+    """Silently skipping the decode (the prior fix for unquote(None)
+    raising TypeError) left create_engine() to omit the database name entirely, so libpq would
+    connect to its own default database (commonly the connecting username) instead of the one
+    the caller meant -- decode_database_name=True must raise instead of tolerating a DSN with no
+    database segment to decode."""
+    with pytest.raises(RuntimeError, match="database"):
+        create_sync_engine(
+            "postgresql+psycopg://user:pass@localhost:5432", decode_database_name=True
+        )
+
+
+def test_create_sync_engine_with_decode_flag_fails_fast_on_a_dsn_with_empty_database_segment() -> None:
+    """Twentieth code review pass finding: a DSN with a trailing slash and nothing after it
+    (e.g. "...@host:5432/") parses to database="" (empty string), not None -- the `is None`
+    guard missed this, and create_engine() would build with an empty dbname, which libpq
+    resolves the same silently-wrong way as a missing one. Reachable in production:
+    build_postgres_url_from_env() only treats POSTGRES_DB_ENV as absent when unset, not merely
+    empty."""
+    with pytest.raises(RuntimeError, match="database"):
+        create_sync_engine(
+            "postgresql+psycopg://user:pass@localhost:5432/", decode_database_name=True
+        )
 
 
 @pytest.mark.parametrize(
