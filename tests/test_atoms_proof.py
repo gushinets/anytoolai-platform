@@ -936,6 +936,23 @@ def test_build_engine_fails_fast_when_decode_flag_set_on_a_dsn_with_empty_databa
         )
 
 
+def test_build_engine_labels_its_own_errors_as_atoms_proof_not_runtime_storage() -> None:
+    """Twenty-first code review pass finding: _build_engine() delegates to
+    create_sync_engine(), whose errors default to a "Runtime storage" label describing
+    platform-api/platform-worker's boot path -- misleading for this CLI's own operator-facing
+    configuration errors (e.g. a bad --database-url-env DSN). _build_engine() now passes its
+    own context."""
+    module = load_atoms_proof_module()
+
+    with pytest.raises(RuntimeError, match="^atoms-proof:"):
+        module._build_engine(
+            "postgresql+psycopg://user:pass@127.0.0.1:5432", decode_database_name=True
+        )
+
+    with pytest.raises(RuntimeError, match="^atoms-proof "):
+        module._build_engine("sqlite:///tmp.db")
+
+
 def test_module_exposes_eleven_atom_and_three_composite_cases() -> None:
     module = load_atoms_proof_module()
 
