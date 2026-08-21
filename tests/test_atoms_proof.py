@@ -262,7 +262,11 @@ def test_classify_ledger_reports_proof017_when_step_artifact_lineage_mismatches(
 
 def test_classify_ledger_reports_proof018_when_result_artifact_lineage_mismatches() -> None:
     """Mirrors PROOF017 for the job's own result_artifact_id: must belong to this job and carry
-    no action_run_id (workflows/runner.py's _create_final_artifact always creates it that way)."""
+    no action_run_id (workflows/runner.py's _create_final_artifact always creates it that way).
+    Twenty-second code review pass: PROOF023's full ownership scan (allow_none=True, since
+    artifacts_table.job_id is nullable) now runs before this check and already rejects a wrong,
+    non-null job_id for every row -- so the only way this specific check still reaches a job_id
+    mismatch is the null-job_id residual PROOF023 tolerates."""
     module = load_atoms_proof_module()
 
     case = module._classify_ledger(
@@ -271,7 +275,7 @@ def test_classify_ledger_reports_proof018_when_result_artifact_lineage_mismatche
         job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
         action_runs=[_one_step_row()],
         provider_calls=[_one_provider_call()],
-        artifacts=[_one_step_artifact(), _one_result_artifact(job_id="job-other")],
+        artifacts=[_one_step_artifact(), _one_result_artifact(job_id=None)],
         events=_all_expected_events(),
         expected_event_types=EXPECTED_EVENT_TYPES,
     )

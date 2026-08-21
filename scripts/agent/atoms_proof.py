@@ -304,6 +304,32 @@ def _classify_ledger(
             )
 
     artifacts_by_id = {artifact["id"]: artifact for artifact in artifacts}
+    # artifacts is filtered independently by scenario_session_id only (see _check_ledger), so an
+    # extra, unreferenced row for a different job could be present alongside the rows
+    # action_runs/job actually reference. If that row happens to carry exactly one matching
+    # artifact.created event, PROOF020/021's per-artifact_id correlation below would never
+    # notice either, since it only asks "does this id have exactly one creation event", not
+    # "does this id belong here at all". Scanned here, before the PROOF004/017/018
+    # reference-specific checks below -- mirroring PROOF016's placement before PROOF003/012 for
+    # provider_calls -- rather than as an ad hoc fourth check appended after them.
+    # allow_none=True: unlike provider_calls_table.job_id (nullable=False, so PROOF016 needs no
+    # tolerance and downstream provider_calls checks never re-touch job_id at all),
+    # artifacts_table.job_id is nullable -- ArtifactRecord.job_id: str | None, and both
+    # ArtifactService creation methods accept job_id=None (no current caller does, but the model
+    # supports it, same as event_log.job_id's PROOF019 check above). A job-less artifact is a
+    # legitimate row, not an ownership defect, so this scan only rejects a *wrong*, non-null
+    # job_id.
+    mismatch = _first_job_id_mismatch(
+        artifacts, job_id=job_id, error_code="PROOF023", allow_none=True,
+        describe=lambda artifact: f"artifacts_table row {artifact['id']}",
+    )
+    if mismatch is not None:
+        return _fail(
+            label=label, scenario_id=scenario_id, kind=kind,
+            session_id=scenario_session_id, job_id=job_id,
+            error_code="PROOF023", error_message=mismatch,
+        )
+
     for action_run in action_runs:
         output_artifact_id = action_run["output_artifact_id"]
         artifact = artifacts_by_id.get(output_artifact_id)
@@ -317,9 +343,10 @@ def _classify_ledger(
                     f"{action_run['step_id']}) has no matching artifacts_table row"
                 ),
             )
-        # A row can exist under output_artifact_id yet belong to a different job/action_run
-        # (e.g. copy-paste of another session's artifact id) -- artifact_ids membership alone
-        # can't catch that, so check lineage directly.
+        # PROOF023 above already rejects a *wrong* job_id for every row, including this one, but
+        # tolerates a *null* job_id -- a step's own output artifact must not be job-less, so
+        # this still checks job_id (now only reachable via the null case) alongside the
+        # action_run_id lineage PROOF023's row-level scan can't express.
         if artifact["job_id"] != job_id or artifact["action_run_id"] != action_run["id"]:
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
@@ -346,6 +373,7 @@ def _classify_ledger(
                 f"artifacts_table rows for scenario_session_id {scenario_session_id}"
             ),
         )
+    # Same null-job_id residual as PROOF017 above: PROOF023 already rejected a wrong job_id.
     if result_artifact["job_id"] != job_id or result_artifact["action_run_id"] is not None:
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
@@ -357,23 +385,6 @@ def _classify_ledger(
                 f"{result_artifact['action_run_id']!r}, expected job_id {job_id!r}/"
                 "action_run_id None"
             ),
-        )
-    # PROOF017/PROOF018 above only validate the artifact rows action_runs/job actually
-    # reference -- artifacts is filtered independently by scenario_session_id only (see
-    # _check_ledger), so an extra, unreferenced row for a different job could still be present.
-    # If that row happens to carry exactly one matching artifact.created event, PROOF020/021's
-    # per-artifact_id correlation below would never notice either, since it only asks "does this
-    # id have exactly one creation event", not "does this id belong here at all" (team-lead-#3
-    # review).
-    mismatch = _first_job_id_mismatch(
-        artifacts, job_id=job_id, error_code="PROOF023",
-        describe=lambda artifact: f"artifacts_table row {artifact['id']}",
-    )
-    if mismatch is not None:
-        return _fail(
-            label=label, scenario_id=scenario_id, kind=kind,
-            session_id=scenario_session_id, job_id=job_id,
-            error_code="PROOF023", error_message=mismatch,
         )
 
     observed_event_types = {event["event_type"] for event in events}
