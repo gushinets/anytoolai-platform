@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -134,7 +135,10 @@ def _build_engine(database_url: str, *, decode_database_name: bool = False) -> "
     url = make_url(database_url)
     if url.drivername == "postgresql":
         url = url.set(drivername="postgresql+psycopg")
-    return create_sync_engine(url, decode_database_name=decode_database_name)
+    # context="atoms-proof": create_sync_engine()'s default "Runtime storage" label describes
+    # platform-api/platform-worker's boot path, not this CLI's operator-facing configuration
+    # errors (e.g. a bad --database-url-env DSN) -- twenty-first code review pass finding.
+    return create_sync_engine(url, decode_database_name=decode_database_name, context="atoms-proof")
 
 
 def _orphan_ids(*count_dicts: dict, known_ids: set) -> list:
@@ -169,16 +173,12 @@ def _first_job_id_mismatch(
     return None
 
 
-def _correlate_events_by_id(events: list[dict], *, event_type: str, id_field: str) -> dict:
+def _correlate_events_by_id(events: list[dict], *, event_type: str, id_field: str) -> Counter:
     """Counts of `events` rows with event_type `event_type`, keyed by row[id_field]. Shared by
     the PROOF006/013/020 count checks and their PROOF014/015/021 orphan checks below -- five
     near-identical counting loops otherwise (action.started, action.succeeded,
     provider.request_started, provider.request_succeeded, artifact.created)."""
-    counts: dict = {}
-    for event in events:
-        if event["event_type"] == event_type:
-            counts[event.get(id_field)] = counts.get(event.get(id_field), 0) + 1
-    return counts
+    return Counter(event.get(id_field) for event in events if event["event_type"] == event_type)
 
 
 def _fail(
@@ -306,7 +306,7 @@ def _classify_ledger(
     artifacts_by_id = {artifact["id"]: artifact for artifact in artifacts}
     for action_run in action_runs:
         output_artifact_id = action_run["output_artifact_id"]
-        artifact = None if output_artifact_id is None else artifacts_by_id.get(output_artifact_id)
+        artifact = artifacts_by_id.get(output_artifact_id)
         if artifact is None:
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
@@ -681,14 +681,18 @@ def run(
         print(empty_error, file=sys.stderr)
         return [], 1
 
-    # _build_engine() can now raise RuntimeError (a caller-declared decode contract that finds
-    # nothing to decode -- see its own docstring); left uncaught, that propagated as a raw
-    # traceback instead of the PROOF0xx failure category the module docstring promises for
-    # every category of failure, and skipped write_evidence_report() entirely.
+    # _build_engine() can raise RuntimeError for any engine-configuration problem it or
+    # create_sync_engine() detects -- not only the decode-with-nothing-to-decode contract (see
+    # _build_engine()'s own docstring), but also e.g. a non-PostgreSQL --database-url-env value
+    # (require_postgresql_url()). PROOF022 is deliberately this broad, not one specific cause:
+    # left uncaught, any of these propagated as a raw traceback instead of the PROOF0xx failure
+    # category the module docstring promises for every category of failure, and skipped
+    # write_evidence_report() entirely; the exception text (never a credential -- database_url
+    # itself is never part of RuntimeError's own message here) still tells them apart.
     try:
         engine = _build_engine(database_url, decode_database_name=decode_database_name)
     except RuntimeError as exc:
-        print(f"PROOF022: {exc}", file=sys.stderr)
+        print(f"PROOF022: engine configuration error: {exc}", file=sys.stderr)
         return [], 1
 
     cases: list[EvidenceCase] = []
