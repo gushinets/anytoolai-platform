@@ -134,7 +134,19 @@ def _build_engine(database_url: str, *, decode_database_name: bool = False) -> "
     RuntimeIdentity.database_url in scripts/agent/runner.py); leave False for a hand-written or
     otherwise arbitrary DSN, whose database name is used exactly as given."""
     url = make_url(database_url)
-    if decode_database_name and url.database is not None:
+    if decode_database_name:
+        if url.database is None:
+            # Silently skipping the decode here (the prior fix for unquote(None) raising
+            # TypeError) left create_engine() to omit the database name entirely; libpq then
+            # connects to its own default database (commonly the connecting username) instead
+            # of the one the caller actually meant, which is worse than failing loudly -- the
+            # caller declared this DSN's database segment is encoded, so a DSN with no segment
+            # to decode is a configuration error, not something to tolerate (team-lead-#2
+            # review, mirrored in storage/db.py's create_sync_engine()).
+            raise RuntimeError(
+                "--database-url-is-percent-encoded was set but the DSN has no database path "
+                "segment to decode"
+            )
         url = url.set(database=urllib.parse.unquote(url.database))
     if url.drivername == "postgresql":
         url = url.set(drivername="postgresql+psycopg")
@@ -226,6 +238,24 @@ def _classify_ledger(
             )
 
     action_run_ids = {action_run["id"] for action_run in action_runs}
+
+    # provider_calls, artifacts, and event_log are all filtered independently by
+    # scenario_session_id only (see _check_ledger) -- action_run_id membership (PROOF012 below)
+    # already implies a provider_calls row belongs to *an* action_run of this job, but not that
+    # the row's own job_id column agrees. Check it directly so a mislinked row can't pass
+    # silently (team-lead-#2 review).
+    for call in provider_calls:
+        if call["job_id"] != job_id:
+            return _fail(
+                label=label, scenario_id=scenario_id, kind=kind,
+                session_id=scenario_session_id, job_id=job_id,
+                error_code="PROOF016",
+                error_message=(
+                    f"PROOF016: provider_calls row {call['id']} has job_id {call['job_id']!r}, "
+                    f"expected {job_id!r}"
+                ),
+            )
+
     provider_call_counts: dict[str, int] = {}
     for call in provider_calls:
         provider_call_counts[call["action_run_id"]] = (
@@ -259,10 +289,11 @@ def _classify_ledger(
                 ),
             )
 
-    artifact_ids = {artifact["id"] for artifact in artifacts}
+    artifacts_by_id = {artifact["id"]: artifact for artifact in artifacts}
     for action_run in action_runs:
         output_artifact_id = action_run["output_artifact_id"]
-        if output_artifact_id is None or output_artifact_id not in artifact_ids:
+        artifact = None if output_artifact_id is None else artifacts_by_id.get(output_artifact_id)
+        if artifact is None:
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
@@ -272,10 +303,26 @@ def _classify_ledger(
                     f"{action_run['step_id']}) has no matching artifacts_table row"
                 ),
             )
+        # A row can exist under output_artifact_id yet belong to a different job/action_run
+        # (e.g. copy-paste of another session's artifact id) -- artifact_ids membership alone
+        # can't catch that, so check lineage directly (team-lead-#2 review).
+        if artifact["job_id"] != job_id or artifact["action_run_id"] != action_run["id"]:
+            return _fail(
+                label=label, scenario_id=scenario_id, kind=kind,
+                session_id=scenario_session_id, job_id=job_id,
+                error_code="PROOF017",
+                error_message=(
+                    f"PROOF017: artifact {output_artifact_id} for action_run "
+                    f"{action_run['id']} (step {action_run['step_id']}) has job_id "
+                    f"{artifact['job_id']!r}/action_run_id {artifact['action_run_id']!r}, "
+                    f"expected job_id {job_id!r}/action_run_id {action_run['id']!r}"
+                ),
+            )
     # result_artifact_id is a separate artifact row (action_run_id=None), never a step's own
     # output_artifact_id -- workflows/runner.py's _create_final_artifact always creates a fresh
     # row from the final workflow_output.
-    if result_artifact_id not in artifact_ids:
+    result_artifact = artifacts_by_id.get(result_artifact_id)
+    if result_artifact is None:
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
@@ -283,6 +330,18 @@ def _classify_ledger(
             error_message=(
                 f"PROOF004: job result_artifact_id {result_artifact_id} not found among "
                 f"artifacts_table rows for scenario_session_id {scenario_session_id}"
+            ),
+        )
+    if result_artifact["job_id"] != job_id or result_artifact["action_run_id"] is not None:
+        return _fail(
+            label=label, scenario_id=scenario_id, kind=kind,
+            session_id=scenario_session_id, job_id=job_id,
+            error_code="PROOF018",
+            error_message=(
+                f"PROOF018: job result_artifact_id {result_artifact_id} has job_id "
+                f"{result_artifact['job_id']!r}/action_run_id "
+                f"{result_artifact['action_run_id']!r}, expected job_id {job_id!r}/"
+                "action_run_id None"
             ),
         )
 
@@ -296,6 +355,58 @@ def _classify_ledger(
             error_message=(
                 f"PROOF005: event_log_table is missing expected event types {missing} for "
                 f"scenario_session_id {scenario_session_id}"
+            ),
+        )
+
+    # job_id is nullable on event_log (some session-scoped events, e.g. scenario.started, are
+    # emitted before a job exists), so only a *non-null* mismatch is a real ownership defect
+    # (team-lead-#2 review).
+    for event in events:
+        event_job_id = event.get("job_id")
+        if event_job_id is not None and event_job_id != job_id:
+            return _fail(
+                label=label, scenario_id=scenario_id, kind=kind,
+                session_id=scenario_session_id, job_id=job_id,
+                error_code="PROOF019",
+                error_message=(
+                    f"PROOF019: event_log row (event_type {event['event_type']!r}) has job_id "
+                    f"{event_job_id!r}, expected {job_id!r}"
+                ),
+            )
+
+    # PROOF005 above only checks the *type* is present anywhere in the session, so one
+    # artifact.created row can satisfy a multi-artifact workflow with several artifacts_table
+    # rows. Correlate by artifact_id, matching the same per-entity correlation this check class
+    # already does for action_run_id/provider_call_id below (team-lead-#2 review).
+    artifact_created_counts: dict[str, int] = {}
+    for event in events:
+        if event["event_type"] == "artifact.created":
+            artifact_created_counts[event.get("artifact_id")] = (
+                artifact_created_counts.get(event.get("artifact_id"), 0) + 1
+            )
+    for artifact_id in artifacts_by_id:
+        count = artifact_created_counts.get(artifact_id, 0)
+        if count != 1:
+            return _fail(
+                label=label, scenario_id=scenario_id, kind=kind,
+                session_id=scenario_session_id, job_id=job_id,
+                error_code="PROOF020",
+                error_message=(
+                    f"PROOF020: expected exactly one artifact.created event_log row for "
+                    f"artifact {artifact_id}, found {count}"
+                ),
+            )
+    orphan_artifact_event_ids = _orphan_ids(
+        artifact_created_counts, known_ids=set(artifacts_by_id)
+    )
+    if orphan_artifact_event_ids:
+        return _fail(
+            label=label, scenario_id=scenario_id, kind=kind,
+            session_id=scenario_session_id, job_id=job_id,
+            error_code="PROOF021",
+            error_message=(
+                f"PROOF021: event_log has artifact.created rows for artifact_id(s) "
+                f"{orphan_artifact_event_ids}, not among this session's artifacts_table rows"
             ),
         )
 

@@ -108,9 +108,20 @@ def create_sync_engine(
     make_url() does not decode that segment on parse, so a blind, unconditional unquote() here
     would silently corrupt an operator-supplied database name that legitimately contains a
     "%"-looking substring not meant as encoding (eighteenth code review pass finding, same
-    class as scripts/agent/atoms_proof.py's _build_engine())."""
+    class as scripts/agent/atoms_proof.py's _build_engine()).
+
+    decode_database_name=True with a DSN that has no database path segment at all is a
+    configuration error, not something to tolerate: skipping the decode there would leave
+    create_engine() to omit the database name, and libpq would silently connect to its own
+    default database (commonly the connecting username) instead of the one the caller meant
+    (team-lead-#2 review, mirrored in scripts/agent/atoms_proof.py's _build_engine())."""
     url = require_postgresql_url(database_url, context="Runtime storage")
-    if decode_database_name and url.database is not None:
+    if decode_database_name:
+        if url.database is None:
+            raise RuntimeError(
+                "Runtime storage: decode_database_name=True but the DSN has no database path "
+                "segment to decode"
+            )
         url = url.set(database=unquote(url.database))
     return sa.create_engine(url, future=True, **kwargs)
 

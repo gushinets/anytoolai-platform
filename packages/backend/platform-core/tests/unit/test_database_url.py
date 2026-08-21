@@ -120,13 +120,16 @@ def test_create_sync_engine_rejects_non_postgresql_urls() -> None:
         create_sync_engine("sqlite:///tmp.db")
 
 
-def test_create_sync_engine_with_decode_flag_tolerates_a_dsn_with_no_database_segment() -> None:
-    """A DSN missing its database path segment leaves url.database as None; unquote(None) raises
-    TypeError, so decode_database_name=True must skip the decode instead of blindly unquoting."""
-    engine = create_sync_engine(
-        "postgresql+psycopg://user:pass@localhost:5432", decode_database_name=True
-    )
-    assert engine.url.database is None
+def test_create_sync_engine_with_decode_flag_fails_fast_on_a_dsn_with_no_database_segment() -> None:
+    """Team-lead-#2 review: silently skipping the decode (the prior fix for unquote(None)
+    raising TypeError) left create_engine() to omit the database name entirely, so libpq would
+    connect to its own default database (commonly the connecting username) instead of the one
+    the caller meant -- decode_database_name=True must raise instead of tolerating a DSN with no
+    database segment to decode."""
+    with pytest.raises(RuntimeError, match="database"):
+        create_sync_engine(
+            "postgresql+psycopg://user:pass@localhost:5432", decode_database_name=True
+        )
 
 
 @pytest.mark.parametrize(
