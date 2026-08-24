@@ -165,6 +165,24 @@ class ScenarioRuntimeService:
             )
         )
 
+        # code-review (2026-08-24) finding: an idempotency-key replay below returns a
+        # snapshot before the internal_only/live_canary_token check further down ever runs, so a
+        # caller who ever learns (or brute-forces, within the same guest_id scope) a valid
+        # idempotency_key for an internal_only scenario could replay it without the token.
+        # live_canary.py itself never sends Idempotency-Key today, so this can't fire in
+        # practice yet, but checking it here (before touching idempotency at all) closes the gap
+        # regardless of how any future caller behaves. A bare config peek, not
+        # _require_product_scenario() (which raises on an unknown/removed scenario_id) -- an
+        # idempotency replay of a session whose scenario has since been removed from config must
+        # keep the config-drift tolerance the comment below describes, not fail here instead.
+        early_scenario = self._config_registry.get_scenario(scenario_id)
+        if (
+            early_scenario is not None
+            and early_scenario.internal_only
+            and not _live_canary_token_is_valid(live_canary_token)
+        ):
+            raise ScenarioNotFoundError()
+
         # A replay of an already-accepted start must survive config drift since the
         # original request: the frontend can be disabled, the quota policy
         # reconfigured/broken, or the guest identity removed in between -- none of

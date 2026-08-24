@@ -175,9 +175,10 @@ def _first_job_id_mismatch(
 
 def _correlate_events_by_id(events: list[dict], *, event_type: str, id_field: str) -> Counter:
     """Counts of `events` rows with event_type `event_type`, keyed by row[id_field]. Shared by
-    the PROOF006/013/020 count checks and their PROOF014/015/021 orphan checks below -- five
+    the PROOF006/013/020/024 count checks and their PROOF014/015/021 orphan checks below -- six
     near-identical counting loops otherwise (action.started, action.succeeded,
-    provider.request_started, provider.request_succeeded, artifact.created)."""
+    provider.request_started, provider.request_succeeded, provider.request_failed,
+    artifact.created)."""
     return Counter(event.get(id_field) for event in events if event["event_type"] == event_type)
 
 
@@ -284,7 +285,7 @@ def _classify_ledger(
     Every internal failure returns through `fail` (functools.partial over _fail(), bound once
     with label/scenario_id/kind/session_id/steps=known_steps -- the fields every PROOF00x branch
     shares -- leaving each call site to supply only job_id/error_code/error_message) instead of
-    calling _fail() directly at each of the 19 return sites below -- `/code-review` #4 (2026-08-24)
+    calling _fail() directly at each of the 23 return sites below -- `/code-review` #4 (2026-08-24)
     finding #6: a manually repeated steps=known_steps() at every call site meant a missed site (as
     in finding #1, the _check_ledger() except-branch) silently produced incomplete evidence.
     Binding the shared fields once makes that particular class of typo far less likely, since a
@@ -562,6 +563,12 @@ def _classify_ledger(
             ),
         )
 
+    # `/code-review` #3 (2026-08-24) finding: a transport retry's *first* provider_calls row
+    # legitimately ends in provider.request_failed, not provider.request_succeeded (the gateway
+    # then makes another physical attempt, which succeeds) -- requiring succeeded == 1 on every
+    # row rejected exactly the retry case max_provider_calls_per_action (PROOF003, above) was
+    # just relaxed to allow. Each row needs exactly one *terminal* event (succeeded xor failed),
+    # not specifically a succeeded one.
     provider_call_ids = {call["id"] for call in provider_calls}
     provider_started_counts = _correlate_events_by_id(
         events, event_type="provider.request_started", id_field="provider_call_id"
@@ -569,22 +576,62 @@ def _classify_ledger(
     provider_succeeded_counts = _correlate_events_by_id(
         events, event_type="provider.request_succeeded", id_field="provider_call_id"
     )
+    provider_failed_counts = _correlate_events_by_id(
+        events, event_type="provider.request_failed", id_field="provider_call_id"
+    )
     for call in provider_calls:
         call_id = call["id"]
         started = provider_started_counts.get(call_id, 0)
-        succeeded = provider_succeeded_counts.get(call_id, 0)
-        if started != 1 or succeeded != 1:
+        if started != 1:
             return fail(
                 job_id=job_id,
                 error_code="PROOF013",
                 error_message=(
-                    f"PROOF013: expected exactly one provider.request_started and one "
-                    f"provider.request_succeeded event_log row for provider_call {call_id} "
-                    f"(action_run {call['action_run_id']}), found {started} and {succeeded}"
+                    f"PROOF013: expected exactly one provider.request_started event_log "
+                    f"row for provider_call {call_id} (action_run {call['action_run_id']}), "
+                    f"found {started}"
+                ),
+            )
+        succeeded = provider_succeeded_counts.get(call_id, 0)
+        failed = provider_failed_counts.get(call_id, 0)
+        if succeeded + failed != 1:
+            return fail(
+                job_id=job_id,
+                error_code="PROOF024",
+                error_message=(
+                    f"PROOF024: expected exactly one terminal event_log row "
+                    f"(provider.request_succeeded xor provider.request_failed) for "
+                    f"provider_call {call_id} (action_run {call['action_run_id']}), found "
+                    f"{succeeded} succeeded and {failed} failed"
+                ),
+            )
+        # The persisted provider_calls.status must agree with whichever terminal event fired --
+        # ProviderCallStatus.timed_out also emits provider.request_failed (gateway/events.py),
+        # so a failed terminal event accepts either "failed" or "timed_out".
+        status = call["status"]
+        if succeeded and status != "succeeded":
+            return fail(
+                job_id=job_id,
+                error_code="PROOF025",
+                error_message=(
+                    f"PROOF025: provider_call {call_id} (action_run "
+                    f"{call['action_run_id']}) has a provider.request_succeeded event but "
+                    f"status {status!r}, expected 'succeeded'"
+                ),
+            )
+        if failed and status not in ("failed", "timed_out"):
+            return fail(
+                job_id=job_id,
+                error_code="PROOF025",
+                error_message=(
+                    f"PROOF025: provider_call {call_id} (action_run "
+                    f"{call['action_run_id']}) has a provider.request_failed event but "
+                    f"status {status!r}, expected 'failed' or 'timed_out'"
                 ),
             )
     orphan_provider_event_ids = _orphan_ids(
-        provider_started_counts, provider_succeeded_counts, known_ids=provider_call_ids
+        provider_started_counts, provider_succeeded_counts, provider_failed_counts,
+        known_ids=provider_call_ids,
     )
     if orphan_provider_event_ids:
         return fail(
@@ -592,11 +639,32 @@ def _classify_ledger(
             error_code="PROOF015",
             error_message=(
                 f"PROOF015: event_log has provider.request_started/"
-                f"provider.request_succeeded rows for provider_call_id(s) "
-                f"{orphan_provider_event_ids}, not among this session's "
+                f"provider.request_succeeded/provider.request_failed rows for "
+                f"provider_call_id(s) {orphan_provider_event_ids}, not among this session's "
                 f"provider_calls"
             ),
         )
+    # A session only reaches _classify_ledger() after the HTTP layer already observed it
+    # succeed (kernel_demo_smoke.py's own polling) -- so every action_run's *last* physical
+    # attempt (highest physical_call_index) must be the one that succeeded; any earlier ones
+    # are the retried failures the checks above now tolerate.
+    for action_run in action_runs:
+        calls = provider_calls_by_action_run_id.get(action_run["id"], [])
+        if not calls:
+            continue
+        last_call = max(calls, key=lambda call: call["physical_call_index"])
+        if last_call["status"] != "succeeded":
+            return fail(
+                job_id=job_id,
+                error_code="PROOF026",
+                error_message=(
+                    f"PROOF026: action_run {action_run['id']} (step "
+                    f"{action_run['step_id']}) succeeded, but its last physical "
+                    f"provider_calls row (id {last_call['id']}, physical_call_index "
+                    f"{last_call['physical_call_index']}) has status "
+                    f"{last_call['status']!r}, expected 'succeeded'"
+                ),
+            )
 
     steps = tuple(
         _step_evidence_from_action_run(row, provider_calls_by_action_run_id[row["id"]])

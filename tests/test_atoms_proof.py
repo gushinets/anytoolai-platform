@@ -47,13 +47,17 @@ def _all_expected_events(
     *,
     action_run_ids: tuple[str, ...] = ("run-1",),
     provider_call_ids: tuple[str, ...] = ("call-1",),
+    failed_provider_call_ids: tuple[str, ...] = (),
     artifact_ids: tuple[str, ...] = ("artifact-step-1", "artifact-result"),
 ) -> list[dict]:
     """One event per session-scoped expected type, plus one artifact.created row per
     artifact_id, one action.started/action.succeeded pair per action_run_id, and one
-    provider.request_started/succeeded pair per provider_call_id -- matching the per-row
-    artifact_id/action_run_id/provider_call_id correlation _classify_ledger requires. Defaults
-    match _one_step_row()'s "run-1", _one_provider_call()'s "call-1", and
+    provider.request_started/terminal pair per provider_call_id -- matching the per-row
+    artifact_id/action_run_id/provider_call_id correlation _classify_ledger requires. Every
+    provider_call_id gets a terminal provider.request_succeeded event, except those also listed
+    in failed_provider_call_ids (a subset of provider_call_ids), which get provider.request_failed
+    instead -- models a retried physical attempt's own first, failed call. Defaults match
+    _one_step_row()'s "run-1", _one_provider_call()'s "call-1", and
     _one_step_artifact()/_one_result_artifact()'s ids."""
     events = [
         {"event_type": event_type}
@@ -66,7 +70,12 @@ def _all_expected_events(
         events.append({"event_type": "action.succeeded", "action_run_id": run_id})
     for call_id in provider_call_ids:
         events.append({"event_type": "provider.request_started", "provider_call_id": call_id})
-        events.append({"event_type": "provider.request_succeeded", "provider_call_id": call_id})
+        terminal_event_type = (
+            "provider.request_failed"
+            if call_id in failed_provider_call_ids
+            else "provider.request_succeeded"
+        )
+        events.append({"event_type": terminal_event_type, "provider_call_id": call_id})
     return events
 
 
@@ -88,6 +97,8 @@ def _one_provider_call(**overrides) -> dict:
         "id": "call-1",
         "action_run_id": "run-1",
         "job_id": "job-1",
+        "physical_call_index": 0,
+        "status": "succeeded",
         "latency_ms": 123,
         "input_tokens": 10,
         "output_tokens": 20,
@@ -220,7 +231,13 @@ def test_classify_ledger_passes_and_sums_cost_across_retried_provider_calls() ->
     provider_calls row for a single action_run is a legitimate outcome for a live case, not a
     correlation defect, as long as it's within max_provider_calls_per_action. The step's evidence
     must sum every physical attempt's cost/tokens/latency, not report just one of them (which
-    would silently lose real spend from live_canary.py's cost cap)."""
+    would silently lose real spend from live_canary.py's cost cap).
+
+    `/code-review` #3 (2026-08-24) finding: this test's own events used to give BOTH provider_calls
+    rows a provider.request_succeeded event, which never exercised the actual retry shape (a
+    transport retry's first physical attempt ends in provider.request_failed, then a second
+    attempt succeeds) -- that shape was rejected as PROOF013 until the fix below. call-1 here is
+    the failed first attempt (lower physical_call_index), call-2 is the succeeded retry."""
     module = load_atoms_proof_module()
 
     case = module._classify_ledger(
@@ -229,11 +246,17 @@ def test_classify_ledger_passes_and_sums_cost_across_retried_provider_calls() ->
         job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
         action_runs=[_one_step_row()],
         provider_calls=[
-            _one_provider_call(id="call-1", action_run_id="run-1"),
-            _one_provider_call(id="call-2", action_run_id="run-1"),
+            _one_provider_call(
+                id="call-1", action_run_id="run-1", physical_call_index=0, status="failed",
+            ),
+            _one_provider_call(
+                id="call-2", action_run_id="run-1", physical_call_index=1, status="succeeded",
+            ),
         ],
         artifacts=[_one_step_artifact(), _one_result_artifact()],
-        events=_all_expected_events(provider_call_ids=("call-1", "call-2")),
+        events=_all_expected_events(
+            provider_call_ids=("call-1", "call-2"), failed_provider_call_ids=("call-1",),
+        ),
         expected_event_types=EXPECTED_EVENT_TYPES,
         max_provider_calls_per_action=2,
     )
@@ -270,6 +293,225 @@ def test_classify_ledger_reports_proof003_when_retry_count_exceeds_the_configure
 
     assert case.status == "fail"
     assert case.error_code == "PROOF003"
+
+
+def test_classify_ledger_reports_proof024_when_a_provider_call_has_no_terminal_event() -> None:
+    """`/code-review` #3 (2026-08-24): a provider_calls row with only a provider.request_started
+    event (no succeeded, no failed -- e.g. the physical attempt is still in flight, or its
+    terminal event was lost) must fail, not silently pass now that a bare succeeded==1 check was
+    relaxed. Uses a second, fully-normal run-2/call-2 pair alongside the run-1/call-1 pair under
+    test purely so provider.request_succeeded still appears somewhere in the session -- otherwise
+    stripping call-1's only succeeded event would (correctly, but not usefully for this test)
+    trip the session-wide PROOF005 check before PROOF024 ever gets a chance to run."""
+    module = load_atoms_proof_module()
+
+    events = [
+        event
+        for event in _all_expected_events(
+            action_run_ids=("run-1", "run-2"),
+            provider_call_ids=("call-1", "call-2"),
+            artifact_ids=("artifact-step-1", "artifact-step-2", "artifact-result"),
+        )
+        if not (
+            event["event_type"] == "provider.request_succeeded"
+            and event.get("provider_call_id") == "call-1"
+        )
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[
+            _one_step_row(),
+            _one_step_row(id="run-2", step_id="detect_issues", output_artifact_id="artifact-step-2"),
+        ],
+        provider_calls=[
+            _one_provider_call(id="call-1", action_run_id="run-1"),
+            _one_provider_call(id="call-2", action_run_id="run-2"),
+        ],
+        artifacts=[
+            _one_step_artifact(),
+            _one_step_artifact(id="artifact-step-2", action_run_id="run-2"),
+            _one_result_artifact(),
+        ],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF024"
+
+
+def test_classify_ledger_reports_proof024_when_a_provider_call_has_both_terminal_events() -> None:
+    """A provider_calls row with both a provider.request_succeeded and a provider.request_failed
+    event is an inconsistent double-terminal state, not a legitimate retry (a retry is two
+    *separate* provider_calls rows, one terminal event each)."""
+    module = load_atoms_proof_module()
+
+    events = [
+        *_all_expected_events(),
+        {"event_type": "provider.request_failed", "provider_call_id": "call-1"},
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF024"
+
+
+def test_classify_ledger_reports_proof025_when_succeeded_event_disagrees_with_persisted_status() -> None:
+    """The persisted provider_calls.status must agree with whichever terminal event fired -- a
+    row with a provider.request_succeeded event but a "failed" status column is an inconsistent
+    ledger, not just a missing/duplicate-event defect PROOF024 already covers."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call(status="failed")],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=_all_expected_events(),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF025"
+
+
+def test_classify_ledger_reports_proof025_when_failed_event_disagrees_with_persisted_status() -> None:
+    """Same PROOF005-avoidance reasoning as the no-terminal-event test above: call-1 alone
+    emitting provider.request_failed (instead of succeeded) would strip the session's only
+    provider.request_succeeded event, so a second, fully-normal run-2/call-2 pair keeps that type
+    present while call-1 is the one under test."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[
+            _one_step_row(),
+            _one_step_row(id="run-2", step_id="detect_issues", output_artifact_id="artifact-step-2"),
+        ],
+        provider_calls=[
+            _one_provider_call(id="call-1", action_run_id="run-1", status="succeeded"),
+            _one_provider_call(id="call-2", action_run_id="run-2"),
+        ],
+        artifacts=[
+            _one_step_artifact(),
+            _one_step_artifact(id="artifact-step-2", action_run_id="run-2"),
+            _one_result_artifact(),
+        ],
+        events=_all_expected_events(
+            action_run_ids=("run-1", "run-2"),
+            provider_call_ids=("call-1", "call-2"),
+            failed_provider_call_ids=("call-1",),
+            artifact_ids=("artifact-step-1", "artifact-step-2", "artifact-result"),
+        ),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF025"
+
+
+def test_classify_ledger_accepts_timed_out_status_for_a_failed_terminal_event() -> None:
+    """ProviderCallStatus.timed_out also emits provider.request_failed (gateway/events.py), not a
+    dedicated event type -- a "timed_out" status must satisfy the failed-terminal-event check,
+    not just "failed"."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="text.extract_structured_fields", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[
+            _one_provider_call(
+                id="call-1", action_run_id="run-1", physical_call_index=0, status="timed_out",
+            ),
+            _one_provider_call(
+                id="call-2", action_run_id="run-1", physical_call_index=1, status="succeeded",
+            ),
+        ],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=_all_expected_events(
+            provider_call_ids=("call-1", "call-2"), failed_provider_call_ids=("call-1",),
+        ),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+        max_provider_calls_per_action=2,
+    )
+
+    assert case.status == "pass"
+    assert case.error_code is None
+
+
+def test_classify_ledger_reports_proof015_when_a_failed_event_is_orphaned() -> None:
+    """Orphan detection (PROOF015) must also cover provider.request_failed rows, not just
+    started/succeeded -- a failed event misattributed to an unknown provider_call_id is just as
+    much a correlation defect as an orphaned started/succeeded one."""
+    module = load_atoms_proof_module()
+
+    events = [
+        *_all_expected_events(),
+        {"event_type": "provider.request_failed", "provider_call_id": "call-bogus"},
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF015"
+
+
+def test_classify_ledger_reports_proof026_when_the_last_physical_attempt_did_not_succeed() -> None:
+    """An action_run only reaches _classify_ledger() after the HTTP layer already observed the
+    session succeed, so its *last* physical attempt (highest physical_call_index) must be the one
+    that succeeded -- a ledger where the highest-index call is still "failed" (e.g. a
+    physical_call_index recorded out of actual attempt order) is an inconsistent evidence trail
+    even though every individual row passes PROOF013/024/025 on its own."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[
+            _one_provider_call(
+                id="call-1", action_run_id="run-1", physical_call_index=0, status="succeeded",
+            ),
+            _one_provider_call(
+                id="call-2", action_run_id="run-1", physical_call_index=1, status="failed",
+            ),
+        ],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=_all_expected_events(
+            provider_call_ids=("call-1", "call-2"), failed_provider_call_ids=("call-2",),
+        ),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+        max_provider_calls_per_action=2,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF026"
 
 
 def test_classify_ledger_reports_proof004_when_step_artifact_missing() -> None:
