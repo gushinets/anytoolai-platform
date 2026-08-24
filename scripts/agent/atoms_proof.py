@@ -32,6 +32,7 @@ import sys
 from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+from functools import cache
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -251,17 +252,23 @@ def _classify_ledger(
     """Pure pass/fail classification over already-fetched rows -- no DB access. Split out from
     _check_ledger so the PROOF00x branches are unit-testable with fake dict rows, no real
     Postgres needed."""
-    # Built once, up front, from the two lists this function receives regardless of which
-    # PROOF00x branch below returns first -- _fail()'s steps=known_steps lets a case that
-    # already made a real, billed provider call before failing a later correctness check
-    # still report its real cost instead of silently reporting 0 (live_canary.py's cost cap
-    # sums exactly this field).
-    known_steps = _best_effort_steps_from_provider_calls(action_runs, provider_calls)
+    # Lazy + memoized (@cache on a fresh per-call closure, not module-level -- the cache can't
+    # leak between calls to _classify_ledger since a new known_steps function object is created
+    # each time): _fail()'s steps=known_steps() lets a case that already made a real, billed
+    # provider call before failing a later correctness check still report its real cost instead
+    # of silently reporting 0 (live_canary.py's cost cap sums exactly this field). Lazy rather
+    # than computed unconditionally up front (`/code-review` #3, 2026-08-24 finding #3): the
+    # success path below builds its own, differently-ordered `steps` tuple from action_runs, so an
+    # eager computation here would just be discarded, unused work on every passing case.
+    @cache
+    def known_steps() -> tuple[StepEvidence, ...]:
+        return _best_effort_steps_from_provider_calls(action_runs, provider_calls)
+
     if job_row is None:
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=None,
-            steps=known_steps,
+            steps=known_steps(),
             error_code="PROOF001",
             error_message=(
                 f"PROOF001: no jobs_table row found for scenario_session_id "
@@ -275,7 +282,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
-            steps=known_steps,
+            steps=known_steps(),
             error_code="PROOF002",
             error_message=(
                 f"PROOF002: no action_runs rows found for scenario_session_id "
@@ -294,7 +301,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
-            steps=known_steps,
+            steps=known_steps(),
             error_code="PROOF011", error_message=mismatch,
         )
 
@@ -313,7 +320,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
-            steps=known_steps,
+            steps=known_steps(),
             error_code="PROOF016", error_message=mismatch,
         )
 
@@ -329,7 +336,7 @@ def _classify_ledger(
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
-                steps=known_steps,
+                steps=known_steps(),
                 error_code="PROOF003",
                 error_message=(
                     f"PROOF003: expected exactly one provider_calls row for "
@@ -345,7 +352,7 @@ def _classify_ledger(
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
-                steps=known_steps,
+                steps=known_steps(),
                 error_code="PROOF012",
                 error_message=(
                     f"PROOF012: provider_calls row {call['id']} references action_run_id "
@@ -377,7 +384,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
-            steps=known_steps,
+            steps=known_steps(),
             error_code="PROOF023", error_message=mismatch,
         )
 
@@ -388,7 +395,7 @@ def _classify_ledger(
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
-                steps=known_steps,
+                steps=known_steps(),
                 error_code="PROOF004",
                 error_message=(
                     f"PROOF004: action_run {action_run['id']} (step "
@@ -403,7 +410,7 @@ def _classify_ledger(
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
-                steps=known_steps,
+                steps=known_steps(),
                 error_code="PROOF017",
                 error_message=(
                     f"PROOF017: artifact {output_artifact_id} for action_run "
@@ -419,7 +426,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
-            steps=known_steps,
+            steps=known_steps(),
             error_code="PROOF004",
             error_message=(
                 f"PROOF004: job result_artifact_id {result_artifact_id} not found among "
@@ -432,7 +439,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
-            steps=known_steps,
+            steps=known_steps(),
             error_code="PROOF018",
             error_message=(
                 f"PROOF018: job result_artifact_id {result_artifact_id} has action_run_id "
@@ -446,7 +453,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
-            steps=known_steps,
+            steps=known_steps(),
             error_code="PROOF005",
             error_message=(
                 f"PROOF005: event_log_table is missing expected event types {missing} for "
@@ -464,7 +471,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
-            steps=known_steps,
+            steps=known_steps(),
             error_code="PROOF019", error_message=mismatch,
         )
 
@@ -481,7 +488,7 @@ def _classify_ledger(
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
-                steps=known_steps,
+                steps=known_steps(),
                 error_code="PROOF020",
                 error_message=(
                     f"PROOF020: expected exactly one artifact.created event_log row for "
@@ -495,7 +502,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
-            steps=known_steps,
+            steps=known_steps(),
             error_code="PROOF021",
             error_message=(
                 f"PROOF021: event_log has artifact.created rows for artifact_id(s) "
@@ -521,7 +528,7 @@ def _classify_ledger(
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
-                steps=known_steps,
+                steps=known_steps(),
                 error_code="PROOF006",
                 error_message=(
                     f"PROOF006: expected exactly one action.started and one "
@@ -540,7 +547,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
-            steps=known_steps,
+            steps=known_steps(),
             error_code="PROOF014",
             error_message=(
                 f"PROOF014: event_log has action.started/action.succeeded rows for "
@@ -564,7 +571,7 @@ def _classify_ledger(
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
-                steps=known_steps,
+                steps=known_steps(),
                 error_code="PROOF013",
                 error_message=(
                     f"PROOF013: expected exactly one provider.request_started and one "
@@ -579,7 +586,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
-            steps=known_steps,
+            steps=known_steps(),
             error_code="PROOF015",
             error_message=(
                 f"PROOF015: event_log has provider.request_started/"
@@ -613,6 +620,43 @@ def _classify_ledger(
         error_message=None,
         steps=steps,
     )
+
+
+def _known_steps_for_session(
+    engine: "sa.engine.Engine", scenario_session_id: str | None
+) -> tuple[StepEvidence, ...]:
+    """`/code-review` #3 (2026-08-24) finding: a case can fail at the HTTP/status-polling layer
+    (_run_case_with_ledger_check's `result.error_message is not None` branch) *after* a real,
+    billed provider call already happened server-side -- that branch never reaches
+    _check_ledger()/_classify_ledger(), the only place known_steps recovery was wired in, so the
+    spend would otherwise silently report 0 to live_canary.py's cost cap. This is that same
+    recovery for the HTTP-layer failure path: a minimal, best-effort query for just the two tables
+    _best_effort_steps_from_provider_calls() needs, not a full _check_ledger() run (which would
+    misclassify an HTTP-layer failure as a ledger-correctness one). Tolerant of everything -- no
+    scenario_session_id yet (nothing could have run), a DB error, or a session with no rows yet --
+    all resolve to () rather than raising, since this is best-effort recovery on an
+    already-failing path, not a correctness check of its own."""
+    if scenario_session_id is None:
+        return ()
+    try:
+        with engine.connect() as conn:
+            action_runs = list(
+                conn.execute(
+                    sa.select(action_runs_table).where(
+                        action_runs_table.c.scenario_session_id == scenario_session_id
+                    )
+                ).mappings()
+            )
+            provider_calls = list(
+                conn.execute(
+                    sa.select(provider_calls_table).where(
+                        provider_calls_table.c.scenario_session_id == scenario_session_id
+                    )
+                ).mappings()
+            )
+    except sa.exc.SQLAlchemyError:
+        return ()
+    return _best_effort_steps_from_provider_calls(action_runs, provider_calls)
 
 
 def _check_ledger(
@@ -720,6 +764,7 @@ def _run_case_with_ledger_check(
                 f"{error_code}: HTTP-layer case failed for scenario_id {scenario_id} "
                 "(see stderr for full diagnostic)"
             ),
+            steps=_known_steps_for_session(engine, result.session_id),
         )
     return _check_ledger(
         engine, label=label, scenario_id=scenario_id, kind=kind,

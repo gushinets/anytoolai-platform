@@ -110,6 +110,53 @@ def test_live_composite_coverage_error_reports_missing_workflow() -> None:
     assert error is not None and "LIVE010" in error
 
 
+def test_live_atom_coverage_labels_report_live008_not_smoke007() -> None:
+    """`/code-review` #3 (2026-08-24) finding: main() used to call
+    atoms_proof.smoke._atom_coverage_error(LIVE_ATOM_CASES) with no labels override, so a live
+    atom-coverage failure reported SMOKE007/ATOM_SMOKE_CASES -- misattributing it to the
+    fake-provider config instead of the live one, and breaking the LIVE0xx convention every other
+    failure in this script follows."""
+    module = load_live_canary_module()
+
+    error = module.atoms_proof.smoke._atom_coverage_error(
+        (("action.one", "scenario-one", {}),), labels=module._LIVE_ATOM_COVERAGE_LABELS
+    )
+
+    assert error is not None
+    assert "LIVE008" in error
+    assert "LIVE_ATOM_CASES" in error
+    assert "SMOKE007" not in error
+    assert "ATOM_SMOKE_CASES" not in error
+
+
+def test_main_passes_live_atom_coverage_labels_to_atom_coverage_error(monkeypatch) -> None:
+    module = load_live_canary_module()
+    monkeypatch.setenv("TEST_LIVE_CANARY_MAIN_DB_URL", "postgresql://u:p@127.0.0.1:5432/db")
+    captured: dict = {}
+
+    def _fake_atom_coverage_error(cases, **kwargs):
+        captured.update(cases=cases, kwargs=kwargs)
+        return "LIVE008: forced failure for this test"
+
+    monkeypatch.setattr(module.atoms_proof.smoke, "_atom_coverage_error", _fake_atom_coverage_error)
+    monkeypatch.setattr(
+        module.atoms_proof, "write_evidence_report", lambda cases, exit_code, **kwargs: Path("x")
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "live_canary.py", "http://127.0.0.1:8000",
+            "--database-url-env", "TEST_LIVE_CANARY_MAIN_DB_URL",
+        ],
+    )
+
+    assert module.main() == 1
+
+    assert captured["cases"] == module.LIVE_ATOM_CASES
+    assert captured["kwargs"]["labels"] is module._LIVE_ATOM_COVERAGE_LABELS
+
+
 def test_live_composite_coverage_error_catches_scenario_workflow_mismatch() -> None:
     """Mirrors kernel_demo_smoke.py's own _composite_coverage_error() binding-mismatch guard, but
     for the live-suffixed workflows -- pairing a real live scenario_id with the wrong live

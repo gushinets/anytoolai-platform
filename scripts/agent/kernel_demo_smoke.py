@@ -281,15 +281,46 @@ def _empty_cases_error(
     return None
 
 
-def _atom_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None:
+@dataclass(frozen=True)
+class CoverageLabels:
+    """Bundles the 3 labels a coverage-error function needs to report under the right
+    error-code family/tuple name/description -- one value object instead of 3 loose keyword
+    parameters that always travel together (a caller supplies all 3 or none). `/code-review` #2
+    (2026-08-24) finding: a prior 4-loose-kwarg signature (error_code/tuple_name/kind plus
+    entries_provider) expanded a shared function's surface just for live_canary.py's single other
+    caller; bundling the 3 always-together labels into one object keeps the dedup (a future fix to
+    the correlation logic still applies to both callers at once) without the sprawling parameter
+    list. Shared by _atom_coverage_error() and _composite_coverage_error() (`/code-review` #3,
+    2026-08-24 finding #2: the atom check used to hardcode SMOKE007/ATOM_SMOKE_CASES even when
+    called from live_canary.py, misattributing a live-canary failure to the fake-provider
+    config)."""
+
+    error_code: str
+    tuple_name: str
+    kind: str
+
+
+_FAKE_ATOM_COVERAGE_LABELS = CoverageLabels(
+    error_code="SMOKE007", tuple_name="ATOM_SMOKE_CASES", kind="action types"
+)
+_FAKE_COMPOSITE_COVERAGE_LABELS = CoverageLabels(
+    error_code="SMOKE010", tuple_name="COMPOSITE_SMOKE_CASES", kind="composite workflows"
+)
+
+
+def _atom_coverage_error(
+    cases: tuple[tuple[str, str, dict], ...],
+    *,
+    labels: CoverageLabels = _FAKE_ATOM_COVERAGE_LABELS,
+) -> str | None:
     action_types = [action_type for action_type, _, _ in cases]
     if len(action_types) != len(set(action_types)):
-        return "SMOKE007: ATOM_SMOKE_CASES has duplicate action_type entries"
+        return f"{labels.error_code}: {labels.tuple_name} has duplicate action_type entries"
     if not ACTION_DEFINITIONS_ROOT.is_dir():
         return (
-            f"SMOKE007: cannot verify required atom coverage -- {ACTION_DEFINITIONS_ROOT} "
-            "not found (expected a full repo checkout with configs/kernel/action_definitions/ "
-            "two levels above this script)"
+            f"{labels.error_code}: cannot verify required atom coverage -- "
+            f"{ACTION_DEFINITIONS_ROOT} not found (expected a full repo checkout with "
+            "configs/kernel/action_definitions/ two levels above this script)"
         )
     covered = set(action_types)
     required = _required_action_types()
@@ -297,9 +328,9 @@ def _atom_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None
         return _coverage_mismatch_error(
             covered,
             required,
-            error_code="SMOKE007",
-            tuple_name="ATOM_SMOKE_CASES",
-            kind="action types",
+            error_code=labels.error_code,
+            tuple_name=labels.tuple_name,
+            kind=labels.kind,
         )
     return None
 
@@ -319,32 +350,11 @@ def _composite_case_ids(
     )
 
 
-@dataclass(frozen=True)
-class CompositeCoverageLabels:
-    """Bundles the 3 labels _composite_case_shape_error()/_composite_coverage_error() need to
-    report under the right error-code family/tuple name/description -- one value object instead
-    of 3 loose keyword parameters that always travel together (a caller supplies all 3 or none).
-    `/code-review` #2 (2026-08-24) finding: the prior 4-loose-kwarg signature (error_code/
-    tuple_name/kind plus entries_provider) expanded this shared function's surface just for
-    live_canary.py's single other caller; bundling the 3 always-together labels into one object
-    keeps the dedup (a future fix to the correlation logic still applies to both callers at once)
-    without the sprawling parameter list."""
-
-    error_code: str
-    tuple_name: str
-    kind: str
-
-
-_FAKE_COMPOSITE_COVERAGE_LABELS = CompositeCoverageLabels(
-    error_code="SMOKE010", tuple_name="COMPOSITE_SMOKE_CASES", kind="composite workflows"
-)
-
-
 def _composite_case_shape_error(
     workflow_ids: list[str],
     scenario_ids: list[str],
     *,
-    labels: CompositeCoverageLabels = _FAKE_COMPOSITE_COVERAGE_LABELS,
+    labels: CoverageLabels = _FAKE_COMPOSITE_COVERAGE_LABELS,
 ) -> str | None:
     """Checks a composite case list's own ids (duplicates) and that the config files needed to
     verify it even exist -- split out of _composite_coverage_error() so both checks fold into one
@@ -392,7 +402,7 @@ def _composite_coverage_error(
     cases: tuple[tuple[str, str, dict], ...],
     *,
     entries_provider: Callable[[], list[dict]] | None = None,
-    labels: CompositeCoverageLabels = _FAKE_COMPOSITE_COVERAGE_LABELS,
+    labels: CoverageLabels = _FAKE_COMPOSITE_COVERAGE_LABELS,
 ) -> str | None:
     """Composite counterpart of _atom_coverage_error() -- catches not just an empty case tuple but
     also a partial one (e.g. a merge drops 1 of 3 entries), a reused scenario_id (silently dropping

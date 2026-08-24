@@ -155,7 +155,10 @@ def _live_composite_workflow_entries() -> list[dict]:
     ]
 
 
-_LIVE_COMPOSITE_COVERAGE_LABELS = atoms_proof.smoke.CompositeCoverageLabels(
+_LIVE_ATOM_COVERAGE_LABELS = atoms_proof.smoke.CoverageLabels(
+    error_code="LIVE008", tuple_name="LIVE_ATOM_CASES", kind="live action types"
+)
+_LIVE_COMPOSITE_COVERAGE_LABELS = atoms_proof.smoke.CoverageLabels(
     error_code="LIVE010", tuple_name="LIVE_COMPOSITE_CASES", kind="live composite workflows"
 )
 
@@ -324,7 +327,7 @@ def main() -> int:
         return 2
 
     coverage_error = atoms_proof.smoke._atom_coverage_error(
-        LIVE_ATOM_CASES
+        LIVE_ATOM_CASES, labels=_LIVE_ATOM_COVERAGE_LABELS
     ) or _live_composite_coverage_error(LIVE_COMPOSITE_CASES)
     if coverage_error is not None:
         print(coverage_error, file=sys.stderr)

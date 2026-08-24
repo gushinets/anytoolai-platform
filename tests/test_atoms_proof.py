@@ -815,6 +815,70 @@ def test_run_case_with_ledger_check_reports_http_failure_without_touching_db(
     assert "boom" not in case.error_message
     assert "SMOKE001" in case.error_message
     assert "boom (contains raw upstream detail)" in capsys.readouterr().err
+    assert case.steps == ()
+
+
+class _FakeResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def mappings(self):
+        return self
+
+    def __iter__(self):
+        return iter(self._rows)
+
+    def one_or_none(self):
+        return self._rows[0] if self._rows else None
+
+
+class _FakeConnection:
+    def __init__(self, results):
+        self._results = list(results)
+
+    def execute(self, _stmt):
+        return self._results.pop(0)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+
+def test_run_case_with_ledger_check_recovers_known_cost_on_an_http_layer_failure(
+    monkeypatch, capsys
+) -> None:
+    """`/code-review` #3 (2026-08-24) finding: a case can fail at the HTTP/status-polling layer
+    *after* a real, billed provider call already happened server-side (e.g. the session completed
+    but SMOKE009's schema_ref cross-check then failed) -- this branch never reaches
+    _check_ledger()/_classify_ledger(), so without _known_steps_for_session() the spend would
+    silently report 0 to live_canary.py's cost cap."""
+    module = load_atoms_proof_module()
+    monkeypatch.setattr(
+        module.smoke,
+        "_run_one_case",
+        lambda api_url, scenario_id, scenario_input, timeout, **_kwargs: module.smoke.CaseResult(
+            session_id="session-1", error_code="SMOKE009",
+            error_message="SMOKE009: schema_ref mismatch",
+        ),
+    )
+    action_runs = [_one_step_row()]
+    provider_calls = [_one_provider_call()]
+
+    class _FakeEngine:
+        def connect(self):
+            return _FakeConnection([_FakeResult(action_runs), _FakeResult(provider_calls)])
+
+    case = module._run_case_with_ledger_check(
+        "http://127.0.0.1:8000", _FakeEngine(), kind="atom", label="atom.one",
+        scenario_id="scenario-1", scenario_input={}, timeout=5.0,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "SMOKE009"
+    assert len(case.steps) == 1
+    assert case.steps[0].estimated_cost == 0.001
 
 
 def test_run_case_with_ledger_check_dispatches_a_passing_http_result_into_check_ledger(
@@ -872,32 +936,6 @@ def test_check_ledger_wires_all_five_query_results_into_classify_ledger(monkeypa
     provider_calls = [{"id": "call-1", "action_run_id": "run-1"}]
     artifacts = [_one_step_artifact(), _one_result_artifact()]
     events = [{"event_type": "action.started", "action_run_id": "run-1"}]
-
-    class _FakeResult:
-        def __init__(self, rows):
-            self._rows = rows
-
-        def mappings(self):
-            return self
-
-        def __iter__(self):
-            return iter(self._rows)
-
-        def one_or_none(self):
-            return self._rows[0] if self._rows else None
-
-    class _FakeConnection:
-        def __init__(self, results):
-            self._results = list(results)
-
-        def execute(self, _stmt):
-            return self._results.pop(0)
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc_info):
-            return False
 
     class _FakeEngine:
         def connect(self):
