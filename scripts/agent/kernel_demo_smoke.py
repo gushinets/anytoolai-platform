@@ -115,7 +115,15 @@ def _composite_workflow_entries() -> list[dict]:
     """Parses workflows.yaml once and filters to composite-prefixed workflow entries -- shared
     by _composite_output_schema_ref_by_workflow_id() and _composite_workflow_config() so the
     open+parse+filter logic lives in one place instead of near-identical copies that could drift
-    if the filtering rule ever changes."""
+    if the filtering rule ever changes.
+
+    Permanently excludes "_live_v1"-suffixed workflow_ids: those are the credentialed live-canary
+    (ANY-221) provider-variant siblings of these same composite workflows, wired to a real
+    provider instead of the fake one this whole module (and dev-smoke/prod-smoke, which run
+    against it) exists to exercise deterministically and for free. They're covered by
+    live_canary.py's own, separate coverage check instead -- not a runtime mode toggle, since
+    provider selection is a static config fact here, not something this function's callers choose
+    per invocation."""
     with WORKFLOWS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle)
     return [
@@ -124,6 +132,7 @@ def _composite_workflow_entries() -> list[dict]:
         if isinstance(entry, dict)
         and isinstance(entry.get("workflow_id"), str)
         and entry["workflow_id"].startswith(_COMPOSITE_WORKFLOW_ID_PREFIX)
+        and not entry["workflow_id"].endswith("_live_v1")
     ]
 
 

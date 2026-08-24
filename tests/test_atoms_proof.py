@@ -84,7 +84,16 @@ def _one_step_row(**overrides) -> dict:
 
 
 def _one_provider_call(**overrides) -> dict:
-    row = {"id": "call-1", "action_run_id": "run-1", "job_id": "job-1"}
+    row = {
+        "id": "call-1",
+        "action_run_id": "run-1",
+        "job_id": "job-1",
+        "latency_ms": 123,
+        "input_tokens": 10,
+        "output_tokens": 20,
+        "total_tokens": 30,
+        "estimated_cost": 0.001,
+    }
     row.update(overrides)
     return row
 
@@ -126,6 +135,11 @@ def test_classify_ledger_passes_with_full_correlation() -> None:
             step_id="extract",
             action_type="text.extract_structured_fields",
             action_config_id="kernel_demo.extract_structured_fields_v1",
+            latency_ms=123,
+            input_tokens=10,
+            output_tokens=20,
+            total_tokens=30,
+            estimated_cost=0.001,
         ),
     )
 

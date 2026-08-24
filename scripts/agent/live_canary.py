@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""ANY-221: runs the same 11 standalone kernel_demo atom scenarios atoms_proof.py proves
-deterministically, but through their `_live_` siblings -- action_configs wired to
-`default_text_generation_v1` (a real LiteLLM/OpenAI call via ProviderGateway), not the fake
-provider. Same ledger/schema validation, same privacy-safe evidence shape, plus an
-estimated-cost cap this run-scoped script owns (ProviderGateway itself stays frozen -- see
-ANY-221's execution constraints).
+"""ANY-221: runs the same 11 standalone kernel_demo atom scenarios and 3 composite kernel_demo
+workflows atoms_proof.py proves deterministically, but through their `_live_` siblings --
+action_configs wired to `default_text_generation_v1` (a real LiteLLM/OpenAI call via
+ProviderGateway), not the fake provider. Same ledger/schema validation, same privacy-safe evidence
+shape, plus an estimated-cost cap this run-scoped script owns (ProviderGateway itself stays frozen
+-- see ANY-221's execution constraints).
 
 Reuses atoms_proof.py's HTTP/DB/evidence machinery wholesale (_run_case_with_ledger_check,
 _build_engine, _fail, write_evidence_report) instead of duplicating it -- this script only adds
@@ -21,6 +21,8 @@ import argparse
 import os
 import sys
 from pathlib import Path
+
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -67,6 +69,101 @@ LIVE_ATOM_CASES: tuple[tuple[str, str, dict], ...] = tuple(
     for action_type, _fake_scenario_id, start_input in atoms_proof.ATOM_SMOKE_CASES
 )
 
+# fake workflow_id -> live workflow_id/scenario_id. Unlike LIVE_ATOM_SCENARIO_IDS, a mechanical
+# transform is safe here: all 3 fake composite workflow_ids uniformly end in "_v1" and their
+# scenario_ids uniformly end in "_smoke_v1" (verified against configs/kernel/products/kernel_demo/
+# workflows.yaml and scenarios.yaml), unlike the atom-level extract case which lacks a uniform
+# suffix pattern.
+LIVE_COMPOSITE_WORKFLOW_IDS: dict[str, str] = {
+    fake_workflow_id: f"{fake_workflow_id.removesuffix('_v1')}_live_v1"
+    for fake_workflow_id, _fake_scenario_id, _start_input in atoms_proof.COMPOSITE_SMOKE_CASES
+}
+LIVE_COMPOSITE_SCENARIO_IDS: dict[str, str] = {
+    fake_scenario_id: f"{fake_scenario_id.removesuffix('_smoke_v1')}_live_smoke_v1"
+    for _fake_workflow_id, fake_scenario_id, _start_input in atoms_proof.COMPOSITE_SMOKE_CASES
+}
+
+LIVE_COMPOSITE_CASES: tuple[tuple[str, str, dict], ...] = tuple(
+    (
+        LIVE_COMPOSITE_WORKFLOW_IDS[workflow_id],
+        LIVE_COMPOSITE_SCENARIO_IDS[fake_scenario_id],
+        start_input,
+    )
+    for workflow_id, fake_scenario_id, start_input in atoms_proof.COMPOSITE_SMOKE_CASES
+)
+
+
+def _live_composite_workflow_entries() -> list[dict]:
+    """Own, live-canary-local parse of workflows.yaml, filtered to the "_live_v1"-suffixed
+    composite entries -- the inverse of kernel_demo_smoke.py's _composite_workflow_entries(),
+    which permanently excludes them (see that function's docstring). Deliberately not shared with
+    or parameterized onto that function: provider selection is a static config fact here, not a
+    runtime mode kernel_demo_smoke.py's fake-provider-oriented coverage checks (also used by
+    atoms_proof.py and dev-smoke/prod-smoke) need to know about."""
+    with atoms_proof.smoke.WORKFLOWS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    return [
+        entry
+        for entry in data.get("workflows", [])
+        if isinstance(entry, dict)
+        and isinstance(entry.get("workflow_id"), str)
+        and entry["workflow_id"].startswith(atoms_proof.smoke._COMPOSITE_WORKFLOW_ID_PREFIX)
+        and entry["workflow_id"].endswith("_live_v1")
+    ]
+
+
+def _live_composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None:
+    """Live-canary counterpart of kernel_demo_smoke.py's _composite_coverage_error(), scoped to
+    the 3 "_live_v1" composite workflows instead of the 3 fake ones. Reuses that module's
+    non-fake-specific pure helpers (case-id unzip, schema-ref derivation, coverage-mismatch
+    formatting, the real scenario<->workflow binding from scenarios.yaml) since those only operate
+    on already-filtered inputs and encode no fake/live assumption themselves -- only the
+    duplicate/shape checks are reimplemented here (not reused), since the shared version's error
+    strings hardcode "COMPOSITE_SMOKE_CASES"/"SMOKE010", which would misname the live case list
+    and error family in a live-canary failure message."""
+    smoke = atoms_proof.smoke
+    workflow_ids, scenario_ids = smoke._composite_case_ids(cases)
+    for field_name, ids in (("workflow_id", workflow_ids), ("scenario_id", scenario_ids)):
+        if len(ids) != len(set(ids)):
+            return f"LIVE010: LIVE_COMPOSITE_CASES has duplicate {field_name} entries"
+    for config_path in (smoke.WORKFLOWS_CONFIG_PATH, smoke.SCENARIOS_CONFIG_PATH):
+        if not config_path.is_file():
+            return (
+                f"LIVE010: cannot verify required live composite coverage -- {config_path} "
+                "not found"
+            )
+    try:
+        entries = _live_composite_workflow_entries()
+        required = smoke._composite_required_ids(entries)
+        output_schema_ref_by_workflow_id = smoke._composite_schema_ref_by_workflow_id(entries)
+        workflow_id_by_scenario_id = smoke._required_composite_workflow_id_by_scenario_id()
+    except smoke._COMPOSITE_CONFIG_PARSE_ERRORS as exc:
+        return (
+            "LIVE010: could not parse composite workflow/scenario config to verify required "
+            f"live composite coverage: {exc}"
+        )
+    missing_schema_ref = sorted(required - output_schema_ref_by_workflow_id.keys())
+    if missing_schema_ref:
+        return (
+            "LIVE010: live composite workflow config validation failed: missing/invalid "
+            f"output_schema_ref for workflow(s): {missing_schema_ref}"
+        )
+    covered = set(workflow_ids)
+    if covered != required:
+        return smoke._coverage_mismatch_error(
+            covered, required, error_code="LIVE010", tuple_name="LIVE_COMPOSITE_CASES",
+            kind="live composite workflows",
+        )
+    for workflow_id, scenario_id in zip(workflow_ids, scenario_ids, strict=True):
+        expected_workflow_id = workflow_id_by_scenario_id.get(scenario_id)
+        if expected_workflow_id != workflow_id:
+            return (
+                f"LIVE010: LIVE_COMPOSITE_CASES pairs scenario {scenario_id!r} with workflow "
+                f"{workflow_id!r}, but scenarios.yaml binds that scenario to "
+                f"{expected_workflow_id!r} -- scenario/workflow mismatch"
+            )
+    return None
+
 
 def _cumulative_estimated_cost(cases: list[EvidenceCase]) -> float:
     """Sums estimated_cost across every step of every case so far. None (a step whose
@@ -80,24 +177,39 @@ def _cumulative_estimated_cost(cases: list[EvidenceCase]) -> float:
 def run(
     api_url: str, database_url: str, timeout: float, *, max_total_cost_usd: float
 ) -> tuple[list[EvidenceCase], int]:
-    """Runs LIVE_ATOM_CASES against a live api_url/database_url, aborting the remaining cases
-    (marked LIVE001, not silently dropped) once cumulative estimated_cost crosses the cap."""
-    empty_error = atoms_proof.smoke._empty_cases_error(
-        LIVE_ATOM_CASES, error_code="LIVE002", tuple_name="LIVE_ATOM_CASES", purpose="prove"
-    )
-    if empty_error is not None:
-        print(empty_error, file=sys.stderr)
-        return [], 1
+    """Runs LIVE_ATOM_CASES then LIVE_COMPOSITE_CASES against a live api_url/database_url, as one
+    combined, kind-tagged queue -- atoms first, then composites -- so a single cumulative
+    estimated_cost cap and a single chained case_timeout apply across both without duplicating the
+    per-case loop for each group. Once the cap trips (LIVE001), every remaining case is marked
+    failed instead of silently dropped, regardless of whether it's still in the atom queue or
+    hasn't reached the composite queue yet -- so composite_total in the evidence report always
+    reflects all 3 composites, even if none of them actually ran."""
+    for cases_spec, tuple_name, error_code in (
+        (LIVE_ATOM_CASES, "LIVE_ATOM_CASES", "LIVE002"),
+        (LIVE_COMPOSITE_CASES, "LIVE_COMPOSITE_CASES", "LIVE003"),
+    ):
+        empty_error = atoms_proof.smoke._empty_cases_error(
+            cases_spec, error_code=error_code, tuple_name=tuple_name, purpose="prove"
+        )
+        if empty_error is not None:
+            print(empty_error, file=sys.stderr)
+            return [], 1
 
     engine = atoms_proof._build_engine(database_url)
     cases: list[EvidenceCase] = []
     case_timeout = timeout
     try:
-        remaining = list(LIVE_ATOM_CASES)
+        remaining: list[tuple[str, str, str, dict]] = [
+            ("atom", label, scenario_id, scenario_input)
+            for label, scenario_id, scenario_input in LIVE_ATOM_CASES
+        ] + [
+            ("composite", label, scenario_id, scenario_input)
+            for label, scenario_id, scenario_input in LIVE_COMPOSITE_CASES
+        ]
         while remaining:
-            label, scenario_id, scenario_input = remaining.pop(0)
+            kind, label, scenario_id, scenario_input = remaining.pop(0)
             case = atoms_proof._run_case_with_ledger_check(
-                api_url, engine, kind="atom", label=label, scenario_id=scenario_id,
+                api_url, engine, kind=kind, label=label, scenario_id=scenario_id,
                 scenario_input=scenario_input, timeout=case_timeout,
             )
             cases.append(case)
@@ -118,10 +230,11 @@ def run(
                     f"{len(remaining)} case(s)",
                     file=sys.stderr,
                 )
-                for skipped_label, skipped_scenario_id, _ in remaining:
+                for skipped_kind, skipped_label, skipped_scenario_id, _ in remaining:
                     cases.append(
                         atoms_proof._fail(
-                            label=skipped_label, scenario_id=skipped_scenario_id, kind="atom",
+                            label=skipped_label, scenario_id=skipped_scenario_id,
+                            kind=skipped_kind,
                             session_id=None, job_id=None,
                             error_code="LIVE001",
                             error_message=(
@@ -132,10 +245,18 @@ def run(
                     )
                 break
 
-        passed = sum(1 for case in cases if case.status == "pass")
-        total = len(LIVE_ATOM_CASES)
-        print(f"{passed}/{total} kernel_demo live atoms passed")
-        return cases, 0 if passed == total else 1
+        atom_total = len(LIVE_ATOM_CASES)
+        atom_passed = sum(1 for case in cases if case.kind == "atom" and case.status == "pass")
+        composite_total = len(LIVE_COMPOSITE_CASES)
+        composite_passed = sum(
+            1 for case in cases if case.kind == "composite" and case.status == "pass"
+        )
+        print(f"{atom_passed}/{atom_total} kernel_demo live atoms passed")
+        print(f"{composite_passed}/{composite_total} kernel_demo live composites passed")
+        exit_code = (
+            0 if atom_passed == atom_total and composite_passed == composite_total else 1
+        )
+        return cases, exit_code
     finally:
         engine.dispose()
 
@@ -200,7 +321,9 @@ def main() -> int:
         )
         return 2
 
-    coverage_error = atoms_proof.smoke._atom_coverage_error(LIVE_ATOM_CASES)
+    coverage_error = atoms_proof.smoke._atom_coverage_error(
+        LIVE_ATOM_CASES
+    ) or _live_composite_coverage_error(LIVE_COMPOSITE_CASES)
     if coverage_error is not None:
         print(coverage_error, file=sys.stderr)
         cases, exit_code = [], 1

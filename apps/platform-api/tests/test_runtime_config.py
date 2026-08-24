@@ -85,6 +85,9 @@ def test_runtime_config_returns_frontend_safe_metadata() -> None:
         "kernel_demo.single_action_compare_and_classify_live_smoke_v1",
         "kernel_demo.single_action_score_match_by_rubric_live_smoke_v1",
         "kernel_demo.single_action_score_multidimensional_axes_live_smoke_v1",
+        "kernel_demo.composite_analyze_and_clarify_live_smoke_v1",
+        "kernel_demo.composite_evaluate_match_live_smoke_v1",
+        "kernel_demo.composite_shape_and_write_live_smoke_v1",
     ]
     assert data["quota_summary"] == {
         "quota_policy_id": "kernel_demo.guest_quota_v1",

@@ -327,12 +327,42 @@ def test_required_composite_workflow_ids_are_derived_from_workflows_config() -> 
     assert "kernel_demo.composite_analyze_and_clarify_v1" in required
 
 
+def test_composite_workflow_entries_excludes_live_suffixed_workflow_ids() -> None:
+    """workflows.yaml now also has 3 "_live_v1"-suffixed composite entries (ANY-221 live-canary
+    extension), sharing the same "kernel_demo.composite_" prefix this module's own fake-provider
+    coverage check scans for -- _composite_workflow_entries() must keep excluding them
+    permanently, or every fake-provider composite coverage check above would start demanding 6
+    COMPOSITE_SMOKE_CASES entries instead of 3."""
+    smoke = load_smoke_module()
+    workflow_ids = {entry["workflow_id"] for entry in smoke._composite_workflow_entries()}
+    assert workflow_ids == {workflow_id for workflow_id, _, _ in smoke.COMPOSITE_SMOKE_CASES}
+    assert not any(workflow_id.endswith("_live_v1") for workflow_id in workflow_ids)
+
+
 def test_required_composite_workflow_id_by_scenario_id_matches_real_config() -> None:
+    """_required_composite_workflow_id_by_scenario_id() deliberately isn't filtered to fake-only
+    (see _composite_workflow_entries()'s docstring) -- it's a plain scenario_id -> workflow_id
+    lookup, and fake/live scenario_ids never collide as keys, so scenarios.yaml legitimately binds
+    both the 3 fake COMPOSITE_SMOKE_CASES pairs and the 3 ANY-221 live-canary composite pairs."""
     smoke = load_smoke_module()
     binding = smoke._required_composite_workflow_id_by_scenario_id()
-    assert binding == {
+    expected = {
         scenario_id: workflow_id for workflow_id, scenario_id, _ in smoke.COMPOSITE_SMOKE_CASES
     }
+    expected.update(
+        {
+            "kernel_demo.composite_analyze_and_clarify_live_smoke_v1": (
+                "kernel_demo.composite_analyze_and_clarify_live_v1"
+            ),
+            "kernel_demo.composite_evaluate_match_live_smoke_v1": (
+                "kernel_demo.composite_evaluate_match_live_v1"
+            ),
+            "kernel_demo.composite_shape_and_write_live_smoke_v1": (
+                "kernel_demo.composite_shape_and_write_live_v1"
+            ),
+        }
+    )
+    assert binding == expected
 
 
 def test_expected_schema_ref_by_scenario_matches_real_composite_config() -> None:
