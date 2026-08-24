@@ -2,19 +2,18 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-20
-- Last updated: 2026-08-21
-- Review date: 2026-08-21
-- Next action: run the credentialed manual cycle (`OPENAI_API_KEY` + `dev-up` -> `live-canary` ->
-  `dev-down`) to get the first real evidence report (now covering both the 11 atoms and the 3
-  composite workflows), then link its result in this doc's Progress log and in MVP-A1's own
-  completion doc.
-- Blocker: none for the CI-safe half of this ticket; the manual credentialed run still needs an
-  operator with a real `OPENAI_API_KEY` to execute it. A non-credentialed ad hoc local run against
-  Ollama (not the ticket's real-provider acceptance evidence) already exercised the 11-atom path
-  end-to-end -- see `plans/ANY-221-ollama-verification.md`.
+- Last updated: 2026-08-25
+- Review date: 2026-08-25
+- Next action: none. The credentialed OpenAI canary passed 11/11 atoms + 3/3 composites; a
+  privacy-safe copy of the evidence JSON is committed at
+  `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260824T164316Z.json` (`/code-
+  review` #5, 2026-08-25 finding: the local `.agent/live-canary/` runtime-artifact path referenced
+  by earlier revisions of this doc is gitignored and unreachable by a future agent after
+  checkout -- see the Decision log entry below).
+- Blocker: none.
 
 ## Goal
 
@@ -180,14 +179,21 @@ Full design rationale (verified against real code before implementation) lives i
       `postgresql-check` exit 0.
 - [x] (2026-08-24) Manual credentialed run: `dev-up -> live-canary -> dev-down` against real
       OpenAI (`gpt-4.1-mini`), both `OPENAI_API_KEY` and `ANYTOOLAI_LIVE_CANARY_TOKEN` set. Printed
-      `11/11` atoms and `3/3` composites, exit 0, evidence JSON written to `.agent/live-canary/
-      evidence-20260824T164316Z.json` with `atoms_total: 11, composite_total: 3`.
-- [x] (2026-08-24) Linked the successful run's evidence in this file's Progress log (see below).
-      No separate MVP-A1 "completion doc" exists as a distinct file to update -- MVP-A1's own
-      Definition of Done (`docs/product-specs/mvp-a-platform-kernel.md`) states the criterion
-      narratively ("a recent manual live-provider canary proves schema-valid output for all 11
-      atoms") with no evidence-link field of its own; this exec-plan's Progress log is the evidence
-      record.
+      `11/11` atoms and `3/3` composites, exit 0, evidence JSON originally written to the local,
+      gitignored `.agent/live-canary/evidence-20260824T164316Z.json` with
+      `atoms_total: 11, composite_total: 3`.
+- [x] (2026-08-25) A privacy-safe copy of that evidence JSON (ids, status, and per-step
+      cost/token/latency counters only -- no prompts, generated content, or secrets, confirmed by
+      reading the full file before committing) is now tracked in the repo at
+      `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260824T164316Z.json`,
+      linked in this file's Progress log (see below), addressing `/code-review` #5 (2026-08-25):
+      the earlier local-only `.agent/...` path is gitignored and unreachable by any future agent
+      after checkout, which AGENTS.md's own "context not in the repo does not exist" principle
+      means was effectively no evidence at all. No separate MVP-A1 "completion doc" exists as a
+      distinct file to update -- MVP-A1's own Definition of Done
+      (`docs/product-specs/mvp-a-platform-kernel.md`) states the criterion narratively ("a recent
+      manual live-provider canary proves schema-valid output for all 11 atoms") with no
+      evidence-link field of its own; this exec-plan's Progress log is the evidence record.
 
 ## Validation
 
@@ -232,6 +238,7 @@ Full design rationale (verified against real code before implementation) lives i
 | 2026-08-24 | `internal_only` check placed in `ScenarioRuntimeService.start_session()`/`create_linked_session()` (service layer), not `_require_product_scenario()` itself | `_require_product_scenario()` is also called by `get_session_snapshot()`/`record_next_action()` (status polling, next-action) for an *already-started* session -- gating those too would require the CLI to resend the token on every poll for no security benefit (viewing status of a session that already legitimately started isn't the risk; *starting* a new billed one is). Keeping the check at the two start-a-session call sites only, not inside the shared existence-check helper, avoids that. |
 | 2026-08-24 | `create_linked_session()` (handoff continuation) rejects `internal_only` unconditionally, no token parameter at all | `live_canary.py` never creates linked/handoff sessions, so no legitimate caller could ever supply a matching token there anyway; an unconditional reject is simpler than plumbing a token parameter through the handoff flow for a path that must never succeed. |
 | 2026-08-24 | `max_provider_calls_per_action` is a plain function parameter (default 1) threaded through `_classify_ledger`/`_check_ledger`/`_run_case_with_ledger_check`, not read dynamically from `configs/kernel/provider_policies.yaml` at ledger-check time | `atoms_proof.py`/`live_canary.py` deliberately keep this a pure, DB-only ledger-correctness check with no `ConfigLoader` dependency; resolving the real per-action cap would need a full action_run -> action_config -> provider_policy chase, and would make a correctness check depend on live, possibly-since-changed config state. `live_canary.py`'s `_LIVE_PROVIDER_MAX_CALLS_PER_ACTION = 4` is a static constant that must be kept in sync with the policy by hand -- accepted as a deliberate, documented tradeoff. |
+| 2026-08-25 | Acceptance evidence committed as a tracked repo file (`docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260824T164316Z.json`), not a link to a GitHub Actions artifact/run or an external object-storage URL | The credentialed run that produced it was a local manual cycle, not a `live-canary.yml` `workflow_dispatch`/schedule invocation, so no CI run URL or uploaded-artifact URL exists to link to. The file itself is confirmed privacy-safe (ids, status, per-step cost/token/latency counters only -- read in full before committing), so committing it directly satisfies AGENTS.md's "context not in the repo does not exist for future agents" more directly than a URL would, and needs no external service to stay reachable. |
 
 ## Progress log
 
@@ -241,8 +248,9 @@ Full design rationale (verified against real code before implementation) lives i
 | 2026-08-20 | Merged `feature/ANY-220` into the branch; fixed 4 regressions the merge + config additions surfaced (stale generated config-registry doc, a runtime-config test's hardcoded scenario_ids list, a positional-index test assumption broken by appending workflows, ledger fixtures missing the 5 new columns). `quick-check` green (813 tests). Committed (`3c8004a`). Implemented `scripts/agent/live_canary.py`, the `live-canary` runner command, the `docker-compose.yml` `OPENAI_API_KEY` passthrough, and all CI-safe tests (`test_live_canary_config.py`, `tests/test_live_canary.py`, 3 new `test_runner.py` cases). `quick-check` green (816 tests). Committed (`5454523`). Added `.github/workflows/live-canary.yml` and this exec-plan doc (`baba53c`). Ran `full-check` (backend 816 + frontend typecheck/test/build/generate-api-types + freelancer-suite), all green. | Run the manual credentialed cycle (`dev-up` -> `live-canary` -> `dev-down`) with a real `OPENAI_API_KEY`, confirm `11/11`, inspect the evidence JSON, then link results here and in MVP-A1's completion doc. |
 | 2026-08-21 | Root-caused a merge artifact from `feature/ANY-220` (duplicate `_one_provider_call()` helper definitions in `tests/test_atoms_proof.py` left both fake-merge halves in place, the second shadowing the first and missing the `id` key some tests relied on) and fixed it -- unrelated to this ticket's own code but was blocking `quick-check`. Ran an ad hoc, uncommitted, non-credentialed local live-canary cycle against a local Ollama model (not this ticket's real-provider acceptance evidence -- see `plans/ANY-221-ollama-verification.md`), root-caused an intermittent timeout as Ollama's own cold-model-load latency after an idle eviction (confirmed via `/api/ps` and a direct no-Docker timing test), not a wiring bug; achieved `11/11` once warmed (`.agent/live-canary/evidence-20260821T083703Z.json`). At the user's request, scoped and implemented composite-workflow live coverage (previously out of scope): 3 new `_live_v1` composite workflow/scenario config entries, a permanent one-line `_live_v1` exclusion in `kernel_demo_smoke.py`'s `_composite_workflow_entries()` (not a fake/live parameter, per user pushback), `live_canary.py`'s own local live-composite coverage check, and a `run()` restructured to one combined atom+composite queue. Added/updated 8 tests across `tests/test_kernel_demo_smoke.py`/`tests/test_live_canary.py`/`apps/platform-api/tests/test_runtime_config.py`. `quick-check` green (846 tests; the one remaining failure is the pre-existing, unrelated, uncommitted local-Ollama config edit). | Run `full-check` to confirm the composite addition doesn't regress frontend/product-suite checks, then the manual credentialed OpenAI cycle (`dev-up` -> `live-canary` -> `dev-down`), confirm both `11/11` atoms and `3/3` composites, then link results here and in MVP-A1's completion doc. |
 | 2026-08-24 | Fixed 2 blockers a human code reviewer requested before merge: (1) the 14 live scenario_ids were reachable through the normal public start-session API with no gate, bypassing `live_canary.py`'s cost cap/API-key fail-fast entirely; (2) `PROOF003` required exactly one `provider_calls` row per action_run, but `default_text_generation_v1` permits up to 4 (legitimate retries), so a live case's own retry was failing as a correctness bug. Implemented `ScenarioDefinition.internal_only` (core + SDK contract) + `X-Live-Canary-Token`/`ANYTOOLAI_LIVE_CANARY_TOKEN` gate across `scenarios/service.py`, the API route, `live_canary.py`/`kernel_demo_smoke.py`, `runner.py` (new `LIVE011`), `docker-compose.yml`, and `live-canary.yml`. Relaxed `PROOF003` to a configurable `max_provider_calls_per_action` and made the success-path `StepEvidence` sum cost/tokens/latency across every physical attempt per action_run instead of losing every retry but one. Added 20 new tests across 7 files, including `postgresql`-marked integration coverage verified against a real local PostgreSQL container (`postgresql-check` exit 0, not just `quick-check`'s DB-free subset). Regenerated `docs/generated/openapi.json`/`platformApi.ts` for the new header. `quick-check` 916 tests, `full-check` exit 0. | Commit; run the manual credentialed cycle (now needs both `OPENAI_API_KEY` and `ANYTOOLAI_LIVE_CANARY_TOKEN`), confirm `11/11` atoms and `3/3` composites, then link results here and in MVP-A1's completion doc. |
-| 2026-08-24 | Ran the manual credentialed cycle against a real OpenAI provider (`gpt-4.1-mini`) on the new head, with both `OPENAI_API_KEY` and `ANYTOOLAI_LIVE_CANARY_TOKEN` set. Along the way, found and fixed 2 dev-stack issues unrelated to the ticket's own code: `configs/kernel/` isn't bind-mounted in the dev compose target, so a stale image (built while a since-reverted local-Ollama edit to `litellm_router.yaml` was present) kept serving that old config until rebuilt (`docker compose build platform-api platform-worker`); and `dev-up`, unlike `prod-up`, never passes `--build`, so recreating containers without the right shell env (`ANYTOOLAI_API_PORT`, `ANYTOOLAI_LIVE_CANARY_TOKEN`) silently reset the port mapping and blanked the server-side token, which the `internal_only` gate correctly (by design) treated as "reject everything" until `dev-up` was re-run from a shell with the real values. Result: `11/11` atoms + `3/3` composites passed (`.agent/live-canary/evidence-20260824T164316Z.json`; 14 cases, ~13,989 total tokens, ~$0.0082 total estimated cost). | Close ANY-221; link this evidence in MVP-A1's completion doc. |
+| 2026-08-24 | Ran the manual credentialed cycle against a real OpenAI provider (`gpt-4.1-mini`) on the new head, with both `OPENAI_API_KEY` and `ANYTOOLAI_LIVE_CANARY_TOKEN` set. Along the way, found and fixed 2 dev-stack issues unrelated to the ticket's own code: `configs/kernel/` isn't bind-mounted in the dev compose target, so a stale image (built while a since-reverted local-Ollama edit to `litellm_router.yaml` was present) kept serving that old config until rebuilt (`docker compose build platform-api platform-worker`); and `dev-up`, unlike `prod-up`, never passes `--build`, so recreating containers without the right shell env (`ANYTOOLAI_API_PORT`, `ANYTOOLAI_LIVE_CANARY_TOKEN`) silently reset the port mapping and blanked the server-side token, which the `internal_only` gate correctly (by design) treated as "reject everything" until `dev-up` was re-run from a shell with the real values. Result: `11/11` atoms + `3/3` composites passed (evidence originally at the local, gitignored `.agent/live-canary/evidence-20260824T164316Z.json`; 14 cases, ~13,989 total tokens, ~$0.0082 total estimated cost -- a repo-tracked copy was committed 2026-08-25, see below). | Close ANY-221; link this evidence in MVP-A1's completion doc. |
 | 2026-08-25 | Fixed a [P1] finding from a third human code review: `PROOF013` rejected a legitimate transport retry (its first physical attempt correctly ends in `provider.request_failed`, not `succeeded`), because `PROOF013` still demanded exactly one `succeeded` event per `provider_calls` row even after `PROOF003` was relaxed to allow retries. Split the check into `PROOF013` (started count), a new `PROOF024` (exactly one terminal event, succeeded xor failed), a new `PROOF025` (persisted `status` must agree with which terminal event fired; `timed_out` accepted alongside `failed`), extended `PROOF015` orphan detection to `provider.request_failed`, and added a new `PROOF026` (the last physical attempt by `physical_call_index` must be the one that succeeded). Also fixed the same review's non-blocking access-control-ordering note: `start_session()`'s idempotency-key replay lookup ran before the `internal_only`/token check, so a future caller sending `Idempotency-Key` against an internal_only scenario could in principle replay past the gate (`live_canary.py` itself never sends one today, so not currently exploitable) -- added an early `internal_only` peek (a bare config lookup, not `_require_product_scenario()`, so replay still tolerates a since-removed scenario) before the replay branch. 7 new regression tests in `tests/test_atoms_proof.py`, 1 new `postgresql`-marked test in `test_scenario_runtime.py`. `quick-check` 923 tests, `postgresql-check` exit 0 (real local Postgres). The existing 2026-08-24 credentialed-run evidence is unaffected (it had no retries, so never hit the old PROOF013 bug either way) -- no new live run is required by this fix, only a fresh review pass. Committed (`32c2883`). | Fix a fourth review pass's 2 remaining valid findings (live-canary.yml secret scoping, a missing token-forwarding assertion); get explicit go-ahead to commit those, then close ANY-221. |
+| 2026-08-25 | Fixed a [P1/acceptance] finding from a fifth human code review: this doc claimed acceptance evidence was "linked" via the local `.agent/live-canary/evidence-20260824T164316Z.json` path, but `.agent/` is gitignored, so no future agent could ever actually reach that file after a fresh checkout -- AGENTS.md's own "context not in the repo does not exist" principle means that was effectively unlinked evidence, not linked evidence, despite the doc's own claims to the contrary. Read the full evidence JSON first to confirm it holds only ids, status, and per-step cost/token/latency counters (no prompts, generated content, or secrets), then committed a copy at `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260824T164316Z.json`. Also fixed the review's [P2] finding: the Status header block (State/Last updated/Review date/Next action/Blocker) was stale from 2026-08-21, still describing the credentialed run as not-yet-attempted, directly contradicting the Progress log's own 2026-08-24/25 rows in the same document -- updated to State: completed, and moved this file from `docs/exec-plans/active/` to `docs/exec-plans/completed/` (via `git mv`, no other repo file referenced the old path). `validate-docs`/`generate-docs --check` confirmed no drift. | None -- ANY-221 is closed. |
 
 ## Open questions
 
@@ -253,6 +261,7 @@ Full design rationale (verified against real code before implementation) lives i
 
 ## Follow-up debt
 
-- None outstanding. The credentialed run is linked (2026-08-24 Progress log row); the
-  `$0.50`/4-calls/60s estimates in Open questions above are the only remaining soft spot, and they
-  were validated as reasonable by the real run (14 cases cost ~$0.0082 total, nowhere near the cap).
+- None outstanding. The credentialed run's evidence is committed and repo-tracked (2026-08-25
+  Progress log row); the `$0.50`/4-calls/60s estimates in Open questions above are the only
+  remaining soft spot, and they were validated as reasonable by the real run (14 cases cost
+  ~$0.0082 total, nowhere near the cap).
