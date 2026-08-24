@@ -214,6 +214,64 @@ def test_classify_ledger_reports_proof003_when_provider_call_is_duplicated() -> 
     assert case.error_code == "PROOF003"
 
 
+def test_classify_ledger_passes_and_sums_cost_across_retried_provider_calls() -> None:
+    """Code-review finding: default_text_generation_v1's retry_policy.hard_limits permits up to 4
+    physical provider calls per action (structured-output/transport retries) -- more than one
+    provider_calls row for a single action_run is a legitimate outcome for a live case, not a
+    correlation defect, as long as it's within max_provider_calls_per_action. The step's evidence
+    must sum every physical attempt's cost/tokens/latency, not report just one of them (which
+    would silently lose real spend from live_canary.py's cost cap)."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="text.extract_structured_fields", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[
+            _one_provider_call(id="call-1", action_run_id="run-1"),
+            _one_provider_call(id="call-2", action_run_id="run-1"),
+        ],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=_all_expected_events(provider_call_ids=("call-1", "call-2")),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+        max_provider_calls_per_action=2,
+    )
+
+    assert case.status == "pass"
+    assert case.error_code is None
+    assert len(case.steps) == 1
+    step = case.steps[0]
+    assert step.latency_ms == 246
+    assert step.input_tokens == 20
+    assert step.output_tokens == 40
+    assert step.total_tokens == 60
+    assert step.estimated_cost == pytest.approx(0.002)
+
+
+def test_classify_ledger_reports_proof003_when_retry_count_exceeds_the_configured_cap() -> None:
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[
+            _one_provider_call(id="call-1", action_run_id="run-1"),
+            _one_provider_call(id="call-2", action_run_id="run-1"),
+            _one_provider_call(id="call-3", action_run_id="run-1"),
+        ],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=_all_expected_events(provider_call_ids=("call-1", "call-2", "call-3")),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+        max_provider_calls_per_action=2,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF003"
+
+
 def test_classify_ledger_reports_proof004_when_step_artifact_missing() -> None:
     module = load_atoms_proof_module()
 
@@ -897,7 +955,7 @@ def test_run_case_with_ledger_check_dispatches_a_passing_http_result_into_check_
     )
     captured: dict = {}
 
-    def _fake_check_ledger(engine, *, label, scenario_id, kind, scenario_session_id):
+    def _fake_check_ledger(engine, *, label, scenario_id, kind, scenario_session_id, **_kwargs):
         captured.update(
             engine=engine, label=label, scenario_id=scenario_id, kind=kind,
             scenario_session_id=scenario_session_id,
@@ -1330,7 +1388,7 @@ def test_main_writes_evidence_report_on_coverage_gate_failure(monkeypatch, capsy
 
 
 def _passing_check_ledger(module):
-    def fake(engine, *, label, scenario_id, kind, scenario_session_id):
+    def fake(engine, *, label, scenario_id, kind, scenario_session_id, **_kwargs):
         return module.EvidenceCase(
             label=label, scenario_id=scenario_id, kind=kind, status="pass",
             session_id=scenario_session_id, job_id="job-1", error_code=None, error_message=None,

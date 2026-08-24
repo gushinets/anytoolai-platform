@@ -287,9 +287,17 @@ def test_live_canary_workflow_sets_openai_api_key_at_job_level() -> None:
 
     job = workflow["jobs"]["live-canary"]
     assert job["env"]["OPENAI_API_KEY"] == "${{ secrets.OPENAI_API_KEY }}"
+    # Code-review finding: platform-api (not the worker) checks internal_only scenarios'
+    # X-Live-Canary-Token header, and also reads it at container-creation time during the same
+    # earlier "Boot dev Compose stack" step -- must be job-level for the same reason as
+    # OPENAI_API_KEY above.
+    assert (
+        job["env"]["ANYTOOLAI_LIVE_CANARY_TOKEN"] == "${{ secrets.ANYTOOLAI_LIVE_CANARY_TOKEN }}"
+    )
 
     boot_step = next(step for step in job["steps"] if step.get("name", "").startswith("Boot dev"))
     assert "OPENAI_API_KEY" not in boot_step.get("env", {})
+    assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in boot_step.get("env", {})
 
 
 def test_resolve_postgres_db_falls_back_to_dev_default(monkeypatch) -> None:
@@ -968,9 +976,28 @@ def test_live_canary_fails_without_openai_api_key(monkeypatch, capsys) -> None:
     assert "LIVE000" in capsys.readouterr().err
 
 
+def test_live_canary_fails_without_live_canary_token(monkeypatch, capsys) -> None:
+    """Code-review finding: the 14 live scenario_ids are config-flagged internal_only, so
+    platform-api rejects every case without a token matching its own
+    ANYTOOLAI_LIVE_CANARY_TOKEN -- fail clearly up front instead of letting every case fail
+    LIVE-layer 404s one by one."""
+    runner = load_runner_module()
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.delenv("ANYTOOLAI_LIVE_CANARY_TOKEN", raising=False)
+    monkeypatch.setattr(
+        runner,
+        "runtime_identity",
+        lambda: pytest.fail("live_canary must not touch Docker/DB without a live-canary token"),
+    )
+
+    assert runner.live_canary() == 2
+    assert "LIVE011" in capsys.readouterr().err
+
+
 def test_live_canary_reports_dev001_for_invalid_port_override(monkeypatch, capsys) -> None:
     runner = load_runner_module()
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "sekret")
 
     def fake_runtime_identity():
         raise ValueError("ANYTOOLAI_API_PORT must be an integer port")
@@ -984,6 +1011,7 @@ def test_live_canary_reports_dev001_for_invalid_port_override(monkeypatch, capsy
 def test_live_canary_passes_database_url_via_env_not_argv(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "sekret")
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
     monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
     calls: list[tuple[list[str], dict[str, str]]] = []

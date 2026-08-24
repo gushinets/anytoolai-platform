@@ -119,6 +119,10 @@ def test_live_scenarios_resolve_to_a_one_step_workflow_on_the_live_provider_poli
         live_scenario = registry.get_scenario(live_scenario_id)
         assert live_scenario is not None, live_scenario_id
         assert live_scenario.workflow_id == live_workflow_id
+        # ANY-221 code-review finding: every live scenario must be internal_only, or the normal
+        # public start-session API can reach it with no gate at all, bypassing live_canary.py's
+        # own cost cap and OPENAI_API_KEY fail-fast entirely.
+        assert live_scenario.internal_only is True, live_scenario_id
 
     live_scenario_ids = {
         scenario_id for _workflow_id, scenario_id in LIVE_ATOM_WORKFLOW_AND_SCENARIO_IDS.values()

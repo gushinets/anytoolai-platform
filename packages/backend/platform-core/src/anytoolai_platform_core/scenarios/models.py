@@ -29,6 +29,12 @@ class ScenarioDefinition:
     allowed_next_actions: list[str] = field(default_factory=list)
     schema_version: int = 1
     metadata: dict[str, Any] = field(default_factory=dict)
+    # ANY-221: the 14 kernel_demo "_live_" canary scenarios (real, billed OpenAI calls) set this
+    # so ScenarioRuntimeService.start_session() rejects the normal public start-session API for
+    # them -- they exist to run only through scripts/agent/live_canary.py's own cost-capped,
+    # credentialed-gated CLI, not any frontend/Chrome-extension client reachable through the same
+    # public endpoint. See ScenarioRuntimeService's own internal_only check for the enforcement.
+    internal_only: bool = False
 
 
 @dataclass(frozen=True)

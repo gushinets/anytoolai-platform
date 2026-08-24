@@ -547,6 +547,71 @@ def test_run_passes_live_expected_schema_ref_by_scenario_to_ledger_check(monkeyp
     assert all(entry is module.LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO for entry in seen)
 
 
+def test_run_passes_live_canary_token_and_max_provider_calls_to_ledger_check(monkeypatch) -> None:
+    """Code-review finding: the normal public start-session API used to reach the 14 live
+    scenario_ids with no gate at all. run() must forward live_canary_token as the
+    X-Live-Canary-Token header on every case, and the retry-tolerant
+    max_provider_calls_per_action bound matching default_text_generation_v1's own policy, or
+    neither fix does anything."""
+    module = load_live_canary_module()
+    seen_tokens: list[str | None] = []
+    seen_max_calls: list[int | None] = []
+
+    def _fake_run_case_with_ledger_check(
+        api_url, engine, *, kind, label, scenario_id, scenario_input, timeout, **kwargs
+    ):
+        seen_tokens.append(kwargs.get("live_canary_token"))
+        seen_max_calls.append(kwargs.get("max_provider_calls_per_action"))
+        return module.EvidenceCase(
+            label=label, scenario_id=scenario_id, kind=kind, status="pass",
+            session_id="session", job_id="job", error_code=None, error_message=None, steps=(),
+        )
+
+    monkeypatch.setattr(
+        module.atoms_proof, "_run_case_with_ledger_check", _fake_run_case_with_ledger_check
+    )
+    monkeypatch.setattr(
+        module.atoms_proof, "_build_engine", lambda database_url, **kwargs: _FakeEngine()
+    )
+
+    module.run(
+        "http://127.0.0.1:8000", "postgresql://unused", timeout=1.0, max_total_cost_usd=1.0,
+        live_canary_token="sekret",
+    )
+
+    assert seen_tokens
+    assert all(token == "sekret" for token in seen_tokens)
+    assert all(count == module._LIVE_PROVIDER_MAX_CALLS_PER_ACTION for count in seen_max_calls)
+
+
+def test_main_reads_live_canary_token_env_var_and_forwards_it_to_run(monkeypatch) -> None:
+    module = load_live_canary_module()
+    monkeypatch.setenv(module.LIVE_CANARY_TOKEN_ENV_VAR, "sekret-from-env")
+    monkeypatch.setenv("TEST_LIVE_CANARY_MAIN_DB_URL_2", "postgresql://u:p@127.0.0.1:5432/db")
+    captured: dict = {}
+
+    def _fake_run(*args, **kwargs):
+        captured.update(kwargs)
+        return [], 0
+
+    monkeypatch.setattr(module, "run", _fake_run)
+    monkeypatch.setattr(
+        module.atoms_proof, "write_evidence_report", lambda cases, exit_code, **kwargs: Path("x")
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "live_canary.py", "http://127.0.0.1:8000",
+            "--database-url-env", "TEST_LIVE_CANARY_MAIN_DB_URL_2",
+        ],
+    )
+
+    assert module.main() == 0
+
+    assert captured["live_canary_token"] == "sekret-from-env"
+
+
 def load_live_canary_config_test_module():
     module_path = (
         Path(__file__).resolve().parents[1]
@@ -679,3 +744,19 @@ def test_main_writes_evidence_report_on_engine_configuration_error(monkeypatch, 
 
     assert write_evidence_report_calls == [([], 1)]
     assert "LIVE009" in capsys.readouterr().err
+
+
+def test_live_composite_scenarios_are_config_flagged_internal_only() -> None:
+    """ANY-221 code-review finding: every live scenario (atom and composite) must be
+    internal_only, or the normal public start-session API can reach it with no gate at all,
+    bypassing live_canary.py's own cost cap and OPENAI_API_KEY fail-fast entirely. The 11 atom
+    scenarios are covered by apps/platform-api/tests/test_live_canary_config.py; this covers the
+    3 composite ones."""
+    module = load_live_canary_module()
+    config_test_module = load_live_canary_config_test_module()
+    registry = config_test_module.ConfigLoader(config_test_module.CONFIG_ROOT).load()
+
+    for _workflow_id, scenario_id, _input in module.LIVE_COMPOSITE_CASES:
+        scenario = registry.get_scenario(scenario_id)
+        assert scenario is not None, scenario_id
+        assert scenario.internal_only is True, scenario_id

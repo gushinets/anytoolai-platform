@@ -47,6 +47,18 @@ EvidenceCase = atoms_proof.EvidenceCase  # always defined, unlike `smoke` (see b
 
 DEFAULT_MAX_TOTAL_COST_USD = 0.50
 
+# Code-review finding: _classify_ledger's PROOF003 check used to require exactly one
+# provider_calls row per action_run, but configs/kernel/provider_policies.yaml's
+# default_text_generation_v1 -- the policy every live_ action_config uses -- permits up to 4
+# physical provider calls per action (retry_policy.hard_limits.max_physical_provider_calls_per_
+# action: 4, from 2 transport attempts x 2 validation attempts), so a live case that legitimately
+# retried once was failing as a PROOF003 correctness bug. Not read dynamically from that YAML
+# (this script deliberately keeps no ConfigLoader dependency for a pure ledger-correctness check)
+# -- if the policy's own cap ever changes, this constant needs updating to match.
+_LIVE_PROVIDER_MAX_CALLS_PER_ACTION = 4
+
+LIVE_CANARY_TOKEN_ENV_VAR = "ANYTOOLAI_LIVE_CANARY_TOKEN"
+
 
 def _positive_finite_cost(raw: str) -> float:
     """Code-review finding: a bare float() accepts "nan"/"inf"/"-inf"/"0"/negative strings as
@@ -211,6 +223,7 @@ def run(
     *,
     max_total_cost_usd: float,
     decode_database_name: bool = False,
+    live_canary_token: str | None = None,
 ) -> tuple[list[EvidenceCase], int]:
     """Runs LIVE_ATOM_CASES then LIVE_COMPOSITE_CASES against a live api_url/database_url, as one
     combined, kind-tagged queue -- atoms first, then composites -- so a single cumulative
@@ -219,7 +232,13 @@ def run(
     failed instead of silently dropped, regardless of whether it's still in the atom queue or
     hasn't reached the composite queue yet -- so composite_total in the evidence report always
     reflects all 3 composites, even if none of them actually ran. decode_database_name is
-    forwarded to atoms_proof._build_engine() verbatim -- see its own docstring."""
+    forwarded to atoms_proof._build_engine() verbatim -- see its own docstring. live_canary_token
+    is forwarded to atoms_proof._run_case_with_ledger_check()/smoke._run_one_case() verbatim as
+    the X-Live-Canary-Token header -- the 14 live scenario_ids are config-flagged internal_only,
+    so the backend rejects a start request for them without a token matching its own
+    ANYTOOLAI_LIVE_CANARY_TOKEN (code review finding: the normal public start-session API used to
+    reach these scenarios with no gate at all, bypassing this script's own cost cap/API-key
+    fail-fast entirely)."""
     for cases_spec, tuple_name, error_code in (
         (LIVE_ATOM_CASES, "LIVE_ATOM_CASES", "LIVE002"),
         (LIVE_COMPOSITE_CASES, "LIVE_COMPOSITE_CASES", "LIVE003"),
@@ -259,6 +278,8 @@ def run(
                 api_url, engine, kind=kind, label=label, scenario_id=scenario_id,
                 scenario_input=scenario_input, timeout=case_timeout,
                 expected_schema_ref_by_scenario=LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO,
+                live_canary_token=live_canary_token,
+                max_provider_calls_per_action=_LIVE_PROVIDER_MAX_CALLS_PER_ACTION,
             )
             cases.append(case)
             if case.status == "pass":
@@ -367,6 +388,7 @@ def main() -> int:
             args.api_url.rstrip("/"), database_url, args.timeout,
             max_total_cost_usd=args.max_total_cost_usd,
             decode_database_name=args.database_url_is_percent_encoded,
+            live_canary_token=os.environ.get(LIVE_CANARY_TOKEN_ENV_VAR),
         )
 
     report_path = atoms_proof.write_evidence_report(

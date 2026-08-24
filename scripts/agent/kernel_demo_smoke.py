@@ -475,12 +475,19 @@ def _composite_coverage_error(
 
 
 def _http_json_request(
-    url: str, *, method: str = "GET", payload: dict | None = None, timeout: float = 5.0
+    url: str,
+    *,
+    method: str = "GET",
+    payload: dict | None = None,
+    timeout: float = 5.0,
+    extra_headers: dict[str, str] | None = None,
 ) -> dict:
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
     headers = {"Accept": "application/json"}
     if data is not None:
         headers["Content-Type"] = "application/json"
+    if extra_headers:
+        headers.update(extra_headers)
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
@@ -509,6 +516,7 @@ def _run_one_case(
     timeout: float,
     *,
     expected_schema_ref_by_scenario: dict[str, str] | None = None,
+    live_canary_token: str | None = None,
 ) -> CaseResult:
     """Runs one scenario to completion under its own fresh guest identity (kernel_demo's
     guest quota is a shared per-guest lifetime budget across scenarios, smaller than the
@@ -519,7 +527,14 @@ def _run_one_case(
     ids this module's own fixtures/config parsing know about. live_canary.py passes its own dict
     (covering its 14 live scenario_ids too) instead of mutating the shared module-level one, which
     would leak into kernel_demo_smoke.py's/atoms_proof.py's own fake-only runs sharing this same
-    loaded module in-process during tests."""
+    loaded module in-process during tests.
+
+    live_canary_token is sent as the X-Live-Canary-Token header on the start-session request only
+    -- ANY-221's 14 "_live_" scenarios are config-flagged internal_only, so the backend rejects a
+    start request for them (as a plain scenario_not_found, same as any unknown scenario_id)
+    without a token matching the server's own ANYTOOLAI_LIVE_CANARY_TOKEN. None (this module's own
+    fake-provider dev-smoke/prod-smoke callers) sends no header at all -- fake scenarios are never
+    internal_only, so they never need one; live_canary.py passes its own token."""
     try:
         guest = _http_json_request(f"{api_url}/v1/identity/guest", method="POST")
         guest_id = guest["guest_id"]
@@ -531,6 +546,9 @@ def _run_one_case(
                 "guest_id": guest_id,
                 "input": scenario_input,
             },
+            extra_headers=(
+                {"X-Live-Canary-Token": live_canary_token} if live_canary_token else None
+            ),
         )
         session_id = start["scenario_session_id"]
     except (

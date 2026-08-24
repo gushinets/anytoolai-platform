@@ -286,6 +286,26 @@ def _parse_positive_int_field(
     return raw_value
 
 
+def _parse_optional_bool_field(
+    raw_value: Any,
+    *,
+    field_name: str,
+    file_path: Path,
+    config_id: str,
+) -> bool:
+    if raw_value is None:
+        return False
+    if not isinstance(raw_value, bool):
+        raise InvalidConfigShapeError(
+            file_path,
+            f"{field_name} must be a boolean if set",
+            config_id=config_id,
+            ref_type=field_name,
+            ref_value=_stringify_config_value(raw_value),
+        )
+    return raw_value
+
+
 def _reject_unexpected_mapping_keys(
     mapping: dict[str, Any],
     *,
@@ -1692,6 +1712,12 @@ class ConfigLoader:
                     workflow_id=workflow_id,
                     allowed_next_actions=scenario_data.get("allowed_next_actions", []),
                     metadata={"_file_path": str(path)},
+                    internal_only=_parse_optional_bool_field(
+                        scenario_data.get("internal_only"),
+                        field_name="internal_only",
+                        file_path=path,
+                        config_id=scenario_id,
+                    ),
                 )
                 self._remember_source("scenario", scenario_id, path)
         except ConfigError as error:

@@ -24,6 +24,11 @@ jobs:
     # passing.
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # Same job-level reasoning as OPENAI_API_KEY above: platform-api reads this at
+      # container-creation time to check internal_only scenarios' X-Live-Canary-Token header
+      # (code review finding -- the 14 live scenario_ids were previously reachable through the
+      # normal public start-session API with no gate at all).
+      ANYTOOLAI_LIVE_CANARY_TOKEN: ${{ secrets.ANYTOOLAI_LIVE_CANARY_TOKEN }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:

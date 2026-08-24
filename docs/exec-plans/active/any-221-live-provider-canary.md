@@ -58,16 +58,43 @@ Full design rationale (verified against real code before implementation) lives i
   in `quick_check.py`'s `PYTEST_TARGETS` where needed.
 - `.github/workflows/live-canary.yml` (new): `workflow_dispatch` + weekly `schedule`, separate from
   `backend.yml`, uploads the evidence JSON as a workflow artifact.
+- (2026-08-24, code-review finding) `internal_only` scenario config flag + `X-Live-Canary-Token`
+  gate: the 14 live scenario_ids were reachable through the normal public start-session API with
+  no gate at all, bypassing `live_canary.py`'s own cost cap and `OPENAI_API_KEY` fail-fast
+  entirely (both exist only in the CLI). `ScenarioDefinition.internal_only: bool = False` (core +
+  SDK contract), set `true` on all 14 live scenarios; `ScenarioRuntimeService.start_session()`
+  rejects them (as a plain `scenario_not_found`, indistinguishable from an unknown scenario_id)
+  unless the caller's `X-Live-Canary-Token` header matches the server's own
+  `ANYTOOLAI_LIVE_CANARY_TOKEN` env var (fails closed if that's unset server-side);
+  `create_linked_session()` (handoff continuation) rejects them unconditionally, no token check at
+  all, since no legitimate handoff ever targets one. `live_canary.py`/`kernel_demo_smoke.py`'s
+  `_run_one_case()` send the header via a new `live_canary_token` parameter; `runner.py`'s
+  `live_canary()` fails fast (`LIVE011`) if the token env var is unset, mirroring `OPENAI_API_KEY`;
+  `docker-compose.yml`'s `platform-api` service and `live-canary.yml`'s job-level `env:` both pass
+  it through.
+- (2026-08-24, code-review finding) `_classify_ledger`'s `PROOF003` check relaxed from "exactly
+  one `provider_calls` row per `action_run`" to a configurable `max_provider_calls_per_action`
+  (default 1, unchanged for `atoms_proof.py`'s own fake-provider callers) -- the exactly-one
+  invariant only ever held for `default_fake_provider_v1`
+  (`max_physical_provider_calls_per_action: 1`); `default_text_generation_v1` (every live scenario)
+  permits up to 4, so a live case's own legitimate structured-output/transport retry was failing
+  as a `PROOF003` correctness bug. `live_canary.py` passes `_LIVE_PROVIDER_MAX_CALLS_PER_ACTION =
+  4` (a static constant mirroring the policy's own config, not read dynamically). The success-path
+  `StepEvidence` construction now sums every physical attempt's cost/tokens/latency per action_run
+  (new `_step_evidence_from_action_run()`) instead of a single-row lookup that would silently drop
+  every retry but one's own cost from `live_canary.py`'s cost cap.
 
 ### Out of scope
 
 - Refactoring any frozen hot-path file (`config/loader.py`, `workflows/runner.py`,
   `actions/runner.py`, `StructuredLlmActionExecutor`, `handlers/run_workflow.py`, Session
   ownership) -- per ANY-24's execution constraints.
-- A dedicated canary provider policy, a run-level physical-call aggregate cap (the fixed 11-atom +
-  3-composite case list x the existing per-action `max_physical_provider_calls_per_action: 4` cap
-  already bounds the run structurally), or a full fake-provider round-trip test for the new live
-  scenario ids.
+- A dedicated canary provider policy or a full fake-provider round-trip test for the new live
+  scenario ids. (A run-level physical-call aggregate cap was previously listed here too, on the
+  reasoning that the fixed 11-atom + 3-composite case list x the per-action
+  `max_physical_provider_calls_per_action` cap already bounds the run structurally -- still true
+  for the *count* of physical calls, but not for their *cost*, which is why `PROOF003`/evidence
+  needed the 2026-08-24 fix above instead of staying purely out of scope.)
 - Prompt benchmarking, semantic quality scoring, automatic model comparison, or exposing
   credentials/provider controls to clients (ticket non-goals).
 
@@ -79,16 +106,23 @@ Full design rationale (verified against real code before implementation) lives i
 
 ## Contracts touched
 
-- API: none (drives existing `/v1/*` endpoints over HTTP, same as `atoms_proof.py`).
+- API: (2026-08-24) `POST /v1/products/{product_id}/scenarios/{scenario_id}/start` gained an
+  optional `X-Live-Canary-Token` header (`docs/generated/openapi.json`/`platformApi.ts`
+  regenerated) -- absent on every normal request, so no behavior change for existing callers; only
+  consulted for `internal_only` scenarios. Documented 404 response shape (`scenario_not_found`)
+  is unchanged, since an internal_only rejection reuses it verbatim.
 - DB: read-only ledger check, same 5 tables `atoms_proof.py` already reads; no schema change --
   `provider_calls`' `latency_ms`/`input_tokens`/`output_tokens`/`total_tokens`/`estimated_cost`
   columns already existed.
 - Config: 11 new action_config/workflow/scenario entries + 11 new `product.yaml` scenario_ids, all
   additive; no existing entry mutated (regression-guarded by
-  `test_live_canary_config.py`).
+  `test_live_canary_config.py`). (2026-08-24) New optional `ScenarioDefinition.internal_only: bool`
+  field (core dataclass + SDK contract, mirrored per `test_contract_field_compatibility.py`),
+  default `False` so every pre-existing scenario is unaffected; set `true` on all 14 live
+  scenarios.
 - Events: none produced; existing event types read and asserted against (same set
   `atoms_proof.py` already checks).
-- Frontend: none.
+- Frontend: none (the new header is CLI-only; no frontend/CE-kit code sends it).
 
 ## Implementation steps
 
@@ -121,11 +155,39 @@ Full design rationale (verified against real code before implementation) lives i
       composite case-list shape, own coverage-entries/coverage-error/binding-mismatch checks,
       composite evidence round-trip; 1 existing cost-abort test updated for the combined queue),
       `apps/platform-api/tests/test_runtime_config.py` (hardcoded `scenario_ids` list extended).
-- [ ] Manual credentialed run: `OPENAI_API_KEY=... dev-up -> live-canary -> dev-down`, must print
-      `N/11` atoms and `M/3` composites both fully passing, exit 0, evidence JSON written to
-      `.agent/live-canary/` with `atoms_total: 11, composite_total: 3`.
-- [ ] Link the first successful run's evidence in this file's Progress log and in MVP-A1's own
-      completion doc.
+- [x] (2026-08-24) `internal_only` access control: `ScenarioDefinition.internal_only` (core + SDK
+      contract) set on all 14 live scenarios; `ScenarioRuntimeService.start_session()` gates on
+      `X-Live-Canary-Token` matching `ANYTOOLAI_LIVE_CANARY_TOKEN` (fails closed if unset
+      server-side), `create_linked_session()` rejects unconditionally;
+      `live_canary.py`/`kernel_demo_smoke.py`'s `_run_one_case()` send the header;
+      `runner.py live-canary` fails fast (`LIVE011`) if the token is unset;
+      `docker-compose.yml`/`live-canary.yml` pass the env var through to `platform-api`.
+- [x] (2026-08-24) `PROOF003` retry tolerance: `max_provider_calls_per_action` (default 1,
+      `live_canary.py` passes 4 matching `default_text_generation_v1`'s own policy cap); success-path
+      `StepEvidence` now sums cost/tokens/latency across every physical provider_calls row per
+      action_run instead of a single-row lookup.
+- [x] (2026-08-24) Tests: `packages/backend/platform-core/tests/unit/test_scenario_runtime.py` (5
+      new `postgresql`-marked cases -- reject without token, reject with wrong token, fail closed
+      when server token unset, accept with correct token, `create_linked_session` unconditional
+      reject), new fast `test_scenario_service_live_canary_token.py` (6 cases, no DB),
+      `test_config_loader.py` (2 cases -- parses `internal_only`, rejects a non-bool value),
+      `apps/platform-api/tests/test_scenario_runtime_api.py` (2 new `postgresql`-marked HTTP-level
+      cases), `test_live_canary_config.py`/`tests/test_live_canary.py` extended to assert
+      `internal_only is True` on all 14 live scenarios, `tests/test_atoms_proof.py` (3 new cases
+      for the relaxed `PROOF003`/summed evidence), `tests/test_live_canary.py`/`test_runner.py`
+      extended for the token env-var/header plumbing and the new `LIVE011` fail-fast. Verified
+      against a real local PostgreSQL container (not just `quick-check`'s DB-free subset) --
+      `postgresql-check` exit 0.
+- [x] (2026-08-24) Manual credentialed run: `dev-up -> live-canary -> dev-down` against real
+      OpenAI (`gpt-4.1-mini`), both `OPENAI_API_KEY` and `ANYTOOLAI_LIVE_CANARY_TOKEN` set. Printed
+      `11/11` atoms and `3/3` composites, exit 0, evidence JSON written to `.agent/live-canary/
+      evidence-20260824T164316Z.json` with `atoms_total: 11, composite_total: 3`.
+- [x] (2026-08-24) Linked the successful run's evidence in this file's Progress log (see below).
+      No separate MVP-A1 "completion doc" exists as a distinct file to update -- MVP-A1's own
+      Definition of Done (`docs/product-specs/mvp-a-platform-kernel.md`) states the criterion
+      narratively ("a recent manual live-provider canary proves schema-valid output for all 11
+      atoms") with no evidence-link field of its own; this exec-plan's Progress log is the evidence
+      record.
 
 ## Validation
 
@@ -135,10 +197,19 @@ Full design rationale (verified against real code before implementation) lives i
       added; the 1 pre-existing `test_litellm_adapter.py` failure seen during this pass is caused
       by an unrelated, uncommitted, temporary local Ollama-testing edit to `litellm_router.yaml`
       -- see `plans/ANY-221-ollama-verification.md` -- not by this ticket's changes)
-- [ ] `export OPENAI_API_KEY=... && python scripts/agent/runner.py dev-up && python scripts/agent/runner.py live-canary && python scripts/agent/runner.py dev-down`
+- [x] (2026-08-24) `export OPENAI_API_KEY=... ANYTOOLAI_LIVE_CANARY_TOKEN=... && python scripts/agent/runner.py dev-up && python scripts/agent/runner.py live-canary && python scripts/agent/runner.py dev-down`
+      -- exit 0, `11/11` atoms + `3/3` composites.
 - [x] `python scripts/agent/runner.py full-check` (2026-08-21, with the temporary uncommitted
       Ollama-testing edits stashed for a clean run: exit 0, 847 backend + 216 frontend tests,
       typecheck/build/OpenAPI-contract-drift all clean, freelancer-suite product tests pass)
+- [x] (2026-08-24) `python scripts/agent/runner.py postgresql-check` against a real local
+      PostgreSQL container (`docker run postgres:16-alpine`, not just CI) -- exit 0, all
+      `postgresql`-marked tests including the 7 new `internal_only`-related cases across
+      `test_scenario_runtime.py`/`test_scenario_runtime_api.py`.
+- [x] (2026-08-24) `python scripts/agent/runner.py quick-check` (916 tests) and `full-check`
+      (regenerated `docs/generated/openapi.json` and `platformApi.ts` for the new
+      `X-Live-Canary-Token` header parameter, both were flagged stale by `generate-docs --check`/
+      `generate-api-types:check` until regenerated) both green.
 
 ## Decision log
 
@@ -157,6 +228,10 @@ Full design rationale (verified against real code before implementation) lives i
 | 2026-08-21 | `kernel_demo_smoke.py`'s `_composite_workflow_entries()` fixed with a permanent, unconditional `_live_v1` exclusion, not an `only_live: bool \| None` parameter threaded through it/`_composite_workflow_config()`/`_composite_coverage_error()` | First design drafted a tri-state parameter; user pushback ("зачем вводим флаги fake/live") was correct -- provider selection is a static config fact, not a mode this shared, fake-provider-oriented module (also used by `atoms_proof.py` and `dev-smoke`/`prod-smoke`) needs to choose per call. The hardcoded exclusion needs zero call-site changes anywhere existing. |
 | 2026-08-21 | `live_canary.py` owns its own `_live_composite_workflow_entries()`/`_live_composite_coverage_error()`, not a reuse of `kernel_demo_smoke.py`'s `_composite_coverage_error()` even after the above fix | That shared function's error strings hardcode `"SMOKE010"`/`"COMPOSITE_SMOKE_CASES"`, which would misname the live case list/error family in a live-canary failure message; the live-specific version reuses only the non-fake-specific pure helpers (`_composite_case_ids`, `_composite_schema_ref_by_workflow_id`, `_coverage_mismatch_error`, `_required_composite_workflow_id_by_scenario_id`) and reimplements only the small duplicate/shape checks with correct naming. **Superseded 2026-08-24: `_composite_coverage_error()` was reworked to take `entries_provider`/`labels` (a `CoverageLabels` dataclass bundling `error_code`/`tuple_name`/`kind`) precisely so callers like this one can supply their own naming instead of hardcoding SMOKE010/COMPOSITE_SMOKE_CASES. `_live_composite_coverage_error()` is now a ~10-line wrapper that calls `atoms_proof.smoke._composite_coverage_error(cases, entries_provider=_live_composite_workflow_entries, labels=_LIVE_COMPOSITE_COVERAGE_LABELS)` instead of reimplementing the duplicate/shape/coverage/binding checks itself. Reuse that shared, parameterized helper for any future live-canary-side coverage check rather than re-duplicating its logic again.** |
 | 2026-08-21 | `live_canary.py`'s `run()` restructured to one combined, kind-tagged (atom/composite) queue instead of two sequential phase calls | Simpler than threading a separate `_run_case_group()`-style two-phase orchestration: the existing per-case cost-abort loop already generalizes to a mixed queue by tagging each entry with its `kind`, so a cost-cap trip mid-atom-phase naturally marks every remaining item -- atoms and composites alike -- as `LIVE001` with no special-casing. |
+| 2026-08-24 | `internal_only` gate enforced by a shared-secret header (`X-Live-Canary-Token` vs. server `ANYTOOLAI_LIVE_CANARY_TOKEN`), not a per-scenario allowlist keyed on some existing identity (guest_id, frontend_id) | No existing identity concept in this codebase distinguishes "the live-canary CLI" from "a normal guest" -- guest identities are anonymous and created fresh per case by design (`kernel_demo`'s own quota model). A shared secret is the smallest primitive that doesn't require inventing a new identity/auth system; `secrets.compare_digest` avoids a timing side-channel, and failing closed when the env var is unset means an operator who forgets to configure it gets "scenario unreachable" (safe) rather than "scenario reachable by anyone" (unsafe). |
+| 2026-08-24 | `internal_only` check placed in `ScenarioRuntimeService.start_session()`/`create_linked_session()` (service layer), not `_require_product_scenario()` itself | `_require_product_scenario()` is also called by `get_session_snapshot()`/`record_next_action()` (status polling, next-action) for an *already-started* session -- gating those too would require the CLI to resend the token on every poll for no security benefit (viewing status of a session that already legitimately started isn't the risk; *starting* a new billed one is). Keeping the check at the two start-a-session call sites only, not inside the shared existence-check helper, avoids that. |
+| 2026-08-24 | `create_linked_session()` (handoff continuation) rejects `internal_only` unconditionally, no token parameter at all | `live_canary.py` never creates linked/handoff sessions, so no legitimate caller could ever supply a matching token there anyway; an unconditional reject is simpler than plumbing a token parameter through the handoff flow for a path that must never succeed. |
+| 2026-08-24 | `max_provider_calls_per_action` is a plain function parameter (default 1) threaded through `_classify_ledger`/`_check_ledger`/`_run_case_with_ledger_check`, not read dynamically from `configs/kernel/provider_policies.yaml` at ledger-check time | `atoms_proof.py`/`live_canary.py` deliberately keep this a pure, DB-only ledger-correctness check with no `ConfigLoader` dependency; resolving the real per-action cap would need a full action_run -> action_config -> provider_policy chase, and would make a correctness check depend on live, possibly-since-changed config state. `live_canary.py`'s `_LIVE_PROVIDER_MAX_CALLS_PER_ACTION = 4` is a static constant that must be kept in sync with the policy by hand -- accepted as a deliberate, documented tradeoff. |
 
 ## Progress log
 
@@ -165,6 +240,8 @@ Full design rationale (verified against real code before implementation) lives i
 | 2026-08-20 | Verified `plans/ANY-221.md`'s pre-existing implementation plan against real code (3 parallel Explore passes), corrected 2 minor inaccuracies (a docstring-citation overclaim, a stale 4-job `backend.yml` count). Implemented config wiring (11 x 4 YAML entries) and `atoms_proof.py`'s `StepEvidence`/`_classify_ledger` extension; `validate-configs` passed. Committed (`624ed47`). | Continue with `live_canary.py` and the rest of the file list. |
 | 2026-08-20 | Merged `feature/ANY-220` into the branch; fixed 4 regressions the merge + config additions surfaced (stale generated config-registry doc, a runtime-config test's hardcoded scenario_ids list, a positional-index test assumption broken by appending workflows, ledger fixtures missing the 5 new columns). `quick-check` green (813 tests). Committed (`3c8004a`). Implemented `scripts/agent/live_canary.py`, the `live-canary` runner command, the `docker-compose.yml` `OPENAI_API_KEY` passthrough, and all CI-safe tests (`test_live_canary_config.py`, `tests/test_live_canary.py`, 3 new `test_runner.py` cases). `quick-check` green (816 tests). Committed (`5454523`). Added `.github/workflows/live-canary.yml` and this exec-plan doc (`baba53c`). Ran `full-check` (backend 816 + frontend typecheck/test/build/generate-api-types + freelancer-suite), all green. | Run the manual credentialed cycle (`dev-up` -> `live-canary` -> `dev-down`) with a real `OPENAI_API_KEY`, confirm `11/11`, inspect the evidence JSON, then link results here and in MVP-A1's completion doc. |
 | 2026-08-21 | Root-caused a merge artifact from `feature/ANY-220` (duplicate `_one_provider_call()` helper definitions in `tests/test_atoms_proof.py` left both fake-merge halves in place, the second shadowing the first and missing the `id` key some tests relied on) and fixed it -- unrelated to this ticket's own code but was blocking `quick-check`. Ran an ad hoc, uncommitted, non-credentialed local live-canary cycle against a local Ollama model (not this ticket's real-provider acceptance evidence -- see `plans/ANY-221-ollama-verification.md`), root-caused an intermittent timeout as Ollama's own cold-model-load latency after an idle eviction (confirmed via `/api/ps` and a direct no-Docker timing test), not a wiring bug; achieved `11/11` once warmed (`.agent/live-canary/evidence-20260821T083703Z.json`). At the user's request, scoped and implemented composite-workflow live coverage (previously out of scope): 3 new `_live_v1` composite workflow/scenario config entries, a permanent one-line `_live_v1` exclusion in `kernel_demo_smoke.py`'s `_composite_workflow_entries()` (not a fake/live parameter, per user pushback), `live_canary.py`'s own local live-composite coverage check, and a `run()` restructured to one combined atom+composite queue. Added/updated 8 tests across `tests/test_kernel_demo_smoke.py`/`tests/test_live_canary.py`/`apps/platform-api/tests/test_runtime_config.py`. `quick-check` green (846 tests; the one remaining failure is the pre-existing, unrelated, uncommitted local-Ollama config edit). | Run `full-check` to confirm the composite addition doesn't regress frontend/product-suite checks, then the manual credentialed OpenAI cycle (`dev-up` -> `live-canary` -> `dev-down`), confirm both `11/11` atoms and `3/3` composites, then link results here and in MVP-A1's completion doc. |
+| 2026-08-24 | Fixed 2 blockers a human code reviewer requested before merge: (1) the 14 live scenario_ids were reachable through the normal public start-session API with no gate, bypassing `live_canary.py`'s cost cap/API-key fail-fast entirely; (2) `PROOF003` required exactly one `provider_calls` row per action_run, but `default_text_generation_v1` permits up to 4 (legitimate retries), so a live case's own retry was failing as a correctness bug. Implemented `ScenarioDefinition.internal_only` (core + SDK contract) + `X-Live-Canary-Token`/`ANYTOOLAI_LIVE_CANARY_TOKEN` gate across `scenarios/service.py`, the API route, `live_canary.py`/`kernel_demo_smoke.py`, `runner.py` (new `LIVE011`), `docker-compose.yml`, and `live-canary.yml`. Relaxed `PROOF003` to a configurable `max_provider_calls_per_action` and made the success-path `StepEvidence` sum cost/tokens/latency across every physical attempt per action_run instead of losing every retry but one. Added 20 new tests across 7 files, including `postgresql`-marked integration coverage verified against a real local PostgreSQL container (`postgresql-check` exit 0, not just `quick-check`'s DB-free subset). Regenerated `docs/generated/openapi.json`/`platformApi.ts` for the new header. `quick-check` 916 tests, `full-check` exit 0. | Commit; run the manual credentialed cycle (now needs both `OPENAI_API_KEY` and `ANYTOOLAI_LIVE_CANARY_TOKEN`), confirm `11/11` atoms and `3/3` composites, then link results here and in MVP-A1's completion doc. |
+| 2026-08-24 | Ran the manual credentialed cycle against a real OpenAI provider (`gpt-4.1-mini`) on the new head, with both `OPENAI_API_KEY` and `ANYTOOLAI_LIVE_CANARY_TOKEN` set. Along the way, found and fixed 2 dev-stack issues unrelated to the ticket's own code: `configs/kernel/` isn't bind-mounted in the dev compose target, so a stale image (built while a since-reverted local-Ollama edit to `litellm_router.yaml` was present) kept serving that old config until rebuilt (`docker compose build platform-api platform-worker`); and `dev-up`, unlike `prod-up`, never passes `--build`, so recreating containers without the right shell env (`ANYTOOLAI_API_PORT`, `ANYTOOLAI_LIVE_CANARY_TOKEN`) silently reset the port mapping and blanked the server-side token, which the `internal_only` gate correctly (by design) treated as "reject everything" until `dev-up` was re-run from a shell with the real values. Result: `11/11` atoms + `3/3` composites passed (`.agent/live-canary/evidence-20260824T164316Z.json`; 14 cases, ~13,989 total tokens, ~$0.0082 total estimated cost). | Close ANY-221; link this evidence in MVP-A1's completion doc. |
 
 ## Open questions
 
@@ -175,6 +252,6 @@ Full design rationale (verified against real code before implementation) lives i
 
 ## Follow-up debt
 
-- The first successful manual/CI `live-canary` run's evidence still needs to be linked here (this
-  file's Progress log) and from MVP-A1's own completion doc, per the parent ticket's acceptance
-  criterion ("a recent successful manual live-provider canary is linked").
+- None outstanding. The credentialed run is linked (2026-08-24 Progress log row); the
+  `$0.50`/4-calls/60s estimates in Open questions above are the only remaining soft spot, and they
+  were validated as reasonable by the real run (14 cases cost ~$0.0082 total, nowhere near the cap).

@@ -29,7 +29,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import partial
@@ -236,6 +236,27 @@ def _best_effort_steps_from_provider_calls(
     return tuple(steps)
 
 
+def _step_evidence_from_action_run(action_run: dict, calls: list[dict]) -> StepEvidence:
+    """Aggregates every physical provider_calls row for one action_run into a single StepEvidence
+    -- default_text_generation_v1's retry_policy.hard_limits permits up to 4 physical calls per
+    logical action (structured-output/transport retries), so more than one row for a single,
+    successfully-completed action is a legitimate outcome, not a correlation defect (code review
+    finding: PROOF003 below used to require exactly one, which would fail a live case's own
+    legitimate retry as a correctness bug). Summing keeps every real, billed attempt's
+    cost/latency/tokens in the evidence and in live_canary.py's cost cap, instead of the previous
+    single-row lookup silently dropping every retry but the last one's own cost."""
+    return StepEvidence(
+        step_id=action_run["step_id"],
+        action_type=action_run["action_type"],
+        action_config_id=action_run["action_config_id"],
+        latency_ms=sum(call["latency_ms"] for call in calls),
+        input_tokens=sum(call["input_tokens"] for call in calls),
+        output_tokens=sum(call["output_tokens"] for call in calls),
+        total_tokens=sum(call["total_tokens"] for call in calls),
+        estimated_cost=sum(call["estimated_cost"] for call in calls),
+    )
+
+
 def _classify_ledger(
     *,
     label: str,
@@ -248,10 +269,17 @@ def _classify_ledger(
     artifacts: list[dict],
     events: list[dict],
     expected_event_types: frozenset[str],
+    max_provider_calls_per_action: int = 1,
 ) -> EvidenceCase:
     """Pure pass/fail classification over already-fetched rows -- no DB access. Split out from
     _check_ledger so the PROOF00x branches are unit-testable with fake dict rows, no real
     Postgres needed.
+
+    max_provider_calls_per_action bounds PROOF003's per-action_run provider_calls count (default
+    1, this script's own fake-provider callers never retry). live_canary.py passes a higher bound
+    matching default_text_generation_v1's own retry_policy.hard_limits.max_physical_provider_calls_
+    per_action (code review finding: the exactly-one invariant only ever held for the fake
+    provider, and legitimately fails a live case's own retry as a PROOF003 correctness bug).
 
     Every internal failure returns through `fail` (functools.partial over _fail(), bound once
     with label/scenario_id/kind/session_id/steps=known_steps -- the fields every PROOF00x branch
@@ -327,22 +355,23 @@ def _classify_ledger(
             error_code="PROOF016", error_message=mismatch,
         )
 
-    # `/code-review` #2 (2026-08-24) finding: previously a hand-rolled loop incrementing a count
-    # dict and populating a lookup dict in lockstep -- two pieces of state to keep in sync for no
-    # reason, since both are pure, independent derivations of the same provider_calls list. Counter
-    # already does exactly this counting job elsewhere in this file (_correlate_events_by_id).
-    provider_call_counts = Counter(call["action_run_id"] for call in provider_calls)
-    provider_call_by_action_run_id = {call["action_run_id"]: call for call in provider_calls}
+    # Groups (not counts) provider_calls by action_run_id -- one action_run can legitimately have
+    # more than one physical provider_calls row (retries, bounded by max_provider_calls_per_action;
+    # see this function's own docstring), so a plain Counter (round #2's own dedup fix) would only
+    # tell us "how many", losing which specific rows to sum into that step's evidence below.
+    provider_calls_by_action_run_id: dict[str, list[dict]] = defaultdict(list)
+    for call in provider_calls:
+        provider_calls_by_action_run_id[call["action_run_id"]].append(call)
     for action_run in action_runs:
-        count = provider_call_counts.get(action_run["id"], 0)
-        if count != 1:
+        calls = provider_calls_by_action_run_id.get(action_run["id"], [])
+        if not (1 <= len(calls) <= max_provider_calls_per_action):
             return fail(
                 job_id=job_id,
                 error_code="PROOF003",
                 error_message=(
-                    f"PROOF003: expected exactly one provider_calls row for "
-                    f"action_run {action_run['id']} (step {action_run['step_id']}), "
-                    f"found {count}"
+                    f"PROOF003: expected 1-{max_provider_calls_per_action} provider_calls "
+                    f"row(s) for action_run {action_run['id']} (step {action_run['step_id']}), "
+                    f"found {len(calls)}"
                 ),
             )
     # An orphan provider_calls row (right scenario_session_id, action_run_id pointing outside
@@ -570,16 +599,7 @@ def _classify_ledger(
         )
 
     steps = tuple(
-        StepEvidence(
-            step_id=row["step_id"],
-            action_type=row["action_type"],
-            action_config_id=row["action_config_id"],
-            latency_ms=provider_call_by_action_run_id[row["id"]]["latency_ms"],
-            input_tokens=provider_call_by_action_run_id[row["id"]]["input_tokens"],
-            output_tokens=provider_call_by_action_run_id[row["id"]]["output_tokens"],
-            total_tokens=provider_call_by_action_run_id[row["id"]]["total_tokens"],
-            estimated_cost=provider_call_by_action_run_id[row["id"]]["estimated_cost"],
-        )
+        _step_evidence_from_action_run(row, provider_calls_by_action_run_id[row["id"]])
         for row in action_runs
     )
     return EvidenceCase(
@@ -649,7 +669,13 @@ def _known_steps_for_session(
 
 
 def _check_ledger(
-    engine: "sa.engine.Engine", *, label: str, scenario_id: str, kind: str, scenario_session_id: str
+    engine: "sa.engine.Engine",
+    *,
+    label: str,
+    scenario_id: str,
+    kind: str,
+    scenario_session_id: str,
+    max_provider_calls_per_action: int = 1,
 ) -> EvidenceCase:
     try:
         with engine.connect() as conn:
@@ -709,6 +735,7 @@ def _check_ledger(
         artifacts=artifacts,
         events=events,
         expected_event_types=_EXPECTED_EVENT_TYPES,
+        max_provider_calls_per_action=max_provider_calls_per_action,
     )
 
 
@@ -722,13 +749,19 @@ def _run_case_with_ledger_check(
     scenario_input: dict,
     timeout: float,
     expected_schema_ref_by_scenario: dict[str, str] | None = None,
+    live_canary_token: str | None = None,
+    max_provider_calls_per_action: int = 1,
 ) -> EvidenceCase:
-    """expected_schema_ref_by_scenario is forwarded to smoke._run_one_case() verbatim -- see its
-    own docstring. None (this script's own dev-smoke/prod-smoke-style fake-provider callers) keeps
-    smoke._run_one_case()'s default module-level lookup; live_canary.py passes its own dict."""
+    """expected_schema_ref_by_scenario/live_canary_token are forwarded to smoke._run_one_case()
+    verbatim -- see its own docstring. None (this script's own dev-smoke/prod-smoke-style
+    fake-provider callers) keeps smoke._run_one_case()'s defaults (module-level schema-ref lookup,
+    no X-Live-Canary-Token header); live_canary.py passes its own values for both.
+    max_provider_calls_per_action is forwarded to _check_ledger()/_classify_ledger() verbatim --
+    see _classify_ledger()'s own docstring."""
     result = smoke._run_one_case(
         api_url, scenario_id, scenario_input, timeout,
         expected_schema_ref_by_scenario=expected_schema_ref_by_scenario,
+        live_canary_token=live_canary_token,
     )
     if result.error_message is not None:
         # result.error_message is free-form text this script doesn't control (e.g. SMOKE004
@@ -750,6 +783,7 @@ def _run_case_with_ledger_check(
     return _check_ledger(
         engine, label=label, scenario_id=scenario_id, kind=kind,
         scenario_session_id=result.session_id,
+        max_provider_calls_per_action=max_provider_calls_per_action,
     )
 
 

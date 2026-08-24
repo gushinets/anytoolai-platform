@@ -44,6 +44,10 @@ services:
       target: prod
     environment:
       <<: *postgres-credentials
+      # platform-api itself checks internal_only scenarios' X-Live-Canary-Token header against
+      # this (ScenarioRuntimeService.start_session()) -- unset by default so normal dev-up/
+      # quick-check stays credential-free; only live-canary (ANY-221) needs a real token.
+      ANYTOOLAI_LIVE_CANARY_TOKEN: ${ANYTOOLAI_LIVE_CANARY_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy

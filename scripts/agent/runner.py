@@ -693,6 +693,18 @@ def live_canary() -> int:
             file=sys.stderr,
         )
         return 2
+    # Same reasoning as OPENAI_API_KEY above: the 14 live scenario_ids are config-flagged
+    # internal_only (code review finding), so platform-api rejects a start request for them
+    # without a token matching its own ANYTOOLAI_LIVE_CANARY_TOKEN -- every case would otherwise
+    # fail LIVE-layer 404s one by one instead of failing clearly up front.
+    if not os.environ.get("ANYTOOLAI_LIVE_CANARY_TOKEN", "").strip():
+        print(
+            "LIVE011: live-canary requires ANYTOOLAI_LIVE_CANARY_TOKEN to be set (the live "
+            "scenario_ids are internal_only -- platform-api rejects every case without a "
+            "matching token).",
+            file=sys.stderr,
+        )
+        return 2
     return _run_proof_script("scripts/agent/live_canary.py", "ANYTOOLAI_LIVE_CANARY_DATABASE_URL")
 
 

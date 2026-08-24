@@ -201,6 +201,7 @@ def start_scenario(
     session_factory: Annotated[Any, Depends(get_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    live_canary_token: Annotated[str | None, Header(alias="X-Live-Canary-Token")] = None,
 ) -> ScenarioStartResponse:
     # PlatformError (including quota_exhausted) is caught only after the `with` block
     # exits, so any failure -- not just the classic pre-insert quota_exhausted -- rolls
@@ -223,6 +224,7 @@ def start_scenario(
                 user_id=request.user_id,
                 source_frontend_instance_id=request.source_frontend_instance_id,
                 idempotency_key=idempotency_key,
+                live_canary_token=live_canary_token,
             )
     except PlatformError as exc:
         raise _to_api_error(exc) from exc
