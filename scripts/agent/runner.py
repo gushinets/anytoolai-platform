@@ -651,26 +651,35 @@ def dev_smoke() -> int:
     return run([sys.executable, "scripts/agent/kernel_demo_smoke.py", identity.api_url])
 
 
-def atoms_proof() -> int:
+def _run_proof_script(script_path: str, database_url_env: str) -> int:
+    """Shared by atoms_proof() and live_canary(): both invoke a sibling scripts/agent/*.py script
+    (atoms_proof.py / live_canary.py) with the same identity/DSN-passing contract -- resolve
+    runtime_identity(), then pass its database_url through the environment (never argv, since it
+    can embed a real ANYTOOLAI_POSTGRES_PASSWORD override that a process-listing/`ps` would
+    otherwise expose) alongside --database-url-is-percent-encoded, since RuntimeIdentity.database_url
+    always percent-encodes its database-name path segment. One shared implementation instead of
+    two hand-copies: --database-url-is-percent-encoded already drifted between them once (missing
+    entirely from live_canary()) and was only caught on review, precisely because they were
+    written separately instead of sharing this contract."""
     try:
         identity = runtime_identity()
     except ValueError as exc:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
-    # identity.database_url can embed a real ANYTOOLAI_POSTGRES_PASSWORD override; passed via
-    # env instead of argv so it doesn't show up in `ps`/process-listing output the way an argv
-    # value would. atoms_proof.py only ever sees this env var's *name* on its own command line.
-    database_url_env = "ANYTOOLAI_ATOMS_PROOF_DATABASE_URL"
     env = runner_env()
     env[database_url_env] = identity.database_url
     return run_with_env(
         [
-            sys.executable, "scripts/agent/atoms_proof.py", identity.api_url,
+            sys.executable, script_path, identity.api_url,
             "--database-url-env", database_url_env,
             "--database-url-is-percent-encoded",
         ],
         env,
     )
+
+
+def atoms_proof() -> int:
+    return _run_proof_script("scripts/agent/atoms_proof.py", "ANYTOOLAI_ATOMS_PROOF_DATABASE_URL")
 
 
 def live_canary() -> int:
@@ -684,22 +693,7 @@ def live_canary() -> int:
             file=sys.stderr,
         )
         return 2
-    try:
-        identity = runtime_identity()
-    except ValueError as exc:
-        print(f"DEV001: {exc}", file=sys.stderr)
-        return 2
-    database_url_env = "ANYTOOLAI_LIVE_CANARY_DATABASE_URL"
-    env = runner_env()
-    env[database_url_env] = identity.database_url
-    return run_with_env(
-        [
-            sys.executable, "scripts/agent/live_canary.py", identity.api_url,
-            "--database-url-env", database_url_env,
-            "--database-url-is-percent-encoded",
-        ],
-        env,
-    )
+    return _run_proof_script("scripts/agent/live_canary.py", "ANYTOOLAI_LIVE_CANARY_DATABASE_URL")
 
 
 def _prod_compose_command(*args: str) -> list[str]:

@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from tests.module_loading import load_cached_module
+from tests.test_atoms_proof import load_atoms_proof_module
 
 
 def load_live_canary_module():
@@ -20,6 +21,18 @@ def load_live_canary_module():
 
 def test_load_live_canary_module_returns_the_same_cached_module_on_repeat_calls() -> None:
     assert load_live_canary_module() is load_live_canary_module()
+
+
+def test_live_canary_atoms_proof_is_the_same_cached_module_test_atoms_proof_uses() -> None:
+    """`/code-review` #2 (2026-08-24) finding: live_canary.py used to do a bare `import
+    atoms_proof`, which registers a SEPARATE copy of the module under sys.modules["atoms_proof"]
+    instead of reusing the load_cached_module()-backed instance tests/test_atoms_proof.py itself
+    uses -- re-parsing/re-executing atoms_proof.py's own YAML/config loading and engine-wiring a
+    second time for no reason whenever both test files load in one pytest run. Mirrors the
+    existing atoms_proof.smoke identity check (test_atom_runtime_matrix_module_shares_smoke)."""
+    module = load_live_canary_module()
+
+    assert module.atoms_proof is load_atoms_proof_module()
 
 
 def test_live_atom_cases_has_eleven_entries_matching_atom_smoke_cases_action_types() -> None:
@@ -144,7 +157,7 @@ def test_run_aborts_remaining_cases_once_cost_cap_exceeded_without_running_them(
     calls: list[str] = []
 
     def _fake_run_case_with_ledger_check(
-        api_url, engine, *, kind, label, scenario_id, scenario_input, timeout
+        api_url, engine, *, kind, label, scenario_id, scenario_input, timeout, **_kwargs
     ):
         calls.append(scenario_id)
         return module.EvidenceCase(
@@ -380,3 +393,104 @@ def test_main_forwards_database_url_is_percent_encoded_flag_when_unset(monkeypat
     )
 
     assert decode_database_name is False
+
+
+def test_live_expected_schema_ref_by_scenario_covers_all_fourteen_live_scenarios() -> None:
+    """`/code-review` #2 (2026-08-24) finding: kernel_demo_smoke.py's own
+    _EXPECTED_SCHEMA_REF_BY_SCENARIO only ever knows about fake-provider scenario_ids, so
+    smoke._run_one_case's SMOKE009 cross-check silently no-ops for every live case unless
+    live_canary.py supplies its own dict covering the 14 live scenario_ids too -- each mapped to
+    exactly the same expected schema_ref as its fake sibling, since a live scenario produces the
+    same output shape through a real provider instead of the fake one."""
+    module = load_live_canary_module()
+    fake_schema_ref_by_scenario = module.atoms_proof.smoke._EXPECTED_SCHEMA_REF_BY_SCENARIO
+
+    live_atom_scenario_ids = {
+        scenario_id for _action_type, scenario_id, _input in module.LIVE_ATOM_CASES
+    }
+    live_composite_scenario_ids = {
+        scenario_id for _workflow_id, scenario_id, _input in module.LIVE_COMPOSITE_CASES
+    }
+    all_live_scenario_ids = live_atom_scenario_ids | live_composite_scenario_ids
+    assert len(all_live_scenario_ids) == 14
+    assert set(module.LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO) == all_live_scenario_ids
+
+    for (_action_type, fake_scenario_id, _input), (_a, live_scenario_id, _i) in zip(
+        module.atoms_proof.ATOM_SMOKE_CASES, module.LIVE_ATOM_CASES, strict=True
+    ):
+        assert (
+            module.LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO[live_scenario_id]
+            == fake_schema_ref_by_scenario[fake_scenario_id]
+        )
+    for (_workflow_id, fake_scenario_id, _input), (_w, live_scenario_id, _i) in zip(
+        module.atoms_proof.COMPOSITE_SMOKE_CASES, module.LIVE_COMPOSITE_CASES, strict=True
+    ):
+        assert (
+            module.LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO[live_scenario_id]
+            == fake_schema_ref_by_scenario[fake_scenario_id]
+        )
+
+
+def test_run_passes_live_expected_schema_ref_by_scenario_to_ledger_check(monkeypatch) -> None:
+    """Pins that run() actually forwards LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO through to
+    _run_case_with_ledger_check -- the dict existing on its own doesn't help if nothing passes it
+    to the HTTP layer that performs the SMOKE009 check."""
+    module = load_live_canary_module()
+    seen: list[dict | None] = []
+
+    def _fake_run_case_with_ledger_check(
+        api_url, engine, *, kind, label, scenario_id, scenario_input, timeout, **kwargs
+    ):
+        seen.append(kwargs.get("expected_schema_ref_by_scenario"))
+        return module.EvidenceCase(
+            label=label, scenario_id=scenario_id, kind=kind, status="pass",
+            session_id="session", job_id="job", error_code=None, error_message=None, steps=(),
+        )
+
+    monkeypatch.setattr(
+        module.atoms_proof, "_run_case_with_ledger_check", _fake_run_case_with_ledger_check
+    )
+    monkeypatch.setattr(
+        module.atoms_proof, "_build_engine", lambda database_url, **kwargs: _FakeEngine()
+    )
+
+    module.run("http://127.0.0.1:8000", "postgresql://unused", timeout=1.0, max_total_cost_usd=1.0)
+
+    assert seen
+    assert all(entry is module.LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO for entry in seen)
+
+
+def load_live_canary_config_test_module():
+    module_path = (
+        Path(__file__).resolve().parents[1]
+        / "apps" / "platform-api" / "tests" / "test_live_canary_config.py"
+    )
+    return load_cached_module("live_canary_config_test_module", module_path)
+
+
+def test_live_atom_scenario_ids_agree_with_the_independently_maintained_config_test_maps() -> None:
+    """`/code-review` #2 (2026-08-24) finding: the fake-atom -> live-atom mapping is hand-written
+    three times independently (this module's LIVE_ATOM_SCENARIO_IDS keyed by action_type,
+    apps/platform-api/tests/test_live_canary_config.py's LIVE_ATOM_ACTION_CONFIG_IDS and
+    LIVE_ATOM_WORKFLOW_AND_SCENARIO_IDS both keyed by fake action_config_id) with nothing
+    cross-checking them -- a transposition typo between any two would pass quick-check/full-check
+    cleanly and only surface on the weekly credentialed run, burning real API budget. Joins all
+    three through the real ConfigLoader-derived action_type for each fake action_config_id, the
+    one field common to all three maps."""
+    live_canary_module = load_live_canary_module()
+    config_test_module = load_live_canary_config_test_module()
+
+    registry = config_test_module.ConfigLoader(config_test_module.CONFIG_ROOT).load()
+    action_type_by_fake_action_config_id = {
+        fake_action_config_id: registry.get_action_configuration(fake_action_config_id).action_type
+        for fake_action_config_id in config_test_module.LIVE_ATOM_ACTION_CONFIG_IDS
+    }
+    assert len(action_type_by_fake_action_config_id) == 11
+
+    for fake_action_config_id, action_type in action_type_by_fake_action_config_id.items():
+        _live_workflow_id, live_scenario_id = (
+            config_test_module.LIVE_ATOM_WORKFLOW_AND_SCENARIO_IDS[fake_action_config_id]
+        )
+        assert live_canary_module.LIVE_ATOM_SCENARIO_IDS[action_type] == live_scenario_id, (
+            action_type
+        )

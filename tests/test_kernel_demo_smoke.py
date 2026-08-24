@@ -181,6 +181,39 @@ def test_run_one_case_reports_smoke009_when_result_schema_ref_mismatches(monkeyp
     assert result.error_message is not None and "schema_ref" in result.error_message
 
 
+def test_run_one_case_expected_schema_ref_by_scenario_param_overrides_module_global(
+    monkeypatch,
+) -> None:
+    """`/code-review` #2 (2026-08-24) finding: live_canary.py needs SMOKE009 to check its 14 live
+    scenario_ids too, but the module-level _EXPECTED_SCHEMA_REF_BY_SCENARIO only ever knows about
+    fake-provider scenario_ids -- the expected_schema_ref_by_scenario param lets a caller supply
+    its own lookup instead, without mutating shared state other in-process callers/tests read."""
+    smoke = load_smoke_module()
+    # Module-level dict says nothing about scenario-1 (or says something wrong) -- if the param
+    # weren't actually used, this test would either skip the check entirely or fail.
+    monkeypatch.setattr(smoke, "_EXPECTED_SCHEMA_REF_BY_SCENARIO", {})
+    monkeypatch.setattr(
+        smoke,
+        "_http_json_request",
+        _sequenced_request(
+            [
+                {"guest_id": "guest-1"},
+                {"scenario_session_id": "session-1"},
+                {"status": "completed", "result_artifact_id": "artifact-1"},
+                {"schema_ref": "kernel.schemas.wrong_v1"},
+            ]
+        ),
+    )
+
+    result = smoke._run_one_case(
+        "http://127.0.0.1:8000", "scenario-1", {}, 5.0,
+        expected_schema_ref_by_scenario={"scenario-1": "kernel.schemas.expected_v1"},
+    )
+
+    assert result.error_code == "SMOKE009"
+    assert result.error_message is not None and "schema_ref" in result.error_message
+
+
 def test_expected_schema_ref_by_scenario_covers_every_real_smoke_case() -> None:
     smoke = load_smoke_module()
     for action_type, scenario_id, _ in smoke.ATOM_SMOKE_CASES:

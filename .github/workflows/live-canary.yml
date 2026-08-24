@@ -10,6 +10,14 @@ permissions:
 jobs:
   live-canary:
     runs-on: ubuntu-latest
+    # Job-level, not just on the live-canary step: docker-compose.yml's worker service
+    # interpolates ${OPENAI_API_KEY:-} at container-creation time, which happens during the
+    # earlier "Boot dev Compose stack" step's `docker compose up` -- a step-scoped env on the
+    # later live-canary step alone would boot the worker container with an empty key, so every
+    # scheduled run would silently make 0 real provider calls despite the CLI's own pre-check
+    # passing.
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -27,8 +35,6 @@ jobs:
           ANYTOOLAI_READY_TIMEOUT: "120"
       - name: Run 11-atom live provider canary
         run: uv run python scripts/agent/runner.py live-canary
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       # Same debuggability precedent as backend.yml's compose-smoke-dev job: dump every
       # container's logs before teardown so a failure is diagnosable from the Actions log alone.
       - name: Dump Docker Compose logs on failure

@@ -319,27 +319,47 @@ def _composite_case_ids(
     )
 
 
+@dataclass(frozen=True)
+class CompositeCoverageLabels:
+    """Bundles the 3 labels _composite_case_shape_error()/_composite_coverage_error() need to
+    report under the right error-code family/tuple name/description -- one value object instead
+    of 3 loose keyword parameters that always travel together (a caller supplies all 3 or none).
+    `/code-review` #2 (2026-08-24) finding: the prior 4-loose-kwarg signature (error_code/
+    tuple_name/kind plus entries_provider) expanded this shared function's surface just for
+    live_canary.py's single other caller; bundling the 3 always-together labels into one object
+    keeps the dedup (a future fix to the correlation logic still applies to both callers at once)
+    without the sprawling parameter list."""
+
+    error_code: str
+    tuple_name: str
+    kind: str
+
+
+_FAKE_COMPOSITE_COVERAGE_LABELS = CompositeCoverageLabels(
+    error_code="SMOKE010", tuple_name="COMPOSITE_SMOKE_CASES", kind="composite workflows"
+)
+
+
 def _composite_case_shape_error(
     workflow_ids: list[str],
     scenario_ids: list[str],
     *,
-    error_code: str = "SMOKE010",
-    tuple_name: str = "COMPOSITE_SMOKE_CASES",
+    labels: CompositeCoverageLabels = _FAKE_COMPOSITE_COVERAGE_LABELS,
 ) -> str | None:
     """Checks a composite case list's own ids (duplicates) and that the config files needed to
     verify it even exist -- split out of _composite_coverage_error() so both checks fold into one
     call+return there, alongside _composite_workflow_config()'s own single call+return, keeping
-    that function within PLR0911's 6-return budget without a raise-to-catch workaround.
-    error_code/tuple_name are parameterized so live_canary.py's live-composite variant can reuse
-    this verbatim instead of duplicating it under a different error family/tuple name."""
+    that function within PLR0911's 6-return budget without a raise-to-catch workaround. labels
+    defaults to the fake-only shape so live_canary.py's live-composite variant can reuse this
+    verbatim instead of duplicating it under a different error family/tuple name."""
     for field_name, ids in (("workflow_id", workflow_ids), ("scenario_id", scenario_ids)):
         if len(ids) != len(set(ids)):
-            return f"{error_code}: {tuple_name} has duplicate {field_name} entries"
+            return f"{labels.error_code}: {labels.tuple_name} has duplicate {field_name} entries"
     for config_path in (WORKFLOWS_CONFIG_PATH, SCENARIOS_CONFIG_PATH):
         if not config_path.is_file():
             return (
-                f"{error_code}: cannot verify required composite coverage -- {config_path} "
-                "not found"
+                f"{labels.error_code}: cannot verify required composite coverage -- "
+                f"{config_path} not found"
             )
     return None
 
@@ -372,22 +392,18 @@ def _composite_coverage_error(
     cases: tuple[tuple[str, str, dict], ...],
     *,
     entries_provider: Callable[[], list[dict]] | None = None,
-    error_code: str = "SMOKE010",
-    tuple_name: str = "COMPOSITE_SMOKE_CASES",
-    kind: str = "composite workflows",
+    labels: CompositeCoverageLabels = _FAKE_COMPOSITE_COVERAGE_LABELS,
 ) -> str | None:
     """Composite counterpart of _atom_coverage_error() -- catches not just an empty case tuple but
     also a partial one (e.g. a merge drops 1 of 3 entries), a reused scenario_id (silently dropping
     the workflow whose scenario it displaced), and a scenario_id swapped onto the wrong workflow_id
     label (each side would still individually be unique, just paired with the wrong partner -- a
-    bare duplicate check on either side alone would miss it). entries_provider/error_code/
-    tuple_name/kind default to the fake-only COMPOSITE_SMOKE_CASES/SMOKE010 shape; live_canary.py
-    calls this with its own live-only entries fetcher and LIVE010/LIVE_COMPOSITE_CASES naming
-    instead of duplicating this whole check under a different error family."""
+    bare duplicate check on either side alone would miss it). entries_provider/labels default to
+    the fake-only COMPOSITE_SMOKE_CASES/SMOKE010 shape; live_canary.py calls this with its own
+    live-only entries fetcher and LIVE010/LIVE_COMPOSITE_CASES labels instead of duplicating this
+    whole check under a different error family."""
     workflow_ids, scenario_ids = _composite_case_ids(cases)
-    shape_error = _composite_case_shape_error(
-        workflow_ids, scenario_ids, error_code=error_code, tuple_name=tuple_name
-    )
+    shape_error = _composite_case_shape_error(workflow_ids, scenario_ids, labels=labels)
     if shape_error is not None:
         return shape_error
     try:
@@ -396,13 +412,13 @@ def _composite_coverage_error(
         )
     except _COMPOSITE_CONFIG_PARSE_ERRORS as exc:
         return (
-            f"{error_code}: could not parse composite workflow/scenario config to verify "
-            f"required {kind} coverage: {exc}"
+            f"{labels.error_code}: could not parse composite workflow/scenario config to verify "
+            f"required {labels.kind} coverage: {exc}"
         )
     missing_schema_ref = sorted(required - output_schema_ref_by_workflow_id.keys())
     if missing_schema_ref:
         return (
-            f"{error_code}: composite workflow config validation failed: missing/invalid "
+            f"{labels.error_code}: composite workflow config validation failed: missing/invalid "
             f"output_schema_ref for workflow(s): {missing_schema_ref}"
         )
     covered = set(workflow_ids)
@@ -410,16 +426,16 @@ def _composite_coverage_error(
         return _coverage_mismatch_error(
             covered,
             required,
-            error_code=error_code,
-            tuple_name=tuple_name,
-            kind=kind,
+            error_code=labels.error_code,
+            tuple_name=labels.tuple_name,
+            kind=labels.kind,
         )
     for workflow_id, scenario_id in zip(workflow_ids, scenario_ids, strict=True):
         expected_workflow_id = workflow_id_by_scenario_id.get(scenario_id)
         if expected_workflow_id != workflow_id:
             return (
-                f"{error_code}: {tuple_name} pairs scenario {scenario_id!r} with workflow "
-                f"{workflow_id!r}, but scenarios.yaml binds that scenario to "
+                f"{labels.error_code}: {labels.tuple_name} pairs scenario {scenario_id!r} with "
+                f"workflow {workflow_id!r}, but scenarios.yaml binds that scenario to "
                 f"{expected_workflow_id!r} -- scenario/workflow mismatch"
             )
     return None
@@ -453,10 +469,24 @@ class CaseResult:
     error_message: str | None
 
 
-def _run_one_case(api_url: str, scenario_id: str, scenario_input: dict, timeout: float) -> CaseResult:
+def _run_one_case(
+    api_url: str,
+    scenario_id: str,
+    scenario_input: dict,
+    timeout: float,
+    *,
+    expected_schema_ref_by_scenario: dict[str, str] | None = None,
+) -> CaseResult:
     """Runs one scenario to completion under its own fresh guest identity (kernel_demo's
     guest quota is a shared per-guest lifetime budget across scenarios, smaller than the
-    number of atoms in the matrix, so every case needs its own guest)."""
+    number of atoms in the matrix, so every case needs its own guest).
+
+    expected_schema_ref_by_scenario overrides the module-level _EXPECTED_SCHEMA_REF_BY_SCENARIO
+    lookup for SMOKE009's cross-check -- that dict only ever contains the fake-provider scenario
+    ids this module's own fixtures/config parsing know about. live_canary.py passes its own dict
+    (covering its 14 live scenario_ids too) instead of mutating the shared module-level one, which
+    would leak into kernel_demo_smoke.py's/atoms_proof.py's own fake-only runs sharing this same
+    loaded module in-process during tests."""
     try:
         guest = _http_json_request(f"{api_url}/v1/identity/guest", method="POST")
         guest_id = guest["guest_id"]
@@ -510,7 +540,12 @@ def _run_one_case(api_url: str, scenario_id: str, scenario_input: dict, timeout:
                         "result artifact"
                     ),
                 )
-            expected_schema_ref = _EXPECTED_SCHEMA_REF_BY_SCENARIO.get(scenario_id)
+            schema_ref_lookup = (
+                _EXPECTED_SCHEMA_REF_BY_SCENARIO
+                if expected_schema_ref_by_scenario is None
+                else expected_schema_ref_by_scenario
+            )
+            expected_schema_ref = schema_ref_lookup.get(scenario_id)
             if expected_schema_ref is not None:
                 try:
                     result = _http_json_request(

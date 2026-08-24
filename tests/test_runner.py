@@ -274,6 +274,24 @@ def test_required_backend_workflow_runs_canonical_postgresql_check() -> None:
     )
 
 
+def test_live_canary_workflow_sets_openai_api_key_at_job_level() -> None:
+    """`/code-review` #2 (2026-08-24) finding: docker-compose.yml's worker service interpolates
+    OPENAI_API_KEY at container-creation time, during the earlier "Boot dev Compose stack" step
+    -- a step-scoped env on the later live-canary step alone would boot the worker with an empty
+    key, so every scheduled run would silently make 0 real provider calls. Job-level env is the
+    fix; this pins that against a future step-scoped regression."""
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load(
+        (repo_root / ".github" / "workflows" / "live-canary.yml").read_text(encoding="utf-8")
+    )
+
+    job = workflow["jobs"]["live-canary"]
+    assert job["env"]["OPENAI_API_KEY"] == "${{ secrets.OPENAI_API_KEY }}"
+
+    boot_step = next(step for step in job["steps"] if step.get("name", "").startswith("Boot dev"))
+    assert "OPENAI_API_KEY" not in boot_step.get("env", {})
+
+
 def test_resolve_postgres_db_falls_back_to_dev_default(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_POSTGRES_DB", raising=False)

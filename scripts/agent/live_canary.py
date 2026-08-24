@@ -17,7 +17,6 @@ quick-check/full-check/postgresql-check.
 
 from __future__ import annotations
 
-import argparse
 import os
 import sys
 from pathlib import Path
@@ -25,12 +24,21 @@ from pathlib import Path
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DIR))
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-import atoms_proof  # noqa: E402
-from atoms_proof import EvidenceCase  # noqa: E402 -- always defined, unlike `smoke` (see below)
+from tests.test_atoms_proof import load_atoms_proof_module  # noqa: E402
+
+# Loaded via the same load_cached_module()-backed helper tests/test_atoms_proof.py itself uses
+# (cache key "atoms_proof_module"), not a bare `import atoms_proof` -- a bare import registers a
+# SEPARATE copy of the module under sys.modules["atoms_proof"], re-parsing/re-executing
+# atoms_proof.py's own YAML/config loading and engine-wiring a second time whenever this script
+# and the test suite's own atoms_proof tests load in the same process (e.g. a single quick-check
+# pytest invocation covering both tests/test_atoms_proof.py and tests/test_live_canary.py) --
+# pure duplicate work in a gate that's supposed to stay fast. Mirrors atoms_proof.py's own
+# `smoke = load_smoke_module()` for exactly the same reason (see its docstring there).
+atoms_proof = load_atoms_proof_module()
+EvidenceCase = atoms_proof.EvidenceCase  # always defined, unlike `smoke` (see below)
 
 # atoms_proof.smoke is only bound when atoms_proof's own module-load try/except block succeeds
 # (mirrors atoms_proof.py's own guarded ATOM_SMOKE_CASES/COMPOSITE_SMOKE_CASES pattern) -- looked
@@ -94,6 +102,40 @@ LIVE_COMPOSITE_CASES: tuple[tuple[str, str, dict], ...] = tuple(
 )
 
 
+def _schema_ref_overrides(
+    fake_cases: tuple[tuple[str, str, dict], ...], live_cases: tuple[tuple[str, str, dict], ...]
+) -> dict[str, str]:
+    """live_scenario_id -> its fake sibling's expected_output_schema_ref, for
+    LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO below. fake_cases/live_cases are same-length,
+    same-order-zippable by construction (LIVE_ATOM_CASES/LIVE_COMPOSITE_CASES are each built by a
+    single comprehension over ATOM_SMOKE_CASES/COMPOSITE_SMOKE_CASES)."""
+    fake_schema_ref_by_scenario = atoms_proof.smoke._EXPECTED_SCHEMA_REF_BY_SCENARIO
+    return {
+        live_scenario_id: fake_schema_ref_by_scenario[fake_scenario_id]
+        for (_fake_label, fake_scenario_id, _fake_input), (_live_label, live_scenario_id, _live_input)
+        in zip(fake_cases, live_cases, strict=True)
+        if fake_scenario_id in fake_schema_ref_by_scenario
+    }
+
+
+# Extends smoke._run_one_case()'s SMOKE009 schema_ref cross-check to the 14 live scenario_ids --
+# without this, that check silently no-ops for every live case (kernel_demo_smoke.py's own
+# _EXPECTED_SCHEMA_REF_BY_SCENARIO only ever knows about fake-provider scenario_ids), exactly the
+# class of "wired to the wrong workflow/action" bug SMOKE009 exists to catch. Built as its own
+# local dict (see _run_case_with_ledger_check's expected_schema_ref_by_scenario parameter), not by
+# mutating the shared kernel_demo_smoke.py module-level dict, since that module is the same cached
+# instance atoms_proof.py's own fake-provider runs and kernel_demo_smoke.py's own tests share
+# in-process during a single quick-check/pytest run.
+LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO: dict[str, str] = (
+    _schema_ref_overrides(atoms_proof.ATOM_SMOKE_CASES, LIVE_ATOM_CASES)
+    if _MODULE_LOAD_ERROR is None
+    else {}
+)
+LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO.update(
+    _schema_ref_overrides(atoms_proof.COMPOSITE_SMOKE_CASES, LIVE_COMPOSITE_CASES)
+)
+
+
 def _live_composite_workflow_entries() -> list[dict]:
     """Own, live-canary-local parse of workflows.yaml, filtered to the "_live_v1"-suffixed
     composite entries -- the inverse of kernel_demo_smoke.py's _composite_workflow_entries(),
@@ -113,18 +155,21 @@ def _live_composite_workflow_entries() -> list[dict]:
     ]
 
 
+_LIVE_COMPOSITE_COVERAGE_LABELS = atoms_proof.smoke.CompositeCoverageLabels(
+    error_code="LIVE010", tuple_name="LIVE_COMPOSITE_CASES", kind="live composite workflows"
+)
+
+
 def _live_composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None:
     """Live-canary counterpart of kernel_demo_smoke.py's _composite_coverage_error(), scoped to
     the 3 "_live_v1" composite workflows instead of the 3 fake ones. A thin wrapper around that
-    same function (parameterized by entries_provider/error_code/tuple_name/kind precisely for this
-    kind of reuse) instead of a second ~35-line copy of its duplicate/shape/coverage/binding
-    checks -- keeps a future fix to any of those checks from needing to be applied twice."""
+    same function (parameterized by entries_provider/labels precisely for this kind of reuse)
+    instead of a second ~35-line copy of its duplicate/shape/coverage/binding checks -- keeps a
+    future fix to any of those checks from needing to be applied twice."""
     return atoms_proof.smoke._composite_coverage_error(
         cases,
         entries_provider=_live_composite_workflow_entries,
-        error_code="LIVE010",
-        tuple_name="LIVE_COMPOSITE_CASES",
-        kind="live composite workflows",
+        labels=_LIVE_COMPOSITE_COVERAGE_LABELS,
     )
 
 
@@ -180,6 +225,7 @@ def run(
             case = atoms_proof._run_case_with_ledger_check(
                 api_url, engine, kind=kind, label=label, scenario_id=scenario_id,
                 scenario_input=scenario_input, timeout=case_timeout,
+                expected_schema_ref_by_scenario=LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO,
             )
             cases.append(case)
             if case.status == "pass":
@@ -256,39 +302,15 @@ def main() -> int:
         )
         return 2
 
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "api_url", help="Base URL of a live platform-api, e.g. http://127.0.0.1:8000"
-    )
-    parser.add_argument(
-        "--database-url-env",
-        required=True,
-        metavar="ENV_VAR",
-        help="Name of an environment variable holding the PostgreSQL URL for the same stack's "
-        "database -- the URL itself is read from the environment, not passed here, since it can "
-        "embed credentials that argv/process listings would otherwise expose.",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=float,
-        default=default_timeout,
-        help="Seconds to wait for each scenario to complete (default: %(default)s, "
-        "also settable via ANYTOOLAI_SMOKE_TIMEOUT)",
-    )
+    # Shared with atoms_proof.py's own main() -- see its own docstring for why this isn't
+    # declared separately here (it drifted out of sync once already when it was).
+    parser = atoms_proof._build_arg_parser(__doc__, default_timeout=default_timeout)
     parser.add_argument(
         "--max-total-cost-usd",
         type=float,
         default=default_max_cost,
         help="Abort remaining cases once cumulative estimated_cost exceeds this (default: "
         "%(default)s, also settable via ANYTOOLAI_LIVE_CANARY_MAX_COST_USD)",
-    )
-    parser.add_argument(
-        "--database-url-is-percent-encoded",
-        action="store_true",
-        help="Set when the DSN in --database-url-env's env var had its database-name path "
-        "segment percent-encoded by its producer (e.g. scripts/agent/runner.py's "
-        "RuntimeIdentity.database_url) -- decodes it back before connecting. Leave unset for a "
-        "hand-written or otherwise arbitrary DSN, whose database name is used exactly as given.",
     )
     args = parser.parse_args()
 

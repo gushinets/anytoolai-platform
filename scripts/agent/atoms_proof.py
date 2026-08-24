@@ -183,7 +183,12 @@ def _correlate_events_by_id(events: list[dict], *, event_type: str, id_field: st
 def _fail(
     *, label: str, scenario_id: str, kind: str, session_id: str | None, job_id: str | None,
     error_code: str, error_message: str,
+    steps: tuple[StepEvidence, ...] = (),
 ) -> EvidenceCase:
+    """steps defaults to () for the common case (nothing ran yet, so no cost was incurred) but
+    _classify_ledger's PROOF00x branches pass known_steps -- see its own comment -- so a case
+    that already made a real, billed provider call before failing a later correctness check still
+    reports its real cost instead of silently reporting 0."""
     return EvidenceCase(
         label=label,
         scenario_id=scenario_id,
@@ -193,8 +198,41 @@ def _fail(
         job_id=job_id,
         error_code=error_code,
         error_message=error_message,
-        steps=(),
+        steps=steps,
     )
+
+
+def _best_effort_steps_from_provider_calls(
+    action_runs: list[dict], provider_calls: list[dict]
+) -> tuple[StepEvidence, ...]:
+    """Best-effort StepEvidence built directly from provider_calls, independent of whether the
+    correlation checks _classify_ledger runs below have passed -- used only for _fail()'s
+    steps=known_steps so a case that already made a real, billed provider call before failing a
+    later correctness check still reports its real cost (live_canary.py's cost cap sums exactly
+    this field), instead of silently reporting 0. Tolerant of any of the correlation defects those
+    checks exist to catch (duplicate/orphan calls, mismatched action_run_id) -- falls back to the
+    bare action_run_id when a provider_calls row can't be matched to a known action_run."""
+    action_run_by_id = {action_run["id"]: action_run for action_run in action_runs}
+    steps = []
+    for call in provider_calls:
+        action_run = action_run_by_id.get(call["action_run_id"])
+        steps.append(
+            StepEvidence(
+                step_id=(
+                    action_run["step_id"] if action_run is not None else call["action_run_id"]
+                ),
+                action_type=action_run["action_type"] if action_run is not None else "unknown",
+                action_config_id=(
+                    action_run["action_config_id"] if action_run is not None else "unknown"
+                ),
+                latency_ms=call["latency_ms"],
+                input_tokens=call["input_tokens"],
+                output_tokens=call["output_tokens"],
+                total_tokens=call["total_tokens"],
+                estimated_cost=call["estimated_cost"],
+            )
+        )
+    return tuple(steps)
 
 
 def _classify_ledger(
@@ -213,10 +251,17 @@ def _classify_ledger(
     """Pure pass/fail classification over already-fetched rows -- no DB access. Split out from
     _check_ledger so the PROOF00x branches are unit-testable with fake dict rows, no real
     Postgres needed."""
+    # Built once, up front, from the two lists this function receives regardless of which
+    # PROOF00x branch below returns first -- _fail()'s steps=known_steps lets a case that
+    # already made a real, billed provider call before failing a later correctness check
+    # still report its real cost instead of silently reporting 0 (live_canary.py's cost cap
+    # sums exactly this field).
+    known_steps = _best_effort_steps_from_provider_calls(action_runs, provider_calls)
     if job_row is None:
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=None,
+            steps=known_steps,
             error_code="PROOF001",
             error_message=(
                 f"PROOF001: no jobs_table row found for scenario_session_id "
@@ -230,6 +275,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
+            steps=known_steps,
             error_code="PROOF002",
             error_message=(
                 f"PROOF002: no action_runs rows found for scenario_session_id "
@@ -248,6 +294,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
+            steps=known_steps,
             error_code="PROOF011", error_message=mismatch,
         )
 
@@ -266,22 +313,23 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
+            steps=known_steps,
             error_code="PROOF016", error_message=mismatch,
         )
 
-    provider_call_counts: dict[str, int] = {}
-    provider_call_by_action_run_id: dict[str, dict] = {}
-    for call in provider_calls:
-        provider_call_counts[call["action_run_id"]] = (
-            provider_call_counts.get(call["action_run_id"], 0) + 1
-        )
-        provider_call_by_action_run_id[call["action_run_id"]] = call
+    # `/code-review` #2 (2026-08-24) finding: previously a hand-rolled loop incrementing a count
+    # dict and populating a lookup dict in lockstep -- two pieces of state to keep in sync for no
+    # reason, since both are pure, independent derivations of the same provider_calls list. Counter
+    # already does exactly this counting job elsewhere in this file (_correlate_events_by_id).
+    provider_call_counts = Counter(call["action_run_id"] for call in provider_calls)
+    provider_call_by_action_run_id = {call["action_run_id"]: call for call in provider_calls}
     for action_run in action_runs:
         count = provider_call_counts.get(action_run["id"], 0)
         if count != 1:
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
+                steps=known_steps,
                 error_code="PROOF003",
                 error_message=(
                     f"PROOF003: expected exactly one provider_calls row for "
@@ -297,6 +345,7 @@ def _classify_ledger(
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
+                steps=known_steps,
                 error_code="PROOF012",
                 error_message=(
                     f"PROOF012: provider_calls row {call['id']} references action_run_id "
@@ -328,6 +377,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
+            steps=known_steps,
             error_code="PROOF023", error_message=mismatch,
         )
 
@@ -338,6 +388,7 @@ def _classify_ledger(
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
+                steps=known_steps,
                 error_code="PROOF004",
                 error_message=(
                     f"PROOF004: action_run {action_run['id']} (step "
@@ -352,6 +403,7 @@ def _classify_ledger(
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
+                steps=known_steps,
                 error_code="PROOF017",
                 error_message=(
                     f"PROOF017: artifact {output_artifact_id} for action_run "
@@ -367,6 +419,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
+            steps=known_steps,
             error_code="PROOF004",
             error_message=(
                 f"PROOF004: job result_artifact_id {result_artifact_id} not found among "
@@ -379,6 +432,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
+            steps=known_steps,
             error_code="PROOF018",
             error_message=(
                 f"PROOF018: job result_artifact_id {result_artifact_id} has action_run_id "
@@ -392,6 +446,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
+            steps=known_steps,
             error_code="PROOF005",
             error_message=(
                 f"PROOF005: event_log_table is missing expected event types {missing} for "
@@ -409,6 +464,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
+            steps=known_steps,
             error_code="PROOF019", error_message=mismatch,
         )
 
@@ -425,6 +481,7 @@ def _classify_ledger(
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
+                steps=known_steps,
                 error_code="PROOF020",
                 error_message=(
                     f"PROOF020: expected exactly one artifact.created event_log row for "
@@ -438,6 +495,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
+            steps=known_steps,
             error_code="PROOF021",
             error_message=(
                 f"PROOF021: event_log has artifact.created rows for artifact_id(s) "
@@ -463,6 +521,7 @@ def _classify_ledger(
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
+                steps=known_steps,
                 error_code="PROOF006",
                 error_message=(
                     f"PROOF006: expected exactly one action.started and one "
@@ -481,6 +540,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
+            steps=known_steps,
             error_code="PROOF014",
             error_message=(
                 f"PROOF014: event_log has action.started/action.succeeded rows for "
@@ -504,6 +564,7 @@ def _classify_ledger(
             return _fail(
                 label=label, scenario_id=scenario_id, kind=kind,
                 session_id=scenario_session_id, job_id=job_id,
+                steps=known_steps,
                 error_code="PROOF013",
                 error_message=(
                     f"PROOF013: expected exactly one provider.request_started and one "
@@ -518,6 +579,7 @@ def _classify_ledger(
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=job_id,
+            steps=known_steps,
             error_code="PROOF015",
             error_message=(
                 f"PROOF015: event_log has provider.request_started/"
@@ -634,8 +696,15 @@ def _run_case_with_ledger_check(
     scenario_id: str,
     scenario_input: dict,
     timeout: float,
+    expected_schema_ref_by_scenario: dict[str, str] | None = None,
 ) -> EvidenceCase:
-    result = smoke._run_one_case(api_url, scenario_id, scenario_input, timeout)
+    """expected_schema_ref_by_scenario is forwarded to smoke._run_one_case() verbatim -- see its
+    own docstring. None (this script's own dev-smoke/prod-smoke-style fake-provider callers) keeps
+    smoke._run_one_case()'s default module-level lookup; live_canary.py passes its own dict."""
+    result = smoke._run_one_case(
+        api_url, scenario_id, scenario_input, timeout,
+        expected_schema_ref_by_scenario=expected_schema_ref_by_scenario,
+    )
     if result.error_message is not None:
         # result.error_message is free-form text this script doesn't control (e.g. SMOKE004
         # embeds the whole raw scenario-session response body) -- print it once here for a human
@@ -796,18 +865,18 @@ def _default_timeout() -> float:
     return float(raw)
 
 
-def main() -> int:
-    if _MODULE_LOAD_ERROR is not None:
-        print(_MODULE_LOAD_ERROR, file=sys.stderr)
-        return 1
-
-    try:
-        default_timeout = _default_timeout()
-    except ValueError as exc:
-        print(f"PROOF007: ANYTOOLAI_SMOKE_TIMEOUT must be a number: {exc}", file=sys.stderr)
-        return 2
-
-    parser = argparse.ArgumentParser(description=__doc__)
+def _build_arg_parser(
+    description: str | None, *, default_timeout: float
+) -> argparse.ArgumentParser:
+    """Shared by this script's own main() below and live_canary.py's -- both need the identical
+    api_url/--database-url-env/--timeout/--database-url-is-percent-encoded arguments (same help
+    text, same DSN-passing/timeout contract, see _run_case_with_ledger_check/_build_engine), since
+    live_canary.py reuses this script's HTTP/DB/evidence machinery wholesale. A near-copy of this
+    parser previously lived in live_canary.py too; --database-url-is-percent-encoded once drifted
+    out of sync between the two (caught only on review), precisely because they were declared
+    separately instead of sharing this builder. live_canary.py adds its own --max-total-cost-usd
+    on top of what this returns."""
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
         "api_url", help="Base URL of a live platform-api, e.g. http://127.0.0.1:8000"
     )
@@ -835,6 +904,21 @@ def main() -> int:
         "RuntimeIdentity.database_url) -- decodes it back before connecting. Leave unset for a "
         "hand-written or otherwise arbitrary DSN, whose database name is used exactly as given.",
     )
+    return parser
+
+
+def main() -> int:
+    if _MODULE_LOAD_ERROR is not None:
+        print(_MODULE_LOAD_ERROR, file=sys.stderr)
+        return 1
+
+    try:
+        default_timeout = _default_timeout()
+    except ValueError as exc:
+        print(f"PROOF007: ANYTOOLAI_SMOKE_TIMEOUT must be a number: {exc}", file=sys.stderr)
+        return 2
+
+    parser = _build_arg_parser(__doc__, default_timeout=default_timeout)
     args = parser.parse_args()
 
     database_url = os.environ.get(args.database_url_env)

@@ -591,6 +591,20 @@ def test_classify_ledger_reports_proof012_when_provider_call_is_orphaned() -> No
 
     assert case.status == "fail"
     assert case.error_code == "PROOF012"
+    # `/code-review` #2 (2026-08-24) finding: both provider_calls rows already carry a real,
+    # billed estimated_cost -- a failed case must still report it (live_canary.py's cost cap sums
+    # exactly this field), not silently drop it to 0 just because the overall ledger is invalid.
+    # The orphan row can't be correlated to a known action_run, so it falls back to its own
+    # action_run_id as step_id and "unknown" for the fields only action_runs carries.
+    assert len(case.steps) == 2
+    matched_step, orphan_step = case.steps
+    assert matched_step.step_id == "extract"
+    assert matched_step.estimated_cost == 0.001
+    assert orphan_step.step_id == "run-does-not-exist"
+    assert orphan_step.action_type == "unknown"
+    assert orphan_step.action_config_id == "unknown"
+    assert orphan_step.estimated_cost == 0.001
+    assert sum(step.estimated_cost for step in case.steps) == pytest.approx(0.002)
 
 
 def test_classify_ledger_reports_proof016_when_provider_call_job_id_mismatches() -> None:
@@ -782,7 +796,7 @@ def test_run_case_with_ledger_check_reports_http_failure_without_touching_db(
     monkeypatch.setattr(
         module.smoke,
         "_run_one_case",
-        lambda api_url, scenario_id, scenario_input, timeout: module.smoke.CaseResult(
+        lambda api_url, scenario_id, scenario_input, timeout, **_kwargs: module.smoke.CaseResult(
             session_id=None, error_code="SMOKE001",
             error_message="SMOKE001: boom (contains raw upstream detail)",
         ),
@@ -813,7 +827,7 @@ def test_run_case_with_ledger_check_dispatches_a_passing_http_result_into_check_
     monkeypatch.setattr(
         module.smoke,
         "_run_one_case",
-        lambda api_url, scenario_id, scenario_input, timeout: module.smoke.CaseResult(
+        lambda api_url, scenario_id, scenario_input, timeout, **_kwargs: module.smoke.CaseResult(
             session_id="session-1", error_code=None, error_message=None
         ),
     )
@@ -1267,7 +1281,7 @@ def test_run_chains_degraded_timeout_from_atom_batch_into_composite_batch(monkey
     monkeypatch.setattr(module, "_check_ledger", _passing_check_ledger(module))
     seen_timeouts = []
 
-    def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
+    def fake_run_one_case(api_url, scenario_id, scenario_input, timeout, **_kwargs):
         seen_timeouts.append(timeout)
         return _fake_case_result(
             module.smoke, scenario_id, timed_out=(scenario_id == "scenario-one")
@@ -1296,7 +1310,7 @@ def test_run_reports_full_success_when_every_case_passes(monkeypatch, capsys) ->
     monkeypatch.setattr(
         module.smoke,
         "_run_one_case",
-        lambda api_url, scenario_id, scenario_input, timeout: module.smoke.CaseResult(
+        lambda api_url, scenario_id, scenario_input, timeout, **_kwargs: module.smoke.CaseResult(
             session_id=scenario_id, error_code=None, error_message=None
         ),
     )
@@ -1363,7 +1377,7 @@ def test_run_case_group_derives_passed_count_from_results(monkeypatch, capsys) -
     monkeypatch.setattr(
         module.smoke,
         "_run_one_case",
-        lambda api_url, scenario_id, scenario_input, timeout: (
+        lambda api_url, scenario_id, scenario_input, timeout, **_kwargs: (
             module.smoke.CaseResult(session_id="s-one", error_code=None, error_message=None)
             if scenario_id == "scenario-one"
             else module.smoke.CaseResult(
@@ -1404,7 +1418,7 @@ def test_run_fails_instead_of_vacuous_success_on_empty_composite_case_list(
     monkeypatch.setattr(
         module.smoke,
         "_run_one_case",
-        lambda api_url, scenario_id, scenario_input, timeout: module.smoke.CaseResult(
+        lambda api_url, scenario_id, scenario_input, timeout, **_kwargs: module.smoke.CaseResult(
             session_id="s1", error_code=None, error_message=None
         ),
     )
