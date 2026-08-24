@@ -696,6 +696,7 @@ def live_canary() -> int:
         [
             sys.executable, "scripts/agent/live_canary.py", identity.api_url,
             "--database-url-env", database_url_env,
+            "--database-url-is-percent-encoded",
         ],
         env,
     )

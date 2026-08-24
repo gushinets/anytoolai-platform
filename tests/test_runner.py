@@ -980,10 +980,16 @@ def test_live_canary_passes_database_url_via_env_not_argv(monkeypatch) -> None:
     assert len(calls) == 1
     command, env = calls[0]
     assert identity.database_url not in command
-    assert command[:2] == [runner.sys.executable, "scripts/agent/live_canary.py"]
-    assert command[2] == identity.api_url
-    assert command[3] == "--database-url-env"
     env_var_name = command[4]
+    # Full argv, not just the database-url-env prefix: atoms_proof() passes
+    # --database-url-is-percent-encoded for the same identity.database_url; live_canary() must
+    # too, or a reserved-character ANYTOOLAI_POSTGRES_PASSWORD/_DB connects fine via atoms-proof
+    # but silently fails to connect via live-canary on the same stack.
+    assert command == [
+        runner.sys.executable, "scripts/agent/live_canary.py", identity.api_url,
+        "--database-url-env", env_var_name,
+        "--database-url-is-percent-encoded",
+    ]
     assert env[env_var_name] == identity.database_url
 
 

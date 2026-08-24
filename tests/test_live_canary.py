@@ -5,7 +5,9 @@ it tests is only ever meaningfully run manually/on a schedule with a real OPENAI
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import sys
 from pathlib import Path
 
 from tests.module_loading import load_cached_module
@@ -158,7 +160,11 @@ def test_run_aborts_remaining_cases_once_cost_cap_exceeded_without_running_them(
     monkeypatch.setattr(
         module.atoms_proof, "_run_case_with_ledger_check", _fake_run_case_with_ledger_check
     )
-    monkeypatch.setattr(module.atoms_proof, "_build_engine", lambda database_url: _FakeEngine())
+    monkeypatch.setattr(
+        module.atoms_proof,
+        "_build_engine",
+        lambda database_url, **kwargs: _FakeEngine(),
+    )
 
     cases, exit_code = module.run(
         "http://127.0.0.1:8000", "postgresql://unused", timeout=1.0, max_total_cost_usd=0.25,
@@ -278,3 +284,99 @@ def test_write_evidence_report_round_trips_composite_kind_with_multiple_steps(tm
         assert step["output_tokens"] == 5 * index
         assert step["total_tokens"] == 15 * index
         assert step["estimated_cost"] == 0.001 * index
+
+
+def test_live_atom_cases_reports_live007_on_missing_scenario_id_mapping(monkeypatch) -> None:
+    """`/code-review` (2026-08-24) finding: a future 12th atom_type added to
+    kernel_demo_smoke.py's ATOM_SMOKE_CASES without a matching LIVE_ATOM_SCENARIO_IDS entry in
+    the same PR must fail this module's load as a clean LIVE007, not a raw KeyError out of the
+    module-level LIVE_ATOM_CASES comprehension -- mirrors atoms_proof.py's own guarded
+    module-load pattern (_MODULE_LOAD_ERROR)."""
+    module = load_live_canary_module()
+    monkeypatch.setattr(
+        module.atoms_proof,
+        "ATOM_SMOKE_CASES",
+        (*module.atoms_proof.ATOM_SMOKE_CASES, ("text.some_unknown_atom", "unused", {})),
+    )
+
+    reload_path = Path(__file__).resolve().parents[1] / "scripts" / "agent" / "live_canary.py"
+    spec = importlib.util.spec_from_file_location("live_canary_reload_test", reload_path)
+    assert spec is not None
+    assert spec.loader is not None
+    reloaded = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = reloaded
+    try:
+        spec.loader.exec_module(reloaded)
+    finally:
+        del sys.modules[spec.name]
+
+    assert reloaded.LIVE_ATOM_CASES == ()
+    assert reloaded._MODULE_LOAD_ERROR is not None
+    assert "LIVE007" in reloaded._MODULE_LOAD_ERROR
+    assert "text.some_unknown_atom" in reloaded._MODULE_LOAD_ERROR
+
+
+def test_main_reports_live007_module_load_error_before_touching_the_database(monkeypatch) -> None:
+    module = load_live_canary_module()
+    monkeypatch.setattr(module, "_MODULE_LOAD_ERROR", "LIVE007: fake module load error")
+    monkeypatch.setattr(
+        module,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("main() must not call run() after a module-load error")
+        ),
+    )
+
+    assert module.main() == 1
+
+
+_TEST_DATABASE_URL_ENV = "TEST_LIVE_CANARY_DATABASE_URL"
+_TEST_MAIN_ARGV = [
+    "live_canary.py", "http://127.0.0.1:8000", "--database-url-env", _TEST_DATABASE_URL_ENV,
+]
+
+
+def _run_main_capturing_decode_database_name(module, monkeypatch, argv) -> bool:
+    captured = {}
+
+    def fake_run(*args, **kwargs):
+        captured["decode_database_name"] = kwargs["decode_database_name"]
+        return [], 0
+
+    monkeypatch.setattr(module, "run", fake_run)
+    monkeypatch.setattr(
+        module.atoms_proof,
+        "write_evidence_report",
+        lambda cases, exit_code, **kwargs: Path("evidence-fake.json"),
+    )
+    monkeypatch.setattr(sys, "argv", argv)
+
+    assert module.main() == 0
+    return captured["decode_database_name"]
+
+
+def test_main_forwards_database_url_is_percent_encoded_flag_when_set(monkeypatch) -> None:
+    """`/code-review` (2026-08-24) finding: runner.py's live_canary() passes
+    --database-url-is-percent-encoded (mirroring atoms_proof()), but this script didn't accept or
+    forward the flag at all -- a reserved-character ANYTOOLAI_POSTGRES_PASSWORD/_DB would connect
+    fine via atoms-proof but silently fail to connect via live-canary on the same stack."""
+    module = load_live_canary_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
+
+    decode_database_name = _run_main_capturing_decode_database_name(
+        module, monkeypatch, [*_TEST_MAIN_ARGV, "--database-url-is-percent-encoded"]
+    )
+
+    assert decode_database_name is True
+
+
+def test_main_forwards_database_url_is_percent_encoded_flag_when_unset(monkeypatch) -> None:
+    """Mirror of the above for the flag's unset (default) case."""
+    module = load_live_canary_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
+
+    decode_database_name = _run_main_capturing_decode_database_name(
+        module, monkeypatch, _TEST_MAIN_ARGV
+    )
+
+    assert decode_database_name is False

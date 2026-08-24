@@ -22,6 +22,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -318,64 +319,90 @@ def _composite_case_ids(
     )
 
 
-def _composite_case_shape_error(workflow_ids: list[str], scenario_ids: list[str]) -> str | None:
-    """Checks COMPOSITE_SMOKE_CASES' own ids (duplicates) and that the config files needed to
+def _composite_case_shape_error(
+    workflow_ids: list[str],
+    scenario_ids: list[str],
+    *,
+    error_code: str = "SMOKE010",
+    tuple_name: str = "COMPOSITE_SMOKE_CASES",
+) -> str | None:
+    """Checks a composite case list's own ids (duplicates) and that the config files needed to
     verify it even exist -- split out of _composite_coverage_error() so both checks fold into one
     call+return there, alongside _composite_workflow_config()'s own single call+return, keeping
-    that function within PLR0911's 6-return budget without a raise-to-catch workaround."""
+    that function within PLR0911's 6-return budget without a raise-to-catch workaround.
+    error_code/tuple_name are parameterized so live_canary.py's live-composite variant can reuse
+    this verbatim instead of duplicating it under a different error family/tuple name."""
     for field_name, ids in (("workflow_id", workflow_ids), ("scenario_id", scenario_ids)):
         if len(ids) != len(set(ids)):
-            return f"SMOKE010: COMPOSITE_SMOKE_CASES has duplicate {field_name} entries"
+            return f"{error_code}: {tuple_name} has duplicate {field_name} entries"
     for config_path in (WORKFLOWS_CONFIG_PATH, SCENARIOS_CONFIG_PATH):
         if not config_path.is_file():
             return (
-                f"SMOKE010: cannot verify required composite coverage -- {config_path} not found"
+                f"{error_code}: cannot verify required composite coverage -- {config_path} "
+                "not found"
             )
     return None
 
 
-def _composite_workflow_config() -> tuple[frozenset[str], dict[str, str], dict[str, str]]:
+def _composite_workflow_config(
+    entries_provider: Callable[[], list[dict]] | None = None,
+) -> tuple[frozenset[str], dict[str, str], dict[str, str]]:
     """Parses workflows.yaml/scenarios.yaml exactly once each and derives
     (required_workflow_ids, workflow_id_by_scenario_id, output_schema_ref_by_workflow_id) for
     _composite_coverage_error(). Raises (doesn't catch) any of _COMPOSITE_CONFIG_PARSE_ERRORS on
     a parse failure -- that's the caller's job, so this function's return type stays a plain
     success-only tuple instead of a tuple-or-error-string union that would invert the str | None
     (None-means-success) convention every other coverage function in this module follows.
-    Computes required/output_schema_ref_by_workflow_id from a single _composite_workflow_entries()
-    call via the shared pure helpers (_composite_required_ids(),
-    _composite_schema_ref_by_workflow_id()), not by calling
-    _composite_output_schema_ref_by_workflow_id() (which parses workflows.yaml on its own) --
-    avoids re-reading the same file twice per call."""
-    entries = _composite_workflow_entries()
+    Computes required/output_schema_ref_by_workflow_id from a single entries_provider() call via
+    the shared pure helpers (_composite_required_ids(), _composite_schema_ref_by_workflow_id()),
+    not by calling _composite_output_schema_ref_by_workflow_id() (which parses workflows.yaml on
+    its own) -- avoids re-reading the same file twice per call. entries_provider defaults to the
+    fake-only _composite_workflow_entries(); live_canary.py passes its own _live_v1-only entries
+    fetcher to reuse this without duplicating the derivation logic. Default is late-bound (None,
+    resolved to the module-level _composite_workflow_entries at call time) rather than bound at
+    def time, so tests that monkeypatch the module-level function still take effect here."""
+    entries = (entries_provider or _composite_workflow_entries)()
     required = _composite_required_ids(entries)
     output_schema_ref_by_workflow_id = _composite_schema_ref_by_workflow_id(entries)
     workflow_id_by_scenario_id = _required_composite_workflow_id_by_scenario_id()
     return required, workflow_id_by_scenario_id, output_schema_ref_by_workflow_id
 
 
-def _composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None:
-    """Composite counterpart of _atom_coverage_error() -- catches not just an empty
-    COMPOSITE_SMOKE_CASES but also a partial one (e.g. a merge drops 1 of 3 entries), a reused
-    scenario_id (silently dropping the workflow whose scenario it displaced), and a scenario_id
-    swapped onto the wrong workflow_id label (each side would still individually be unique, just
-    paired with the wrong partner -- a bare duplicate check on either side alone would miss it)."""
+def _composite_coverage_error(
+    cases: tuple[tuple[str, str, dict], ...],
+    *,
+    entries_provider: Callable[[], list[dict]] | None = None,
+    error_code: str = "SMOKE010",
+    tuple_name: str = "COMPOSITE_SMOKE_CASES",
+    kind: str = "composite workflows",
+) -> str | None:
+    """Composite counterpart of _atom_coverage_error() -- catches not just an empty case tuple but
+    also a partial one (e.g. a merge drops 1 of 3 entries), a reused scenario_id (silently dropping
+    the workflow whose scenario it displaced), and a scenario_id swapped onto the wrong workflow_id
+    label (each side would still individually be unique, just paired with the wrong partner -- a
+    bare duplicate check on either side alone would miss it). entries_provider/error_code/
+    tuple_name/kind default to the fake-only COMPOSITE_SMOKE_CASES/SMOKE010 shape; live_canary.py
+    calls this with its own live-only entries fetcher and LIVE010/LIVE_COMPOSITE_CASES naming
+    instead of duplicating this whole check under a different error family."""
     workflow_ids, scenario_ids = _composite_case_ids(cases)
-    shape_error = _composite_case_shape_error(workflow_ids, scenario_ids)
+    shape_error = _composite_case_shape_error(
+        workflow_ids, scenario_ids, error_code=error_code, tuple_name=tuple_name
+    )
     if shape_error is not None:
         return shape_error
     try:
         required, workflow_id_by_scenario_id, output_schema_ref_by_workflow_id = (
-            _composite_workflow_config()
+            _composite_workflow_config(entries_provider)
         )
     except _COMPOSITE_CONFIG_PARSE_ERRORS as exc:
         return (
-            "SMOKE010: could not parse composite workflow/scenario config to verify required "
-            f"composite coverage: {exc}"
+            f"{error_code}: could not parse composite workflow/scenario config to verify "
+            f"required {kind} coverage: {exc}"
         )
     missing_schema_ref = sorted(required - output_schema_ref_by_workflow_id.keys())
     if missing_schema_ref:
         return (
-            "SMOKE010: composite workflow config validation failed: missing/invalid "
+            f"{error_code}: composite workflow config validation failed: missing/invalid "
             f"output_schema_ref for workflow(s): {missing_schema_ref}"
         )
     covered = set(workflow_ids)
@@ -383,15 +410,15 @@ def _composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str |
         return _coverage_mismatch_error(
             covered,
             required,
-            error_code="SMOKE010",
-            tuple_name="COMPOSITE_SMOKE_CASES",
-            kind="composite workflows",
+            error_code=error_code,
+            tuple_name=tuple_name,
+            kind=kind,
         )
     for workflow_id, scenario_id in zip(workflow_ids, scenario_ids, strict=True):
         expected_workflow_id = workflow_id_by_scenario_id.get(scenario_id)
         if expected_workflow_id != workflow_id:
             return (
-                f"SMOKE010: COMPOSITE_SMOKE_CASES pairs scenario {scenario_id!r} with workflow "
+                f"{error_code}: {tuple_name} pairs scenario {scenario_id!r} with workflow "
                 f"{workflow_id!r}, but scenarios.yaml binds that scenario to "
                 f"{expected_workflow_id!r} -- scenario/workflow mismatch"
             )

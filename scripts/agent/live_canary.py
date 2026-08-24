@@ -64,29 +64,30 @@ LIVE_ATOM_SCENARIO_IDS: dict[str, str] = {
     ),
 }
 
-LIVE_ATOM_CASES: tuple[tuple[str, str, dict], ...] = tuple(
-    (action_type, LIVE_ATOM_SCENARIO_IDS[action_type], start_input)
-    for action_type, _fake_scenario_id, start_input in atoms_proof.ATOM_SMOKE_CASES
-)
+# Guarded like atoms_proof.py's own module-load try/except: a future 12th atom added to
+# kernel_demo_smoke.py's ATOM_SMOKE_CASES without a matching LIVE_ATOM_SCENARIO_IDS entry in the
+# same PR must fail as a clean LIVE007, not a raw KeyError out of this module-level comprehension.
+_MODULE_LOAD_ERROR: str | None = None
+try:
+    LIVE_ATOM_CASES: tuple[tuple[str, str, dict], ...] = tuple(
+        (action_type, LIVE_ATOM_SCENARIO_IDS[action_type], start_input)
+        for action_type, _fake_scenario_id, start_input in atoms_proof.ATOM_SMOKE_CASES
+    )
+except KeyError as exc:
+    _MODULE_LOAD_ERROR = (
+        f"LIVE007: action_type {exc} from kernel_demo_smoke.py's ATOM_SMOKE_CASES has no matching "
+        "entry in LIVE_ATOM_SCENARIO_IDS"
+    )
+    LIVE_ATOM_CASES = ()
 
-# fake workflow_id -> live workflow_id/scenario_id. Unlike LIVE_ATOM_SCENARIO_IDS, a mechanical
-# transform is safe here: all 3 fake composite workflow_ids uniformly end in "_v1" and their
-# scenario_ids uniformly end in "_smoke_v1" (verified against configs/kernel/products/kernel_demo/
-# workflows.yaml and scenarios.yaml), unlike the atom-level extract case which lacks a uniform
-# suffix pattern.
-LIVE_COMPOSITE_WORKFLOW_IDS: dict[str, str] = {
-    fake_workflow_id: f"{fake_workflow_id.removesuffix('_v1')}_live_v1"
-    for fake_workflow_id, _fake_scenario_id, _start_input in atoms_proof.COMPOSITE_SMOKE_CASES
-}
-LIVE_COMPOSITE_SCENARIO_IDS: dict[str, str] = {
-    fake_scenario_id: f"{fake_scenario_id.removesuffix('_smoke_v1')}_live_smoke_v1"
-    for _fake_workflow_id, fake_scenario_id, _start_input in atoms_proof.COMPOSITE_SMOKE_CASES
-}
-
+# fake workflow_id/scenario_id -> live equivalent, inline. A mechanical transform is safe here:
+# all 3 fake composite workflow_ids uniformly end in "_v1" and their scenario_ids uniformly end in
+# "_smoke_v1" (verified against configs/kernel/products/kernel_demo/workflows.yaml and
+# scenarios.yaml), unlike the atom-level extract case above which lacks a uniform suffix pattern.
 LIVE_COMPOSITE_CASES: tuple[tuple[str, str, dict], ...] = tuple(
     (
-        LIVE_COMPOSITE_WORKFLOW_IDS[workflow_id],
-        LIVE_COMPOSITE_SCENARIO_IDS[fake_scenario_id],
+        f"{workflow_id.removesuffix('_v1')}_live_v1",
+        f"{fake_scenario_id.removesuffix('_smoke_v1')}_live_smoke_v1",
         start_input,
     )
     for workflow_id, fake_scenario_id, start_input in atoms_proof.COMPOSITE_SMOKE_CASES
@@ -114,55 +115,17 @@ def _live_composite_workflow_entries() -> list[dict]:
 
 def _live_composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None:
     """Live-canary counterpart of kernel_demo_smoke.py's _composite_coverage_error(), scoped to
-    the 3 "_live_v1" composite workflows instead of the 3 fake ones. Reuses that module's
-    non-fake-specific pure helpers (case-id unzip, schema-ref derivation, coverage-mismatch
-    formatting, the real scenario<->workflow binding from scenarios.yaml) since those only operate
-    on already-filtered inputs and encode no fake/live assumption themselves -- only the
-    duplicate/shape checks are reimplemented here (not reused), since the shared version's error
-    strings hardcode "COMPOSITE_SMOKE_CASES"/"SMOKE010", which would misname the live case list
-    and error family in a live-canary failure message."""
-    smoke = atoms_proof.smoke
-    workflow_ids, scenario_ids = smoke._composite_case_ids(cases)
-    for field_name, ids in (("workflow_id", workflow_ids), ("scenario_id", scenario_ids)):
-        if len(ids) != len(set(ids)):
-            return f"LIVE010: LIVE_COMPOSITE_CASES has duplicate {field_name} entries"
-    for config_path in (smoke.WORKFLOWS_CONFIG_PATH, smoke.SCENARIOS_CONFIG_PATH):
-        if not config_path.is_file():
-            return (
-                f"LIVE010: cannot verify required live composite coverage -- {config_path} "
-                "not found"
-            )
-    try:
-        entries = _live_composite_workflow_entries()
-        required = smoke._composite_required_ids(entries)
-        output_schema_ref_by_workflow_id = smoke._composite_schema_ref_by_workflow_id(entries)
-        workflow_id_by_scenario_id = smoke._required_composite_workflow_id_by_scenario_id()
-    except smoke._COMPOSITE_CONFIG_PARSE_ERRORS as exc:
-        return (
-            "LIVE010: could not parse composite workflow/scenario config to verify required "
-            f"live composite coverage: {exc}"
-        )
-    missing_schema_ref = sorted(required - output_schema_ref_by_workflow_id.keys())
-    if missing_schema_ref:
-        return (
-            "LIVE010: live composite workflow config validation failed: missing/invalid "
-            f"output_schema_ref for workflow(s): {missing_schema_ref}"
-        )
-    covered = set(workflow_ids)
-    if covered != required:
-        return smoke._coverage_mismatch_error(
-            covered, required, error_code="LIVE010", tuple_name="LIVE_COMPOSITE_CASES",
-            kind="live composite workflows",
-        )
-    for workflow_id, scenario_id in zip(workflow_ids, scenario_ids, strict=True):
-        expected_workflow_id = workflow_id_by_scenario_id.get(scenario_id)
-        if expected_workflow_id != workflow_id:
-            return (
-                f"LIVE010: LIVE_COMPOSITE_CASES pairs scenario {scenario_id!r} with workflow "
-                f"{workflow_id!r}, but scenarios.yaml binds that scenario to "
-                f"{expected_workflow_id!r} -- scenario/workflow mismatch"
-            )
-    return None
+    the 3 "_live_v1" composite workflows instead of the 3 fake ones. A thin wrapper around that
+    same function (parameterized by entries_provider/error_code/tuple_name/kind precisely for this
+    kind of reuse) instead of a second ~35-line copy of its duplicate/shape/coverage/binding
+    checks -- keeps a future fix to any of those checks from needing to be applied twice."""
+    return atoms_proof.smoke._composite_coverage_error(
+        cases,
+        entries_provider=_live_composite_workflow_entries,
+        error_code="LIVE010",
+        tuple_name="LIVE_COMPOSITE_CASES",
+        kind="live composite workflows",
+    )
 
 
 def _cumulative_estimated_cost(cases: list[EvidenceCase]) -> float:
@@ -175,7 +138,12 @@ def _cumulative_estimated_cost(cases: list[EvidenceCase]) -> float:
 
 
 def run(
-    api_url: str, database_url: str, timeout: float, *, max_total_cost_usd: float
+    api_url: str,
+    database_url: str,
+    timeout: float,
+    *,
+    max_total_cost_usd: float,
+    decode_database_name: bool = False,
 ) -> tuple[list[EvidenceCase], int]:
     """Runs LIVE_ATOM_CASES then LIVE_COMPOSITE_CASES against a live api_url/database_url, as one
     combined, kind-tagged queue -- atoms first, then composites -- so a single cumulative
@@ -183,7 +151,8 @@ def run(
     per-case loop for each group. Once the cap trips (LIVE001), every remaining case is marked
     failed instead of silently dropped, regardless of whether it's still in the atom queue or
     hasn't reached the composite queue yet -- so composite_total in the evidence report always
-    reflects all 3 composites, even if none of them actually ran."""
+    reflects all 3 composites, even if none of them actually ran. decode_database_name is
+    forwarded to atoms_proof._build_engine() verbatim -- see its own docstring."""
     for cases_spec, tuple_name, error_code in (
         (LIVE_ATOM_CASES, "LIVE_ATOM_CASES", "LIVE002"),
         (LIVE_COMPOSITE_CASES, "LIVE_COMPOSITE_CASES", "LIVE003"),
@@ -195,7 +164,7 @@ def run(
             print(empty_error, file=sys.stderr)
             return [], 1
 
-    engine = atoms_proof._build_engine(database_url)
+    engine = atoms_proof._build_engine(database_url, decode_database_name=decode_database_name)
     cases: list[EvidenceCase] = []
     case_timeout = timeout
     try:
@@ -265,6 +234,9 @@ def main() -> int:
     if atoms_proof._MODULE_LOAD_ERROR is not None:
         print(atoms_proof._MODULE_LOAD_ERROR, file=sys.stderr)
         return 1
+    if _MODULE_LOAD_ERROR is not None:
+        print(_MODULE_LOAD_ERROR, file=sys.stderr)
+        return 1
 
     try:
         default_timeout = atoms_proof._default_timeout()
@@ -310,6 +282,14 @@ def main() -> int:
         help="Abort remaining cases once cumulative estimated_cost exceeds this (default: "
         "%(default)s, also settable via ANYTOOLAI_LIVE_CANARY_MAX_COST_USD)",
     )
+    parser.add_argument(
+        "--database-url-is-percent-encoded",
+        action="store_true",
+        help="Set when the DSN in --database-url-env's env var had its database-name path "
+        "segment percent-encoded by its producer (e.g. scripts/agent/runner.py's "
+        "RuntimeIdentity.database_url) -- decodes it back before connecting. Leave unset for a "
+        "hand-written or otherwise arbitrary DSN, whose database name is used exactly as given.",
+    )
     args = parser.parse_args()
 
     database_url = os.environ.get(args.database_url_env)
@@ -331,6 +311,7 @@ def main() -> int:
         cases, exit_code = run(
             args.api_url.rstrip("/"), database_url, args.timeout,
             max_total_cost_usd=args.max_total_cost_usd,
+            decode_database_name=args.database_url_is_percent_encoded,
         )
 
     report_path = atoms_proof.write_evidence_report(
