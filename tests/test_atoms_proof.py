@@ -994,6 +994,39 @@ def test_check_ledger_reports_proof000_without_leaking_raw_exception_text() -> N
     assert case.error_code == "PROOF000"
     assert "SQLAlchemyError" in case.error_message
     assert "secret-looking-detail" not in case.error_message
+    assert case.steps == ()
+
+
+def test_check_ledger_recovers_known_cost_when_its_own_fetch_raises(monkeypatch) -> None:
+    """`/code-review` #4 (2026-08-24) finding #1: a case can make a real, billed provider call and
+    then hit a transient SQLAlchemyError (connection drop, pool exhaustion, statement timeout)
+    fetching _check_ledger()'s own 5-table batch -- that spend must not silently report 0 to
+    live_canary.py's cost cap just because the *second* connection attempt (this batch's own)
+    failed, when a fresh recovery connection can still see the already-committed provider_calls
+    row."""
+    module = load_atoms_proof_module()
+    action_runs = [_one_step_row()]
+    provider_calls = [_one_provider_call()]
+
+    class _FailsOnceThenRecoversEngine:
+        def __init__(self):
+            self._connect_count = 0
+
+        def connect(self):
+            self._connect_count += 1
+            if self._connect_count == 1:
+                raise module.sa.exc.SQLAlchemyError("boom")
+            return _FakeConnection([_FakeResult(action_runs), _FakeResult(provider_calls)])
+
+    case = module._check_ledger(
+        _FailsOnceThenRecoversEngine(), label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF000"
+    assert len(case.steps) == 1
+    assert case.steps[0].estimated_cost == 0.001
 
 
 def test_write_evidence_report_is_privacy_safe_and_shaped_correctly(tmp_path) -> None:

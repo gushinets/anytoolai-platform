@@ -96,6 +96,16 @@ def test_live_composite_workflow_entries_returns_exactly_the_three_live_suffixed
     assert all(workflow_id.endswith("_live_v1") for workflow_id in workflow_ids)
 
 
+def test_live_composite_workflow_entries_delegates_to_the_shared_suffix_helper() -> None:
+    """`/code-review` #4 (2026-08-24) finding #2: this used to be its own near-verbatim copy of
+    kernel_demo_smoke.py's open+parse+filter logic; pins that it's now a thin wrapper instead."""
+    module = load_live_canary_module()
+
+    assert module._live_composite_workflow_entries() == (
+        module.atoms_proof.smoke._composite_workflow_entries_by_suffix(live=True)
+    )
+
+
 def test_live_composite_coverage_error_covers_the_three_live_composite_workflows() -> None:
     module = load_live_canary_module()
 

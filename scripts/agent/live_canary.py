@@ -21,8 +21,6 @@ import os
 import sys
 from pathlib import Path
 
-import yaml
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -137,22 +135,13 @@ LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO.update(
 
 
 def _live_composite_workflow_entries() -> list[dict]:
-    """Own, live-canary-local parse of workflows.yaml, filtered to the "_live_v1"-suffixed
-    composite entries -- the inverse of kernel_demo_smoke.py's _composite_workflow_entries(),
-    which permanently excludes them (see that function's docstring). Deliberately not shared with
-    or parameterized onto that function: provider selection is a static config fact here, not a
-    runtime mode kernel_demo_smoke.py's fake-provider-oriented coverage checks (also used by
-    atoms_proof.py and dev-smoke/prod-smoke) need to know about."""
-    with atoms_proof.smoke.WORKFLOWS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
-        data = yaml.safe_load(handle)
-    return [
-        entry
-        for entry in data.get("workflows", [])
-        if isinstance(entry, dict)
-        and isinstance(entry.get("workflow_id"), str)
-        and entry["workflow_id"].startswith(atoms_proof.smoke._COMPOSITE_WORKFLOW_ID_PREFIX)
-        and entry["workflow_id"].endswith("_live_v1")
-    ]
+    """Live-canary-named wrapper around kernel_demo_smoke.py's shared
+    _composite_workflow_entries_by_suffix(live=True) -- the inverse of that module's own
+    _composite_workflow_entries() (live=False), which permanently excludes them (see that
+    function's docstring). `/code-review` #4 (2026-08-24) finding #2: this used to be its own
+    near-verbatim copy of the open+parse+filter logic; only the suffix-check direction actually
+    differs between the fake and live variants, so that's the only thing this wrapper supplies."""
+    return atoms_proof.smoke._composite_workflow_entries_by_suffix(live=True)
 
 
 _LIVE_ATOM_COVERAGE_LABELS = atoms_proof.smoke.CoverageLabels(

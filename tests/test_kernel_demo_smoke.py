@@ -372,6 +372,26 @@ def test_composite_workflow_entries_excludes_live_suffixed_workflow_ids() -> Non
     assert not any(workflow_id.endswith("_live_v1") for workflow_id in workflow_ids)
 
 
+def test_composite_workflow_entries_by_suffix_partitions_fake_and_live_entries() -> None:
+    """`/code-review` #4 (2026-08-24) finding #2: _composite_workflow_entries() (live=False) and
+    live_canary.py's own live-only entries fetcher used to be near-verbatim copies; both now share
+    _composite_workflow_entries_by_suffix(), which this pins as a true partition of the same
+    underlying workflows.yaml composite entries -- every entry lands in exactly one of the two
+    (never both, never neither)."""
+    smoke = load_smoke_module()
+
+    fake_entries = smoke._composite_workflow_entries_by_suffix(live=False)
+    live_entries = smoke._composite_workflow_entries_by_suffix(live=True)
+    fake_ids = {entry["workflow_id"] for entry in fake_entries}
+    live_ids = {entry["workflow_id"] for entry in live_entries}
+
+    assert fake_ids == {workflow_id for workflow_id, _, _ in smoke.COMPOSITE_SMOKE_CASES}
+    assert fake_ids.isdisjoint(live_ids)
+    assert len(live_ids) == 3
+    assert all(workflow_id.endswith("_live_v1") for workflow_id in live_ids)
+    assert smoke._composite_workflow_entries() == fake_entries
+
+
 def test_required_composite_workflow_id_by_scenario_id_matches_real_config() -> None:
     """_required_composite_workflow_id_by_scenario_id() deliberately isn't filtered to fake-only
     (see _composite_workflow_entries()'s docstring) -- it's a plain scenario_id -> workflow_id

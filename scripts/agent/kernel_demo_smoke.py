@@ -112,6 +112,25 @@ def _required_action_types() -> frozenset[str]:
     return frozenset(path.stem for path in ACTION_DEFINITIONS_ROOT.glob("*.yaml"))
 
 
+def _composite_workflow_entries_by_suffix(*, live: bool) -> list[dict]:
+    """Shared open+parse+filter core for _composite_workflow_entries() (fake, live=False) and
+    live_canary.py's own live-only entries fetcher (live=True) -- `/code-review` #4 (2026-08-24)
+    finding #2: those two used to be near-verbatim copies of each other, differing only in which
+    side of the "_live_v1" suffix check they wanted. The suffix check itself is the only live/fake
+    knowledge here; everything else (which file, which prefix, how to filter malformed entries) is
+    identical between the two callers, so it belongs in one place."""
+    with WORKFLOWS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    return [
+        entry
+        for entry in data.get("workflows", [])
+        if isinstance(entry, dict)
+        and isinstance(entry.get("workflow_id"), str)
+        and entry["workflow_id"].startswith(_COMPOSITE_WORKFLOW_ID_PREFIX)
+        and entry["workflow_id"].endswith("_live_v1") == live
+    ]
+
+
 def _composite_workflow_entries() -> list[dict]:
     """Parses workflows.yaml once and filters to composite-prefixed workflow entries -- shared
     by _composite_output_schema_ref_by_workflow_id() and _composite_workflow_config() so the
@@ -125,16 +144,7 @@ def _composite_workflow_entries() -> list[dict]:
     live_canary.py's own, separate coverage check instead -- not a runtime mode toggle, since
     provider selection is a static config fact here, not something this function's callers choose
     per invocation."""
-    with WORKFLOWS_CONFIG_PATH.open("r", encoding="utf-8") as handle:
-        data = yaml.safe_load(handle)
-    return [
-        entry
-        for entry in data.get("workflows", [])
-        if isinstance(entry, dict)
-        and isinstance(entry.get("workflow_id"), str)
-        and entry["workflow_id"].startswith(_COMPOSITE_WORKFLOW_ID_PREFIX)
-        and not entry["workflow_id"].endswith("_live_v1")
-    ]
+    return _composite_workflow_entries_by_suffix(live=False)
 
 
 def _composite_required_ids(entries: list[dict]) -> frozenset[str]:
