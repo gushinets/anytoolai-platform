@@ -17,6 +17,7 @@ quick-check/full-check/postgresql-check.
 
 from __future__ import annotations
 
+import math
 import os
 import sys
 from pathlib import Path
@@ -45,6 +46,21 @@ EvidenceCase = atoms_proof.EvidenceCase  # always defined, unlike `smoke` (see b
 # atoms_proof load would raise a raw ImportError before main() ever gets to print a clean code.
 
 DEFAULT_MAX_TOTAL_COST_USD = 0.50
+
+
+def _positive_finite_cost(raw: str) -> float:
+    """Code-review finding: a bare float() accepts "nan"/"inf"/"-inf"/"0"/negative strings as
+    "valid" for --max-total-cost-usd/ANYTOOLAI_LIVE_CANARY_MAX_COST_USD. nan is the catastrophic
+    case -- `total_cost > max_total_cost_usd` (run()'s cost-cap check) is always False when
+    max_total_cost_usd is nan, so LIVE001 can never fire and the canary runs every case with no
+    cost cap at all, silently defeating the whole point of this cap. Used both as argparse's
+    type= for --max-total-cost-usd (argparse turns a raised ValueError into a clean, controlled
+    CLI error before any case runs) and directly for the ANYTOOLAI_LIVE_CANARY_MAX_COST_USD env
+    var (main() already wraps that call in its own try/except ValueError -> LIVE006)."""
+    value = float(raw)
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f"must be a positive, finite number, got {raw!r}")
+    return value
 
 # action_type -> live scenario_id, mirroring the fake-sibling scenario ids one-for-one (see
 # configs/kernel/products/kernel_demo/scenarios.yaml). Explicit rather than a string-transform
@@ -201,7 +217,18 @@ def run(
             print(empty_error, file=sys.stderr)
             return [], 1
 
-    engine = atoms_proof._build_engine(database_url, decode_database_name=decode_database_name)
+    # Code-review finding: _build_engine() can raise RuntimeError for any engine-configuration
+    # problem (malformed DSN, unsupported driver, decode-with-nothing-to-decode -- see its own
+    # docstring). Left uncaught, this used to propagate as a raw traceback instead of a LIVE0xx
+    # code, and skipped write_evidence_report() entirely (main() only calls it after run()
+    # returns), leaving the operator with no evidence artifact to diagnose from -- mirrors
+    # atoms_proof.py's own run(), which already wraps this the same way (PROOF022).
+    try:
+        engine = atoms_proof._build_engine(database_url, decode_database_name=decode_database_name)
+    except RuntimeError as exc:
+        print(f"LIVE009: engine configuration error: {exc}", file=sys.stderr)
+        return [], 1
+
     cases: list[EvidenceCase] = []
     case_timeout = timeout
     try:
@@ -285,7 +312,7 @@ def main() -> int:
     try:
         raw_max_cost = os.environ.get("ANYTOOLAI_LIVE_CANARY_MAX_COST_USD")
         default_max_cost = (
-            DEFAULT_MAX_TOTAL_COST_USD if raw_max_cost is None else float(raw_max_cost)
+            DEFAULT_MAX_TOTAL_COST_USD if raw_max_cost is None else _positive_finite_cost(raw_max_cost)
         )
     except ValueError as exc:
         print(
@@ -299,7 +326,7 @@ def main() -> int:
     parser = atoms_proof._build_arg_parser(__doc__, default_timeout=default_timeout)
     parser.add_argument(
         "--max-total-cost-usd",
-        type=float,
+        type=_positive_finite_cost,
         default=default_max_cost,
         help="Abort remaining cases once cumulative estimated_cost exceeds this (default: "
         "%(default)s, also settable via ANYTOOLAI_LIVE_CANARY_MAX_COST_USD)",

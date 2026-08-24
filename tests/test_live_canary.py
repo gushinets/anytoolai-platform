@@ -10,6 +10,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 from tests.module_loading import load_cached_module
 from tests.test_atoms_proof import load_atoms_proof_module
 
@@ -551,3 +553,101 @@ def test_live_atom_scenario_ids_agree_with_the_independently_maintained_config_t
         assert live_canary_module.LIVE_ATOM_SCENARIO_IDS[action_type] == live_scenario_id, (
             action_type
         )
+
+
+@pytest.mark.parametrize("raw", ["nan", "inf", "-inf", "0", "-1", "-0.01"])
+def test_positive_finite_cost_rejects_non_positive_and_non_finite_values(raw) -> None:
+    """Code-review finding: a bare float() accepts "nan"/"inf"/"-inf"/"0"/negative strings as
+    "valid" for --max-total-cost-usd/ANYTOOLAI_LIVE_CANARY_MAX_COST_USD. nan is the catastrophic
+    case: `total_cost > max_total_cost_usd` (run()'s cost-cap check) is always False when
+    max_total_cost_usd is nan, so LIVE001 can never fire and the canary runs with no cost cap at
+    all."""
+    module = load_live_canary_module()
+
+    with pytest.raises(ValueError):
+        module._positive_finite_cost(raw)
+
+
+@pytest.mark.parametrize("raw", ["0.5", "1", "0.001", "1e-3"])
+def test_positive_finite_cost_accepts_positive_finite_values(raw) -> None:
+    module = load_live_canary_module()
+
+    assert module._positive_finite_cost(raw) == float(raw)
+
+
+def test_main_reports_live006_for_nan_cost_cap_env_var(monkeypatch, capsys) -> None:
+    module = load_live_canary_module()
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_MAX_COST_USD", "nan")
+    monkeypatch.setattr(
+        sys, "argv", ["live_canary.py", "http://127.0.0.1:8000", "--database-url-env", "UNUSED"]
+    )
+
+    assert module.main() == 2
+    assert "LIVE006" in capsys.readouterr().err
+
+
+def test_main_rejects_nan_max_total_cost_usd_cli_flag(monkeypatch, capsys) -> None:
+    """The --max-total-cost-usd CLI flag must be validated the same way as the env var -- argparse
+    turns _positive_finite_cost's ValueError into a clean, controlled CLI error (SystemExit(2)),
+    not a case silently running with the cost cap disabled."""
+    module = load_live_canary_module()
+    monkeypatch.delenv("ANYTOOLAI_LIVE_CANARY_MAX_COST_USD", raising=False)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "live_canary.py", "http://127.0.0.1:8000", "--database-url-env", "UNUSED",
+            "--max-total-cost-usd", "nan",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        module.main()
+
+    assert exc_info.value.code == 2
+
+
+def test_run_reports_live009_instead_of_a_raw_traceback_on_engine_configuration_error(
+    monkeypatch, capsys
+) -> None:
+    """Code-review finding: _build_engine() can raise RuntimeError (e.g. a caller-declared decode
+    contract with nothing to decode) -- previously uncaught here, so it propagated as a raw
+    traceback instead of a LIVE0xx failure code, and never reached write_evidence_report(), same
+    root cause as atoms_proof.py's own PROOF022 (already fixed there) before this fix."""
+    module = load_live_canary_module()
+
+    cases, exit_code = module.run(
+        "http://127.0.0.1:8000",
+        "postgresql+psycopg://user:pass@127.0.0.1:5432/",
+        timeout=5.0,
+        max_total_cost_usd=1.0,
+        decode_database_name=True,
+    )
+
+    assert cases == []
+    assert exit_code == 1
+    assert "LIVE009" in capsys.readouterr().err
+
+
+def test_main_writes_evidence_report_on_engine_configuration_error(monkeypatch, capsys) -> None:
+    """main()-level: an engine-configuration RuntimeError must not skip write_evidence_report() --
+    without run()'s LIVE009 fix, this would raise before main() ever reaches that call."""
+    module = load_live_canary_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql+psycopg://user:pass@127.0.0.1:5432/")
+    write_evidence_report_calls = []
+    monkeypatch.setattr(
+        module.atoms_proof,
+        "write_evidence_report",
+        lambda cases, exit_code, **kwargs: write_evidence_report_calls.append(
+            (cases, exit_code)
+        )
+        or Path("evidence-fake.json"),
+    )
+    monkeypatch.setattr(
+        sys, "argv", [*_TEST_MAIN_ARGV, "--database-url-is-percent-encoded"]
+    )
+
+    assert module.main() == 1
+
+    assert write_evidence_report_calls == [([], 1)]
+    assert "LIVE009" in capsys.readouterr().err
