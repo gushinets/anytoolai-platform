@@ -16,19 +16,6 @@ jobs:
     # stuck provider call could otherwise sit unnoticed for hours on this unattended weekly
     # schedule before anyone sees it failed.
     timeout-minutes: 30
-    # Job-level, not just on the live-canary step: docker-compose.yml's worker service
-    # interpolates ${OPENAI_API_KEY:-} at container-creation time, which happens during the
-    # earlier "Boot dev Compose stack" step's `docker compose up` -- a step-scoped env on the
-    # later live-canary step alone would boot the worker container with an empty key, so every
-    # scheduled run would silently make 0 real provider calls despite the CLI's own pre-check
-    # passing.
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      # Same job-level reasoning as OPENAI_API_KEY above: platform-api reads this at
-      # container-creation time to check internal_only scenarios' X-Live-Canary-Token header
-      # (code review finding -- the 14 live scenario_ids were previously reachable through the
-      # normal public start-session API with no gate at all).
-      ANYTOOLAI_LIVE_CANARY_TOKEN: ${{ secrets.ANYTOOLAI_LIVE_CANARY_TOKEN }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -40,12 +27,27 @@ jobs:
         with:
           version: "0.11.16"
       - run: uv sync --frozen --group dev
+      # OPENAI_API_KEY/ANYTOOLAI_LIVE_CANARY_TOKEN are scoped to exactly these two steps, not
+      # job-level: docker-compose.yml's worker service interpolates OPENAI_API_KEY (and
+      # platform-api interpolates ANYTOOLAI_LIVE_CANARY_TOKEN, for internal_only scenarios'
+      # X-Live-Canary-Token header) at container-creation time, during this step's `docker
+      # compose up` -- both must be present here, or every scheduled run would silently make 0
+      # real provider calls / reject every case as not-found. runner.py's live-canary command
+      # also reads both directly from its own process env for its LIVE000/LIVE011 fail-fast
+      # checks, so both must be present on the later step too. Every other step (checkout,
+      # setup-python, setup-uv, uv sync, log dump, teardown, upload) has no need for either
+      # secret, so job-level env would only widen exposure with no benefit.
       - name: Boot dev Compose stack (waits for platform-api healthy)
         run: uv run python scripts/agent/runner.py dev-up
         env:
           ANYTOOLAI_READY_TIMEOUT: "120"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANYTOOLAI_LIVE_CANARY_TOKEN: ${{ secrets.ANYTOOLAI_LIVE_CANARY_TOKEN }}
       - name: Run 11-atom live provider canary
         run: uv run python scripts/agent/runner.py live-canary
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANYTOOLAI_LIVE_CANARY_TOKEN: ${{ secrets.ANYTOOLAI_LIVE_CANARY_TOKEN }}
       # Same debuggability precedent as backend.yml's compose-smoke-dev job: dump every
       # container's logs before teardown so a failure is diagnosable from the Actions log alone.
       - name: Dump Docker Compose logs on failure

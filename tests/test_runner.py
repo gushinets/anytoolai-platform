@@ -274,30 +274,41 @@ def test_required_backend_workflow_runs_canonical_postgresql_check() -> None:
     )
 
 
-def test_live_canary_workflow_sets_openai_api_key_at_job_level() -> None:
+def test_live_canary_workflow_scopes_secrets_to_exactly_the_two_steps_that_need_them() -> None:
     """`/code-review` #2 (2026-08-24) finding: docker-compose.yml's worker service interpolates
-    OPENAI_API_KEY at container-creation time, during the earlier "Boot dev Compose stack" step
-    -- a step-scoped env on the later live-canary step alone would boot the worker with an empty
-    key, so every scheduled run would silently make 0 real provider calls. Job-level env is the
-    fix; this pins that against a future step-scoped regression."""
+    OPENAI_API_KEY at container-creation time, during the "Boot dev Compose stack" step -- that
+    step must have it, or every scheduled run would silently make 0 real provider calls.
+    platform-api reads ANYTOOLAI_LIVE_CANARY_TOKEN the same way, for internal_only scenarios'
+    X-Live-Canary-Token header. runner.py's live-canary command also reads both directly from its
+    own process env for its LIVE000/LIVE011 fail-fast checks, so the later "Run 11-atom live
+    provider canary" step needs them too.
+
+    `/code-review` #4 (2026-08-25) finding: an earlier version of this workflow put both secrets
+    at job level, which every step (checkout, setup-python, setup-uv, uv sync, log dump,
+    teardown, upload) also inherited despite having no need for either -- scoped down to exactly
+    the two steps that need them, narrowing exposure with no loss of correctness."""
     repo_root = Path(__file__).resolve().parents[1]
     workflow = yaml.safe_load(
         (repo_root / ".github" / "workflows" / "live-canary.yml").read_text(encoding="utf-8")
     )
 
     job = workflow["jobs"]["live-canary"]
-    assert job["env"]["OPENAI_API_KEY"] == "${{ secrets.OPENAI_API_KEY }}"
-    # Code-review finding: platform-api (not the worker) checks internal_only scenarios'
-    # X-Live-Canary-Token header, and also reads it at container-creation time during the same
-    # earlier "Boot dev Compose stack" step -- must be job-level for the same reason as
-    # OPENAI_API_KEY above.
-    assert (
-        job["env"]["ANYTOOLAI_LIVE_CANARY_TOKEN"] == "${{ secrets.ANYTOOLAI_LIVE_CANARY_TOKEN }}"
-    )
+    assert "OPENAI_API_KEY" not in job.get("env", {})
+    assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in job.get("env", {})
 
-    boot_step = next(step for step in job["steps"] if step.get("name", "").startswith("Boot dev"))
-    assert "OPENAI_API_KEY" not in boot_step.get("env", {})
-    assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in boot_step.get("env", {})
+    secret_needing_step_names = {"Boot dev Compose stack", "Run 11-atom live provider canary"}
+    for step in job["steps"]:
+        name = step.get("name", "")
+        step_env = step.get("env", {})
+        if any(name.startswith(prefix) for prefix in secret_needing_step_names):
+            assert step_env.get("OPENAI_API_KEY") == "${{ secrets.OPENAI_API_KEY }}", name
+            assert (
+                step_env.get("ANYTOOLAI_LIVE_CANARY_TOKEN")
+                == "${{ secrets.ANYTOOLAI_LIVE_CANARY_TOKEN }}"
+            ), name
+        else:
+            assert "OPENAI_API_KEY" not in step_env, name
+            assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in step_env, name
 
 
 def test_resolve_postgres_db_falls_back_to_dev_default(monkeypatch) -> None:
@@ -1037,6 +1048,11 @@ def test_live_canary_passes_database_url_via_env_not_argv(monkeypatch) -> None:
         "--database-url-is-percent-encoded",
     ]
     assert env[env_var_name] == identity.database_url
+    # `/code-review` #4 (2026-08-25) nitpick: _run_proof_script()'s env comes from runner_env()
+    # (os.environ.copy() plus a few extras), so the subprocess that actually makes the request
+    # must inherit ANYTOOLAI_LIVE_CANARY_TOKEN from this test's own monkeypatched os.environ, not
+    # just have it checked by live_canary()'s own upfront LIVE011 fail-fast.
+    assert env["ANYTOOLAI_LIVE_CANARY_TOKEN"] == "sekret"
 
 
 def test_prod_smoke_invokes_kernel_demo_smoke_against_prod_port(monkeypatch) -> None:
