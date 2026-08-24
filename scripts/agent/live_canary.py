@@ -140,14 +140,20 @@ def _schema_ref_overrides(
 # mutating the shared kernel_demo_smoke.py module-level dict, since that module is the same cached
 # instance atoms_proof.py's own fake-provider runs and kernel_demo_smoke.py's own tests share
 # in-process during a single quick-check/pytest run.
-LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO: dict[str, str] = (
-    _schema_ref_overrides(atoms_proof.ATOM_SMOKE_CASES, LIVE_ATOM_CASES)
-    if _MODULE_LOAD_ERROR is None
-    else {}
-)
-LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO.update(
-    _schema_ref_overrides(atoms_proof.COMPOSITE_SMOKE_CASES, LIVE_COMPOSITE_CASES)
-)
+# Gated on atoms_proof._MODULE_LOAD_ERROR too, not just this module's own _MODULE_LOAD_ERROR:
+# _schema_ref_overrides() reaches into atoms_proof.smoke, which is never bound as an attribute at
+# all when atoms_proof's own guarded import block fails (its `smoke = load_smoke_module()` never
+# runs) -- calling it unconditionally would raise a raw AttributeError at this module's own import
+# time instead of leaving the mapping empty for main() to report the already-recorded load error
+# cleanly.
+LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO: dict[str, str] = {}
+if atoms_proof._MODULE_LOAD_ERROR is None and _MODULE_LOAD_ERROR is None:
+    LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO.update(
+        _schema_ref_overrides(atoms_proof.ATOM_SMOKE_CASES, LIVE_ATOM_CASES)
+    )
+    LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO.update(
+        _schema_ref_overrides(atoms_proof.COMPOSITE_SMOKE_CASES, LIVE_COMPOSITE_CASES)
+    )
 
 
 def _live_composite_workflow_entries() -> list[dict]:
@@ -160,12 +166,20 @@ def _live_composite_workflow_entries() -> list[dict]:
     return atoms_proof.smoke._composite_workflow_entries_by_suffix(live=True)
 
 
-_LIVE_ATOM_COVERAGE_LABELS = atoms_proof.smoke.CoverageLabels(
-    error_code="LIVE008", tuple_name="LIVE_ATOM_CASES", kind="live action types"
-)
-_LIVE_COMPOSITE_COVERAGE_LABELS = atoms_proof.smoke.CoverageLabels(
-    error_code="LIVE010", tuple_name="LIVE_COMPOSITE_CASES", kind="live composite workflows"
-)
+# Same atoms_proof._MODULE_LOAD_ERROR guard as LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO above and for
+# the same reason: atoms_proof.smoke isn't bound at all when atoms_proof's own guarded import
+# fails, and these are otherwise never consulted in that case anyway -- main() already returns
+# before its coverage_error check (the only place either is read) once it sees
+# atoms_proof._MODULE_LOAD_ERROR is not None.
+_LIVE_ATOM_COVERAGE_LABELS = None
+_LIVE_COMPOSITE_COVERAGE_LABELS = None
+if atoms_proof._MODULE_LOAD_ERROR is None:
+    _LIVE_ATOM_COVERAGE_LABELS = atoms_proof.smoke.CoverageLabels(
+        error_code="LIVE008", tuple_name="LIVE_ATOM_CASES", kind="live action types"
+    )
+    _LIVE_COMPOSITE_COVERAGE_LABELS = atoms_proof.smoke.CoverageLabels(
+        error_code="LIVE010", tuple_name="LIVE_COMPOSITE_CASES", kind="live composite workflows"
+    )
 
 
 def _live_composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> str | None:

@@ -253,18 +253,23 @@ def _classify_ledger(
     _check_ledger so the PROOF00x branches are unit-testable with fake dict rows, no real
     Postgres needed.
 
-    Every internal failure returns through `fail` (functools.partial over _fail(), bound with
-    every field shared by all of them, including steps=known_steps) instead of calling _fail()
-    directly at each of the 19 return sites below -- `/code-review` #4 (2026-08-24) finding #6: a
-    manually repeated steps=known_steps() at every call site meant a missed site (as in finding
-    #1, the _check_ledger() except-branch) silently produced incomplete evidence. Binding it once
-    makes that omission structurally impossible for any future branch added here. known_steps is
-    computed eagerly (not lazily, unlike a prior round -- `/code-review` #4 finding #5: a
-    per-call-scoped @cache on a closure that's provably called at most once per invocation, since
-    every call site immediately returns, was pure overhead and a misleading "memoized for reuse"
-    signal) -- the small, bounded cost of this on the success path (which builds its own,
-    differently-ordered `steps` tuple from action_runs and never touches `fail`) is worth the
-    structural safety."""
+    Every internal failure returns through `fail` (functools.partial over _fail(), bound once
+    with label/scenario_id/kind/session_id/steps=known_steps -- the fields every PROOF00x branch
+    shares -- leaving each call site to supply only job_id/error_code/error_message) instead of
+    calling _fail() directly at each of the 19 return sites below -- `/code-review` #4 (2026-08-24)
+    finding #6: a manually repeated steps=known_steps() at every call site meant a missed site (as
+    in finding #1, the _check_ledger() except-branch) silently produced incomplete evidence.
+    Binding the shared fields once makes that particular class of typo far less likely, since a
+    call site no longer has to hand-type steps=known_steps() (or any of the other shared fields)
+    at all -- but `_fail()` itself is still directly importable/callable from this same scope, so
+    this is a strong convention this function's own 19 call sites all follow, not a
+    language-enforced guarantee (`/code-review` #5, 2026-08-24 finding #1: an earlier version of
+    this docstring overclaimed "structurally impossible"). known_steps is computed eagerly (not
+    lazily, unlike a prior round -- `/code-review` #4 finding #5: a per-call-scoped @cache on a
+    closure that's provably called at most once per invocation, since every call site immediately
+    returns, was pure overhead and a misleading "memoized for reuse" signal) -- the small, bounded
+    cost of this on the success path (which builds its own, differently-ordered `steps` tuple from
+    action_runs and never touches `fail`) is worth the added safety."""
     known_steps = _best_effort_steps_from_provider_calls(action_runs, provider_calls)
     fail = partial(
         _fail, label=label, scenario_id=scenario_id, kind=kind,
@@ -280,11 +285,11 @@ def _classify_ledger(
             ),
         )
     job_id = job_row["id"]
-    fail = partial(fail, job_id=job_id)
     result_artifact_id = job_row["result_artifact_id"]
 
     if not action_runs:
         return fail(
+            job_id=job_id,
             error_code="PROOF002",
             error_message=(
                 f"PROOF002: no action_runs rows found for scenario_session_id "
@@ -301,6 +306,7 @@ def _classify_ledger(
     )
     if mismatch is not None:
         return fail(
+            job_id=job_id,
             error_code="PROOF011", error_message=mismatch,
         )
 
@@ -317,6 +323,7 @@ def _classify_ledger(
     )
     if mismatch is not None:
         return fail(
+            job_id=job_id,
             error_code="PROOF016", error_message=mismatch,
         )
 
@@ -330,6 +337,7 @@ def _classify_ledger(
         count = provider_call_counts.get(action_run["id"], 0)
         if count != 1:
             return fail(
+                job_id=job_id,
                 error_code="PROOF003",
                 error_message=(
                     f"PROOF003: expected exactly one provider_calls row for "
@@ -343,6 +351,7 @@ def _classify_ledger(
     for call in provider_calls:
         if call["action_run_id"] not in action_run_ids:
             return fail(
+                job_id=job_id,
                 error_code="PROOF012",
                 error_message=(
                     f"PROOF012: provider_calls row {call['id']} references action_run_id "
@@ -372,6 +381,7 @@ def _classify_ledger(
     )
     if mismatch is not None:
         return fail(
+            job_id=job_id,
             error_code="PROOF023", error_message=mismatch,
         )
 
@@ -380,6 +390,7 @@ def _classify_ledger(
         artifact = artifacts_by_id.get(output_artifact_id)
         if artifact is None:
             return fail(
+                job_id=job_id,
                 error_code="PROOF004",
                 error_message=(
                     f"PROOF004: action_run {action_run['id']} (step "
@@ -392,6 +403,7 @@ def _classify_ledger(
         # never re-touches job_id after PROOF016.
         if artifact["action_run_id"] != action_run["id"]:
             return fail(
+                job_id=job_id,
                 error_code="PROOF017",
                 error_message=(
                     f"PROOF017: artifact {output_artifact_id} for action_run "
@@ -405,6 +417,7 @@ def _classify_ledger(
     result_artifact = artifacts_by_id.get(result_artifact_id)
     if result_artifact is None:
         return fail(
+            job_id=job_id,
             error_code="PROOF004",
             error_message=(
                 f"PROOF004: job result_artifact_id {result_artifact_id} not found among "
@@ -415,6 +428,7 @@ def _classify_ledger(
     # lineage remains to check.
     if result_artifact["action_run_id"] is not None:
         return fail(
+            job_id=job_id,
             error_code="PROOF018",
             error_message=(
                 f"PROOF018: job result_artifact_id {result_artifact_id} has action_run_id "
@@ -426,6 +440,7 @@ def _classify_ledger(
     if not expected_event_types.issubset(observed_event_types):
         missing = sorted(expected_event_types - observed_event_types)
         return fail(
+            job_id=job_id,
             error_code="PROOF005",
             error_message=(
                 f"PROOF005: event_log_table is missing expected event types {missing} for "
@@ -441,6 +456,7 @@ def _classify_ledger(
     )
     if mismatch is not None:
         return fail(
+            job_id=job_id,
             error_code="PROOF019", error_message=mismatch,
         )
 
@@ -455,6 +471,7 @@ def _classify_ledger(
         count = artifact_created_counts.get(artifact_id, 0)
         if count != 1:
             return fail(
+                job_id=job_id,
                 error_code="PROOF020",
                 error_message=(
                     f"PROOF020: expected exactly one artifact.created event_log row for "
@@ -466,6 +483,7 @@ def _classify_ledger(
     )
     if orphan_artifact_event_ids:
         return fail(
+            job_id=job_id,
             error_code="PROOF021",
             error_message=(
                 f"PROOF021: event_log has artifact.created rows for artifact_id(s) "
@@ -489,6 +507,7 @@ def _classify_ledger(
         succeeded = action_succeeded_counts.get(run_id, 0)
         if started != 1 or succeeded != 1:
             return fail(
+                job_id=job_id,
                 error_code="PROOF006",
                 error_message=(
                     f"PROOF006: expected exactly one action.started and one "
@@ -505,6 +524,7 @@ def _classify_ledger(
     )
     if orphan_action_event_ids:
         return fail(
+            job_id=job_id,
             error_code="PROOF014",
             error_message=(
                 f"PROOF014: event_log has action.started/action.succeeded rows for "
@@ -526,6 +546,7 @@ def _classify_ledger(
         succeeded = provider_succeeded_counts.get(call_id, 0)
         if started != 1 or succeeded != 1:
             return fail(
+                job_id=job_id,
                 error_code="PROOF013",
                 error_message=(
                     f"PROOF013: expected exactly one provider.request_started and one "
@@ -538,6 +559,7 @@ def _classify_ledger(
     )
     if orphan_provider_event_ids:
         return fail(
+            job_id=job_id,
             error_code="PROOF015",
             error_message=(
                 f"PROOF015: event_log has provider.request_started/"

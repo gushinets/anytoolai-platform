@@ -10,6 +10,12 @@ permissions:
 jobs:
   live-canary:
     runs-on: ubuntu-latest
+    # Bounded well under GitHub's 360-minute default: image build + dev-up healthcheck + 14 real
+    # provider-backed cases (each capped at DEFAULT_TIMEOUT_SECONDS, degrading further on a
+    # timeout) + teardown normally finish in well under this. Without a cap, a hung container or a
+    # stuck provider call could otherwise sit unnoticed for hours on this unattended weekly
+    # schedule before anyone sees it failed.
+    timeout-minutes: 30
     # Job-level, not just on the live-canary step: docker-compose.yml's worker service
     # interpolates ${OPENAI_API_KEY:-} at container-creation time, which happens during the
     # earlier "Boot dev Compose stack" step's `docker compose up` -- a step-scoped env on the

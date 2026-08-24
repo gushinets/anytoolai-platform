@@ -388,6 +388,34 @@ def test_live_atom_cases_reports_live007_on_missing_scenario_id_mapping(monkeypa
     assert "text.some_unknown_atom" in reloaded._MODULE_LOAD_ERROR
 
 
+def test_module_import_survives_atoms_proof_module_load_error(monkeypatch) -> None:
+    """Code-review finding: atoms_proof.smoke is never bound as an attribute at all when
+    atoms_proof's own guarded import block fails (its `smoke = load_smoke_module()` never runs)
+    -- LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO/_LIVE_ATOM_COVERAGE_LABELS/
+    _LIVE_COMPOSITE_COVERAGE_LABELS used to build unconditionally at this module's own import
+    time, reaching into atoms_proof.smoke regardless -- a raw AttributeError instead of leaving
+    them empty/None for main() to report the already-recorded atoms_proof._MODULE_LOAD_ERROR
+    cleanly (main() checks that before it ever reads any of the three)."""
+    module = load_live_canary_module()
+    monkeypatch.setattr(module.atoms_proof, "_MODULE_LOAD_ERROR", "PROOF000: fake load error")
+    monkeypatch.delattr(module.atoms_proof, "smoke", raising=False)
+
+    reload_path = Path(__file__).resolve().parents[1] / "scripts" / "agent" / "live_canary.py"
+    spec = importlib.util.spec_from_file_location("live_canary_reload_test_atoms_proof", reload_path)
+    assert spec is not None
+    assert spec.loader is not None
+    reloaded = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = reloaded
+    try:
+        spec.loader.exec_module(reloaded)
+    finally:
+        del sys.modules[spec.name]
+
+    assert reloaded.LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO == {}
+    assert reloaded._LIVE_ATOM_COVERAGE_LABELS is None
+    assert reloaded._LIVE_COMPOSITE_COVERAGE_LABELS is None
+
+
 def test_main_reports_live007_module_load_error_before_touching_the_database(monkeypatch) -> None:
     module = load_live_canary_module()
     monkeypatch.setattr(module, "_MODULE_LOAD_ERROR", "LIVE007: fake module load error")

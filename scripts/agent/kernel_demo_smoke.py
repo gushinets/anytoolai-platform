@@ -112,6 +112,22 @@ def _required_action_types() -> frozenset[str]:
     return frozenset(path.stem for path in ACTION_DEFINITIONS_ROOT.glob("*.yaml"))
 
 
+def _is_composite_entry_for_suffix(entry: object, *, live: bool) -> bool:
+    """`/code-review` #5 (2026-08-24) finding #3: `entry["workflow_id"].endswith("_live_v1") ==
+    live` (comparing a bool to the `live` flag) read less directly than branching on `live`
+    explicitly -- this says the same thing but as a plain if/else."""
+    if not (
+        isinstance(entry, dict)
+        and isinstance(entry.get("workflow_id"), str)
+        and entry["workflow_id"].startswith(_COMPOSITE_WORKFLOW_ID_PREFIX)
+    ):
+        return False
+    is_live_suffixed = entry["workflow_id"].endswith("_live_v1")
+    if live:
+        return is_live_suffixed
+    return not is_live_suffixed
+
+
 def _composite_workflow_entries_by_suffix(*, live: bool) -> list[dict]:
     """Shared open+parse+filter core for _composite_workflow_entries() (fake, live=False) and
     live_canary.py's own live-only entries fetcher (live=True) -- `/code-review` #4 (2026-08-24)
@@ -124,10 +140,7 @@ def _composite_workflow_entries_by_suffix(*, live: bool) -> list[dict]:
     return [
         entry
         for entry in data.get("workflows", [])
-        if isinstance(entry, dict)
-        and isinstance(entry.get("workflow_id"), str)
-        and entry["workflow_id"].startswith(_COMPOSITE_WORKFLOW_ID_PREFIX)
-        and entry["workflow_id"].endswith("_live_v1") == live
+        if _is_composite_entry_for_suffix(entry, live=live)
     ]
 
 
