@@ -6,15 +6,13 @@ This package covers **A15 — CE Kit MVP API Client** (ANY-8): **A15a — Founda
 **A15b — Scenario, Quota, and Polling Client** (ANY-171), and **A15c — Result Artifact Client**
 (ANY-226). The transport layer, the stable error union, injectable storage, guest identity, runtime
 config, quota, idempotent scenario start, session polling, next-action, and the frontend-safe
-result artifact read are all real. `pollJob`, `getArtifact`, `captureEmail`, and `trackClientEvent`
-are intentionally not exported: their backend contracts don't exist yet (public job polling, raw
-artifact fetching, email capture, client-event ingestion, owned by ANY-36 / later tickets).
-`createHandoff` and `openHandoffConsent` are also not exported, but for a different reason: the
-`/v1/handoffs` backend (create/get/accept/decline) is already implemented and in the generated
-OpenAPI types -- only the CE-kit client helpers are deferred, to ANY-222/A18a, which owns wiring
-them up. Unsupported capabilities must not ship as fake-success helpers, so all of the above will be
-added for real once their owning tickets land. (The deferred `getArtifact` name above is unrelated
-to the real `getResult()` below.)
+result artifact read, and the handoff creation/consent-navigation helpers (A18a / ANY-222) are all
+real. `pollJob`, `getArtifact`, `captureEmail`, and `trackClientEvent` are intentionally not
+exported: their backend contracts don't exist yet (public job polling, raw artifact fetching,
+email capture, client-event ingestion, owned by ANY-36 / later tickets). Unsupported capabilities
+must not ship as fake-success helpers, so all of the above will be added for real once their
+owning tickets land. (The deferred `getArtifact` name above is unrelated to the real `getResult()`
+below.)
 
 ## PlatformApiClient
 
@@ -397,12 +395,61 @@ const result = await nextAction(client, {
 });
 ```
 
+## Handoff
+
+`createHandoff(client, { handoffDefinitionId, sourceScenarioSessionId, sourceArtifactId })` is a
+single typed `POST /v1/handoffs` that mints a fresh handoff token for a source scenario
+session/artifact. `handoffToken` in the response is the only place the opaque plaintext token ever
+appears -- treat it as a short-lived bearer capability: never log it, store it beyond the consent
+navigation need, or derive/inspect its contents.
+
+```ts
+import { createHandoff } from "@anytoolai/ce-kit";
+
+const created = await createHandoff(client, {
+  handoffDefinitionId: "kernel_demo.to_freelancer_demo",
+  sourceScenarioSessionId,
+  sourceArtifactId,
+});
+if (created.ok) {
+  const { handoffId, handoffToken, status, expiresAt } = created.value;
+}
+```
+
+`openHandoffConsent({ webConsentBaseUrl, handoffToken, navigate })` is not a network call -- it
+builds the backend-owned consent URL (`{webConsentBaseUrl}/handoff/{handoffToken}`) and hands it to
+an injected `navigate`. CE-kit does not invent or hardcode a deployed web-mirror origin; callers
+always supply `webConsentBaseUrl`, the same way `PlatformApiClient` takes a caller-supplied
+`baseUrl`. An empty/whitespace-only `webConsentBaseUrl` throws synchronously, matching
+`PlatformApiClient`'s own `baseUrl` validation.
+
+```ts
+import { createWindowNavigator, openHandoffConsent } from "@anytoolai/ce-kit";
+
+await openHandoffConsent({
+  webConsentBaseUrl: "https://app.anytoolai.example.com",
+  handoffToken: created.ok ? created.value.handoffToken : "",
+  navigate: createWindowNavigator(window),
+});
+```
+
+`createChromeTabNavigator(chrome.tabs)` is the Chrome-extension equivalent of
+`createWindowNavigator(window)`, opening the consent URL in a new tab via `chrome.tabs.create()`.
+Both adapters implement the same injectable `Navigate` shape CE-kit's storage adapters use for
+`AsyncStorage`, so tests can pass a fake instead of a real browser/`chrome` global.
+
+`POST /v1/handoffs` never returns a `handoff_expired` code -- create always mints a fresh token, so
+there is no `isHandoffExpired()` guard here. That code only applies to `GET`/`accept`/`decline` on
+an existing token, which are out of scope for CE-kit today (see [A18 handoff surfaces
+non-goals](../../../docs/architecture/frontend-boundaries.md)).
+
 ## Classifying backend errors
 
 `isIdempotencyKeyConflict()`, `isScenarioActionConflict()`, `isQuotaExhausted()`,
-`isResultNotFound()`, and `isResultUnavailable()` are typed guards over `PlatformApiError` for the
-ambiguous cases above -- prefer them over comparing `error.code` strings directly, since they're
-the tested, reusable source of truth for which codes mean what:
+`isResultNotFound()`, `isResultUnavailable()`, `isHandoffNotFound()`, `isHandoffSourceInvalid()`,
+and `isHandoffTargetSchemaInvalid()` are typed guards over `PlatformApiError` for the ambiguous
+cases above -- prefer them over comparing `error.code` strings directly, since they're the tested,
+reusable source of truth for which codes mean what:
 
 ```ts
 import { isIdempotencyKeyConflict, isQuotaExhausted } from "@anytoolai/ce-kit";
