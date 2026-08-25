@@ -280,6 +280,64 @@ def test_classify_ledger_passes_and_sums_cost_across_retried_provider_calls() ->
     assert step.estimated_cost == pytest.approx(0.002)
 
 
+def test_classify_ledger_fails_closed_when_retried_provider_calls_cost_nets_out() -> None:
+    """`code-review` (me #8) finding: two individually-plausible provider_calls rows can net out
+    to an innocuous-looking StepEvidence.estimated_cost via plain summation -- e.g. $0.60 and
+    -$0.50 sum to $0.10, which live_canary.py's own post-hoc _safe_step_cost() guard (applied to
+    the already-summed StepEvidence.estimated_cost) sees as a perfectly valid, small cost.
+    _step_evidence_from_action_run() must poison the sum to math.inf per corrupt raw call
+    *before* summing, not validate only the finished total."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="text.extract_structured_fields", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[
+            _one_provider_call(
+                id="call-1", action_run_id="run-1", physical_call_index=0, status="failed",
+                estimated_cost=0.6,
+            ),
+            _one_provider_call(
+                id="call-2", action_run_id="run-1", physical_call_index=1, status="succeeded",
+                estimated_cost=-0.5,
+            ),
+        ],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=_all_expected_events(
+            provider_call_ids=("call-1", "call-2"), failed_provider_call_ids=("call-1",),
+        ),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+        max_provider_calls_per_action=2,
+    )
+
+    assert case.status == "pass"
+    assert len(case.steps) == 1
+    assert case.steps[0].estimated_cost == module.math.inf
+
+
+def test_classify_ledger_fails_closed_on_nan_provider_call_cost() -> None:
+    """Same `_safe_raw_cost()` guard as the negative-netting test above, for a NaN raw
+    `provider_calls.estimated_cost` -- a single corrupt row is enough here (no second call
+    needed to net anything out), since `sum()` of anything containing math.inf is math.inf."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="text.extract_structured_fields", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call(estimated_cost=module.math.nan)],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=_all_expected_events(),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "pass"
+    assert case.steps[0].estimated_cost == module.math.inf
+
+
 def test_classify_ledger_reports_proof003_when_retry_count_exceeds_the_configured_cap() -> None:
     module = load_atoms_proof_module()
 

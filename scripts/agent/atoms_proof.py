@@ -27,6 +27,7 @@ database URL, not the URL itself) -- the URL can embed credentials
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import sys
 from collections import Counter, defaultdict
@@ -260,6 +261,24 @@ def _best_effort_steps_from_provider_calls(
     return tuple(steps)
 
 
+def _safe_raw_cost(estimated_cost: float | None) -> float:
+    """None -> 0.0 (matches how the rest of this ledger is nullable-by-default); a non-finite
+    (NaN/inf) or negative raw `provider_calls.estimated_cost` -> math.inf, a corrupt row this
+    script never writes itself (`providers/adapters/litellm.py`'s `_float_like()` accepts either
+    via a bare `float(value or 0.0)`, and the DB column has no check constraint). Applied to each
+    *raw* call before summing in `_step_evidence_from_action_run()` below -- `code-review`
+    (me #8) finding: summing first and validating the result after (as live_canary.py's own
+    `_safe_step_cost()` does for the already-aggregated `StepEvidence.estimated_cost`) lets two
+    calls net out to an innocuous-looking total, e.g. `$0.60` and `-$0.50` summing to `$0.10`,
+    which passes that post-hoc guard cleanly. math.inf here poisons the sum unconditionally, the
+    same way it poisons live_canary.py's cost-cap sum."""
+    if estimated_cost is None:
+        return 0.0
+    if not math.isfinite(estimated_cost) or estimated_cost < 0:
+        return math.inf
+    return estimated_cost
+
+
 def _step_evidence_from_action_run(action_run: dict, calls: list[dict]) -> StepEvidence:
     """Aggregates every physical provider_calls row for one action_run into a single StepEvidence
     -- default_text_generation_v1's retry_policy.hard_limits permits up to 4 physical calls per
@@ -277,7 +296,7 @@ def _step_evidence_from_action_run(action_run: dict, calls: list[dict]) -> StepE
         input_tokens=sum(call["input_tokens"] for call in calls),
         output_tokens=sum(call["output_tokens"] for call in calls),
         total_tokens=sum(call["total_tokens"] for call in calls),
-        estimated_cost=sum(call["estimated_cost"] for call in calls),
+        estimated_cost=sum(_safe_raw_cost(call["estimated_cost"]) for call in calls),
         output_artifact_id=action_run["output_artifact_id"],
     )
 
