@@ -426,11 +426,13 @@ always supply `webConsentBaseUrl`, the same way `PlatformApiClient` takes a call
 ```ts
 import { createWindowNavigator, openHandoffConsent } from "@anytoolai/ce-kit";
 
-await openHandoffConsent({
-  webConsentBaseUrl: "https://app.anytoolai.example.com",
-  handoffToken: created.ok ? created.value.handoffToken : "",
-  navigate: createWindowNavigator(window),
-});
+if (created.ok) {
+  await openHandoffConsent({
+    webConsentBaseUrl: "https://app.anytoolai.example.com",
+    handoffToken: created.value.handoffToken,
+    navigate: createWindowNavigator(window),
+  });
+}
 ```
 
 `createChromeTabNavigator(chrome.tabs)` is the Chrome-extension equivalent of

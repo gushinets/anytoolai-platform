@@ -70,7 +70,11 @@ describe("createWindowNavigator", () => {
 
     navigate("https://web.example.com/handoff/token_abc");
 
-    expect(win.open).toHaveBeenCalledWith("https://web.example.com/handoff/token_abc");
+    expect(win.open).toHaveBeenCalledWith(
+      "https://web.example.com/handoff/token_abc",
+      "_blank",
+      "noopener",
+    );
   });
 });
 
