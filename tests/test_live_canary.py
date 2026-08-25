@@ -211,6 +211,54 @@ def test_cumulative_estimated_cost_treats_none_as_zero() -> None:
     assert module._cumulative_estimated_cost([_case(0.1, 0.2), _case(0.3)]) == 0.6
 
 
+def test_cumulative_estimated_cost_fails_closed_on_nan() -> None:
+    """code review finding: a NaN estimated_cost (a corrupt ledger row -- this script never
+    writes one itself) summed at face value would make every later `total_cost >
+    max_total_cost_usd` comparison silently False (NaN compares False to everything), the same
+    catastrophic fail-open `_positive_finite_cost()` already guards against for the cap value
+    itself. Must return math.inf instead, so run()'s existing cap-trip branch fires."""
+    module = load_live_canary_module()
+    StepEvidence = module.atoms_proof.StepEvidence
+    EvidenceCase = module.EvidenceCase
+
+    def _case(*costs: float | None) -> "EvidenceCase":
+        return EvidenceCase(
+            label="atom.one", scenario_id="s", kind="atom", status="pass",
+            session_id="session", job_id="job", error_code=None, error_message=None,
+            steps=tuple(
+                StepEvidence(step_id="x", action_type="t", action_config_id="c", estimated_cost=c)
+                for c in costs
+            ),
+        )
+
+    assert module._cumulative_estimated_cost([_case(0.1, float("nan"))]) == module.math.inf
+    # A NaN step buried after other, otherwise-summable cases still poisons the total.
+    assert module._cumulative_estimated_cost(
+        [_case(0.1), _case(0.2, float("nan"))]
+    ) == module.math.inf
+
+
+def test_cumulative_estimated_cost_fails_closed_on_negative_value() -> None:
+    """code review finding: a negative estimated_cost would quietly reduce the running total
+    instead of adding to it, letting real spend hide behind an offsetting negative row and delay
+    or prevent the cost cap from ever tripping. Must return math.inf instead of subtracting."""
+    module = load_live_canary_module()
+    StepEvidence = module.atoms_proof.StepEvidence
+    EvidenceCase = module.EvidenceCase
+
+    def _case(*costs: float | None) -> "EvidenceCase":
+        return EvidenceCase(
+            label="atom.one", scenario_id="s", kind="atom", status="pass",
+            session_id="session", job_id="job", error_code=None, error_message=None,
+            steps=tuple(
+                StepEvidence(step_id="x", action_type="t", action_config_id="c", estimated_cost=c)
+                for c in costs
+            ),
+        )
+
+    assert module._cumulative_estimated_cost([_case(1.0, -0.5)]) == module.math.inf
+
+
 def test_run_aborts_remaining_cases_once_cost_cap_exceeded_without_running_them(monkeypatch) -> None:
     module = load_live_canary_module()
     calls: list[str] = []

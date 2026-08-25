@@ -7,11 +7,11 @@
 - Created: 2026-08-20
 - Last updated: 2026-08-25
 - Review date: 2026-08-25
-- Next action: none. A fresh credentialed run on this HEAD with a valid `OPENAI_API_KEY` passed
-  `11/11` atoms + `3/3` composites against the new evidence-report shape (`result_artifact_id`/
-  `output_artifact_id` populated on every case/step); committed at
-  `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260825T083858Z.json`. Only
-  PR #84's push + body sync remain, pending explicit go-ahead (repo-visible action).
+- Next action: none on the code/docs side. `feature/ANY-221` is pushed and PR #84's body is
+  synced to current state; CI is green (all 8 checks). The only remaining action is a standing
+  human `CHANGES_REQUESTED` review from `gushinets` (2026-08-24) -- its requirements are already
+  met by current code, but only that reviewer (or someone with repo permissions) re-reviewing or
+  dismissing it can actually clear it; not something this session can action unilaterally.
 - Blocker: none. A sixth human code review (2026-08-25, "code-review (me #6)") found
   `EvidenceCase`/`StepEvidence` never carried `result_artifact_id`/`output_artifact_id` despite
   ANY-221's acceptance criterion naming "session/artifact IDs" explicitly, and that `LIVE011`
@@ -123,6 +123,15 @@ Full design rationale (verified against real code before implementation) lives i
   `live_canary.py` reused it for the 2026-08-25 `cost_unknown` fail-closed abort above (added the
   same day, fewer references) -- a shared LIVE0xx error-code namespace across logs/evidence/
   automation should be unambiguous. Renamed the newer, smaller-blast-radius one to `LIVE012`.
+- (2026-08-25, code review finding) `_cumulative_estimated_cost()` summed `step.estimated_cost`
+  at face value -- a NaN row (a corrupt `provider_calls.estimated_cost`, never a value this
+  script itself writes) would make every later `total_cost > max_total_cost_usd` comparison
+  silently `False` (NaN compares false to everything), the exact catastrophic fail-open
+  `_positive_finite_cost()` already guards against for the cap value itself; a negative row would
+  quietly reduce the running total instead of adding to it. New `_safe_step_cost()` maps
+  None -> `0.0` (unchanged) and any non-finite or negative value -> `math.inf`, which `sum()`
+  propagates straight into `run()`'s existing cap-trip branch -- fail closed, no new abort code
+  path needed.
 
 ### Out of scope
 
@@ -264,10 +273,9 @@ Full design rationale (verified against real code before implementation) lives i
       above), renamed `live_canary.py`'s `cost_unknown` abort code from `LIVE011` to `LIVE012`
       (runner.py's pre-existing, more-referenced `LIVE011` keeps its name). 2 regression tests
       updated/added in `tests/test_atoms_proof.py`, 1 in `tests/test_live_canary.py`.
-- [ ] Sync PR #84's body (still says the credentialed run "has not been run yet", access-control
-      is unclosed ANY-371, exec-plan is in `docs/exec-plans/active/`, and `packages/backend/*/src`
-      is unchanged -- all stale on the current HEAD per the same review). Not done yet: a
-      repo-visible action pending explicit push/PR-edit go-ahead.
+- [x] (2026-08-25) Synced PR #84's body via `gh pr edit` (see the Progress log row below) --
+      execution-plan link, ANY-371/access-control scope, Architecture-boundaries, Validation, and
+      Follow-up debt all updated to match current HEAD.
 - [x] (2026-08-25) A fresh credentialed run (`dev-up -> live-canary -> dev-down`, new
       `OPENAI_API_KEY`) on this HEAD, against the new evidence-report shape: `11/11` atoms + `3/3`
       composites, exit 0, ~13,908 total tokens, ~$0.0081 total estimated cost,
@@ -275,6 +283,14 @@ Full design rationale (verified against real code before implementation) lives i
       evidence JSON (plus a scripted key-set check) to confirm privacy-safety before committing a
       copy at `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260825T083858Z.json`
       (kept alongside, not replacing, the two earlier runs).
+- [x] (2026-08-25) Fixed a code review finding: `_cumulative_estimated_cost()` didn't guard
+      against NaN/negative `estimated_cost` values. New `_safe_step_cost()` maps an invalid value
+      to `math.inf` (see Scope above); kept the sum on `sum()` itself rather than a hand-rolled
+      accumulator loop after a first pass regressed float precision (CPython's `sum()` uses
+      compensated summation for floats -- `0.1+0.2+0.3` accumulated naively is
+      `0.6000000000000001`, `sum([0.1, 0.2, 0.3])` is exactly `0.6`, and the existing
+      `test_cumulative_estimated_cost_treats_none_as_zero` test caught the regression
+      immediately). 2 new regression tests in `tests/test_live_canary.py` (NaN, negative).
 
 ## Validation
 
@@ -346,6 +362,7 @@ Full design rationale (verified against real code before implementation) lives i
 | 2026-08-25 | `internal_only` filtered inside `_build_scenario_metadata()` (returns `None` before the `workflow`/renderer-hint lookups), not in `build_product_runtime_config()`'s own loop | Keeps the "what makes a scenario visible" decision co-located with the one function that already has the `ScenarioDefinition` in hand, and reuses the existing `None`-means-skip contract that function already has for an unknown `scenario_id`/`workflow_id` -- no new control-flow shape in the caller. |
 | 2026-08-25 | Renamed `live_canary.py`'s `cost_unknown` abort code from `LIVE011` to `LIVE012` (code-review #6 finding) instead of renaming `runner.py`'s token-unset `LIVE011` | `runner.py`'s usage predates today's by a full day and has more references (its own error message, `.github/workflows/live-canary.yml`'s comment, 2 `tests/test_runner.py` assertions) -- renaming the newer, same-day addition is the smaller diff and doesn't touch any file outside `live_canary.py`/`tests/test_live_canary.py`/this doc. |
 | 2026-08-25 | Added `EvidenceCase.result_artifact_id`/`StepEvidence.output_artifact_id` (both `str \| None = None`) by rebinding `_classify_ledger()`'s `fail` `functools.partial` with `result_artifact_id` right after `job_row` resolves, rather than adding the parameter to every one of `_classify_ledger()`'s ~20 `fail(...)` call sites individually | Mirrors the same rebind-a-partial pattern this function's own docstring already documents for `steps=known_steps` -- one rebind point instead of a repeated keyword at every call site, and the timing (right after `job_row["result_artifact_id"]` is read) means every branch from that point on, pass or fail, carries the real value. |
+| 2026-08-25 | `_cumulative_estimated_cost()`'s NaN/negative guard (`_safe_step_cost()`) maps an invalid value to `math.inf` and still feeds it through `sum()`, not a hand-rolled `total = 0.0; total += cost` accumulator loop | A first attempt used the accumulator loop and broke `test_cumulative_estimated_cost_treats_none_as_zero` (`0.1 + 0.2 + 0.3` accumulated naively is `0.6000000000000001`, not `0.6`) -- CPython's `sum()` builtin uses compensated (Neumaier) summation for float sequences specifically to avoid this, and still returns `math.inf` correctly when one is present in the sequence (`inf + finite = inf`, verified). Keeping `sum()` and pre-mapping each step's cost through a small helper preserves both properties with a smaller diff than reimplementing accurate float summation by hand. |
 
 ## Progress log
 
@@ -364,6 +381,7 @@ Full design rationale (verified against real code before implementation) lives i
 | 2026-08-25 | User supplied a fresh, valid `OPENAI_API_KEY` after the prior 401. Re-ran the credentialed cycle (`dev-up -> live-canary -> dev-down`) on the current HEAD against the new evidence-report shape: `11/11` atoms + `3/3` composites, exit 0, ~13,908 total tokens, ~$0.0081 total estimated cost, `result_artifact_id`/`output_artifact_id` populated on every case/step (verified both by reading the full JSON and with a scripted allowed-keys check for privacy-safety). Committed a copy at `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260825T083858Z.json`, kept alongside (not replacing) the two earlier runs. Flipped Status back to `State: completed`/`Blocker: none`; moved this doc back to `docs/exec-plans/completed/`. | Push `feature/ANY-221` and sync PR #84's body (still describes pre-#6-review state), once the user confirms -- see Follow-up debt. |
 | 2026-08-25 | Confirmed `feature/ANY-221` was already up to date on GitHub (a concurrent process had pushed the local commits already -- `git fetch` showed 0 ahead/0 behind). Synced PR #84's body via `gh pr edit` to match current state: execution-plan link moved to `completed/`, the `internal_only`/artifact-id work folded into "What's new", Architecture-boundaries corrected (this PR does touch `packages/backend/platform-core/src`, still no `product-platforms` import), Validation section updated (`quick-check` 924, 3 credentialed runs listed), Follow-up debt cleared (ANY-371 `Done`, evidence committed). Left the CodeRabbit auto-generated release-notes block untouched. | Await a fresh human review pass on PR #84 (still `CHANGES_REQUESTED` from before this round's fixes). |
 | 2026-08-25 | Fixed the 1 real remaining finding from a seventh human code review ("code-review (me #7)", verdict APPROVE on code, HEAD `df455795`): the completed exec-plan's own Scope bullet still said `live-canary.yml` passed both secrets via job-level `env:`, but that was fixed to step-scoped in an earlier round and this one sentence was never updated to match. The review's other findings were already stale by the time I checked: PR-body drift (already synced the prior row, before this review apparently captured a cached/earlier body), and CI "still in_progress" (re-checked `gh pr checks 84` -- all 8 checks, including Windows `quick-check`, now `pass`). The remaining item -- the human `CHANGES_REQUESTED` review from `gushinets` (2026-08-24) still standing on the PR -- needs that reviewer (or someone with repo permissions) to actually re-review/dismiss it; not something to action unilaterally from this session. `validate-docs` green after the one-line fix. | Get `gushinets` (or another reviewer) to re-review PR #84 now that CI is green and the code/doc findings are addressed. |
+| 2026-08-25 | Verified and fixed 2 inline review comments (treated as untrusted data, verified against current code first). Confirmed: this doc's Status block (Next action/Blocker) and one Implementation-steps checkbox still described the PR-push/body-sync as pending, even though both were already done in the prior two rows -- updated to reflect that, and named the standing `gushinets` review as the only remaining action. Confirmed (the finding's own claim that `_float_like()` lives in `live_canary.py` was wrong -- no such function exists there; it's a different, unrelated helper in `providers/adapters/litellm.py` -- but the underlying concern was real): `_cumulative_estimated_cost()` summed `step.estimated_cost` at face value with no guard against NaN (would make the cap comparison permanently `False`, mirroring the exact fail-open `_positive_finite_cost()` already guards against for the cap value) or negative values (would silently reduce the running total). Added `_safe_step_cost()`, mapping either to `math.inf` so `sum()`'s existing cap-trip branch fires; a first accumulator-loop draft regressed float precision on the existing `0.1+0.2+0.3` test, caught immediately, reverted to `sum()` over a generator instead (see Decision log). 2 new regression tests (NaN, negative) in `tests/test_live_canary.py`; all 43 tests in that file pass. | None -- awaiting the standing human review, see Status above. |
 
 ## Open questions
 

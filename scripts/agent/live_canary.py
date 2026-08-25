@@ -207,12 +207,31 @@ def _live_composite_coverage_error(cases: tuple[tuple[str, str, dict], ...]) -> 
     )
 
 
+def _safe_step_cost(estimated_cost: float | None) -> float:
+    """None (a step whose provider_calls row predates cost tracking, or a still-fake case)
+    contributes 0, not a TypeError -- matches how the rest of this ledger is nullable-by-default.
+
+    A non-finite (NaN/inf) or negative value -- a corrupt ledger row, never a value this script
+    itself writes -- returns math.inf instead of its face value: NaN would make every later
+    `total_cost > max_total_cost_usd` comparison silently False (the same catastrophic failure
+    mode `_positive_finite_cost()`'s own docstring documents for the cap value itself), and a
+    negative value would quietly reduce the running total instead of adding to it. math.inf
+    propagates through sum() (inf + anything finite is inf) straight into run()'s existing
+    cap-trip branch to fail closed -- code review finding."""
+    if estimated_cost is None:
+        return 0.0
+    if not math.isfinite(estimated_cost) or estimated_cost < 0:
+        return math.inf
+    return estimated_cost
+
+
 def _cumulative_estimated_cost(cases: list[EvidenceCase]) -> float:
-    """Sums estimated_cost across every step of every case so far. None (a step whose
-    provider_calls row predates cost tracking, or a still-fake case) contributes 0, not a
-    TypeError -- matches how the rest of this ledger is nullable-by-default."""
+    """Sums estimated_cost across every step of every case so far -- see _safe_step_cost() for
+    the None/NaN/negative handling. Plain sum(), not a hand-rolled accumulator loop: CPython's
+    sum() uses compensated (Neumaier) summation for floats, which is measurably more accurate
+    than naive left-to-right accumulation for a long run of small per-step costs."""
     return sum(
-        step.estimated_cost or 0.0 for case in cases for step in case.steps
+        _safe_step_cost(step.estimated_cost) for case in cases for step in case.steps
     )
 
 
