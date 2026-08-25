@@ -120,6 +120,9 @@ class EvidenceCase:
     error_code: str | None
     error_message: str | None
     steps: tuple[StepEvidence, ...]
+    # True only when this case's real cost could not be recovered after a ledger/DB error --
+    # steps is then () but that does NOT mean $0 was spent. `code-review` finding.
+    cost_unknown: bool = False
 
 
 def _build_engine(database_url: str, *, decode_database_name: bool = False) -> "sa.engine.Engine":
@@ -186,11 +189,14 @@ def _fail(
     *, label: str, scenario_id: str, kind: str, session_id: str | None, job_id: str | None,
     error_code: str, error_message: str,
     steps: tuple[StepEvidence, ...] = (),
+    cost_unknown: bool = False,
 ) -> EvidenceCase:
     """steps defaults to () for the common case (nothing ran yet, so no cost was incurred) but
     _classify_ledger's PROOF00x branches pass known_steps -- see its own comment -- so a case
     that already made a real, billed provider call before failing a later correctness check still
-    reports its real cost instead of silently reporting 0."""
+    reports its real cost instead of silently reporting 0. cost_unknown defaults to False for the
+    same reason; call sites that recover steps via _known_steps_for_session() pass
+    cost_unknown=True when that recovery itself returned None (see its own docstring)."""
     return EvidenceCase(
         label=label,
         scenario_id=scenario_id,
@@ -201,6 +207,7 @@ def _fail(
         error_code=error_code,
         error_message=error_message,
         steps=steps,
+        cost_unknown=cost_unknown,
     )
 
 
@@ -285,16 +292,16 @@ def _classify_ledger(
     Every internal failure returns through `fail` (functools.partial over _fail(), bound once
     with label/scenario_id/kind/session_id/steps=known_steps -- the fields every PROOF00x branch
     shares -- leaving each call site to supply only job_id/error_code/error_message) instead of
-    calling _fail() directly at each of the 23 return sites below -- `/code-review` #4 (2026-08-24)
-    finding #6: a manually repeated steps=known_steps() at every call site meant a missed site (as
+    calling _fail() directly at each of the 23 return sites below -- `code-review`
+    finding: a manually repeated steps=known_steps() at every call site meant a missed site (as
     in finding #1, the _check_ledger() except-branch) silently produced incomplete evidence.
     Binding the shared fields once makes that particular class of typo far less likely, since a
     call site no longer has to hand-type steps=known_steps() (or any of the other shared fields)
     at all -- but `_fail()` itself is still directly importable/callable from this same scope, so
     this is a strong convention this function's own 19 call sites all follow, not a
-    language-enforced guarantee (`/code-review` #5, 2026-08-24 finding #1: an earlier version of
+    language-enforced guarantee (`code-review` finding: an earlier version of
     this docstring overclaimed "structurally impossible"). known_steps is computed eagerly (not
-    lazily, unlike a prior round -- `/code-review` #4 finding #5: a per-call-scoped @cache on a
+    lazily, unlike a prior round -- `code-review` finding: a per-call-scoped @cache on a
     closure that's provably called at most once per invocation, since every call site immediately
     returns, was pure overhead and a misleading "memoized for reuse" signal) -- the small, bounded
     cost of this on the success path (which builds its own, differently-ordered `steps` tuple from
@@ -563,7 +570,7 @@ def _classify_ledger(
             ),
         )
 
-    # `/code-review` #3 (2026-08-24) finding: a transport retry's *first* provider_calls row
+    # code review #3 (2026-08-24) finding: a transport retry's *first* provider_calls row
     # legitimately ends in provider.request_failed, not provider.request_succeeded (the gateway
     # then makes another physical attempt, which succeeds) -- requiring succeeded == 1 on every
     # row rejected exactly the retry case max_provider_calls_per_action (PROOF003, above) was
@@ -685,7 +692,7 @@ def _classify_ledger(
 
 def _fetch_action_runs(conn: "sa.engine.Connection", scenario_session_id: str) -> list[dict]:
     """Shared by _check_ledger()'s main fetch and _known_steps_for_session()'s recovery fetch --
-    `/code-review` #4 (2026-08-24) finding: those two used to run this exact query independently,
+    code review #4 (2026-08-24) finding: those two used to run this exact query independently,
     risking the two drifting apart on a future schema change applied to only one of them."""
     return list(
         conn.execute(
@@ -710,8 +717,8 @@ def _fetch_provider_calls(conn: "sa.engine.Connection", scenario_session_id: str
 
 def _known_steps_for_session(
     engine: "sa.engine.Engine", scenario_session_id: str | None
-) -> tuple[StepEvidence, ...]:
-    """`/code-review` #3 (2026-08-24) finding: a case can fail at the HTTP/status-polling layer
+) -> tuple[StepEvidence, ...] | None:
+    """code review #3 (2026-08-24) finding: a case can fail at the HTTP/status-polling layer
     (_run_case_with_ledger_check's `result.error_message is not None` branch) *after* a real,
     billed provider call already happened server-side -- that branch never reaches
     _check_ledger()/_classify_ledger(), the only place known_steps recovery was wired in, so the
@@ -719,12 +726,17 @@ def _known_steps_for_session(
     recovery for the HTTP-layer failure path: a minimal, best-effort query for just the two tables
     _best_effort_steps_from_provider_calls() needs, not a full _check_ledger() run (which would
     misclassify an HTTP-layer failure as a ledger-correctness one). Also reused by _check_ledger()
-    itself for the same recovery when its own 5-table fetch raises (`/code-review` #4, 2026-08-24
+    itself for the same recovery when its own 5-table fetch raises (code review #4, 2026-08-24
     finding #1 -- a case that made a real provider call and then hit a transient SQLAlchemyError
-    fetching the ledger was losing its cost the same way). Tolerant of everything -- no
-    scenario_session_id yet (nothing could have run), a DB error, or a session with no rows yet --
-    all resolve to () rather than raising, since this is best-effort recovery on an
-    already-failing path, not a correctness check of its own."""
+    fetching the ledger was losing its cost the same way).
+
+    Returns None -- not () -- when scenario_session_id is set but the recovery query itself also
+    hits a SQLAlchemyError: cost is genuinely unknown then, not zero, since a real, billed
+    provider call could already have happened before the DB became unreachable. code review
+    (me #5) finding: callers used to fold that into (), which made live_canary.py's cost cap
+    fail-open -- a lost DB connection made every subsequent case look free instead of aborting.
+    () still means "confirmed no cost": no scenario_session_id yet (nothing could have run), or a
+    successful query that found no rows."""
     if scenario_session_id is None:
         return ()
     try:
@@ -732,7 +744,7 @@ def _known_steps_for_session(
             action_runs = _fetch_action_runs(conn, scenario_session_id)
             provider_calls = _fetch_provider_calls(conn, scenario_session_id)
     except sa.exc.SQLAlchemyError:
-        return ()
+        return None
     return _best_effort_steps_from_provider_calls(action_runs, provider_calls)
 
 
@@ -780,7 +792,8 @@ def _check_ledger(
         # e.g. OperationalError (connection/auth) from ProgrammingError (bad query) at a glance.
         # steps recovers a real, billed provider call this same batch's own SQLAlchemyError
         # (connection drop, pool exhaustion, statement timeout right after a slow live provider
-        # round-trip) would otherwise have silently lost -- `/code-review` #4 finding #1.
+        # round-trip) would otherwise have silently lost -- code review #4 finding #1.
+        known_steps = _known_steps_for_session(engine, scenario_session_id)
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=scenario_session_id, job_id=None,
@@ -789,7 +802,8 @@ def _check_ledger(
                 f"PROOF000: database ledger check failed for scenario_session_id "
                 f"{scenario_session_id}: {type(exc).__name__}"
             ),
-            steps=_known_steps_for_session(engine, scenario_session_id),
+            steps=known_steps or (),
+            cost_unknown=known_steps is None,
         )
 
     return _classify_ledger(
@@ -838,6 +852,7 @@ def _run_case_with_ledger_check(
         # documented as privacy-safe-by-construction (ids/labels/booleans only).
         print(f"{label} ({scenario_id}): {result.error_message}", file=sys.stderr)
         error_code = result.error_code or "PROOF000"
+        known_steps = _known_steps_for_session(engine, result.session_id)
         return _fail(
             label=label, scenario_id=scenario_id, kind=kind,
             session_id=result.session_id, job_id=None,
@@ -846,7 +861,8 @@ def _run_case_with_ledger_check(
                 f"{error_code}: HTTP-layer case failed for scenario_id {scenario_id} "
                 "(see stderr for full diagnostic)"
             ),
-            steps=_known_steps_for_session(engine, result.session_id),
+            steps=known_steps or (),
+            cost_unknown=known_steps is None,
         )
     return _check_ledger(
         engine, label=label, scenario_id=scenario_id, kind=kind,

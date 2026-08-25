@@ -26,7 +26,7 @@ def test_load_live_canary_module_returns_the_same_cached_module_on_repeat_calls(
 
 
 def test_live_canary_atoms_proof_is_the_same_cached_module_test_atoms_proof_uses() -> None:
-    """`/code-review` #2 (2026-08-24) finding: live_canary.py used to do a bare `import
+    """`code-review` finding: live_canary.py used to do a bare `import
     atoms_proof`, which registers a SEPARATE copy of the module under sys.modules["atoms_proof"]
     instead of reusing the load_cached_module()-backed instance tests/test_atoms_proof.py itself
     uses -- re-parsing/re-executing atoms_proof.py's own YAML/config loading and engine-wiring a
@@ -99,7 +99,7 @@ def test_live_composite_workflow_entries_returns_exactly_the_three_live_suffixed
 
 
 def test_live_composite_workflow_entries_delegates_to_the_shared_suffix_helper() -> None:
-    """`/code-review` #4 (2026-08-24) finding #2: this used to be its own near-verbatim copy of
+    """code review #4 (2026-08-24) finding #2: this used to be its own near-verbatim copy of
     kernel_demo_smoke.py's open+parse+filter logic; pins that it's now a thin wrapper instead."""
     module = load_live_canary_module()
 
@@ -123,7 +123,7 @@ def test_live_composite_coverage_error_reports_missing_workflow() -> None:
 
 
 def test_live_atom_coverage_labels_report_live008_not_smoke007() -> None:
-    """`/code-review` #3 (2026-08-24) finding: main() used to call
+    """code review #3 (2026-08-24) finding: main() used to call
     atoms_proof.smoke._atom_coverage_error(LIVE_ATOM_CASES) with no labels override, so a live
     atom-coverage failure reported SMOKE007/ATOM_SMOKE_CASES -- misattributing it to the
     fake-provider config instead of the live one, and breaking the LIVE0xx convention every other
@@ -262,6 +262,62 @@ def test_run_aborts_remaining_cases_once_cost_cap_exceeded_without_running_them(
     assert [case.kind for case in skipped_cases] == ["atom"] * 8 + ["composite"] * 3
 
 
+def test_run_fails_closed_and_stops_when_a_case_cost_cannot_be_recovered(monkeypatch) -> None:
+    """code review (me #5) finding: a case that already made a real, billed provider call and
+    then hit a ledger/DB error whose own recovery query also failed used to report cost_unknown
+    steps=() the same as a genuinely free case -- the cumulative cost cap saw $0 for it and kept
+    running every remaining case with no cap in effect. Regression scenario the reviewer asked
+    for: case 1 spends money and passes, case 2's ledger recovery loses its cost entirely
+    (cost_unknown=True); case 3 must never run."""
+    module = load_live_canary_module()
+    calls: list[str] = []
+
+    def _fake_run_case_with_ledger_check(
+        api_url, engine, *, kind, label, scenario_id, scenario_input, timeout, **_kwargs
+    ):
+        calls.append(scenario_id)
+        if len(calls) == 1:
+            return module.EvidenceCase(
+                label=label, scenario_id=scenario_id, kind=kind, status="pass",
+                session_id="session", job_id="job", error_code=None, error_message=None,
+                steps=(
+                    module.atoms_proof.StepEvidence(
+                        step_id="x", action_type=label, action_config_id="c",
+                        estimated_cost=0.1,
+                    ),
+                ),
+            )
+        return module.EvidenceCase(
+            label=label, scenario_id=scenario_id, kind=kind, status="fail",
+            session_id="session", job_id=None, error_code="PROOF000",
+            error_message="PROOF000: database ledger check failed", steps=(),
+            cost_unknown=True,
+        )
+
+    monkeypatch.setattr(
+        module.atoms_proof, "_run_case_with_ledger_check", _fake_run_case_with_ledger_check
+    )
+    monkeypatch.setattr(
+        module.atoms_proof,
+        "_build_engine",
+        lambda database_url, **kwargs: _FakeEngine(),
+    )
+
+    cases, exit_code = module.run(
+        "http://127.0.0.1:8000", "postgresql://unused", timeout=1.0, max_total_cost_usd=1000.0,
+    )
+
+    # Only the first 2 of the combined 14-case queue actually ran -- case 2's cost_unknown trips
+    # the abort before the (very high, never-tripped-by-real-cost) cap check even runs.
+    assert calls == [scenario_id for _action_type, scenario_id, _input in module.LIVE_ATOM_CASES[:2]]
+    assert len(cases) == 14
+    assert exit_code == 1
+    assert cases[0].status == "pass"
+    assert cases[1].status == "fail" and cases[1].error_code == "PROOF000"
+    skipped_cases = cases[2:]
+    assert all(case.status == "fail" and case.error_code == "LIVE011" for case in skipped_cases)
+
+
 class _FakeEngine:
     def dispose(self) -> None:
         pass
@@ -359,7 +415,7 @@ def test_write_evidence_report_round_trips_composite_kind_with_multiple_steps(tm
 
 
 def test_live_atom_cases_reports_live007_on_missing_scenario_id_mapping(monkeypatch) -> None:
-    """`/code-review` (2026-08-24) finding: a future 12th atom_type added to
+    """code review (2026-08-24) finding: a future 12th atom_type added to
     kernel_demo_smoke.py's ATOM_SMOKE_CASES without a matching LIVE_ATOM_SCENARIO_IDS entry in
     the same PR must fail this module's load as a clean LIVE007, not a raw KeyError out of the
     module-level LIVE_ATOM_CASES comprehension -- mirrors atoms_proof.py's own guarded
@@ -456,7 +512,7 @@ def _run_main_capturing_decode_database_name(module, monkeypatch, argv) -> bool:
 
 
 def test_main_forwards_database_url_is_percent_encoded_flag_when_set(monkeypatch) -> None:
-    """`/code-review` (2026-08-24) finding: runner.py's live_canary() passes
+    """code review (2026-08-24) finding: runner.py's live_canary() passes
     --database-url-is-percent-encoded (mirroring atoms_proof()), but this script didn't accept or
     forward the flag at all -- a reserved-character ANYTOOLAI_POSTGRES_PASSWORD/_DB would connect
     fine via atoms-proof but silently fail to connect via live-canary on the same stack."""
@@ -483,7 +539,7 @@ def test_main_forwards_database_url_is_percent_encoded_flag_when_unset(monkeypat
 
 
 def test_live_expected_schema_ref_by_scenario_covers_all_fourteen_live_scenarios() -> None:
-    """`/code-review` #2 (2026-08-24) finding: kernel_demo_smoke.py's own
+    """code review #2 (2026-08-24) finding: kernel_demo_smoke.py's own
     _EXPECTED_SCHEMA_REF_BY_SCENARIO only ever knows about fake-provider scenario_ids, so
     smoke._run_one_case's SMOKE009 cross-check silently no-ops for every live case unless
     live_canary.py supplies its own dict covering the 14 live scenario_ids too -- each mapped to
@@ -621,7 +677,7 @@ def load_live_canary_config_test_module():
 
 
 def test_live_atom_scenario_ids_agree_with_the_independently_maintained_config_test_maps() -> None:
-    """`/code-review` #2 (2026-08-24) finding: the fake-atom -> live-atom mapping is hand-written
+    """code review #2 (2026-08-24) finding: the fake-atom -> live-atom mapping is hand-written
     three times independently (this module's LIVE_ATOM_SCENARIO_IDS keyed by action_type,
     apps/platform-api/tests/test_live_canary_config.py's LIVE_ATOM_ACTION_CONFIG_IDS and
     LIVE_ATOM_WORKFLOW_AND_SCENARIO_IDS both keyed by fake action_config_id) with nothing

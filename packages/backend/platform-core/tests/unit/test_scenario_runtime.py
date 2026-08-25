@@ -246,7 +246,7 @@ def test_start_session_rejects_internal_only_scenario_idempotency_replay_without
     config_registry,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`/code-review` #3 (2026-08-24) finding: the idempotency-key replay lookup used to run
+    """`code-review` finding: the idempotency-key replay lookup used to run
     before the internal_only/live_canary_token check, so a second start_session() call reusing
     the same idempotency_key from a legitimately-token-authorized first call, but omitting the
     token this time, would return the replayed snapshot instead of being rejected -- the token

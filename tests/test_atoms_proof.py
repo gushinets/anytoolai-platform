@@ -233,7 +233,7 @@ def test_classify_ledger_passes_and_sums_cost_across_retried_provider_calls() ->
     must sum every physical attempt's cost/tokens/latency, not report just one of them (which
     would silently lose real spend from live_canary.py's cost cap).
 
-    `/code-review` #3 (2026-08-24) finding: this test's own events used to give BOTH provider_calls
+    `code-review` finding: this test's own events used to give BOTH provider_calls
     rows a provider.request_succeeded event, which never exercised the actual retry shape (a
     transport retry's first physical attempt ends in provider.request_failed, then a second
     attempt succeeds) -- that shape was rejected as PROOF013 until the fix below. call-1 here is
@@ -296,7 +296,7 @@ def test_classify_ledger_reports_proof003_when_retry_count_exceeds_the_configure
 
 
 def test_classify_ledger_reports_proof024_when_a_provider_call_has_no_terminal_event() -> None:
-    """`/code-review` #3 (2026-08-24): a provider_calls row with only a provider.request_started
+    """`code-review`: a provider_calls row with only a provider.request_started
     event (no succeeded, no failed -- e.g. the physical attempt is still in flight, or its
     terminal event was lost) must fail, not silently pass now that a bare succeeded==1 check was
     relaxed. Uses a second, fully-normal run-2/call-2 pair alongside the run-1/call-1 pair under
@@ -891,7 +891,7 @@ def test_classify_ledger_reports_proof012_when_provider_call_is_orphaned() -> No
 
     assert case.status == "fail"
     assert case.error_code == "PROOF012"
-    # `/code-review` #2 (2026-08-24) finding: both provider_calls rows already carry a real,
+    # code review #2 (2026-08-24) finding: both provider_calls rows already carry a real,
     # billed estimated_cost -- a failed case must still report it (live_canary.py's cost cap sums
     # exactly this field), not silently drop it to 0 just because the overall ledger is invalid.
     # The orphan row can't be correlated to a known action_run, so it falls back to its own
@@ -1149,7 +1149,7 @@ class _FakeConnection:
 def test_run_case_with_ledger_check_recovers_known_cost_on_an_http_layer_failure(
     monkeypatch, capsys
 ) -> None:
-    """`/code-review` #3 (2026-08-24) finding: a case can fail at the HTTP/status-polling layer
+    """code review #3 (2026-08-24) finding: a case can fail at the HTTP/status-polling layer
     *after* a real, billed provider call already happened server-side (e.g. the session completed
     but SMOKE009's schema_ref cross-check then failed) -- this branch never reaches
     _check_ledger()/_classify_ledger(), so without _known_steps_for_session() the spend would
@@ -1179,6 +1179,7 @@ def test_run_case_with_ledger_check_recovers_known_cost_on_an_http_layer_failure
     assert case.error_code == "SMOKE009"
     assert len(case.steps) == 1
     assert case.steps[0].estimated_cost == 0.001
+    assert case.cost_unknown is False
 
 
 def test_run_case_with_ledger_check_dispatches_a_passing_http_result_into_check_ledger(
@@ -1278,7 +1279,12 @@ def test_check_ledger_reports_proof000_without_leaking_raw_exception_text() -> N
     """Fourteenth-round finding: database_url isn't guaranteed to be the fixed dev-only default
     (ANYTOOLAI_POSTGRES_PASSWORD is overridable), so a driver exception's free-form message must
     not flow into the persisted evidence report -- only PROOF000 plus the exception class name,
-    which is still enough to tell e.g. an auth/connection failure from a bad-query error."""
+    which is still enough to tell e.g. an auth/connection failure from a bad-query error.
+
+    Every connect() call fails here, so _known_steps_for_session()'s own recovery query fails
+    too -- `code-review` finding: this must report cost_unknown=True (steps=() does NOT
+    mean $0 was spent), not silently look identical to a case that never got a session at all,
+    or live_canary.py's cost cap fails open on a lost DB connection."""
     module = load_atoms_proof_module()
 
     class _FailingEngine:
@@ -1295,10 +1301,11 @@ def test_check_ledger_reports_proof000_without_leaking_raw_exception_text() -> N
     assert "SQLAlchemyError" in case.error_message
     assert "secret-looking-detail" not in case.error_message
     assert case.steps == ()
+    assert case.cost_unknown is True
 
 
 def test_check_ledger_recovers_known_cost_when_its_own_fetch_raises(monkeypatch) -> None:
-    """`/code-review` #4 (2026-08-24) finding #1: a case can make a real, billed provider call and
+    """code review #4 (2026-08-24) finding #1: a case can make a real, billed provider call and
     then hit a transient SQLAlchemyError (connection drop, pool exhaustion, statement timeout)
     fetching _check_ledger()'s own 5-table batch -- that spend must not silently report 0 to
     live_canary.py's cost cap just because the *second* connection attempt (this batch's own)
@@ -1327,6 +1334,7 @@ def test_check_ledger_recovers_known_cost_when_its_own_fetch_raises(monkeypatch)
     assert case.error_code == "PROOF000"
     assert len(case.steps) == 1
     assert case.steps[0].estimated_cost == 0.001
+    assert case.cost_unknown is False
 
 
 def test_write_evidence_report_is_privacy_safe_and_shaped_correctly(tmp_path) -> None:

@@ -184,7 +184,7 @@ def test_run_one_case_reports_smoke009_when_result_schema_ref_mismatches(monkeyp
 def test_run_one_case_expected_schema_ref_by_scenario_param_overrides_module_global(
     monkeypatch,
 ) -> None:
-    """`/code-review` #2 (2026-08-24) finding: live_canary.py needs SMOKE009 to check its 14 live
+    """`code-review` finding: live_canary.py needs SMOKE009 to check its 14 live
     scenario_ids too, but the module-level _EXPECTED_SCHEMA_REF_BY_SCENARIO only ever knows about
     fake-provider scenario_ids -- the expected_schema_ref_by_scenario param lets a caller supply
     its own lookup instead, without mutating shared state other in-process callers/tests read."""
@@ -373,7 +373,7 @@ def test_composite_workflow_entries_excludes_live_suffixed_workflow_ids() -> Non
 
 
 def test_composite_workflow_entries_by_suffix_partitions_fake_and_live_entries() -> None:
-    """`/code-review` #4 (2026-08-24) finding #2: _composite_workflow_entries() (live=False) and
+    """`code-review` finding: _composite_workflow_entries() (live=False) and
     live_canary.py's own live-only entries fetcher used to be near-verbatim copies; both now share
     _composite_workflow_entries_by_suffix(), which this pins as a true partition of the same
     underlying workflows.yaml composite entries -- every entry lands in exactly one of the two

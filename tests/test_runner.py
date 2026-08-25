@@ -275,7 +275,7 @@ def test_required_backend_workflow_runs_canonical_postgresql_check() -> None:
 
 
 def test_live_canary_workflow_scopes_secrets_to_exactly_the_two_steps_that_need_them() -> None:
-    """`/code-review` #2 (2026-08-24) finding: docker-compose.yml's worker service interpolates
+    """`code-review` finding: docker-compose.yml's worker service interpolates
     OPENAI_API_KEY at container-creation time, during the "Boot dev Compose stack" step -- that
     step must have it, or every scheduled run would silently make 0 real provider calls.
     platform-api reads ANYTOOLAI_LIVE_CANARY_TOKEN the same way, for internal_only scenarios'
@@ -283,7 +283,7 @@ def test_live_canary_workflow_scopes_secrets_to_exactly_the_two_steps_that_need_
     own process env for its LIVE000/LIVE011 fail-fast checks, so the later "Run 11-atom live
     provider canary" step needs them too.
 
-    `/code-review` #4 (2026-08-25) finding: an earlier version of this workflow put both secrets
+    `code-review` finding: an earlier version of this workflow put both secrets
     at job level, which every step (checkout, setup-python, setup-uv, uv sync, log dump,
     teardown, upload) also inherited despite having no need for either -- scoped down to exactly
     the two steps that need them, narrowing exposure with no loss of correctness."""
@@ -1048,7 +1048,7 @@ def test_live_canary_passes_database_url_via_env_not_argv(monkeypatch) -> None:
         "--database-url-is-percent-encoded",
     ]
     assert env[env_var_name] == identity.database_url
-    # `/code-review` #4 (2026-08-25) nitpick: _run_proof_script()'s env comes from runner_env()
+    # `code-review` nitpick: _run_proof_script()'s env comes from runner_env()
     # (os.environ.copy() plus a few extras), so the subprocess that actually makes the request
     # must inherit ANYTOOLAI_LIVE_CANARY_TOKEN from this test's own monkeypatched os.environ, not
     # just have it checked by live_canary()'s own upfront LIVE011 fail-fast.

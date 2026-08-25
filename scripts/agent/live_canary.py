@@ -172,7 +172,7 @@ def _live_composite_workflow_entries() -> list[dict]:
     """Live-canary-named wrapper around kernel_demo_smoke.py's shared
     _composite_workflow_entries_by_suffix(live=True) -- the inverse of that module's own
     _composite_workflow_entries() (live=False), which permanently excludes them (see that
-    function's docstring). `/code-review` #4 (2026-08-24) finding #2: this used to be its own
+    function's docstring). code review #4 (2026-08-24) finding #2: this used to be its own
     near-verbatim copy of the open+parse+filter logic; only the suffix-check direction actually
     differs between the fake and live variants, so that's the only thing this wrapper supplies."""
     return atoms_proof.smoke._composite_workflow_entries_by_suffix(live=True)
@@ -290,6 +290,33 @@ def run(
                 case_timeout, timeout,
                 timed_out=case.error_code == atoms_proof.smoke._TIMEOUT_ERROR_CODE,
             )
+
+            # `code-review` finding: a case whose real cost couldn't be recovered after
+            # a ledger/DB error (case.cost_unknown) used to fall through as $0 to the cumulative
+            # cost-cap check below, fail-open -- a lost DB connection let every remaining case
+            # keep spending with no cap in effect. Fail closed instead: abort immediately, since
+            # a real, billed provider call may already have happened for this case.
+            if case.cost_unknown:
+                print(
+                    f"LIVE011: cost for case {label} ({scenario_id}) could not be recovered "
+                    f"after a ledger/database error -- aborting remaining {len(remaining)} "
+                    "case(s) fail-closed since actual spend is unknown",
+                    file=sys.stderr,
+                )
+                for skipped_kind, skipped_label, skipped_scenario_id, _ in remaining:
+                    cases.append(
+                        atoms_proof._fail(
+                            label=skipped_label, scenario_id=skipped_scenario_id,
+                            kind=skipped_kind,
+                            session_id=None, job_id=None,
+                            error_code="LIVE011",
+                            error_message=(
+                                f"LIVE011: skipped -- case {label} left the cumulative cost "
+                                "cap in an unknown state after a ledger/database error"
+                            ),
+                        )
+                    )
+                break
 
             total_cost = _cumulative_estimated_cost(cases)
             if total_cost > max_total_cost_usd:

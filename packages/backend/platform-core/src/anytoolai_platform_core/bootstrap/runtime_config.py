@@ -102,6 +102,12 @@ def _build_scenario_metadata(
     scenario = registry.get_scenario(scenario_id)
     if scenario is None:
         return None
+    # `code-review` finding: this frontend-safe projection advertised internal_only
+    # (live-canary-only) scenarios in scenario_ids/scenarios while ScenarioRuntimeService's own
+    # /start gate (service.py) rejects them for any normal frontend client with
+    # scenario_not_found -- a contradictory API contract. Filter them out here, server-side.
+    if scenario.internal_only:
+        return None
 
     workflow = registry.get_workflow(scenario.workflow_id)
     if workflow is None:

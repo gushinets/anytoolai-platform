@@ -113,7 +113,7 @@ def _required_action_types() -> frozenset[str]:
 
 
 def _is_composite_entry_for_suffix(entry: object, *, live: bool) -> bool:
-    """`/code-review` #5 (2026-08-24) finding #3: `entry["workflow_id"].endswith("_live_v1") ==
+    """`code-review` finding: `entry["workflow_id"].endswith("_live_v1") ==
     live` (comparing a bool to the `live` flag) read less directly than branching on `live`
     explicitly -- this says the same thing but as a plain if/else."""
     if not (
@@ -130,8 +130,8 @@ def _is_composite_entry_for_suffix(entry: object, *, live: bool) -> bool:
 
 def _composite_workflow_entries_by_suffix(*, live: bool) -> list[dict]:
     """Shared open+parse+filter core for _composite_workflow_entries() (fake, live=False) and
-    live_canary.py's own live-only entries fetcher (live=True) -- `/code-review` #4 (2026-08-24)
-    finding #2: those two used to be near-verbatim copies of each other, differing only in which
+    live_canary.py's own live-only entries fetcher (live=True) -- `code-review`
+    finding: those two used to be near-verbatim copies of each other, differing only in which
     side of the "_live_v1" suffix check they wanted. The suffix check itself is the only live/fake
     knowledge here; everything else (which file, which prefix, how to filter malformed entries) is
     identical between the two callers, so it belongs in one place."""
@@ -308,13 +308,13 @@ def _empty_cases_error(
 class CoverageLabels:
     """Bundles the 3 labels a coverage-error function needs to report under the right
     error-code family/tuple name/description -- one value object instead of 3 loose keyword
-    parameters that always travel together (a caller supplies all 3 or none). `/code-review` #2
-    (2026-08-24) finding: a prior 4-loose-kwarg signature (error_code/tuple_name/kind plus
+    parameters that always travel together (a caller supplies all 3 or none). `code-review`
+    finding: a prior 4-loose-kwarg signature (error_code/tuple_name/kind plus
     entries_provider) expanded a shared function's surface just for live_canary.py's single other
     caller; bundling the 3 always-together labels into one object keeps the dedup (a future fix to
     the correlation logic still applies to both callers at once) without the sprawling parameter
-    list. Shared by _atom_coverage_error() and _composite_coverage_error() (`/code-review` #3,
-    2026-08-24 finding #2: the atom check used to hardcode SMOKE007/ATOM_SMOKE_CASES even when
+    list. Shared by _atom_coverage_error() and _composite_coverage_error() (`code-review`,
+    finding: the atom check used to hardcode SMOKE007/ATOM_SMOKE_CASES even when
     called from live_canary.py, misattributing a live-canary failure to the fake-provider
     config)."""
 
