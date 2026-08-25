@@ -64,17 +64,13 @@ describe("openHandoffConsent", () => {
 });
 
 describe("createWindowNavigator", () => {
-  it("calls through to the underlying open() with the built URL", () => {
-    const win = { open: vi.fn() };
+  it("calls through to the underlying location.assign() with the built URL", () => {
+    const win = { location: { assign: vi.fn() } };
     const navigate = createWindowNavigator(win);
 
     navigate("https://web.example.com/handoff/token_abc");
 
-    expect(win.open).toHaveBeenCalledWith(
-      "https://web.example.com/handoff/token_abc",
-      "_blank",
-      "noopener",
-    );
+    expect(win.location.assign).toHaveBeenCalledWith("https://web.example.com/handoff/token_abc");
   });
 });
 
