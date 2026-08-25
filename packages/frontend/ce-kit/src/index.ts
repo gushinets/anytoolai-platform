@@ -8,6 +8,9 @@ export type {
 } from "./api/client";
 export type { PlatformApiError } from "./api/errors";
 export {
+  isHandoffNotFound,
+  isHandoffSourceInvalid,
+  isHandoffTargetSchemaInvalid,
   isIdempotencyKeyConflict,
   isQuotaExhausted,
   isResultNotFound,
@@ -56,6 +59,16 @@ export type {
 export { getResult } from "./results/getResult";
 export type { GetResultOptions } from "./results/getResult";
 export type { ResultArtifact } from "./results/types";
+
+export { createHandoff } from "./handoffs/createHandoff";
+export type { CreateHandoffOptions } from "./handoffs/createHandoff";
+export type { CreateHandoffRequest, HandoffCreated } from "./handoffs/types";
+export { openHandoffConsent } from "./handoffs/openHandoffConsent";
+export type { OpenHandoffConsentOptions } from "./handoffs/openHandoffConsent";
+export type { Navigate } from "./handoffs/navigation";
+export { createWindowNavigator } from "./handoffs/windowNavigator";
+export { createChromeTabNavigator } from "./handoffs/chromeTabNavigator";
+export type { ChromeTabsArea } from "./handoffs/chromeTabNavigator";
 
 export function renderQuotaState(status: string): { status: string } {
   return { status };

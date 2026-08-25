@@ -1,7 +1,7 @@
-export function normalizeBaseUrl(baseUrl: string): string {
+export function normalizeBaseUrl(baseUrl: string, requiredBy = "PlatformApiClient"): string {
   const trimmed = baseUrl.trim();
   if (trimmed.length === 0) {
-    throw new Error("PlatformApiClient requires a non-empty baseUrl.");
+    throw new Error(`${requiredBy} requires a non-empty baseUrl.`);
   }
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
 }
