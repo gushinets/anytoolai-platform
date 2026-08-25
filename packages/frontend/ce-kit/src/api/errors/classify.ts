@@ -14,6 +14,9 @@ export const BACKEND_ERROR_CODE = {
   quotaExhausted: "quota_exhausted",
   resultArtifactNotFound: "result_artifact_not_found",
   resultArtifactUnavailable: "result_artifact_unavailable",
+  handoffNotFound: "handoff_not_found",
+  handoffSourceInvalid: "handoff_source_invalid",
+  handoffTargetSchemaInvalid: "handoff_target_schema_invalid",
 } as const;
 
 function _isBackendErrorWithCode(
@@ -57,4 +60,19 @@ export function isResultNotFound(error: PlatformApiError): boolean {
  */
 export function isResultUnavailable(error: PlatformApiError): boolean {
   return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.resultArtifactUnavailable);
+}
+
+/** True only for the 404 that means the handoff_definition_id is unknown. */
+export function isHandoffNotFound(error: PlatformApiError): boolean {
+  return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffNotFound);
+}
+
+/** True only for the 404 that means the source scenario session/artifact is not eligible. */
+export function isHandoffSourceInvalid(error: PlatformApiError): boolean {
+  return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffSourceInvalid);
+}
+
+/** True only for the 409 that means the target schema for the handoff definition is invalid. */
+export function isHandoffTargetSchemaInvalid(error: PlatformApiError): boolean {
+  return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffTargetSchemaInvalid);
 }

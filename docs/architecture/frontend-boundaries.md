@@ -65,6 +65,10 @@ A15 ownership and delivery slices:
   `isResultNotFound()` / `isResultUnavailable()`;
 - A18 owns shared client handoff helpers and web consent; product-specific handoff routes remain in
   Freelancer Suite.
+- A18a / ANY-222 delivered `createHandoff()` and `openHandoffConsent()` as real CE-kit helpers over
+  the A17 `/v1/handoffs` create endpoint, with typed `handoff_not_found` / `handoff_source_invalid` /
+  `handoff_target_schema_invalid` handling via `isHandoffNotFound()` / `isHandoffSourceInvalid()` /
+  `isHandoffTargetSchemaInvalid()`.
 
 ## A12/A13 public scenario runtime contract
 
