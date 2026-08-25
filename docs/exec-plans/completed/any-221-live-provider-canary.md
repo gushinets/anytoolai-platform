@@ -2,24 +2,21 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-20
 - Last updated: 2026-08-25
 - Review date: 2026-08-25
-- Next action: get a *valid* `OPENAI_API_KEY` (the operator-supplied one from earlier today now
-  gets `401 AuthenticationError` from OpenAI -- see the 2026-08-25 Progress log row; the same key
-  worked for the prior run, so it was very likely revoked/rotated between the two runs, not a bug
-  in this branch) to re-run the credentialed cycle once more on this HEAD -- the evidence format
-  itself changed (added `result_artifact_id`/`output_artifact_id`), so the 2026-08-25
-  `...T075842Z` evidence below no longer matches the current report shape. Then push and
-  re-request PR #84 review with a synced PR body.
-- Blocker: a sixth human code review (2026-08-25, "code-review (me #6)") found `EvidenceCase`/
-  `StepEvidence` never carried `result_artifact_id`/`output_artifact_id` despite ANY-221's
-  acceptance criterion naming "session/artifact IDs" explicitly, and that `LIVE011` meant two
-  different things across `runner.py` and `live_canary.py`. Both fixed (see the 2026-08-25 rows
-  below). Still open: PR body sync, and a fresh evidence run against the new report shape (blocked
-  on a valid `OPENAI_API_KEY` -- the one available earlier today started 401'ing).
+- Next action: none. A fresh credentialed run on this HEAD with a valid `OPENAI_API_KEY` passed
+  `11/11` atoms + `3/3` composites against the new evidence-report shape (`result_artifact_id`/
+  `output_artifact_id` populated on every case/step); committed at
+  `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260825T083858Z.json`. Only
+  PR #84's push + body sync remain, pending explicit go-ahead (repo-visible action).
+- Blocker: none. A sixth human code review (2026-08-25, "code-review (me #6)") found
+  `EvidenceCase`/`StepEvidence` never carried `result_artifact_id`/`output_artifact_id` despite
+  ANY-221's acceptance criterion naming "session/artifact IDs" explicitly, and that `LIVE011`
+  meant two different things across `runner.py` and `live_canary.py` -- both fixed, and now
+  confirmed against a real credentialed run (see the 2026-08-25 rows below).
 
 ## Goal
 
@@ -267,10 +264,15 @@ Full design rationale (verified against real code before implementation) lives i
       updated/added in `tests/test_atoms_proof.py`, 1 in `tests/test_live_canary.py`.
 - [ ] Sync PR #84's body (still says the credentialed run "has not been run yet", access-control
       is unclosed ANY-371, exec-plan is in `docs/exec-plans/active/`, and `packages/backend/*/src`
-      is unchanged -- all stale on the current HEAD per the same review).
-- [ ] A fresh credentialed run (`dev-up -> live-canary -> dev-down`) on this HEAD, now that the
-      evidence report's shape itself changed (`result_artifact_id`/`output_artifact_id` added);
-      commit the resulting evidence JSON.
+      is unchanged -- all stale on the current HEAD per the same review). Not done yet: a
+      repo-visible action pending explicit push/PR-edit go-ahead.
+- [x] (2026-08-25) A fresh credentialed run (`dev-up -> live-canary -> dev-down`, new
+      `OPENAI_API_KEY`) on this HEAD, against the new evidence-report shape: `11/11` atoms + `3/3`
+      composites, exit 0, ~13,908 total tokens, ~$0.0081 total estimated cost,
+      `result_artifact_id`/`output_artifact_id` populated on every case/step. Read the full
+      evidence JSON (plus a scripted key-set check) to confirm privacy-safety before committing a
+      copy at `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260825T083858Z.json`
+      (kept alongside, not replacing, the two earlier runs).
 
 ## Validation
 
@@ -303,13 +305,18 @@ Full design rationale (verified against real code before implementation) lives i
       of new test functions) and `validate-docs` both green after moving this doc back to
       `docs/exec-plans/active/` (`validate-docs`'s `DOC004` enforces `State: active` living under
       `active/`).
-- [ ] (2026-08-25) Re-ran the credentialed cycle to pick up the new evidence report shape --
-      `0/11` + `0/3`, every case failed with `litellm.AuthenticationError`/HTTP 401 from OpenAI.
-      Confirmed the key reached the worker container correctly (checked its length/prefix/suffix
-      inside the container, matched what was supplied) and that this is the *same* key that
-      passed `11/11` + `3/3` earlier the same day -- so the key itself was very likely
-      revoked/rotated between the two runs, not a regression in this branch. Tore the stack back
-      down; did not commit any evidence from this attempt. Needs a valid key to complete.
+- (2026-08-25, failed attempt, no checkbox -- superseded by the next row) Re-ran the credentialed
+      cycle to pick up the new evidence report shape -- `0/11` + `0/3`, every case failed with
+      `litellm.AuthenticationError`/HTTP 401 from OpenAI. Confirmed the key reached the worker
+      container correctly (checked its length/prefix/suffix inside the container, matched what
+      was supplied) and that this is the *same* key that passed `11/11` + `3/3` earlier the same
+      day -- so the key itself was very likely revoked/rotated between the two runs, not a
+      regression in this branch. Tore the stack back down; did not commit any evidence from this
+      attempt.
+- [x] (2026-08-25) `export OPENAI_API_KEY=... ANYTOOLAI_LIVE_CANARY_TOKEN=... && python scripts/agent/runner.py dev-up && python scripts/agent/runner.py live-canary && python scripts/agent/runner.py dev-down`
+      on this HEAD with a fresh (operator-rotated) key -- exit 0, `11/11` atoms + `3/3` composites,
+      ~13,908 total tokens, ~$0.0081 total estimated cost, `result_artifact_id`/
+      `output_artifact_id` populated throughout.
 
 ## Decision log
 
@@ -352,6 +359,7 @@ Full design rationale (verified against real code before implementation) lives i
 | 2026-08-25 | Fixed 2 of 3 findings from a sixth human code review (PR #84, current HEAD): (1) [Blocker/P1] cost-cap fail-open when a case's ledger recovery itself hits a DB error (`cost_unknown`/`LIVE011`, see Scope/Decision log above); (2) [P2] `internal_only` scenarios still listed in the public `/runtime-config` response despite `/start` rejecting them (filtered in `_build_scenario_metadata()`). The third finding -- committed 2026-08-24 evidence no longer speaks for the current HEAD after this fix plus the earlier `PROOF013`/`024`/`025`/`026` fix -- is not a code fix; it needs a fresh credentialed run, which this session has no `OPENAI_API_KEY` to perform. Also swept every tracked file for the literal `` `/code-review` `` phrasing (a local skill/slash-command name meaningless outside this environment -- the same fix `docs/exec-plans/active/any-220-atom-runtime-proof-cli.md`'s 2026-08-20 rows already made once, which had crept back in through the 2026-08-24/25 review rounds) and replaced it with plain "code review"; left the gitignored `plans/ANY-*.md` session logs untouched. Re-ran `quick-check` (924 passed, was 923) and `validate-docs`, both green. Reverted Status's `State` from `completed` to `active` and moved this file back to `docs/exec-plans/active/` (`git mv`) to reflect the reopened acceptance blocker -- see Status above. Committed (`d540355`). | Get a fresh credentialed `11/11` + `3/3` run on this HEAD, commit its evidence, then push and re-request PR #84 review. |
 | 2026-08-25 | User supplied `OPENAI_API_KEY`/`ANYTOOLAI_LIVE_CANARY_TOKEN` for this session. Confirmed Docker is available here (`doctor` passed); ran the manual credentialed cycle (`dev-up -> live-canary -> dev-down`) directly against real OpenAI on the current HEAD: `11/11` atoms + `3/3` composites, exit 0, ~13,901 total tokens, ~$0.0081 total estimated cost -- confirming the `cost_unknown`/`internal_only` fixes above don't regress the happy path. Read the full evidence JSON before committing a copy at `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260825T075842Z.json` (kept alongside, not replacing, the 2026-08-24 evidence). Checked Linear directly (MCP connected this session): ANY-371 is `Done` (completed 2026-08-24), so the PR-metadata-drift note from the sixth review was already stale -- no further Linear sync needed. Flipped Status back to `State: completed`/`Blocker: none` and moved this file (and both evidence JSONs) back to `docs/exec-plans/completed/`. | Push `feature/ANY-221` and re-request PR #84 review, once the user confirms. |
 | 2026-08-25 | Fixed the remaining 2 code findings from a sixth human code review ("code-review (me #6)"): (1) [P1/acceptance blocker] `EvidenceCase`/`StepEvidence` never carried `result_artifact_id`/`output_artifact_id` despite ANY-221's own acceptance criterion naming "session/artifact IDs" explicitly -- both values were already read by `_classify_ledger()` for its PROOF004/017/018/023 checks, just never threaded into the report; added both fields, rebinding `_classify_ledger()`'s `fail` partial with `result_artifact_id` once `job_row` resolves so failure paths carry it too, not just the success path. (2) [P2] `LIVE011` meant two different things across `runner.py` (token unset) and `live_canary.py` (today's `cost_unknown` abort); renamed the newer, smaller one to `LIVE012`. 2 tests updated, 1 new assertion, in `tests/test_atoms_proof.py`; 1 test updated in `tests/test_live_canary.py`. `quick-check` 924 (unchanged count -- existing tests extended, no new test functions). Moved this doc back to `docs/exec-plans/active/` (`validate-docs`'s `DOC004` requires `State: active` under `active/`) and re-ran the credentialed cycle to get evidence matching the new report shape -- every one of the 14 cases failed with a `litellm.AuthenticationError`/401 from OpenAI. Verified the key reached the platform-worker container intact (checked length/prefix/suffix inside the container) and that it's the identical key that passed `11/11` + `3/3` earlier the same day, so it was very likely revoked/rotated between runs, not a regression here. Tore the stack down without committing any evidence from the failed attempt. The [P2/reviewability] PR-body-drift finding is real but out of scope for this session without explicit push/PR-edit authorization -- see Status above. | Get a *valid* `OPENAI_API_KEY`, re-run the credentialed cycle, commit the resulting evidence (replacing the now-format-stale 2026-08-25 `...T075842Z` one, or adding alongside it), then push `feature/ANY-221` and sync PR #84's body once the user confirms. |
+| 2026-08-25 | User supplied a fresh, valid `OPENAI_API_KEY` after the prior 401. Re-ran the credentialed cycle (`dev-up -> live-canary -> dev-down`) on the current HEAD against the new evidence-report shape: `11/11` atoms + `3/3` composites, exit 0, ~13,908 total tokens, ~$0.0081 total estimated cost, `result_artifact_id`/`output_artifact_id` populated on every case/step (verified both by reading the full JSON and with a scripted allowed-keys check for privacy-safety). Committed a copy at `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260825T083858Z.json`, kept alongside (not replacing) the two earlier runs. Flipped Status back to `State: completed`/`Blocker: none`; moved this doc back to `docs/exec-plans/completed/`. | Push `feature/ANY-221` and sync PR #84's body (still describes pre-#6-review state), once the user confirms -- see Follow-up debt. |
 
 ## Open questions
 
@@ -362,14 +370,10 @@ Full design rationale (verified against real code before implementation) lives i
 
 ## Follow-up debt
 
-- A fresh credentialed run against the new evidence-report shape (`result_artifact_id`/
-  `output_artifact_id`) is still needed -- blocked on a valid `OPENAI_API_KEY`, see Status above.
-  The 2026-08-25 `...T075842Z` evidence committed under `docs/exec-plans/completed/` predates
-  this shape change and no longer demonstrates the current report contract, though it still
-  demonstrates the atom/composite prompts themselves work end to end.
 - PR #84's body has drifted from current state (still says the credentialed run "has not been run
   yet", access-control is unclosed ANY-371, the exec-plan is in `docs/exec-plans/active/`, and
-  `packages/backend/*/src` is unchanged) -- needs a sync once pushed.
+  `packages/backend/*/src` is unchanged) -- needs a sync once pushed. Repo-visible action pending
+  explicit go-ahead, not open engineering debt.
 - The `$0.50`/4-calls/60s estimates in Open questions above are otherwise the only remaining soft
   spot, and both completed runs so far validated them as reasonable (~$0.0081-0.0082 total per
   run, nowhere near the cap).
