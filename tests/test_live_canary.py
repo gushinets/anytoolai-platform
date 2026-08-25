@@ -315,7 +315,7 @@ def test_run_fails_closed_and_stops_when_a_case_cost_cannot_be_recovered(monkeyp
     assert cases[0].status == "pass"
     assert cases[1].status == "fail" and cases[1].error_code == "PROOF000"
     skipped_cases = cases[2:]
-    assert all(case.status == "fail" and case.error_code == "LIVE011" for case in skipped_cases)
+    assert all(case.status == "fail" and case.error_code == "LIVE012" for case in skipped_cases)
 
 
 class _FakeEngine:

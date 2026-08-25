@@ -296,9 +296,12 @@ def run(
             # cost-cap check below, fail-open -- a lost DB connection let every remaining case
             # keep spending with no cap in effect. Fail closed instead: abort immediately, since
             # a real, billed provider call may already have happened for this case.
+            # LIVE012, not LIVE011: `code-review` (me #6) finding -- runner.py already uses
+            # LIVE011 for a completely different condition (ANYTOOLAI_LIVE_CANARY_TOKEN unset),
+            # and that error-code namespace is shared across logs/evidence/automation.
             if case.cost_unknown:
                 print(
-                    f"LIVE011: cost for case {label} ({scenario_id}) could not be recovered "
+                    f"LIVE012: cost for case {label} ({scenario_id}) could not be recovered "
                     f"after a ledger/database error -- aborting remaining {len(remaining)} "
                     "case(s) fail-closed since actual spend is unknown",
                     file=sys.stderr,
@@ -309,9 +312,9 @@ def run(
                             label=skipped_label, scenario_id=skipped_scenario_id,
                             kind=skipped_kind,
                             session_id=None, job_id=None,
-                            error_code="LIVE011",
+                            error_code="LIVE012",
                             error_message=(
-                                f"LIVE011: skipped -- case {label} left the cumulative cost "
+                                f"LIVE012: skipped -- case {label} left the cumulative cost "
                                 "cap in an unknown state after a ledger/database error"
                             ),
                         )

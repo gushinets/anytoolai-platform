@@ -141,6 +141,7 @@ def test_classify_ledger_passes_with_full_correlation() -> None:
     assert case.error_code is None
     assert case.job_id == "job-1"
     assert case.session_id == "session-1"
+    assert case.result_artifact_id == "artifact-result"
     assert case.steps == (
         module.StepEvidence(
             step_id="extract",
@@ -151,6 +152,7 @@ def test_classify_ledger_passes_with_full_correlation() -> None:
             output_tokens=20,
             total_tokens=30,
             estimated_cost=0.001,
+            output_artifact_id="artifact-step-1",
         ),
     )
 
@@ -168,6 +170,9 @@ def test_classify_ledger_reports_proof001_when_no_job_row() -> None:
     assert case.status == "fail"
     assert case.error_code == "PROOF001"
     assert case.job_id is None
+    # `code-review` (me #6) finding: no job row was ever resolved here, so there is no known
+    # result_artifact_id to report -- must stay None, not e.g. crash or default to something else.
+    assert case.result_artifact_id is None
 
 
 def test_classify_ledger_reports_proof002_when_no_action_runs() -> None:
@@ -184,6 +189,9 @@ def test_classify_ledger_reports_proof002_when_no_action_runs() -> None:
     assert case.status == "fail"
     assert case.error_code == "PROOF002"
     assert case.job_id == "job-1"
+    # `code-review` (me #6) finding: a case that fails *after* its job row resolved must still
+    # carry the real result_artifact_id, not silently drop it just because the case failed.
+    assert case.result_artifact_id == "artifact-result"
 
 
 def test_classify_ledger_reports_proof003_when_provider_call_count_is_wrong() -> None:

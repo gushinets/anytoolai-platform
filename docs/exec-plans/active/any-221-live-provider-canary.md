@@ -2,19 +2,24 @@
 
 ## Status
 
-- State: completed
+- State: active
 - Owner: agent
 - Created: 2026-08-20
 - Last updated: 2026-08-25
 - Review date: 2026-08-25
-- Next action: none. A fresh credentialed OpenAI run on this HEAD (post `cost_unknown`/`LIVE011`
-  and `internal_only`-runtime-config fixes) passed `11/11` atoms + `3/3` composites; a privacy-safe
-  copy is committed at
-  `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260825T075842Z.json`, kept
-  alongside (not replacing) the 2026-08-24 run so the run history stays legible. Checked Linear:
-  ANY-371 (the related access-control finding) is already `Done` (completed 2026-08-24), so no
-  further sync needed there.
-- Blocker: none.
+- Next action: get a *valid* `OPENAI_API_KEY` (the operator-supplied one from earlier today now
+  gets `401 AuthenticationError` from OpenAI -- see the 2026-08-25 Progress log row; the same key
+  worked for the prior run, so it was very likely revoked/rotated between the two runs, not a bug
+  in this branch) to re-run the credentialed cycle once more on this HEAD -- the evidence format
+  itself changed (added `result_artifact_id`/`output_artifact_id`), so the 2026-08-25
+  `...T075842Z` evidence below no longer matches the current report shape. Then push and
+  re-request PR #84 review with a synced PR body.
+- Blocker: a sixth human code review (2026-08-25, "code-review (me #6)") found `EvidenceCase`/
+  `StepEvidence` never carried `result_artifact_id`/`output_artifact_id` despite ANY-221's
+  acceptance criterion naming "session/artifact IDs" explicitly, and that `LIVE011` meant two
+  different things across `runner.py` and `live_canary.py`. Both fixed (see the 2026-08-25 rows
+  below). Still open: PR body sync, and a fresh evidence run against the new report shape (blocked
+  on a valid `OPENAI_API_KEY` -- the one available earlier today started 401'ing).
 
 ## Goal
 
@@ -90,8 +95,9 @@ Full design rationale (verified against real code before implementation) lives i
   cap saw `$0` for that case and kept running every remaining one with no cap actually in effect.
   Now returns `None` for "recovery itself failed" (cost genuinely unknown, not zero); a new
   `EvidenceCase.cost_unknown: bool` field carries that through `_fail()`, and `run()` aborts all
-  remaining cases fail-closed (`LIVE011`) the moment it sees `cost_unknown=True`, instead of
-  comparing against `max_total_cost_usd`.
+  remaining cases fail-closed (`LIVE012` -- see the 2026-08-25 code-review-#6 row below for why
+  not `LIVE011`) the moment it sees `cost_unknown=True`, instead of comparing against
+  `max_total_cost_usd`.
 - (2026-08-25, code review finding) `internal_only` scenarios leaking into the public runtime-
   config: `build_product_runtime_config()`'s frontend-safe projection listed all 14 live
   scenario_ids in `scenario_ids`/`scenarios` even though `ScenarioRuntimeService.start_session()`
@@ -100,6 +106,24 @@ Full design rationale (verified against real code before implementation) lives i
   `_build_scenario_metadata()` now returns `None` for `scenario.internal_only` scenarios, filtering
   them out of `scenario_ids`, `scenarios`, and (via `_allowed_ui_capabilities()`) the aggregated
   capability list.
+- (2026-08-25, code review finding) Evidence report missing artifact IDs: ANY-221's acceptance
+  criterion names a privacy-safe report with "session/artifact IDs" explicitly, but
+  `EvidenceCase`/`StepEvidence` never carried `result_artifact_id`/`output_artifact_id` even
+  though `_classify_ledger()` already reads both (`job_row["result_artifact_id"]`,
+  `action_run["output_artifact_id"]`) for its own PROOF004/017/018/023 correlation checks --
+  the values existed and were validated, just never threaded into the report. Added both fields
+  (`str | None`, default `None`); the success path in `_classify_ledger()` and
+  `_step_evidence_from_action_run()` populate them from the rows already in hand,
+  `_best_effort_steps_from_provider_calls()`'s cost-recovery path populates
+  `output_artifact_id` the same way it already does for the other per-step fields, and `fail`'s
+  `functools.partial` is rebound with `result_artifact_id` right after `job_row` resolves so
+  every PROOF00x branch from that point on carries the real value even on failure -- not just
+  the success path.
+- (2026-08-25, code review finding) `LIVE011` meant two different things: `runner.py` uses it for
+  "`ANYTOOLAI_LIVE_CANARY_TOKEN` unset" (pre-existing, more call sites/docs/tests reference it),
+  `live_canary.py` reused it for the 2026-08-25 `cost_unknown` fail-closed abort above (added the
+  same day, fewer references) -- a shared LIVE0xx error-code namespace across logs/evidence/
+  automation should be unambiguous. Renamed the newer, smaller-blast-radius one to `LIVE012`.
 
 ### Out of scope
 
@@ -144,6 +168,10 @@ Full design rationale (verified against real code before implementation) lives i
   no longer include the 14 `internal_only` live scenarios -- narrows an already-inconsistent
   response (they were never actually startable through this product's normal `/start` endpoint),
   no schema/shape change.
+- Evidence report: (2026-08-25) `EvidenceCase`/`StepEvidence` gained `result_artifact_id`/
+  `output_artifact_id: str | None = None` -- additive fields on this script's own private,
+  gitignored-by-default JSON report (not a versioned API contract), so no consumer-breaking
+  change; `write_evidence_report()`'s `asdict(case)` serialization picks them up automatically.
 
 ## Implementation steps
 
@@ -232,6 +260,17 @@ Full design rationale (verified against real code before implementation) lives i
       in full to confirm it holds only ids, status, and per-step cost/token/latency counters (no
       prompts, generated content, or secrets) before committing a copy at
       `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260825T075842Z.json`.
+- [x] (2026-08-25) Fixed a sixth human code review's two remaining code findings: added
+      `result_artifact_id`/`output_artifact_id` to the evidence report (see Scope/Contracts
+      above), renamed `live_canary.py`'s `cost_unknown` abort code from `LIVE011` to `LIVE012`
+      (runner.py's pre-existing, more-referenced `LIVE011` keeps its name). 2 regression tests
+      updated/added in `tests/test_atoms_proof.py`, 1 in `tests/test_live_canary.py`.
+- [ ] Sync PR #84's body (still says the credentialed run "has not been run yet", access-control
+      is unclosed ANY-371, exec-plan is in `docs/exec-plans/active/`, and `packages/backend/*/src`
+      is unchanged -- all stale on the current HEAD per the same review).
+- [ ] A fresh credentialed run (`dev-up -> live-canary -> dev-down`) on this HEAD, now that the
+      evidence report's shape itself changed (`result_artifact_id`/`output_artifact_id` added);
+      commit the resulting evidence JSON.
 
 ## Validation
 
@@ -259,6 +298,18 @@ Full design rationale (verified against real code before implementation) lives i
 - [x] (2026-08-25) `export OPENAI_API_KEY=... ANYTOOLAI_LIVE_CANARY_TOKEN=... && python scripts/agent/runner.py dev-up && python scripts/agent/runner.py live-canary && python scripts/agent/runner.py dev-down`
       on this HEAD -- exit 0, `11/11` atoms + `3/3` composites, ~13,901 total tokens, ~$0.0081
       total estimated cost.
+- [x] (2026-08-25) `python scripts/agent/runner.py quick-check` (924 tests, unchanged -- this
+      round added `result_artifact_id`/`output_artifact_id` assertions to existing tests instead
+      of new test functions) and `validate-docs` both green after moving this doc back to
+      `docs/exec-plans/active/` (`validate-docs`'s `DOC004` enforces `State: active` living under
+      `active/`).
+- [ ] (2026-08-25) Re-ran the credentialed cycle to pick up the new evidence report shape --
+      `0/11` + `0/3`, every case failed with `litellm.AuthenticationError`/HTTP 401 from OpenAI.
+      Confirmed the key reached the worker container correctly (checked its length/prefix/suffix
+      inside the container, matched what was supplied) and that this is the *same* key that
+      passed `11/11` + `3/3` earlier the same day -- so the key itself was very likely
+      revoked/rotated between the two runs, not a regression in this branch. Tore the stack back
+      down; did not commit any evidence from this attempt. Needs a valid key to complete.
 
 ## Decision log
 
@@ -282,8 +333,10 @@ Full design rationale (verified against real code before implementation) lives i
 | 2026-08-24 | `create_linked_session()` (handoff continuation) rejects `internal_only` unconditionally, no token parameter at all | `live_canary.py` never creates linked/handoff sessions, so no legitimate caller could ever supply a matching token there anyway; an unconditional reject is simpler than plumbing a token parameter through the handoff flow for a path that must never succeed. |
 | 2026-08-24 | `max_provider_calls_per_action` is a plain function parameter (default 1) threaded through `_classify_ledger`/`_check_ledger`/`_run_case_with_ledger_check`, not read dynamically from `configs/kernel/provider_policies.yaml` at ledger-check time | `atoms_proof.py`/`live_canary.py` deliberately keep this a pure, DB-only ledger-correctness check with no `ConfigLoader` dependency; resolving the real per-action cap would need a full action_run -> action_config -> provider_policy chase, and would make a correctness check depend on live, possibly-since-changed config state. `live_canary.py`'s `_LIVE_PROVIDER_MAX_CALLS_PER_ACTION = 4` is a static constant that must be kept in sync with the policy by hand -- accepted as a deliberate, documented tradeoff. |
 | 2026-08-25 | Acceptance evidence committed as a tracked repo file (`docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260824T164316Z.json`), not a link to a GitHub Actions artifact/run or an external object-storage URL | The credentialed run that produced it was a local manual cycle, not a `live-canary.yml` `workflow_dispatch`/schedule invocation, so no CI run URL or uploaded-artifact URL exists to link to. The file itself is confirmed privacy-safe (ids, status, per-step cost/token/latency counters only -- read in full before committing), so committing it directly satisfies AGENTS.md's "context not in the repo does not exist for future agents" more directly than a URL would, and needs no external service to stay reachable. |
-| 2026-08-25 | `_known_steps_for_session()` distinguishes "confirmed zero cost" (`()`) from "cost genuinely unknown" (`None`) instead of collapsing both to `()`, and `live_canary.run()` aborts fail-closed (new `LIVE011`) on the latter rather than folding it into the existing `max_total_cost_usd` comparison | A silent `$0` for an unrecoverable case defeats the safety cap's whole purpose (a lost DB connection could let real spend run unbounded); reusing `LIVE001`'s abort-and-mark-remaining-failed loop for the new condition, rather than inventing a second code path, keeps the two abort reasons symmetric in the evidence report. `LIVE010` was already taken (composite coverage-error label), hence `LIVE011`. |
+| 2026-08-25 | `_known_steps_for_session()` distinguishes "confirmed zero cost" (`()`) from "cost genuinely unknown" (`None`) instead of collapsing both to `()`, and `live_canary.run()` aborts fail-closed (new `LIVE012`, originally `LIVE011` -- renamed same day, see the code-review-#6 row below) on the latter rather than folding it into the existing `max_total_cost_usd` comparison | A silent `$0` for an unrecoverable case defeats the safety cap's whole purpose (a lost DB connection could let real spend run unbounded); reusing `LIVE001`'s abort-and-mark-remaining-failed loop for the new condition, rather than inventing a second code path, keeps the two abort reasons symmetric in the evidence report. |
 | 2026-08-25 | `internal_only` filtered inside `_build_scenario_metadata()` (returns `None` before the `workflow`/renderer-hint lookups), not in `build_product_runtime_config()`'s own loop | Keeps the "what makes a scenario visible" decision co-located with the one function that already has the `ScenarioDefinition` in hand, and reuses the existing `None`-means-skip contract that function already has for an unknown `scenario_id`/`workflow_id` -- no new control-flow shape in the caller. |
+| 2026-08-25 | Renamed `live_canary.py`'s `cost_unknown` abort code from `LIVE011` to `LIVE012` (code-review #6 finding) instead of renaming `runner.py`'s token-unset `LIVE011` | `runner.py`'s usage predates today's by a full day and has more references (its own error message, `.github/workflows/live-canary.yml`'s comment, 2 `tests/test_runner.py` assertions) -- renaming the newer, same-day addition is the smaller diff and doesn't touch any file outside `live_canary.py`/`tests/test_live_canary.py`/this doc. |
+| 2026-08-25 | Added `EvidenceCase.result_artifact_id`/`StepEvidence.output_artifact_id` (both `str \| None = None`) by rebinding `_classify_ledger()`'s `fail` `functools.partial` with `result_artifact_id` right after `job_row` resolves, rather than adding the parameter to every one of `_classify_ledger()`'s ~20 `fail(...)` call sites individually | Mirrors the same rebind-a-partial pattern this function's own docstring already documents for `steps=known_steps` -- one rebind point instead of a repeated keyword at every call site, and the timing (right after `job_row["result_artifact_id"]` is read) means every branch from that point on, pass or fail, carries the real value. |
 
 ## Progress log
 
@@ -298,6 +351,7 @@ Full design rationale (verified against real code before implementation) lives i
 | 2026-08-25 | Fixed a [P1/acceptance] finding from a fifth human code review: this doc claimed acceptance evidence was "linked" via the local `.agent/live-canary/evidence-20260824T164316Z.json` path, but `.agent/` is gitignored, so no future agent could ever actually reach that file after a fresh checkout -- AGENTS.md's own "context not in the repo does not exist" principle means that was effectively unlinked evidence, not linked evidence, despite the doc's own claims to the contrary. Read the full evidence JSON first to confirm it holds only ids, status, and per-step cost/token/latency counters (no prompts, generated content, or secrets), then committed a copy at `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260824T164316Z.json`. Also fixed the review's [P2] finding: the Status header block (State/Last updated/Review date/Next action/Blocker) was stale from 2026-08-21, still describing the credentialed run as not-yet-attempted, directly contradicting the Progress log's own 2026-08-24/25 rows in the same document -- updated to State: completed, and moved this file from `docs/exec-plans/active/` to `docs/exec-plans/completed/` (via `git mv`, no other repo file referenced the old path). `validate-docs`/`generate-docs --check` confirmed no drift. | None -- ANY-221 is closed. |
 | 2026-08-25 | Fixed 2 of 3 findings from a sixth human code review (PR #84, current HEAD): (1) [Blocker/P1] cost-cap fail-open when a case's ledger recovery itself hits a DB error (`cost_unknown`/`LIVE011`, see Scope/Decision log above); (2) [P2] `internal_only` scenarios still listed in the public `/runtime-config` response despite `/start` rejecting them (filtered in `_build_scenario_metadata()`). The third finding -- committed 2026-08-24 evidence no longer speaks for the current HEAD after this fix plus the earlier `PROOF013`/`024`/`025`/`026` fix -- is not a code fix; it needs a fresh credentialed run, which this session has no `OPENAI_API_KEY` to perform. Also swept every tracked file for the literal `` `/code-review` `` phrasing (a local skill/slash-command name meaningless outside this environment -- the same fix `docs/exec-plans/active/any-220-atom-runtime-proof-cli.md`'s 2026-08-20 rows already made once, which had crept back in through the 2026-08-24/25 review rounds) and replaced it with plain "code review"; left the gitignored `plans/ANY-*.md` session logs untouched. Re-ran `quick-check` (924 passed, was 923) and `validate-docs`, both green. Reverted Status's `State` from `completed` to `active` and moved this file back to `docs/exec-plans/active/` (`git mv`) to reflect the reopened acceptance blocker -- see Status above. Committed (`d540355`). | Get a fresh credentialed `11/11` + `3/3` run on this HEAD, commit its evidence, then push and re-request PR #84 review. |
 | 2026-08-25 | User supplied `OPENAI_API_KEY`/`ANYTOOLAI_LIVE_CANARY_TOKEN` for this session. Confirmed Docker is available here (`doctor` passed); ran the manual credentialed cycle (`dev-up -> live-canary -> dev-down`) directly against real OpenAI on the current HEAD: `11/11` atoms + `3/3` composites, exit 0, ~13,901 total tokens, ~$0.0081 total estimated cost -- confirming the `cost_unknown`/`internal_only` fixes above don't regress the happy path. Read the full evidence JSON before committing a copy at `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260825T075842Z.json` (kept alongside, not replacing, the 2026-08-24 evidence). Checked Linear directly (MCP connected this session): ANY-371 is `Done` (completed 2026-08-24), so the PR-metadata-drift note from the sixth review was already stale -- no further Linear sync needed. Flipped Status back to `State: completed`/`Blocker: none` and moved this file (and both evidence JSONs) back to `docs/exec-plans/completed/`. | Push `feature/ANY-221` and re-request PR #84 review, once the user confirms. |
+| 2026-08-25 | Fixed the remaining 2 code findings from a sixth human code review ("code-review (me #6)"): (1) [P1/acceptance blocker] `EvidenceCase`/`StepEvidence` never carried `result_artifact_id`/`output_artifact_id` despite ANY-221's own acceptance criterion naming "session/artifact IDs" explicitly -- both values were already read by `_classify_ledger()` for its PROOF004/017/018/023 checks, just never threaded into the report; added both fields, rebinding `_classify_ledger()`'s `fail` partial with `result_artifact_id` once `job_row` resolves so failure paths carry it too, not just the success path. (2) [P2] `LIVE011` meant two different things across `runner.py` (token unset) and `live_canary.py` (today's `cost_unknown` abort); renamed the newer, smaller one to `LIVE012`. 2 tests updated, 1 new assertion, in `tests/test_atoms_proof.py`; 1 test updated in `tests/test_live_canary.py`. `quick-check` 924 (unchanged count -- existing tests extended, no new test functions). Moved this doc back to `docs/exec-plans/active/` (`validate-docs`'s `DOC004` requires `State: active` under `active/`) and re-ran the credentialed cycle to get evidence matching the new report shape -- every one of the 14 cases failed with a `litellm.AuthenticationError`/401 from OpenAI. Verified the key reached the platform-worker container intact (checked length/prefix/suffix inside the container) and that it's the identical key that passed `11/11` + `3/3` earlier the same day, so it was very likely revoked/rotated between runs, not a regression here. Tore the stack down without committing any evidence from the failed attempt. The [P2/reviewability] PR-body-drift finding is real but out of scope for this session without explicit push/PR-edit authorization -- see Status above. | Get a *valid* `OPENAI_API_KEY`, re-run the credentialed cycle, commit the resulting evidence (replacing the now-format-stale 2026-08-25 `...T075842Z` one, or adding alongside it), then push `feature/ANY-221` and sync PR #84's body once the user confirms. |
 
 ## Open questions
 
@@ -308,9 +362,14 @@ Full design rationale (verified against real code before implementation) lives i
 
 ## Follow-up debt
 
-- None outstanding. A fresh credentialed run on the current HEAD (2026-08-25, `11/11` + `3/3`) is
-  committed alongside the original 2026-08-24 run; the `$0.50`/4-calls/60s estimates in Open
-  questions above are the only remaining soft spot, and both runs validated them as reasonable
-  (~$0.0081-0.0082 total per run, nowhere near the cap). PR #84 still needs a push and a
-  re-request for review -- see Status above -- but that's a repo-visible action pending explicit
-  go-ahead, not open engineering debt.
+- A fresh credentialed run against the new evidence-report shape (`result_artifact_id`/
+  `output_artifact_id`) is still needed -- blocked on a valid `OPENAI_API_KEY`, see Status above.
+  The 2026-08-25 `...T075842Z` evidence committed under `docs/exec-plans/completed/` predates
+  this shape change and no longer demonstrates the current report contract, though it still
+  demonstrates the atom/composite prompts themselves work end to end.
+- PR #84's body has drifted from current state (still says the credentialed run "has not been run
+  yet", access-control is unclosed ANY-371, the exec-plan is in `docs/exec-plans/active/`, and
+  `packages/backend/*/src` is unchanged) -- needs a sync once pushed.
+- The `$0.50`/4-calls/60s estimates in Open questions above are otherwise the only remaining soft
+  spot, and both completed runs so far validated them as reasonable (~$0.0081-0.0082 total per
+  run, nowhere near the cap).

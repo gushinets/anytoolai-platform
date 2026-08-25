@@ -103,6 +103,10 @@ class StepEvidence:
     output_tokens: int | None = None
     total_tokens: int | None = None
     estimated_cost: float | None = None
+    # This step's action_runs.output_artifact_id -- ANY-221's acceptance criterion names
+    # "session/artifact IDs" explicitly; None for a step whose action_config produces no
+    # dedicated artifact. `code-review` (me #6) finding.
+    output_artifact_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -123,6 +127,11 @@ class EvidenceCase:
     # True only when this case's real cost could not be recovered after a ledger/DB error --
     # steps is then () but that does NOT mean $0 was spent. `code-review` finding.
     cost_unknown: bool = False
+    # This case's jobs.result_artifact_id -- see StepEvidence.output_artifact_id. None whenever
+    # no job row was ever resolved (e.g. PROOF001/a ledger-fetch failure), not just on failure in
+    # general -- a case that failed after the job row resolved still carries its real value.
+    # `code-review` (me #6) finding.
+    result_artifact_id: str | None = None
 
 
 def _build_engine(database_url: str, *, decode_database_name: bool = False) -> "sa.engine.Engine":
@@ -190,13 +199,16 @@ def _fail(
     error_code: str, error_message: str,
     steps: tuple[StepEvidence, ...] = (),
     cost_unknown: bool = False,
+    result_artifact_id: str | None = None,
 ) -> EvidenceCase:
     """steps defaults to () for the common case (nothing ran yet, so no cost was incurred) but
     _classify_ledger's PROOF00x branches pass known_steps -- see its own comment -- so a case
     that already made a real, billed provider call before failing a later correctness check still
     reports its real cost instead of silently reporting 0. cost_unknown defaults to False for the
     same reason; call sites that recover steps via _known_steps_for_session() pass
-    cost_unknown=True when that recovery itself returned None (see its own docstring)."""
+    cost_unknown=True when that recovery itself returned None (see its own docstring).
+    result_artifact_id defaults to None (no job row resolved yet); _classify_ledger's fail
+    partial rebinds it once job_row["result_artifact_id"] is known -- see its own docstring."""
     return EvidenceCase(
         label=label,
         scenario_id=scenario_id,
@@ -208,6 +220,7 @@ def _fail(
         error_message=error_message,
         steps=steps,
         cost_unknown=cost_unknown,
+        result_artifact_id=result_artifact_id,
     )
 
 
@@ -239,6 +252,9 @@ def _best_effort_steps_from_provider_calls(
                 output_tokens=call["output_tokens"],
                 total_tokens=call["total_tokens"],
                 estimated_cost=call["estimated_cost"],
+                output_artifact_id=(
+                    action_run["output_artifact_id"] if action_run is not None else None
+                ),
             )
         )
     return tuple(steps)
@@ -262,6 +278,7 @@ def _step_evidence_from_action_run(action_run: dict, calls: list[dict]) -> StepE
         output_tokens=sum(call["output_tokens"] for call in calls),
         total_tokens=sum(call["total_tokens"] for call in calls),
         estimated_cost=sum(call["estimated_cost"] for call in calls),
+        output_artifact_id=action_run["output_artifact_id"],
     )
 
 
@@ -322,6 +339,13 @@ def _classify_ledger(
         )
     job_id = job_row["id"]
     result_artifact_id = job_row["result_artifact_id"]
+    # Every PROOF00x branch from here on has a resolved job_row, so its result_artifact_id is
+    # real (possibly still None if the job hasn't completed) -- rebind once instead of adding
+    # result_artifact_id=result_artifact_id at each of the remaining ~20 fail() call sites.
+    # `code-review` (me #6) finding: EvidenceCase never carried result_artifact_id/
+    # output_artifact_id at all, though ANY-221's acceptance criterion names "session/artifact
+    # IDs" explicitly and both values were already being read here (just never threaded through).
+    fail = partial(fail, result_artifact_id=result_artifact_id)
 
     if not action_runs:
         return fail(
@@ -687,6 +711,7 @@ def _classify_ledger(
         error_code=None,
         error_message=None,
         steps=steps,
+        result_artifact_id=result_artifact_id,
     )
 
 
