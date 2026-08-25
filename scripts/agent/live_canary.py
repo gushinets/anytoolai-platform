@@ -250,7 +250,12 @@ def run(
     per-case loop for each group. Once the cap trips (LIVE001), every remaining case is marked
     failed instead of silently dropped, regardless of whether it's still in the atom queue or
     hasn't reached the composite queue yet -- so composite_total in the evidence report always
-    reflects all 3 composites, even if none of them actually ran. decode_database_name is
+    reflects all 3 composites, even if none of them actually ran. The tripping case itself keeps
+    its own real pass/fail status (its ledger/schema correctness is a separate question from the
+    cost cap), but the run-level `cost_safety_aborted` flag still forces a non-zero exit_code even
+    when the cap trips on the very last queued case -- `remaining` is empty then, so no case would
+    otherwise get marked failed and the run would silently report success (`code-review` (me #9)
+    finding). decode_database_name is
     forwarded to atoms_proof._build_engine() verbatim -- see its own docstring. live_canary_token
     is forwarded to atoms_proof._run_case_with_ledger_check()/smoke._run_one_case() verbatim as
     the X-Live-Canary-Token header -- the 14 live scenario_ids are config-flagged internal_only,
@@ -283,6 +288,13 @@ def run(
 
     cases: list[EvidenceCase] = []
     case_timeout = timeout
+    # `code-review` (me #9) finding: exit_code below is derived purely from per-case pass/fail
+    # counts. Both abort branches below mark every case still in `remaining` as failed -- but if
+    # the tripping case is the *last* one in the queue, `remaining` is already empty, so nothing
+    # gets marked failed and a cost-cap violation on the final case silently reports exit 0. This
+    # flag makes the abort itself part of exit_code, independent of whether any case happened to
+    # need marking.
+    cost_safety_aborted = False
     try:
         remaining: list[tuple[str, str, str, dict]] = [
             ("atom", label, scenario_id, scenario_input)
@@ -319,6 +331,7 @@ def run(
             # LIVE011 for a completely different condition (ANYTOOLAI_LIVE_CANARY_TOKEN unset),
             # and that error-code namespace is shared across logs/evidence/automation.
             if case.cost_unknown:
+                cost_safety_aborted = True
                 print(
                     f"LIVE012: cost for case {label} ({scenario_id}) could not be recovered "
                     f"after a ledger/database error -- aborting remaining {len(remaining)} "
@@ -342,6 +355,7 @@ def run(
 
             total_cost = _cumulative_estimated_cost(cases)
             if total_cost > max_total_cost_usd:
+                cost_safety_aborted = True
                 print(
                     f"LIVE001: cumulative estimated_cost {total_cost:.4f} exceeded cap "
                     f"{max_total_cost_usd:.4f} after case {label} -- aborting remaining "
@@ -371,8 +385,19 @@ def run(
         )
         print(f"{atom_passed}/{atom_total} kernel_demo live atoms passed")
         print(f"{composite_passed}/{composite_total} kernel_demo live composites passed")
+        if cost_safety_aborted:
+            print(
+                "LIVE001/LIVE012: cost-safety abort tripped during this run -- forcing a "
+                "non-zero exit code even though every attempted case's own ledger/schema "
+                "correctness passed",
+                file=sys.stderr,
+            )
         exit_code = (
-            0 if atom_passed == atom_total and composite_passed == composite_total else 1
+            0
+            if atom_passed == atom_total
+            and composite_passed == composite_total
+            and not cost_safety_aborted
+            else 1
         )
         return cases, exit_code
     finally:

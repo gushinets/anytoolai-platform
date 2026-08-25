@@ -310,6 +310,50 @@ def test_run_aborts_remaining_cases_once_cost_cap_exceeded_without_running_them(
     assert [case.kind for case in skipped_cases] == ["atom"] * 8 + ["composite"] * 3
 
 
+def test_run_forces_non_zero_exit_code_when_cost_cap_trips_on_the_last_case(monkeypatch) -> None:
+    """`code-review` (me #9) finding: if the cost cap trips exactly on the final queued case,
+    `remaining` is already empty by the time run() checks the cap, so the "mark every remaining
+    case failed" loop has nothing to mark -- every case, including the one that tripped the cap,
+    keeps status="pass", and exit_code (previously derived only from per-case pass counts) used
+    to read as 0 even though the run actually violated its own cost cap."""
+    module = load_live_canary_module()
+    calls: list[str] = []
+
+    def _fake_run_case_with_ledger_check(
+        api_url, engine, *, kind, label, scenario_id, scenario_input, timeout, **_kwargs
+    ):
+        calls.append(scenario_id)
+        return module.EvidenceCase(
+            label=label, scenario_id=scenario_id, kind=kind, status="pass",
+            session_id="session", job_id="job", error_code=None, error_message=None,
+            steps=(
+                module.atoms_proof.StepEvidence(
+                    step_id="x", action_type=label, action_config_id="c", estimated_cost=0.1,
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(
+        module.atoms_proof, "_run_case_with_ledger_check", _fake_run_case_with_ledger_check
+    )
+    monkeypatch.setattr(
+        module.atoms_proof,
+        "_build_engine",
+        lambda database_url, **kwargs: _FakeEngine(),
+    )
+
+    # 14 cases x $0.1 = $1.40 total; a $1.35 cap is only exceeded by the 14th (last) case's own
+    # contribution, so `remaining` is empty when run() checks the cap.
+    cases, exit_code = module.run(
+        "http://127.0.0.1:8000", "postgresql://unused", timeout=1.0, max_total_cost_usd=1.35,
+    )
+
+    assert len(calls) == 14
+    assert len(cases) == 14
+    assert all(case.status == "pass" for case in cases)
+    assert exit_code == 1
+
+
 def test_run_fails_closed_and_stops_when_a_case_cost_cannot_be_recovered(monkeypatch) -> None:
     """code review (me #5) finding: a case that already made a real, billed provider call and
     then hit a ledger/DB error whose own recovery query also failed used to report cost_unknown

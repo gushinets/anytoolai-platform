@@ -1476,6 +1476,33 @@ def test_write_evidence_report_rejects_exit_code_zero_with_a_failing_case(tmp_pa
         module.write_evidence_report([failing], 0, output_root=tmp_path)
 
 
+def test_write_evidence_report_normalizes_non_finite_cost_to_null(tmp_path) -> None:
+    """`code-review` (me #9) finding: `_safe_raw_cost()`/live_canary.py's `_safe_step_cost()`
+    deliberately produce math.inf for a corrupt provider_calls.estimated_cost row -- json.dumps()
+    would otherwise happily emit the non-standard `Infinity` token (not valid JSON per RFC 8259),
+    which a strict or non-Python consumer of this evidence report would fail to parse."""
+    module = load_atoms_proof_module()
+    case = module.EvidenceCase(
+        label="atom.one", scenario_id="scenario-1", kind="atom", status="pass",
+        session_id="session-1", job_id="job-1", error_code=None, error_message=None,
+        steps=(
+            module.StepEvidence(
+                step_id="extract", action_type="text.extract_structured_fields",
+                action_config_id="kernel_demo.extract_structured_fields_v1",
+                estimated_cost=module.math.inf,
+            ),
+        ),
+    )
+
+    report_path = module.write_evidence_report([case], exit_code=1, output_root=tmp_path)
+    raw_text = report_path.read_text(encoding="utf-8")
+
+    assert "Infinity" not in raw_text
+    assert "NaN" not in raw_text
+    payload = json.loads(raw_text)
+    assert payload["cases"][0]["steps"][0]["estimated_cost"] is None
+
+
 def test_build_engine_coerces_bare_postgresql_scheme_to_psycopg() -> None:
     module = load_atoms_proof_module()
 

@@ -35,6 +35,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -1014,6 +1015,26 @@ def run(
         engine.dispose()
 
 
+def _json_safe(value: Any) -> Any:
+    """Recursively replaces any non-finite float (math.inf/-inf/nan) with None. Python's json
+    module happily serializes these as the bare tokens `Infinity`/`-Infinity`/`NaN` by default --
+    not valid JSON per RFC 8259, so a strict or non-Python consumer of this evidence report would
+    fail to parse it. `_safe_raw_cost()`/live_canary.py's `_safe_step_cost()` deliberately produce
+    math.inf for a corrupt provider_calls.estimated_cost row (`code-review` (me #9) finding);
+    None here means exactly what it already means for every other nullable field in this report
+    ("no real numeric value"), not "zero"."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    # asdict() preserves the original container type for a tuple field (EvidenceCase.steps is
+    # `tuple[StepEvidence, ...]`), not just plain lists -- json.dumps() serializes both the same
+    # way, but this function's own isinstance checks need to recurse into both.
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
+
+
 def write_evidence_report(
     cases: list[EvidenceCase], exit_code: int, *, output_root: Path | None = None
 ) -> Path:
@@ -1041,7 +1062,7 @@ def write_evidence_report(
         # `cases` (PROOF008/PROOF009's empty-case guards) would otherwise read as vacuous
         # 0-passed-of-0 "success" even though run() itself returned a non-zero exit_code.
         "all_passed": exit_code == 0,
-        "cases": [asdict(case) for case in cases],
+        "cases": [_json_safe(asdict(case)) for case in cases],
     }
     return collect_context.write_timestamped_json_bundle(target_root, "evidence", payload)
 
