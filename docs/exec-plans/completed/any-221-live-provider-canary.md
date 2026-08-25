@@ -2,21 +2,19 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-20
 - Last updated: 2026-08-25
 - Review date: 2026-08-25
-- Next action: get an operator with `OPENAI_API_KEY`/`ANYTOOLAI_LIVE_CANARY_TOKEN` to re-run the
-  credentialed cycle (`dev-up -> live-canary -> dev-down`) on this HEAD, confirm `11/11` atoms +
-  `3/3` composites, and commit a fresh evidence JSON alongside (not replacing, so the run history
-  stays legible) `any-221-live-provider-canary.evidence-20260824T164316Z.json`. Then re-request PR
-  #84 review and sync PR body / ANY-371 with actual current scope.
-- Blocker: a sixth human code review (2026-08-25) found the committed 2026-08-24 evidence now
-  predates two more code changes on this branch (the `PROOF013`/`024`/`025`/`026` ledger-retry fix
-  and today's `cost_unknown`/`LIVE011` fail-closed cost-cap fix, plus the `internal_only` runtime-
-  config filter below) -- moved back to `docs/exec-plans/active/` until a fresh credentialed run on
-  the current HEAD lands. See the 2026-08-25 Progress log row.
+- Next action: none. A fresh credentialed OpenAI run on this HEAD (post `cost_unknown`/`LIVE011`
+  and `internal_only`-runtime-config fixes) passed `11/11` atoms + `3/3` composites; a privacy-safe
+  copy is committed at
+  `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260825T075842Z.json`, kept
+  alongside (not replacing) the 2026-08-24 run so the run history stays legible. Checked Linear:
+  ANY-371 (the related access-control finding) is already `Done` (completed 2026-08-24), so no
+  further sync needed there.
+- Blocker: none.
 
 ## Goal
 
@@ -208,11 +206,12 @@ Full design rationale (verified against real code before implementation) lives i
       `atoms_total: 11, composite_total: 3`.
 - [x] (2026-08-25) A privacy-safe copy of that evidence JSON (ids, status, and per-step
       cost/token/latency counters only -- no prompts, generated content, or secrets, confirmed by
-      reading the full file before committing) is now tracked in the repo (originally at
-      `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260824T164316Z.json`; see
-      this doc's own path for its current location -- both moved back to `active/` together on
-      2026-08-25, see below), linked in this file's Progress log (see below), addressing a fifth
-      code review (2026-08-25):
+      reading the full file before committing) is now tracked in the repo at
+      `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260824T164316Z.json`
+      (this doc and both evidence JSONs briefly round-tripped through `docs/exec-plans/active/`
+      and back on 2026-08-25 while a sixth review's blocker was open -- see the two 2026-08-25
+      Progress log rows below), linked in this file's Progress log (see below), addressing a
+      fifth code review (2026-08-25):
       the earlier local-only `.agent/...` path is gitignored and unreachable by any future agent
       after checkout, which AGENTS.md's own "context not in the repo does not exist" principle
       means was effectively no evidence at all. No separate MVP-A1 "completion doc" exists as a
@@ -226,10 +225,13 @@ Full design rationale (verified against real code before implementation) lives i
       cannot_be_recovered` in `tests/test_live_canary.py`, `cost_unknown` assertions added to 3
       existing `tests/test_atoms_proof.py` cases, `test_runtime_config.py`'s hardcoded-inclusion
       assertions flipped to exclusion). `quick-check` 924 tests (was 923).
-- [ ] Fresh credentialed run (`dev-up -> live-canary -> dev-down`, real `OPENAI_API_KEY` +
-      `ANYTOOLAI_LIVE_CANARY_TOKEN`) on this HEAD, confirming `11/11` atoms + `3/3` composites;
-      commit the resulting evidence JSON. The 2026-08-24 evidence committed above predates this
-      round's changes and the retry-ledger fix, so it no longer speaks for the current HEAD.
+- [x] (2026-08-25) Fresh credentialed run (`dev-up -> live-canary -> dev-down`, real
+      `OPENAI_API_KEY` + `ANYTOOLAI_LIVE_CANARY_TOKEN`, operator-supplied) on this HEAD (post
+      `cost_unknown`/`LIVE011`/`internal_only`-runtime-config fixes): `11/11` atoms + `3/3`
+      composites, exit 0, ~13,901 total tokens, ~$0.0081 total estimated cost. Evidence JSON read
+      in full to confirm it holds only ids, status, and per-step cost/token/latency counters (no
+      prompts, generated content, or secrets) before committing a copy at
+      `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260825T075842Z.json`.
 
 ## Validation
 
@@ -252,6 +254,11 @@ Full design rationale (verified against real code before implementation) lives i
       (regenerated `docs/generated/openapi.json` and `platformApi.ts` for the new
       `X-Live-Canary-Token` header parameter, both were flagged stale by `generate-docs --check`/
       `generate-api-types:check` until regenerated) both green.
+- [x] (2026-08-25) `python scripts/agent/runner.py quick-check` (924 tests, up from 923 with the
+      new `cost_unknown` regression test) and `validate-docs`/`generate-docs --check` all green.
+- [x] (2026-08-25) `export OPENAI_API_KEY=... ANYTOOLAI_LIVE_CANARY_TOKEN=... && python scripts/agent/runner.py dev-up && python scripts/agent/runner.py live-canary && python scripts/agent/runner.py dev-down`
+      on this HEAD -- exit 0, `11/11` atoms + `3/3` composites, ~13,901 total tokens, ~$0.0081
+      total estimated cost.
 
 ## Decision log
 
@@ -289,7 +296,8 @@ Full design rationale (verified against real code before implementation) lives i
 | 2026-08-24 | Ran the manual credentialed cycle against a real OpenAI provider (`gpt-4.1-mini`) on the new head, with both `OPENAI_API_KEY` and `ANYTOOLAI_LIVE_CANARY_TOKEN` set. Along the way, found and fixed 2 dev-stack issues unrelated to the ticket's own code: `configs/kernel/` isn't bind-mounted in the dev compose target, so a stale image (built while a since-reverted local-Ollama edit to `litellm_router.yaml` was present) kept serving that old config until rebuilt (`docker compose build platform-api platform-worker`); and `dev-up`, unlike `prod-up`, never passes `--build`, so recreating containers without the right shell env (`ANYTOOLAI_API_PORT`, `ANYTOOLAI_LIVE_CANARY_TOKEN`) silently reset the port mapping and blanked the server-side token, which the `internal_only` gate correctly (by design) treated as "reject everything" until `dev-up` was re-run from a shell with the real values. Result: `11/11` atoms + `3/3` composites passed (evidence originally at the local, gitignored `.agent/live-canary/evidence-20260824T164316Z.json`; 14 cases, ~13,989 total tokens, ~$0.0082 total estimated cost -- a repo-tracked copy was committed 2026-08-25, see below). | Close ANY-221; link this evidence in MVP-A1's completion doc. |
 | 2026-08-25 | Fixed a [P1] finding from a third human code review: `PROOF013` rejected a legitimate transport retry (its first physical attempt correctly ends in `provider.request_failed`, not `succeeded`), because `PROOF013` still demanded exactly one `succeeded` event per `provider_calls` row even after `PROOF003` was relaxed to allow retries. Split the check into `PROOF013` (started count), a new `PROOF024` (exactly one terminal event, succeeded xor failed), a new `PROOF025` (persisted `status` must agree with which terminal event fired; `timed_out` accepted alongside `failed`), extended `PROOF015` orphan detection to `provider.request_failed`, and added a new `PROOF026` (the last physical attempt by `physical_call_index` must be the one that succeeded). Also fixed the same review's non-blocking access-control-ordering note: `start_session()`'s idempotency-key replay lookup ran before the `internal_only`/token check, so a future caller sending `Idempotency-Key` against an internal_only scenario could in principle replay past the gate (`live_canary.py` itself never sends one today, so not currently exploitable) -- added an early `internal_only` peek (a bare config lookup, not `_require_product_scenario()`, so replay still tolerates a since-removed scenario) before the replay branch. 7 new regression tests in `tests/test_atoms_proof.py`, 1 new `postgresql`-marked test in `test_scenario_runtime.py`. `quick-check` 923 tests, `postgresql-check` exit 0 (real local Postgres). The existing 2026-08-24 credentialed-run evidence is unaffected (it had no retries, so never hit the old PROOF013 bug either way) -- no new live run is required by this fix, only a fresh review pass. Committed (`32c2883`). | Fix a fourth review pass's 2 remaining valid findings (live-canary.yml secret scoping, a missing token-forwarding assertion); get explicit go-ahead to commit those, then close ANY-221. |
 | 2026-08-25 | Fixed a [P1/acceptance] finding from a fifth human code review: this doc claimed acceptance evidence was "linked" via the local `.agent/live-canary/evidence-20260824T164316Z.json` path, but `.agent/` is gitignored, so no future agent could ever actually reach that file after a fresh checkout -- AGENTS.md's own "context not in the repo does not exist" principle means that was effectively unlinked evidence, not linked evidence, despite the doc's own claims to the contrary. Read the full evidence JSON first to confirm it holds only ids, status, and per-step cost/token/latency counters (no prompts, generated content, or secrets), then committed a copy at `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260824T164316Z.json`. Also fixed the review's [P2] finding: the Status header block (State/Last updated/Review date/Next action/Blocker) was stale from 2026-08-21, still describing the credentialed run as not-yet-attempted, directly contradicting the Progress log's own 2026-08-24/25 rows in the same document -- updated to State: completed, and moved this file from `docs/exec-plans/active/` to `docs/exec-plans/completed/` (via `git mv`, no other repo file referenced the old path). `validate-docs`/`generate-docs --check` confirmed no drift. | None -- ANY-221 is closed. |
-| 2026-08-25 | Fixed 2 of 3 findings from a sixth human code review (PR #84, current HEAD): (1) [Blocker/P1] cost-cap fail-open when a case's ledger recovery itself hits a DB error (`cost_unknown`/`LIVE011`, see Scope/Decision log above); (2) [P2] `internal_only` scenarios still listed in the public `/runtime-config` response despite `/start` rejecting them (filtered in `_build_scenario_metadata()`). The third finding -- committed 2026-08-24 evidence no longer speaks for the current HEAD after this fix plus the earlier `PROOF013`/`024`/`025`/`026` fix -- is not a code fix; it needs a fresh credentialed run, which this session has no `OPENAI_API_KEY` to perform. Also swept every tracked file for the literal `` `/code-review` `` phrasing (a local skill/slash-command name meaningless outside this environment -- the same fix `docs/exec-plans/active/any-220-atom-runtime-proof-cli.md`'s 2026-08-20 rows already made once, which had crept back in through the 2026-08-24/25 review rounds) and replaced it with plain "code review"; left the gitignored `plans/ANY-*.md` session logs untouched. Re-ran `quick-check` (924 passed, was 923) and `validate-docs`, both green. Reverted Status's `State` from `completed` to `active` and moved this file back to `docs/exec-plans/active/` (`git mv`) to reflect the reopened acceptance blocker -- see Status above. | Get a fresh credentialed `11/11` + `3/3` run on this HEAD, commit its evidence, then re-request PR #84 review and sync the PR body / ANY-371 scope. |
+| 2026-08-25 | Fixed 2 of 3 findings from a sixth human code review (PR #84, current HEAD): (1) [Blocker/P1] cost-cap fail-open when a case's ledger recovery itself hits a DB error (`cost_unknown`/`LIVE011`, see Scope/Decision log above); (2) [P2] `internal_only` scenarios still listed in the public `/runtime-config` response despite `/start` rejecting them (filtered in `_build_scenario_metadata()`). The third finding -- committed 2026-08-24 evidence no longer speaks for the current HEAD after this fix plus the earlier `PROOF013`/`024`/`025`/`026` fix -- is not a code fix; it needs a fresh credentialed run, which this session has no `OPENAI_API_KEY` to perform. Also swept every tracked file for the literal `` `/code-review` `` phrasing (a local skill/slash-command name meaningless outside this environment -- the same fix `docs/exec-plans/active/any-220-atom-runtime-proof-cli.md`'s 2026-08-20 rows already made once, which had crept back in through the 2026-08-24/25 review rounds) and replaced it with plain "code review"; left the gitignored `plans/ANY-*.md` session logs untouched. Re-ran `quick-check` (924 passed, was 923) and `validate-docs`, both green. Reverted Status's `State` from `completed` to `active` and moved this file back to `docs/exec-plans/active/` (`git mv`) to reflect the reopened acceptance blocker -- see Status above. Committed (`d540355`). | Get a fresh credentialed `11/11` + `3/3` run on this HEAD, commit its evidence, then push and re-request PR #84 review. |
+| 2026-08-25 | User supplied `OPENAI_API_KEY`/`ANYTOOLAI_LIVE_CANARY_TOKEN` for this session. Confirmed Docker is available here (`doctor` passed); ran the manual credentialed cycle (`dev-up -> live-canary -> dev-down`) directly against real OpenAI on the current HEAD: `11/11` atoms + `3/3` composites, exit 0, ~13,901 total tokens, ~$0.0081 total estimated cost -- confirming the `cost_unknown`/`internal_only` fixes above don't regress the happy path. Read the full evidence JSON before committing a copy at `docs/exec-plans/completed/any-221-live-provider-canary.evidence-20260825T075842Z.json` (kept alongside, not replacing, the 2026-08-24 evidence). Checked Linear directly (MCP connected this session): ANY-371 is `Done` (completed 2026-08-24), so the PR-metadata-drift note from the sixth review was already stale -- no further Linear sync needed. Flipped Status back to `State: completed`/`Blocker: none` and moved this file (and both evidence JSONs) back to `docs/exec-plans/completed/`. | Push `feature/ANY-221` and re-request PR #84 review, once the user confirms. |
 
 ## Open questions
 
@@ -300,11 +308,9 @@ Full design rationale (verified against real code before implementation) lives i
 
 ## Follow-up debt
 
-- A fresh credentialed run (`11/11` atoms + `3/3` composites) on the current HEAD is required
-  before this ticket can be considered closed again -- see Status/Blocker above. The committed
-  2026-08-24 evidence still demonstrates the atom/composite prompts and contracts work end to end
-  against a real provider, but no longer speaks for the current cost-cap/`internal_only`-filter/
-  retry-ledger code paths.
-- The `$0.50`/4-calls/60s estimates in Open questions above are otherwise the only remaining soft
-  spot, and were validated as reasonable by the 2026-08-24 run (14 cases cost ~$0.0082 total,
-  nowhere near the cap).
+- None outstanding. A fresh credentialed run on the current HEAD (2026-08-25, `11/11` + `3/3`) is
+  committed alongside the original 2026-08-24 run; the `$0.50`/4-calls/60s estimates in Open
+  questions above are the only remaining soft spot, and both runs validated them as reasonable
+  (~$0.0081-0.0082 total per run, nowhere near the cap). PR #84 still needs a push and a
+  re-request for review -- see Status above -- but that's a repo-visible action pending explicit
+  go-ahead, not open engineering debt.
