@@ -19,7 +19,7 @@ export type OpenHandoffConsentOptions = {
  * mirroring `PlatformApiClient`'s/`normalizeBaseUrl()`'s existing behavior, not reject a promise.
  */
 export function openHandoffConsent(options: OpenHandoffConsentOptions): void | Promise<void> {
-  const baseUrl = normalizeBaseUrl(options.webConsentBaseUrl);
+  const baseUrl = normalizeBaseUrl(options.webConsentBaseUrl, "openHandoffConsent");
   const url = joinUrl(baseUrl, `/handoff/${encodeURIComponent(options.handoffToken)}`);
   return options.navigate(url);
 }

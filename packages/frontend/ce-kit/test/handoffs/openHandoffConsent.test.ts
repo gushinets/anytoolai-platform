@@ -49,7 +49,7 @@ describe("openHandoffConsent", () => {
 
     expect(() =>
       openHandoffConsent({ webConsentBaseUrl: "", handoffToken: "token_abc", navigate }),
-    ).toThrow();
+    ).toThrow(/openHandoffConsent requires a non-empty baseUrl/);
     expect(navigate).not.toHaveBeenCalled();
   });
 
@@ -58,7 +58,7 @@ describe("openHandoffConsent", () => {
 
     expect(() =>
       openHandoffConsent({ webConsentBaseUrl: "   ", handoffToken: "token_abc", navigate }),
-    ).toThrow();
+    ).toThrow(/openHandoffConsent requires a non-empty baseUrl/);
     expect(navigate).not.toHaveBeenCalled();
   });
 });
