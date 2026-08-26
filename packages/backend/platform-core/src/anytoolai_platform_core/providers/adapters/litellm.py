@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from pathlib import Path
 from typing import Any, Mapping
@@ -127,15 +128,52 @@ def _normalize_litellm_response(
 ) -> ProviderResponse:
     usage = _mapping_like(_value_from(response, "usage"))
     hidden_params = _mapping_like(_value_from(response, "_hidden_params"))
-    total_tokens = _int_like(
-        _value_from(usage, "total_tokens") or _value_from(usage, "totalTokens")
+    input_tokens = _int_like(
+        _value_from(usage, "prompt_tokens") or _value_from(usage, "input_tokens")
     )
-    estimated_cost = _float_like(
-        hidden_params.get("response_cost")
-        or _mapping_like(hidden_params.get("additional_headers")).get(
+    output_tokens = _int_like(
+        _value_from(usage, "completion_tokens") or _value_from(usage, "output_tokens")
+    )
+    # A missing/zero aggregate `total_tokens` doesn't mean no billable usage: the response can
+    # report only per-role counts (`code review me #6`). Fall back to input+output so a call that
+    # billed tokens is never mistaken for a genuinely free one just because the aggregate field
+    # was absent.
+    total_tokens = (
+        _int_like(_value_from(usage, "total_tokens") or _value_from(usage, "totalTokens"))
+        or input_tokens + output_tokens
+    )
+
+    def _positive_finite(value: float) -> bool:
+        return math.isfinite(value) and value > 0
+
+    primary_cost = _float_like(hidden_params.get("response_cost"), default=math.nan)
+    fallback_cost = _float_like(
+        _mapping_like(hidden_params.get("additional_headers")).get(
             "llm_provider-x-litellm-response-cost"
-        )
+        ),
+        default=math.nan,
     )
+    # A missing/unparseable cost is NaN, not 0.0 (`code review team lead #1`): 0.0 reads
+    # downstream (_safe_raw_cost()/_safe_step_cost()) as "known, free", letting a billed call
+    # with no cost metadata pass the live-canary cost cap silently. NaN is non-finite, so those
+    # same guards already convert it to math.inf and fail the run closed.
+    #
+    # A *present* but non-positive primary cost is equally untrustworthy when the call actually
+    # billed tokens (`code review me #5`): LiteLLM can report a literal 0.0 for an unmapped/
+    # custom model it can't price, and treating that as "known free" hid a positive real cost
+    # sitting in the fallback header. So: prefer a positive-finite primary cost, then a
+    # positive-finite fallback cost (`_positive_finite()`, not a bare `> 0`, so a corrupt `inf`
+    # primary never wins over a good finite fallback -- `code review me #6`); only fall back to a
+    # real 0.0 when there is no billable usage at all (total_tokens == 0) -- otherwise report NaN
+    # (unknown, fail closed).
+    if _positive_finite(primary_cost):
+        estimated_cost = primary_cost
+    elif _positive_finite(fallback_cost):
+        estimated_cost = fallback_cost
+    elif total_tokens > 0:
+        estimated_cost = math.nan
+    else:
+        estimated_cost = 0.0
     actual_model = _string_like(
         _value_from(response, "model") or hidden_params.get("model")
     )
@@ -157,15 +195,7 @@ def _normalize_litellm_response(
         model=actual_model or request.model,
         output_text=content,
         status=ProviderCallStatus.succeeded,
-        usage=ProviderUsage(
-            input_tokens=_int_like(
-                _value_from(usage, "prompt_tokens") or _value_from(usage, "input_tokens")
-            ),
-            output_tokens=_int_like(
-                _value_from(usage, "completion_tokens")
-                or _value_from(usage, "output_tokens")
-            ),
-        ),
+        usage=ProviderUsage(input_tokens=input_tokens, output_tokens=output_tokens),
         estimated_cost=estimated_cost,
         http_status=http_status or None,
         litellm_response_id=response_id,
@@ -226,11 +256,13 @@ def _int_like(value: Any) -> int:
         return 0
 
 
-def _float_like(value: Any) -> float:
+def _float_like(value: Any, *, default: float = 0.0) -> float:
+    if value is None:
+        return default
     try:
-        return float(value or 0.0)
+        return float(value)
     except (TypeError, ValueError):
-        return 0.0
+        return default
 
 
 def _string_like(value: Any) -> str | None:

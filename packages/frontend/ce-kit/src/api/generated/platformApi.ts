@@ -1010,6 +1010,7 @@ export interface operations {
             query?: never;
             header?: {
                 "Idempotency-Key"?: string | null;
+                "X-Live-Canary-Token"?: string | null;
             };
             path: {
                 product_id: string;

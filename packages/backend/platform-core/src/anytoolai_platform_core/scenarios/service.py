@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import secrets
 from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
@@ -87,6 +89,22 @@ class IdempotencyKeyInvalidError(PlatformError):
         )
 
 
+LIVE_CANARY_TOKEN_ENV_VAR = "ANYTOOLAI_LIVE_CANARY_TOKEN"
+
+
+def _live_canary_token_is_valid(provided: str | None) -> bool:
+    """Gate for ScenarioDefinition.internal_only (ANY-221's 14 kernel_demo "_live_" canary
+    scenarios, real billed OpenAI calls) -- see start_session()'s own check. Fails closed: if the
+    server itself hasn't been configured with a real ANYTOOLAI_LIVE_CANARY_TOKEN, nothing can ever
+    match it, so an unconfigured deployment can never accidentally serve an internal_only scenario
+    to any caller. secrets.compare_digest avoids a timing side-channel on the comparison, the same
+    reasoning any secret-token check gets."""
+    configured = os.environ.get(LIVE_CANARY_TOKEN_ENV_VAR, "")
+    if not configured or not provided:
+        return False
+    return secrets.compare_digest(configured, provided)
+
+
 class ScenarioRuntimeService:
     def __init__(
         self,
@@ -118,6 +136,7 @@ class ScenarioRuntimeService:
         user_id: str | None = None,
         source_frontend_instance_id: str | None = None,
         idempotency_key: str | None = None,
+        live_canary_token: str | None = None,
     ) -> ScenarioSessionSnapshot:
         # An empty or whitespace-only header (e.g. a proxy sending "Idempotency-Key: ")
         # must mean "no key was sent", not a real, distinct empty-string key -- two
@@ -145,6 +164,24 @@ class ScenarioRuntimeService:
                 input_payload=input_payload,
             )
         )
+
+        # code-review (2026-08-24) finding: an idempotency-key replay below returns a
+        # snapshot before the internal_only/live_canary_token check further down ever runs, so a
+        # caller who ever learns (or brute-forces, within the same guest_id scope) a valid
+        # idempotency_key for an internal_only scenario could replay it without the token.
+        # live_canary.py itself never sends Idempotency-Key today, so this can't fire in
+        # practice yet, but checking it here (before touching idempotency at all) closes the gap
+        # regardless of how any future caller behaves. A bare config peek, not
+        # _require_product_scenario() (which raises on an unknown/removed scenario_id) -- an
+        # idempotency replay of a session whose scenario has since been removed from config must
+        # keep the config-drift tolerance the comment below describes, not fail here instead.
+        early_scenario = self._config_registry.get_scenario(scenario_id)
+        if (
+            early_scenario is not None
+            and early_scenario.internal_only
+            and not _live_canary_token_is_valid(live_canary_token)
+        ):
+            raise ScenarioNotFoundError()
 
         # A replay of an already-accepted start must survive config drift since the
         # original request: the frontend can be disabled, the quota policy
@@ -174,6 +211,15 @@ class ScenarioRuntimeService:
             return self._replay_snapshot(existing)
 
         scenario = self._require_product_scenario(product_id, scenario_id)
+        # ANY-221: internal_only scenarios (the 14 kernel_demo "_live_" canary scenarios) exist
+        # only for scripts/agent/live_canary.py's own cost-capped, credentialed-gated CLI, not the
+        # normal public start-session API any frontend/Chrome-extension client also reaches through
+        # this same method -- without this, that public path bypasses live_canary.py's $0.50 cost
+        # cap and OPENAI_API_KEY fail-fast entirely (both exist only in that CLI). Raises the same
+        # ScenarioNotFoundError an unknown scenario_id would -- a caller without the right token
+        # can't distinguish "doesn't exist" from "exists but is internal-only".
+        if scenario.internal_only and not _live_canary_token_is_valid(live_canary_token):
+            raise ScenarioNotFoundError()
         self._require_enabled_frontend(product_id, frontend_id)
 
         workflow = self._config_registry.get_workflow(scenario.workflow_id)
@@ -319,6 +365,11 @@ class ScenarioRuntimeService:
         queue_workflow: bool,
     ) -> LinkedScenarioSessionResult:
         scenario = self._require_product_scenario(product_id, scenario_id)
+        # ANY-221: no legitimate handoff ever targets an internal_only (live-canary) scenario --
+        # unlike start_session(), there's no live_canary_token to check here at all, since
+        # live_canary.py never creates linked/handoff sessions; this path is always rejected.
+        if scenario.internal_only:
+            raise ScenarioNotFoundError()
         self._require_enabled_frontend(product_id, frontend_id)
         if not isinstance(input_payload, Mapping):
             raise ScenarioInputInvalidError()

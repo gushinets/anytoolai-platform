@@ -107,12 +107,15 @@ async def _request(
     json: Any | None = None,
     request_id: str = "req_scenario_runtime_test",
     idempotency_key: str | None = None,
+    live_canary_token: str | None = None,
 ) -> httpx.Response:
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         headers = {"X-Request-ID": request_id}
         if idempotency_key is not None:
             headers["Idempotency-Key"] = idempotency_key
+        if live_canary_token is not None:
+            headers["X-Live-Canary-Token"] = live_canary_token
         return await client.request(
             method,
             path,
@@ -522,6 +525,54 @@ def test_start_scenario_returns_safe_404_for_unknown_or_unattached_scenario(
         }
     }
     assert "kernel_demo.missing_v1" not in response.text
+
+
+def test_start_scenario_returns_safe_404_for_internal_only_scenario_without_token(
+    session_factory: SessionFactory, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ANY-221 code-review finding: the 14 kernel_demo "_live_" scenarios are config-flagged
+    internal_only -- the normal public start-session path (no X-Live-Canary-Token header) must
+    get the exact same safe 404 an unknown scenario_id would, not a distinguishable error."""
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "the-real-token")
+    app = _create_test_app(session_factory)
+
+    response = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_live_smoke_v1/start",
+            json=_start_payload(),
+        )
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json() == {
+        "error": {
+            "code": "scenario_not_found",
+            "message": "Scenario not found.",
+            "request_id": "req_scenario_runtime_test",
+        }
+    }
+
+
+def test_start_scenario_accepts_internal_only_scenario_with_valid_live_canary_token(
+    session_factory: SessionFactory, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "the-real-token")
+    app = _create_test_app(session_factory)
+
+    response = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/products/kernel_demo/scenarios/kernel_demo.single_action_live_smoke_v1/start",
+            json=_start_payload(),
+            live_canary_token="the-real-token",
+        )
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json()["status"] == "started"
 
 
 def test_start_scenario_rejects_invalid_frontend_and_input_shape(

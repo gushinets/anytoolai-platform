@@ -1,0 +1,412 @@
+{
+  "all_passed": true,
+  "atoms_passed": 11,
+  "atoms_total": 11,
+  "cases": [
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787644657944094862_0000000007_3e4424e2a65b419589658470f5f465ab",
+      "kind": "atom",
+      "label": "text.extract_structured_fields",
+      "scenario_id": "kernel_demo.single_action_live_smoke_v1",
+      "session_id": "scenario_session_01787644657912152572_0000000002_e9b63d1b8f8d4c1380ca46fe571884d7",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.extract_structured_fields_live_v1",
+          "action_type": "text.extract_structured_fields",
+          "estimated_cost": 0.00028719999999999993,
+          "input_tokens": 654,
+          "latency_ms": 3405,
+          "output_tokens": 16,
+          "step_id": "extract",
+          "total_tokens": 670
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787644662493827978_0000000015_913e3fc5af4144a693f29f967081c5fa",
+      "kind": "atom",
+      "label": "text.detect_issues_by_taxonomy",
+      "scenario_id": "kernel_demo.single_action_detect_issues_live_smoke_v1",
+      "session_id": "scenario_session_01787644662481589752_0000000010_8e13dc750ad446ae90a26dddffefa5f1",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.detect_issues_live_v1",
+          "action_type": "text.detect_issues_by_taxonomy",
+          "estimated_cost": 0.00023199999999999997,
+          "input_tokens": 344,
+          "latency_ms": 2255,
+          "output_tokens": 59,
+          "step_id": "detect_issues",
+          "total_tokens": 403
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787644665865483655_0000000023_f43c92f3158145e3bbe4d2debb536ca2",
+      "kind": "atom",
+      "label": "document.generate_from_template",
+      "scenario_id": "kernel_demo.single_action_generate_report_live_smoke_v1",
+      "session_id": "scenario_session_01787644665849526381_0000000018_78d3dd558f4d4ad197791702dca8eeb9",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.generate_report_live_v1",
+          "action_type": "document.generate_from_template",
+          "estimated_cost": 0.00038639999999999996,
+          "input_tokens": 586,
+          "latency_ms": 1629,
+          "output_tokens": 95,
+          "step_id": "generate_report",
+          "total_tokens": 681
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787644668709126110_0000000031_3276766af93d4da4a830a01a9a1e7462",
+      "kind": "atom",
+      "label": "text.compose_reply",
+      "scenario_id": "kernel_demo.single_action_compose_reply_live_smoke_v1",
+      "session_id": "scenario_session_01787644668698461263_0000000026_5e5293a2669847fb88108a681b9fccc5",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.compose_reply_live_v1",
+          "action_type": "text.compose_reply",
+          "estimated_cost": 0.0002512,
+          "input_tokens": 412,
+          "latency_ms": 1652,
+          "output_tokens": 54,
+          "step_id": "compose_reply",
+          "total_tokens": 466
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787644671535464169_0000000039_bda5789004a44b0dad1676260ba1b43c",
+      "kind": "atom",
+      "label": "text.generate_clarifying_questions",
+      "scenario_id": "kernel_demo.single_action_generate_clarifying_questions_live_smoke_v1",
+      "session_id": "scenario_session_01787644671525134610_0000000034_a0805fc54d284b39a2e5da76213eb9b7",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.generate_clarifying_questions_live_v1",
+          "action_type": "text.generate_clarifying_questions",
+          "estimated_cost": 0.0003452,
+          "input_tokens": 659,
+          "latency_ms": 1736,
+          "output_tokens": 51,
+          "step_id": "generate_questions",
+          "total_tokens": 710
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787644674381341838_0000000047_d3e066894d4c404dbc732bf023b4a9df",
+      "kind": "atom",
+      "label": "text.synthesize_angle",
+      "scenario_id": "kernel_demo.single_action_synthesize_angle_live_smoke_v1",
+      "session_id": "scenario_session_01787644674369329599_0000000042_72220193c72c4ab59a95640d6cbf1e85",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.synthesize_angle_live_v1",
+          "action_type": "text.synthesize_angle",
+          "estimated_cost": 0.0002096,
+          "input_tokens": 324,
+          "latency_ms": 1597,
+          "output_tokens": 50,
+          "step_id": "synthesize_angle",
+          "total_tokens": 374
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787644676688033081_0000000055_f91272341d2945c096f5a5fdd039e76d",
+      "kind": "atom",
+      "label": "text.compose_persuasive_text",
+      "scenario_id": "kernel_demo.single_action_compose_persuasive_text_live_smoke_v1",
+      "session_id": "scenario_session_01787644676678247435_0000000050_757c6869b73a47048a2fd4aa6961f377",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.compose_persuasive_text_live_v1",
+          "action_type": "text.compose_persuasive_text",
+          "estimated_cost": 0.0002008,
+          "input_tokens": 354,
+          "latency_ms": 1208,
+          "output_tokens": 37,
+          "step_id": "compose_persuasive_text",
+          "total_tokens": 391
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787644678988945278_0000000063_146070f439bb44faa08f3d532a155311",
+      "kind": "atom",
+      "label": "text.generate_gap_rewrites",
+      "scenario_id": "kernel_demo.single_action_generate_gap_rewrites_live_smoke_v1",
+      "session_id": "scenario_session_01787644678977655763_0000000058_e77aa8ad5428473eb94a268d4302b760",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.generate_gap_rewrites_live_v1",
+          "action_type": "text.generate_gap_rewrites",
+          "estimated_cost": 0.00044919999999999997,
+          "input_tokens": 479,
+          "latency_ms": 2973,
+          "output_tokens": 161,
+          "step_id": "generate_gap_rewrites",
+          "total_tokens": 640
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787644682900979212_0000000071_b5597c21633d4a509245d8b8a09dabee",
+      "kind": "atom",
+      "label": "text.compare_and_classify",
+      "scenario_id": "kernel_demo.single_action_compare_and_classify_live_smoke_v1",
+      "session_id": "scenario_session_01787644682891025839_0000000066_05b81e5fa3654bf08a1f0cd9c4bd52c3",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.compare_and_classify_live_v1",
+          "action_type": "text.compare_and_classify",
+          "estimated_cost": 0.0004016,
+          "input_tokens": 596,
+          "latency_ms": 2388,
+          "output_tokens": 102,
+          "step_id": "compare_and_classify",
+          "total_tokens": 698
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787644686280350423_0000000079_29c6d436f7e548609e28d9f70954ba5d",
+      "kind": "atom",
+      "label": "text.score_match_by_rubric",
+      "scenario_id": "kernel_demo.single_action_score_match_by_rubric_live_smoke_v1",
+      "session_id": "scenario_session_01787644686271693085_0000000074_bc9950895e21488aa597838247da5506",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.score_match_by_rubric_live_v1",
+          "action_type": "text.score_match_by_rubric",
+          "estimated_cost": 0.0004824,
+          "input_tokens": 630,
+          "latency_ms": 3113,
+          "output_tokens": 144,
+          "step_id": "score_match_by_rubric",
+          "total_tokens": 774
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787644690727399128_0000000087_a5fe03c68bc047219c537ee9377d40ff",
+      "kind": "atom",
+      "label": "text.score_multidimensional_axes",
+      "scenario_id": "kernel_demo.single_action_score_multidimensional_axes_live_smoke_v1",
+      "session_id": "scenario_session_01787644690716877982_0000000082_71de2140f807401c92de85ac04d95ea5",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.score_multidimensional_axes_live_v1",
+          "action_type": "text.score_multidimensional_axes",
+          "estimated_cost": 0.00034679999999999997,
+          "input_tokens": 567,
+          "latency_ms": 1429,
+          "output_tokens": 75,
+          "step_id": "score_multidimensional_axes",
+          "total_tokens": 642
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787644693026522267_0000000095_4444d8ccebce4405bb32bf9006a6839b",
+      "kind": "composite",
+      "label": "kernel_demo.composite_analyze_and_clarify_live_v1",
+      "scenario_id": "kernel_demo.composite_analyze_and_clarify_live_smoke_v1",
+      "session_id": "scenario_session_01787644693016924003_0000000090_2c697878869642d2b1f3bb62d2f8996e",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.extract_structured_fields_live_v1",
+          "action_type": "text.extract_structured_fields",
+          "estimated_cost": 0.00028719999999999993,
+          "input_tokens": 654,
+          "latency_ms": 1149,
+          "output_tokens": 16,
+          "step_id": "extract",
+          "total_tokens": 670
+        },
+        {
+          "action_config_id": "kernel_demo.detect_issues_live_v1",
+          "action_type": "text.detect_issues_by_taxonomy",
+          "estimated_cost": 0.00023199999999999997,
+          "input_tokens": 344,
+          "latency_ms": 1626,
+          "output_tokens": 59,
+          "step_id": "detect_issues",
+          "total_tokens": 403
+        },
+        {
+          "action_config_id": "kernel_demo.generate_clarifying_questions_live_v1",
+          "action_type": "text.generate_clarifying_questions",
+          "estimated_cost": 0.0003832,
+          "input_tokens": 694,
+          "latency_ms": 1470,
+          "output_tokens": 66,
+          "step_id": "generate_questions",
+          "total_tokens": 760
+        },
+        {
+          "action_config_id": "kernel_demo.generate_report_live_v1",
+          "action_type": "document.generate_from_template",
+          "estimated_cost": 0.0007436,
+          "input_tokens": 715,
+          "latency_ms": 5444,
+          "output_tokens": 286,
+          "step_id": "generate_report",
+          "total_tokens": 1001
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787644703906065974_0000000103_7857f7dde2fe487c9a562ef08d96ea46",
+      "kind": "composite",
+      "label": "kernel_demo.composite_evaluate_match_live_v1",
+      "scenario_id": "kernel_demo.composite_evaluate_match_live_smoke_v1",
+      "session_id": "scenario_session_01787644703896252660_0000000098_ff42caa94081432bb51d010deb2af09c",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.compare_and_classify_live_v1",
+          "action_type": "text.compare_and_classify",
+          "estimated_cost": 0.000428,
+          "input_tokens": 598,
+          "latency_ms": 2171,
+          "output_tokens": 118,
+          "step_id": "compare_and_classify",
+          "total_tokens": 716
+        },
+        {
+          "action_config_id": "kernel_demo.score_match_by_rubric_live_v1",
+          "action_type": "text.score_match_by_rubric",
+          "estimated_cost": 0.0004856,
+          "input_tokens": 658,
+          "latency_ms": 2983,
+          "output_tokens": 139,
+          "step_id": "score_match_by_rubric",
+          "total_tokens": 797
+        },
+        {
+          "action_config_id": "kernel_demo.score_multidimensional_axes_live_v1",
+          "action_type": "text.score_multidimensional_axes",
+          "estimated_cost": 0.0003788,
+          "input_tokens": 587,
+          "latency_ms": 1558,
+          "output_tokens": 90,
+          "step_id": "score_multidimensional_axes",
+          "total_tokens": 677
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787644712088417591_0000000111_4e2f86b9240c46fe95f283257681f2e8",
+      "kind": "composite",
+      "label": "kernel_demo.composite_shape_and_write_live_v1",
+      "scenario_id": "kernel_demo.composite_shape_and_write_live_smoke_v1",
+      "session_id": "scenario_session_01787644712077662874_0000000106_20900729fab345aebc66896993daae0a",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.synthesize_angle_live_v1",
+          "action_type": "text.synthesize_angle",
+          "estimated_cost": 0.0002128,
+          "input_tokens": 324,
+          "latency_ms": 1801,
+          "output_tokens": 52,
+          "step_id": "synthesize_angle",
+          "total_tokens": 376
+        },
+        {
+          "action_config_id": "kernel_demo.generate_gap_rewrites_live_v1",
+          "action_type": "text.generate_gap_rewrites",
+          "estimated_cost": 0.0006776,
+          "input_tokens": 506,
+          "latency_ms": 4639,
+          "output_tokens": 297,
+          "step_id": "generate_gap_rewrites",
+          "total_tokens": 803
+        },
+        {
+          "action_config_id": "kernel_demo.compose_persuasive_text_live_v1",
+          "action_type": "text.compose_persuasive_text",
+          "estimated_cost": 0.0003604,
+          "input_tokens": 657,
+          "latency_ms": 1591,
+          "output_tokens": 61,
+          "step_id": "compose_persuasive_text",
+          "total_tokens": 718
+        },
+        {
+          "action_config_id": "kernel_demo.compose_reply_live_v1",
+          "action_type": "text.compose_reply",
+          "estimated_cost": 0.0003,
+          "input_tokens": 458,
+          "latency_ms": 1759,
+          "output_tokens": 73,
+          "step_id": "compose_reply",
+          "total_tokens": 531
+        }
+      ]
+    }
+  ],
+  "composite_passed": 3,
+  "composite_total": 3,
+  "generated_at": "2026-08-25T07:58:42.880702+00:00"
+}

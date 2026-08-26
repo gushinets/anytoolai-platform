@@ -1,0 +1,448 @@
+{
+  "all_passed": true,
+  "atoms_passed": 11,
+  "atoms_total": 11,
+  "cases": [
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787647079326577513_0000000007_5437a0c2d459442094006b48726f3997",
+      "kind": "atom",
+      "label": "text.extract_structured_fields",
+      "result_artifact_id": "artifact_01787647083044480224_0000000011_832fa4bc2e6a412083198b01b8600f11",
+      "scenario_id": "kernel_demo.single_action_live_smoke_v1",
+      "session_id": "scenario_session_01787647079305311820_0000000002_988f6d13350f41fa95b0d8368eeec0fb",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.extract_structured_fields_live_v1",
+          "action_type": "text.extract_structured_fields",
+          "estimated_cost": 0.00028719999999999993,
+          "input_tokens": 654,
+          "latency_ms": 3559,
+          "output_artifact_id": "artifact_01787647083016365727_0000000007_f2e860977bc44b6c97c995bff14fb9c3",
+          "output_tokens": 16,
+          "step_id": "extract",
+          "total_tokens": 670
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787647083575677019_0000000015_de863b0c3e144f4fa74b457adc7c25a0",
+      "kind": "atom",
+      "label": "text.detect_issues_by_taxonomy",
+      "result_artifact_id": "artifact_01787647085465455330_0000000027_08b9c182adb74a5681585329dc85ab73",
+      "scenario_id": "kernel_demo.single_action_detect_issues_live_smoke_v1",
+      "session_id": "scenario_session_01787647083564000396_0000000010_26ab1232a02e45c4ad52c9cdbfa83d09",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.detect_issues_live_v1",
+          "action_type": "text.detect_issues_by_taxonomy",
+          "estimated_cost": 0.00023359999999999999,
+          "input_tokens": 344,
+          "latency_ms": 1330,
+          "output_artifact_id": "artifact_01787647085452638908_0000000023_7b17359b238a4b749ff7777d4b650e6e",
+          "output_tokens": 60,
+          "step_id": "detect_issues",
+          "total_tokens": 404
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787647086032297049_0000000023_8b9fcae515954d20806070054feed0db",
+      "kind": "atom",
+      "label": "document.generate_from_template",
+      "result_artifact_id": "artifact_01787647088245145992_0000000043_8f43a7e04aff482296603bb66b0b6137",
+      "scenario_id": "kernel_demo.single_action_generate_report_live_smoke_v1",
+      "session_id": "scenario_session_01787647086018293289_0000000018_8931b3b1ce3f4982b5f46fff1d8fbf7f",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.generate_report_live_v1",
+          "action_type": "document.generate_from_template",
+          "estimated_cost": 0.00035279999999999996,
+          "input_tokens": 586,
+          "latency_ms": 1698,
+          "output_artifact_id": "artifact_01787647088230178753_0000000039_bb56da7b8d29458d812e8a8c0b0b6092",
+          "output_tokens": 74,
+          "step_id": "generate_report",
+          "total_tokens": 660
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787647088436434248_0000000031_09753f2d7ebf49ca9d9df5d43c7b5fc6",
+      "kind": "atom",
+      "label": "text.compose_reply",
+      "result_artifact_id": "artifact_01787647090593509008_0000000059_0ba97d5af70f411d9cc61dfa42808dbf",
+      "scenario_id": "kernel_demo.single_action_compose_reply_live_smoke_v1",
+      "session_id": "scenario_session_01787647088427275343_0000000026_8a31b5c8585a4f60a97e8b70d48d7414",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.compose_reply_live_v1",
+          "action_type": "text.compose_reply",
+          "estimated_cost": 0.00023999999999999998,
+          "input_tokens": 412,
+          "latency_ms": 1288,
+          "output_artifact_id": "artifact_01787647090584384558_0000000055_99bac47021ac4be0814da56cc6c7cebd",
+          "output_tokens": 47,
+          "step_id": "compose_reply",
+          "total_tokens": 459
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787647090851112650_0000000039_64c8e105df85473a89ad1e7bf80193ad",
+      "kind": "atom",
+      "label": "text.generate_clarifying_questions",
+      "result_artifact_id": "artifact_01787647093079883194_0000000075_c2834981302d4bd889f7a9379820ef3a",
+      "scenario_id": "kernel_demo.single_action_generate_clarifying_questions_live_smoke_v1",
+      "session_id": "scenario_session_01787647090842092809_0000000034_afdbf0b126b04cb4b3f15d14c4f582bd",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.generate_clarifying_questions_live_v1",
+          "action_type": "text.generate_clarifying_questions",
+          "estimated_cost": 0.0003452,
+          "input_tokens": 659,
+          "latency_ms": 1411,
+          "output_artifact_id": "artifact_01787647093069778087_0000000071_7e00b797cf0e4cee9d5c5e5c39d14d70",
+          "output_tokens": 51,
+          "step_id": "generate_questions",
+          "total_tokens": 710
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787647093706376801_0000000047_46e3e9a8ba404bdd9015ed81f15edc86",
+      "kind": "atom",
+      "label": "text.synthesize_angle",
+      "result_artifact_id": "artifact_01787647095403537503_0000000091_ded58ac9c1664b1db2cc2a2b315b1859",
+      "scenario_id": "kernel_demo.single_action_synthesize_angle_live_smoke_v1",
+      "session_id": "scenario_session_01787647093694975916_0000000042_8a4179b8c6a24957ba1fde008db0d223",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.synthesize_angle_live_v1",
+          "action_type": "text.synthesize_angle",
+          "estimated_cost": 0.0002128,
+          "input_tokens": 324,
+          "latency_ms": 1245,
+          "output_artifact_id": "artifact_01787647095385215060_0000000087_03b9fd010cd248c294ec202d64b9f870",
+          "output_tokens": 52,
+          "step_id": "synthesize_angle",
+          "total_tokens": 376
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787647096023683753_0000000055_8753daf641bb493db4c145db2bf9fd5b",
+      "kind": "atom",
+      "label": "text.compose_persuasive_text",
+      "result_artifact_id": "artifact_01787647097799622895_0000000107_6c3355c81d694fcf9d62e252ab385ff6",
+      "scenario_id": "kernel_demo.single_action_compose_persuasive_text_live_smoke_v1",
+      "session_id": "scenario_session_01787647096008378609_0000000050_674098168a8a4780bb2de8037ed4e0e1",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.compose_persuasive_text_live_v1",
+          "action_type": "text.compose_persuasive_text",
+          "estimated_cost": 0.00023920000000000001,
+          "input_tokens": 354,
+          "latency_ms": 1322,
+          "output_artifact_id": "artifact_01787647097790416515_0000000103_9cab65d242a7493b99874762bad8b5d4",
+          "output_tokens": 61,
+          "step_id": "compose_persuasive_text",
+          "total_tokens": 415
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787647098324301016_0000000063_a54d5df8111b47758a10c9b8207e4f9b",
+      "kind": "atom",
+      "label": "text.generate_gap_rewrites",
+      "result_artifact_id": "artifact_01787647101906644184_0000000123_93c4578b56454817bea05172d7089134",
+      "scenario_id": "kernel_demo.single_action_generate_gap_rewrites_live_smoke_v1",
+      "session_id": "scenario_session_01787647098315160020_0000000058_97749439dad24496a948df6342a637a6",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.generate_gap_rewrites_live_v1",
+          "action_type": "text.generate_gap_rewrites",
+          "estimated_cost": 0.0004636,
+          "input_tokens": 479,
+          "latency_ms": 3036,
+          "output_artifact_id": "artifact_01787647101897630229_0000000119_78f99faa197a4039aedb46f7e3dc58f8",
+          "output_tokens": 170,
+          "step_id": "generate_gap_rewrites",
+          "total_tokens": 649
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787647102224895620_0000000071_101bbf70a0924cb69fd7f01db9e1e151",
+      "kind": "atom",
+      "label": "text.compare_and_classify",
+      "result_artifact_id": "artifact_01787647104713716889_0000000139_42b4bfcbfac64df59a927f36422faa1b",
+      "scenario_id": "kernel_demo.single_action_compare_and_classify_live_smoke_v1",
+      "session_id": "scenario_session_01787647102215121479_0000000066_68b38c95db1f4e5eb27bc283ee31c875",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.compare_and_classify_live_v1",
+          "action_type": "text.compare_and_classify",
+          "estimated_cost": 0.0004016,
+          "input_tokens": 596,
+          "latency_ms": 1741,
+          "output_artifact_id": "artifact_01787647104702904226_0000000135_c4df91fe528d4487ae7d8f518f8730ba",
+          "output_tokens": 102,
+          "step_id": "compare_and_classify",
+          "total_tokens": 698
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787647105064397572_0000000079_dcfaac9de5e74bf9b15fe9bd0573522d",
+      "kind": "atom",
+      "label": "text.score_match_by_rubric",
+      "result_artifact_id": "artifact_01787647108640544631_0000000155_335080f62d6243bd8f8c86df3fd746a3",
+      "scenario_id": "kernel_demo.single_action_score_match_by_rubric_live_smoke_v1",
+      "session_id": "scenario_session_01787647105053328710_0000000074_1031f60c2ea54618a43f0520ab91c2b8",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.score_match_by_rubric_live_v1",
+          "action_type": "text.score_match_by_rubric",
+          "estimated_cost": 0.0004744,
+          "input_tokens": 630,
+          "latency_ms": 2846,
+          "output_artifact_id": "artifact_01787647108622105908_0000000151_1e1a1ff85dc34ebf94aba5ef23069cad",
+          "output_tokens": 139,
+          "step_id": "score_match_by_rubric",
+          "total_tokens": 769
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787647108981163385_0000000087_e6ba50e78a1b4de897ba84f6339cf34f",
+      "kind": "atom",
+      "label": "text.score_multidimensional_axes",
+      "result_artifact_id": "artifact_01787647111671726219_0000000171_849fd1e6a0834105801a26323e888870",
+      "scenario_id": "kernel_demo.single_action_score_multidimensional_axes_live_smoke_v1",
+      "session_id": "scenario_session_01787647108970450183_0000000082_efe9a7d09d844c249767ef162e0c5fa1",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.score_multidimensional_axes_live_v1",
+          "action_type": "text.score_multidimensional_axes",
+          "estimated_cost": 0.0003452,
+          "input_tokens": 567,
+          "latency_ms": 1956,
+          "output_artifact_id": "artifact_01787647111659406358_0000000167_fa4732b4bc684ecc93da12f5348ee3df",
+          "output_tokens": 74,
+          "step_id": "score_multidimensional_axes",
+          "total_tokens": 641
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787647111818125205_0000000095_0d6fc9097b3f4583a21b084c35e0a2e9",
+      "kind": "composite",
+      "label": "kernel_demo.composite_analyze_and_clarify_live_v1",
+      "result_artifact_id": "artifact_01787647122007216145_0000000217_5ec9f48002af42a6b426211feedacbf4",
+      "scenario_id": "kernel_demo.composite_analyze_and_clarify_live_smoke_v1",
+      "session_id": "scenario_session_01787647111808226179_0000000090_b940b2e747114fe79afc7752a6e55e8b",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.extract_structured_fields_live_v1",
+          "action_type": "text.extract_structured_fields",
+          "estimated_cost": 0.00028719999999999993,
+          "input_tokens": 654,
+          "latency_ms": 1077,
+          "output_artifact_id": "artifact_01787647113800338877_0000000183_bf53cf4b83b744c08308ebc752fad187",
+          "output_tokens": 16,
+          "step_id": "extract",
+          "total_tokens": 670
+        },
+        {
+          "action_config_id": "kernel_demo.detect_issues_live_v1",
+          "action_type": "text.detect_issues_by_taxonomy",
+          "estimated_cost": 0.00023199999999999997,
+          "input_tokens": 344,
+          "latency_ms": 1873,
+          "output_artifact_id": "artifact_01787647115700127886_0000000193_c273d5ce8b6448ca83caf4f116c915ab",
+          "output_tokens": 59,
+          "step_id": "detect_issues",
+          "total_tokens": 403
+        },
+        {
+          "action_config_id": "kernel_demo.generate_clarifying_questions_live_v1",
+          "action_type": "text.generate_clarifying_questions",
+          "estimated_cost": 0.000388,
+          "input_tokens": 694,
+          "latency_ms": 1468,
+          "output_artifact_id": "artifact_01787647117198332604_0000000203_50881d14f415476eb39ba1385de0778d",
+          "output_tokens": 69,
+          "step_id": "generate_questions",
+          "total_tokens": 763
+        },
+        {
+          "action_config_id": "kernel_demo.generate_report_live_v1",
+          "action_type": "document.generate_from_template",
+          "estimated_cost": 0.000778,
+          "input_tokens": 717,
+          "latency_ms": 4765,
+          "output_artifact_id": "artifact_01787647121996642421_0000000213_e7249b73a8c348d6bd643ad5f57d7594",
+          "output_tokens": 307,
+          "step_id": "generate_report",
+          "total_tokens": 1024
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787647122154979205_0000000103_4724088eebe548a58fd05adcb85366e1",
+      "kind": "composite",
+      "label": "kernel_demo.composite_evaluate_match_live_v1",
+      "result_artifact_id": "artifact_01787647129214975258_0000000253_c053b9e61da24a918f75f598f88cdf5d",
+      "scenario_id": "kernel_demo.composite_evaluate_match_live_smoke_v1",
+      "session_id": "scenario_session_01787647122145549877_0000000098_2ae1af58601446faa1ba0333040c3915",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.compare_and_classify_live_v1",
+          "action_type": "text.compare_and_classify",
+          "estimated_cost": 0.00043119999999999996,
+          "input_tokens": 598,
+          "latency_ms": 1901,
+          "output_artifact_id": "artifact_01787647124965381978_0000000229_b19bb383eefe453292e6789f35014428",
+          "output_tokens": 120,
+          "step_id": "compare_and_classify",
+          "total_tokens": 718
+        },
+        {
+          "action_config_id": "kernel_demo.score_match_by_rubric_live_v1",
+          "action_type": "text.score_match_by_rubric",
+          "estimated_cost": 0.0004788,
+          "input_tokens": 657,
+          "latency_ms": 2525,
+          "output_artifact_id": "artifact_01787647127524447364_0000000239_9924c197390443e7aa3ecd890f7750b7",
+          "output_tokens": 135,
+          "step_id": "score_match_by_rubric",
+          "total_tokens": 792
+        },
+        {
+          "action_config_id": "kernel_demo.score_multidimensional_axes_live_v1",
+          "action_type": "text.score_multidimensional_axes",
+          "estimated_cost": 0.0003792,
+          "input_tokens": 584,
+          "latency_ms": 1651,
+          "output_artifact_id": "artifact_01787647129205187632_0000000249_bdb2bc7d573e461c9a954054644cb8b0",
+          "output_tokens": 91,
+          "step_id": "score_multidimensional_axes",
+          "total_tokens": 675
+        }
+      ]
+    },
+    {
+      "cost_unknown": false,
+      "error_code": null,
+      "error_message": null,
+      "job_id": "job_01787647129795090995_0000000111_4bcbc41db9a54d2db2caf190a4380840",
+      "kind": "composite",
+      "label": "kernel_demo.composite_shape_and_write_live_v1",
+      "result_artifact_id": "artifact_01787647138278599465_0000000299_e5f146972e6b45a9bbf8e1d13cfc3a19",
+      "scenario_id": "kernel_demo.composite_shape_and_write_live_smoke_v1",
+      "session_id": "scenario_session_01787647129786217652_0000000106_4308ea674f44463998d3144e4387af31",
+      "status": "pass",
+      "steps": [
+        {
+          "action_config_id": "kernel_demo.synthesize_angle_live_v1",
+          "action_type": "text.synthesize_angle",
+          "estimated_cost": 0.0002128,
+          "input_tokens": 324,
+          "latency_ms": 1163,
+          "output_artifact_id": "artifact_01787647131430893164_0000000265_a73ebb81a5504f4799638d49b7776f7d",
+          "output_tokens": 52,
+          "step_id": "synthesize_angle",
+          "total_tokens": 376
+        },
+        {
+          "action_config_id": "kernel_demo.generate_gap_rewrites_live_v1",
+          "action_type": "text.generate_gap_rewrites",
+          "estimated_cost": 0.0006424,
+          "input_tokens": 506,
+          "latency_ms": 3998,
+          "output_artifact_id": "artifact_01787647135455188513_0000000275_e2fb9665814e4a22ac32d06c5cfdd44b",
+          "output_tokens": 275,
+          "step_id": "generate_gap_rewrites",
+          "total_tokens": 781
+        },
+        {
+          "action_config_id": "kernel_demo.compose_persuasive_text_live_v1",
+          "action_type": "text.compose_persuasive_text",
+          "estimated_cost": 0.0003836,
+          "input_tokens": 635,
+          "latency_ms": 1433,
+          "output_artifact_id": "artifact_01787647136916700188_0000000285_4d024a4e11ab4534920f773658e0e678",
+          "output_tokens": 81,
+          "step_id": "compose_persuasive_text",
+          "total_tokens": 716
+        },
+        {
+          "action_config_id": "kernel_demo.compose_reply_live_v1",
+          "action_type": "text.compose_reply",
+          "estimated_cost": 0.00028879999999999997,
+          "input_tokens": 478,
+          "latency_ms": 1327,
+          "output_artifact_id": "artifact_01787647138269535841_0000000295_21fbac801d3d4b1f816c8c962103acf6",
+          "output_tokens": 61,
+          "step_id": "compose_reply",
+          "total_tokens": 539
+        }
+      ]
+    }
+  ],
+  "composite_passed": 3,
+  "composite_total": 3,
+  "generated_at": "2026-08-25T08:38:58.433364+00:00"
+}

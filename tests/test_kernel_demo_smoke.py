@@ -181,6 +181,39 @@ def test_run_one_case_reports_smoke009_when_result_schema_ref_mismatches(monkeyp
     assert result.error_message is not None and "schema_ref" in result.error_message
 
 
+def test_run_one_case_expected_schema_ref_by_scenario_param_overrides_module_global(
+    monkeypatch,
+) -> None:
+    """`code-review` finding: live_canary.py needs SMOKE009 to check its 14 live
+    scenario_ids too, but the module-level _EXPECTED_SCHEMA_REF_BY_SCENARIO only ever knows about
+    fake-provider scenario_ids -- the expected_schema_ref_by_scenario param lets a caller supply
+    its own lookup instead, without mutating shared state other in-process callers/tests read."""
+    smoke = load_smoke_module()
+    # Module-level dict says nothing about scenario-1 (or says something wrong) -- if the param
+    # weren't actually used, this test would either skip the check entirely or fail.
+    monkeypatch.setattr(smoke, "_EXPECTED_SCHEMA_REF_BY_SCENARIO", {})
+    monkeypatch.setattr(
+        smoke,
+        "_http_json_request",
+        _sequenced_request(
+            [
+                {"guest_id": "guest-1"},
+                {"scenario_session_id": "session-1"},
+                {"status": "completed", "result_artifact_id": "artifact-1"},
+                {"schema_ref": "kernel.schemas.wrong_v1"},
+            ]
+        ),
+    )
+
+    result = smoke._run_one_case(
+        "http://127.0.0.1:8000", "scenario-1", {}, 5.0,
+        expected_schema_ref_by_scenario={"scenario-1": "kernel.schemas.expected_v1"},
+    )
+
+    assert result.error_code == "SMOKE009"
+    assert result.error_message is not None and "schema_ref" in result.error_message
+
+
 def test_expected_schema_ref_by_scenario_covers_every_real_smoke_case() -> None:
     smoke = load_smoke_module()
     for action_type, scenario_id, _ in smoke.ATOM_SMOKE_CASES:
@@ -327,12 +360,62 @@ def test_required_composite_workflow_ids_are_derived_from_workflows_config() -> 
     assert "kernel_demo.composite_analyze_and_clarify_v1" in required
 
 
+def test_composite_workflow_entries_excludes_live_suffixed_workflow_ids() -> None:
+    """workflows.yaml now also has 3 "_live_v1"-suffixed composite entries (ANY-221 live-canary
+    extension), sharing the same "kernel_demo.composite_" prefix this module's own fake-provider
+    coverage check scans for -- _composite_workflow_entries() must keep excluding them
+    permanently, or every fake-provider composite coverage check above would start demanding 6
+    COMPOSITE_SMOKE_CASES entries instead of 3."""
+    smoke = load_smoke_module()
+    workflow_ids = {entry["workflow_id"] for entry in smoke._composite_workflow_entries()}
+    assert workflow_ids == {workflow_id for workflow_id, _, _ in smoke.COMPOSITE_SMOKE_CASES}
+    assert not any(workflow_id.endswith("_live_v1") for workflow_id in workflow_ids)
+
+
+def test_composite_workflow_entries_by_suffix_partitions_fake_and_live_entries() -> None:
+    """`code-review` finding: _composite_workflow_entries() (live=False) and
+    live_canary.py's own live-only entries fetcher used to be near-verbatim copies; both now share
+    _composite_workflow_entries_by_suffix(), which this pins as a true partition of the same
+    underlying workflows.yaml composite entries -- every entry lands in exactly one of the two
+    (never both, never neither)."""
+    smoke = load_smoke_module()
+
+    fake_entries = smoke._composite_workflow_entries_by_suffix(live=False)
+    live_entries = smoke._composite_workflow_entries_by_suffix(live=True)
+    fake_ids = {entry["workflow_id"] for entry in fake_entries}
+    live_ids = {entry["workflow_id"] for entry in live_entries}
+
+    assert fake_ids == {workflow_id for workflow_id, _, _ in smoke.COMPOSITE_SMOKE_CASES}
+    assert fake_ids.isdisjoint(live_ids)
+    assert len(live_ids) == 3
+    assert all(workflow_id.endswith("_live_v1") for workflow_id in live_ids)
+    assert smoke._composite_workflow_entries() == fake_entries
+
+
 def test_required_composite_workflow_id_by_scenario_id_matches_real_config() -> None:
+    """_required_composite_workflow_id_by_scenario_id() deliberately isn't filtered to fake-only
+    (see _composite_workflow_entries()'s docstring) -- it's a plain scenario_id -> workflow_id
+    lookup, and fake/live scenario_ids never collide as keys, so scenarios.yaml legitimately binds
+    both the 3 fake COMPOSITE_SMOKE_CASES pairs and the 3 ANY-221 live-canary composite pairs."""
     smoke = load_smoke_module()
     binding = smoke._required_composite_workflow_id_by_scenario_id()
-    assert binding == {
+    expected = {
         scenario_id: workflow_id for workflow_id, scenario_id, _ in smoke.COMPOSITE_SMOKE_CASES
     }
+    expected.update(
+        {
+            "kernel_demo.composite_analyze_and_clarify_live_smoke_v1": (
+                "kernel_demo.composite_analyze_and_clarify_live_v1"
+            ),
+            "kernel_demo.composite_evaluate_match_live_smoke_v1": (
+                "kernel_demo.composite_evaluate_match_live_v1"
+            ),
+            "kernel_demo.composite_shape_and_write_live_smoke_v1": (
+                "kernel_demo.composite_shape_and_write_live_v1"
+            ),
+        }
+    )
+    assert binding == expected
 
 
 def test_expected_schema_ref_by_scenario_matches_real_composite_config() -> None:
