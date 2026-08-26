@@ -161,6 +161,38 @@ def test_litellm_adapter_reports_nan_cost_when_billed_tokens_report_a_zero_cost(
     assert math.isnan(response.estimated_cost)
 
 
+def test_litellm_adapter_reports_nan_cost_when_the_aggregate_total_is_missing_but_tokens_were_billed() -> None:
+    router = RecordingRouter(
+        make_router_response(
+            _hidden_params={"response_cost": 0.0},
+            usage={"total_tokens": None},
+        )
+    )
+    adapter = LiteLLMProviderAdapter(router)
+
+    response = asyncio.run(adapter.complete(make_request()))
+
+    assert response.usage.input_tokens == 12
+    assert response.usage.output_tokens == 4
+    assert math.isnan(response.estimated_cost)
+
+
+def test_litellm_adapter_prefers_a_finite_fallback_over_an_infinite_primary_cost() -> None:
+    router = RecordingRouter(
+        make_router_response(
+            _hidden_params={
+                "response_cost": math.inf,
+                "additional_headers": {"llm_provider-x-litellm-response-cost": "0.0002"},
+            }
+        )
+    )
+    adapter = LiteLLMProviderAdapter(router)
+
+    response = asyncio.run(adapter.complete(make_request()))
+
+    assert response.estimated_cost == pytest.approx(0.0002)
+
+
 def test_litellm_adapter_uses_the_fallback_header_when_primary_cost_is_a_non_positive_zero() -> None:
     router = RecordingRouter(
         make_router_response(
