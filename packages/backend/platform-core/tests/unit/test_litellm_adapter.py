@@ -139,12 +139,42 @@ def test_litellm_adapter_reports_nan_cost_when_litellm_omits_cost_metadata() -> 
 
 
 def test_litellm_adapter_preserves_a_genuinely_zero_cost() -> None:
-    router = RecordingRouter(make_router_response(_hidden_params={"response_cost": 0.0}))
+    router = RecordingRouter(
+        make_router_response(
+            _hidden_params={"response_cost": 0.0},
+            usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        )
+    )
     adapter = LiteLLMProviderAdapter(router)
 
     response = asyncio.run(adapter.complete(make_request()))
 
     assert response.estimated_cost == 0.0
+
+
+def test_litellm_adapter_reports_nan_cost_when_billed_tokens_report_a_zero_cost() -> None:
+    router = RecordingRouter(make_router_response(_hidden_params={"response_cost": 0.0}))
+    adapter = LiteLLMProviderAdapter(router)
+
+    response = asyncio.run(adapter.complete(make_request()))
+
+    assert math.isnan(response.estimated_cost)
+
+
+def test_litellm_adapter_uses_the_fallback_header_when_primary_cost_is_a_non_positive_zero() -> None:
+    router = RecordingRouter(
+        make_router_response(
+            _hidden_params={
+                "response_cost": 0.0,
+                "additional_headers": {"llm_provider-x-litellm-response-cost": "0.0002"},
+            }
+        )
+    )
+    adapter = LiteLLMProviderAdapter(router)
+
+    response = asyncio.run(adapter.complete(make_request()))
+
+    assert response.estimated_cost == pytest.approx(0.0002)
 
 
 def test_litellm_adapter_falls_back_to_prompt_as_user_message() -> None:

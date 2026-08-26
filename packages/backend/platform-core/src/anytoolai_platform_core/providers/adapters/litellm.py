@@ -131,16 +131,32 @@ def _normalize_litellm_response(
     total_tokens = _int_like(
         _value_from(usage, "total_tokens") or _value_from(usage, "totalTokens")
     )
-    raw_response_cost = hidden_params.get("response_cost")
-    if raw_response_cost is None:
-        raw_response_cost = _mapping_like(hidden_params.get("additional_headers")).get(
+    primary_cost = _float_like(hidden_params.get("response_cost"), default=math.nan)
+    fallback_cost = _float_like(
+        _mapping_like(hidden_params.get("additional_headers")).get(
             "llm_provider-x-litellm-response-cost"
-        )
-    # A missing/unparseable cost is NaN, not 0.0: `code review (team lead #1)` finding -- 0.0
-    # reads downstream (_safe_raw_cost()/_safe_step_cost()) as "known, free", letting a billed
-    # call with no cost metadata pass the live-canary cost cap silently. NaN is non-finite, so
-    # those same guards already convert it to math.inf and fail the run closed.
-    estimated_cost = _float_like(raw_response_cost, default=math.nan)
+        ),
+        default=math.nan,
+    )
+    # A missing/unparseable cost is NaN, not 0.0 (`code review team lead #1`): 0.0 reads
+    # downstream (_safe_raw_cost()/_safe_step_cost()) as "known, free", letting a billed call
+    # with no cost metadata pass the live-canary cost cap silently. NaN is non-finite, so those
+    # same guards already convert it to math.inf and fail the run closed.
+    #
+    # A *present* but non-positive primary cost is equally untrustworthy when the call actually
+    # billed tokens (`code review me #5`): LiteLLM can report a literal 0.0 for an unmapped/
+    # custom model it can't price, and treating that as "known free" hid a positive real cost
+    # sitting in the fallback header. So: prefer a positive-finite primary cost, then a
+    # positive-finite fallback cost; only fall back to a real 0.0 when there is no billable usage
+    # at all (total_tokens == 0) -- otherwise report NaN (unknown, fail closed).
+    if primary_cost > 0:
+        estimated_cost = primary_cost
+    elif fallback_cost > 0:
+        estimated_cost = fallback_cost
+    elif total_tokens > 0:
+        estimated_cost = math.nan
+    else:
+        estimated_cost = 0.0
     actual_model = _string_like(
         _value_from(response, "model") or hidden_params.get("model")
     )
