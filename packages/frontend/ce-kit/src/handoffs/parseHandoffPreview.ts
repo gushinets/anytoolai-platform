@@ -3,6 +3,10 @@ import type { components } from "../api/generated/platformApi";
 import { isRecord } from "../api/parsing";
 import type { HandoffPreview } from "./types";
 
+function isNullableString(value: unknown): value is string | null | undefined {
+  return value === undefined || value === null || typeof value === "string";
+}
+
 /**
  * Validates and maps the backend's `HandoffPreviewResponse` payload (snake_case) into the
  * client's `HandoffPreview` shape (camelCase). Shared by `getHandoff()`, `acceptHandoff()`, and
@@ -45,14 +49,7 @@ export function parseHandoffPreview(payload: unknown): HandoffPreview | null {
   }
   // `target_scenario_session_id`/`target_job_id` are optional-and-nullable on the wire -- an
   // absent key and an explicit null both mean "no target session/job yet" (pre-acceptance).
-  if (
-    targetScenarioSessionId !== undefined &&
-    targetScenarioSessionId !== null &&
-    typeof targetScenarioSessionId !== "string"
-  ) {
-    return null;
-  }
-  if (targetJobId !== undefined && targetJobId !== null && typeof targetJobId !== "string") {
+  if (!isNullableString(targetScenarioSessionId) || !isNullableString(targetJobId)) {
     return null;
   }
 

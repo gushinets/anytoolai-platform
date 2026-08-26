@@ -130,15 +130,47 @@ describe("HandoffConsent", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/went wrong/i));
   });
 
-  it("renders a safe-error view when guest identity resolution fails, without blocking on it", async () => {
-    const { client } = makeRoutedClient({
+  it("renders the consent view without blocking when guest identity resolution fails, falling back to no guestId on accept", async () => {
+    const { client, calls } = makeRoutedClient({
       [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
       [GUEST_IDENTITY_ROUTE]: [errorResponse(500, "internal_error")],
+      [ACCEPT_ROUTE]: [jsonResponse(200, previewPayload({ status: "accepted", target_scenario_session_id: "scenario_session_1" }))],
     });
 
     render(<HandoffConsent client={client} handoffToken="token_abc" />);
-
     await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+
+    await waitFor(() => expect(calls.some((call) => call.key === ACCEPT_ROUTE)).toBe(true));
+    const acceptCall = calls.find((call) => call.key === ACCEPT_ROUTE);
+    expect(JSON.parse(acceptCall?.init.body as string)).toEqual({});
+  });
+
+  it("keeps the page usable when accessing window.localStorage itself throws (storage-denied sandboxes)", async () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("Storage access denied");
+      },
+    });
+
+    try {
+      // No GUEST_IDENTITY_ROUTE queued -- resolveGuestIdentity() must catch the synchronous throw
+      // from constructing the adapter and never reach the network call.
+      const { client } = makeRoutedClient({
+        [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
+      });
+
+      render(<HandoffConsent client={client} handoffToken="token_abc" />);
+
+      await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy());
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(window, "localStorage", originalDescriptor);
+      }
+    }
   });
 
   it("reuses the persisted guest identity across remounts instead of minting a new one each time", async () => {
@@ -293,6 +325,67 @@ describe("HandoffConsent", () => {
 
     await waitFor(() => expect(screen.getByText("failed")).toBeTruthy());
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
+  });
+
+  it("on an accept rejected because the accepting guest id itself doesn't resolve (404, pre-claim), shows an inline error instead of a pointless refetch", async () => {
+    const { client, calls } = makeRoutedClient({
+      // Two identical, still non-terminal preview responses queued: a refetch here (if the fix
+      // regressed) would just return the same actionable preview, not a terminal status.
+      [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload()), jsonResponse(200, previewPayload())],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse("guest_stale"), guestIdentityResponse("guest_fresh")],
+      [ACCEPT_ROUTE]: [errorResponse(404, "handoff_source_invalid")],
+    });
+
+    render(<HandoffConsent client={client} handoffToken="token_abc" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not be completed/i));
+    expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy();
+    expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(1);
+  });
+
+  it("on an accept rejected because the persisted guest id no longer resolves, clears it, mints a fresh one, and lets a retry succeed", async () => {
+    const { client, calls } = makeRoutedClient({
+      [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse("guest_stale"), guestIdentityResponse("guest_fresh")],
+      [ACCEPT_ROUTE]: [
+        errorResponse(404, "handoff_source_invalid"),
+        jsonResponse(200, previewPayload({ status: "accepted", target_scenario_session_id: "scenario_session_1" })),
+      ],
+    });
+
+    render(<HandoffConsent client={client} handoffToken="token_abc" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not be completed/i));
+    // Clearing the stale persisted id makes createGuestIdentity() miss its localStorage read on
+    // retry and hit the backend again for a fresh one.
+    expect(calls.filter((call) => call.key === GUEST_IDENTITY_ROUTE)).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+
+    await waitFor(() => expect(screen.getByText("accepted")).toBeTruthy());
+    const acceptCalls = calls.filter((call) => call.key === ACCEPT_ROUTE);
+    expect(acceptCalls).toHaveLength(2);
+    expect(JSON.parse(acceptCalls[1]?.init.body as string)).toEqual({ guest_id: "guest_fresh" });
+  });
+
+  it("on an accept against an unknown token, refetches and renders the not-found view", async () => {
+    const { client } = makeRoutedClient({
+      [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload()), errorResponse(404, "handoff_not_found")],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      [ACCEPT_ROUTE]: [errorResponse(404, "handoff_not_found")],
+    });
+
+    render(<HandoffConsent client={client} handoffToken="token_abc" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/not valid/i));
   });
 
   it("keeps the consent view and shows an inline error for an unclassified accept failure", async () => {

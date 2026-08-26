@@ -32,6 +32,14 @@ function _isBackendErrorWithCode(
   return error.type === "backend_error" && error.code === code;
 }
 
+function _isBackendErrorWithCodeAndStatus(
+  error: PlatformApiError,
+  code: string,
+  status: number,
+): error is BackendApiError {
+  return _isBackendErrorWithCode(error, code) && error.status === status;
+}
+
 /** True only for the 409 that means "retry with a new Idempotency-Key or the original request." */
 export function isIdempotencyKeyConflict(error: PlatformApiError): boolean {
   return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.idempotencyKeyConflict);
@@ -74,11 +82,18 @@ export function isHandoffNotFound(error: PlatformApiError): boolean {
 }
 
 /**
- * True for the source-session-invalid case, whether raised as the 404 from `createHandoff()` (the
- * source scenario session/artifact was never eligible) or the 500 `acceptHandoff()` can raise if
- * the source session went away between handoff creation and acceptance -- the backend marks the
- * handoff `failed` in that second case, so treat it the same as `isHandoffAcceptanceFailed()`:
- * refetch and render the resulting terminal state instead of retrying.
+ * True whenever the backend returns `handoff_source_invalid`, regardless of context: the 404
+ * `createHandoff()` raises when the source scenario session/artifact was never eligible, or either
+ * of the two distinct cases `acceptHandoff()` can separately raise the same code for (see
+ * `isHandoffGuestIdentityInvalid()`'s 404 and `isHandoffAcceptanceSourceInvalid()`'s 500).
+ * Deliberately status-agnostic, matching every other guard in this file that classifies by `code`
+ * alone.
+ *
+ * Do NOT treat a true result here as uniformly refetchable/terminal for an `acceptHandoff()`
+ * error -- the 404 case leaves the handoff record non-terminal (refetching would just return the
+ * same actionable preview), while only the 500 case is. Callers handling `acceptHandoff()` results
+ * should use `isHandoffGuestIdentityInvalid()`/`isHandoffAcceptanceSourceInvalid()` instead, which
+ * already encode that distinction -- see `HandoffConsent.tsx`'s `resolveActionError()`.
  */
 export function isHandoffSourceInvalid(error: PlatformApiError): boolean {
   return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffSourceInvalid);
@@ -87,6 +102,31 @@ export function isHandoffSourceInvalid(error: PlatformApiError): boolean {
 /** True only for the 409 that means the target schema for the handoff definition is invalid. */
 export function isHandoffTargetSchemaInvalid(error: PlatformApiError): boolean {
   return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffTargetSchemaInvalid);
+}
+
+/**
+ * True only for the 404 `handoff_source_invalid` that `acceptHandoff()` raises *before* claiming
+ * the handoff, when the accepting guest id itself doesn't resolve on the backend (e.g. a
+ * persisted-but-since-deleted guest -- `createGuestIdentity()` caches a guest id in `localStorage`
+ * with no server-side revalidation). The record stays non-terminal, so this is deterministic and
+ * permanent for that guest id: refetching or retrying with the same stale id repeats the same 404
+ * forever. Callers must clear the persisted guest id and resolve a fresh one before retrying --
+ * see `HandoffConsent.tsx`'s `resolveActionError()`. Distinct from `isHandoffAcceptanceSourceInvalid()`,
+ * which the backend reuses the same `handoff_source_invalid` code for, for an unrelated 500 case.
+ */
+export function isHandoffGuestIdentityInvalid(error: PlatformApiError): boolean {
+  return _isBackendErrorWithCodeAndStatus(error, BACKEND_ERROR_CODE.handoffSourceInvalid, 404);
+}
+
+/**
+ * True only for the 500 `handoff_source_invalid` that `acceptHandoff()` raises *after* claiming
+ * the handoff, when the source scenario session vanished between handoff creation and acceptance.
+ * The backend marks the record `failed` in this case, so it's a genuine terminal status a refetch
+ * via `getHandoff()` will land on -- unlike `isHandoffGuestIdentityInvalid()`'s 404 case, which
+ * leaves the record non-terminal.
+ */
+export function isHandoffAcceptanceSourceInvalid(error: PlatformApiError): boolean {
+  return _isBackendErrorWithCodeAndStatus(error, BACKEND_ERROR_CODE.handoffSourceInvalid, 500);
 }
 
 /**
@@ -116,4 +156,25 @@ export function isHandoffNotActionable(error: PlatformApiError): boolean {
 /** True only for the 500 that means accepting the handoff failed while executing the target. */
 export function isHandoffAcceptanceFailed(error: PlatformApiError): boolean {
   return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffAcceptanceFailed);
+}
+
+/**
+ * True for every accept()/decline() error that should be handled by refetching via getHandoff()
+ * and rendering its authoritative `status`, rather than retrying the mutation or showing a generic
+ * inline error: expiry, the not-actionable family, acceptance execution failure, an unknown token
+ * (accept()/decline() reach the same token lookup getHandoff() uses), the terminal (500) form of
+ * source-session invalidation, and quota exhaustion.
+ *
+ * Deliberately excludes `isHandoffGuestIdentityInvalid()`'s 404 case -- refetching that would just
+ * return the same non-terminal, actionable preview -- see that guard's docstring.
+ */
+export function isHandoffActionRefetchable(error: PlatformApiError): boolean {
+  return (
+    isHandoffExpired(error) ||
+    isHandoffNotActionable(error) ||
+    isHandoffAcceptanceFailed(error) ||
+    isHandoffNotFound(error) ||
+    isHandoffAcceptanceSourceInvalid(error) ||
+    isQuotaExhausted(error)
+  );
 }

@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { createLocalStorageAdapter } from "../../src/storage/localStorageAdapter";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createLocalStorageAdapter, createWindowLocalStorageAdapter } from "../../src/storage/localStorageAdapter";
 
 /** Minimal fake matching the synchronous `Storage` interface (`window.localStorage`'s shape). */
 function createFakeStorage(initial: Record<string, string> = {}): Storage {
@@ -43,5 +43,35 @@ describe("createLocalStorageAdapter", () => {
     await storage.remove("guest_id");
 
     await expect(storage.get("guest_id")).resolves.toBeUndefined();
+  });
+});
+
+describe("createWindowLocalStorageAdapter", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns null when window is not defined (e.g. non-browser/SSR contexts)", () => {
+    expect(createWindowLocalStorageAdapter()).toBeNull();
+  });
+
+  it("returns null when accessing window.localStorage itself throws (storage-denied sandboxes)", () => {
+    vi.stubGlobal("window", {
+      get localStorage(): Storage {
+        throw new DOMException("Storage access denied");
+      },
+    });
+
+    expect(createWindowLocalStorageAdapter()).toBeNull();
+  });
+
+  it("returns a working adapter backed by window.localStorage when access succeeds", async () => {
+    vi.stubGlobal("window", { localStorage: createFakeStorage() });
+
+    const storage = createWindowLocalStorageAdapter();
+
+    expect(storage).not.toBeNull();
+    await storage?.set("guest_id", "guest_123");
+    await expect(storage?.get("guest_id")).resolves.toBe("guest_123");
   });
 });

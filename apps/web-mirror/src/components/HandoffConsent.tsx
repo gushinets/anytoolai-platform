@@ -3,19 +3,41 @@
 import { useEffect, useState } from "react";
 import {
   acceptHandoff,
-  createLocalStorageAdapter,
+  createWindowLocalStorageAdapter,
+  DEFAULT_GUEST_STORAGE_KEY,
   declineHandoff,
   getHandoff,
-  isHandoffAcceptanceFailed,
-  isHandoffExpired,
-  isHandoffNotActionable,
+  isHandoffActionRefetchable,
+  isHandoffGuestIdentityInvalid,
   isHandoffNotFound,
-  isHandoffSourceInvalid,
-  isQuotaExhausted,
+  networkError,
+  type GuestIdentityResult,
   type HandoffPreview,
   type PlatformApiClient,
   type PlatformApiError,
+  type PlatformApiResult,
 } from "@anytoolai/ce-kit";
+
+// createWindowLocalStorageAdapter() already guards against window.localStorage itself throwing
+// synchronously (privacy-hardened browsers, storage-denied sandboxed iframes) -- null here
+// degrades to "no persisted guest id" (the same fallback an unrelated identity-request failure
+// already gets) instead of an unhandled exception inside the mount effect.
+function resolveGuestIdentity(client: PlatformApiClient): Promise<GuestIdentityResult> {
+  const storage = createWindowLocalStorageAdapter();
+  return storage ? client.createGuestIdentity({ storage }) : Promise.resolve({ ok: false, error: networkError() });
+}
+
+// createGuestIdentity() caches a guest id in localStorage with no server-side revalidation -- if
+// the backend later deletes that guest, accept() 404s with isHandoffGuestIdentityInvalid()
+// forever for that stale id. Clears it so the next resolveGuestIdentity() call mints a fresh one
+// instead of resending the same id that can never succeed.
+async function clearStaleGuestIdentity(): Promise<void> {
+  try {
+    await createWindowLocalStorageAdapter()?.remove(DEFAULT_GUEST_STORAGE_KEY);
+  } catch {
+    // Storage-denied sandboxes have nothing persisted to clear anyway.
+  }
+}
 
 export type HandoffConsentProps = {
   client: PlatformApiClient;
@@ -74,7 +96,7 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
       // caller on this client instance, so one caller cancelling could not cancel the others) --
       // a fast unmount/token change leaves this POST running in the background for a discarded
       // result, same as any other fire-and-forget identity call in ce-kit today.
-      client.createGuestIdentity({ storage: createLocalStorageAdapter(window.localStorage) }),
+      resolveGuestIdentity(client),
     ]).then(([previewResult, guestResult]) => {
       if (controller.signal.aborted) {
         return;
@@ -93,17 +115,25 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
   // or a failed target execution). Rather than retry the mutation, refetch the authoritative
   // preview via getHandoff() and render whatever terminal state it reports -- this is what makes a
   // consumed token unreplayable from the client's side: the backend's current state always wins.
+  function showRetryableActionError(): void {
+    setState((prev) =>
+      prev.kind === "consent" ? { ...prev, pending: null, actionError: "That action could not be completed. Please try again." } : prev,
+    );
+  }
+
   async function resolveActionError(error: PlatformApiError): Promise<void> {
-    const shouldRefetch =
-      isHandoffExpired(error) ||
-      isHandoffNotActionable(error) ||
-      isHandoffAcceptanceFailed(error) ||
-      isHandoffSourceInvalid(error) ||
-      isQuotaExhausted(error);
-    if (!shouldRefetch) {
-      setState((prev) =>
-        prev.kind === "consent" ? { ...prev, pending: null, actionError: "That action could not be completed. Please try again." } : prev,
-      );
+    if (isHandoffGuestIdentityInvalid(error)) {
+      // Deterministic and permanent for the current guestId (the record stays non-terminal, so
+      // refetching would just return the same actionable preview) -- clear the stale persisted id
+      // and resolve a fresh one so a retry can actually succeed instead of 404ing forever.
+      await clearStaleGuestIdentity();
+      const fresh = await resolveGuestIdentity(client);
+      setGuestId(fresh.ok ? fresh.value.guestId : undefined);
+      showRetryableActionError();
+      return;
+    }
+    if (!isHandoffActionRefetchable(error)) {
+      showRetryableActionError();
       return;
     }
     const refetched = await getHandoff(client, handoffToken);
@@ -112,7 +142,7 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
 
   async function runAction(
     kind: "accept" | "decline",
-    mutate: () => ReturnType<typeof acceptHandoff>,
+    mutate: () => Promise<PlatformApiResult<HandoffPreview>>,
   ) {
     setState((prev) => (prev.kind === "consent" ? { ...prev, pending: kind, actionError: null } : prev));
     const result = await mutate();
