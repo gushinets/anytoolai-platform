@@ -8,6 +8,9 @@ export type {
 } from "./api/client";
 export type { PlatformApiError } from "./api/errors";
 export {
+  isHandoffAcceptanceFailed,
+  isHandoffExpired,
+  isHandoffNotActionable,
   isHandoffNotFound,
   isHandoffSourceInvalid,
   isHandoffTargetSchemaInvalid,
@@ -21,6 +24,7 @@ export { createInMemoryAsyncStorage } from "./storage/inMemoryAsyncStorage";
 export type { AsyncStorage } from "./storage/asyncStorage";
 export { createChromeStorageAdapter } from "./storage/chromeStorageAdapter";
 export type { ChromeStorageArea } from "./storage/chromeStorageAdapter";
+export { createLocalStorageAdapter } from "./storage/localStorageAdapter";
 
 export type { GuestIdentity, GuestIdentityOptions, GuestIdentityResult } from "./identity/guestIdentity";
 export { getQuota } from "./quota/getQuota";
@@ -62,7 +66,18 @@ export type { ResultArtifact } from "./results/types";
 
 export { createHandoff } from "./handoffs/createHandoff";
 export type { CreateHandoffOptions } from "./handoffs/createHandoff";
-export type { CreateHandoffRequest, HandoffCreated } from "./handoffs/types";
+export { getHandoff } from "./handoffs/getHandoff";
+export type { GetHandoffOptions } from "./handoffs/getHandoff";
+export { acceptHandoff } from "./handoffs/acceptHandoff";
+export type { AcceptHandoffOptions } from "./handoffs/acceptHandoff";
+export { declineHandoff } from "./handoffs/declineHandoff";
+export type { DeclineHandoffOptions } from "./handoffs/declineHandoff";
+export type {
+  AcceptHandoffRequest,
+  CreateHandoffRequest,
+  HandoffCreated,
+  HandoffPreview,
+} from "./handoffs/types";
 export { openHandoffConsent } from "./handoffs/openHandoffConsent";
 export type { OpenHandoffConsentOptions } from "./handoffs/openHandoffConsent";
 export type { Navigate } from "./handoffs/navigation";

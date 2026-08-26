@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  isHandoffAcceptanceFailed,
+  isHandoffExpired,
+  isHandoffNotActionable,
   isIdempotencyKeyConflict,
   isQuotaExhausted,
   isResultNotFound,
@@ -70,5 +73,44 @@ describe("isResultUnavailable", () => {
 
   it("is false for an unrelated code, even though both are HTTP 404", () => {
     expect(isResultUnavailable(backendError("scenario_session_not_found"))).toBe(false);
+  });
+});
+
+describe("isHandoffExpired", () => {
+  it("is true only for the handoff_expired code", () => {
+    expect(isHandoffExpired(backendError("handoff_expired"))).toBe(true);
+    expect(isHandoffExpired(backendError("handoff_not_actionable"))).toBe(false);
+  });
+
+  it("is false for non-backend_error variants", () => {
+    expect(isHandoffExpired({ type: "timeout" })).toBe(false);
+  });
+});
+
+describe("isHandoffNotActionable", () => {
+  it("is true for the already-accepted/declined/failed/not-actionable codes", () => {
+    expect(isHandoffNotActionable(backendError("handoff_already_accepted"))).toBe(true);
+    expect(isHandoffNotActionable(backendError("handoff_declined"))).toBe(true);
+    expect(isHandoffNotActionable(backendError("handoff_failed"))).toBe(true);
+    expect(isHandoffNotActionable(backendError("handoff_not_actionable"))).toBe(true);
+  });
+
+  it("is false for handoff_expired, even though both mean the token can't be acted on", () => {
+    expect(isHandoffNotActionable(backendError("handoff_expired"))).toBe(false);
+  });
+
+  it("is false for an unrelated code", () => {
+    expect(isHandoffNotActionable(backendError("handoff_not_found"))).toBe(false);
+  });
+});
+
+describe("isHandoffAcceptanceFailed", () => {
+  it("is true only for the handoff_acceptance_failed code", () => {
+    expect(isHandoffAcceptanceFailed(backendError("handoff_acceptance_failed"))).toBe(true);
+    expect(isHandoffAcceptanceFailed(backendError("handoff_failed"))).toBe(false);
+  });
+
+  it("is false for non-backend_error variants", () => {
+    expect(isHandoffAcceptanceFailed({ type: "timeout" })).toBe(false);
   });
 });

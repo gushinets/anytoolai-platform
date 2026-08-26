@@ -6,8 +6,9 @@ This package covers **A15 — CE Kit MVP API Client** (ANY-8): **A15a — Founda
 **A15b — Scenario, Quota, and Polling Client** (ANY-171), and **A15c — Result Artifact Client**
 (ANY-226). The transport layer, the stable error union, injectable storage, guest identity, runtime
 config, quota, idempotent scenario start, session polling, next-action, and the frontend-safe
-result artifact read, and the handoff creation/consent-navigation helpers (A18a / ANY-222) are all
-real. `pollJob`, `getArtifact`, `captureEmail`, and `trackClientEvent` are intentionally not
+result artifact read, the handoff creation/consent-navigation helpers (A18a / ANY-222), and the
+handoff preview/accept/decline helpers (A18b / ANY-223) are all real. `pollJob`, `getArtifact`,
+`captureEmail`, and `trackClientEvent` are intentionally not
 exported: their backend contracts don't exist yet (public job polling, raw artifact fetching,
 email capture, client-event ingestion, owned by ANY-36 / later tickets). Unsupported capabilities
 must not ship as fake-success helpers, so all of the above will be added for real once their
@@ -441,16 +442,44 @@ Both adapters implement the same injectable `Navigate` shape CE-kit's storage ad
 `AsyncStorage`, so tests can pass a fake instead of a real browser/`chrome` global.
 
 `POST /v1/handoffs` never returns a `handoff_expired` code -- create always mints a fresh token, so
-there is no `isHandoffExpired()` guard here. That code only applies to `GET`/`accept`/`decline` on
-an existing token, which are out of scope for CE-kit today (see [A18 handoff surfaces
-non-goals](../../../docs/architecture/frontend-boundaries.md)).
+there is no `isHandoffExpired()` case to hit there. That code -- along with the rest of a token's
+lifecycle -- is handled by `getHandoff()`/`acceptHandoff()`/`declineHandoff()` below.
+
+`getHandoff(client, handoffToken)`, `acceptHandoff(client, handoffToken, request?)`, and
+`declineHandoff(client, handoffToken)` are the `GET`/`accept`/`decline` counterparts to
+`createHandoff()`, all backing the `web-mirror` `/handoff/{handoff_token}` consent page
+(`HandoffConsent`). All three return the identical `HandoffPreview` shape -- the backend safe
+preview (source/target product identity, `status`, `expiresAt`, and an opaque `preview` map, plus
+`targetScenarioSessionId`/`targetJobId` once accepted). `getHandoff()` never rejects on a
+terminal/expired status; it always returns the preview with `status` reflecting the true current
+state, and only raises `handoff_not_found` for an unknown token -- this is the authoritative way to
+render or refetch a terminal view instead of trusting client-side state.
+
+```ts
+import { acceptHandoff, declineHandoff, getHandoff } from "@anytoolai/ce-kit";
+
+const preview = await getHandoff(client, handoffToken);
+if (preview.ok && (preview.value.status === "created" || preview.value.status === "viewed")) {
+  const accepted = await acceptHandoff(client, handoffToken, { guestId });
+  // or: const declined = await declineHandoff(client, handoffToken);
+}
+```
+
+`acceptHandoff()`/`declineHandoff()` can raise `handoff_expired` (410), the `handoff_not_actionable`
+family (409 -- already accepted/declined/failed, see `isHandoffNotActionable()`), and
+`acceptHandoff()` additionally `quota_exhausted` (429, see `isQuotaExhausted()`) or
+`handoff_acceptance_failed` (500, see `isHandoffAcceptanceFailed()`). All of these mean the token is
+no longer actionable from this client's mutation -- the correct response is to refetch via
+`getHandoff()` and render its authoritative `status`, not to retry the mutation. This is what makes
+a consumed token unreplayable: the backend's current state always wins.
 
 ## Classifying backend errors
 
 `isIdempotencyKeyConflict()`, `isScenarioActionConflict()`, `isQuotaExhausted()`,
 `isResultNotFound()`, `isResultUnavailable()`, `isHandoffNotFound()`, `isHandoffSourceInvalid()`,
-and `isHandoffTargetSchemaInvalid()` are typed guards over `PlatformApiError` for the ambiguous
-cases above -- prefer them over comparing `error.code` strings directly, since they're the tested,
+`isHandoffTargetSchemaInvalid()`, `isHandoffExpired()`, `isHandoffNotActionable()`, and
+`isHandoffAcceptanceFailed()` are typed guards over `PlatformApiError` for the ambiguous cases
+above -- prefer them over comparing `error.code` strings directly, since they're the tested,
 reusable source of truth for which codes mean what:
 
 ```ts

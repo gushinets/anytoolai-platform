@@ -47,6 +47,9 @@ Required `ce-kit` capabilities:
 - `getResult()`
 - `createHandoff()`
 - `openHandoffConsent()`
+- `getHandoff()`
+- `acceptHandoff()`
+- `declineHandoff()`
 - `captureEmail()`
 - `trackClientEvent()`
 - `renderQuotaState()`
@@ -69,6 +72,15 @@ A15 ownership and delivery slices:
   the A17 `/v1/handoffs` create endpoint, with typed `handoff_not_found` / `handoff_source_invalid` /
   `handoff_target_schema_invalid` handling via `isHandoffNotFound()` / `isHandoffSourceInvalid()` /
   `isHandoffTargetSchemaInvalid()`.
+- A18b / ANY-223 delivered `getHandoff()`, `acceptHandoff()`, and `declineHandoff()` as real CE-kit
+  helpers over the A17 `/v1/handoffs/{token}`, `.../accept`, and `.../decline` endpoints, with typed
+  `handoff_expired` / `handoff_already_accepted` / `handoff_declined` / `handoff_failed` /
+  `handoff_not_actionable` / `handoff_acceptance_failed` handling via `isHandoffExpired()` /
+  `isHandoffNotActionable()` / `isHandoffAcceptanceFailed()` (reusing `isQuotaExhausted()` for the
+  429 case), plus the `web-mirror` `/handoff/{handoff_token}` consent page (`HandoffConsent`) that
+  renders the backend safe preview and all terminal states -- web-mirror's first real wiring to
+  CE-kit. Component/browser tests cover this over Vitest + Testing Library; a real running
+  dev-server route is ANY-224's job.
 
 ## A12/A13 public scenario runtime contract
 

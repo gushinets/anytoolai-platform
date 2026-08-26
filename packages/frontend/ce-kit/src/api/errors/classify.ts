@@ -17,6 +17,12 @@ export const BACKEND_ERROR_CODE = {
   handoffNotFound: "handoff_not_found",
   handoffSourceInvalid: "handoff_source_invalid",
   handoffTargetSchemaInvalid: "handoff_target_schema_invalid",
+  handoffExpired: "handoff_expired",
+  handoffAlreadyAccepted: "handoff_already_accepted",
+  handoffDeclined: "handoff_declined",
+  handoffFailed: "handoff_failed",
+  handoffNotActionable: "handoff_not_actionable",
+  handoffAcceptanceFailed: "handoff_acceptance_failed",
 } as const;
 
 function _isBackendErrorWithCode(
@@ -62,12 +68,18 @@ export function isResultUnavailable(error: PlatformApiError): boolean {
   return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.resultArtifactUnavailable);
 }
 
-/** True only for the 404 that means the handoff_definition_id is unknown. */
+/** True only for the 404 that means the handoff_definition_id or the handoff_token is unknown. */
 export function isHandoffNotFound(error: PlatformApiError): boolean {
   return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffNotFound);
 }
 
-/** True only for the 404 that means the source scenario session/artifact is not eligible. */
+/**
+ * True for the source-session-invalid case, whether raised as the 404 from `createHandoff()` (the
+ * source scenario session/artifact was never eligible) or the 500 `acceptHandoff()` can raise if
+ * the source session went away between handoff creation and acceptance -- the backend marks the
+ * handoff `failed` in that second case, so treat it the same as `isHandoffAcceptanceFailed()`:
+ * refetch and render the resulting terminal state instead of retrying.
+ */
 export function isHandoffSourceInvalid(error: PlatformApiError): boolean {
   return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffSourceInvalid);
 }
@@ -75,4 +87,33 @@ export function isHandoffSourceInvalid(error: PlatformApiError): boolean {
 /** True only for the 409 that means the target schema for the handoff definition is invalid. */
 export function isHandoffTargetSchemaInvalid(error: PlatformApiError): boolean {
   return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffTargetSchemaInvalid);
+}
+
+/**
+ * True only for the 410 that means the handoff token has expired. Only `acceptHandoff()`/
+ * `declineHandoff()` can raise it as an error -- `getHandoff()` never rejects on expiry, it always
+ * returns 200 with `status` reflecting the expired token instead.
+ */
+export function isHandoffExpired(error: PlatformApiError): boolean {
+  return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffExpired);
+}
+
+/**
+ * True for the 409s that mean the token is no longer actionable (already accepted/declined, the
+ * target failed, or a generic not-actionable state) -- one guard, not four, since the correct UI
+ * response to all of them is identical: refetch via `getHandoff()` and trust its authoritative
+ * `status` instead of retrying the mutation.
+ */
+export function isHandoffNotActionable(error: PlatformApiError): boolean {
+  return (
+    _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffAlreadyAccepted) ||
+    _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffDeclined) ||
+    _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffFailed) ||
+    _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffNotActionable)
+  );
+}
+
+/** True only for the 500 that means accepting the handoff failed while executing the target. */
+export function isHandoffAcceptanceFailed(error: PlatformApiError): boolean {
+  return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffAcceptanceFailed);
 }
