@@ -1,11 +1,7 @@
 import type { AssertExactSchemaShape } from "../api/driftAssertions";
 import type { components } from "../api/generated/platformApi";
-import { isRecord } from "../api/parsing";
+import { isNullableString, isRecord } from "../api/parsing";
 import type { HandoffPreview } from "./types";
-
-function isNullableString(value: unknown): value is string | null | undefined {
-  return value === undefined || value === null || typeof value === "string";
-}
 
 /**
  * Validates and maps the backend's `HandoffPreviewResponse` payload (snake_case) into the

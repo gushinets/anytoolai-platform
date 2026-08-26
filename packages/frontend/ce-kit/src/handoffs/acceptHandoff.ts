@@ -7,11 +7,15 @@ export type AcceptHandoffOptions = Pick<PlatformApiRequestOptions, "signal" | "t
 
 /**
  * `POST /v1/handoffs/{handoff_token}/accept` -- accepts the handoff and returns its updated
- * preview. Can raise `handoff_expired` (410), the `handoff_not_actionable` family (409, already
+ * preview. Can raise `handoff_expired` (410), `handoff_not_found` (404, unknown token -- see
+ * `isHandoffNotFound()`), the `handoff_not_actionable` family (409, already
  * accepted/declined/failed -- see `isHandoffNotActionable()`), `quota_exhausted` (429, see
- * `isQuotaExhausted()`), `handoff_source_invalid` (500, the source session vanished between
- * creation and acceptance -- see `isHandoffSourceInvalid()`), or `handoff_acceptance_failed` (500,
- * see `isHandoffAcceptanceFailed()`).
+ * `isQuotaExhausted()`), `handoff_acceptance_failed` (500, see `isHandoffAcceptanceFailed()`), or
+ * `handoff_source_invalid` under two distinct cases the same code covers -- 404 when the accepting
+ * guest id itself doesn't resolve, before the handoff is claimed (see
+ * `isHandoffGuestIdentityInvalid()`), or 500 when the source session vanished after claiming (see
+ * `isHandoffAcceptanceSourceInvalid()`). Do not use the broader `isHandoffSourceInvalid()` to
+ * branch on an `acceptHandoff()` result -- see its own docstring for why.
  * `request` is optional -- an omitted `guestId`/`sourceFrontendInstanceId` is dropped from the
  * body, matching the backend's own optional `HandoffAcceptRequest` fields.
  */

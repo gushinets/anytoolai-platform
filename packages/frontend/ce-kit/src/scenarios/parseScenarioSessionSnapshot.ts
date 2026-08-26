@@ -1,6 +1,6 @@
 import type { AssertExactSchemaShape } from "../api/driftAssertions";
 import type { components } from "../api/generated/platformApi";
-import { isRecord, isStringArray } from "../api/parsing";
+import { isNullableString, isRecord, isStringArray } from "../api/parsing";
 import type { ScenarioSession, ScenarioSessionSnapshot } from "./types";
 
 /**
@@ -40,7 +40,7 @@ export function parseScenarioSessionSnapshot(payload: unknown): ScenarioSessionS
   if (jobId !== null && typeof jobId !== "string") {
     return null;
   }
-  if (resultArtifactId !== null && resultArtifactId !== undefined && typeof resultArtifactId !== "string") {
+  if (!isNullableString(resultArtifactId)) {
     return null;
   }
 
@@ -82,7 +82,7 @@ export function parseScenarioSession(payload: unknown): ScenarioSession | null {
   }
 
   const { current_checkpoint_id: currentCheckpointId } = payload;
-  if (currentCheckpointId !== null && currentCheckpointId !== undefined && typeof currentCheckpointId !== "string") {
+  if (!isNullableString(currentCheckpointId)) {
     return null;
   }
 

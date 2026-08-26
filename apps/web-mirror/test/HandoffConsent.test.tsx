@@ -130,6 +130,21 @@ describe("HandoffConsent", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/went wrong/i));
   });
 
+  it("recovers from a safe-error view via its Try again button instead of requiring a page reload", async () => {
+    const { client, calls } = makeRoutedClient({
+      [PREVIEW_ROUTE]: [errorResponse(500, "some_unexpected_backend_error"), jsonResponse(200, previewPayload())],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse(), guestIdentityResponse()],
+    });
+
+    render(<HandoffConsent client={client} handoffToken="token_abc" />);
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/went wrong/i));
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await waitFor(() => expect(screen.getByText("Kernel Demo")).toBeTruthy());
+    expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(2);
+  });
+
   it("renders the consent view but keeps Accept disabled when guest identity resolution fails, to avoid misattributing quota to the handoff creator", async () => {
     const { client, calls } = makeRoutedClient({
       [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
@@ -155,7 +170,7 @@ describe("HandoffConsent", () => {
     await waitFor(() => expect(screen.getByText("declined")).toBeTruthy());
   });
 
-  it("keeps the page usable when accessing window.localStorage itself throws (storage-denied sandboxes)", async () => {
+  it("still resolves a guest identity and allows Accept when window.localStorage itself throws (storage-denied sandboxes)", async () => {
     const originalDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
     Object.defineProperty(window, "localStorage", {
       configurable: true,
@@ -165,19 +180,94 @@ describe("HandoffConsent", () => {
     });
 
     try {
-      // No GUEST_IDENTITY_ROUTE queued -- resolveGuestIdentity() must catch the synchronous throw
-      // from constructing the adapter and never reach the network call.
-      const { client } = makeRoutedClient({
+      // resolveGuestIdentity() must catch the synchronous throw from window.localStorage and fall
+      // back to an in-memory adapter -- still calling the backend to mint a real (if ephemeral)
+      // guest id, rather than leaving Accept permanently disabled.
+      const { client, calls } = makeRoutedClient({
         [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
+        [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse("guest_ephemeral")],
+        [ACCEPT_ROUTE]: [jsonResponse(200, previewPayload({ status: "accepted", target_scenario_session_id: "scenario_session_1" }))],
       });
 
       render(<HandoffConsent client={client} handoffToken="token_abc" />);
-
       await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy());
+
+      const acceptButton = screen.getByRole("button", { name: "Accept" }) as HTMLButtonElement;
+      expect(acceptButton.disabled).toBe(false);
+      fireEvent.click(acceptButton);
+
+      await waitFor(() => expect(screen.getByText("accepted")).toBeTruthy());
+      const acceptCall = calls.find((call) => call.key === ACCEPT_ROUTE);
+      expect(JSON.parse(acceptCall?.init.body as string)).toEqual({ guest_id: "guest_ephemeral" });
     } finally {
       if (originalDescriptor) {
         Object.defineProperty(window, "localStorage", originalDescriptor);
       }
+    }
+  });
+
+  it("resolves neither localStorage nor a guest identity, but still renders usably with Accept disabled", async () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("Storage access denied");
+      },
+    });
+
+    try {
+      // Both failures at once: the ephemeral fallback resolveGuestIdentity() reaches for after
+      // catching the localStorage throw is itself a real backend call, and that call fails too.
+      const { client } = makeRoutedClient({
+        [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
+        [GUEST_IDENTITY_ROUTE]: [errorResponse(500, "internal_error")],
+      });
+
+      render(<HandoffConsent client={client} handoffToken="token_abc" />);
+
+      await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/couldn't verify your identity/i));
+      expect(screen.getByText("Kernel Demo")).toBeTruthy();
+      const acceptButton = screen.getByRole("button", { name: "Accept" }) as HTMLButtonElement;
+      expect(acceptButton.disabled).toBe(true);
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(window, "localStorage", originalDescriptor);
+      }
+    }
+  });
+
+  it("self-heals a stale guest id via the ephemeral fallback even when clearing it from localStorage itself fails", async () => {
+    const removeItemSpy = vi.spyOn(window.localStorage, "removeItem").mockImplementationOnce(() => {
+      throw new DOMException("write restricted");
+    });
+
+    try {
+      const { client, calls } = makeRoutedClient({
+        [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
+        [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse("guest_stale"), guestIdentityResponse("guest_fresh")],
+        [ACCEPT_ROUTE]: [
+          errorResponse(404, "handoff_source_invalid"),
+          jsonResponse(200, previewPayload({ status: "accepted", target_scenario_session_id: "scenario_session_1" })),
+        ],
+      });
+
+      render(<HandoffConsent client={client} handoffToken="token_abc" />);
+      await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy());
+
+      fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+      await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not be completed/i));
+      // If the failed removeItem() left "guest_stale" readable from localStorage,
+      // createGuestIdentity() would short-circuit on that cached read and never reach the backend
+      // a second time -- this assertion is what the ephemeral-fallback-on-failed-clear fix buys.
+      expect(calls.filter((call) => call.key === GUEST_IDENTITY_ROUTE)).toHaveLength(2);
+
+      fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+
+      await waitFor(() => expect(screen.getByText("accepted")).toBeTruthy());
+      const acceptCalls = calls.filter((call) => call.key === ACCEPT_ROUTE);
+      expect(JSON.parse(acceptCalls[1]?.init.body as string)).toEqual({ guest_id: "guest_fresh" });
+    } finally {
+      removeItemSpy.mockRestore();
     }
   });
 

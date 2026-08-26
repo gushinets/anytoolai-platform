@@ -40,6 +40,13 @@ function _isBackendErrorWithCodeAndStatus(
   return _isBackendErrorWithCode(error, code) && error.status === status;
 }
 
+function _isBackendErrorWithAnyCode(
+  error: PlatformApiError,
+  codes: readonly string[],
+): error is BackendApiError {
+  return error.type === "backend_error" && codes.includes(error.code);
+}
+
 /** True only for the 409 that means "retry with a new Idempotency-Key or the original request." */
 export function isIdempotencyKeyConflict(error: PlatformApiError): boolean {
   return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.idempotencyKeyConflict);
@@ -50,11 +57,11 @@ export function isIdempotencyKeyConflict(error: PlatformApiError): boolean {
  * distinct from `isIdempotencyKeyConflict()` even though both surface as HTTP 409.
  */
 export function isScenarioActionConflict(error: PlatformApiError): boolean {
-  return (
-    _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.scenarioCheckpointConflict) ||
-    _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.scenarioCheckpointNotActionable) ||
-    _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.scenarioNextActionNotAllowed)
-  );
+  return _isBackendErrorWithAnyCode(error, [
+    BACKEND_ERROR_CODE.scenarioCheckpointConflict,
+    BACKEND_ERROR_CODE.scenarioCheckpointNotActionable,
+    BACKEND_ERROR_CODE.scenarioNextActionNotAllowed,
+  ]);
 }
 
 /** True only for the 429 that means the guest has no quota left; no session/job was created. */
@@ -145,12 +152,12 @@ export function isHandoffExpired(error: PlatformApiError): boolean {
  * `status` instead of retrying the mutation.
  */
 export function isHandoffNotActionable(error: PlatformApiError): boolean {
-  return (
-    _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffAlreadyAccepted) ||
-    _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffDeclined) ||
-    _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffFailed) ||
-    _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffNotActionable)
-  );
+  return _isBackendErrorWithAnyCode(error, [
+    BACKEND_ERROR_CODE.handoffAlreadyAccepted,
+    BACKEND_ERROR_CODE.handoffDeclined,
+    BACKEND_ERROR_CODE.handoffFailed,
+    BACKEND_ERROR_CODE.handoffNotActionable,
+  ]);
 }
 
 /** True only for the 500 that means accepting the handoff failed while executing the target. */
@@ -167,6 +174,10 @@ export function isHandoffAcceptanceFailed(error: PlatformApiError): boolean {
  *
  * Deliberately excludes `isHandoffGuestIdentityInvalid()`'s 404 case -- refetching that would just
  * return the same non-terminal, actionable preview -- see that guard's docstring.
+ *
+ * ponytail: this OR-list is a manually-synced membership set, like `TERMINAL_STATUSES` in
+ * `HandoffConsent.tsx` -- a new backend error code that logically belongs here needs a matching
+ * guard added to this list by hand; nothing enforces that at compile time.
  */
 export function isHandoffActionRefetchable(error: PlatformApiError): boolean {
   return (
