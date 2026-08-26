@@ -130,21 +130,29 @@ describe("HandoffConsent", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/went wrong/i));
   });
 
-  it("renders the consent view without blocking when guest identity resolution fails, falling back to no guestId on accept", async () => {
+  it("renders the consent view but keeps Accept disabled when guest identity resolution fails, to avoid misattributing quota to the handoff creator", async () => {
     const { client, calls } = makeRoutedClient({
       [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
       [GUEST_IDENTITY_ROUTE]: [errorResponse(500, "internal_error")],
-      [ACCEPT_ROUTE]: [jsonResponse(200, previewPayload({ status: "accepted", target_scenario_session_id: "scenario_session_1" }))],
+      [DECLINE_ROUTE]: [jsonResponse(200, previewPayload({ status: "declined" }))],
     });
 
     render(<HandoffConsent client={client} handoffToken="token_abc" />);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/couldn't verify your identity/i));
 
-    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+    // No guestId means an accept would silently attribute quota to the handoff's creator
+    // (HandoffService.accept() falls back to record.created_by_guest_id) instead of the person
+    // accepting -- so Accept must stay unavailable rather than send guest_id-less request.
+    const acceptButton = screen.getByRole("button", { name: "Accept" }) as HTMLButtonElement;
+    expect(acceptButton.disabled).toBe(true);
+    fireEvent.click(acceptButton);
+    expect(calls.some((call) => call.key === ACCEPT_ROUTE)).toBe(false);
 
-    await waitFor(() => expect(calls.some((call) => call.key === ACCEPT_ROUTE)).toBe(true));
-    const acceptCall = calls.find((call) => call.key === ACCEPT_ROUTE);
-    expect(JSON.parse(acceptCall?.init.body as string)).toEqual({});
+    // Decline needs no guest attribution, so it stays available and works normally.
+    const declineButton = screen.getByRole("button", { name: "Decline" }) as HTMLButtonElement;
+    expect(declineButton.disabled).toBe(false);
+    fireEvent.click(declineButton);
+    await waitFor(() => expect(screen.getByText("declined")).toBeTruthy());
   });
 
   it("keeps the page usable when accessing window.localStorage itself throws (storage-denied sandboxes)", async () => {

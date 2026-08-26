@@ -80,14 +80,18 @@ function viewStateFromResult(result: Awaited<ReturnType<typeof getHandoff>>): Vi
 export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
   const [state, setState] = useState<ViewState>({ kind: "loading" });
   const [guestId, setGuestId] = useState<string | undefined>(undefined);
+  // Distinct from `guestId === undefined`: that also covers "not resolved yet," which never
+  // reaches the consent view (resolved alongside the preview fetch below, before Accept/Decline
+  // can render at all). This tracks a *failed* resolution specifically, so Accept can be kept
+  // unavailable instead of silently sending no guest_id -- which the backend's
+  // HandoffService.accept() would attribute to the handoff's creator, not the person accepting.
+  const [guestIdentityUnresolved, setGuestIdentityUnresolved] = useState(false);
 
   // The backend attributes an accept's quota to `guest_id` if given, falling back to the
   // handoff's original creator otherwise -- so the person actually clicking Accept needs their
   // own guest identity, not the creator's. Resolved alongside the preview fetch (not after) so
   // Accept/Decline never render before guestId has settled -- otherwise a click that races the
-  // identity call would silently fall back to creator-attribution again. A resolution failure
-  // just leaves guestId unset, matching that same pre-existing fallback rather than blocking the
-  // page.
+  // identity call would silently fall back to creator-attribution again.
   useEffect(() => {
     const controller = new AbortController();
     Promise.all([
@@ -101,9 +105,8 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
       if (controller.signal.aborted) {
         return;
       }
-      if (guestResult.ok) {
-        setGuestId(guestResult.value.guestId);
-      }
+      setGuestId(guestResult.ok ? guestResult.value.guestId : undefined);
+      setGuestIdentityUnresolved(!guestResult.ok);
       setState(viewStateFromResult(previewResult));
     });
     return () => {
@@ -129,6 +132,7 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
       await clearStaleGuestIdentity();
       const fresh = await resolveGuestIdentity(client);
       setGuestId(fresh.ok ? fresh.value.guestId : undefined);
+      setGuestIdentityUnresolved(!fresh.ok);
       showRetryableActionError();
       return;
     }
@@ -192,12 +196,16 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
       </dl>
       {state.kind === "consent" ? (
         <>
-          <button type="button" onClick={handleAccept} disabled={state.pending !== null}>
+          <button type="button" onClick={handleAccept} disabled={state.pending !== null || guestIdentityUnresolved}>
             Accept
           </button>
           <button type="button" onClick={handleDecline} disabled={state.pending !== null}>
             Decline
           </button>
+          {/* Decline stays available: it needs no guest attribution, unlike Accept. */}
+          {guestIdentityUnresolved ? (
+            <p role="alert">We couldn't verify your identity. Please reload the page and try again.</p>
+          ) : null}
           {state.actionError ? <p role="alert">{state.actionError}</p> : null}
         </>
       ) : null}
