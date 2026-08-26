@@ -85,7 +85,7 @@ platform-owned contracts.
 - [x] Add ActionRunner and `StructuredLlmActionExecutor` retry tests with full event lineage.
 - [x] Add focused schema/cross-validator boundary tests (missing/unexpected properties,
       enum/range violations, malformed output).
-- [x] Harden markup detection through six rounds of `/code-review` (allowlist gaps, false
+- [x] Harden markup detection through six rounds of code review (allowlist gaps, false
       positives, format-cross-checking, float-length coercion, two quadratic-regex fixes,
       missing third cross-validator registration site).
 - [x] Post-merge (`1283e1c`, merging main's ANY-252/ANY-254): fixed the resulting docs staleness
@@ -94,7 +94,7 @@ platform-owned contracts.
 - [x] Consolidate A06's standalone regex-based markup detector onto A07's shared parser-backed
       `_has_markup`/`_has_html_tag` helpers, and drop the `format == "markdown"`
       decorative-token requirement to match A07 (team-lead review #1; also closes the seventh-pass
-      `/code-review` finding that the two independent detectors disagreed on identical input).
+      code review finding that the two independent detectors disagreed on identical input).
 - [x] Ground the fake-provider fixture's persuasive text strictly in its `context` input instead of
       inventing unsupplied facts, and remove a dead/unreachable A04 taxonomy re-check left over as
       merge residue in `DetectIssuesByTaxonomyCrossValidator` (team-lead review #2).
@@ -117,7 +117,7 @@ platform-owned contracts.
 | Date | Decision | Why |
 |---|---|---|
 | 2026-08-11 | Implemented `PersuasiveTextCrossValidator` with its own regex-based HTML/Markdown detector rather than reusing A07's helpers | A07 (`ComposeReplyCrossValidator`) lived on an unmerged sibling branch at the time, so no shared implementation was available to reuse in-tree |
-| 2026-08-11 to 2026-08-11 | Hardened the regex detector through six `/code-review` rounds instead of switching to a real parser immediately | Kept the diff minimal per-round while the true fix (a shared parser-backed detector) waited on A07 actually merging into `main` |
+| 2026-08-11 to 2026-08-11 | Hardened the regex detector through six code review rounds instead of switching to a real parser immediately | Kept the diff minimal per-round while the true fix (a shared parser-backed detector) waited on A07 actually merging into `main` |
 | 2026-08-13 | Consolidated onto A07's shared `_has_markup`/`_has_html_tag` (markdown-it-py-backed) helpers and deleted the ~130-line regex allowlist machinery, after `main` merged and made the shared helpers available | Team-lead review #1: the two independent detectors diverged on identical input (e.g. spaced `*emphasis*`); one canonical definition removes the divergence and the six rounds of allowlist maintenance debt at once |
 | 2026-08-13 | Dropped the `constraints.format == "markdown"` decorative-markup-token requirement | Team-lead review #1: the prompt only says "format accordingly," not "must contain a decorative construct"; a plain paragraph is valid Markdown, and the sibling A07 validator doesn't require this either |
 | 2026-08-13 | Rewrote the fake-provider fixture text and its matching `test_action_runner.py` assertion to reference only `product`/`deadline` facts actually present in the test's `context` input | Team-lead review #2: the previous fixture text asserted a "discounted rate," "this quarter," a team, and a "rollout" not present anywhere in the input, contradicting the prompt's grounding rule and locking invented claims in as expected behavior |
@@ -128,8 +128,8 @@ platform-owned contracts.
 
 | Date | Progress | Next |
 |---|---|---|
-| 2026-08-11 | Implemented strict input/output schemas, prompt, `kernel_demo.compose_persuasive_text_v1` config/fixture, `PersuasiveTextCrossValidator`, and initial ActionRunner/retry tests | Address six rounds of `/code-review` markup-detection findings |
-| 2026-08-11 | Hardened HTML/Markdown detection through six `/code-review` rounds (allowlist expansion, false-positive fixes, format-cross-checking, float-length coercion, two quadratic-regex fixes, third registration site) | Commit and open PR |
+| 2026-08-11 | Implemented strict input/output schemas, prompt, `kernel_demo.compose_persuasive_text_v1` config/fixture, `PersuasiveTextCrossValidator`, and initial ActionRunner/retry tests | Address six rounds of code review markup-detection findings |
+| 2026-08-11 | Hardened HTML/Markdown detection through six code review rounds (allowlist expansion, false-positive fixes, format-cross-checking, float-length coercion, two quadratic-regex fixes, third registration site) | Commit and open PR |
 | 2026-08-13 | Merged `main` (ANY-252/ANY-254), fixed resulting doc staleness, verified no cross-validator wiring was silently dropped | Address team-lead review #1 |
 | 2026-08-13 | Consolidated markup detection onto A07's shared parser-backed helpers, dropped the markdown decorative-token requirement, removed dead/duplicate test spy-gateway classes | Address team-lead review #2 |
 | 2026-08-13 | Grounded the fixture/test in its actual input context, removed the dead A04 taxonomy re-check, added this execution plan and filled in the PR description | Confirm `quick-check` is green end-to-end |

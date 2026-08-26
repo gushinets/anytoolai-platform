@@ -131,7 +131,7 @@ toward 11/11 without a placeholder/smoke qualification.
 
 | Date | Progress | Next |
 |---|---|---|
-| 2026-08-14 | Implemented strict input/output schemas, both validators (with the `_reject_duplicate_ids` extraction done inline rather than deferred to a review round), prompt, config wiring, fake-provider fixture, and full test coverage (schema + cross-validation + ActionRunner retry-ledger) | Run full validation gate suite and address any `/code-review` findings |
+| 2026-08-14 | Implemented strict input/output schemas, both validators (with the `_reject_duplicate_ids` extraction done inline rather than deferred to a review round), prompt, config wiring, fake-provider fixture, and full test coverage (schema + cross-validation + ActionRunner retry-ledger) | Run full validation gate suite and address any code review findings |
 
 ## Open questions
 

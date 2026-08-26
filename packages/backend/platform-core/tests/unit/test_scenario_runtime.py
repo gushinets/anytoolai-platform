@@ -133,6 +133,183 @@ def test_start_session_creates_linked_session_and_job(
     assert job.metadata["scenario_chain_id"] == scenario_session.scenario_chain_id
 
 
+_LIVE_SCENARIO_INPUT = {
+    "source_text": "deadline budget deliverables",
+    "fields": [
+        {
+            "name": "deadline",
+            "type": "string",
+            "description": "Project deadline mentioned in the text.",
+            "required": True,
+        },
+    ],
+    "strict": False,
+}
+
+
+def test_start_session_rejects_internal_only_scenario_without_a_live_canary_token(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ANY-221 code-review finding: the 14 kernel_demo "_live_" scenarios are config-flagged
+    internal_only, so the normal public start-session path (no X-Live-Canary-Token header) must
+    be rejected the same way an unknown scenario_id would -- not a distinguishable error, so a
+    caller without the token can't even tell the scenario exists."""
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "the-real-token")
+    with transaction_boundary(session_factory) as session:
+        service = _runtime_service(session, config_registry=config_registry)
+
+        with pytest.raises(ScenarioNotFoundError):
+            service.start_session(
+                tenant_id="anytoolai",
+                region="default",
+                product_id="kernel_demo",
+                scenario_id="kernel_demo.single_action_live_smoke_v1",
+                frontend_id="kernel_demo_ce",
+                input_payload=_LIVE_SCENARIO_INPUT,
+                guest_id="guest_demo",
+            )
+
+
+def test_start_session_rejects_internal_only_scenario_with_a_wrong_live_canary_token(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "the-real-token")
+    with transaction_boundary(session_factory) as session:
+        service = _runtime_service(session, config_registry=config_registry)
+
+        with pytest.raises(ScenarioNotFoundError):
+            service.start_session(
+                tenant_id="anytoolai",
+                region="default",
+                product_id="kernel_demo",
+                scenario_id="kernel_demo.single_action_live_smoke_v1",
+                frontend_id="kernel_demo_ce",
+                input_payload=_LIVE_SCENARIO_INPUT,
+                guest_id="guest_demo",
+                live_canary_token="not-the-real-token",
+            )
+
+
+def test_start_session_rejects_internal_only_scenario_when_server_token_is_unset(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fails closed: even a caller who somehow supplies *some* token must be rejected if the
+    server itself hasn't been configured with its own ANYTOOLAI_LIVE_CANARY_TOKEN."""
+    monkeypatch.delenv("ANYTOOLAI_LIVE_CANARY_TOKEN", raising=False)
+    with transaction_boundary(session_factory) as session:
+        service = _runtime_service(session, config_registry=config_registry)
+
+        with pytest.raises(ScenarioNotFoundError):
+            service.start_session(
+                tenant_id="anytoolai",
+                region="default",
+                product_id="kernel_demo",
+                scenario_id="kernel_demo.single_action_live_smoke_v1",
+                frontend_id="kernel_demo_ce",
+                input_payload=_LIVE_SCENARIO_INPUT,
+                guest_id="guest_demo",
+                live_canary_token="anything",
+            )
+
+
+def test_start_session_accepts_internal_only_scenario_with_the_correct_live_canary_token(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "the-real-token")
+    with transaction_boundary(session_factory) as session:
+        service = _runtime_service(session, config_registry=config_registry)
+
+        snapshot = service.start_session(
+            tenant_id="anytoolai",
+            region="default",
+            product_id="kernel_demo",
+            scenario_id="kernel_demo.single_action_live_smoke_v1",
+            frontend_id="kernel_demo_ce",
+            input_payload=_LIVE_SCENARIO_INPUT,
+            guest_id="guest_demo",
+            live_canary_token="the-real-token",
+        )
+
+    assert snapshot.status is ScenarioSessionStatus.started
+
+
+def test_start_session_rejects_internal_only_scenario_idempotency_replay_without_a_live_canary_token(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`code-review` finding: the idempotency-key replay lookup used to run
+    before the internal_only/live_canary_token check, so a second start_session() call reusing
+    the same idempotency_key from a legitimately-token-authorized first call, but omitting the
+    token this time, would return the replayed snapshot instead of being rejected -- the token
+    check must fire before idempotency replay is even considered, not just on a genuinely new
+    request."""
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "the-real-token")
+    with transaction_boundary(session_factory) as session:
+        service = _runtime_service(session, config_registry=config_registry)
+        service.start_session(
+            tenant_id="anytoolai",
+            region="default",
+            product_id="kernel_demo",
+            scenario_id="kernel_demo.single_action_live_smoke_v1",
+            frontend_id="kernel_demo_ce",
+            input_payload=_LIVE_SCENARIO_INPUT,
+            guest_id="guest_demo",
+            idempotency_key="idem-internal-only-replay",
+            live_canary_token="the-real-token",
+        )
+
+        with pytest.raises(ScenarioNotFoundError):
+            service.start_session(
+                tenant_id="anytoolai",
+                region="default",
+                product_id="kernel_demo",
+                scenario_id="kernel_demo.single_action_live_smoke_v1",
+                frontend_id="kernel_demo_ce",
+                input_payload=_LIVE_SCENARIO_INPUT,
+                guest_id="guest_demo",
+                idempotency_key="idem-internal-only-replay",
+            )
+
+
+def test_create_linked_session_always_rejects_internal_only_scenario(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+    config_registry,
+) -> None:
+    """No legitimate handoff ever targets an internal_only (live-canary) scenario -- unlike
+    start_session(), there's no token that can ever make this succeed. The check happens before
+    any DB write, so the handoff-specific ids below never need to reference real rows."""
+    with transaction_boundary(session_factory) as session:
+        service = _runtime_service(session, config_registry=config_registry)
+
+        with pytest.raises(ScenarioNotFoundError):
+            service.create_linked_session(
+                tenant_id="anytoolai",
+                region="default",
+                product_id="kernel_demo",
+                scenario_id="kernel_demo.single_action_live_smoke_v1",
+                frontend_id="kernel_demo_ce",
+                input_payload=_LIVE_SCENARIO_INPUT,
+                scenario_session_id="scenario_session_linked",
+                scenario_chain_id="scenario_chain_1",
+                parent_scenario_session_id="scenario_session_parent",
+                handoff_id="handoff_1",
+                source_artifact_id="artifact_1",
+                guest_id="guest_demo",
+                user_id=None,
+                source_frontend_instance_id=None,
+                queue_workflow=True,
+            )
+
+
 def test_start_session_rejects_unknown_guest_before_writing_any_row(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
     config_registry,

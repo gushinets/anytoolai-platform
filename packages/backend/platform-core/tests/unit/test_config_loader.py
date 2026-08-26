@@ -490,6 +490,38 @@ def test_loader_fails_on_missing_workflow_reference(tmp_path: Path) -> None:
     )
 
 
+def test_loader_parses_internal_only_scenario_flag() -> None:
+    registry = ConfigLoader(CONFIG_ROOT).load()
+
+    live_scenario = registry.get_scenario("kernel_demo.single_action_live_smoke_v1")
+    assert live_scenario is not None
+    assert live_scenario.internal_only is True
+
+    fake_scenario = registry.get_scenario("kernel_demo.single_action_smoke_v1")
+    assert fake_scenario is not None
+    assert fake_scenario.internal_only is False
+
+
+def test_loader_rejects_non_bool_internal_only_scenario_flag(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "scenarios.yaml"
+    data = _load_yaml(path)
+    data["scenarios"][0]["internal_only"] = "yes"
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo.single_action_smoke_v1",
+        ref_type="internal_only",
+        ref_value="yes",
+        message_part="internal_only must be a boolean if set",
+    )
+
+
 def test_loader_fails_on_missing_action_config_reference(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "products" / "kernel_demo" / "workflows.yaml"
@@ -916,7 +948,12 @@ def test_loader_rejects_negative_workflow_step_retry_count(tmp_path: Path) -> No
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "products" / "kernel_demo" / "workflows.yaml"
     data = _load_yaml(path)
-    data["workflows"][-1]["steps"][0]["retry_count"] = -1
+    retry_workflow = next(
+        workflow
+        for workflow in data["workflows"]
+        if workflow["workflow_id"] == "kernel_demo.retry_extract_v1"
+    )
+    retry_workflow["steps"][0]["retry_count"] = -1
     _write_yaml(path, data)
 
     with pytest.raises(RegistryLoadError) as exc_info:

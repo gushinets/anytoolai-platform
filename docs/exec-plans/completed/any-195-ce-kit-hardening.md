@@ -17,7 +17,7 @@ Close four correctness/safety gaps left in the `PlatformApiClient` foundation (A
 before A15b (ANY-171) builds scenario/quota/polling client methods on top of it: unsafe fetch
 exception text leaking into public errors, retry backoff not observing caller cancellation,
 `storage.get()` rejections escaping `createGuestIdentity()`, and OpenAPI drift checks that only
-compare property names, not types/nullability. Two subsequent `/code-review` passes (see "Code
+compare property names, not types/nullability. Two subsequent code review passes (see "Code
 review" sections below) surfaced and fixed follow-on issues in the same four areas that weren't
 caught by the original scope: an unreachable branch and a missing optionality check in the new
 drift assertion, a `parseRuntimeConfig` false-rejection the drift assertion itself exposed, a
@@ -98,7 +98,7 @@ retry-loop abort check that only ran after a configured delay, and two variants 
 
 ## Code review (2026-08-05)
 
-`/code-review` on this branch found 2 CONFIRMED issues, both fixed:
+code review on this branch found 2 CONFIRMED issues, both fixed:
 
 1. **Dead `missingFromShape` branch.** The original `AssertExactSchemaShape<T extends object, Shape
    extends { [K in keyof T]: unknown }>` constrained `Shape` to already carry every key of `T` at
@@ -123,7 +123,7 @@ retry-loop abort check that only ran after a configured delay, and two variants 
 
 ## Code review (2026-08-05, second pass)
 
-A second `/code-review` pass, run after the first pass's two findings were fixed, surfaced 4 more
+A second code review pass, run after the first pass's two findings were fixed, surfaced 4 more
 issues (3 CONFIRMED, 1 PLAUSIBLE). All fixed except the PLAUSIBLE one, which was a no-op reorder.
 
 1. CONFIRMED `PlatformApiClient.ts` retry loop -- the `options.signal?.aborted` check after the

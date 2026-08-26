@@ -68,7 +68,7 @@ dependency proofs) and live-smoke-tested via `dev-smoke`.
       dependency proofs against a real Postgres instance.
 - [x] `kernel_demo_smoke.py` / `test_kernel_demo_smoke.py`: composite coverage checks, wired into
       `dev-smoke`.
-- [x] 20 rounds of `/code-review` passes plus 4 team-lead reviews addressed. The two mapping-DSL
+- [x] 20 rounds of code review passes plus 4 team-lead reviews addressed. The two mapping-DSL
       workarounds those passes converged on (`overall_rationale` on `score_match_by_rubric`, and
       leaving `extract -> detect_issues` order-only) and why are documented once, in
       `docs/architecture/action-model.md`'s "kernel_demo composite workflow mapping notes" section
@@ -101,7 +101,7 @@ dependency proofs) and live-smoke-tested via `dev-smoke`.
 
 | Date | Progress | Next |
 |---|---|---|
-| 2026-08-18 | Composite workflow configs, matrix test, and smoke-check coverage implemented and merged onto `feature/ANY-219`; 15+ `/code-review` passes and 2 team-lead reviews addressed iteratively (dead-code removal, PLR0911 lint-budget refactors, coverage-check hardening, docstring accuracy). | Await further review. |
+| 2026-08-18 | Composite workflow configs, matrix test, and smoke-check coverage implemented and merged onto `feature/ANY-219`; 15+ code review passes and 2 team-lead reviews addressed iteratively (dead-code removal, PLR0911 lint-budget refactors, coverage-check hardening, docstring accuracy). | Await further review. |
 | 2026-08-18 | Team-lead-3 review found the two composite workflows didn't prove real adjacent-artifact consumption for two step pairs; resolved `score_match_by_rubric -> score_multidimensional_axes` via the `overall_rationale` schema addition (user-approved), attempted the same pattern for `extract -> detect_issues`. | Await further review. |
 | 2026-08-18 | Seventeenth pass found the `extract -> detect_issues` fix (a `taxonomy` mapping from `missing_fields`) was semantically wrong — it forced `detect_issues`' `category` field to a raw field name — and the composite matrix's dependency proof for it was vacuous (empty-array fixture). Replaced with a new `notes` field on `extract`'s output instead. | Await further review. |
 | 2026-08-18 | Eighteenth pass found the `notes` field itself regressed `scenario.input.context` support, added unused-field generation cost to 6 other workflows, and added retry risk to `retry_extract_v1`. Reverted `notes` entirely; `extract -> detect_issues` returned to order-only with an inline comment explaining why. | Await further review. |

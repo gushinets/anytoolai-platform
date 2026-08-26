@@ -75,6 +75,27 @@ def test_runtime_config_returns_frontend_safe_metadata() -> None:
         "kernel_demo.composite_evaluate_match_smoke_v1",
         "kernel_demo.composite_shape_and_write_smoke_v1",
     ]
+    # `code-review` finding: the 14 "_live_" scenarios are config-flagged internal_only
+    # (ANY-221's live-canary-only scenarios) -- ScenarioRuntimeService's own /start gate
+    # (service.py) rejects them for any normal frontend client with scenario_not_found, so this
+    # frontend-safe projection must not advertise them as available either.
+    for live_scenario_id in (
+        "kernel_demo.single_action_live_smoke_v1",
+        "kernel_demo.single_action_detect_issues_live_smoke_v1",
+        "kernel_demo.single_action_generate_report_live_smoke_v1",
+        "kernel_demo.single_action_compose_reply_live_smoke_v1",
+        "kernel_demo.single_action_generate_clarifying_questions_live_smoke_v1",
+        "kernel_demo.single_action_synthesize_angle_live_smoke_v1",
+        "kernel_demo.single_action_compose_persuasive_text_live_smoke_v1",
+        "kernel_demo.single_action_generate_gap_rewrites_live_smoke_v1",
+        "kernel_demo.single_action_compare_and_classify_live_smoke_v1",
+        "kernel_demo.single_action_score_match_by_rubric_live_smoke_v1",
+        "kernel_demo.single_action_score_multidimensional_axes_live_smoke_v1",
+        "kernel_demo.composite_analyze_and_clarify_live_smoke_v1",
+        "kernel_demo.composite_evaluate_match_live_smoke_v1",
+        "kernel_demo.composite_shape_and_write_live_smoke_v1",
+    ):
+        assert live_scenario_id not in data["scenario_ids"]
     assert data["quota_summary"] == {
         "quota_policy_id": "kernel_demo.guest_quota_v1",
         "unit": "scenario_run",

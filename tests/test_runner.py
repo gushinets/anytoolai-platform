@@ -274,6 +274,43 @@ def test_required_backend_workflow_runs_canonical_postgresql_check() -> None:
     )
 
 
+def test_live_canary_workflow_scopes_secrets_to_exactly_the_two_steps_that_need_them() -> None:
+    """`code-review` finding: docker-compose.yml's worker service interpolates
+    OPENAI_API_KEY at container-creation time, during the "Boot dev Compose stack" step -- that
+    step must have it, or every scheduled run would silently make 0 real provider calls.
+    platform-api reads ANYTOOLAI_LIVE_CANARY_TOKEN the same way, for internal_only scenarios'
+    X-Live-Canary-Token header. runner.py's live-canary command also reads both directly from its
+    own process env for its LIVE000/LIVE011 fail-fast checks, so the later "Run 11-atom live
+    provider canary" step needs them too.
+
+    `code-review` finding: an earlier version of this workflow put both secrets
+    at job level, which every step (checkout, setup-python, setup-uv, uv sync, log dump,
+    teardown, upload) also inherited despite having no need for either -- scoped down to exactly
+    the two steps that need them, narrowing exposure with no loss of correctness."""
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load(
+        (repo_root / ".github" / "workflows" / "live-canary.yml").read_text(encoding="utf-8")
+    )
+
+    job = workflow["jobs"]["live-canary"]
+    assert "OPENAI_API_KEY" not in job.get("env", {})
+    assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in job.get("env", {})
+
+    secret_needing_step_names = {"Boot dev Compose stack", "Run 11-atom live provider canary"}
+    for step in job["steps"]:
+        name = step.get("name", "")
+        step_env = step.get("env", {})
+        if any(name.startswith(prefix) for prefix in secret_needing_step_names):
+            assert step_env.get("OPENAI_API_KEY") == "${{ secrets.OPENAI_API_KEY }}", name
+            assert (
+                step_env.get("ANYTOOLAI_LIVE_CANARY_TOKEN")
+                == "${{ secrets.ANYTOOLAI_LIVE_CANARY_TOKEN }}"
+            ), name
+        else:
+            assert "OPENAI_API_KEY" not in step_env, name
+            assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in step_env, name
+
+
 def test_resolve_postgres_db_falls_back_to_dev_default(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_POSTGRES_DB", raising=False)
@@ -935,6 +972,87 @@ def test_atoms_proof_reports_dev001_for_invalid_port_override(monkeypatch, capsy
 
     assert runner.atoms_proof() == 2
     assert "DEV001" in capsys.readouterr().err
+
+
+def test_live_canary_fails_without_openai_api_key(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(
+        runner,
+        "runtime_identity",
+        lambda: pytest.fail("live_canary must not touch Docker/DB without OPENAI_API_KEY"),
+    )
+
+    assert runner.live_canary() == 2
+    assert "LIVE000" in capsys.readouterr().err
+
+
+def test_live_canary_fails_without_live_canary_token(monkeypatch, capsys) -> None:
+    """Code-review finding: the 14 live scenario_ids are config-flagged internal_only, so
+    platform-api rejects every case without a token matching its own
+    ANYTOOLAI_LIVE_CANARY_TOKEN -- fail clearly up front instead of letting every case fail
+    LIVE-layer 404s one by one."""
+    runner = load_runner_module()
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.delenv("ANYTOOLAI_LIVE_CANARY_TOKEN", raising=False)
+    monkeypatch.setattr(
+        runner,
+        "runtime_identity",
+        lambda: pytest.fail("live_canary must not touch Docker/DB without a live-canary token"),
+    )
+
+    assert runner.live_canary() == 2
+    assert "LIVE011" in capsys.readouterr().err
+
+
+def test_live_canary_reports_dev001_for_invalid_port_override(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "sekret")
+
+    def fake_runtime_identity():
+        raise ValueError("ANYTOOLAI_API_PORT must be an integer port")
+
+    monkeypatch.setattr(runner, "runtime_identity", fake_runtime_identity)
+
+    assert runner.live_canary() == 2
+    assert "DEV001" in capsys.readouterr().err
+
+
+def test_live_canary_passes_database_url_via_env_not_argv(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "sekret")
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    calls: list[tuple[list[str], dict[str, str]]] = []
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env: calls.append((list(command), dict(env))) or 0,
+    )
+
+    assert runner.live_canary() == 0
+
+    assert len(calls) == 1
+    command, env = calls[0]
+    assert identity.database_url not in command
+    env_var_name = command[4]
+    # Full argv, not just the database-url-env prefix: atoms_proof() passes
+    # --database-url-is-percent-encoded for the same identity.database_url; live_canary() must
+    # too, or a reserved-character ANYTOOLAI_POSTGRES_PASSWORD/_DB connects fine via atoms-proof
+    # but silently fails to connect via live-canary on the same stack.
+    assert command == [
+        runner.sys.executable, "scripts/agent/live_canary.py", identity.api_url,
+        "--database-url-env", env_var_name,
+        "--database-url-is-percent-encoded",
+    ]
+    assert env[env_var_name] == identity.database_url
+    # `code-review` nitpick: _run_proof_script()'s env comes from runner_env()
+    # (os.environ.copy() plus a few extras), so the subprocess that actually makes the request
+    # must inherit ANYTOOLAI_LIVE_CANARY_TOKEN from this test's own monkeypatched os.environ, not
+    # just have it checked by live_canary()'s own upfront LIVE011 fail-fast.
+    assert env["ANYTOOLAI_LIVE_CANARY_TOKEN"] == "sekret"
 
 
 def test_prod_smoke_invokes_kernel_demo_smoke_against_prod_port(monkeypatch) -> None:

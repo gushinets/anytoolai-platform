@@ -1432,6 +1432,22 @@
               ],
               "title": "Idempotency-Key"
             }
+          },
+          {
+            "in": "header",
+            "name": "X-Live-Canary-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Live-Canary-Token"
+            }
           }
         ],
         "requestBody": {

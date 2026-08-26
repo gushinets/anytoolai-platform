@@ -1,0 +1,910 @@
+"""ANY-221: CI-safe tests for scripts/agent/live_canary.py -- no DB, no network, no credentials.
+Mirrors tests/test_atoms_proof.py's module-loading pattern (load_cached_module by file path) so
+this file can run as part of the normal credential-free quick-check gate even though the script
+it tests is only ever meaningfully run manually/on a schedule with a real OPENAI_API_KEY."""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+from tests.module_loading import load_cached_module
+from tests.test_atoms_proof import load_atoms_proof_module
+
+
+def load_live_canary_module():
+    module_path = Path(__file__).resolve().parents[1] / "scripts" / "agent" / "live_canary.py"
+    return load_cached_module("live_canary_module", module_path)
+
+
+def test_load_live_canary_module_returns_the_same_cached_module_on_repeat_calls() -> None:
+    assert load_live_canary_module() is load_live_canary_module()
+
+
+def test_live_canary_atoms_proof_is_the_same_cached_module_test_atoms_proof_uses() -> None:
+    """`code-review` finding: live_canary.py used to do a bare `import
+    atoms_proof`, which registers a SEPARATE copy of the module under sys.modules["atoms_proof"]
+    instead of reusing the load_cached_module()-backed instance tests/test_atoms_proof.py itself
+    uses -- re-parsing/re-executing atoms_proof.py's own YAML/config loading and engine-wiring a
+    second time for no reason whenever both test files load in one pytest run. Mirrors the
+    existing atoms_proof.smoke identity check (test_atom_runtime_matrix_module_shares_smoke)."""
+    module = load_live_canary_module()
+
+    assert module.atoms_proof is load_atoms_proof_module()
+
+
+def test_live_atom_cases_has_eleven_entries_matching_atom_smoke_cases_action_types() -> None:
+    module = load_live_canary_module()
+
+    assert len(module.LIVE_ATOM_CASES) == 11
+    live_action_types = {action_type for action_type, _scenario_id, _input in module.LIVE_ATOM_CASES}
+    smoke_action_types = {
+        action_type for action_type, _scenario_id, _input in module.atoms_proof.ATOM_SMOKE_CASES
+    }
+    assert live_action_types == smoke_action_types
+
+    # Every live scenario_id must actually be the `_live_` sibling, not accidentally reused from
+    # ATOM_SMOKE_CASES -- a live case sharing a fake scenario_id would silently run the fake
+    # provider instead of the real one.
+    fake_scenario_ids = {
+        scenario_id for _action_type, scenario_id, _input in module.atoms_proof.ATOM_SMOKE_CASES
+    }
+    for _action_type, live_scenario_id, _input in module.LIVE_ATOM_CASES:
+        assert live_scenario_id not in fake_scenario_ids
+        assert "live" in live_scenario_id
+
+
+def test_live_composite_cases_has_three_entries_matching_composite_smoke_cases_workflow_ids() -> None:
+    module = load_live_canary_module()
+
+    assert len(module.LIVE_COMPOSITE_CASES) == 3
+    live_workflow_ids = {
+        workflow_id for workflow_id, _scenario_id, _input in module.LIVE_COMPOSITE_CASES
+    }
+    fake_workflow_ids = {
+        workflow_id
+        for workflow_id, _scenario_id, _input in module.atoms_proof.COMPOSITE_SMOKE_CASES
+    }
+    assert len(live_workflow_ids) == 3
+    assert live_workflow_ids.isdisjoint(fake_workflow_ids)
+
+    # Every live scenario_id must actually be the "_live_" sibling, not accidentally reused from
+    # COMPOSITE_SMOKE_CASES -- a live case sharing a fake scenario_id would silently run the fake
+    # provider instead of the real one.
+    fake_scenario_ids = {
+        scenario_id
+        for _workflow_id, scenario_id, _input in module.atoms_proof.COMPOSITE_SMOKE_CASES
+    }
+    for workflow_id, live_scenario_id, _input in module.LIVE_COMPOSITE_CASES:
+        assert live_scenario_id not in fake_scenario_ids
+        assert workflow_id.endswith("_live_v1")
+        assert live_scenario_id.endswith("_live_smoke_v1")
+
+
+def test_live_composite_workflow_entries_returns_exactly_the_three_live_suffixed_entries() -> None:
+    module = load_live_canary_module()
+
+    entries = module._live_composite_workflow_entries()
+    workflow_ids = {entry["workflow_id"] for entry in entries}
+
+    assert len(entries) == 3
+    assert workflow_ids == {
+        workflow_id for workflow_id, _scenario_id, _input in module.LIVE_COMPOSITE_CASES
+    }
+    assert all(workflow_id.endswith("_live_v1") for workflow_id in workflow_ids)
+
+
+def test_live_composite_workflow_entries_delegates_to_the_shared_suffix_helper() -> None:
+    """code review #4 (2026-08-24) finding #2: this used to be its own near-verbatim copy of
+    kernel_demo_smoke.py's open+parse+filter logic; pins that it's now a thin wrapper instead."""
+    module = load_live_canary_module()
+
+    assert module._live_composite_workflow_entries() == (
+        module.atoms_proof.smoke._composite_workflow_entries_by_suffix(live=True)
+    )
+
+
+def test_live_composite_coverage_error_covers_the_three_live_composite_workflows() -> None:
+    module = load_live_canary_module()
+
+    assert module._live_composite_coverage_error(module.LIVE_COMPOSITE_CASES) is None
+
+
+def test_live_composite_coverage_error_reports_missing_workflow() -> None:
+    module = load_live_canary_module()
+
+    error = module._live_composite_coverage_error((("workflow.one", "scenario-one", {}),))
+
+    assert error is not None and "LIVE010" in error
+
+
+def test_live_atom_coverage_labels_report_live008_not_smoke007() -> None:
+    """code review #3 (2026-08-24) finding: main() used to call
+    atoms_proof.smoke._atom_coverage_error(LIVE_ATOM_CASES) with no labels override, so a live
+    atom-coverage failure reported SMOKE007/ATOM_SMOKE_CASES -- misattributing it to the
+    fake-provider config instead of the live one, and breaking the LIVE0xx convention every other
+    failure in this script follows."""
+    module = load_live_canary_module()
+
+    error = module.atoms_proof.smoke._atom_coverage_error(
+        (("action.one", "scenario-one", {}),), labels=module._LIVE_ATOM_COVERAGE_LABELS
+    )
+
+    assert error is not None
+    assert "LIVE008" in error
+    assert "LIVE_ATOM_CASES" in error
+    assert "SMOKE007" not in error
+    assert "ATOM_SMOKE_CASES" not in error
+
+
+def test_main_passes_live_atom_coverage_labels_to_atom_coverage_error(monkeypatch) -> None:
+    module = load_live_canary_module()
+    monkeypatch.setenv("TEST_LIVE_CANARY_MAIN_DB_URL", "postgresql://u:p@127.0.0.1:5432/db")
+    captured: dict = {}
+
+    def _fake_atom_coverage_error(cases, **kwargs):
+        captured.update(cases=cases, kwargs=kwargs)
+        return "LIVE008: forced failure for this test"
+
+    monkeypatch.setattr(module.atoms_proof.smoke, "_atom_coverage_error", _fake_atom_coverage_error)
+    monkeypatch.setattr(
+        module.atoms_proof, "write_evidence_report", lambda cases, exit_code, **kwargs: Path("x")
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "live_canary.py", "http://127.0.0.1:8000",
+            "--database-url-env", "TEST_LIVE_CANARY_MAIN_DB_URL",
+        ],
+    )
+
+    assert module.main() == 1
+
+    assert captured["cases"] == module.LIVE_ATOM_CASES
+    assert captured["kwargs"]["labels"] is module._LIVE_ATOM_COVERAGE_LABELS
+
+
+def test_live_composite_coverage_error_catches_scenario_workflow_mismatch() -> None:
+    """Mirrors kernel_demo_smoke.py's own _composite_coverage_error() binding-mismatch guard, but
+    for the live-suffixed workflows -- pairing a real live scenario_id with the wrong live
+    workflow_id (each individually still unique/valid) must be caught, not just a bare duplicate
+    check on either side alone."""
+    module = load_live_canary_module()
+    real_scenario_ids = [
+        scenario_id for _workflow_id, scenario_id, _input in module.LIVE_COMPOSITE_CASES
+    ]
+    real_workflow_ids = [
+        workflow_id for workflow_id, _scenario_id, _input in module.LIVE_COMPOSITE_CASES
+    ]
+    swapped_cases = tuple(
+        (real_workflow_ids[(index + 1) % len(real_workflow_ids)], scenario_id, {})
+        for index, scenario_id in enumerate(real_scenario_ids)
+    )
+
+    error = module._live_composite_coverage_error(swapped_cases)
+
+    assert error is not None and "LIVE010" in error and "mismatch" in error
+
+
+def test_cumulative_estimated_cost_treats_none_as_zero() -> None:
+    module = load_live_canary_module()
+    StepEvidence = module.atoms_proof.StepEvidence
+    EvidenceCase = module.EvidenceCase
+
+    def _case(*costs: float | None) -> "EvidenceCase":
+        return EvidenceCase(
+            label="atom.one", scenario_id="s", kind="atom", status="pass",
+            session_id="session", job_id="job", error_code=None, error_message=None,
+            steps=tuple(
+                StepEvidence(step_id="x", action_type="t", action_config_id="c", estimated_cost=c)
+                for c in costs
+            ),
+        )
+
+    assert module._cumulative_estimated_cost([]) == 0.0
+    assert module._cumulative_estimated_cost([_case(None)]) == 0.0
+    assert module._cumulative_estimated_cost([_case(0.1, 0.2), _case(0.3)]) == 0.6
+
+
+def test_cumulative_estimated_cost_fails_closed_on_nan() -> None:
+    """code review finding: a NaN estimated_cost (a corrupt ledger row -- this script never
+    writes one itself) summed at face value would make every later `total_cost >
+    max_total_cost_usd` comparison silently False (NaN compares False to everything), the same
+    catastrophic fail-open `_positive_finite_cost()` already guards against for the cap value
+    itself. Must return math.inf instead, so run()'s existing cap-trip branch fires."""
+    module = load_live_canary_module()
+    StepEvidence = module.atoms_proof.StepEvidence
+    EvidenceCase = module.EvidenceCase
+
+    def _case(*costs: float | None) -> "EvidenceCase":
+        return EvidenceCase(
+            label="atom.one", scenario_id="s", kind="atom", status="pass",
+            session_id="session", job_id="job", error_code=None, error_message=None,
+            steps=tuple(
+                StepEvidence(step_id="x", action_type="t", action_config_id="c", estimated_cost=c)
+                for c in costs
+            ),
+        )
+
+    assert module._cumulative_estimated_cost([_case(0.1, float("nan"))]) == module.math.inf
+    # A NaN step buried after other, otherwise-summable cases still poisons the total.
+    assert module._cumulative_estimated_cost(
+        [_case(0.1), _case(0.2, float("nan"))]
+    ) == module.math.inf
+
+
+def test_cumulative_estimated_cost_fails_closed_on_negative_value() -> None:
+    """code review finding: a negative estimated_cost would quietly reduce the running total
+    instead of adding to it, letting real spend hide behind an offsetting negative row and delay
+    or prevent the cost cap from ever tripping. Must return math.inf instead of subtracting."""
+    module = load_live_canary_module()
+    StepEvidence = module.atoms_proof.StepEvidence
+    EvidenceCase = module.EvidenceCase
+
+    def _case(*costs: float | None) -> "EvidenceCase":
+        return EvidenceCase(
+            label="atom.one", scenario_id="s", kind="atom", status="pass",
+            session_id="session", job_id="job", error_code=None, error_message=None,
+            steps=tuple(
+                StepEvidence(step_id="x", action_type="t", action_config_id="c", estimated_cost=c)
+                for c in costs
+            ),
+        )
+
+    assert module._cumulative_estimated_cost([_case(1.0, -0.5)]) == module.math.inf
+
+
+def test_run_aborts_remaining_cases_once_cost_cap_exceeded_without_running_them(monkeypatch) -> None:
+    module = load_live_canary_module()
+    calls: list[str] = []
+
+    def _fake_run_case_with_ledger_check(
+        api_url, engine, *, kind, label, scenario_id, scenario_input, timeout, **_kwargs
+    ):
+        calls.append(scenario_id)
+        return module.EvidenceCase(
+            label=label, scenario_id=scenario_id, kind=kind, status="pass",
+            session_id="session", job_id="job", error_code=None, error_message=None,
+            steps=(
+                module.atoms_proof.StepEvidence(
+                    step_id="x", action_type=label, action_config_id="c", estimated_cost=0.1,
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(
+        module.atoms_proof, "_run_case_with_ledger_check", _fake_run_case_with_ledger_check
+    )
+    monkeypatch.setattr(
+        module.atoms_proof,
+        "_build_engine",
+        lambda database_url, **kwargs: _FakeEngine(),
+    )
+
+    cases, exit_code = module.run(
+        "http://127.0.0.1:8000", "postgresql://unused", timeout=1.0, max_total_cost_usd=0.25,
+    )
+
+    # 0.1 + 0.1 + 0.1 = 0.3 > 0.25 -- cap trips after the 3rd case, so only 3 of the combined
+    # 11 atom + 3 composite queue (14 total) actually run; the rest -- the remaining 8 atoms and
+    # all 3 composites, since the cap trips during the atom phase -- are marked LIVE001.
+    assert len(calls) == 3
+    assert len(cases) == 14
+    assert exit_code == 1
+    ran_cases = cases[:3]
+    skipped_cases = cases[3:]
+    assert all(case.status == "pass" for case in ran_cases)
+    assert all(case.status == "fail" and case.error_code == "LIVE001" for case in skipped_cases)
+    # Skipped cases must still carry their real label/scenario_id/kind (from LIVE_ATOM_CASES then
+    # LIVE_COMPOSITE_CASES, in queue order), not a placeholder -- the evidence report's atom/
+    # composite totals must stay attributable per case, and composite_total must still read 3 even
+    # though the cost cap tripped before any composite case ran.
+    assert [case.scenario_id for case in skipped_cases] == [
+        scenario_id for _action_type, scenario_id, _input in module.LIVE_ATOM_CASES[3:]
+    ] + [scenario_id for _workflow_id, scenario_id, _input in module.LIVE_COMPOSITE_CASES]
+    assert [case.kind for case in skipped_cases] == ["atom"] * 8 + ["composite"] * 3
+
+
+def test_run_forces_non_zero_exit_code_when_cost_cap_trips_on_the_last_case(monkeypatch) -> None:
+    """`code-review` (me #9) finding: if the cost cap trips exactly on the final queued case,
+    `remaining` is already empty by the time run() checks the cap, so the "mark every remaining
+    case failed" loop has nothing to mark -- every case, including the one that tripped the cap,
+    keeps status="pass", and exit_code (previously derived only from per-case pass counts) used
+    to read as 0 even though the run actually violated its own cost cap."""
+    module = load_live_canary_module()
+    calls: list[str] = []
+
+    def _fake_run_case_with_ledger_check(
+        api_url, engine, *, kind, label, scenario_id, scenario_input, timeout, **_kwargs
+    ):
+        calls.append(scenario_id)
+        return module.EvidenceCase(
+            label=label, scenario_id=scenario_id, kind=kind, status="pass",
+            session_id="session", job_id="job", error_code=None, error_message=None,
+            steps=(
+                module.atoms_proof.StepEvidence(
+                    step_id="x", action_type=label, action_config_id="c", estimated_cost=0.1,
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(
+        module.atoms_proof, "_run_case_with_ledger_check", _fake_run_case_with_ledger_check
+    )
+    monkeypatch.setattr(
+        module.atoms_proof,
+        "_build_engine",
+        lambda database_url, **kwargs: _FakeEngine(),
+    )
+
+    # 14 cases x $0.1 = $1.40 total; a $1.35 cap is only exceeded by the 14th (last) case's own
+    # contribution, so `remaining` is empty when run() checks the cap.
+    cases, exit_code = module.run(
+        "http://127.0.0.1:8000", "postgresql://unused", timeout=1.0, max_total_cost_usd=1.35,
+    )
+
+    assert len(calls) == 14
+    assert len(cases) == 14
+    assert all(case.status == "pass" for case in cases)
+    assert exit_code == 1
+
+
+def test_run_fails_closed_and_stops_when_a_case_cost_cannot_be_recovered(monkeypatch) -> None:
+    """code review (me #5) finding: a case that already made a real, billed provider call and
+    then hit a ledger/DB error whose own recovery query also failed used to report cost_unknown
+    steps=() the same as a genuinely free case -- the cumulative cost cap saw $0 for it and kept
+    running every remaining case with no cap in effect. Regression scenario the reviewer asked
+    for: case 1 spends money and passes, case 2's ledger recovery loses its cost entirely
+    (cost_unknown=True); case 3 must never run."""
+    module = load_live_canary_module()
+    calls: list[str] = []
+
+    def _fake_run_case_with_ledger_check(
+        api_url, engine, *, kind, label, scenario_id, scenario_input, timeout, **_kwargs
+    ):
+        calls.append(scenario_id)
+        if len(calls) == 1:
+            return module.EvidenceCase(
+                label=label, scenario_id=scenario_id, kind=kind, status="pass",
+                session_id="session", job_id="job", error_code=None, error_message=None,
+                steps=(
+                    module.atoms_proof.StepEvidence(
+                        step_id="x", action_type=label, action_config_id="c",
+                        estimated_cost=0.1,
+                    ),
+                ),
+            )
+        return module.EvidenceCase(
+            label=label, scenario_id=scenario_id, kind=kind, status="fail",
+            session_id="session", job_id=None, error_code="PROOF000",
+            error_message="PROOF000: database ledger check failed", steps=(),
+            cost_unknown=True,
+        )
+
+    monkeypatch.setattr(
+        module.atoms_proof, "_run_case_with_ledger_check", _fake_run_case_with_ledger_check
+    )
+    monkeypatch.setattr(
+        module.atoms_proof,
+        "_build_engine",
+        lambda database_url, **kwargs: _FakeEngine(),
+    )
+
+    cases, exit_code = module.run(
+        "http://127.0.0.1:8000", "postgresql://unused", timeout=1.0, max_total_cost_usd=1000.0,
+    )
+
+    # Only the first 2 of the combined 14-case queue actually ran -- case 2's cost_unknown trips
+    # the abort before the (very high, never-tripped-by-real-cost) cap check even runs.
+    assert calls == [scenario_id for _action_type, scenario_id, _input in module.LIVE_ATOM_CASES[:2]]
+    assert len(cases) == 14
+    assert exit_code == 1
+    assert cases[0].status == "pass"
+    assert cases[1].status == "fail" and cases[1].error_code == "PROOF000"
+    skipped_cases = cases[2:]
+    assert all(case.status == "fail" and case.error_code == "LIVE012" for case in skipped_cases)
+
+
+class _FakeEngine:
+    def dispose(self) -> None:
+        pass
+
+
+def test_write_evidence_report_round_trips_extended_stepevidence_fields(tmp_path) -> None:
+    module = load_live_canary_module()
+
+    case = module.EvidenceCase(
+        label="text.extract_structured_fields", scenario_id="kernel_demo.single_action_live_smoke_v1",
+        kind="atom", status="pass", session_id="session-1", job_id="job-1", error_code=None,
+        error_message=None,
+        steps=(
+            module.atoms_proof.StepEvidence(
+                step_id="extract", action_type="text.extract_structured_fields",
+                action_config_id="kernel_demo.extract_structured_fields_live_v1",
+                latency_ms=842, input_tokens=120, output_tokens=45, total_tokens=165,
+                estimated_cost=0.0021,
+            ),
+        ),
+    )
+
+    report_path = module.atoms_proof.write_evidence_report(
+        [case], exit_code=0, output_root=tmp_path
+    )
+
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    step = payload["cases"][0]["steps"][0]
+    assert step["latency_ms"] == 842
+    assert step["input_tokens"] == 120
+    assert step["output_tokens"] == 45
+    assert step["total_tokens"] == 165
+    assert step["estimated_cost"] == 0.0021
+
+    # Privacy-safe by construction: no key anywhere in the payload should carry prompt/output
+    # text or fixture bodies -- only ids/labels/booleans/numeric ledger metrics.
+    serialized = json.dumps(payload)
+    assert "start_input" not in serialized
+
+
+def test_write_evidence_report_round_trips_composite_kind_with_multiple_steps(tmp_path) -> None:
+    module = load_live_canary_module()
+
+    atom_case = module.EvidenceCase(
+        label="text.extract_structured_fields",
+        scenario_id="kernel_demo.single_action_live_smoke_v1",
+        kind="atom", status="pass", session_id="session-1", job_id="job-1", error_code=None,
+        error_message=None,
+        steps=(
+            module.atoms_proof.StepEvidence(
+                step_id="extract", action_type="text.extract_structured_fields",
+                action_config_id="kernel_demo.extract_structured_fields_live_v1",
+                latency_ms=842, input_tokens=120, output_tokens=45, total_tokens=165,
+                estimated_cost=0.0021,
+            ),
+        ),
+    )
+    composite_case = module.EvidenceCase(
+        label="kernel_demo.composite_analyze_and_clarify_live_v1",
+        scenario_id="kernel_demo.composite_analyze_and_clarify_live_smoke_v1",
+        kind="composite", status="pass", session_id="session-2", job_id="job-2", error_code=None,
+        error_message=None,
+        steps=tuple(
+            module.atoms_proof.StepEvidence(
+                step_id=step_id, action_type=f"text.{step_id}",
+                action_config_id=f"{step_id}_live_v1",
+                latency_ms=100 * index, input_tokens=10 * index, output_tokens=5 * index,
+                total_tokens=15 * index, estimated_cost=0.001 * index,
+            )
+            for index, step_id in enumerate(
+                ["extract", "detect_issues", "generate_questions", "generate_report"], start=1
+            )
+        ),
+    )
+
+    report_path = module.atoms_proof.write_evidence_report(
+        [atom_case, composite_case], exit_code=0, output_root=tmp_path
+    )
+
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["atoms_total"] == 1
+    assert payload["atoms_passed"] == 1
+    assert payload["composite_total"] == 1
+    assert payload["composite_passed"] == 1
+
+    composite_payload = payload["cases"][1]
+    assert composite_payload["kind"] == "composite"
+    assert len(composite_payload["steps"]) == 4
+    for index, step in enumerate(composite_payload["steps"], start=1):
+        assert step["latency_ms"] == 100 * index
+        assert step["input_tokens"] == 10 * index
+        assert step["output_tokens"] == 5 * index
+        assert step["total_tokens"] == 15 * index
+        assert step["estimated_cost"] == 0.001 * index
+
+
+def test_live_atom_cases_reports_live007_on_missing_scenario_id_mapping(monkeypatch) -> None:
+    """code review (2026-08-24) finding: a future 12th atom_type added to
+    kernel_demo_smoke.py's ATOM_SMOKE_CASES without a matching LIVE_ATOM_SCENARIO_IDS entry in
+    the same PR must fail this module's load as a clean LIVE007, not a raw KeyError out of the
+    module-level LIVE_ATOM_CASES comprehension -- mirrors atoms_proof.py's own guarded
+    module-load pattern (_MODULE_LOAD_ERROR)."""
+    module = load_live_canary_module()
+    monkeypatch.setattr(
+        module.atoms_proof,
+        "ATOM_SMOKE_CASES",
+        (*module.atoms_proof.ATOM_SMOKE_CASES, ("text.some_unknown_atom", "unused", {})),
+    )
+
+    reload_path = Path(__file__).resolve().parents[1] / "scripts" / "agent" / "live_canary.py"
+    spec = importlib.util.spec_from_file_location("live_canary_reload_test", reload_path)
+    assert spec is not None
+    assert spec.loader is not None
+    reloaded = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = reloaded
+    try:
+        spec.loader.exec_module(reloaded)
+    finally:
+        del sys.modules[spec.name]
+
+    assert reloaded.LIVE_ATOM_CASES == ()
+    assert reloaded._MODULE_LOAD_ERROR is not None
+    assert "LIVE007" in reloaded._MODULE_LOAD_ERROR
+    assert "text.some_unknown_atom" in reloaded._MODULE_LOAD_ERROR
+
+
+def test_module_import_survives_atoms_proof_module_load_error(monkeypatch) -> None:
+    """Code-review finding: atoms_proof.smoke is never bound as an attribute at all when
+    atoms_proof's own guarded import block fails (its `smoke = load_smoke_module()` never runs)
+    -- LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO/_LIVE_ATOM_COVERAGE_LABELS/
+    _LIVE_COMPOSITE_COVERAGE_LABELS used to build unconditionally at this module's own import
+    time, reaching into atoms_proof.smoke regardless -- a raw AttributeError instead of leaving
+    them empty/None for main() to report the already-recorded atoms_proof._MODULE_LOAD_ERROR
+    cleanly (main() checks that before it ever reads any of the three)."""
+    module = load_live_canary_module()
+    monkeypatch.setattr(module.atoms_proof, "_MODULE_LOAD_ERROR", "PROOF000: fake load error")
+    monkeypatch.delattr(module.atoms_proof, "smoke", raising=False)
+
+    reload_path = Path(__file__).resolve().parents[1] / "scripts" / "agent" / "live_canary.py"
+    spec = importlib.util.spec_from_file_location("live_canary_reload_test_atoms_proof", reload_path)
+    assert spec is not None
+    assert spec.loader is not None
+    reloaded = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = reloaded
+    try:
+        spec.loader.exec_module(reloaded)
+    finally:
+        del sys.modules[spec.name]
+
+    assert reloaded.LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO == {}
+    assert reloaded._LIVE_ATOM_COVERAGE_LABELS is None
+    assert reloaded._LIVE_COMPOSITE_COVERAGE_LABELS is None
+
+
+def test_main_reports_live007_module_load_error_before_touching_the_database(monkeypatch) -> None:
+    module = load_live_canary_module()
+    monkeypatch.setattr(module, "_MODULE_LOAD_ERROR", "LIVE007: fake module load error")
+    monkeypatch.setattr(
+        module,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("main() must not call run() after a module-load error")
+        ),
+    )
+
+    assert module.main() == 1
+
+
+_TEST_DATABASE_URL_ENV = "TEST_LIVE_CANARY_DATABASE_URL"
+_TEST_MAIN_ARGV = [
+    "live_canary.py", "http://127.0.0.1:8000", "--database-url-env", _TEST_DATABASE_URL_ENV,
+]
+
+
+def _run_main_capturing_decode_database_name(module, monkeypatch, argv) -> bool:
+    captured = {}
+
+    def fake_run(*args, **kwargs):
+        captured["decode_database_name"] = kwargs["decode_database_name"]
+        return [], 0
+
+    monkeypatch.setattr(module, "run", fake_run)
+    monkeypatch.setattr(
+        module.atoms_proof,
+        "write_evidence_report",
+        lambda cases, exit_code, **kwargs: Path("evidence-fake.json"),
+    )
+    monkeypatch.setattr(sys, "argv", argv)
+
+    assert module.main() == 0
+    return captured["decode_database_name"]
+
+
+def test_main_forwards_database_url_is_percent_encoded_flag_when_set(monkeypatch) -> None:
+    """code review (2026-08-24) finding: runner.py's live_canary() passes
+    --database-url-is-percent-encoded (mirroring atoms_proof()), but this script didn't accept or
+    forward the flag at all -- a reserved-character ANYTOOLAI_POSTGRES_PASSWORD/_DB would connect
+    fine via atoms-proof but silently fail to connect via live-canary on the same stack."""
+    module = load_live_canary_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
+
+    decode_database_name = _run_main_capturing_decode_database_name(
+        module, monkeypatch, [*_TEST_MAIN_ARGV, "--database-url-is-percent-encoded"]
+    )
+
+    assert decode_database_name is True
+
+
+def test_main_forwards_database_url_is_percent_encoded_flag_when_unset(monkeypatch) -> None:
+    """Mirror of the above for the flag's unset (default) case."""
+    module = load_live_canary_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
+
+    decode_database_name = _run_main_capturing_decode_database_name(
+        module, monkeypatch, _TEST_MAIN_ARGV
+    )
+
+    assert decode_database_name is False
+
+
+def test_live_expected_schema_ref_by_scenario_covers_all_fourteen_live_scenarios() -> None:
+    """code review #2 (2026-08-24) finding: kernel_demo_smoke.py's own
+    _EXPECTED_SCHEMA_REF_BY_SCENARIO only ever knows about fake-provider scenario_ids, so
+    smoke._run_one_case's SMOKE009 cross-check silently no-ops for every live case unless
+    live_canary.py supplies its own dict covering the 14 live scenario_ids too -- each mapped to
+    exactly the same expected schema_ref as its fake sibling, since a live scenario produces the
+    same output shape through a real provider instead of the fake one."""
+    module = load_live_canary_module()
+    fake_schema_ref_by_scenario = module.atoms_proof.smoke._EXPECTED_SCHEMA_REF_BY_SCENARIO
+
+    live_atom_scenario_ids = {
+        scenario_id for _action_type, scenario_id, _input in module.LIVE_ATOM_CASES
+    }
+    live_composite_scenario_ids = {
+        scenario_id for _workflow_id, scenario_id, _input in module.LIVE_COMPOSITE_CASES
+    }
+    all_live_scenario_ids = live_atom_scenario_ids | live_composite_scenario_ids
+    assert len(all_live_scenario_ids) == 14
+    assert set(module.LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO) == all_live_scenario_ids
+
+    for (_action_type, fake_scenario_id, _input), (_a, live_scenario_id, _i) in zip(
+        module.atoms_proof.ATOM_SMOKE_CASES, module.LIVE_ATOM_CASES, strict=True
+    ):
+        assert (
+            module.LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO[live_scenario_id]
+            == fake_schema_ref_by_scenario[fake_scenario_id]
+        )
+    for (_workflow_id, fake_scenario_id, _input), (_w, live_scenario_id, _i) in zip(
+        module.atoms_proof.COMPOSITE_SMOKE_CASES, module.LIVE_COMPOSITE_CASES, strict=True
+    ):
+        assert (
+            module.LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO[live_scenario_id]
+            == fake_schema_ref_by_scenario[fake_scenario_id]
+        )
+
+
+def test_run_passes_live_expected_schema_ref_by_scenario_to_ledger_check(monkeypatch) -> None:
+    """Pins that run() actually forwards LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO through to
+    _run_case_with_ledger_check -- the dict existing on its own doesn't help if nothing passes it
+    to the HTTP layer that performs the SMOKE009 check."""
+    module = load_live_canary_module()
+    seen: list[dict | None] = []
+
+    def _fake_run_case_with_ledger_check(
+        api_url, engine, *, kind, label, scenario_id, scenario_input, timeout, **kwargs
+    ):
+        seen.append(kwargs.get("expected_schema_ref_by_scenario"))
+        return module.EvidenceCase(
+            label=label, scenario_id=scenario_id, kind=kind, status="pass",
+            session_id="session", job_id="job", error_code=None, error_message=None, steps=(),
+        )
+
+    monkeypatch.setattr(
+        module.atoms_proof, "_run_case_with_ledger_check", _fake_run_case_with_ledger_check
+    )
+    monkeypatch.setattr(
+        module.atoms_proof, "_build_engine", lambda database_url, **kwargs: _FakeEngine()
+    )
+
+    module.run("http://127.0.0.1:8000", "postgresql://unused", timeout=1.0, max_total_cost_usd=1.0)
+
+    assert seen
+    assert all(entry is module.LIVE_EXPECTED_SCHEMA_REF_BY_SCENARIO for entry in seen)
+
+
+def test_run_passes_live_canary_token_and_max_provider_calls_to_ledger_check(monkeypatch) -> None:
+    """Code-review finding: the normal public start-session API used to reach the 14 live
+    scenario_ids with no gate at all. run() must forward live_canary_token as the
+    X-Live-Canary-Token header on every case, and the retry-tolerant
+    max_provider_calls_per_action bound matching default_text_generation_v1's own policy, or
+    neither fix does anything."""
+    module = load_live_canary_module()
+    seen_tokens: list[str | None] = []
+    seen_max_calls: list[int | None] = []
+
+    def _fake_run_case_with_ledger_check(
+        api_url, engine, *, kind, label, scenario_id, scenario_input, timeout, **kwargs
+    ):
+        seen_tokens.append(kwargs.get("live_canary_token"))
+        seen_max_calls.append(kwargs.get("max_provider_calls_per_action"))
+        return module.EvidenceCase(
+            label=label, scenario_id=scenario_id, kind=kind, status="pass",
+            session_id="session", job_id="job", error_code=None, error_message=None, steps=(),
+        )
+
+    monkeypatch.setattr(
+        module.atoms_proof, "_run_case_with_ledger_check", _fake_run_case_with_ledger_check
+    )
+    monkeypatch.setattr(
+        module.atoms_proof, "_build_engine", lambda database_url, **kwargs: _FakeEngine()
+    )
+
+    module.run(
+        "http://127.0.0.1:8000", "postgresql://unused", timeout=1.0, max_total_cost_usd=1.0,
+        live_canary_token="sekret",
+    )
+
+    assert seen_tokens
+    assert all(token == "sekret" for token in seen_tokens)
+    assert all(count == module._LIVE_PROVIDER_MAX_CALLS_PER_ACTION for count in seen_max_calls)
+
+
+def test_main_reads_live_canary_token_env_var_and_forwards_it_to_run(monkeypatch) -> None:
+    module = load_live_canary_module()
+    monkeypatch.setenv(module.LIVE_CANARY_TOKEN_ENV_VAR, "sekret-from-env")
+    monkeypatch.setenv("TEST_LIVE_CANARY_MAIN_DB_URL_2", "postgresql://u:p@127.0.0.1:5432/db")
+    captured: dict = {}
+
+    def _fake_run(*args, **kwargs):
+        captured.update(kwargs)
+        return [], 0
+
+    monkeypatch.setattr(module, "run", _fake_run)
+    monkeypatch.setattr(
+        module.atoms_proof, "write_evidence_report", lambda cases, exit_code, **kwargs: Path("x")
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "live_canary.py", "http://127.0.0.1:8000",
+            "--database-url-env", "TEST_LIVE_CANARY_MAIN_DB_URL_2",
+        ],
+    )
+
+    assert module.main() == 0
+
+    assert captured["live_canary_token"] == "sekret-from-env"
+
+
+def load_live_canary_config_test_module():
+    module_path = (
+        Path(__file__).resolve().parents[1]
+        / "apps" / "platform-api" / "tests" / "test_live_canary_config.py"
+    )
+    return load_cached_module("live_canary_config_test_module", module_path)
+
+
+def test_live_atom_scenario_ids_agree_with_the_independently_maintained_config_test_maps() -> None:
+    """code review #2 (2026-08-24) finding: the fake-atom -> live-atom mapping is hand-written
+    three times independently (this module's LIVE_ATOM_SCENARIO_IDS keyed by action_type,
+    apps/platform-api/tests/test_live_canary_config.py's LIVE_ATOM_ACTION_CONFIG_IDS and
+    LIVE_ATOM_WORKFLOW_AND_SCENARIO_IDS both keyed by fake action_config_id) with nothing
+    cross-checking them -- a transposition typo between any two would pass quick-check/full-check
+    cleanly and only surface on the weekly credentialed run, burning real API budget. Joins all
+    three through the real ConfigLoader-derived action_type for each fake action_config_id, the
+    one field common to all three maps."""
+    live_canary_module = load_live_canary_module()
+    config_test_module = load_live_canary_config_test_module()
+
+    registry = config_test_module.ConfigLoader(config_test_module.CONFIG_ROOT).load()
+    action_type_by_fake_action_config_id = {
+        fake_action_config_id: registry.get_action_configuration(fake_action_config_id).action_type
+        for fake_action_config_id in config_test_module.LIVE_ATOM_ACTION_CONFIG_IDS
+    }
+    assert len(action_type_by_fake_action_config_id) == 11
+
+    for fake_action_config_id, action_type in action_type_by_fake_action_config_id.items():
+        _live_workflow_id, live_scenario_id = (
+            config_test_module.LIVE_ATOM_WORKFLOW_AND_SCENARIO_IDS[fake_action_config_id]
+        )
+        assert live_canary_module.LIVE_ATOM_SCENARIO_IDS[action_type] == live_scenario_id, (
+            action_type
+        )
+
+
+@pytest.mark.parametrize("raw", ["nan", "inf", "-inf", "0", "-1", "-0.01"])
+def test_positive_finite_cost_rejects_non_positive_and_non_finite_values(raw) -> None:
+    """Code-review finding: a bare float() accepts "nan"/"inf"/"-inf"/"0"/negative strings as
+    "valid" for --max-total-cost-usd/ANYTOOLAI_LIVE_CANARY_MAX_COST_USD. nan is the catastrophic
+    case: `total_cost > max_total_cost_usd` (run()'s cost-cap check) is always False when
+    max_total_cost_usd is nan, so LIVE001 can never fire and the canary runs with no cost cap at
+    all."""
+    module = load_live_canary_module()
+
+    with pytest.raises(ValueError):
+        module._positive_finite_cost(raw)
+
+
+@pytest.mark.parametrize("raw", ["0.5", "1", "0.001", "1e-3"])
+def test_positive_finite_cost_accepts_positive_finite_values(raw) -> None:
+    module = load_live_canary_module()
+
+    assert module._positive_finite_cost(raw) == float(raw)
+
+
+def test_main_reports_live006_for_nan_cost_cap_env_var(monkeypatch, capsys) -> None:
+    module = load_live_canary_module()
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_MAX_COST_USD", "nan")
+    monkeypatch.setattr(
+        sys, "argv", ["live_canary.py", "http://127.0.0.1:8000", "--database-url-env", "UNUSED"]
+    )
+
+    assert module.main() == 2
+    assert "LIVE006" in capsys.readouterr().err
+
+
+def test_main_rejects_nan_max_total_cost_usd_cli_flag(monkeypatch, capsys) -> None:
+    """The --max-total-cost-usd CLI flag must be validated the same way as the env var -- argparse
+    turns _positive_finite_cost's ValueError into a clean, controlled CLI error (SystemExit(2)),
+    not a case silently running with the cost cap disabled."""
+    module = load_live_canary_module()
+    monkeypatch.delenv("ANYTOOLAI_LIVE_CANARY_MAX_COST_USD", raising=False)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "live_canary.py", "http://127.0.0.1:8000", "--database-url-env", "UNUSED",
+            "--max-total-cost-usd", "nan",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        module.main()
+
+    assert exc_info.value.code == 2
+
+
+def test_run_reports_live009_instead_of_a_raw_traceback_on_engine_configuration_error(
+    monkeypatch, capsys
+) -> None:
+    """Code-review finding: _build_engine() can raise RuntimeError (e.g. a caller-declared decode
+    contract with nothing to decode) -- previously uncaught here, so it propagated as a raw
+    traceback instead of a LIVE0xx failure code, and never reached write_evidence_report(), same
+    root cause as atoms_proof.py's own PROOF022 (already fixed there) before this fix."""
+    module = load_live_canary_module()
+
+    cases, exit_code = module.run(
+        "http://127.0.0.1:8000",
+        "postgresql+psycopg://user:pass@127.0.0.1:5432/",
+        timeout=5.0,
+        max_total_cost_usd=1.0,
+        decode_database_name=True,
+    )
+
+    assert cases == []
+    assert exit_code == 1
+    assert "LIVE009" in capsys.readouterr().err
+
+
+def test_main_writes_evidence_report_on_engine_configuration_error(monkeypatch, capsys) -> None:
+    """main()-level: an engine-configuration RuntimeError must not skip write_evidence_report() --
+    without run()'s LIVE009 fix, this would raise before main() ever reaches that call."""
+    module = load_live_canary_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql+psycopg://user:pass@127.0.0.1:5432/")
+    write_evidence_report_calls = []
+    monkeypatch.setattr(
+        module.atoms_proof,
+        "write_evidence_report",
+        lambda cases, exit_code, **kwargs: write_evidence_report_calls.append(
+            (cases, exit_code)
+        )
+        or Path("evidence-fake.json"),
+    )
+    monkeypatch.setattr(
+        sys, "argv", [*_TEST_MAIN_ARGV, "--database-url-is-percent-encoded"]
+    )
+
+    assert module.main() == 1
+
+    assert write_evidence_report_calls == [([], 1)]
+    assert "LIVE009" in capsys.readouterr().err
+
+
+def test_live_composite_scenarios_are_config_flagged_internal_only() -> None:
+    """ANY-221 code-review finding: every live scenario (atom and composite) must be
+    internal_only, or the normal public start-session API can reach it with no gate at all,
+    bypassing live_canary.py's own cost cap and OPENAI_API_KEY fail-fast entirely. The 11 atom
+    scenarios are covered by apps/platform-api/tests/test_live_canary_config.py; this covers the
+    3 composite ones."""
+    module = load_live_canary_module()
+    config_test_module = load_live_canary_config_test_module()
+    registry = config_test_module.ConfigLoader(config_test_module.CONFIG_ROOT).load()
+
+    for _workflow_id, scenario_id, _input in module.LIVE_COMPOSITE_CASES:
+        scenario = registry.get_scenario(scenario_id)
+        assert scenario is not None, scenario_id
+        assert scenario.internal_only is True, scenario_id

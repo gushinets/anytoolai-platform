@@ -47,13 +47,17 @@ def _all_expected_events(
     *,
     action_run_ids: tuple[str, ...] = ("run-1",),
     provider_call_ids: tuple[str, ...] = ("call-1",),
+    failed_provider_call_ids: tuple[str, ...] = (),
     artifact_ids: tuple[str, ...] = ("artifact-step-1", "artifact-result"),
 ) -> list[dict]:
     """One event per session-scoped expected type, plus one artifact.created row per
     artifact_id, one action.started/action.succeeded pair per action_run_id, and one
-    provider.request_started/succeeded pair per provider_call_id -- matching the per-row
-    artifact_id/action_run_id/provider_call_id correlation _classify_ledger requires. Defaults
-    match _one_step_row()'s "run-1", _one_provider_call()'s "call-1", and
+    provider.request_started/terminal pair per provider_call_id -- matching the per-row
+    artifact_id/action_run_id/provider_call_id correlation _classify_ledger requires. Every
+    provider_call_id gets a terminal provider.request_succeeded event, except those also listed
+    in failed_provider_call_ids (a subset of provider_call_ids), which get provider.request_failed
+    instead -- models a retried physical attempt's own first, failed call. Defaults match
+    _one_step_row()'s "run-1", _one_provider_call()'s "call-1", and
     _one_step_artifact()/_one_result_artifact()'s ids."""
     events = [
         {"event_type": event_type}
@@ -66,7 +70,12 @@ def _all_expected_events(
         events.append({"event_type": "action.succeeded", "action_run_id": run_id})
     for call_id in provider_call_ids:
         events.append({"event_type": "provider.request_started", "provider_call_id": call_id})
-        events.append({"event_type": "provider.request_succeeded", "provider_call_id": call_id})
+        terminal_event_type = (
+            "provider.request_failed"
+            if call_id in failed_provider_call_ids
+            else "provider.request_succeeded"
+        )
+        events.append({"event_type": terminal_event_type, "provider_call_id": call_id})
     return events
 
 
@@ -84,7 +93,18 @@ def _one_step_row(**overrides) -> dict:
 
 
 def _one_provider_call(**overrides) -> dict:
-    row = {"id": "call-1", "action_run_id": "run-1", "job_id": "job-1"}
+    row = {
+        "id": "call-1",
+        "action_run_id": "run-1",
+        "job_id": "job-1",
+        "physical_call_index": 0,
+        "status": "succeeded",
+        "latency_ms": 123,
+        "input_tokens": 10,
+        "output_tokens": 20,
+        "total_tokens": 30,
+        "estimated_cost": 0.001,
+    }
     row.update(overrides)
     return row
 
@@ -121,11 +141,18 @@ def test_classify_ledger_passes_with_full_correlation() -> None:
     assert case.error_code is None
     assert case.job_id == "job-1"
     assert case.session_id == "session-1"
+    assert case.result_artifact_id == "artifact-result"
     assert case.steps == (
         module.StepEvidence(
             step_id="extract",
             action_type="text.extract_structured_fields",
             action_config_id="kernel_demo.extract_structured_fields_v1",
+            latency_ms=123,
+            input_tokens=10,
+            output_tokens=20,
+            total_tokens=30,
+            estimated_cost=0.001,
+            output_artifact_id="artifact-step-1",
         ),
     )
 
@@ -143,6 +170,9 @@ def test_classify_ledger_reports_proof001_when_no_job_row() -> None:
     assert case.status == "fail"
     assert case.error_code == "PROOF001"
     assert case.job_id is None
+    # `code-review` (me #6) finding: no job row was ever resolved here, so there is no known
+    # result_artifact_id to report -- must stay None, not e.g. crash or default to something else.
+    assert case.result_artifact_id is None
 
 
 def test_classify_ledger_reports_proof002_when_no_action_runs() -> None:
@@ -159,6 +189,9 @@ def test_classify_ledger_reports_proof002_when_no_action_runs() -> None:
     assert case.status == "fail"
     assert case.error_code == "PROOF002"
     assert case.job_id == "job-1"
+    # `code-review` (me #6) finding: a case that fails *after* its job row resolved must still
+    # carry the real result_artifact_id, not silently drop it just because the case failed.
+    assert case.result_artifact_id == "artifact-result"
 
 
 def test_classify_ledger_reports_proof003_when_provider_call_count_is_wrong() -> None:
@@ -198,6 +231,353 @@ def test_classify_ledger_reports_proof003_when_provider_call_is_duplicated() -> 
 
     assert case.status == "fail"
     assert case.error_code == "PROOF003"
+
+
+def test_classify_ledger_passes_and_sums_cost_across_retried_provider_calls() -> None:
+    """Code-review finding: default_text_generation_v1's retry_policy.hard_limits permits up to 4
+    physical provider calls per action (structured-output/transport retries) -- more than one
+    provider_calls row for a single action_run is a legitimate outcome for a live case, not a
+    correlation defect, as long as it's within max_provider_calls_per_action. The step's evidence
+    must sum every physical attempt's cost/tokens/latency, not report just one of them (which
+    would silently lose real spend from live_canary.py's cost cap).
+
+    `code-review` finding: this test's own events used to give BOTH provider_calls
+    rows a provider.request_succeeded event, which never exercised the actual retry shape (a
+    transport retry's first physical attempt ends in provider.request_failed, then a second
+    attempt succeeds) -- that shape was rejected as PROOF013 until the fix below. call-1 here is
+    the failed first attempt (lower physical_call_index), call-2 is the succeeded retry."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="text.extract_structured_fields", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[
+            _one_provider_call(
+                id="call-1", action_run_id="run-1", physical_call_index=0, status="failed",
+            ),
+            _one_provider_call(
+                id="call-2", action_run_id="run-1", physical_call_index=1, status="succeeded",
+            ),
+        ],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=_all_expected_events(
+            provider_call_ids=("call-1", "call-2"), failed_provider_call_ids=("call-1",),
+        ),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+        max_provider_calls_per_action=2,
+    )
+
+    assert case.status == "pass"
+    assert case.error_code is None
+    assert len(case.steps) == 1
+    step = case.steps[0]
+    assert step.latency_ms == 246
+    assert step.input_tokens == 20
+    assert step.output_tokens == 40
+    assert step.total_tokens == 60
+    assert step.estimated_cost == pytest.approx(0.002)
+
+
+def test_classify_ledger_fails_closed_when_retried_provider_calls_cost_nets_out() -> None:
+    """`code-review` (me #8) finding: two individually-plausible provider_calls rows can net out
+    to an innocuous-looking StepEvidence.estimated_cost via plain summation -- e.g. $0.60 and
+    -$0.50 sum to $0.10, which live_canary.py's own post-hoc _safe_step_cost() guard (applied to
+    the already-summed StepEvidence.estimated_cost) sees as a perfectly valid, small cost.
+    _step_evidence_from_action_run() must poison the sum to math.inf per corrupt raw call
+    *before* summing, not validate only the finished total."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="text.extract_structured_fields", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[
+            _one_provider_call(
+                id="call-1", action_run_id="run-1", physical_call_index=0, status="failed",
+                estimated_cost=0.6,
+            ),
+            _one_provider_call(
+                id="call-2", action_run_id="run-1", physical_call_index=1, status="succeeded",
+                estimated_cost=-0.5,
+            ),
+        ],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=_all_expected_events(
+            provider_call_ids=("call-1", "call-2"), failed_provider_call_ids=("call-1",),
+        ),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+        max_provider_calls_per_action=2,
+    )
+
+    assert case.status == "pass"
+    assert len(case.steps) == 1
+    assert case.steps[0].estimated_cost == module.math.inf
+
+
+def test_classify_ledger_fails_closed_on_nan_provider_call_cost() -> None:
+    """Same `_safe_raw_cost()` guard as the negative-netting test above, for a NaN raw
+    `provider_calls.estimated_cost` -- a single corrupt row is enough here (no second call
+    needed to net anything out), since `sum()` of anything containing math.inf is math.inf."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="text.extract_structured_fields", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call(estimated_cost=module.math.nan)],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=_all_expected_events(),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "pass"
+    assert case.steps[0].estimated_cost == module.math.inf
+
+
+def test_classify_ledger_reports_proof003_when_retry_count_exceeds_the_configured_cap() -> None:
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[
+            _one_provider_call(id="call-1", action_run_id="run-1"),
+            _one_provider_call(id="call-2", action_run_id="run-1"),
+            _one_provider_call(id="call-3", action_run_id="run-1"),
+        ],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=_all_expected_events(provider_call_ids=("call-1", "call-2", "call-3")),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+        max_provider_calls_per_action=2,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF003"
+
+
+def test_classify_ledger_reports_proof024_when_a_provider_call_has_no_terminal_event() -> None:
+    """`code-review`: a provider_calls row with only a provider.request_started
+    event (no succeeded, no failed -- e.g. the physical attempt is still in flight, or its
+    terminal event was lost) must fail, not silently pass now that a bare succeeded==1 check was
+    relaxed. Uses a second, fully-normal run-2/call-2 pair alongside the run-1/call-1 pair under
+    test purely so provider.request_succeeded still appears somewhere in the session -- otherwise
+    stripping call-1's only succeeded event would (correctly, but not usefully for this test)
+    trip the session-wide PROOF005 check before PROOF024 ever gets a chance to run."""
+    module = load_atoms_proof_module()
+
+    events = [
+        event
+        for event in _all_expected_events(
+            action_run_ids=("run-1", "run-2"),
+            provider_call_ids=("call-1", "call-2"),
+            artifact_ids=("artifact-step-1", "artifact-step-2", "artifact-result"),
+        )
+        if not (
+            event["event_type"] == "provider.request_succeeded"
+            and event.get("provider_call_id") == "call-1"
+        )
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[
+            _one_step_row(),
+            _one_step_row(id="run-2", step_id="detect_issues", output_artifact_id="artifact-step-2"),
+        ],
+        provider_calls=[
+            _one_provider_call(id="call-1", action_run_id="run-1"),
+            _one_provider_call(id="call-2", action_run_id="run-2"),
+        ],
+        artifacts=[
+            _one_step_artifact(),
+            _one_step_artifact(id="artifact-step-2", action_run_id="run-2"),
+            _one_result_artifact(),
+        ],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF024"
+
+
+def test_classify_ledger_reports_proof024_when_a_provider_call_has_both_terminal_events() -> None:
+    """A provider_calls row with both a provider.request_succeeded and a provider.request_failed
+    event is an inconsistent double-terminal state, not a legitimate retry (a retry is two
+    *separate* provider_calls rows, one terminal event each)."""
+    module = load_atoms_proof_module()
+
+    events = [
+        *_all_expected_events(),
+        {"event_type": "provider.request_failed", "provider_call_id": "call-1"},
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF024"
+
+
+def test_classify_ledger_reports_proof025_when_succeeded_event_disagrees_with_persisted_status() -> None:
+    """The persisted provider_calls.status must agree with whichever terminal event fired -- a
+    row with a provider.request_succeeded event but a "failed" status column is an inconsistent
+    ledger, not just a missing/duplicate-event defect PROOF024 already covers."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call(status="failed")],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=_all_expected_events(),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF025"
+
+
+def test_classify_ledger_reports_proof025_when_failed_event_disagrees_with_persisted_status() -> None:
+    """Same PROOF005-avoidance reasoning as the no-terminal-event test above: call-1 alone
+    emitting provider.request_failed (instead of succeeded) would strip the session's only
+    provider.request_succeeded event, so a second, fully-normal run-2/call-2 pair keeps that type
+    present while call-1 is the one under test."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[
+            _one_step_row(),
+            _one_step_row(id="run-2", step_id="detect_issues", output_artifact_id="artifact-step-2"),
+        ],
+        provider_calls=[
+            _one_provider_call(id="call-1", action_run_id="run-1", status="succeeded"),
+            _one_provider_call(id="call-2", action_run_id="run-2"),
+        ],
+        artifacts=[
+            _one_step_artifact(),
+            _one_step_artifact(id="artifact-step-2", action_run_id="run-2"),
+            _one_result_artifact(),
+        ],
+        events=_all_expected_events(
+            action_run_ids=("run-1", "run-2"),
+            provider_call_ids=("call-1", "call-2"),
+            failed_provider_call_ids=("call-1",),
+            artifact_ids=("artifact-step-1", "artifact-step-2", "artifact-result"),
+        ),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF025"
+
+
+def test_classify_ledger_accepts_timed_out_status_for_a_failed_terminal_event() -> None:
+    """ProviderCallStatus.timed_out also emits provider.request_failed (gateway/events.py), not a
+    dedicated event type -- a "timed_out" status must satisfy the failed-terminal-event check,
+    not just "failed"."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="text.extract_structured_fields", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[
+            _one_provider_call(
+                id="call-1", action_run_id="run-1", physical_call_index=0, status="timed_out",
+            ),
+            _one_provider_call(
+                id="call-2", action_run_id="run-1", physical_call_index=1, status="succeeded",
+            ),
+        ],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=_all_expected_events(
+            provider_call_ids=("call-1", "call-2"), failed_provider_call_ids=("call-1",),
+        ),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+        max_provider_calls_per_action=2,
+    )
+
+    assert case.status == "pass"
+    assert case.error_code is None
+
+
+def test_classify_ledger_reports_proof015_when_a_failed_event_is_orphaned() -> None:
+    """Orphan detection (PROOF015) must also cover provider.request_failed rows, not just
+    started/succeeded -- a failed event misattributed to an unknown provider_call_id is just as
+    much a correlation defect as an orphaned started/succeeded one."""
+    module = load_atoms_proof_module()
+
+    events = [
+        *_all_expected_events(),
+        {"event_type": "provider.request_failed", "provider_call_id": "call-bogus"},
+    ]
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[_one_provider_call()],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=events,
+        expected_event_types=EXPECTED_EVENT_TYPES,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF015"
+
+
+def test_classify_ledger_reports_proof026_when_the_last_physical_attempt_did_not_succeed() -> None:
+    """An action_run only reaches _classify_ledger() after the HTTP layer already observed the
+    session succeed, so its *last* physical attempt (highest physical_call_index) must be the one
+    that succeeded -- a ledger where the highest-index call is still "failed" (e.g. a
+    physical_call_index recorded out of actual attempt order) is an inconsistent evidence trail
+    even though every individual row passes PROOF013/024/025 on its own."""
+    module = load_atoms_proof_module()
+
+    case = module._classify_ledger(
+        label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+        job_row={"id": "job-1", "result_artifact_id": "artifact-result"},
+        action_runs=[_one_step_row()],
+        provider_calls=[
+            _one_provider_call(
+                id="call-1", action_run_id="run-1", physical_call_index=0, status="succeeded",
+            ),
+            _one_provider_call(
+                id="call-2", action_run_id="run-1", physical_call_index=1, status="failed",
+            ),
+        ],
+        artifacts=[_one_step_artifact(), _one_result_artifact()],
+        events=_all_expected_events(
+            provider_call_ids=("call-1", "call-2"), failed_provider_call_ids=("call-2",),
+        ),
+        expected_event_types=EXPECTED_EVENT_TYPES,
+        max_provider_calls_per_action=2,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF026"
 
 
 def test_classify_ledger_reports_proof004_when_step_artifact_missing() -> None:
@@ -577,6 +957,20 @@ def test_classify_ledger_reports_proof012_when_provider_call_is_orphaned() -> No
 
     assert case.status == "fail"
     assert case.error_code == "PROOF012"
+    # code review #2 (2026-08-24) finding: both provider_calls rows already carry a real,
+    # billed estimated_cost -- a failed case must still report it (live_canary.py's cost cap sums
+    # exactly this field), not silently drop it to 0 just because the overall ledger is invalid.
+    # The orphan row can't be correlated to a known action_run, so it falls back to its own
+    # action_run_id as step_id and "unknown" for the fields only action_runs carries.
+    assert len(case.steps) == 2
+    matched_step, orphan_step = case.steps
+    assert matched_step.step_id == "extract"
+    assert matched_step.estimated_cost == 0.001
+    assert orphan_step.step_id == "run-does-not-exist"
+    assert orphan_step.action_type == "unknown"
+    assert orphan_step.action_config_id == "unknown"
+    assert orphan_step.estimated_cost == 0.001
+    assert sum(step.estimated_cost for step in case.steps) == pytest.approx(0.002)
 
 
 def test_classify_ledger_reports_proof016_when_provider_call_job_id_mismatches() -> None:
@@ -768,7 +1162,7 @@ def test_run_case_with_ledger_check_reports_http_failure_without_touching_db(
     monkeypatch.setattr(
         module.smoke,
         "_run_one_case",
-        lambda api_url, scenario_id, scenario_input, timeout: module.smoke.CaseResult(
+        lambda api_url, scenario_id, scenario_input, timeout, **_kwargs: module.smoke.CaseResult(
             session_id=None, error_code="SMOKE001",
             error_message="SMOKE001: boom (contains raw upstream detail)",
         ),
@@ -787,6 +1181,71 @@ def test_run_case_with_ledger_check_reports_http_failure_without_touching_db(
     assert "boom" not in case.error_message
     assert "SMOKE001" in case.error_message
     assert "boom (contains raw upstream detail)" in capsys.readouterr().err
+    assert case.steps == ()
+
+
+class _FakeResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def mappings(self):
+        return self
+
+    def __iter__(self):
+        return iter(self._rows)
+
+    def one_or_none(self):
+        return self._rows[0] if self._rows else None
+
+
+class _FakeConnection:
+    def __init__(self, results):
+        self._results = list(results)
+
+    def execute(self, _stmt):
+        return self._results.pop(0)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+
+def test_run_case_with_ledger_check_recovers_known_cost_on_an_http_layer_failure(
+    monkeypatch, capsys
+) -> None:
+    """code review #3 (2026-08-24) finding: a case can fail at the HTTP/status-polling layer
+    *after* a real, billed provider call already happened server-side (e.g. the session completed
+    but SMOKE009's schema_ref cross-check then failed) -- this branch never reaches
+    _check_ledger()/_classify_ledger(), so without _known_steps_for_session() the spend would
+    silently report 0 to live_canary.py's cost cap."""
+    module = load_atoms_proof_module()
+    monkeypatch.setattr(
+        module.smoke,
+        "_run_one_case",
+        lambda api_url, scenario_id, scenario_input, timeout, **_kwargs: module.smoke.CaseResult(
+            session_id="session-1", error_code="SMOKE009",
+            error_message="SMOKE009: schema_ref mismatch",
+        ),
+    )
+    action_runs = [_one_step_row()]
+    provider_calls = [_one_provider_call()]
+
+    class _FakeEngine:
+        def connect(self):
+            return _FakeConnection([_FakeResult(action_runs), _FakeResult(provider_calls)])
+
+    case = module._run_case_with_ledger_check(
+        "http://127.0.0.1:8000", _FakeEngine(), kind="atom", label="atom.one",
+        scenario_id="scenario-1", scenario_input={}, timeout=5.0,
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "SMOKE009"
+    assert len(case.steps) == 1
+    assert case.steps[0].estimated_cost == 0.001
+    assert case.cost_unknown is False
 
 
 def test_run_case_with_ledger_check_dispatches_a_passing_http_result_into_check_ledger(
@@ -799,13 +1258,13 @@ def test_run_case_with_ledger_check_dispatches_a_passing_http_result_into_check_
     monkeypatch.setattr(
         module.smoke,
         "_run_one_case",
-        lambda api_url, scenario_id, scenario_input, timeout: module.smoke.CaseResult(
+        lambda api_url, scenario_id, scenario_input, timeout, **_kwargs: module.smoke.CaseResult(
             session_id="session-1", error_code=None, error_message=None
         ),
     )
     captured: dict = {}
 
-    def _fake_check_ledger(engine, *, label, scenario_id, kind, scenario_session_id):
+    def _fake_check_ledger(engine, *, label, scenario_id, kind, scenario_session_id, **_kwargs):
         captured.update(
             engine=engine, label=label, scenario_id=scenario_id, kind=kind,
             scenario_session_id=scenario_session_id,
@@ -844,32 +1303,6 @@ def test_check_ledger_wires_all_five_query_results_into_classify_ledger(monkeypa
     provider_calls = [{"id": "call-1", "action_run_id": "run-1"}]
     artifacts = [_one_step_artifact(), _one_result_artifact()]
     events = [{"event_type": "action.started", "action_run_id": "run-1"}]
-
-    class _FakeResult:
-        def __init__(self, rows):
-            self._rows = rows
-
-        def mappings(self):
-            return self
-
-        def __iter__(self):
-            return iter(self._rows)
-
-        def one_or_none(self):
-            return self._rows[0] if self._rows else None
-
-    class _FakeConnection:
-        def __init__(self, results):
-            self._results = list(results)
-
-        def execute(self, _stmt):
-            return self._results.pop(0)
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc_info):
-            return False
 
     class _FakeEngine:
         def connect(self):
@@ -912,7 +1345,12 @@ def test_check_ledger_reports_proof000_without_leaking_raw_exception_text() -> N
     """Fourteenth-round finding: database_url isn't guaranteed to be the fixed dev-only default
     (ANYTOOLAI_POSTGRES_PASSWORD is overridable), so a driver exception's free-form message must
     not flow into the persisted evidence report -- only PROOF000 plus the exception class name,
-    which is still enough to tell e.g. an auth/connection failure from a bad-query error."""
+    which is still enough to tell e.g. an auth/connection failure from a bad-query error.
+
+    Every connect() call fails here, so _known_steps_for_session()'s own recovery query fails
+    too -- `code-review` finding: this must report cost_unknown=True (steps=() does NOT
+    mean $0 was spent), not silently look identical to a case that never got a session at all,
+    or live_canary.py's cost cap fails open on a lost DB connection."""
     module = load_atoms_proof_module()
 
     class _FailingEngine:
@@ -928,6 +1366,41 @@ def test_check_ledger_reports_proof000_without_leaking_raw_exception_text() -> N
     assert case.error_code == "PROOF000"
     assert "SQLAlchemyError" in case.error_message
     assert "secret-looking-detail" not in case.error_message
+    assert case.steps == ()
+    assert case.cost_unknown is True
+
+
+def test_check_ledger_recovers_known_cost_when_its_own_fetch_raises(monkeypatch) -> None:
+    """code review #4 (2026-08-24) finding #1: a case can make a real, billed provider call and
+    then hit a transient SQLAlchemyError (connection drop, pool exhaustion, statement timeout)
+    fetching _check_ledger()'s own 5-table batch -- that spend must not silently report 0 to
+    live_canary.py's cost cap just because the *second* connection attempt (this batch's own)
+    failed, when a fresh recovery connection can still see the already-committed provider_calls
+    row."""
+    module = load_atoms_proof_module()
+    action_runs = [_one_step_row()]
+    provider_calls = [_one_provider_call()]
+
+    class _FailsOnceThenRecoversEngine:
+        def __init__(self):
+            self._connect_count = 0
+
+        def connect(self):
+            self._connect_count += 1
+            if self._connect_count == 1:
+                raise module.sa.exc.SQLAlchemyError("boom")
+            return _FakeConnection([_FakeResult(action_runs), _FakeResult(provider_calls)])
+
+    case = module._check_ledger(
+        _FailsOnceThenRecoversEngine(), label="atom.one", scenario_id="scenario-1", kind="atom",
+        scenario_session_id="session-1",
+    )
+
+    assert case.status == "fail"
+    assert case.error_code == "PROOF000"
+    assert len(case.steps) == 1
+    assert case.steps[0].estimated_cost == 0.001
+    assert case.cost_unknown is False
 
 
 def test_write_evidence_report_is_privacy_safe_and_shaped_correctly(tmp_path) -> None:
@@ -1001,6 +1474,33 @@ def test_write_evidence_report_rejects_exit_code_zero_with_a_failing_case(tmp_pa
 
     with pytest.raises(ValueError, match="exit_code=0"):
         module.write_evidence_report([failing], 0, output_root=tmp_path)
+
+
+def test_write_evidence_report_normalizes_non_finite_cost_to_null(tmp_path) -> None:
+    """`code-review` (me #9) finding: `_safe_raw_cost()`/live_canary.py's `_safe_step_cost()`
+    deliberately produce math.inf for a corrupt provider_calls.estimated_cost row -- json.dumps()
+    would otherwise happily emit the non-standard `Infinity` token (not valid JSON per RFC 8259),
+    which a strict or non-Python consumer of this evidence report would fail to parse."""
+    module = load_atoms_proof_module()
+    case = module.EvidenceCase(
+        label="atom.one", scenario_id="scenario-1", kind="atom", status="pass",
+        session_id="session-1", job_id="job-1", error_code=None, error_message=None,
+        steps=(
+            module.StepEvidence(
+                step_id="extract", action_type="text.extract_structured_fields",
+                action_config_id="kernel_demo.extract_structured_fields_v1",
+                estimated_cost=module.math.inf,
+            ),
+        ),
+    )
+
+    report_path = module.write_evidence_report([case], exit_code=1, output_root=tmp_path)
+    raw_text = report_path.read_text(encoding="utf-8")
+
+    assert "Infinity" not in raw_text
+    assert "NaN" not in raw_text
+    payload = json.loads(raw_text)
+    assert payload["cases"][0]["steps"][0]["estimated_cost"] is None
 
 
 def test_build_engine_coerces_bare_postgresql_scheme_to_psycopg() -> None:
@@ -1231,7 +1731,7 @@ def test_main_writes_evidence_report_on_coverage_gate_failure(monkeypatch, capsy
 
 
 def _passing_check_ledger(module):
-    def fake(engine, *, label, scenario_id, kind, scenario_session_id):
+    def fake(engine, *, label, scenario_id, kind, scenario_session_id, **_kwargs):
         return module.EvidenceCase(
             label=label, scenario_id=scenario_id, kind=kind, status="pass",
             session_id=scenario_session_id, job_id="job-1", error_code=None, error_message=None,
@@ -1253,7 +1753,7 @@ def test_run_chains_degraded_timeout_from_atom_batch_into_composite_batch(monkey
     monkeypatch.setattr(module, "_check_ledger", _passing_check_ledger(module))
     seen_timeouts = []
 
-    def fake_run_one_case(api_url, scenario_id, scenario_input, timeout):
+    def fake_run_one_case(api_url, scenario_id, scenario_input, timeout, **_kwargs):
         seen_timeouts.append(timeout)
         return _fake_case_result(
             module.smoke, scenario_id, timed_out=(scenario_id == "scenario-one")
@@ -1282,7 +1782,7 @@ def test_run_reports_full_success_when_every_case_passes(monkeypatch, capsys) ->
     monkeypatch.setattr(
         module.smoke,
         "_run_one_case",
-        lambda api_url, scenario_id, scenario_input, timeout: module.smoke.CaseResult(
+        lambda api_url, scenario_id, scenario_input, timeout, **_kwargs: module.smoke.CaseResult(
             session_id=scenario_id, error_code=None, error_message=None
         ),
     )
@@ -1349,7 +1849,7 @@ def test_run_case_group_derives_passed_count_from_results(monkeypatch, capsys) -
     monkeypatch.setattr(
         module.smoke,
         "_run_one_case",
-        lambda api_url, scenario_id, scenario_input, timeout: (
+        lambda api_url, scenario_id, scenario_input, timeout, **_kwargs: (
             module.smoke.CaseResult(session_id="s-one", error_code=None, error_message=None)
             if scenario_id == "scenario-one"
             else module.smoke.CaseResult(
@@ -1390,7 +1890,7 @@ def test_run_fails_instead_of_vacuous_success_on_empty_composite_case_list(
     monkeypatch.setattr(
         module.smoke,
         "_run_one_case",
-        lambda api_url, scenario_id, scenario_input, timeout: module.smoke.CaseResult(
+        lambda api_url, scenario_id, scenario_input, timeout, **_kwargs: module.smoke.CaseResult(
             session_id="s1", error_code=None, error_message=None
         ),
     )
