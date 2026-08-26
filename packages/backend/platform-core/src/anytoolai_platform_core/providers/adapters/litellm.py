@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from pathlib import Path
 from typing import Any, Mapping
@@ -130,12 +131,16 @@ def _normalize_litellm_response(
     total_tokens = _int_like(
         _value_from(usage, "total_tokens") or _value_from(usage, "totalTokens")
     )
-    estimated_cost = _float_like(
-        hidden_params.get("response_cost")
-        or _mapping_like(hidden_params.get("additional_headers")).get(
+    raw_response_cost = hidden_params.get("response_cost")
+    if raw_response_cost is None:
+        raw_response_cost = _mapping_like(hidden_params.get("additional_headers")).get(
             "llm_provider-x-litellm-response-cost"
         )
-    )
+    # A missing/unparseable cost is NaN, not 0.0: `code review (team lead #1)` finding -- 0.0
+    # reads downstream (_safe_raw_cost()/_safe_step_cost()) as "known, free", letting a billed
+    # call with no cost metadata pass the live-canary cost cap silently. NaN is non-finite, so
+    # those same guards already convert it to math.inf and fail the run closed.
+    estimated_cost = _float_like(raw_response_cost, default=math.nan)
     actual_model = _string_like(
         _value_from(response, "model") or hidden_params.get("model")
     )
@@ -226,11 +231,13 @@ def _int_like(value: Any) -> int:
         return 0
 
 
-def _float_like(value: Any) -> float:
+def _float_like(value: Any, *, default: float = 0.0) -> float:
+    if value is None:
+        return default
     try:
-        return float(value or 0.0)
+        return float(value)
     except (TypeError, ValueError):
-        return 0.0
+        return default
 
 
 def _string_like(value: Any) -> str | None:

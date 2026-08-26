@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from pathlib import Path
 from types import SimpleNamespace
 from types import MappingProxyType
@@ -124,6 +125,26 @@ def test_litellm_adapter_maps_messages_to_router_acompletion() -> None:
             "num_retries": 0,
         }
     ]
+
+
+def test_litellm_adapter_reports_nan_cost_when_litellm_omits_cost_metadata() -> None:
+    router = RecordingRouter(
+        make_router_response(_hidden_params={"response_cost": None, "additional_headers": {}})
+    )
+    adapter = LiteLLMProviderAdapter(router)
+
+    response = asyncio.run(adapter.complete(make_request()))
+
+    assert math.isnan(response.estimated_cost)
+
+
+def test_litellm_adapter_preserves_a_genuinely_zero_cost() -> None:
+    router = RecordingRouter(make_router_response(_hidden_params={"response_cost": 0.0}))
+    adapter = LiteLLMProviderAdapter(router)
+
+    response = asyncio.run(adapter.complete(make_request()))
+
+    assert response.estimated_cost == 0.0
 
 
 def test_litellm_adapter_falls_back_to_prompt_as_user_message() -> None:
