@@ -2,14 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-18
-- Last updated: 2026-08-21
+- Last updated: 2026-08-26
 - Review date: 2026-08-21 (post-team-lead-#6 root-cause audit)
-- Next action: push `feature/ANY-220` so PR #82 picks up the fixed commit; update PR #82's
-  description (still says dev/prod and "15 tests" -- implementation is dev-only, current test
-  file has 56 test functions) once pushed; merge once green.
+- Next action: none — PR #82 merged (`c41b8ab`, ANY-220 A21a3). Moved to `completed/` as part of
+  the ANY-24 closeout.
 - Blocker: none.
 
 ## Goal
