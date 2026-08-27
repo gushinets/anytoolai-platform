@@ -1,1 +1,5 @@
-export function App() { return <div>App</div>; }
+import { HandoffView } from "./HandoffView";
+
+export function App() {
+  return <HandoffView />;
+}

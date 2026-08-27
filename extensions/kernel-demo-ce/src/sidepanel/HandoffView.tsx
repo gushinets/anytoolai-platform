@@ -1,1 +1,109 @@
-export function HandoffView() { return <div>HandoffView</div>; }
+import { useState } from "react";
+import {
+  createChromeStorageAdapter,
+  createChromeTabNavigator,
+  createHandoff,
+  openHandoffConsent,
+  pollScenarioSession,
+  startScenario,
+  PlatformApiClient,
+} from "@anytoolai/ce-kit";
+import { CAPTURE_INPUT_MESSAGE, type CaptureInputResponse } from "../content/messages";
+import { productConfig } from "../product.config";
+import { runtimeConfig } from "../runtimeConfig";
+
+type ViewState =
+  | { kind: "idle" }
+  | { kind: "running"; step: string }
+  | { kind: "opened" }
+  | { kind: "error"; message: string };
+
+async function captureActiveTabInput(): Promise<CaptureInputResponse> {
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!activeTab?.id) {
+    throw new Error("No active tab to capture input from.");
+  }
+  const response = (await chrome.tabs.sendMessage(activeTab.id, CAPTURE_INPUT_MESSAGE)) as
+    | CaptureInputResponse
+    | undefined;
+  if (!response) {
+    throw new Error("Could not capture input from the active tab.");
+  }
+  return response;
+}
+
+/**
+ * Minimal source-side wiring for the ANY-224 handoff smoke journey: capture -> run
+ * `kernel_demo.handoff_smoke_source_v1` to completion -> create a handoff -> open the backend-
+ * owned consent page in a new tab. This is the only journey this ticket wires up (see
+ * plans/ANY-224.md assumption 1) -- it deliberately does not build the general
+ * Input/Progress/Result product experience.
+ */
+export function HandoffView() {
+  const [state, setState] = useState<ViewState>({ kind: "idle" });
+
+  async function runSmokeJourney() {
+    setState({ kind: "running", step: "Capturing input…" });
+    try {
+      const captured = await captureActiveTabInput();
+
+      const client = new PlatformApiClient({ baseUrl: runtimeConfig.platformApiBaseUrl });
+      const guestIdentity = await client.createGuestIdentity({
+        storage: createChromeStorageAdapter(chrome.storage.local),
+      });
+      const guestId = guestIdentity.ok ? guestIdentity.value.guestId : undefined;
+
+      setState({ kind: "running", step: "Running source scenario…" });
+      const started = await startScenario(client, {
+        productId: productConfig.productId,
+        scenarioId: productConfig.handoffSourceScenarioId,
+        frontendId: productConfig.frontendId,
+        input: { source_text: captured.text },
+        guestId,
+      });
+      if (!started.ok) {
+        throw new Error("Could not start the source scenario.");
+      }
+
+      setState({ kind: "running", step: "Waiting for the result…" });
+      const polled = await pollScenarioSession(client, started.value.scenarioSessionId);
+      if (!polled.result.ok || polled.result.value.status !== "completed") {
+        throw new Error("The source scenario did not complete.");
+      }
+      const resultArtifactId = polled.result.value.resultArtifactId;
+      if (!resultArtifactId) {
+        throw new Error("The source scenario completed without a result artifact.");
+      }
+
+      setState({ kind: "running", step: "Creating handoff…" });
+      const handoff = await createHandoff(client, {
+        handoffDefinitionId: productConfig.handoffDefinitionId,
+        sourceScenarioSessionId: started.value.scenarioSessionId,
+        sourceArtifactId: resultArtifactId,
+      });
+      if (!handoff.ok) {
+        throw new Error("Could not create the handoff.");
+      }
+
+      await openHandoffConsent({
+        webConsentBaseUrl: runtimeConfig.webConsentBaseUrl,
+        handoffToken: handoff.value.handoffToken,
+        navigate: createChromeTabNavigator(chrome.tabs),
+      });
+      setState({ kind: "opened" });
+    } catch (error) {
+      setState({ kind: "error", message: error instanceof Error ? error.message : "Something went wrong." });
+    }
+  }
+
+  return (
+    <div>
+      <button type="button" onClick={runSmokeJourney} disabled={state.kind === "running"}>
+        Run handoff smoke journey
+      </button>
+      {state.kind === "running" ? <p role="status">{state.step}</p> : null}
+      {state.kind === "opened" ? <p role="status">Handoff created. Consent opened in a new tab.</p> : null}
+      {state.kind === "error" ? <p role="alert">{state.message}</p> : null}
+    </div>
+  );
+}

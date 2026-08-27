@@ -2,6 +2,7 @@ packages:
   - "apps/web-mirror"
   - "extensions/*"
   - "packages/frontend/*"
+  - "tests/e2e/*"
 allowBuilds:
   esbuild: true
   spawn-sync: true

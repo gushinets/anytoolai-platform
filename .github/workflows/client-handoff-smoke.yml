@@ -1,0 +1,50 @@
+name: client-handoff-smoke
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly, not per-PR: this is the repo's first browser-driven CI step (real Chromium + an
+    # unpacked extension + a Next.js server + platform-api via Compose, all in one job) -- see
+    # plans/ANY-224.md risk 5. Promote to `pull_request` once it's proven stable over a few runs.
+    - cron: "0 7 * * 1"
+permissions:
+  contents: read
+jobs:
+  client-handoff-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 10.34.1
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @anytoolai/client-handoff-smoke exec playwright install --with-deps chromium
+      - name: Boot dev Compose stack (waits for platform-api healthy)
+        run: python scripts/agent/runner.py dev-up
+        env:
+          ANYTOOLAI_READY_TIMEOUT: "120"
+      - name: Run client handoff browser-evidence smoke
+        run: xvfb-run --auto-servernum python scripts/agent/runner.py client-handoff-smoke
+      - name: Dump Docker Compose logs on failure
+        if: failure()
+        run: |
+          PROJECT=$(python -c "import sys; sys.path.insert(0, 'scripts/agent'); from runner import runtime_identity; print(runtime_identity().compose_project)")
+          docker compose --project-name "$PROJECT" \
+            -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.override.yml \
+            logs --no-color
+      - name: Tear down dev stack
+        if: always()
+        run: python scripts/agent/runner.py dev-down
+      - name: Upload evidence report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: client-handoff-smoke-evidence
+          path: .agent/client-handoff-smoke/
+          if-no-files-found: ignore

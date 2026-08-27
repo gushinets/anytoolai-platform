@@ -1,16 +1,23 @@
 import type { AsyncStorage } from "./asyncStorage";
 
-/** Adapts `window.localStorage` (sync, browser-only) to the async `AsyncStorage` contract. */
-export function createLocalStorageAdapter(storage: Storage): AsyncStorage {
+/**
+ * Adapts `window.localStorage` (sync, browser-only) to the async `AsyncStorage` contract.
+ *
+ * Parameter named `backingStorage`, not `storage` -- a bare `storage` identifier is what WXT's
+ * global auto-import scans for (`wxt/utils/storage`) when this workspace package is bundled
+ * directly into a Chrome-extension build, and its regex-based scan isn't scope-aware enough to
+ * see this is a local parameter, not that global.
+ */
+export function createLocalStorageAdapter(backingStorage: Storage): AsyncStorage {
   return {
     async get(key) {
-      return storage.getItem(key) ?? undefined;
+      return backingStorage.getItem(key) ?? undefined;
     },
     async set(key, value) {
-      storage.setItem(key, value);
+      backingStorage.setItem(key, value);
     },
     async remove(key) {
-      storage.removeItem(key);
+      backingStorage.removeItem(key);
     },
   };
 }
