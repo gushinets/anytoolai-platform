@@ -2,14 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-19
-- Last updated: 2026-08-19
+- Last updated: 2026-08-26
 - Review date: 2026-08-19
-- Next action: none — implementation and 20 rounds of review-finding fixes have landed on
-  `feature/ANY-219` (PR #81, open); continue addressing review passes as they arrive, move to
-  `completed/` once merged.
+- Next action: none — PR #81 merged (`6afca1b`, ANY-219 A21a2). Moved to `completed/` as part of
+  the ANY-24 closeout.
 - Blocker: none
 
 ## Goal
