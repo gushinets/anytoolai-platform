@@ -452,6 +452,71 @@ def test_dev_ready_waits_for_health(monkeypatch) -> None:
     assert runner.dev_ready() == 0
 
 
+class _FakeProcess:
+    def __init__(self, pid=4321, wait_effects=None):
+        self.pid = pid
+        self._wait_effects = list(wait_effects or [])
+        self.wait_calls: list[float | None] = []
+
+    def wait(self, timeout=None):
+        self.wait_calls.append(timeout)
+        effect = self._wait_effects.pop(0) if self._wait_effects else None
+        if isinstance(effect, Exception):
+            raise effect
+        return effect
+
+
+def test_terminate_process_group_ignores_a_group_that_exits_between_getpgid_and_sigterm(
+    monkeypatch,
+) -> None:
+    # Race: the process group can exit on its own right after getpgid() succeeds but before
+    # killpg() runs. This is called from a `finally` cleanup block, so an uncaught
+    # ProcessLookupError here would replace -- and mask -- whatever result was about to be
+    # returned, rather than just being a harmless no-op cleanup.
+    runner = load_runner_module()
+    process = _FakeProcess()
+    monkeypatch.setattr(runner.os, "getpgid", lambda pid: 999)
+
+    def _killpg(pgid, sig):
+        raise ProcessLookupError()
+
+    monkeypatch.setattr(runner.os, "killpg", _killpg)
+
+    runner._terminate_process_group(process)  # must not raise
+
+    assert process.wait_calls == []
+
+
+def test_terminate_process_group_escalates_to_sigkill_and_reaps_it(monkeypatch) -> None:
+    runner = load_runner_module()
+    process = _FakeProcess(wait_effects=[runner.subprocess.TimeoutExpired(cmd="x", timeout=10), None])
+    killpg_calls: list[tuple[int, int]] = []
+    monkeypatch.setattr(runner.os, "getpgid", lambda pid: 999)
+    monkeypatch.setattr(runner.os, "killpg", lambda pgid, sig: killpg_calls.append((pgid, sig)))
+
+    runner._terminate_process_group(process)
+
+    assert killpg_calls == [(999, runner.signal.SIGTERM), (999, runner.signal.SIGKILL)]
+    # Reaped after SIGKILL, not just after the first (timed-out) wait.
+    assert process.wait_calls == [10, None]
+
+
+def test_terminate_process_group_ignores_a_group_that_exits_between_timeout_and_sigkill(
+    monkeypatch,
+) -> None:
+    runner = load_runner_module()
+    process = _FakeProcess(wait_effects=[runner.subprocess.TimeoutExpired(cmd="x", timeout=10)])
+    monkeypatch.setattr(runner.os, "getpgid", lambda pid: 999)
+
+    def _killpg(pgid, sig):
+        if sig == runner.signal.SIGKILL:
+            raise ProcessLookupError()
+
+    monkeypatch.setattr(runner.os, "killpg", _killpg)
+
+    runner._terminate_process_group(process)  # must not raise
+
+
 def test_dev_status_and_down_are_scoped_to_worktree_project(monkeypatch) -> None:
     runner = load_runner_module()
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)

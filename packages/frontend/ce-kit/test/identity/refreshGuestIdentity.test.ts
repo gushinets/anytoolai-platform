@@ -56,4 +56,44 @@ describe("refreshGuestIdentity", () => {
     expect(result).toEqual({ ok: true, value: { guestId: "guest_fresh" } });
     await expect(fallbackStorage.get("anytoolai.guest_id")).resolves.toBe("guest_fresh");
   });
+
+  // Regression: a caller-supplied fallbackStorage isn't necessarily empty -- e.g. one already
+  // reused across an earlier heal in the same component lifetime. If it isn't cleared before
+  // reuse, createGuestIdentity() reads its pre-populated id straight back out instead of minting a
+  // genuinely fresh one, silently no-op'ing the self-heal on a second failure.
+  it("mints a genuinely fresh id via the fallback even when it already has a cached id from an earlier heal", async () => {
+    const backingStorage = createInMemoryAsyncStorage({ "anytoolai.guest_id": "guest_stale" });
+    backingStorage.remove = vi.fn().mockRejectedValue(new Error("write restricted"));
+    const fallbackStorage = createInMemoryAsyncStorage({ "anytoolai.guest_id": "guest_previously_healed" });
+    const fetchImpl = vi.fn(async () => jsonResponse(200, { guest_id: "guest_fresh" }));
+
+    const result = await refreshGuestIdentity(
+      makeClient(fetchImpl as unknown as typeof fetch),
+      backingStorage,
+      { fallbackStorage },
+    );
+
+    expect(result).toEqual({ ok: true, value: { guestId: "guest_fresh" } });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    await expect(fallbackStorage.get("anytoolai.guest_id")).resolves.toBe("guest_fresh");
+  });
+
+  it("falls back to a throwaway in-memory adapter when both backingStorage and fallbackStorage fail to clear", async () => {
+    const backingStorage = createInMemoryAsyncStorage({ "anytoolai.guest_id": "guest_stale" });
+    backingStorage.remove = vi.fn().mockRejectedValue(new Error("write restricted"));
+    const fallbackStorage = createInMemoryAsyncStorage({ "anytoolai.guest_id": "guest_also_stale" });
+    fallbackStorage.remove = vi.fn().mockRejectedValue(new Error("write restricted"));
+    const fetchImpl = vi.fn(async () => jsonResponse(200, { guest_id: "guest_fresh" }));
+
+    const result = await refreshGuestIdentity(
+      makeClient(fetchImpl as unknown as typeof fetch),
+      backingStorage,
+      { fallbackStorage },
+    );
+
+    expect(result).toEqual({ ok: true, value: { guestId: "guest_fresh" } });
+    // Neither still-stale value must ever come back as this call's result.
+    await expect(backingStorage.get("anytoolai.guest_id")).resolves.toBe("guest_stale");
+    await expect(fallbackStorage.get("anytoolai.guest_id")).resolves.toBe("guest_also_stale");
+  });
 });

@@ -106,14 +106,33 @@ export function HandoffView() {
         throw new Error("The source scenario completed without a result artifact.");
       }
 
+      // The poll loop above already stops on unmount (its own signal), but createHandoff() and
+      // openHandoffConsent() below have not started yet -- without this check, closing the
+      // sidepanel right after a successful poll would still mint a real handoff and pop open a new
+      // tab for a journey nobody is watching anymore.
+      if (controller.signal.aborted) {
+        return;
+      }
+
       setState({ kind: "running", step: "Creating handoff…" });
-      const handoff = await createHandoff(client, {
-        handoffDefinitionId: productConfig.handoffDefinitionId,
-        sourceScenarioSessionId: started.value.scenarioSessionId,
-        sourceArtifactId: resultArtifactId,
-      });
+      const handoff = await createHandoff(
+        client,
+        {
+          handoffDefinitionId: productConfig.handoffDefinitionId,
+          sourceScenarioSessionId: started.value.scenarioSessionId,
+          sourceArtifactId: resultArtifactId,
+        },
+        { signal: controller.signal },
+      );
       if (!handoff.ok) {
         throw new Error("Could not create the handoff.");
+      }
+
+      // openHandoffConsent() has no signal/cancellation of its own (it's a synchronous tab-open,
+      // not a network call) -- this check is the only thing standing between an unmount and
+      // opening a new tab the user never asked for anymore.
+      if (controller.signal.aborted) {
+        return;
       }
 
       await openHandoffConsent({

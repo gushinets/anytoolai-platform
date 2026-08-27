@@ -724,16 +724,26 @@ def _client_handoff_smoke_web_mirror_port() -> int:
 
 def _terminate_process_group(process: subprocess.Popen) -> None:
     """Pairs with start_new_session=True: signals the whole process group, not just `process`'s
-    own pid, since some wrappers (pnpm's `exec`) don't forward signals to the child they spawn."""
+    own pid, since some wrappers (pnpm's `exec`) don't forward signals to the child they spawn.
+    Called from a `finally` cleanup block, so an uncaught ProcessLookupError here (the group can
+    exit on its own between the getpgid() check and a killpg() call) would otherwise replace --
+    and mask -- whatever smoke-test result was about to be returned."""
     try:
         pgid = os.getpgid(process.pid)
     except ProcessLookupError:
         return
-    os.killpg(pgid, signal.SIGTERM)
+    try:
+        os.killpg(pgid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
     try:
         process.wait(timeout=10)
     except subprocess.TimeoutExpired:
-        os.killpg(pgid, signal.SIGKILL)
+        try:
+            os.killpg(pgid, signal.SIGKILL)
+        except ProcessLookupError:
+            return
+        process.wait()
 
 
 def _write_client_handoff_smoke_evidence(exit_code: int) -> Path:

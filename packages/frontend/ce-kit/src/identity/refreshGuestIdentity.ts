@@ -10,7 +10,10 @@ export type RefreshGuestIdentityOptions = {
    * actually forgotten the stale id, so falling back to `backingStorage` would silently defeat the
    * whole point of this function: `createGuestIdentity()` would just read the same stale id
    * straight back out of it. A caller may still pass its own (e.g. one it already keeps around for
-   * other storage-unavailable fallbacks) to avoid an extra throwaway adapter/identity per heal. */
+   * other storage-unavailable fallbacks) to avoid an extra throwaway adapter/identity per heal --
+   * it is cleared the same way `backingStorage` is before reuse, so a caller-supplied instance
+   * that already has an id cached from an earlier heal (or that happens to be the same adapter as
+   * `backingStorage`) still gets a genuinely fresh mint, not that cached value read straight back. */
   fallbackStorage?: AsyncStorage;
 };
 
@@ -34,14 +37,24 @@ export async function refreshGuestIdentity(
   options?: RefreshGuestIdentityOptions,
 ): Promise<GuestIdentityResult> {
   const storageKey = options?.storageKey ?? DEFAULT_GUEST_STORAGE_KEY;
-  let cleared = true;
   try {
     await backingStorage.remove(storageKey);
+    return client.createGuestIdentity({ storage: backingStorage, storageKey });
   } catch {
-    cleared = false;
+    // Fall through to the fallback below.
   }
-  const targetStorage = cleared
-    ? backingStorage
-    : (options?.fallbackStorage ?? createInMemoryAsyncStorage());
-  return client.createGuestIdentity({ storage: targetStorage, storageKey });
+  // backingStorage couldn't be trusted to have forgotten the stale id -- but the fallback needs
+  // clearing too before reuse: it may be a caller-supplied instance already holding an id cached
+  // from an earlier heal, or (in the default case) it's freshly created and this is a no-op, or it
+  // could even be the same adapter as backingStorage. Skipping this would let createGuestIdentity()
+  // read that stale/cached value straight back out instead of minting a genuinely fresh one.
+  const fallbackStorage = options?.fallbackStorage ?? createInMemoryAsyncStorage();
+  try {
+    await fallbackStorage.remove(storageKey);
+    return client.createGuestIdentity({ storage: fallbackStorage, storageKey });
+  } catch {
+    // The fallback itself can't be trusted to have forgotten anything either -- a brand-new
+    // in-memory adapter is guaranteed empty, so this is the last resort that can't fail to heal.
+    return client.createGuestIdentity({ storage: createInMemoryAsyncStorage(), storageKey });
+  }
 }
