@@ -796,18 +796,26 @@ def client_handoff_smoke() -> int:
 
     env = runner_env()
     env["PLATFORM_API_BASE_URL"] = identity.api_url
-    exit_code = run_with_env(["pnpm", "--filter", "@anytoolai/web-mirror", "build"], env)
-    if exit_code != 0:
-        return exit_code
-
     extension_env = dict(env)
     extension_env["WXT_PLATFORM_API_BASE_URL"] = identity.api_url
     extension_env["WXT_WEB_CONSENT_BASE_URL"] = web_mirror_url
-    exit_code = run_with_env(
-        ["pnpm", "--filter", "@anytoolai/kernel-demo-ce", "exec", "wxt", "build"], extension_env
-    )
-    if exit_code != 0:
-        return exit_code
+
+    # web-mirror's build and the extension's build don't depend on each other -- wxt build's only
+    # "dependency" on web-mirror is web_mirror_url, a static string derived from the port above,
+    # not web-mirror's actual build output -- so run them concurrently instead of paying the sum of
+    # both build times.
+    web_mirror_build_command = ["pnpm", "--filter", "@anytoolai/web-mirror", "build"]
+    extension_build_command = ["pnpm", "--filter", "@anytoolai/kernel-demo-ce", "exec", "wxt", "build"]
+    print_command(web_mirror_build_command)
+    print_command(extension_build_command)
+    web_mirror_build = subprocess.Popen(web_mirror_build_command, cwd=ROOT, env=env)
+    extension_build = subprocess.Popen(extension_build_command, cwd=ROOT, env=extension_env)
+    web_mirror_build_exit = web_mirror_build.wait()
+    extension_build_exit = extension_build.wait()
+    if web_mirror_build_exit != 0:
+        return web_mirror_build_exit
+    if extension_build_exit != 0:
+        return extension_build_exit
 
     # start_new_session=True so this lands in its own process group -- `pnpm exec next start`
     # spawns `next-server` as a child that does NOT receive a plain terminate() sent to just the

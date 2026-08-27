@@ -23,6 +23,7 @@ export const BACKEND_ERROR_CODE = {
   handoffFailed: "handoff_failed",
   handoffNotActionable: "handoff_not_actionable",
   handoffAcceptanceFailed: "handoff_acceptance_failed",
+  guestIdentityNotFound: "guest_identity_not_found",
 } as const;
 
 function _isBackendErrorWithCode(
@@ -163,6 +164,17 @@ export function isHandoffNotActionable(error: PlatformApiError): boolean {
 /** True only for the 500 that means accepting the handoff failed while executing the target. */
 export function isHandoffAcceptanceFailed(error: PlatformApiError): boolean {
   return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.handoffAcceptanceFailed);
+}
+
+/**
+ * True only for the 404 that means the `guest_id` a request carried doesn't resolve on the
+ * backend (e.g. a persisted-but-since-deleted guest -- `createGuestIdentity()` caches a guest id
+ * with no server-side revalidation). Raised by `startScenario()`'s quota check, distinct from
+ * `isHandoffGuestIdentityInvalid()`, which is the equivalent case for `acceptHandoff()`. Both are
+ * deterministic and permanent for the current guest id -- see `refreshGuestIdentity()`.
+ */
+export function isGuestIdentityNotFound(error: PlatformApiError): boolean {
+  return _isBackendErrorWithCode(error, BACKEND_ERROR_CODE.guestIdentityNotFound);
 }
 
 /**

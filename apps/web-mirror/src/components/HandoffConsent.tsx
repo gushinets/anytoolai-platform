@@ -5,12 +5,12 @@ import {
   acceptHandoff,
   createInMemoryAsyncStorage,
   createWindowLocalStorageAdapter,
-  DEFAULT_GUEST_STORAGE_KEY,
   declineHandoff,
   getHandoff,
   isHandoffActionRefetchable,
   isHandoffGuestIdentityInvalid,
   isHandoffNotFound,
+  refreshGuestIdentity,
   type AsyncStorage,
   type GuestIdentityResult,
   type HandoffPreview,
@@ -32,23 +32,6 @@ function activeGuestStorage(fallbackStorage: AsyncStorage): AsyncStorage {
 
 function resolveGuestIdentity(client: PlatformApiClient, storage: AsyncStorage): Promise<GuestIdentityResult> {
   return client.createGuestIdentity({ storage });
-}
-
-// createGuestIdentity() caches a guest id in its storage with no server-side revalidation -- if
-// the backend later deletes that guest, accept() 404s with isHandoffGuestIdentityInvalid() forever
-// for that stale id. Clears it so the next resolveGuestIdentity() call mints a fresh one instead of
-// resending the same id that can never succeed. Returns whether the removal actually happened: a
-// failed remove() (write-restricted storage, access revoked mid-session) would otherwise leave the
-// stale id sitting right where the very next resolveGuestIdentity() call reads it straight back
-// out of storage.get()'s own read-before-mint check -- silently turning this "self-heal" into a
-// no-op retry that hits the same 404 forever, while the UI still says "try again."
-async function clearStaleGuestIdentity(storage: AsyncStorage): Promise<boolean> {
-  try {
-    await storage.remove(DEFAULT_GUEST_STORAGE_KEY);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export type HandoffConsentProps = {
@@ -120,13 +103,23 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
       // a fast unmount/token change leaves this POST running in the background for a discarded
       // result, same as any other fire-and-forget identity call in ce-kit today.
       resolveGuestIdentity(client, activeGuestStorage(ephemeralGuestStorage)),
-    ]).then(([previewResult, guestResult]) => {
-      if (controller.signal.aborted) {
-        return;
-      }
-      setGuestId(guestResult.ok ? guestResult.value.guestId : undefined);
-      setState(viewStateFromResult(previewResult));
-    });
+    ]).then(
+      ([previewResult, guestResult]) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setGuestId(guestResult.ok ? guestResult.value.guestId : undefined);
+        setState(viewStateFromResult(previewResult));
+      },
+      () => {
+        // getHandoff()/resolveGuestIdentity() never reject today, but a synchronous throw before
+        // either promise resolves (or a future change to either) must not strand this view on
+        // "Loading handoff..." forever with no way out.
+        if (!controller.signal.aborted) {
+          setState({ kind: "safe-error" });
+        }
+      },
+    );
     return () => {
       controller.abort();
     };
@@ -142,17 +135,19 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
     );
   }
 
-  async function resolveActionError(error: PlatformApiError): Promise<void> {
-    if (isHandoffGuestIdentityInvalid(error)) {
+  // The guest-identity self-heal branch below only ever applies to accept: declineHandoff() never
+  // sends guest_id and (per ce-kit's own docs) can only return handoff_expired/handoff_not_actionable
+  // -- gating on `kind` keeps that tied to the accept path explicitly, rather than relying on decline
+  // simply never triggering it today.
+  async function resolveActionError(kind: "accept" | "decline", error: PlatformApiError): Promise<void> {
+    if (kind === "accept" && isHandoffGuestIdentityInvalid(error)) {
       // Deterministic and permanent for the current guestId (the record stays non-terminal, so
-      // refetching would just return the same actionable preview) -- clear the stale persisted id
-      // and resolve a fresh one so a retry can actually succeed instead of 404ing forever.
-      const storage = activeGuestStorage(ephemeralGuestStorage);
-      const cleared = await clearStaleGuestIdentity(storage);
-      // If the removal itself failed, `storage` can't be trusted to have actually forgotten the
-      // stale id -- force the ephemeral fallback for this mint instead of risking
-      // resolveGuestIdentity() reading the same stale value straight back out of it.
-      const fresh = await resolveGuestIdentity(client, cleared ? storage : ephemeralGuestStorage);
+      // refetching would just return the same actionable preview) -- refreshGuestIdentity() clears
+      // the stale persisted id and resolves a fresh one so a retry can actually succeed instead of
+      // 404ing forever.
+      const fresh = await refreshGuestIdentity(client, activeGuestStorage(ephemeralGuestStorage), {
+        fallbackStorage: ephemeralGuestStorage,
+      });
       setGuestId(fresh.ok ? fresh.value.guestId : undefined);
       showRetryableActionError();
       return;
@@ -174,7 +169,7 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
     if (result.ok) {
       setState(stateForPreview(result.value));
     } else {
-      await resolveActionError(result.error);
+      await resolveActionError(kind, result.error);
     }
   }
 

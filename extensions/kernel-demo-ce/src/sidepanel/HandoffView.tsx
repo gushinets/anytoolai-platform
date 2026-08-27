@@ -3,8 +3,10 @@ import {
   createChromeStorageAdapter,
   createChromeTabNavigator,
   createHandoff,
+  isGuestIdentityNotFound,
   openHandoffConsent,
   pollScenarioSession,
+  refreshGuestIdentity,
   startScenario,
   PlatformApiClient,
 } from "@anytoolai/ce-kit";
@@ -20,7 +22,7 @@ type ViewState =
 
 async function captureActiveTabInput(): Promise<CaptureInputResponse> {
   const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!activeTab?.id) {
+  if (activeTab?.id === undefined) {
     throw new Error("No active tab to capture input from.");
   }
   const response = (await chrome.tabs.sendMessage(activeTab.id, CAPTURE_INPUT_MESSAGE)) as
@@ -45,22 +47,37 @@ export function HandoffView() {
   async function runSmokeJourney() {
     setState({ kind: "running", step: "Capturing input…" });
     try {
-      const captured = await captureActiveTabInput();
-
       const client = new PlatformApiClient({ baseUrl: runtimeConfig.platformApiBaseUrl });
-      const guestIdentity = await client.createGuestIdentity({
-        storage: createChromeStorageAdapter(chrome.storage.local),
-      });
-      const guestId = guestIdentity.ok ? guestIdentity.value.guestId : undefined;
+      // Named `guestStorage`, not `storage` -- see createLocalStorageAdapter()'s docstring for why
+      // a bare `storage` identifier can't be used in a file bundled directly into this WXT build.
+      const guestStorage = createChromeStorageAdapter(chrome.storage.local);
+
+      // Capturing input from the active tab doesn't depend on guest-identity resolution -- run
+      // them concurrently instead of paying the sum of both latencies.
+      const [captured, guestIdentity] = await Promise.all([
+        captureActiveTabInput(),
+        client.createGuestIdentity({ storage: guestStorage }),
+      ]);
+      let guestId = guestIdentity.ok ? guestIdentity.value.guestId : undefined;
+
+      const startSourceScenario = (id: string | undefined) =>
+        startScenario(client, {
+          productId: productConfig.productId,
+          scenarioId: productConfig.handoffSourceScenarioId,
+          frontendId: productConfig.frontendId,
+          input: { source_text: captured.text },
+          guestId: id,
+        });
 
       setState({ kind: "running", step: "Running source scenario…" });
-      const started = await startScenario(client, {
-        productId: productConfig.productId,
-        scenarioId: productConfig.handoffSourceScenarioId,
-        frontendId: productConfig.frontendId,
-        input: { source_text: captured.text },
-        guestId,
-      });
+      let started = await startSourceScenario(guestId);
+      if (!started.ok && isGuestIdentityNotFound(started.error)) {
+        // The persisted guest id is stale (backend deleted it) -- self-heal the same way
+        // HandoffConsent.tsx does for a stale id on accept(), then retry once with a fresh id.
+        const refreshed = await refreshGuestIdentity(client, guestStorage);
+        guestId = refreshed.ok ? refreshed.value.guestId : undefined;
+        started = await startSourceScenario(guestId);
+      }
       if (!started.ok) {
         throw new Error("Could not start the source scenario.");
       }

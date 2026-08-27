@@ -9,6 +9,7 @@ export type {
 export type { PlatformApiError } from "./api/errors";
 export { networkError } from "./api/errors";
 export {
+  isGuestIdentityNotFound,
   isHandoffAcceptanceFailed,
   isHandoffAcceptanceSourceInvalid,
   isHandoffActionRefetchable,
@@ -32,6 +33,8 @@ export { createLocalStorageAdapter, createWindowLocalStorageAdapter } from "./st
 
 export { DEFAULT_GUEST_STORAGE_KEY } from "./identity/guestIdentity";
 export type { GuestIdentity, GuestIdentityOptions, GuestIdentityResult } from "./identity/guestIdentity";
+export { refreshGuestIdentity } from "./identity/refreshGuestIdentity";
+export type { RefreshGuestIdentityOptions } from "./identity/refreshGuestIdentity";
 export { getQuota } from "./quota/getQuota";
 export type { QuotaRequest, QuotaState } from "./quota/types";
 export { startScenario } from "./scenarios/startScenario";
