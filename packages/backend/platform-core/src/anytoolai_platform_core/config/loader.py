@@ -293,20 +293,6 @@ def _parse_optional_bool_field(
     file_path: Path,
     config_id: str,
 ) -> bool:
-    """Parse an optional boolean field, defaulting to False if None.
-
-    Args:
-        raw_value: The raw configuration value to parse.
-        field_name: Name of the field being parsed (for error messages).
-        file_path: Path to the configuration file being processed.
-        config_id: Identifier of the configuration being processed.
-
-    Returns:
-        False if raw_value is None, otherwise the boolean value.
-
-    Raises:
-        InvalidConfigShapeError: If raw_value is not None and not a boolean.
-    """
     if raw_value is None:
         return False
     if not isinstance(raw_value, bool):
