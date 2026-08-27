@@ -9,6 +9,7 @@ on:
       - "apps/web-mirror/**"
       - "extensions/kernel-demo-ce/**"
       - "packages/frontend/ce-kit/**"
+      - "packages/backend/platform-core/**"
       - "tests/e2e/client-handoff-smoke/**"
       - "scripts/agent/runner.py"
       - ".github/workflows/client-handoff-smoke.yml"
