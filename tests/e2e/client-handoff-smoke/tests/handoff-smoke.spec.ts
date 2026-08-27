@@ -45,6 +45,10 @@ async function serveSourcePage(): Promise<{ url: string; close: () => Promise<vo
   };
 }
 
+function handoffTokenFromUrl(page: Page): string | undefined {
+  return new URL(page.url()).pathname.split("/").pop();
+}
+
 async function getExtensionId(context: BrowserContext): Promise<string> {
   let [worker] = context.serviceWorkers();
   worker ??= await context.waitForEvent("serviceworker");
@@ -100,11 +104,12 @@ test.describe("ANY-224 client handoff integration smoke", () => {
       await expect(consentPage.getByText("Kernel Demo").first()).toBeVisible();
       await expect(consentPage.getByText(/next Friday/)).toBeVisible();
       await expect(consentPage.getByText(/\$5,000/)).toBeVisible();
+      const pageContent = (await consentPage.content()).toLowerCase();
       for (const forbidden of ["provider", "prompt", "model", "openai", "anthropic"]) {
-        expect((await consentPage.content()).toLowerCase()).not.toContain(forbidden);
+        expect(pageContent).not.toContain(forbidden);
       }
 
-      const handoffToken = new URL(consentPage.url()).pathname.split("/").pop();
+      const handoffToken = handoffTokenFromUrl(consentPage);
       expect(handoffToken).toBeTruthy();
 
       await consentPage.getByRole("button", { name: "Accept" }).click();
@@ -127,7 +132,7 @@ test.describe("ANY-224 client handoff integration smoke", () => {
 
   test("decline: declining leaves no target session", async () => {
     await withHandoffJourney(async ({ consentPage, platformApiBaseUrl }) => {
-      const handoffToken = new URL(consentPage.url()).pathname.split("/").pop();
+      const handoffToken = handoffTokenFromUrl(consentPage);
 
       await consentPage.getByRole("button", { name: "Decline" }).click();
       await expect(consentPage.getByText(/declined/i)).toBeVisible();
