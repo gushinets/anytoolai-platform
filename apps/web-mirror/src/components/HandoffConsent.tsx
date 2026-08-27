@@ -12,27 +12,11 @@ import {
   isHandoffNotFound,
   refreshGuestIdentity,
   type AsyncStorage,
-  type GuestIdentityResult,
   type HandoffPreview,
   type PlatformApiClient,
   type PlatformApiError,
   type PlatformApiResult,
 } from "@anytoolai/ce-kit";
-
-// createWindowLocalStorageAdapter() already guards against window.localStorage itself throwing
-// synchronously (privacy-hardened browsers, storage-denied sandboxed iframes) -- falls back to
-// `fallbackStorage` (an in-memory adapter scoped to this component instance) in that case, so lack
-// of persistent storage never prevents establishing an acceptor identity for this page. The id
-// just won't survive a reload/remount the way a real localStorage one would. Resolved once per
-// call site and reused for every storage operation within it, so a mid-call change in
-// localStorage's availability can't split one logical operation across two different backends.
-function activeGuestStorage(fallbackStorage: AsyncStorage): AsyncStorage {
-  return createWindowLocalStorageAdapter() ?? fallbackStorage;
-}
-
-function resolveGuestIdentity(client: PlatformApiClient, storage: AsyncStorage): Promise<GuestIdentityResult> {
-  return client.createGuestIdentity({ storage });
-}
 
 export type HandoffConsentProps = {
   client: PlatformApiClient;
@@ -59,7 +43,7 @@ function stateForPreview(preview: HandoffPreview): ViewState {
     : { kind: "consent", preview, pending: null, actionError: null };
 }
 
-function viewStateFromResult(result: Awaited<ReturnType<typeof getHandoff>>): ViewState {
+function viewStateFromResult(result: PlatformApiResult<HandoffPreview>): ViewState {
   if (!result.ok) {
     return isHandoffNotFound(result.error) ? { kind: "not-found" } : { kind: "safe-error" };
   }
@@ -80,11 +64,18 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
   // sending no guest_id would let the backend's HandoffService.accept() attribute the target
   // session/quota to the handoff's creator instead of the person actually accepting.
   const [guestId, setGuestId] = useState<string | undefined>(undefined);
-  // Fallback storage for resolveGuestIdentity()/clearStaleGuestIdentity() when window.localStorage
-  // itself isn't available -- lazily created once per component instance (stable across
-  // re-renders and across a self-heal retry within the same mount), not module-level, so it
-  // doesn't leak a minted guest id across remounts/tests the way a module singleton would.
+  // Fallback storage for guestStorage/refreshGuestIdentity() when window.localStorage itself isn't
+  // available -- lazily created once per component instance (stable across re-renders and across a
+  // self-heal retry within the same mount), not module-level, so it doesn't leak a minted guest id
+  // across remounts/tests the way a module singleton would.
   const [ephemeralGuestStorage] = useState<AsyncStorage>(() => createInMemoryAsyncStorage());
+  // Which backend to persist the guest id in, decided once at mount and reused for every storage
+  // operation for this component's whole lifetime -- resolving it fresh on each call (as a prior
+  // version of this component did, once in the mount effect and again in resolveActionError) risks
+  // the two calls disagreeing if localStorage's availability changes in between (e.g. a Storage
+  // Access API grant lands mid-session), which would split a stale/fresh guest id across two
+  // different storage backends instead of ever colocating them.
+  const [guestStorage] = useState<AsyncStorage>(() => createWindowLocalStorageAdapter() ?? ephemeralGuestStorage);
   // Bumped to force the mount effect below to re-run on demand (e.g. a "Try again" click from the
   // safe-error view) without duplicating its fetch logic in a second function.
   const [retryToken, setRetryToken] = useState(0);
@@ -102,7 +93,7 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
       // caller on this client instance, so one caller cancelling could not cancel the others) --
       // a fast unmount/token change leaves this POST running in the background for a discarded
       // result, same as any other fire-and-forget identity call in ce-kit today.
-      resolveGuestIdentity(client, activeGuestStorage(ephemeralGuestStorage)),
+      client.createGuestIdentity({ storage: guestStorage }),
     ]).then(
       ([previewResult, guestResult]) => {
         if (controller.signal.aborted) {
@@ -112,7 +103,7 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
         setState(viewStateFromResult(previewResult));
       },
       () => {
-        // getHandoff()/resolveGuestIdentity() never reject today, but a synchronous throw before
+        // getHandoff()/createGuestIdentity() never reject today, but a synchronous throw before
         // either promise resolves (or a future change to either) must not strand this view on
         // "Loading handoff..." forever with no way out.
         if (!controller.signal.aborted) {
@@ -123,7 +114,7 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
     return () => {
       controller.abort();
     };
-  }, [client, handoffToken, ephemeralGuestStorage, retryToken]);
+  }, [client, handoffToken, guestStorage, retryToken]);
 
   // A stale accept/decline can race an already-terminal token (expired, already accepted/declined,
   // or a failed target execution). Rather than retry the mutation, refetch the authoritative
@@ -145,7 +136,7 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
       // refetching would just return the same actionable preview) -- refreshGuestIdentity() clears
       // the stale persisted id and resolves a fresh one so a retry can actually succeed instead of
       // 404ing forever.
-      const fresh = await refreshGuestIdentity(client, activeGuestStorage(ephemeralGuestStorage), {
+      const fresh = await refreshGuestIdentity(client, guestStorage, {
         fallbackStorage: ephemeralGuestStorage,
       });
       setGuestId(fresh.ok ? fresh.value.guestId : undefined);
@@ -165,11 +156,18 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
     mutate: () => Promise<PlatformApiResult<HandoffPreview>>,
   ) {
     setState((prev) => (prev.kind === "consent" ? { ...prev, pending: kind, actionError: null } : prev));
-    const result = await mutate();
-    if (result.ok) {
-      setState(stateForPreview(result.value));
-    } else {
-      await resolveActionError(kind, result.error);
+    try {
+      const result = await mutate();
+      if (result.ok) {
+        setState(stateForPreview(result.value));
+      } else {
+        await resolveActionError(kind, result.error);
+      }
+    } catch {
+      // mutate()/resolveActionError() should never actually reject, but a rejection must not
+      // strand `pending` forever with both buttons permanently disabled and no way to retry --
+      // same reasoning as the mount effect's own rejection handler above.
+      showRetryableActionError();
     }
   }
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createChromeStorageAdapter,
   createChromeTabNavigator,
@@ -43,8 +43,20 @@ async function captureActiveTabInput(): Promise<CaptureInputResponse> {
  */
 export function HandoffView() {
   const [state, setState] = useState<ViewState>({ kind: "idle" });
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // If the sidepanel is closed/navigated away from mid-journey, abort the in-flight poll loop --
+  // without this, pollScenarioSession() (up to ~30 GETs over its default 60s window) keeps hitting
+  // the backend for a result nothing is listening for anymore.
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   async function runSmokeJourney() {
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setState({ kind: "running", step: "Capturing input…" });
     try {
       const client = new PlatformApiClient({ baseUrl: runtimeConfig.platformApiBaseUrl });
@@ -83,7 +95,9 @@ export function HandoffView() {
       }
 
       setState({ kind: "running", step: "Waiting for the result…" });
-      const polled = await pollScenarioSession(client, started.value.scenarioSessionId);
+      const polled = await pollScenarioSession(client, started.value.scenarioSessionId, {
+        signal: controller.signal,
+      });
       if (!polled.result.ok || polled.result.value.status !== "completed") {
         throw new Error("The source scenario did not complete.");
       }

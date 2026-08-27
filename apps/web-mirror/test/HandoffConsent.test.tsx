@@ -36,6 +36,25 @@ const PREVIEW_ROUTE = "GET /v1/handoffs/token_abc";
 const ACCEPT_ROUTE = "POST /v1/handoffs/token_abc/accept";
 const DECLINE_ROUTE = "POST /v1/handoffs/token_abc/decline";
 
+/** Makes `window.localStorage` itself throw synchronously (privacy-hardened browsers, storage-
+ * denied sandboxed iframes) for the duration of `fn`, then restores it -- even if `fn` throws. */
+async function withThrowingLocalStorage(fn: () => Promise<void>): Promise<void> {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    get() {
+      throw new DOMException("Storage access denied");
+    },
+  });
+  try {
+    await fn();
+  } finally {
+    if (originalDescriptor) {
+      Object.defineProperty(window, "localStorage", originalDescriptor);
+    }
+  }
+}
+
 function guestIdentityResponse(guestId = "guest_1"): Response {
   return jsonResponse(200, { guest_id: guestId });
 }
@@ -145,15 +164,7 @@ describe("HandoffConsent", () => {
   });
 
   it("still resolves a guest identity and allows Accept when window.localStorage itself throws (storage-denied sandboxes)", async () => {
-    const originalDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
-    Object.defineProperty(window, "localStorage", {
-      configurable: true,
-      get() {
-        throw new DOMException("Storage access denied");
-      },
-    });
-
-    try {
+    await withThrowingLocalStorage(async () => {
       // resolveGuestIdentity() must catch the synchronous throw from window.localStorage and fall
       // back to an in-memory adapter -- still calling the backend to mint a real (if ephemeral)
       // guest id, rather than leaving Accept permanently disabled.
@@ -173,23 +184,11 @@ describe("HandoffConsent", () => {
       await waitFor(() => expect(screen.getByText("accepted")).toBeTruthy());
       const acceptCall = calls.find((call) => call.key === ACCEPT_ROUTE);
       expect(JSON.parse(acceptCall?.init.body as string)).toEqual({ guest_id: "guest_ephemeral" });
-    } finally {
-      if (originalDescriptor) {
-        Object.defineProperty(window, "localStorage", originalDescriptor);
-      }
-    }
+    });
   });
 
   it("resolves neither localStorage nor a guest identity, but still renders usably with Accept disabled", async () => {
-    const originalDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
-    Object.defineProperty(window, "localStorage", {
-      configurable: true,
-      get() {
-        throw new DOMException("Storage access denied");
-      },
-    });
-
-    try {
+    await withThrowingLocalStorage(async () => {
       // Both failures at once: the ephemeral fallback resolveGuestIdentity() reaches for after
       // catching the localStorage throw is itself a real backend call, and that call fails too.
       const { client } = makeRoutedClient({
@@ -203,11 +202,7 @@ describe("HandoffConsent", () => {
       expect(screen.getByText("Kernel Demo")).toBeTruthy();
       const acceptButton = screen.getByRole("button", { name: "Accept" }) as HTMLButtonElement;
       expect(acceptButton.disabled).toBe(true);
-    } finally {
-      if (originalDescriptor) {
-        Object.defineProperty(window, "localStorage", originalDescriptor);
-      }
-    }
+    });
   });
 
   it("self-heals a stale guest id via the ephemeral fallback even when clearing it from localStorage itself fails", async () => {
