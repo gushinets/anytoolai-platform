@@ -11,3 +11,8 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 export function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
+
+/** True for a field that's optional-and-nullable on the wire: absent, explicit null, or a string. */
+export function isNullableString(value: unknown): value is string | null | undefined {
+  return value === undefined || value === null || typeof value === "string";
+}

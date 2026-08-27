@@ -1,6 +1,6 @@
 import type { AssertExactSchemaShape } from "../api/driftAssertions";
 import type { components } from "../api/generated/platformApi";
-import { isRecord } from "../api/parsing";
+import { isNullableString, isRecord } from "../api/parsing";
 import type { QuotaState } from "./types";
 
 /**
@@ -43,7 +43,7 @@ export function parseQuotaState(payload: unknown): QuotaState | null {
   ) {
     return null;
   }
-  if (scenarioId !== null && scenarioId !== undefined && typeof scenarioId !== "string") {
+  if (!isNullableString(scenarioId)) {
     return null;
   }
 
