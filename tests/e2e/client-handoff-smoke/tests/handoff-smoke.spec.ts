@@ -121,6 +121,17 @@ test.describe("ANY-224 client handoff integration smoke", () => {
       expect(body.target_scenario_session_id).toBeTruthy();
       expect(body.target_job_id).toBeTruthy();
 
+      // A non-null target_scenario_session_id on the handoff record alone doesn't prove Platform
+      // Core actually created that session -- independently fetch it to prove the linked target
+      // session genuinely exists, not just that the handoff record carries a plausible-looking id.
+      const targetSession = await consentPage.request.get(
+        `${platformApiBaseUrl}/v1/scenario-sessions/${body.target_scenario_session_id}`,
+      );
+      expect(targetSession.ok()).toBe(true);
+      const targetSessionBody = await targetSession.json();
+      expect(targetSessionBody.scenario_session_id).toBe(body.target_scenario_session_id);
+      expect(targetSessionBody.job_id).toBe(body.target_job_id);
+
       // A consumed token is unreplayable from the client's side: reloading must not resurrect
       // Accept/Decline -- this doubles as this smoke's expiry-shaped coverage (a terminal token
       // stays terminal), since waiting out a real expires_at isn't practical in a smoke test.
