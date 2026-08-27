@@ -91,7 +91,7 @@ def test_write_bundle_uses_repository_local_output(monkeypatch, tmp_path) -> Non
 def test_write_bundle_captures_timestamp_before_calling_collect(monkeypatch, tmp_path) -> None:
     """The filename's timestamp must reflect when write_bundle() was called, not when collect()
     (which can take ~20s via docker compose logs/ps) finished -- regression coverage for the
-    ordering fix in docs/exec-plans/active/any-220-atom-runtime-proof-cli.md's decision log
+    ordering fix in docs/exec-plans/completed/any-220-atom-runtime-proof-cli.md's decision log
     (third code review pass): a prior refactor had silently moved the timestamp to after
     collect()."""
     module = load_module()

@@ -7,11 +7,9 @@
 - Created: 2026-08-20
 - Last updated: 2026-08-25
 - Review date: 2026-08-25
-- Next action: none on the code/docs side. `feature/ANY-221` is pushed and PR #84's body is
-  synced to current state; CI is green (all 8 checks). The only remaining action is a standing
-  human `CHANGES_REQUESTED` review from `gushinets` (2026-08-24) -- its requirements are already
-  met by current code, but only that reviewer (or someone with repo permissions) re-reviewing or
-  dismissing it can actually clear it; not something this session can action unilaterally.
+- Next action: none. `feature/ANY-221` is pushed and PR #84 is merged: `gushinets` submitted
+  `APPROVED` on 2026-08-26T08:53:42Z after the standing `CHANGES_REQUESTED` review below was
+  addressed, and #84 merged at 2026-08-26T09:16:02Z.
 - Blocker: none. A sixth human code review (2026-08-25, "code-review (me #6)") found
   `EvidenceCase`/`StepEvidence` never carried `result_artifact_id`/`output_artifact_id` despite
   ANY-221's acceptance criterion naming "session/artifact IDs" explicitly, and that `LIVE011`
@@ -176,7 +174,7 @@ Full design rationale (verified against real code before implementation) lives i
 ## Relevant docs
 
 - `docs/architecture/llm-runtime.md`
-- `docs/exec-plans/active/any-220-atom-runtime-proof-cli.md` (the CLI/evidence machinery this
+- `docs/exec-plans/completed/any-220-atom-runtime-proof-cli.md` (the CLI/evidence machinery this
   ticket extends)
 
 ## Contracts touched
@@ -448,12 +446,10 @@ Full design rationale (verified against real code before implementation) lives i
 
 ## Follow-up debt
 
-- None outstanding on the code/docs side. PR #84's body is synced, CI is green (all 8 checks,
-  including Windows `quick-check`, `pass` on HEAD `df455795`). The one open item is the human
-  `CHANGES_REQUESTED` review from `gushinets` (2026-08-24) still standing on the PR -- its
-  requirements (close public access, retry semantics, fresh `11/11` + `3/3` evidence) are all met
-  by the current code, but only that reviewer (or someone with repo permissions) re-reviewing or
-  dismissing it can actually clear it; not something this session can action unilaterally.
+- None. PR #84 is merged: `gushinets` submitted `APPROVED` on 2026-08-26T08:53:42Z (the
+  requirements behind the earlier standing `CHANGES_REQUESTED` review -- close public access,
+  retry semantics, fresh `11/11` + `3/3` evidence -- were all met by the code above), and #84
+  merged at 2026-08-26T09:16:02Z.
 - The `$0.50`/4-calls/60s estimates in Open questions above are otherwise the only remaining soft
   spot, and all 3 completed runs so far validated them as reasonable (~$0.008 total per run,
   nowhere near the cap).
