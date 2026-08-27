@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 import urllib.parse
 from pathlib import Path
 
@@ -466,6 +467,16 @@ class _FakeProcess:
         return effect
 
 
+# _terminate_process_group() is POSIX-only (os.getpgid()/os.killpg() don't exist on Windows at
+# all, matching client_handoff_smoke()'s own Popen(start_new_session=True) and the
+# client-handoff-smoke CI job itself, which only runs on ubuntu-latest) -- monkeypatch.setattr()
+# on a nonexistent Windows os attribute fails with AttributeError before the test body even runs.
+_posix_only = pytest.mark.skipif(
+    sys.platform == "win32", reason="_terminate_process_group() uses POSIX-only os.getpgid()/os.killpg()"
+)
+
+
+@_posix_only
 def test_terminate_process_group_ignores_a_group_that_exits_between_getpgid_and_sigterm(
     monkeypatch,
 ) -> None:
@@ -487,6 +498,7 @@ def test_terminate_process_group_ignores_a_group_that_exits_between_getpgid_and_
     assert process.wait_calls == []
 
 
+@_posix_only
 def test_terminate_process_group_escalates_to_sigkill_and_reaps_it(monkeypatch) -> None:
     runner = load_runner_module()
     process = _FakeProcess(wait_effects=[runner.subprocess.TimeoutExpired(cmd="x", timeout=10), None])
@@ -501,6 +513,7 @@ def test_terminate_process_group_escalates_to_sigkill_and_reaps_it(monkeypatch) 
     assert process.wait_calls == [10, None]
 
 
+@_posix_only
 def test_terminate_process_group_ignores_a_group_that_exits_between_timeout_and_sigkill(
     monkeypatch,
 ) -> None:

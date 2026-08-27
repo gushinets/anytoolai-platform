@@ -844,6 +844,16 @@ def client_handoff_smoke() -> int:
 
         smoke_env = dict(env)
         smoke_env["WEB_CONSENT_BASE_URL"] = web_mirror_url
+        # runner_env()'s workspace-local TMPDIR is wrong for this one subprocess: the spec's
+        # mkdtemp(join(tmpdir(), ...)) feeds that path straight into Chromium's
+        # launchPersistentContext user-data-dir, and on a long checkout path (e.g. GitHub Actions'
+        # /home/runner/work/<repo>/<repo>) the resulting profile-relative singleton-socket path
+        # exceeds Linux's ~108-byte AF_UNIX limit -- Chrome then FATALs in
+        # process_singleton_posix.cc before the browser ever opens a page. Falling back to the
+        # real system temp dir (always short, e.g. /tmp) keeps the profile path short regardless
+        # of checkout location.
+        for key in ("TMPDIR", "TMP", "TEMP"):
+            smoke_env.pop(key, None)
         CLIENT_HANDOFF_SMOKE_REPORT_PATH.unlink(missing_ok=True)
         exit_code = run_with_env(
             ["pnpm", "--filter", "@anytoolai/client-handoff-smoke", "run", "smoke"], smoke_env
