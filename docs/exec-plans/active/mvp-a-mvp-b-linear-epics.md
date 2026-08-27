@@ -82,7 +82,7 @@ not block Atom Runtime Proof.
 | A16 web result/paywall/onboarding | ANY-11 | ANY-217 and ANY-36 |
 | A18 client handoff parent | ANY-6 | ANY-8 and ANY-20 |
 | A18a handoff CE helpers | ANY-222 | Done |
-| A18b web consent surface | ANY-223 | ANY-20 |
+| A18b web consent surface | ANY-223 | Done |
 | A18c client handoff smoke | ANY-224 | ANY-222/223/20 |
 | A19 kernel-demo CE client proof | ANY-39 | ANY-8/222/223 |
 | MVP-A2 release gate | ANY-225 | A15/A16/A18/A19 |

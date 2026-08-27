@@ -19,3 +19,30 @@ export type HandoffCreated = {
   status: string;
   expiresAt: string;
 };
+
+/**
+ * The backend safe preview shared by `GET /v1/handoffs/{token}`, `POST .../accept`, and `POST
+ * .../decline` -- all three return the identical `HandoffPreviewResponse` shape. `preview` is a
+ * bounded, config-mapped `dict[str, Any]` on the wire -- render it as opaque key/value pairs only,
+ * never assume specific keys. `targetScenarioSessionId`/`targetJobId` are null until a handoff is
+ * accepted.
+ */
+export type HandoffPreview = {
+  handoffId: string;
+  status: string;
+  sourceProductId: string;
+  sourceProductDisplayName: string;
+  targetProductId: string;
+  targetProductDisplayName: string;
+  targetScenarioId: string;
+  preview: Record<string, unknown>;
+  expiresAt: string;
+  targetScenarioSessionId: string | null;
+  targetJobId: string | null;
+};
+
+/** `POST /v1/handoffs/{token}/accept` request body -- both fields are optional on the wire. */
+export type AcceptHandoffRequest = {
+  guestId?: string;
+  sourceFrontendInstanceId?: string;
+};
