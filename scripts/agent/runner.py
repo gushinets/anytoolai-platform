@@ -179,11 +179,41 @@ def quick_check_python() -> str:
     return str(candidate) if candidate.exists() else sys.executable
 
 
+# Must stay in sync with quick_check.py's EDITABLE_PROJECTS/DEPENDENCY_FINGERPRINT_INPUTS: this
+# is the same duplication-across-standalone-scripts pattern already used for ROOT/baseline_env()
+# in both files (neither script imports the other).
+QUICK_CHECK_DEPENDENCY_FINGERPRINT_INPUTS = [
+    ROOT / "uv.lock",
+    ROOT / "packages" / "backend" / "platform-sdk" / "pyproject.toml",
+    ROOT / "packages" / "backend" / "platform-core" / "pyproject.toml",
+    ROOT / "packages" / "backend" / "platform-actions" / "pyproject.toml",
+    ROOT / "apps" / "platform-api" / "pyproject.toml",
+    ROOT / "apps" / "platform-worker" / "pyproject.toml",
+]
+
+
+def quick_check_dependency_fingerprint() -> str:
+    digest = hashlib.sha256()
+    for path in QUICK_CHECK_DEPENDENCY_FINGERPRINT_INPUTS:
+        digest.update(path.read_bytes() if path.exists() else b"")
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
 def quick_check_venv_ready(venv_python: Path) -> bool:
-    # Marker written by quick_check.py's bootstrap() only after every editable install succeeds
-    # (ANY-390): venv_python.exists() alone can't tell a fully bootstrapped venv apart from one
-    # left behind by a quick-check run interrupted mid-way through the editable installs.
-    return venv_python.exists() and (venv_python.parent / ".bootstrap-complete").exists()
+    # Marker written by quick_check.py's bootstrap() only after every editable install succeeds,
+    # containing a fingerprint of uv.lock + each editable project's pyproject.toml (ANY-390):
+    # venv_python.exists() alone can't tell a fully bootstrapped, up-to-date venv apart from one
+    # left behind by an interrupted bootstrap, or one that's gone stale because .quick-check-venv
+    # is gitignored and survives a pull/branch-switch that changed dependency inputs underneath it.
+    marker = venv_python.parent / ".bootstrap-complete"
+    if not venv_python.exists() or not marker.exists():
+        return False
+    try:
+        stored_fingerprint = marker.read_text(encoding="utf-8").strip()
+    except OSError:
+        return False
+    return stored_fingerprint == quick_check_dependency_fingerprint()
 
 
 def run(command: Sequence[str], *, timeout: float | None = None) -> int:
@@ -681,14 +711,17 @@ def _run_proof_script(script_path: str, database_url_env: str) -> int:
     anytoolai_platform_core, which pulls in platform-actions' markdown-it-py, a dependency that
     only exists in the managed venv, never in a bare system Python (ANY-390). Unlike
     quick_check_python(), this does not silently fall back to sys.executable when the venv is
-    missing or incomplete (an interrupted bootstrap can leave the interpreter in place without
-    every editable package installed) -- that would just reproduce the bug on a fresh checkout --
-    it fails fast instead."""
+    missing, incomplete (an interrupted bootstrap can leave the interpreter in place without every
+    editable package installed), or stale (.quick-check-venv is gitignored and survives a pull or
+    branch switch that changed uv.lock/dependency inputs underneath it) -- any of those would just
+    reproduce the bug on a checkout whose venv doesn't actually match what quick-check would
+    install today -- it fails fast instead."""
     venv_python = quick_check_venv_python()
     if not quick_check_venv_ready(venv_python):
         print(
-            "ENV001: .quick-check-venv not found or incomplete -- run `python scripts/agent/runner.py "
-            "quick-check` once to bootstrap the managed environment, then retry.",
+            "ENV001: .quick-check-venv not found, incomplete, or out of date -- run `python "
+            "scripts/agent/runner.py quick-check` once to (re)bootstrap the managed environment, "
+            "then retry.",
             file=sys.stderr,
         )
         return 2

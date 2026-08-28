@@ -190,6 +190,9 @@ def test_bootstrap_syncs_root_environment_from_locked_uv_state(monkeypatch, tmp_
     monkeypatch.setattr(quick_check, "VENV_DIR", venv_dir)
     monkeypatch.setattr(quick_check.sys, "executable", "/tmp/.quick-check-venv/bin/python")
     monkeypatch.setattr(quick_check, "EDITABLE_PROJECTS", [project_one, project_two])
+    # Isolate the fingerprint from real repo state -- it's built from EDITABLE_PROJECTS at module
+    # load time, before the monkeypatch above, so it must be pointed at tmp_path explicitly too.
+    monkeypatch.setattr(quick_check, "DEPENDENCY_FINGERPRINT_INPUTS", [tmp_path / "uv.lock"])
     monkeypatch.setattr(
         quick_check.shutil,
         "which",
@@ -237,7 +240,24 @@ def test_bootstrap_syncs_root_environment_from_locked_uv_state(monkeypatch, tmp_
             str(project_two),
         ],
     ]
-    assert (venv_dir / scripts_dir / ".bootstrap-complete").exists()
+    marker = venv_dir / scripts_dir / ".bootstrap-complete"
+    assert marker.read_text(encoding="utf-8") == quick_check.dependency_fingerprint()
+
+
+def test_marker_fingerprint_changes_when_dependency_state_drifts(monkeypatch, tmp_path) -> None:
+    """Code-review finding (#me 1): a marker written for one dependency state must not read as
+    valid once uv.lock/an editable project's pyproject.toml changes underneath the gitignored,
+    pull-surviving .quick-check-venv."""
+    quick_check = load_quick_check_module()
+    lock_file = tmp_path / "uv.lock"
+    lock_file.write_text("original", encoding="utf-8")
+    monkeypatch.setattr(quick_check, "DEPENDENCY_FINGERPRINT_INPUTS", [lock_file])
+
+    written = quick_check.dependency_fingerprint()
+    lock_file.write_text("changed by a pull/branch switch", encoding="utf-8")
+    recomputed = quick_check.dependency_fingerprint()
+
+    assert written != recomputed
 
 
 def test_bootstrap_leaves_no_marker_on_failure(monkeypatch, tmp_path) -> None:

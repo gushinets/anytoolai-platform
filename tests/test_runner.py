@@ -1038,6 +1038,39 @@ def test_dev_smoke_reports_dev001_for_invalid_port_override(monkeypatch, capsys)
     assert "DEV001" in capsys.readouterr().err
 
 
+def test_quick_check_dependency_fingerprint_changes_when_an_input_file_changes(
+    monkeypatch, tmp_path
+) -> None:
+    """Code-review finding (#me 1): the fingerprint must actually reflect uv.lock/pyproject.toml
+    content, not just their existence, or dependency-state drift would go undetected."""
+    runner = load_runner_module()
+    lock_file = tmp_path / "uv.lock"
+    lock_file.write_text("original lock contents", encoding="utf-8")
+    monkeypatch.setattr(runner, "QUICK_CHECK_DEPENDENCY_FINGERPRINT_INPUTS", [lock_file])
+
+    before = runner.quick_check_dependency_fingerprint()
+    lock_file.write_text("changed lock contents", encoding="utf-8")
+    after = runner.quick_check_dependency_fingerprint()
+
+    assert before != after
+
+
+def test_quick_check_venv_ready_rejects_stale_marker(monkeypatch, tmp_path) -> None:
+    """Code-review finding (#me 1): a marker whose stored fingerprint no longer matches the
+    current dependency inputs (e.g. after `git pull` changed uv.lock) must not be treated as
+    ready -- .quick-check-venv is gitignored and survives such a pull untouched."""
+    runner = load_runner_module()
+    venv_python = tmp_path / "python"
+    venv_python.touch()
+    monkeypatch.setattr(runner, "quick_check_dependency_fingerprint", lambda: "current-fingerprint")
+
+    (venv_python.parent / ".bootstrap-complete").write_text("stale-fingerprint", encoding="utf-8")
+    assert runner.quick_check_venv_ready(venv_python) is False
+
+    (venv_python.parent / ".bootstrap-complete").write_text("current-fingerprint", encoding="utf-8")
+    assert runner.quick_check_venv_ready(venv_python) is True
+
+
 def test_proof_script_fails_fast_when_quick_check_venv_missing(monkeypatch, tmp_path, capsys) -> None:
     """ANY-390: on a fresh checkout that never ran quick-check, atoms-proof/live-canary must fail
     with a clear setup instruction instead of silently launching sys.executable and reproducing
@@ -1076,11 +1109,40 @@ def test_proof_script_fails_fast_when_quick_check_venv_incomplete(monkeypatch, t
     assert "quick-check" in err
 
 
+def test_proof_script_fails_fast_when_quick_check_venv_dependency_state_is_stale(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    """Code-review finding (#me 1): .quick-check-venv is gitignored and survives pulls/branch
+    switches -- a successful bootstrap followed by dependency-state drift (uv.lock or an editable
+    project's pyproject.toml changing underneath it) must not be treated as ready, or
+    atoms-proof/live-canary would launch a stale interpreter and hit PROOF000 instead of ENV001."""
+    runner = load_runner_module()
+    venv_python = tmp_path / "python"
+    venv_python.touch()
+    (venv_python.parent / ".bootstrap-complete").write_text(
+        "fingerprint-from-a-past-bootstrap", encoding="utf-8"
+    )
+    monkeypatch.setattr(runner, "quick_check_venv_python", lambda: venv_python)
+    monkeypatch.setattr(
+        runner, "quick_check_dependency_fingerprint", lambda: "fingerprint-after-uv-lock-changed"
+    )
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: pytest.fail("subprocess must not launch")
+    )
+
+    assert runner.atoms_proof() == 2
+
+    err = capsys.readouterr().err
+    assert "ENV001" in err
+    assert "quick-check" in err
+
+
 def test_atoms_proof_reports_dev001_for_invalid_port_override(monkeypatch, tmp_path, capsys) -> None:
     runner = load_runner_module()
     venv_python = tmp_path / "python"
     venv_python.touch()
-    (venv_python.parent / ".bootstrap-complete").touch()
+    (venv_python.parent / ".bootstrap-complete").write_text("test-fingerprint", encoding="utf-8")
+    monkeypatch.setattr(runner, "quick_check_dependency_fingerprint", lambda: "test-fingerprint")
     monkeypatch.setattr(runner, "quick_check_venv_python", lambda: venv_python)
 
     def fake_runtime_identity():
@@ -1100,7 +1162,8 @@ def test_atoms_proof_passes_database_url_via_env_not_argv(monkeypatch, tmp_path)
     runner = load_runner_module()
     venv_python = tmp_path / "python"
     venv_python.touch()
-    (venv_python.parent / ".bootstrap-complete").touch()
+    (venv_python.parent / ".bootstrap-complete").write_text("test-fingerprint", encoding="utf-8")
+    monkeypatch.setattr(runner, "quick_check_dependency_fingerprint", lambda: "test-fingerprint")
     monkeypatch.setattr(runner, "quick_check_venv_python", lambda: venv_python)
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
     monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
@@ -1143,7 +1206,8 @@ def test_proof_script_uses_managed_venv_python_not_sys_executable(monkeypatch, t
     runner = load_runner_module()
     venv_python = tmp_path / "python"
     venv_python.touch()
-    (venv_python.parent / ".bootstrap-complete").touch()
+    (venv_python.parent / ".bootstrap-complete").write_text("test-fingerprint", encoding="utf-8")
+    monkeypatch.setattr(runner, "quick_check_dependency_fingerprint", lambda: "test-fingerprint")
     monkeypatch.setattr(runner, "quick_check_venv_python", lambda: venv_python)
     monkeypatch.setattr(runner.sys, "executable", "/usr/bin/python3")
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
@@ -1194,7 +1258,8 @@ def test_live_canary_reports_dev001_for_invalid_port_override(monkeypatch, tmp_p
     runner = load_runner_module()
     venv_python = tmp_path / "python"
     venv_python.touch()
-    (venv_python.parent / ".bootstrap-complete").touch()
+    (venv_python.parent / ".bootstrap-complete").write_text("test-fingerprint", encoding="utf-8")
+    monkeypatch.setattr(runner, "quick_check_dependency_fingerprint", lambda: "test-fingerprint")
     monkeypatch.setattr(runner, "quick_check_venv_python", lambda: venv_python)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "sekret")
@@ -1212,7 +1277,8 @@ def test_live_canary_passes_database_url_via_env_not_argv(monkeypatch, tmp_path)
     runner = load_runner_module()
     venv_python = tmp_path / "python"
     venv_python.touch()
-    (venv_python.parent / ".bootstrap-complete").touch()
+    (venv_python.parent / ".bootstrap-complete").write_text("test-fingerprint", encoding="utf-8")
+    monkeypatch.setattr(runner, "quick_check_dependency_fingerprint", lambda: "test-fingerprint")
     monkeypatch.setattr(runner, "quick_check_venv_python", lambda: venv_python)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "sekret")

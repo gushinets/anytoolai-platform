@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import subprocess
@@ -134,6 +135,26 @@ def venv_python() -> Path:
 
 def bootstrap_marker() -> Path:
     return venv_python().parent / ".bootstrap-complete"
+
+
+# ANY-390 code-review finding: .quick-check-venv is gitignored and survives pulls/branch
+# switches, so a marker that only records "some previous bootstrap completed" goes stale the
+# moment uv.lock or an editable project's own pyproject.toml changes underneath it -- the venv's
+# installed packages no longer match what quick-check would install today. Fingerprinting these
+# inputs and storing the fingerprint in the marker (runner.py's quick_check_venv_ready() recomputes
+# and compares it) turns that drift back into a clear ENV001 instead of a stale-venv PROOF000.
+DEPENDENCY_FINGERPRINT_INPUTS = [
+    ROOT / "uv.lock",
+    *(project / "pyproject.toml" for project in EDITABLE_PROJECTS),
+]
+
+
+def dependency_fingerprint() -> str:
+    digest = hashlib.sha256()
+    for path in DEPENDENCY_FINGERPRINT_INPUTS:
+        digest.update(path.read_bytes() if path.exists() else b"")
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def uv_executable() -> str:
@@ -302,11 +323,12 @@ def bootstrap() -> int:
     bootstrap_marker().unlink(missing_ok=True)
     exit_code = run_sequence(commands)
     if exit_code == 0:
-        # atoms-proof/live-canary treat this marker's absence as "venv incomplete" (not just "venv
-        # missing") -- without it, a bootstrap interrupted mid-way (venv created, some editable
-        # installs still missing) would pass runner.py's exists()-only check and fail deep inside
-        # the child script with a raw ModuleNotFoundError instead of a clear ENV001.
-        bootstrap_marker().touch()
+        # atoms-proof/live-canary treat this marker's absence (or a fingerprint mismatch) as "venv
+        # incomplete/stale" -- without it, a bootstrap interrupted mid-way (venv created, some
+        # editable installs still missing) or a stale post-pull venv would pass runner.py's old
+        # exists()-only check and fail deep inside the child script with a raw ModuleNotFoundError
+        # instead of a clear ENV001.
+        bootstrap_marker().write_text(dependency_fingerprint(), encoding="utf-8")
     return exit_code
 
 
