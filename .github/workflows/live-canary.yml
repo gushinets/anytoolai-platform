@@ -17,65 +17,22 @@ jobs:
     # schedule before anyone sees it failed.
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      # OPENAI_API_KEY/ANYTOOLAI_LIVE_CANARY_TOKEN are scoped to exactly the dev-up and
+      # check-command steps inside the composite action, not job-level: docker-compose.yml's
+      # worker service interpolates OPENAI_API_KEY (and platform-api interpolates
+      # ANYTOOLAI_LIVE_CANARY_TOKEN, for internal_only scenarios' X-Live-Canary-Token header) at
+      # container-creation time, during dev-up's `docker compose up` -- both must be present
+      # there, or every scheduled run would silently make 0 real provider calls / reject every
+      # case as not-found. runner.py's live-canary command also reads both directly from its own
+      # process env for its LIVE000/LIVE011 fail-fast checks, so both must be present on the
+      # check-command step too. See .github/actions/compose-stack-check/action.yml.
+      - uses: ./.github/actions/compose-stack-check
         with:
-          persist-credentials: false
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
-        with:
-          version: "0.11.16"
-      - run: uv sync --frozen --group dev
-      # `uv sync --frozen --group dev` above only installs the root project's own dependencies --
-      # atoms_proof.py/live_canary.py (invoked by the two steps below) import
-      # anytoolai_platform_core, which is never a root dependency and is only ever installed by
-      # quick-check's own .quick-check-venv bootstrap (ANY-390: without this step, .quick-check-venv
-      # does not exist here and live-canary fails fast with ENV001 before making a single live call).
-      # --bootstrap-only stops right after that (venv create + editable installs, seconds not
-      # minutes) instead of also running this repo's full DB-free pytest suite as a gate on this
-      # workflow -- that suite is unrelated to whether the venv is usable, and a single unrelated
-      # flaky/failing test in it would otherwise fail this weekly, credentialed run before it ever
-      # makes a real provider call.
-      - run: uv run python scripts/agent/runner.py quick-check --bootstrap-only
-      # OPENAI_API_KEY/ANYTOOLAI_LIVE_CANARY_TOKEN are scoped to exactly these two steps, not
-      # job-level: docker-compose.yml's worker service interpolates OPENAI_API_KEY (and
-      # platform-api interpolates ANYTOOLAI_LIVE_CANARY_TOKEN, for internal_only scenarios'
-      # X-Live-Canary-Token header) at container-creation time, during this step's `docker
-      # compose up` -- both must be present here, or every scheduled run would silently make 0
-      # real provider calls / reject every case as not-found. runner.py's live-canary command
-      # also reads both directly from its own process env for its LIVE000/LIVE011 fail-fast
-      # checks, so both must be present on the later step too. Every other step (checkout,
-      # setup-python, setup-uv, uv sync, log dump, teardown, upload) has no need for either
-      # secret, so job-level env would only widen exposure with no benefit.
-      - name: Boot dev Compose stack (waits for platform-api healthy)
-        run: uv run python scripts/agent/runner.py dev-up
-        env:
-          ANYTOOLAI_READY_TIMEOUT: "120"
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ANYTOOLAI_LIVE_CANARY_TOKEN: ${{ secrets.ANYTOOLAI_LIVE_CANARY_TOKEN }}
-      - name: Run 11-atom live provider canary
-        run: uv run python scripts/agent/runner.py live-canary
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ANYTOOLAI_LIVE_CANARY_TOKEN: ${{ secrets.ANYTOOLAI_LIVE_CANARY_TOKEN }}
-      # Same debuggability precedent as backend.yml's compose-smoke-dev job: dump every
-      # container's logs before teardown so a failure is diagnosable from the Actions log alone.
-      - name: Dump Docker Compose logs on failure
-        if: failure()
-        run: |
-          PROJECT=$(uv run python -c "import sys; sys.path.insert(0, 'scripts/agent'); from runner import runtime_identity; print(runtime_identity().compose_project)")
-          docker compose --project-name "$PROJECT" \
-            -f infra/compose/docker-compose.yml \
-            -f infra/compose/docker-compose.override.yml \
-            logs --no-color
-      - name: Tear down dev stack
-        if: always()
-        run: uv run python scripts/agent/runner.py dev-down
-      - name: Upload evidence report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: live-canary-evidence
-          path: .agent/live-canary/
-          if-no-files-found: ignore
+          bootstrap-quick-check: "true"
+          check-command: live-canary
+          check-step-name: Run 11-atom live provider canary
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          live-canary-token: ${{ secrets.ANYTOOLAI_LIVE_CANARY_TOKEN }}
+          upload-evidence: "true"
+          evidence-artifact-name: live-canary-evidence
+          evidence-artifact-path: .agent/live-canary/
