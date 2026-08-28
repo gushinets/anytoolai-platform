@@ -94,8 +94,12 @@ if the 11-atom/composite-workflow proof fails.
       required-gate job and the credentialed weekly job, beyond this ticket's narrow scope) — user
       chose to extract a composite action now rather than defer. Fixed:
   - New `.github/actions/compose-stack-check/action.yml`: parameterized composite action covering
-    checkout/setup-python/setup-uv/`uv sync`/optional bootstrap/`dev-up`/check-command/log-dump/
-    teardown/optional evidence-upload. Verified `docker-compose.yml` already defaults
+    setup-python/setup-uv/`uv sync`/optional bootstrap/`dev-up`/check-command/log-dump/teardown/
+    optional evidence-upload. Checkout is deliberately **not** one of the action's
+    responsibilities: each calling job performs its own `actions/checkout` step before invoking
+    the local action (see the checkout-ordering fix logged below — a local action reference can
+    only be resolved by the runner after the repo is already checked out). Verified
+    `docker-compose.yml` already defaults
     `OPENAI_API_KEY`/`ANYTOOLAI_LIVE_CANARY_TOKEN` via `${VAR:-}`, so passing empty-string inputs
     for credential-free callers is behavior-preserving.
   - `compose-smoke-dev`, `atoms-proof` (`backend.yml`), and `live-canary` (`live-canary.yml`)
