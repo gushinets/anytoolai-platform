@@ -62,7 +62,7 @@ LiteLLM only behind ProviderGateway adapters, hidden LiteLLM retries disabled, a
 | A21a2 Composite workflow proof | ANY-219 | ANY-218 |
 | A21a3 CLI/evidence report | ANY-220 | ANY-218/219/217 |
 | A21a4 Live-provider canary | ANY-221 | ANY-218/220 |
-| MVP-A1 release gate | ANY-5 | ANY-24 and ANY-218…221 |
+| MVP-A1 release gate | ANY-5 | Done |
 | A22b Generated docs | ANY-7 | MVP-A1 gate |
 | A22c Boundary audit | ANY-25 | MVP-A1 gate |
 
