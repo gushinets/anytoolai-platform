@@ -17,6 +17,11 @@ jobs:
     # schedule before anyone sees it failed.
     timeout-minutes: 30
     steps:
+      # A local action reference (./.github/actions/...) can only be resolved after the repo is
+      # checked out, so checkout must stay a job-level step here, not inside the composite action.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
       # OPENAI_API_KEY/ANYTOOLAI_LIVE_CANARY_TOKEN are scoped to exactly the dev-up and
       # check-command steps inside the composite action, not job-level: docker-compose.yml's
       # worker service interpolates OPENAI_API_KEY (and platform-api interpolates

@@ -126,9 +126,17 @@ if the 11-atom/composite-workflow proof fails.
       themselves, so this run remains representative.
 - [x] YAML syntax validated for `action.yml`, `backend.yml`, `live-canary.yml` via
       `yaml.safe_load`. No `actionlint`/`act` available in this environment to lint/execute the
-      composite action directly.
+      composite action directly -- this gap turned out load-bearing, see below.
+- [x] Real PR run (PR #90) caught a bug `yaml.safe_load`/structural tests couldn't:
+      `compose-smoke-dev`/`atoms-proof` both failed in ~3s with "Can't find action.yml ... did you
+      forget to run actions/checkout" -- a local action reference (`uses: ./.github/actions/...`)
+      can only be resolved by the runner after the repo is checked out, but `actions/checkout` was
+      placed *inside* the composite action itself (chicken-and-egg). Fixed: removed checkout from
+      `action.yml`, restored as a job-level step before the composite-action call in all three
+      callers; updated the two affected tests for the resulting 2-step (checkout + action-call)
+      shape. Re-ran targeted suite (7 passed) and `quick-check` (955 passed).
 - [ ] Confirm the job runs green on a real PR in GitHub Actions, including the artifact upload and
-      the composite-action call itself (only observable once opened against GitHub).
+      the composite-action call itself, after the checkout-ordering fix above.
 
 ## Decision log
 
@@ -139,6 +147,7 @@ if the 11-atom/composite-workflow proof fails.
 | 2026-08-28 (round 1, superseded) | Did not extract the duplicated `quick-check --bootstrap-only` step into a composite action. | Only two call sites for that one line existed; adding an abstraction for a single shared line would be premature. Superseded once round 2 review found the *whole* boot/teardown sequence (not just this line) was duplicated three ways. |
 | 2026-08-28 (round 2) | Extracted `.github/actions/compose-stack-check` and migrated `compose-smoke-dev`/`live-canary`/`atoms-proof` onto it, touching already-working CI outside this ticket's narrow scope. | User's explicit choice when asked, given three real call sites (past the classic "rule of three" threshold) rather than the two round 1 considered. |
 | 2026-08-28 (round 2) | `compose-smoke-prod` left un-migrated. | Not named in the round-2 finding; different command pair (`prod-up`/`prod-down`), no log-dump-on-failure step today — migrating it would need extending the action's contract, better done as its own deliberate follow-up. |
+| 2026-08-28 | Moved `actions/checkout` out of `compose-stack-check/action.yml` back to a job-level step in all three callers. | PR #90's real CI run failed in ~3s: a local action reference can't be resolved before the repo is checked out, so checkout can't itself live inside that same local action. Neither `yaml.safe_load` nor the structural tests model this GitHub Actions resolution-order semantic. |
 
 ## Progress log
 
@@ -146,7 +155,8 @@ if the 11-atom/composite-workflow proof fails.
 |---|---|---|
 | 2026-08-28 | Implemented per `plans/ANY-391.md`: `atoms-proof` job in `backend.yml`, regression test, docs update. Verified end-to-end locally (quick-check green, real dev-up/atoms-proof/dev-down cycle green). | Await/act on code review. |
 | 2026-08-28 | `/code-review high` round 1 found 3 gaps (missing `timeout-minutes`, no exec plan, duplicated bootstrap step). Fixed the first two; documented the third as accepted duplication. Filed this exec plan. | Re-run `quick-check` and targeted suite to confirm still green, then commit. |
-| 2026-08-28 | `/code-review high` round 2 found the duplication was broader than round 1 addressed (whole boot/teardown sequence, 3 call sites). Asked the user; they chose to extract a composite action now. Built `.github/actions/compose-stack-check`, migrated all 3 named jobs onto it, rewrote the affected tests. `quick-check` green (955 passed), targeted suite green (7 passed). | Re-confirm on a real PR once opened; commit. |
+| 2026-08-28 | `/code-review high` round 2 found the duplication was broader than round 1 addressed (whole boot/teardown sequence, 3 call sites). Asked the user; they chose to extract a composite action now. Built `.github/actions/compose-stack-check`, migrated all 3 named jobs onto it, rewrote the affected tests. `quick-check` green (955 passed), targeted suite green (7 passed). Committed and pushed (PR #90). | Check PR #90's real CI run. |
+| 2026-08-28 | PR #90's CI failed: `compose-smoke-dev`/`atoms-proof` both errored in ~3s ("Can't find action.yml ... did you forget to run actions/checkout") because `actions/checkout` was placed inside the composite action instead of at job level, so the local action reference couldn't resolve. Fixed: checkout moved back to a job-level step before the composite-action call in all three callers; updated the two tests that assumed a single-step job. `quick-check` green (955 passed), targeted suite green (7 passed). | Push the fix, recheck PR #90's CI, then mark this plan `completed/` once green. |
 
 ## Open questions
 

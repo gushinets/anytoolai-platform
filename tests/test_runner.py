@@ -396,8 +396,11 @@ def test_live_canary_workflow_delegates_to_compose_stack_check_with_secrets() ->
     assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in job.get("env", {})
     assert job.get("timeout-minutes") == 30
 
-    assert len(job["steps"]) == 1
-    step = job["steps"][0]
+    # A local action reference (./.github/actions/...) can only be resolved after the repo is
+    # checked out, so a job-level checkout step must come first, before the composite-action call.
+    assert len(job["steps"]) == 2
+    checkout_step, step = job["steps"]
+    assert checkout_step["uses"].startswith("actions/checkout@")
     assert step["uses"] == "./.github/actions/compose-stack-check"
     assert step["with"]["bootstrap-quick-check"] == "true"
     assert step["with"]["check-command"] == "live-canary"
@@ -424,8 +427,11 @@ def test_required_backend_workflow_runs_atoms_proof() -> None:
     assert job.get("continue-on-error") is not True
     assert job.get("timeout-minutes") == 30
 
-    assert len(job["steps"]) == 1
-    step = job["steps"][0]
+    # A local action reference (./.github/actions/...) can only be resolved after the repo is
+    # checked out, so a job-level checkout step must come first, before the composite-action call.
+    assert len(job["steps"]) == 2
+    checkout_step, step = job["steps"]
+    assert checkout_step["uses"].startswith("actions/checkout@")
     assert step["uses"] == "./.github/actions/compose-stack-check"
     assert step["with"]["bootstrap-quick-check"] == "true"
     assert step["with"]["check-command"] == "atoms-proof"

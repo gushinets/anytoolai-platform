@@ -53,6 +53,11 @@ jobs:
     # compose-smoke-prod instead of roughly doubling this check's wall-clock time on every PR.
     runs-on: ubuntu-latest
     steps:
+      # A local action reference (./.github/actions/...) can only be resolved after the repo is
+      # checked out, so checkout must stay a job-level step here, not inside the composite action.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/compose-stack-check
         with:
           check-command: dev-smoke
@@ -99,6 +104,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/compose-stack-check
         with:
           bootstrap-quick-check: "true"

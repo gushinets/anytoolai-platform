@@ -58,10 +58,11 @@ inputs:
     default: ""
 runs:
   using: composite
+  # Deliberately no actions/checkout step here: a local action reference (`uses: ./.github/...`)
+  # can only be resolved by the runner after the repo is already checked out at the job level --
+  # putting checkout inside the composite action itself is a chicken-and-egg error ("Can't find
+  # action.yml ... did you forget to run actions/checkout"). Every caller must checkout first.
   steps:
-    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-      with:
-        persist-credentials: false
     - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
       with:
         python-version: ${{ inputs.python-version }}
