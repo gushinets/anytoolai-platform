@@ -27,6 +27,17 @@ jobs:
         with:
           version: "0.11.16"
       - run: uv sync --frozen --group dev
+      # `uv sync --frozen --group dev` above only installs the root project's own dependencies --
+      # atoms_proof.py/live_canary.py (invoked by the two steps below) import
+      # anytoolai_platform_core, which is never a root dependency and is only ever installed by
+      # quick-check's own .quick-check-venv bootstrap (ANY-390: without this step, .quick-check-venv
+      # does not exist here and live-canary fails fast with ENV001 before making a single live call).
+      # --bootstrap-only stops right after that (venv create + editable installs, seconds not
+      # minutes) instead of also running this repo's full DB-free pytest suite as a gate on this
+      # workflow -- that suite is unrelated to whether the venv is usable, and a single unrelated
+      # flaky/failing test in it would otherwise fail this weekly, credentialed run before it ever
+      # makes a real provider call.
+      - run: uv run python scripts/agent/runner.py quick-check --bootstrap-only
       # OPENAI_API_KEY/ANYTOOLAI_LIVE_CANARY_TOKEN are scoped to exactly these two steps, not
       # job-level: docker-compose.yml's worker service interpolates OPENAI_API_KEY (and
       # platform-api interpolates ANYTOOLAI_LIVE_CANARY_TOKEN, for internal_only scenarios'

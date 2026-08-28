@@ -168,13 +168,52 @@ def build_system_requirements(project_root: Path) -> list[str]:
     return requires
 
 
-def quick_check_python() -> str:
+def quick_check_venv_python() -> Path:
     scripts_dir = "Scripts" if os.name == "nt" else "bin"
     python_name = "python.exe" if os.name == "nt" else "python"
-    candidate = QUICK_CHECK_VENV / scripts_dir / python_name
-    if candidate.exists():
-        return str(candidate)
-    return sys.executable
+    return QUICK_CHECK_VENV / scripts_dir / python_name
+
+
+def quick_check_python() -> str:
+    candidate = quick_check_venv_python()
+    return str(candidate) if candidate.exists() else sys.executable
+
+
+# Must stay in sync with quick_check.py's EDITABLE_PROJECTS/DEPENDENCY_FINGERPRINT_INPUTS: this
+# is the same duplication-across-standalone-scripts pattern already used for ROOT/baseline_env()
+# in both files (neither script imports the other).
+QUICK_CHECK_DEPENDENCY_FINGERPRINT_INPUTS = [
+    ROOT / "uv.lock",
+    ROOT / "packages" / "backend" / "platform-sdk" / "pyproject.toml",
+    ROOT / "packages" / "backend" / "platform-core" / "pyproject.toml",
+    ROOT / "packages" / "backend" / "platform-actions" / "pyproject.toml",
+    ROOT / "apps" / "platform-api" / "pyproject.toml",
+    ROOT / "apps" / "platform-worker" / "pyproject.toml",
+]
+
+
+def quick_check_dependency_fingerprint() -> str:
+    digest = hashlib.sha256()
+    for path in QUICK_CHECK_DEPENDENCY_FINGERPRINT_INPUTS:
+        digest.update(path.read_bytes() if path.exists() else b"")
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def quick_check_venv_ready(venv_python: Path) -> bool:
+    # Marker written by quick_check.py's bootstrap() only after every editable install succeeds,
+    # containing a fingerprint of uv.lock + each editable project's pyproject.toml (ANY-390):
+    # venv_python.exists() alone can't tell a fully bootstrapped, up-to-date venv apart from one
+    # left behind by an interrupted bootstrap, or one that's gone stale because .quick-check-venv
+    # is gitignored and survives a pull/branch-switch that changed dependency inputs underneath it.
+    marker = venv_python.parent / ".bootstrap-complete"
+    if not venv_python.exists() or not marker.exists():
+        return False
+    try:
+        stored_fingerprint = marker.read_text(encoding="utf-8").strip()
+    except OSError:
+        return False
+    return stored_fingerprint == quick_check_dependency_fingerprint()
 
 
 def run(command: Sequence[str], *, timeout: float | None = None) -> int:
@@ -298,8 +337,11 @@ def validate_docs() -> int:
     return run([sys.executable, "scripts/agent/validate_docs.py"])
 
 
-def quick_check() -> int:
-    return run_with_env([sys.executable, "scripts/agent/quick_check.py"], baseline_env())
+def quick_check(*, bootstrap_only: bool = False) -> int:
+    command = [sys.executable, "scripts/agent/quick_check.py"]
+    if bootstrap_only:
+        command.append("--bootstrap-only")
+    return run_with_env(command, baseline_env())
 
 
 def postgresql_pytest_command() -> list[str]:
@@ -663,7 +705,26 @@ def _run_proof_script(script_path: str, database_url_env: str) -> int:
     always percent-encodes its database-name path segment. One shared implementation instead of
     two hand-copies: --database-url-is-percent-encoded already drifted between them once (missing
     entirely from live_canary()) and was only caught on review, precisely because they were
-    written separately instead of sharing this contract."""
+    written separately instead of sharing this contract.
+
+    Launches the child with .quick-check-venv's python, not sys.executable: the script imports
+    anytoolai_platform_core, which pulls in platform-actions' markdown-it-py, a dependency that
+    only exists in the managed venv, never in a bare system Python (ANY-390). Unlike
+    quick_check_python(), this does not silently fall back to sys.executable when the venv is
+    missing, incomplete (an interrupted bootstrap can leave the interpreter in place without every
+    editable package installed), or stale (.quick-check-venv is gitignored and survives a pull or
+    branch switch that changed uv.lock/dependency inputs underneath it) -- any of those would just
+    reproduce the bug on a checkout whose venv doesn't actually match what quick-check would
+    install today -- it fails fast instead."""
+    venv_python = quick_check_venv_python()
+    if not quick_check_venv_ready(venv_python):
+        print(
+            "ENV001: .quick-check-venv not found, incomplete, or out of date -- run `python "
+            "scripts/agent/runner.py quick-check` once to (re)bootstrap the managed environment, "
+            "then retry.",
+            file=sys.stderr,
+        )
+        return 2
     try:
         identity = runtime_identity()
     except ValueError as exc:
@@ -673,7 +734,7 @@ def _run_proof_script(script_path: str, database_url_env: str) -> int:
     env[database_url_env] = identity.database_url
     return run_with_env(
         [
-            sys.executable, script_path, identity.api_url,
+            str(venv_python), script_path, identity.api_url,
             "--database-url-env", database_url_env,
             "--database-url-is-percent-encoded",
         ],
@@ -1027,6 +1088,11 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         default=100,
         help="Recent API/worker log lines to collect (1-1000).",
     )
+    parser.add_argument(
+        "--bootstrap-only",
+        action="store_true",
+        help="With quick-check: only bootstrap .quick-check-venv, skip validate/pytest.",
+    )
     return parser.parse_args(argv)
 
 
@@ -1053,6 +1119,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("--failure-file and --log-lines are only valid with collect-context", file=sys.stderr)
             return 2
         return collect_context(failure_file=args.failure_file, log_lines=args.log_lines)
+    if args.bootstrap_only:
+        if args.command != "quick-check":
+            print("--bootstrap-only is only valid with quick-check", file=sys.stderr)
+            return 2
+        return quick_check(bootstrap_only=True)
     return COMMANDS[args.command]()
 
 

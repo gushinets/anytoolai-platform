@@ -33,6 +33,11 @@ It always re-execs into `.quick-check-venv`, even if you started from another ac
 It strips caller-provided `PYTHONPATH`, so no manual `PYTHONPATH` setup is required.
 GitHub Actions runs this same baseline command on both Linux and Windows, and the backend workflow is required on pull requests plus pushes to `main`.
 
+`atoms-proof` and `live-canary` (see `docs/product-specs/mvp-a-platform-kernel.md`) also require
+`.quick-check-venv` and launch their subprocess with its python, not the caller's own interpreter.
+Run `quick-check` once first to bootstrap it; otherwise these two commands fail fast with a setup
+instruction instead of a raw `No module named 'markdown_it'` error.
+
 Python dependency management uses `uv`, not `pip`. Use `uv add <package>` for runtime dependencies,
 `uv add --dev <package>` for dev dependencies, and do not hand-edit `uv.lock`.
 

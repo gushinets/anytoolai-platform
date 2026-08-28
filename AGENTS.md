@@ -117,6 +117,10 @@ Use full check or dedicated smoke commands for broader validation outside the ba
 OpenAPI-contract drift check, build), and implemented product-suite tests. Smoke checks become
 required only after a feature issue supplies a real vertical slice.
 
+`atoms-proof` and `live-canary` also self-manage `.quick-check-venv`: they launch their subprocess
+with its python, not the caller's own interpreter, and fail fast with a setup instruction (run
+`quick-check` once first) if that managed environment does not exist yet.
+
 PostgreSQL production-semantics check:
 
 ```bash
