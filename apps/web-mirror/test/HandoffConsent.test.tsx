@@ -1,4 +1,9 @@
-import { PlatformApiClient } from "@anytoolai/ce-kit";
+// Reuses ce-kit's own shared handoff preview fixture instead of a second hand-maintained copy of
+// the same HandoffPreviewResponse shape -- see that fixture's docstring.
+import { handoffPreviewPayload as previewPayload } from "@anytoolai/ce-kit/test/handoffs/fixtures";
+// Reuses ce-kit's own routed-fetch-mock test util instead of a second hand-maintained
+// implementation of the same "fake platform-api backend" purpose.
+import { makeRoutedFetchClient } from "@anytoolai/ce-kit/test/testUtils/routedFetchClient";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HandoffConsent } from "../src/components/HandoffConsent";
@@ -22,59 +27,33 @@ function errorResponse(status: number, code: string, message = "x"): Response {
   return jsonResponse(status, { error: { code, message, request_id: "req_1" } });
 }
 
-function previewPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
-    handoff_id: "handoff_123",
-    status: "created",
-    source_product_id: "kernel_demo",
-    source_product_display_name: "Kernel Demo",
-    target_product_id: "freelancer_demo",
-    target_product_display_name: "Freelancer Demo",
-    target_scenario_id: "scenario_1",
-    preview: { summary: "Two-step summary" },
-    expires_at: "2026-01-01T00:10:00Z",
-    target_scenario_session_id: null,
-    target_job_id: null,
-    ...overrides,
-  };
-}
-
-function routeKey(url: string, method: string): string {
-  return `${method} ${new URL(url).pathname}`;
-}
-
-/**
- * Dispatches by (method, path) instead of call order -- HandoffConsent fires the preview GET and
- * the guest-identity POST concurrently (`Promise.all`), so a purely positional mock would be
- * fragile to their actual interleaving. Each route is a FIFO queue so the same endpoint (e.g. the
- * preview GET, hit again on refetch) can return a different response on each call.
- */
-function makeRoutedClient(routes: Record<string, Array<Response | (() => Response)>>): {
-  client: PlatformApiClient;
-  calls: Array<{ key: string; init: RequestInit }>;
-} {
-  const queues = new Map(Object.entries(routes).map(([key, responses]) => [key, [...responses]]));
-  const calls: Array<{ key: string; init: RequestInit }> = [];
-  const fetchImpl = vi.fn(async (url: string, init: RequestInit) => {
-    const key = routeKey(url, init.method ?? "GET");
-    calls.push({ key, init });
-    const queue = queues.get(key);
-    if (!queue || queue.length === 0) {
-      throw new Error(`No mock response queued for ${key}`);
-    }
-    const next = queue.shift();
-    return typeof next === "function" ? next() : (next as Response);
-  });
-  return {
-    client: new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl: fetchImpl as unknown as typeof fetch }),
-    calls,
-  };
+function makeRoutedClient(routes: Record<string, Array<Response | (() => Response)>>) {
+  return makeRoutedFetchClient("https://api.example.com", routes);
 }
 
 const GUEST_IDENTITY_ROUTE = "POST /v1/identity/guest";
 const PREVIEW_ROUTE = "GET /v1/handoffs/token_abc";
 const ACCEPT_ROUTE = "POST /v1/handoffs/token_abc/accept";
 const DECLINE_ROUTE = "POST /v1/handoffs/token_abc/decline";
+
+/** Makes `window.localStorage` itself throw synchronously (privacy-hardened browsers, storage-
+ * denied sandboxed iframes) for the duration of `fn`, then restores it -- even if `fn` throws. */
+async function withThrowingLocalStorage(fn: () => Promise<void>): Promise<void> {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    get() {
+      throw new DOMException("Storage access denied");
+    },
+  });
+  try {
+    await fn();
+  } finally {
+    if (originalDescriptor) {
+      Object.defineProperty(window, "localStorage", originalDescriptor);
+    }
+  }
+}
 
 function guestIdentityResponse(guestId = "guest_1"): Response {
   return jsonResponse(200, { guest_id: guestId });
@@ -130,6 +109,20 @@ describe("HandoffConsent", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/went wrong/i));
   });
 
+  it("renders a safe-error view instead of hanging on Loading forever if the mount fetch rejects", async () => {
+    const { client } = makeRoutedClient({
+      [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())],
+    });
+    // getHandoff()/createGuestIdentity() always resolve today (see the .catch() this exercises),
+    // so this forces the rejection a future change could introduce by overriding the method
+    // directly, bypassing PlatformApiClient's own internal error handling entirely.
+    client.createGuestIdentity = () => Promise.reject(new Error("boom"));
+
+    render(<HandoffConsent client={client} handoffToken="token_abc" />);
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/went wrong/i));
+  });
+
   it("recovers from a safe-error view via its Try again button instead of requiring a page reload", async () => {
     const { client, calls } = makeRoutedClient({
       [PREVIEW_ROUTE]: [errorResponse(500, "some_unexpected_backend_error"), jsonResponse(200, previewPayload())],
@@ -171,15 +164,7 @@ describe("HandoffConsent", () => {
   });
 
   it("still resolves a guest identity and allows Accept when window.localStorage itself throws (storage-denied sandboxes)", async () => {
-    const originalDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
-    Object.defineProperty(window, "localStorage", {
-      configurable: true,
-      get() {
-        throw new DOMException("Storage access denied");
-      },
-    });
-
-    try {
+    await withThrowingLocalStorage(async () => {
       // resolveGuestIdentity() must catch the synchronous throw from window.localStorage and fall
       // back to an in-memory adapter -- still calling the backend to mint a real (if ephemeral)
       // guest id, rather than leaving Accept permanently disabled.
@@ -199,23 +184,11 @@ describe("HandoffConsent", () => {
       await waitFor(() => expect(screen.getByText("accepted")).toBeTruthy());
       const acceptCall = calls.find((call) => call.key === ACCEPT_ROUTE);
       expect(JSON.parse(acceptCall?.init.body as string)).toEqual({ guest_id: "guest_ephemeral" });
-    } finally {
-      if (originalDescriptor) {
-        Object.defineProperty(window, "localStorage", originalDescriptor);
-      }
-    }
+    });
   });
 
   it("resolves neither localStorage nor a guest identity, but still renders usably with Accept disabled", async () => {
-    const originalDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
-    Object.defineProperty(window, "localStorage", {
-      configurable: true,
-      get() {
-        throw new DOMException("Storage access denied");
-      },
-    });
-
-    try {
+    await withThrowingLocalStorage(async () => {
       // Both failures at once: the ephemeral fallback resolveGuestIdentity() reaches for after
       // catching the localStorage throw is itself a real backend call, and that call fails too.
       const { client } = makeRoutedClient({
@@ -229,11 +202,7 @@ describe("HandoffConsent", () => {
       expect(screen.getByText("Kernel Demo")).toBeTruthy();
       const acceptButton = screen.getByRole("button", { name: "Accept" }) as HTMLButtonElement;
       expect(acceptButton.disabled).toBe(true);
-    } finally {
-      if (originalDescriptor) {
-        Object.defineProperty(window, "localStorage", originalDescriptor);
-      }
-    }
+    });
   });
 
   it("self-heals a stale guest id via the ephemeral fallback even when clearing it from localStorage itself fails", async () => {

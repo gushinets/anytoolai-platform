@@ -16,9 +16,19 @@ venv/
 node_modules/
 .pnpm-store/
 .next/
+next-env.d.ts
+.wxt/
+.output/
 dist/
 build/
 coverage/
+*.tsbuildinfo
+
+# Playwright
+test-results/
+playwright-report/
+playwright-report.json
+blob-report/
 
 # Environment and secrets
 .env

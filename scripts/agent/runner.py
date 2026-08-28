@@ -4,8 +4,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib.util
+import json
 import os
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -15,6 +17,7 @@ import tomllib
 import urllib.error
 import urllib.request
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
 from urllib.parse import quote
@@ -708,6 +711,159 @@ def live_canary() -> int:
     return _run_proof_script("scripts/agent/live_canary.py", "ANYTOOLAI_LIVE_CANARY_DATABASE_URL")
 
 
+CLIENT_HANDOFF_SMOKE_WEB_MIRROR_PORT_ENV = "ANYTOOLAI_CLIENT_HANDOFF_SMOKE_WEB_MIRROR_PORT"
+CLIENT_HANDOFF_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "client-handoff-smoke"
+CLIENT_HANDOFF_SMOKE_REPORT_PATH = (
+    ROOT / "tests" / "e2e" / "client-handoff-smoke" / "playwright-report.json"
+)
+
+
+def _client_handoff_smoke_web_mirror_port() -> int:
+    return _port_override(CLIENT_HANDOFF_SMOKE_WEB_MIRROR_PORT_ENV, 3000)
+
+
+def _terminate_process_group(process: subprocess.Popen) -> None:
+    """Pairs with start_new_session=True: signals the whole process group, not just `process`'s
+    own pid, since some wrappers (pnpm's `exec`) don't forward signals to the child they spawn.
+    Called from a `finally` cleanup block, so an uncaught ProcessLookupError here (the group can
+    exit on its own between the getpgid() check and a killpg() call) would otherwise replace --
+    and mask -- whatever smoke-test result was about to be returned."""
+    try:
+        pgid = os.getpgid(process.pid)
+    except ProcessLookupError:
+        return
+    try:
+        os.killpg(pgid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(pgid, signal.SIGKILL)
+        except ProcessLookupError:
+            return
+        process.wait()
+
+
+def _write_client_handoff_smoke_evidence(exit_code: int) -> Path:
+    """Mirrors atoms_proof.py's write_evidence_report() shape (generated_at/all_passed plus the
+    raw detail) -- the raw detail here is Playwright's own JSON reporter output, not a hand-rolled
+    case list, since the smoke's actual pass/fail granularity already lives in that report."""
+    from collect_context import write_timestamped_json_bundle
+
+    report = None
+    if CLIENT_HANDOFF_SMOKE_REPORT_PATH.is_file():
+        try:
+            report = json.loads(CLIENT_HANDOFF_SMOKE_REPORT_PATH.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            report = None
+    payload = {
+        "generated_at": datetime.now(tz=UTC).isoformat(),
+        "all_passed": exit_code == 0,
+        "playwright_report": report,
+    }
+    return write_timestamped_json_bundle(CLIENT_HANDOFF_SMOKE_EVIDENCE_ROOT, "evidence", payload)
+
+
+def client_handoff_smoke() -> int:
+    """ANY-224: builds web-mirror and the kernel-demo-ce extension against the running dev-up
+    platform-api, serves web-mirror, then runs the Playwright browser-evidence smoke
+    (tests/e2e/client-handoff-smoke) that proves the client handoff journey -- source CE scenario
+    run -> handoff creation -> web consent -> accept/decline -> backend-created target session --
+    end to end in a real Chromium loading the built extension.
+
+    Requires `dev-up` already running first (same precedent as atoms-proof/live-canary: this
+    command only resolves runtime_identity() for the API URL, it never starts Docker itself) and
+    Playwright's Chromium already installed (`pnpm --filter @anytoolai/client-handoff-smoke exec
+    playwright install chromium`). MV3 extensions require non-headless Chromium, so this also
+    needs a display -- `xvfb-run` in CI, an existing DISPLAY/WAYLAND_DISPLAY locally.
+
+    web-mirror's next.config.ts rewrites() destination is baked in at `next build` time (Next
+    serializes it into .next/routes-manifest.json; `next start` never re-invokes rewrites()), so
+    PLATFORM_API_BASE_URL must be set for that build step, not just for the later `next start`.
+    """
+    try:
+        identity = runtime_identity()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
+
+    web_mirror_port = _client_handoff_smoke_web_mirror_port()
+    if not _check_ports_available(
+        "CHS001",
+        [
+            (
+                "web-mirror",
+                web_mirror_port,
+                CLIENT_HANDOFF_SMOKE_WEB_MIRROR_PORT_ENV,
+                None,
+            )
+        ],
+    ):
+        return 1
+    web_mirror_url = f"http://localhost:{web_mirror_port}"
+
+    env = runner_env()
+    env["PLATFORM_API_BASE_URL"] = identity.api_url
+    extension_env = dict(env)
+    extension_env["WXT_PLATFORM_API_BASE_URL"] = identity.api_url
+    extension_env["WXT_WEB_CONSENT_BASE_URL"] = web_mirror_url
+
+    # web-mirror's build and the extension's build don't depend on each other -- wxt build's only
+    # "dependency" on web-mirror is web_mirror_url, a static string derived from the port above,
+    # not web-mirror's actual build output -- so run them concurrently instead of paying the sum of
+    # both build times.
+    web_mirror_build_command = ["pnpm", "--filter", "@anytoolai/web-mirror", "build"]
+    extension_build_command = ["pnpm", "--filter", "@anytoolai/kernel-demo-ce", "exec", "wxt", "build"]
+    print_command(web_mirror_build_command)
+    print_command(extension_build_command)
+    web_mirror_build = subprocess.Popen(web_mirror_build_command, cwd=ROOT, env=env)
+    extension_build = subprocess.Popen(extension_build_command, cwd=ROOT, env=extension_env)
+    web_mirror_build_exit = web_mirror_build.wait()
+    extension_build_exit = extension_build.wait()
+    if web_mirror_build_exit != 0:
+        return web_mirror_build_exit
+    if extension_build_exit != 0:
+        return extension_build_exit
+
+    # start_new_session=True so this lands in its own process group -- `pnpm exec next start`
+    # spawns `next-server` as a child that does NOT receive a plain terminate() sent to just the
+    # pnpm wrapper pid (pnpm doesn't forward signals to its child), which otherwise leaks a live
+    # next-server bound to web_mirror_port past this command's exit (found by running this live).
+    web_mirror_process = subprocess.Popen(
+        ["pnpm", "--filter", "@anytoolai/web-mirror", "exec", "next", "start", "-p", str(web_mirror_port)],
+        cwd=ROOT,
+        env=env,
+        start_new_session=True,
+    )
+    try:
+        if not _wait_for_http_ok(web_mirror_url, 30.0):
+            print("CHS002: web-mirror did not become ready in time.", file=sys.stderr)
+            return 1
+
+        smoke_env = dict(env)
+        smoke_env["WEB_CONSENT_BASE_URL"] = web_mirror_url
+        # runner_env()'s workspace-local TMPDIR is wrong for this one subprocess: the spec's
+        # mkdtemp(join(tmpdir(), ...)) feeds that path straight into Chromium's
+        # launchPersistentContext user-data-dir, and on a long checkout path (e.g. GitHub Actions'
+        # /home/runner/work/<repo>/<repo>) the resulting profile-relative singleton-socket path
+        # exceeds Linux's ~108-byte AF_UNIX limit -- Chrome then FATALs in
+        # process_singleton_posix.cc before the browser ever opens a page. Falling back to the
+        # real system temp dir (always short, e.g. /tmp) keeps the profile path short regardless
+        # of checkout location.
+        for key in ("TMPDIR", "TMP", "TEMP"):
+            smoke_env.pop(key, None)
+        CLIENT_HANDOFF_SMOKE_REPORT_PATH.unlink(missing_ok=True)
+        exit_code = run_with_env(
+            ["pnpm", "--filter", "@anytoolai/client-handoff-smoke", "run", "smoke"], smoke_env
+        )
+        _write_client_handoff_smoke_evidence(exit_code)
+        return exit_code
+    finally:
+        _terminate_process_group(web_mirror_process)
+
+
 def _prod_compose_command(*args: str) -> list[str]:
     env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
     return _docker_compose_command(
@@ -832,6 +988,7 @@ COMMANDS = {
     "dev-smoke": dev_smoke,
     "atoms-proof": atoms_proof,
     "live-canary": live_canary,
+    "client-handoff-smoke": client_handoff_smoke,
     "prod-up": prod_up,
     "prod-ready": prod_ready,
     "prod-status": prod_status,
