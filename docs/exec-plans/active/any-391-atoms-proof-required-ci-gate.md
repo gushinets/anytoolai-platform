@@ -29,7 +29,7 @@ if the 11-atom/composite-workflow proof fails.
   `uv sync --frozen --group dev` alone does not install `anytoolai_platform_core`, and
   `atoms_proof.py` imports it.
 - Compose log dump on failure, teardown in `if: always()`, `.agent/atoms-proof/` evidence artifact
-  upload with `if-no-files-found: ignore`.
+  upload with `if-no-files-found: error` (fail-closed, see Progress log — team-lead review round).
 - `timeout-minutes: 30`, matching `live-canary.yml`'s identical job shape.
 - Regression test in `tests/test_runner.py` parsing `backend.yml` to assert the job's shape.
 - `docs/product-specs/mvp-a-platform-kernel.md` Proof Surface note.
@@ -139,8 +139,25 @@ if the 11-atom/composite-workflow proof fails.
       `action.yml`, restored as a job-level step before the composite-action call in all three
       callers; updated the two affected tests for the resulting 2-step (checkout + action-call)
       shape. Re-ran targeted suite (7 passed) and `quick-check` (955 passed).
-- [ ] Confirm the job runs green on a real PR in GitHub Actions, including the artifact upload and
-      the composite-action call itself, after the checkout-ordering fix above.
+- [x] Confirmed the job runs green on PR #90 after the checkout-ordering fix (11/11 atoms, 3/3
+      composites, evidence artifact uploaded).
+- [x] Team-lead code review: two findings verified against current code and fixed —
+  - `if-no-files-found: ignore` -> `error` on the evidence-upload step. Verified
+    `write_evidence_report()` runs (and its exception isn't swallowed) on every `atoms_proof.py`
+    exit path except the three early-return error paths, all of which already return non-zero and
+    redden the job via the check-command step itself — so `error` cannot fire differently from
+    today's outcome on any currently-reachable path, while guarding against a future
+    artifact-path misconfiguration going unnoticed. Updated
+    `test_compose_stack_check_action_shape`'s assertion.
+  - `astral-sh/setup-uv` pin: confirmed via the action's own bundled source (`KNOWN_CHECKSUMS` in
+    v8.1.0's `dist/setup/index.cjs`) that v8.1.0 has no checksum entry for uv `0.11.16`, so
+    checksum verification is silently skipped (`debug("No checksum found ...")`, not a warning or
+    failure) on every job that pins this uv version today. v8.2.0's changelog confirms it added
+    `0.11.16`'s checksum. Bumped the pin to
+    `astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0` (verified against the
+    live `v8.2.0` tag) in all 6 repo occurrences, not just this ticket's new file — round 2 already
+    rejected bumping only the new composite action as creating a version split; bumping everywhere
+    at once avoids that split instead of recreating it.
 
 ## Decision log
 
@@ -161,6 +178,8 @@ if the 11-atom/composite-workflow proof fails.
 | 2026-08-28 | `/code-review high` round 1 found 3 gaps (missing `timeout-minutes`, no exec plan, duplicated bootstrap step). Fixed the first two; documented the third as accepted duplication. Filed this exec plan. | Re-run `quick-check` and targeted suite to confirm still green, then commit. |
 | 2026-08-28 | `/code-review high` round 2 found the duplication was broader than round 1 addressed (whole boot/teardown sequence, 3 call sites). Asked the user; they chose to extract a composite action now. Built `.github/actions/compose-stack-check`, migrated all 3 named jobs onto it, rewrote the affected tests. `quick-check` green (955 passed), targeted suite green (7 passed). Committed and pushed (PR #90). | Check PR #90's real CI run. |
 | 2026-08-28 | PR #90's CI failed: `compose-smoke-dev`/`atoms-proof` both errored in ~3s ("Can't find action.yml ... did you forget to run actions/checkout") because `actions/checkout` was placed inside the composite action instead of at job level, so the local action reference couldn't resolve. Fixed: checkout moved back to a job-level step before the composite-action call in all three callers; updated the two tests that assumed a single-step job. `quick-check` green (955 passed), targeted suite green (7 passed). | Push the fix, recheck PR #90's CI, then mark this plan `completed/` once green. |
+| 2026-08-28 | PR #90 confirmed green after the checkout fix. Three inline-comment findings triaged (1 fixed: stale exec-plan text; 2 rejected with documented reasoning). A self-review ("me #1") flagged the real blocker: `atoms-proof` isn't yet in the `protect main` ruleset's required status checks, so ANY-391's acceptance criteria aren't fully met — GitHub API access available here (`repo`/`workflow` scopes) returned 404 on the PUT needed to fix it, so this needs someone with repo-admin access; the request text and payload were prepared for them. | Await admin action on the ruleset; separately, await/act on further review. |
+| 2026-08-28 | Team-lead review round found two more issues in `.github/actions/compose-stack-check/action.yml`: `if-no-files-found: ignore` should fail closed, and the `setup-uv` pin lacks a checksum for the requested uv version. Both verified against actual code/upstream source (not taken on faith) and confirmed real. Fixed: `if-no-files-found: error` (plus test update); `setup-uv` bumped to v8.2.0 across all 6 repo pins (not just this file, to avoid recreating the version-split round 2 already rejected). `quick-check` green (955 passed), targeted suite green (7 passed). | Recheck PR CI, then mark this plan `completed/` once green and the ruleset is updated. |
 
 ## Open questions
 

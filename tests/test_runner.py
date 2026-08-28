@@ -371,7 +371,7 @@ def test_compose_stack_check_action_shape() -> None:
     assert upload_step["if"] == "always() && inputs.upload-evidence == 'true'"
     assert upload_step["with"]["name"] == "${{ inputs.evidence-artifact-name }}"
     assert upload_step["with"]["path"] == "${{ inputs.evidence-artifact-path }}"
-    assert upload_step["with"]["if-no-files-found"] == "ignore"
+    assert upload_step["with"]["if-no-files-found"] == "error"
 
     assert action["inputs"]["bootstrap-quick-check"]["default"] == "false"
     assert action["inputs"]["upload-evidence"]["default"] == "false"
