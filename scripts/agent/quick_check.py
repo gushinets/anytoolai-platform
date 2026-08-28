@@ -296,12 +296,16 @@ def bootstrap() -> int:
                 python=sys.executable,
             )
         )
+    # ANY-390: clear any marker left by a prior successful bootstrap before this attempt runs --
+    # otherwise a re-bootstrap that fails (stale lock, broken install) would leave a stale marker
+    # in place and runner.py's readiness check would treat a now-possibly-broken venv as ready.
+    bootstrap_marker().unlink(missing_ok=True)
     exit_code = run_sequence(commands)
     if exit_code == 0:
-        # ANY-390: atoms-proof/live-canary treat this marker's absence as "venv incomplete" (not
-        # just "venv missing") -- without it, a bootstrap interrupted mid-way (venv created, some
-        # editable installs still missing) would pass runner.py's exists()-only check and fail
-        # deep inside the child script with a raw ModuleNotFoundError instead of a clear ENV001.
+        # atoms-proof/live-canary treat this marker's absence as "venv incomplete" (not just "venv
+        # missing") -- without it, a bootstrap interrupted mid-way (venv created, some editable
+        # installs still missing) would pass runner.py's exists()-only check and fail deep inside
+        # the child script with a raw ModuleNotFoundError instead of a clear ENV001.
         bootstrap_marker().touch()
     return exit_code
 

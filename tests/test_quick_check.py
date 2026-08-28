@@ -243,17 +243,21 @@ def test_bootstrap_syncs_root_environment_from_locked_uv_state(monkeypatch, tmp_
 def test_bootstrap_leaves_no_marker_on_failure(monkeypatch, tmp_path) -> None:
     """ANY-390: a bootstrap that fails partway through (e.g. one editable install errors) must not
     leave the completion marker behind -- otherwise atoms-proof/live-canary's readiness check
-    would treat an incomplete venv as ready."""
+    would treat an incomplete venv as ready. Also covers a re-bootstrap that fails after a prior
+    successful run: the stale marker from that earlier success must not survive, or the readiness
+    check would treat a now-possibly-broken venv as ready."""
     quick_check = load_quick_check_module()
     venv_dir = tmp_path / ".quick-check-venv"
     scripts_dir = "Scripts" if quick_check.os.name == "nt" else "bin"
     (venv_dir / scripts_dir).mkdir(parents=True)
+    stale_marker = venv_dir / scripts_dir / ".bootstrap-complete"
+    stale_marker.touch()
 
     monkeypatch.setattr(quick_check, "VENV_DIR", venv_dir)
     monkeypatch.setattr(quick_check, "run_sequence", lambda sequence: 1)
 
     assert quick_check.bootstrap() == 1
-    assert not (venv_dir / scripts_dir / ".bootstrap-complete").exists()
+    assert not stale_marker.exists()
 
 
 def test_runtime_env_uses_workspace_owned_temp_and_cache_dirs(monkeypatch, tmp_path) -> None:
