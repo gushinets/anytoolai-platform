@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 
 def load_quick_check_module():
     module_path = Path(__file__).resolve().parents[1] / "scripts" / "agent" / "quick_check.py"
@@ -61,6 +63,7 @@ def test_ensure_virtualenv_keeps_active_legacy_environment_until_reexec(
     monkeypatch.setattr(quick_check.sys, "prefix", str(legacy_venv))
     monkeypatch.setattr(quick_check.sys, "executable", str(legacy_python))
     monkeypatch.setattr(quick_check.sys, "version_info", (3, 12, 1))
+    monkeypatch.setattr(quick_check.sys, "argv", ["scripts/agent/quick_check.py"])
 
     migrate_calls: list[str] = []
     reexec_calls: list[tuple[list[str], dict[str, str]]] = []
@@ -87,6 +90,56 @@ def test_ensure_virtualenv_keeps_active_legacy_environment_until_reexec(
     command, env = reexec_calls[0]
     assert command == [str(expected_python), str(script_path)]
     assert env["ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED"] == "1"
+
+
+def test_ensure_virtualenv_reexec_forwards_cli_args(monkeypatch, tmp_path) -> None:
+    """ANY-390: live-canary.yml's --bootstrap-only flag must survive the venv-creation re-exec
+    (a cold runner never has .quick-check-venv yet) or the re-exec'd child silently falls through
+    to main()'s full validate/pytest tail instead of stopping after bootstrap()."""
+    quick_check = load_quick_check_module()
+    repo_root = tmp_path / "repo"
+    new_venv = repo_root / ".quick-check-venv"
+    expected_python = venv_python_path(new_venv, windows=quick_check.os.name == "nt")
+    script_path = Path(quick_check.__file__).resolve()
+
+    monkeypatch.setattr(quick_check, "ROOT", repo_root)
+    monkeypatch.setattr(quick_check, "VENV_DIR", new_venv)
+    monkeypatch.setattr(quick_check, "LEGACY_VENV_DIR", repo_root / ".venv" / "quick-check")
+    monkeypatch.setattr(quick_check.sys, "prefix", str(repo_root / "system-python"))
+    monkeypatch.setattr(quick_check.sys, "version_info", (3, 12, 1))
+    monkeypatch.setattr(quick_check.sys, "argv", ["scripts/agent/quick_check.py", "--bootstrap-only"])
+    monkeypatch.setattr(quick_check, "run", lambda command: 0)
+    monkeypatch.delenv("ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED", raising=False)
+
+    reexec_calls: list[tuple[list[str], dict[str, str]]] = []
+    monkeypatch.setattr(
+        quick_check,
+        "run_with_env",
+        lambda command, env: reexec_calls.append((list(command), dict(env))) or 0,
+    )
+
+    exit_code = quick_check.ensure_virtualenv()
+
+    assert exit_code == 0
+    assert len(reexec_calls) == 1
+    command, _env = reexec_calls[0]
+    assert command == [str(expected_python), str(script_path), "--bootstrap-only"]
+
+
+def test_main_bootstrap_only_skips_validate_and_pytest(monkeypatch) -> None:
+    """ANY-390: live-canary.yml only needs .quick-check-venv provisioned, not this repo's full
+    DB-free pytest/validate suite gating its weekly credentialed run."""
+    quick_check = load_quick_check_module()
+    monkeypatch.setattr(quick_check.sys, "argv", ["scripts/agent/quick_check.py", "--bootstrap-only"])
+    monkeypatch.setattr(quick_check, "ensure_virtualenv", lambda: None)
+    monkeypatch.setattr(quick_check, "bootstrap", lambda: 0)
+    monkeypatch.setattr(
+        quick_check,
+        "run_sequence",
+        lambda sequence: pytest.fail("validate/pytest sequence must not run with --bootstrap-only"),
+    )
+
+    assert quick_check.main() == 0
 
 
 def test_ensure_virtualenv_cleans_legacy_environment_once_new_environment_is_active(
@@ -125,10 +178,16 @@ def test_ensure_virtualenv_cleans_legacy_environment_once_new_environment_is_act
 
 def test_bootstrap_syncs_root_environment_from_locked_uv_state(monkeypatch, tmp_path) -> None:
     quick_check = load_quick_check_module()
+    venv_dir = tmp_path / ".quick-check-venv"
+    scripts_dir = "Scripts" if quick_check.os.name == "nt" else "bin"
+    # ensure_virtualenv() always creates this before main() calls bootstrap() -- mirror that
+    # precondition instead of adding defensive mkdir logic to bootstrap() itself.
+    (venv_dir / scripts_dir).mkdir(parents=True)
     project_one = tmp_path / "project-one"
     project_two = tmp_path / "project-two"
     commands: list[list[str]] = []
 
+    monkeypatch.setattr(quick_check, "VENV_DIR", venv_dir)
     monkeypatch.setattr(quick_check.sys, "executable", "/tmp/.quick-check-venv/bin/python")
     monkeypatch.setattr(quick_check, "EDITABLE_PROJECTS", [project_one, project_two])
     monkeypatch.setattr(
@@ -178,6 +237,23 @@ def test_bootstrap_syncs_root_environment_from_locked_uv_state(monkeypatch, tmp_
             str(project_two),
         ],
     ]
+    assert (venv_dir / scripts_dir / ".bootstrap-complete").exists()
+
+
+def test_bootstrap_leaves_no_marker_on_failure(monkeypatch, tmp_path) -> None:
+    """ANY-390: a bootstrap that fails partway through (e.g. one editable install errors) must not
+    leave the completion marker behind -- otherwise atoms-proof/live-canary's readiness check
+    would treat an incomplete venv as ready."""
+    quick_check = load_quick_check_module()
+    venv_dir = tmp_path / ".quick-check-venv"
+    scripts_dir = "Scripts" if quick_check.os.name == "nt" else "bin"
+    (venv_dir / scripts_dir).mkdir(parents=True)
+
+    monkeypatch.setattr(quick_check, "VENV_DIR", venv_dir)
+    monkeypatch.setattr(quick_check, "run_sequence", lambda sequence: 1)
+
+    assert quick_check.bootstrap() == 1
+    assert not (venv_dir / scripts_dir / ".bootstrap-complete").exists()
 
 
 def test_runtime_env_uses_workspace_owned_temp_and_cache_dirs(monkeypatch, tmp_path) -> None:

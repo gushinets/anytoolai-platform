@@ -22,14 +22,18 @@ doctor:
 	$(PYTHON) scripts/agent/runner.py doctor
 
 # Every other target uses `uv run python`, not $(PYTHON): most runner.py commands (validate-*,
-# atoms-proof/live-canary, collect-context, ...) import real project packages (pyyaml, pydantic,
-# sqlalchemy, pytest, the editable backend packages, ...) directly in the current interpreter or
-# a subprocess sharing it -- they need the caller's environment to already have them, which a bare
-# $(PYTHON) (e.g. a system python3) does not guarantee. `uv run` resolves/syncs the project's own
-# environment first, so every target behaves the same way regardless of which Python happened to
-# be first on PATH. (quick-check/full-check are the exception that still works either way: they
-# self-bootstrap their own separate `.quick-check-venv` -- `uv run` on top of that is harmless,
-# just resolves uv's own `.venv` first before quick_check.py re-execs into `.quick-check-venv`.)
+# collect-context, dev-*, ...) import real project packages (pyyaml, pydantic, sqlalchemy,
+# pytest, the editable backend packages, ...) directly in the current interpreter -- they need
+# the caller's environment to already have them, which a bare $(PYTHON) (e.g. a system python3)
+# does not guarantee. `uv run` resolves/syncs the project's own environment first, so every
+# target behaves the same way regardless of which Python happened to be first on PATH.
+# atoms-proof/live-canary are a further exception: they launch their proof subprocess with
+# .quick-check-venv's own python explicitly (ANY-390), not the caller's interpreter -- `uv run`
+# here only resolves runner.py's own import environment, not the child process it spawns, so
+# `.quick-check-venv` still needs bootstrapping via quick-check first.
+# (quick-check/full-check are the exception that still works either way: they self-bootstrap
+# their own separate `.quick-check-venv` -- `uv run` on top of that is harmless, just resolves
+# uv's own `.venv` first before quick_check.py re-execs into `.quick-check-venv`.)
 quick-check:
 	uv run python scripts/agent/runner.py quick-check
 

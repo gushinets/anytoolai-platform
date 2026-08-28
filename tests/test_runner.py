@@ -205,6 +205,44 @@ def test_quick_check_strips_pythonpath_from_subprocess_env(monkeypatch) -> None:
     assert "PYTHONPATH" not in recorded
 
 
+def test_quick_check_bootstrap_only_appends_flag_to_subprocess_command(monkeypatch) -> None:
+    runner = load_runner_module()
+    commands: list[list[str]] = []
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: commands.append(list(command)) or 0
+    )
+
+    assert runner.quick_check(bootstrap_only=True) == 0
+
+    assert commands == [[runner.sys.executable, "scripts/agent/quick_check.py", "--bootstrap-only"]]
+
+
+def test_main_forwards_bootstrap_only_to_quick_check(monkeypatch) -> None:
+    """ANY-390: `runner.py quick-check --bootstrap-only` must work through the canonical
+    `python scripts/agent/runner.py <command>` interface (AGENTS.md) -- live-canary.yml relies on
+    this, not on calling quick_check.py directly."""
+    runner = load_runner_module()
+    calls: list[bool] = []
+    monkeypatch.setattr(
+        runner, "quick_check", lambda *, bootstrap_only=False: calls.append(bootstrap_only) or 0
+    )
+
+    assert runner.main(["quick-check", "--bootstrap-only"]) == 0
+
+    assert calls == [True]
+
+
+def test_main_rejects_bootstrap_only_for_other_commands(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner, "doctor", lambda: pytest.fail("doctor must not run for a rejected flag combination")
+    )
+
+    assert runner.main(["doctor", "--bootstrap-only"]) == 2
+
+    assert "--bootstrap-only is only valid with quick-check" in capsys.readouterr().err
+
+
 def test_postgresql_check_uses_marker_driven_backend_roots(monkeypatch) -> None:
     runner = load_runner_module()
     commands: list[list[str]] = []
@@ -1000,12 +1038,70 @@ def test_dev_smoke_reports_dev001_for_invalid_port_override(monkeypatch, capsys)
     assert "DEV001" in capsys.readouterr().err
 
 
-def test_atoms_proof_passes_database_url_via_env_not_argv(monkeypatch) -> None:
+def test_proof_script_fails_fast_when_quick_check_venv_missing(monkeypatch, tmp_path, capsys) -> None:
+    """ANY-390: on a fresh checkout that never ran quick-check, atoms-proof/live-canary must fail
+    with a clear setup instruction instead of silently launching sys.executable and reproducing
+    the PROOF000 missing-dependency bug -- shared by both commands via _run_proof_script()."""
+    runner = load_runner_module()
+    missing_venv_python = tmp_path / "does-not-exist" / "python"
+    monkeypatch.setattr(runner, "quick_check_venv_python", lambda: missing_venv_python)
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: pytest.fail("subprocess must not launch")
+    )
+
+    assert runner.atoms_proof() == 2
+
+    err = capsys.readouterr().err
+    assert "ENV001" in err
+    assert "quick-check" in err
+
+
+def test_proof_script_fails_fast_when_quick_check_venv_incomplete(monkeypatch, tmp_path, capsys) -> None:
+    """ANY-390 round-4 code-review finding: a bootstrap interrupted mid-way can leave
+    .quick-check-venv's python in place without every editable package installed -- exists()
+    alone would wrongly treat that as ready and let the child fail deep with a raw
+    ModuleNotFoundError instead of a clear ENV001."""
+    runner = load_runner_module()
+    venv_python = tmp_path / "python"
+    venv_python.touch()
+    monkeypatch.setattr(runner, "quick_check_venv_python", lambda: venv_python)
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: pytest.fail("subprocess must not launch")
+    )
+
+    assert runner.atoms_proof() == 2
+
+    err = capsys.readouterr().err
+    assert "ENV001" in err
+    assert "quick-check" in err
+
+
+def test_atoms_proof_reports_dev001_for_invalid_port_override(monkeypatch, tmp_path, capsys) -> None:
+    runner = load_runner_module()
+    venv_python = tmp_path / "python"
+    venv_python.touch()
+    (venv_python.parent / ".bootstrap-complete").touch()
+    monkeypatch.setattr(runner, "quick_check_venv_python", lambda: venv_python)
+
+    def fake_runtime_identity():
+        raise ValueError("ANYTOOLAI_API_PORT must be an integer port")
+
+    monkeypatch.setattr(runner, "runtime_identity", fake_runtime_identity)
+
+    assert runner.atoms_proof() == 2
+    assert "DEV001" in capsys.readouterr().err
+
+
+def test_atoms_proof_passes_database_url_via_env_not_argv(monkeypatch, tmp_path) -> None:
     """Fourteenth code review pass finding: identity.database_url can embed a real
     ANYTOOLAI_POSTGRES_PASSWORD override, so it must reach atoms_proof.py through the
     subprocess's environment (invisible to `ps`/process listings), not as a literal argv value
     -- the child only ever sees the *name* of the env var on its own command line."""
     runner = load_runner_module()
+    venv_python = tmp_path / "python"
+    venv_python.touch()
+    (venv_python.parent / ".bootstrap-complete").touch()
+    monkeypatch.setattr(runner, "quick_check_venv_python", lambda: venv_python)
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
     monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
     calls: list[tuple[list[str], dict[str, str]]] = []
@@ -1025,7 +1121,7 @@ def test_atoms_proof_passes_database_url_via_env_not_argv(monkeypatch) -> None:
     # encoded would silently leave a reserved-character database name encoded on the wire, and
     # would have stayed green under the prior prefix-only assertion.
     assert command == [
-        runner.sys.executable, "scripts/agent/atoms_proof.py", identity.api_url,
+        str(venv_python), "scripts/agent/atoms_proof.py", identity.api_url,
         "--database-url-env", env_var_name,
         "--database-url-is-percent-encoded",
     ]
@@ -1040,16 +1136,27 @@ def test_atoms_proof_is_registered_in_commands() -> None:
     assert runner.COMMANDS["atoms-proof"] is runner.atoms_proof
 
 
-def test_atoms_proof_reports_dev001_for_invalid_port_override(monkeypatch, capsys) -> None:
+def test_proof_script_uses_managed_venv_python_not_sys_executable(monkeypatch, tmp_path) -> None:
+    """ANY-390 regression: atoms_proof()/live_canary() must launch their sibling script with
+    .quick-check-venv's python, not sys.executable -- a bare system Python lacks platform-actions'
+    markdown-it-py and fails with PROOF000 before any proof logic runs."""
     runner = load_runner_module()
+    venv_python = tmp_path / "python"
+    venv_python.touch()
+    (venv_python.parent / ".bootstrap-complete").touch()
+    monkeypatch.setattr(runner, "quick_check_venv_python", lambda: venv_python)
+    monkeypatch.setattr(runner.sys, "executable", "/usr/bin/python3")
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: calls.append(list(command)) or 0
+    )
 
-    def fake_runtime_identity():
-        raise ValueError("ANYTOOLAI_API_PORT must be an integer port")
+    assert runner.atoms_proof() == 0
 
-    monkeypatch.setattr(runner, "runtime_identity", fake_runtime_identity)
-
-    assert runner.atoms_proof() == 2
-    assert "DEV001" in capsys.readouterr().err
+    assert calls[0][0] == str(venv_python)
+    assert calls[0][0] != runner.sys.executable
 
 
 def test_live_canary_fails_without_openai_api_key(monkeypatch, capsys) -> None:
@@ -1083,8 +1190,12 @@ def test_live_canary_fails_without_live_canary_token(monkeypatch, capsys) -> Non
     assert "LIVE011" in capsys.readouterr().err
 
 
-def test_live_canary_reports_dev001_for_invalid_port_override(monkeypatch, capsys) -> None:
+def test_live_canary_reports_dev001_for_invalid_port_override(monkeypatch, tmp_path, capsys) -> None:
     runner = load_runner_module()
+    venv_python = tmp_path / "python"
+    venv_python.touch()
+    (venv_python.parent / ".bootstrap-complete").touch()
+    monkeypatch.setattr(runner, "quick_check_venv_python", lambda: venv_python)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "sekret")
 
@@ -1097,8 +1208,12 @@ def test_live_canary_reports_dev001_for_invalid_port_override(monkeypatch, capsy
     assert "DEV001" in capsys.readouterr().err
 
 
-def test_live_canary_passes_database_url_via_env_not_argv(monkeypatch) -> None:
+def test_live_canary_passes_database_url_via_env_not_argv(monkeypatch, tmp_path) -> None:
     runner = load_runner_module()
+    venv_python = tmp_path / "python"
+    venv_python.touch()
+    (venv_python.parent / ".bootstrap-complete").touch()
+    monkeypatch.setattr(runner, "quick_check_venv_python", lambda: venv_python)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "sekret")
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
@@ -1121,7 +1236,7 @@ def test_live_canary_passes_database_url_via_env_not_argv(monkeypatch) -> None:
     # too, or a reserved-character ANYTOOLAI_POSTGRES_PASSWORD/_DB connects fine via atoms-proof
     # but silently fails to connect via live-canary on the same stack.
     assert command == [
-        runner.sys.executable, "scripts/agent/live_canary.py", identity.api_url,
+        str(venv_python), "scripts/agent/live_canary.py", identity.api_url,
         "--database-url-env", env_var_name,
         "--database-url-is-percent-encoded",
     ]

@@ -132,6 +132,10 @@ def venv_python() -> Path:
     return VENV_DIR / scripts_dir / python_name
 
 
+def bootstrap_marker() -> Path:
+    return venv_python().parent / ".bootstrap-complete"
+
+
 def uv_executable() -> str:
     candidate = shutil.which("uv")
     return candidate if candidate is not None else "uv"
@@ -207,6 +211,15 @@ def is_legacy_quick_check_environment() -> bool:
         return False
 
 
+def _reexec_into(expected_python: Path) -> int:
+    """Re-launch this script under expected_python, forwarding CLI args (e.g. --bootstrap-only) --
+    without that forwarding, a cold runner would create the venv here, then lose the flag on the
+    very re-exec that's supposed to carry it into .quick-check-venv (ANY-390)."""
+    env = baseline_env()
+    env["ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED"] = "1"
+    return run_with_env([str(expected_python), str(Path(__file__).resolve()), *sys.argv[1:]], env)
+
+
 def ensure_virtualenv() -> int | None:
     expected_python = venv_python()
     active_legacy_environment = is_legacy_quick_check_environment()
@@ -235,9 +248,7 @@ def ensure_virtualenv() -> int | None:
     if not invoking_python_supported():
         minimum_version = ".".join(str(part) for part in MINIMUM_PYTHON)
         if existing_version is not None:
-            env = baseline_env()
-            env["ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED"] = "1"
-            return run_with_env([str(expected_python), str(Path(__file__).resolve())], env)
+            return _reexec_into(expected_python)
         print(
             f"Quick-check requires Python >= {minimum_version} to create {VENV_DIR}. "
             f"Run it with python{minimum_version} or py -{minimum_version}.",
@@ -263,9 +274,7 @@ def ensure_virtualenv() -> int | None:
     if not active_legacy_environment:
         migrate_legacy_virtualenv()
 
-    env = baseline_env()
-    env["ANYTOOLAI_QUICK_CHECK_BOOTSTRAPPED"] = "1"
-    return run_with_env([str(expected_python), str(Path(__file__).resolve())], env)
+    return _reexec_into(expected_python)
 
 
 def bootstrap() -> int:
@@ -287,7 +296,14 @@ def bootstrap() -> int:
                 python=sys.executable,
             )
         )
-    return run_sequence(commands)
+    exit_code = run_sequence(commands)
+    if exit_code == 0:
+        # ANY-390: atoms-proof/live-canary treat this marker's absence as "venv incomplete" (not
+        # just "venv missing") -- without it, a bootstrap interrupted mid-way (venv created, some
+        # editable installs still missing) would pass runner.py's exists()-only check and fail
+        # deep inside the child script with a raw ModuleNotFoundError instead of a clear ENV001.
+        bootstrap_marker().touch()
+    return exit_code
 
 
 def main() -> int:
@@ -298,6 +314,14 @@ def main() -> int:
     exit_code = bootstrap()
     if exit_code != 0:
         return exit_code
+
+    # ANY-390: live-canary.yml uses this to provision .quick-check-venv (create the venv, install
+    # the local editable packages atoms_proof.py/live_canary.py need) without also gating its
+    # weekly, credentialed run on this repo's full DB-free pytest suite -- that suite is unrelated
+    # to whether the venv is usable, and a single flaky/failing test in it would otherwise fail the
+    # job before it ever makes a real provider call.
+    if "--bootstrap-only" in sys.argv[1:]:
+        return 0
 
     return run_sequence(
         [
