@@ -103,6 +103,13 @@ class ScenarioStartResponse(BaseModel):
     result_artifact_id: str | None = None
 
 
+class DemoRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    demo_id: str
+    source_text: str
+
+
 class ScenarioSessionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

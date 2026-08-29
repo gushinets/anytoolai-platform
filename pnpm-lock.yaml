@@ -113,6 +113,8 @@ importers:
         specifier: ^5.6.0
         version: 5.9.3
 
+  tests/e2e/stakeholder-demo-browser: {}
+
 packages:
 
   '@1natsu/wait-element@4.2.0':
