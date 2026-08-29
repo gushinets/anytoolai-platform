@@ -313,6 +313,28 @@ def test_required_backend_workflow_runs_canonical_postgresql_check() -> None:
     )
 
 
+def test_required_backend_workflow_runs_atoms_proof_with_evidence_and_teardown() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load(
+        (repo_root / ".github" / "workflows" / "backend.yml").read_text(encoding="utf-8")
+    )
+    triggers = workflow.get("on", workflow.get(True))
+    assert "pull_request" in triggers
+    assert triggers["push"]["branches"] == ["main"]
+
+    job = workflow["jobs"]["atoms-proof"]
+    assert job.get("continue-on-error") is not True
+    steps_by_name = {step.get("name"): step for step in job["steps"] if step.get("name")}
+    assert steps_by_name["Run atoms-proof"]["run"] == (
+        "uv run python scripts/agent/runner.py atoms-proof"
+    )
+    assert steps_by_name["Upload atoms-proof evidence"]["if"] == "always()"
+    assert steps_by_name["Upload atoms-proof evidence"]["with"]["path"] == (
+        ".agent/atoms-proof/"
+    )
+    assert steps_by_name["Tear down atoms-proof dev stack"]["if"] == "always()"
+
+
 def test_live_canary_workflow_scopes_secrets_to_exactly_the_two_steps_that_need_them() -> None:
     """`code-review` finding: docker-compose.yml's worker service interpolates
     OPENAI_API_KEY at container-creation time, during the "Boot dev Compose stack" step -- that
