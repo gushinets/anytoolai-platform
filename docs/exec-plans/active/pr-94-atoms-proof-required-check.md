@@ -58,3 +58,4 @@
 |---|---|---|
 | 2026-08-29 | Confirmed ruleset `protect main` requires `atoms-proof`, while PR head `4c82984` publishes no check with that name. Baseline quick-check: 971 passed, 3 skipped. | Add the failing contract test. |
 | 2026-08-29 | Added the job and regression contract. Targeted RED/green verified; quick-check: 972 passed, 3 skipped. | Push and verify the live PR check. |
+| 2026-08-29 | First live job exposed `ENV001`: ordinary `uv sync` does not create the managed proof environment. Added the existing `quick-check --bootstrap-only` prerequisite from `live-canary.yml` and verified RED/green coverage. | Push the follow-up and verify the live proof. |

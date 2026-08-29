@@ -325,6 +325,9 @@ def test_required_backend_workflow_runs_atoms_proof_with_evidence_and_teardown()
     job = workflow["jobs"]["atoms-proof"]
     assert job.get("continue-on-error") is not True
     steps_by_name = {step.get("name"): step for step in job["steps"] if step.get("name")}
+    assert steps_by_name["Bootstrap atoms-proof environment"]["run"] == (
+        "uv run python scripts/agent/runner.py quick-check --bootstrap-only"
+    )
     assert steps_by_name["Run atoms-proof"]["run"] == (
         "uv run python scripts/agent/runner.py atoms-proof"
     )

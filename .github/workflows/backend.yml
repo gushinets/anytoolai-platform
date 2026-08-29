@@ -100,6 +100,8 @@ jobs:
         with:
           version: "0.11.16"
       - run: uv sync --frozen --group dev
+      - name: Bootstrap atoms-proof environment
+        run: uv run python scripts/agent/runner.py quick-check --bootstrap-only
       - name: Boot dev Compose stack for atoms-proof
         run: uv run python scripts/agent/runner.py dev-up
         env:
