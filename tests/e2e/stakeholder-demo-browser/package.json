@@ -1,0 +1,8 @@
+{
+  "name": "@anytoolai/stakeholder-demo-browser-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test demo-state.test.mjs"
+  }
+}
