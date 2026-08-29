@@ -29,5 +29,8 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+anytoolai_platform_api = ["static/demo/*"]
+
 [tool.uv.sources]
 anytoolai-platform-core = { path = "../../packages/backend/platform-core", editable = true }

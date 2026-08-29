@@ -1,6 +1,25 @@
 {
   "components": {
     "schemas": {
+      "DemoRunRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "demo_id": {
+            "title": "Demo Id",
+            "type": "string"
+          },
+          "source_text": {
+            "title": "Source Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "demo_id",
+          "source_text"
+        ],
+        "title": "DemoRunRequest",
+        "type": "object"
+      },
       "ErrorDetailResponse": {
         "additionalProperties": false,
         "properties": {
@@ -782,6 +801,105 @@
         "summary": "Health",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/v1/demo/runs": {
+      "post": {
+        "operationId": "start_demo_run_v1_demo_runs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Demo-Access-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Demo-Access-Code"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScenarioStartResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demo access denied."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Another demo run is active."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demo input is invalid."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Daily demo limit exhausted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demo runtime is unavailable."
+          }
+        },
+        "summary": "Start an allowlisted stakeholder demo workflow",
+        "tags": [
+          "stakeholder-demo"
         ]
       }
     },
