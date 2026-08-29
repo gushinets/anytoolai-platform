@@ -61,10 +61,16 @@ but `POST /v1/demo/runs` fails closed unless all runtime credentials are configu
 
 - `ANYTOOLAI_DEMO_ACCESS_CODE` is provided only to `platform-api` and compared with the request's
   `X-Demo-Access-Code` header using a constant-time comparison;
-- `ANYTOOLAI_LIVE_CANARY_TOKEN` is provided only to `platform-api`, which injects it server-side
-  when starting one of the three allowlisted internal live scenarios;
-- `OPENAI_API_KEY` is provided only to `platform-worker`, where Provider Gateway performs the
-  real model call.
+- in deployed services, `ANYTOOLAI_LIVE_CANARY_TOKEN` is injected only into `platform-api`, which
+  uses it server-side when starting one of the three allowlisted internal live scenarios;
+- in deployed services, `OPENAI_API_KEY` is injected only into `platform-worker`, where Provider
+  Gateway performs the real model call.
+
+Repository-operated Compose and live-canary workflows have a separate operator/CI boundary:
+the shell or CI steps that run `dev-up` and `live-canary` must provide both
+`ANYTOOLAI_LIVE_CANARY_TOKEN` and `OPENAI_API_KEY`. Compose reads them while creating the two
+service containers, and `scripts/agent/runner.py live-canary` reads them for its fail-fast checks.
+Neither value is sent to the demo frontend.
 
 Put these values in the operator secret store or the gitignored `infra/compose/.env.prod` file.
 Never place them in URLs, committed files, frontend source, reverse-proxy logs, screenshots, or
@@ -73,6 +79,37 @@ stakeholder messages. Share the access code separately and rotate it after the r
 Production access to `/demo` requires HTTPS at the reverse-proxy/load-balancer boundary. DNS,
 TLS certificates, firewall rules, OpenAI budget controls, and code rotation are operator-owned;
 the repository does not provision them.
+
+### Run the stakeholder page locally
+
+Start Docker Desktop, then run the worktree-aware development stack from the repository root:
+
+```bash
+python scripts/agent/runner.py dev-up
+```
+
+The command prints the derived API URL for this checkout. Open that URL with `/demo` appended,
+for example `http://127.0.0.1:18123/demo`. Do not assume port 8000: recover the exact URL at any
+time with:
+
+```bash
+python scripts/agent/runner.py dev-status
+```
+
+This is sufficient to inspect the page. Workflow starts remain fail-closed until the three
+runtime values are present in the shell that launches Compose. To exercise the real AI chains,
+set them before `dev-up`:
+
+```bash
+export ANYTOOLAI_DEMO_ACCESS_CODE='replace-with-a-local-shared-code'
+export ANYTOOLAI_LIVE_CANARY_TOKEN='replace-with-a-local-live-token'
+export OPENAI_API_KEY='replace-with-a-real-provider-key'
+python scripts/agent/runner.py dev-up
+```
+
+Enter the value of `ANYTOOLAI_DEMO_ACCESS_CODE` on the page. Stop this checkout's stack with
+`python scripts/agent/runner.py dev-down`. On systems where Python 3 is exposed only as
+`python3`, use `python3` in the commands above.
 
 ## Dev
 

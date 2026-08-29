@@ -90,4 +90,8 @@ def test_demo_styles_cover_mobile_focus_and_reduced_motion() -> None:
     assert "@media (max-width: 600px)" in css
     assert ":focus-visible" in css
     assert ".workflow-card:has(input:focus-visible)" in css
+    assert "word-break: break-word" not in css
+    assert "overflow-wrap: anywhere" in css
+    assert "clip: rect(" not in css
+    assert "clip-path: inset(50%)" in css
     assert "@media (prefers-reduced-motion: reduce)" in css
