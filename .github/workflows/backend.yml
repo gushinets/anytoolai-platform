@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "0.11.16"
       - run: uv sync --frozen --group dev
@@ -35,7 +35,7 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "0.11.16"
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
@@ -53,79 +53,15 @@ jobs:
     # compose-smoke-prod instead of roughly doubling this check's wall-clock time on every PR.
     runs-on: ubuntu-latest
     steps:
+      # A local action reference (./.github/actions/...) can only be resolved after the repo is
+      # checked out, so checkout must stay a job-level step here, not inside the composite action.
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           persist-credentials: false
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+      - uses: ./.github/actions/compose-stack-check
         with:
-          python-version: '3.12'
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
-        with:
-          version: "0.11.16"
-      - run: uv sync --frozen --group dev
-      - name: Boot dev Compose stack (waits for platform-api healthy)
-        run: uv run python scripts/agent/runner.py dev-up
-        env:
-          ANYTOOLAI_READY_TIMEOUT: "120"
-      - name: kernel_demo smoke check against dev
-        run: uv run python scripts/agent/runner.py dev-smoke
-      # Debuggability: if boot or the smoke check failed, dump every container's logs to the
-      # CI console before the stack is torn down, so the failure is diagnosable from the
-      # Actions log alone. Resolves the compose project name via a pure Python computation
-      # (no docker call) rather than `dev-status` (which itself shells out to
-      # `docker compose ps`) -- otherwise, under `set -eo pipefail`, a broken Docker daemon
-      # (a realistic cause of the very failure this step exists to diagnose) would make
-      # `dev-status` fail, abort the pipeline, and skip `docker compose logs` entirely.
-      - name: Dump Docker Compose logs on failure
-        if: failure()
-        run: |
-          PROJECT=$(uv run python -c "import sys; sys.path.insert(0, 'scripts/agent'); from runner import runtime_identity; print(runtime_identity().compose_project)")
-          docker compose --project-name "$PROJECT" \
-            -f infra/compose/docker-compose.yml \
-            -f infra/compose/docker-compose.override.yml \
-            logs --no-color
-      - name: Tear down dev stack
-        if: always()
-        run: uv run python scripts/agent/runner.py dev-down
-  atoms-proof:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
-        with:
-          version: "0.11.16"
-      - run: uv sync --frozen --group dev
-      - name: Bootstrap atoms-proof environment
-        run: uv run python scripts/agent/runner.py quick-check --bootstrap-only
-      - name: Boot dev Compose stack for atoms-proof
-        run: uv run python scripts/agent/runner.py dev-up
-        env:
-          ANYTOOLAI_READY_TIMEOUT: "120"
-      - name: Run atoms-proof
-        run: uv run python scripts/agent/runner.py atoms-proof
-      - name: Dump Docker Compose logs on failure
-        if: failure()
-        run: |
-          PROJECT=$(uv run python -c "import sys; sys.path.insert(0, 'scripts/agent'); from runner import runtime_identity; print(runtime_identity().compose_project)")
-          docker compose --project-name "$PROJECT" \
-            -f infra/compose/docker-compose.yml \
-            -f infra/compose/docker-compose.override.yml \
-            logs --no-color
-      - name: Upload atoms-proof evidence
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: atoms-proof-evidence
-          path: .agent/atoms-proof/
-          if-no-files-found: ignore
-      - name: Tear down atoms-proof dev stack
-        if: always()
-        run: uv run python scripts/agent/runner.py dev-down
+          check-command: dev-smoke
+          check-step-name: kernel_demo smoke check against dev
   compose-smoke-prod:
     # Same proof as compose-smoke-dev, but for the prod overlay (disposable test credentials,
     # never real secrets). Its own job so it runs in parallel with compose-smoke-dev.
@@ -137,7 +73,7 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "0.11.16"
       - run: uv sync --frozen --group dev
@@ -156,6 +92,29 @@ jobs:
           ANYTOOLAI_POSTGRES_USER: ci_produser
           ANYTOOLAI_POSTGRES_PASSWORD: ci_testpass123
           ANYTOOLAI_POSTGRES_DB: ci_proddb
+  atoms-proof:
+    # Runs the deterministic, credential-free 11-atom + composite workflow proof (ANY-391).
+    # Same boot/run/log-dump/teardown shape as compose-smoke-dev, but its own dev Compose stack
+    # (own runner/VM, so it never shares a stack instance with compose-smoke-dev).
+    #
+    # timeout-minutes: this job runs on every PR/push to main (unlike live-canary.yml's weekly
+    # schedule), so a hung `docker compose up` or a stuck poll in atoms_proof.py must fail fast
+    # rather than sit on GitHub's 360-minute default and block the required status check. Same
+    # value live-canary.yml uses for the identical dev-up -> proof -> teardown shape.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/compose-stack-check
+        with:
+          bootstrap-quick-check: "true"
+          check-command: atoms-proof
+          check-step-name: Run 11-atom + composite workflow proof
+          upload-evidence: "true"
+          evidence-artifact-name: atoms-proof-evidence
+          evidence-artifact-path: .agent/atoms-proof/
   postgresql-quota-concurrency:
     runs-on: ubuntu-latest
     services:
@@ -184,7 +143,7 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "0.11.16"
       - run: uv sync --frozen --group dev

@@ -101,7 +101,8 @@ does not gate the MVP-A1 Atom Runtime Proof.
 - frontend-safe `GET /v1/results/{artifact_id}`
 - eleven deterministic standalone scenarios
 - three composite workflows covering all 11 atoms
-- `python scripts/agent/runner.py atoms-proof`
+- `python scripts/agent/runner.py atoms-proof`, run credential-free on every pull request and push
+  to `main` via the `atoms-proof` job in `.github/workflows/backend.yml` (ANY-391)
 - credentialed live-provider canary, separate from baseline CI
 
 Web mirror, shared CE-kit, kernel-demo CE, consent, paywall/onboarding, and browser smoke belong to
