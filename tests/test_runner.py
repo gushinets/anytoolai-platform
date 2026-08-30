@@ -313,6 +313,30 @@ def test_required_backend_workflow_runs_canonical_postgresql_check() -> None:
     )
 
 
+def test_required_backend_workflow_runs_atoms_proof_with_evidence_and_teardown() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load(
+        (repo_root / ".github" / "workflows" / "backend.yml").read_text(encoding="utf-8")
+    )
+    triggers = workflow.get("on", workflow.get(True))
+    assert "pull_request" in triggers
+    assert triggers["push"]["branches"] == ["main"]
+
+    job = workflow["jobs"]["atoms-proof"]
+    assert job.get("continue-on-error") is not True
+    steps_by_name = {step.get("name"): step for step in job["steps"] if step.get("name")}
+    assert steps_by_name["Bootstrap atoms-proof environment"]["run"] == (
+        "uv run python scripts/agent/runner.py quick-check --bootstrap-only"
+    )
+    assert steps_by_name["Run atoms-proof"]["run"] == (
+        "uv run python scripts/agent/runner.py atoms-proof"
+    )
+    assert steps_by_name["Upload atoms-proof evidence"]["if"] == "always()"
+    assert steps_by_name["Upload atoms-proof evidence"]["with"]["path"] == (
+        ".agent/atoms-proof/"
+    )
+    assert steps_by_name["Tear down atoms-proof dev stack"]["if"] == "always()"
+
 def _compose_stack_check_action() -> dict:
     repo_root = Path(__file__).resolve().parents[1]
     return yaml.safe_load(
@@ -347,7 +371,6 @@ def test_compose_stack_check_action_scopes_secrets_to_exactly_two_steps() -> Non
         else:
             assert "OPENAI_API_KEY" not in step_env, step
             assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in step_env, step
-
 
 def test_compose_stack_check_action_shape() -> None:
     """Structural contract: bootstrap is conditional on the input, teardown always runs, the
