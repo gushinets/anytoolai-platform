@@ -378,6 +378,28 @@ def test_compose_stack_check_action_shape() -> None:
     assert action["inputs"]["live-canary-token"]["default"] == ""
 
 
+def test_compose_smoke_dev_workflow_delegates_to_compose_stack_check_once() -> None:
+    """Regression: a merge with main once unioned this job's clean composite-action step with a
+    pre-refactor manual dev-up/check/teardown block instead of picking one side, so the job ran
+    the whole boot/check/teardown lifecycle twice per run and passed a stray `version` key the
+    composite action never declares (only `uv-version`, defaulted from the action itself)."""
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load(
+        (repo_root / ".github" / "workflows" / "backend.yml").read_text(encoding="utf-8")
+    )
+
+    job = workflow["jobs"]["compose-smoke-dev"]
+
+    # A local action reference (./.github/actions/...) can only be resolved after the repo is
+    # checked out, so a job-level checkout step must come first, before the composite-action call.
+    assert len(job["steps"]) == 2
+    checkout_step, step = job["steps"]
+    assert checkout_step["uses"].startswith("actions/checkout@")
+    assert step["uses"] == "./.github/actions/compose-stack-check"
+    assert step["with"]["check-command"] == "dev-smoke"
+    assert "version" not in step["with"]
+
+
 def test_live_canary_workflow_delegates_to_compose_stack_check_with_secrets() -> None:
     """`code-review` finding (round 1, preserved through the round-2 composite-action extraction):
     OPENAI_API_KEY/ANYTOOLAI_LIVE_CANARY_TOKEN must not sit at job level (every step would inherit
