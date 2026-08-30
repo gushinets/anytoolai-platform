@@ -413,6 +413,7 @@ def test_loader_preserves_provider_policy_yaml_metadata() -> None:
     assert policy is not None
     assert policy.provider == "litellm"
     assert policy.model == "anytoolai.default_text"
+    assert policy.temperature == 1.0
     assert policy.retry_policy.transport.max_attempts == 2
     assert policy.retry_policy.transport.litellm_num_retries_per_attempt == 0
     assert policy.retry_policy.validation.max_attempts == 2
