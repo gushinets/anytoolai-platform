@@ -313,19 +313,100 @@ def test_required_backend_workflow_runs_canonical_postgresql_check() -> None:
     )
 
 
-def test_live_canary_workflow_scopes_secrets_to_exactly_the_two_steps_that_need_them() -> None:
-    """`code-review` finding: docker-compose.yml's worker service interpolates
-    OPENAI_API_KEY at container-creation time, during the "Boot dev Compose stack" step -- that
-    step must have it, or every scheduled run would silently make 0 real provider calls.
-    platform-api reads ANYTOOLAI_LIVE_CANARY_TOKEN the same way, for internal_only scenarios'
-    X-Live-Canary-Token header. runner.py's live-canary command also reads both directly from its
-    own process env for its LIVE000/LIVE011 fail-fast checks, so the later "Run 11-atom live
-    provider canary" step needs them too.
+def _compose_stack_check_action() -> dict:
+    repo_root = Path(__file__).resolve().parents[1]
+    return yaml.safe_load(
+        (repo_root / ".github" / "actions" / "compose-stack-check" / "action.yml").read_text(
+            encoding="utf-8"
+        )
+    )
 
-    `code-review` finding: an earlier version of this workflow put both secrets
-    at job level, which every step (checkout, setup-python, setup-uv, uv sync, log dump,
-    teardown, upload) also inherited despite having no need for either -- scoped down to exactly
-    the two steps that need them, narrowing exposure with no loss of correctness."""
+
+def test_compose_stack_check_action_scopes_secrets_to_exactly_two_steps() -> None:
+    """ANY-391 code review round 2: the boot/run/log-dump/teardown/upload sequence used to be
+    duplicated verbatim across compose-smoke-dev, live-canary, and atoms-proof -- extracted into
+    this composite action. The original `code-review` finding (secrets scoped to exactly the
+    dev-up and check-command steps, not job-level, not every other step) now lives here instead of
+    in live-canary.yml directly, so it must still hold at the action level."""
+    action = _compose_stack_check_action()
+    assert action["runs"]["using"] == "composite"
+    steps = action["runs"]["steps"]
+
+    secret_needing_runs = {
+        "uv run python scripts/agent/runner.py dev-up",
+        "uv run python scripts/agent/runner.py ${{ inputs.check-command }}",
+    }
+    for step in steps:
+        step_env = step.get("env", {})
+        if step.get("run") in secret_needing_runs:
+            assert step_env.get("OPENAI_API_KEY") == "${{ inputs.openai-api-key }}", step
+            assert (
+                step_env.get("ANYTOOLAI_LIVE_CANARY_TOKEN")
+                == "${{ inputs.live-canary-token }}"
+            ), step
+        else:
+            assert "OPENAI_API_KEY" not in step_env, step
+            assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in step_env, step
+
+def test_compose_stack_check_action_shape() -> None:
+    """Structural contract: bootstrap is conditional on the input, teardown always runs, the
+    evidence upload is conditional and always runs when enabled, and failure log-dump only runs on
+    failure. A drift in any of these silently breaks every one of the three call sites."""
+    action = _compose_stack_check_action()
+    steps = action["runs"]["steps"]
+    steps_by_run = {step.get("run"): step for step in steps if step.get("run")}
+
+    bootstrap_step = steps_by_run["uv run python scripts/agent/runner.py quick-check --bootstrap-only"]
+    assert bootstrap_step["if"] == "inputs.bootstrap-quick-check == 'true'"
+
+    dump_step = next(s for s in steps if s.get("name") == "Dump Docker Compose logs on failure")
+    assert dump_step["if"] == "failure()"
+
+    teardown_step = steps_by_run["uv run python scripts/agent/runner.py dev-down"]
+    assert teardown_step["name"] == "Tear down dev stack"
+    assert teardown_step["if"] == "always()"
+
+    upload_step = next(s for s in steps if s.get("name") == "Upload evidence report")
+    assert upload_step["if"] == "always() && inputs.upload-evidence == 'true'"
+    assert upload_step["with"]["name"] == "${{ inputs.evidence-artifact-name }}"
+    assert upload_step["with"]["path"] == "${{ inputs.evidence-artifact-path }}"
+    assert upload_step["with"]["if-no-files-found"] == "error"
+
+    assert action["inputs"]["bootstrap-quick-check"]["default"] == "false"
+    assert action["inputs"]["upload-evidence"]["default"] == "false"
+    assert action["inputs"]["openai-api-key"]["default"] == ""
+    assert action["inputs"]["live-canary-token"]["default"] == ""
+
+
+def test_compose_smoke_dev_workflow_delegates_to_compose_stack_check_once() -> None:
+    """Regression: a merge with main once unioned this job's clean composite-action step with a
+    pre-refactor manual dev-up/check/teardown block instead of picking one side, so the job ran
+    the whole boot/check/teardown lifecycle twice per run and passed a stray `version` key the
+    composite action never declares (only `uv-version`, defaulted from the action itself)."""
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load(
+        (repo_root / ".github" / "workflows" / "backend.yml").read_text(encoding="utf-8")
+    )
+
+    job = workflow["jobs"]["compose-smoke-dev"]
+
+    # A local action reference (./.github/actions/...) can only be resolved after the repo is
+    # checked out, so a job-level checkout step must come first, before the composite-action call.
+    assert len(job["steps"]) == 2
+    checkout_step, step = job["steps"]
+    assert checkout_step["uses"].startswith("actions/checkout@")
+    assert step["uses"] == "./.github/actions/compose-stack-check"
+    assert step["with"]["check-command"] == "dev-smoke"
+    assert "version" not in step["with"]
+
+
+def test_live_canary_workflow_delegates_to_compose_stack_check_with_secrets() -> None:
+    """`code-review` finding (round 1, preserved through the round-2 composite-action extraction):
+    OPENAI_API_KEY/ANYTOOLAI_LIVE_CANARY_TOKEN must not sit at job level (every step would inherit
+    them for no reason) and must reach the composite action so its dev-up/check-command steps get
+    them -- runner.py's live-canary command reads both directly from its own process env for its
+    LIVE000/LIVE011 fail-fast checks, and docker-compose.yml's worker/platform-api services
+    interpolate them at container-creation time during dev-up."""
     repo_root = Path(__file__).resolve().parents[1]
     workflow = yaml.safe_load(
         (repo_root / ".github" / "workflows" / "live-canary.yml").read_text(encoding="utf-8")
@@ -334,20 +415,50 @@ def test_live_canary_workflow_scopes_secrets_to_exactly_the_two_steps_that_need_
     job = workflow["jobs"]["live-canary"]
     assert "OPENAI_API_KEY" not in job.get("env", {})
     assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in job.get("env", {})
+    assert job.get("timeout-minutes") == 30
 
-    secret_needing_step_names = {"Boot dev Compose stack", "Run 11-atom live provider canary"}
-    for step in job["steps"]:
-        name = step.get("name", "")
-        step_env = step.get("env", {})
-        if any(name.startswith(prefix) for prefix in secret_needing_step_names):
-            assert step_env.get("OPENAI_API_KEY") == "${{ secrets.OPENAI_API_KEY }}", name
-            assert (
-                step_env.get("ANYTOOLAI_LIVE_CANARY_TOKEN")
-                == "${{ secrets.ANYTOOLAI_LIVE_CANARY_TOKEN }}"
-            ), name
-        else:
-            assert "OPENAI_API_KEY" not in step_env, name
-            assert "ANYTOOLAI_LIVE_CANARY_TOKEN" not in step_env, name
+    # A local action reference (./.github/actions/...) can only be resolved after the repo is
+    # checked out, so a job-level checkout step must come first, before the composite-action call.
+    assert len(job["steps"]) == 2
+    checkout_step, step = job["steps"]
+    assert checkout_step["uses"].startswith("actions/checkout@")
+    assert step["uses"] == "./.github/actions/compose-stack-check"
+    assert step["with"]["bootstrap-quick-check"] == "true"
+    assert step["with"]["check-command"] == "live-canary"
+    assert step["with"]["openai-api-key"] == "${{ secrets.OPENAI_API_KEY }}"
+    assert step["with"]["live-canary-token"] == "${{ secrets.ANYTOOLAI_LIVE_CANARY_TOKEN }}"
+    assert step["with"]["upload-evidence"] == "true"
+    assert step["with"]["evidence-artifact-path"] == ".agent/live-canary/"
+
+
+def test_required_backend_workflow_runs_atoms_proof() -> None:
+    """ANY-391: atoms-proof must run in CI on every PR/push to main. Without this test, the
+    `atoms-proof` job could silently disappear from backend.yml, lose its required managed-`uv`
+    bootstrap, or lose its always()-teardown (inherited from the composite action, but the job
+    must still wire it up with the right inputs), and nothing else in the suite would catch it."""
+    repo_root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load(
+        (repo_root / ".github" / "workflows" / "backend.yml").read_text(encoding="utf-8")
+    )
+    triggers = workflow.get("on", workflow.get(True))
+    assert "pull_request" in triggers
+    assert "main" in triggers["push"]["branches"]
+
+    job = workflow["jobs"]["atoms-proof"]
+    assert job.get("continue-on-error") is not True
+    assert job.get("timeout-minutes") == 30
+
+    # A local action reference (./.github/actions/...) can only be resolved after the repo is
+    # checked out, so a job-level checkout step must come first, before the composite-action call.
+    assert len(job["steps"]) == 2
+    checkout_step, step = job["steps"]
+    assert checkout_step["uses"].startswith("actions/checkout@")
+    assert step["uses"] == "./.github/actions/compose-stack-check"
+    assert step["with"]["bootstrap-quick-check"] == "true"
+    assert step["with"]["check-command"] == "atoms-proof"
+    assert step["with"]["upload-evidence"] == "true"
+    assert step["with"]["evidence-artifact-name"] == "atoms-proof-evidence"
+    assert step["with"]["evidence-artifact-path"] == ".agent/atoms-proof/"
 
 
 def test_resolve_postgres_db_falls_back_to_dev_default(monkeypatch) -> None:

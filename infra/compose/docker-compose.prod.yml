@@ -9,9 +9,9 @@
 #
 # Migrations run once via the `migrate` service (docker-compose.yml), not from platform-api's
 # own entrypoint -- platform-api/platform-worker depend on it completing successfully before
-# they start. That's what makes it safe to run more than one platform-api replica: no
-# container applies Alembic migrations itself, so there's nothing to race on. See
-# infra/deployment/README.md for the full story.
+# they start. That keeps migrations safe with multiple platform-api replicas. The stakeholder
+# /demo start gate is intentionally process-local, however, so deployments exposing /demo must
+# keep platform-api at one replica. See infra/deployment/README.md for the full story.
 # Credentials are passed to platform-api/platform-worker as discrete env vars (below), not
 # pre-assembled into a DATABASE_URL here -- see the matching note in docker-compose.yml. The app
 # builds the DSN itself via SQLAlchemy's URL.create (anytoolai_platform_core.storage.db), which
@@ -51,9 +51,9 @@ services:
       - "${ANYTOOLAI_PROD_API_PORT:-8000}:8000"
     restart: unless-stopped
     deploy:
-      # Just the default replica count, not a safety ceiling -- platform-api doesn't run
-      # migrations itself (see the `migrate` service note above), so raising this (or using
-      # `--scale platform-api=N`) is safe.
+      # A safety ceiling while the stakeholder /demo surface is enabled: its busy/daily gate
+      # uses one process-local lock plus durable PostgreSQL counts. Replace that lock with a
+      # PostgreSQL advisory lock before raising this value or using --scale platform-api=N.
       replicas: 1
       resources:
         limits:

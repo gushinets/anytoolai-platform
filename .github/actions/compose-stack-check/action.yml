@@ -1,0 +1,123 @@
+name: Boot, check, and tear down a disposable Compose dev stack
+description: >
+  Shared by compose-smoke-dev, live-canary, and atoms-proof (ANY-391 code review round 2): boot
+  the dev Compose stack, run one check command against it, dump container logs on failure, always
+  tear the stack down, and optionally upload an evidence-report artifact. One copy instead of
+  three near-identical workflow-job bodies, so a fix to any step (e.g. the ANY-390
+  .quick-check-venv bootstrap, or the log-dump PROJECT resolution) lands everywhere at once.
+inputs:
+  python-version:
+    description: Python version for actions/setup-python.
+    required: false
+    default: "3.12"
+  uv-version:
+    description: uv version for astral-sh/setup-uv.
+    required: false
+    default: "0.11.16"
+  bootstrap-quick-check:
+    description: >
+      Set to "true" to run `quick-check --bootstrap-only` before dev-up. Required by any
+      check-command that imports anytoolai_platform_core: that package is only ever installed by
+      quick-check's own .quick-check-venv bootstrap, never by `uv sync --frozen --group dev`
+      alone (ANY-390). Without it the check-command step fails fast with ENV001.
+    required: false
+    default: "false"
+  dev-up-ready-timeout:
+    description: ANYTOOLAI_READY_TIMEOUT seconds passed to the dev-up step.
+    required: false
+    default: "120"
+  check-command:
+    description: runner.py subcommand to run against the booted stack, e.g. dev-smoke, atoms-proof, live-canary.
+    required: true
+  check-step-name:
+    description: Display name for the step that runs check-command.
+    required: true
+  openai-api-key:
+    description: >
+      OPENAI_API_KEY, scoped to exactly the dev-up and check-command steps -- docker-compose.yml's
+      worker service interpolates it at container-creation time during dev-up, and a credentialed
+      check-command (live-canary) also reads it directly from its own process env. Leave empty
+      for credential-free checks (docker-compose.yml defaults it to "" via ${OPENAI_API_KEY:-}).
+    required: false
+    default: ""
+  live-canary-token:
+    description: ANYTOOLAI_LIVE_CANARY_TOKEN, same scoping and empty-by-default behavior as openai-api-key.
+    required: false
+    default: ""
+  upload-evidence:
+    description: Set to "true" to upload an evidence-report artifact after the run.
+    required: false
+    default: "false"
+  evidence-artifact-name:
+    description: actions/upload-artifact `name`. Required when upload-evidence is "true".
+    required: false
+    default: ""
+  evidence-artifact-path:
+    description: actions/upload-artifact `path`. Required when upload-evidence is "true".
+    required: false
+    default: ""
+runs:
+  using: composite
+  # Deliberately no actions/checkout step here: a local action reference (`uses: ./.github/...`)
+  # can only be resolved by the runner after the repo is already checked out at the job level --
+  # putting checkout inside the composite action itself is a chicken-and-egg error ("Can't find
+  # action.yml ... did you forget to run actions/checkout"). Every caller must checkout first.
+  steps:
+    - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+      with:
+        python-version: ${{ inputs.python-version }}
+    - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      with:
+        version: ${{ inputs.uv-version }}
+    - run: uv sync --frozen --group dev
+      shell: bash
+    - name: Bootstrap .quick-check-venv (ANY-390)
+      if: inputs.bootstrap-quick-check == 'true'
+      run: uv run python scripts/agent/runner.py quick-check --bootstrap-only
+      shell: bash
+    - name: Boot dev Compose stack (waits for platform-api healthy)
+      run: uv run python scripts/agent/runner.py dev-up
+      shell: bash
+      env:
+        ANYTOOLAI_READY_TIMEOUT: ${{ inputs.dev-up-ready-timeout }}
+        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        ANYTOOLAI_LIVE_CANARY_TOKEN: ${{ inputs.live-canary-token }}
+    - name: ${{ inputs.check-step-name }}
+      run: uv run python scripts/agent/runner.py ${{ inputs.check-command }}
+      shell: bash
+      env:
+        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        ANYTOOLAI_LIVE_CANARY_TOKEN: ${{ inputs.live-canary-token }}
+    # Debuggability: if boot or the check failed, dump every container's logs to the CI console
+    # before the stack is torn down, so the failure is diagnosable from the Actions log alone.
+    # Resolves the compose project name via a pure Python computation (no docker call) rather than
+    # `dev-status` (which itself shells out to `docker compose ps`) -- otherwise, under
+    # `set -eo pipefail`, a broken Docker daemon (a realistic cause of the very failure this step
+    # exists to diagnose) would make `dev-status` fail, abort the pipeline, and skip
+    # `docker compose logs` entirely.
+    - name: Dump Docker Compose logs on failure
+      if: failure()
+      shell: bash
+      run: |
+        PROJECT=$(uv run python -c "import sys; sys.path.insert(0, 'scripts/agent'); from runner import runtime_identity; print(runtime_identity().compose_project)")
+        docker compose --project-name "$PROJECT" \
+          -f infra/compose/docker-compose.yml \
+          -f infra/compose/docker-compose.override.yml \
+          logs --no-color
+    - name: Tear down dev stack
+      if: always()
+      run: uv run python scripts/agent/runner.py dev-down
+      shell: bash
+    # error, not ignore: write_evidence_report() (atoms_proof.py) always runs and never swallows
+    # its own exceptions on every exit_code==0 path -- so a genuinely missing evidence file at
+    # this point means either a latent artifact-path misconfiguration between this action and its
+    # caller, not a normal check-command failure (those already redden the job via the
+    # check-command step itself). ANY-391 requires preserving this artifact, so a silent 0-file
+    # upload must not let the job stay green (team-lead code review).
+    - name: Upload evidence report
+      if: always() && inputs.upload-evidence == 'true'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.evidence-artifact-name }}
+        path: ${{ inputs.evidence-artifact-path }}
+        if-no-files-found: error

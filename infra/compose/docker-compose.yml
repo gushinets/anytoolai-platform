@@ -48,6 +48,9 @@ services:
       # this (ScenarioRuntimeService.start_session()) -- unset by default so normal dev-up/
       # quick-check stays credential-free; only live-canary (ANY-221) needs a real token.
       ANYTOOLAI_LIVE_CANARY_TOKEN: ${ANYTOOLAI_LIVE_CANARY_TOKEN:-}
+      # Stakeholder /demo access code. Blank keeps POST /v1/demo/runs fail-closed while the
+      # public page itself remains available; configure only through an operator secret store.
+      ANYTOOLAI_DEMO_ACCESS_CODE: ${ANYTOOLAI_DEMO_ACCESS_CODE:-}
     depends_on:
       postgres:
         condition: service_healthy

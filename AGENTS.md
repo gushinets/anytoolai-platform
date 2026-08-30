@@ -106,6 +106,18 @@ It must re-exec into that environment even if the caller already has another vir
 It strips caller-provided `PYTHONPATH`, so no manual `PYTHONPATH` setup is required.
 GitHub Actions runs this same command on Linux CI and Windows PowerShell, and the backend workflow is required on pull requests and pushes to `main`.
 
+The required GitHub status checks for `main` are:
+
+- `full-check`
+- `postgresql-quota-concurrency`
+- `atoms-proof`
+- `baseline (windows-latest)`
+- `compose-smoke-prod`
+
+`baseline (ubuntu-latest)` is covered by `full-check`; `compose-smoke-dev` is covered more deeply
+by `atoms-proof`; the separate `frontend` and `docs` workflows are covered by `full-check` and are
+not duplicate required checks. `live-canary` remains an optional credentialed scheduled check.
+
 Full check:
 
 ```bash

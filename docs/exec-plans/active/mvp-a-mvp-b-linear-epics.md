@@ -80,7 +80,7 @@ not block Atom Runtime Proof.
 | A15b quota/start/polling | ANY-171 | Done; merged in PR #52 |
 | A15c result client | ANY-226 | Done; merged in PR #62 |
 | A16 web result/paywall/onboarding | ANY-11 | ANY-217 and ANY-36 |
-| A18 client handoff parent | ANY-6 | ANY-8 and ANY-20 |
+| A18 client handoff parent | ANY-6 | Done |
 | A18a handoff CE helpers | ANY-222 | Done |
 | A18b web consent surface | ANY-223 | Done |
 | A18c client handoff smoke | ANY-224 | Done |

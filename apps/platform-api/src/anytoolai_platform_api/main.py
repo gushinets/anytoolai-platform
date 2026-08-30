@@ -16,6 +16,7 @@ from anytoolai_platform_api.errors import (
     request_validation_error_handler,
     unhandled_exception_handler,
 )
+from anytoolai_platform_api.routers.demo import router as demo_router
 from anytoolai_platform_api.routers.handoffs import router as handoffs_router
 from anytoolai_platform_api.routers.health import router as health_router
 from anytoolai_platform_api.routers.identity_quota import router as identity_quota_router
@@ -55,6 +56,7 @@ def create_app(
     _install_error_handlers(app)
 
     app.include_router(health_router)
+    app.include_router(demo_router)
     app.include_router(identity_quota_router)
     app.include_router(handoffs_router)
     app.include_router(runtime_config_router)
@@ -69,7 +71,7 @@ def _install_cors(app: FastAPI) -> None:
         allow_origins=_configured_cors_origins(),
         allow_origin_regex=CHROME_EXTENSION_ORIGIN_REGEX,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", REQUEST_ID_HEADER],
+        allow_headers=["Content-Type", REQUEST_ID_HEADER, "X-Demo-Access-Code"],
         expose_headers=[REQUEST_ID_HEADER],
     )
 
