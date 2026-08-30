@@ -12,12 +12,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-29
-- Last updated: 2026-08-29
-- Review date: 2026-08-29
-- Next action: run validation, commit, push, and verify the PR check
+- Last updated: 2026-08-30
+- Review date: 2026-08-30
+- Next action: none -- superseded by the `atoms-proof` job in `docs/exec-plans/active/any-391-atoms-proof-required-ci-gate.md`
 - Blocker: none
 
 ## Global Constraints
@@ -59,3 +59,4 @@
 | 2026-08-29 | Confirmed ruleset `protect main` requires `atoms-proof`, while PR head `4c82984` publishes no check with that name. Baseline quick-check: 971 passed, 3 skipped. | Add the failing contract test. |
 | 2026-08-29 | Added the job and regression contract. Targeted RED/green verified; quick-check: 972 passed, 3 skipped. | Push and verify the live PR check. |
 | 2026-08-29 | First live job exposed `ENV001`: ordinary `uv sync` does not create the managed proof environment. Added the existing `quick-check --bootstrap-only` prerequisite from `live-canary.yml` and verified RED/green coverage. | Push the follow-up and verify the live proof. |
+| 2026-08-30 | Merging `main` (this PR's `812e789`) into `feature/ANY-391` produced two `jobs.atoms-proof` keys in `backend.yml` (this plan's standalone job plus ANY-391's `compose-stack-check`-based job) and two conflicting workflow-contract tests -- `yaml.safe_load` silently kept only the second job body, so this plan's own `test_required_backend_workflow_runs_atoms_proof_with_evidence_and_teardown` started failing with `KeyError`. Resolved by keeping the ANY-391 composite-action job (fail-closed evidence upload, checksum-verified `setup-uv` pin, `timeout-minutes`, shared with `live-canary`) and removing this plan's standalone job and test as redundant. | None -- superseded. |
