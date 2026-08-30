@@ -101,7 +101,8 @@ does not gate the MVP-A1 Atom Runtime Proof.
 - frontend-safe `GET /v1/results/{artifact_id}`
 - eleven deterministic standalone scenarios
 - three composite workflows covering all 11 atoms
-- `python scripts/agent/runner.py atoms-proof`
+- `python scripts/agent/runner.py atoms-proof`, run credential-free on every pull request and push
+  to `main` via the `atoms-proof` job in `.github/workflows/backend.yml` (ANY-391)
 - credentialed live-provider canary, separate from baseline CI
 
 Web mirror, shared CE-kit, kernel-demo CE, consent, paywall/onboarding, and browser smoke belong to
@@ -222,7 +223,9 @@ MVP-A1 Atom Runtime Proof is done when:
 - Three neutral composite workflows cover all 11 atoms with real input/output mappings.
 - The frontend-safe result API returns only normalized canonical artifacts.
 - `atoms-proof` reports 11/11 standalone and 3/3 composite evidence with runtime ledger checks.
-- A recent manual live-provider canary proves schema-valid output for all 11 atoms.
+- A recent manual live-provider canary proves schema-valid output for all 11 atoms. Most recent
+  credentialed evidence: [`any-221-live-provider-canary.md`](../exec-plans/completed/any-221-live-provider-canary.md)
+  ([`evidence-20260825T083858Z.json`](../exec-plans/completed/any-221-live-provider-canary.evidence-20260825T083858Z.json)).
 - The completion gate has no dependency on CE-kit, web mirror, Chrome, consent, or email/paywall UI.
 
 The most important acceptance criterion: a Freelancer product bundle can be added without changing

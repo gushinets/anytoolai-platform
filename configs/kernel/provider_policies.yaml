@@ -20,7 +20,7 @@ provider_policies:
   - provider_policy_ref: default_text_generation_v1
     provider: litellm
     model: anytoolai.default_text
-    temperature: 0.3
+    temperature: 1.0
     timeout_seconds: 60
     retry_policy:
       transport:

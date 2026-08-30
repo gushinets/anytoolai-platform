@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Демонстрация AI-цепочек — AnytoolAI</title>
+  <meta name="description" content="Демонстрация реальных составных AI-процессов AnytoolAI.">
+  <link rel="stylesheet" href="/demo/demo.css">
+  <script src="/demo/demo.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="/demo" aria-label="AnytoolAI — демонстрация">Anytool<span>AI</span></a>
+      <span class="environment-badge"><span aria-hidden="true"></span> Реальная цепочка</span>
+    </div>
+  </header>
+
+  <main id="demo-app" class="page-shell">
+    <section class="hero glass-panel" aria-labelledby="page-title">
+      <div class="hero__copy">
+        <p class="eyebrow"><span aria-hidden="true"></span> Реальное выполнение на платформе</p>
+        <h1 id="page-title"><em>AnytoolAI — демонстрация рабочих AI-цепочек</em></h1>
+        <p class="hero__lead">Выберите готовый процесс и запустите его на реальном сервере. Результат создаётся моделью через платформу, а не подготовлен заранее.</p>
+      </div>
+      <div class="proof-summary" aria-label="Что подтверждает демонстрация">
+        <div><strong>3</strong><span>составные цепочки</span></div>
+        <div><strong>11</strong><span>универсальных действий</span></div>
+        <div><strong>Онлайн</strong><span>OpenAI через шлюз провайдеров</span></div>
+        <div><strong>Безопасно</strong><span>только нормализованный результат</span></div>
+      </div>
+    </section>
+
+    <section id="access-panel" class="access-panel glass-panel" aria-labelledby="access-title">
+      <div>
+        <p class="section-kicker">Шаг 1</p>
+        <h2 id="access-title">Откройте демонстрацию</h2>
+        <p>Введите код, который вы получили от команды AnytoolAI. Он хранится только в памяти этой вкладки.</p>
+      </div>
+      <form id="access-form" class="access-form">
+        <label for="access-code">Код доступа</label>
+        <div class="field-action">
+          <input id="access-code" name="access-code" type="password" autocomplete="off" required placeholder="Введите код">
+          <button class="button button--primary" type="submit">Открыть демо</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="workflow-section" class="workflow-section" aria-labelledby="workflow-title" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Шаг 2</p>
+          <h2 id="workflow-title">Выберите AI-цепочку</h2>
+        </div>
+        <p>Каждый вариант запускает фиксированный серверный процесс.</p>
+      </div>
+
+      <div class="workflow-grid">
+        <label class="workflow-card glass-panel">
+          <input type="radio" name="demo-workflow" value="analyze" checked>
+          <span class="workflow-card__top"><span class="workflow-icon" aria-hidden="true">01</span><span class="workflow-check" aria-hidden="true">✓</span></span>
+          <strong>Анализ и уточнение</strong>
+          <span class="workflow-description">Находит факты и проблемные места, формирует вопросы и итоговый отчёт.</span>
+          <span class="chain" aria-label="Цепочка действий">Извлечение <i>→</i> Проблемы <i>→</i> Вопросы <i>→</i> Отчёт</span>
+          <span class="output-type">Результат: структурированный анализ</span>
+        </label>
+
+        <label class="workflow-card glass-panel">
+          <input type="radio" name="demo-workflow" value="evaluate">
+          <span class="workflow-card__top"><span class="workflow-icon workflow-icon--teal" aria-hidden="true">02</span><span class="workflow-check" aria-hidden="true">✓</span></span>
+          <strong>Оценка соответствия</strong>
+          <span class="workflow-description">Сравнивает исходные данные, применяет критерии и выдаёт многомерную оценку.</span>
+          <span class="chain" aria-label="Цепочка действий">Сравнение <i>→</i> Критерии <i>→</i> Оценка</span>
+          <span class="output-type">Результат: оценка по осям</span>
+        </label>
+
+        <label class="workflow-card glass-panel">
+          <input type="radio" name="demo-workflow" value="write">
+          <span class="workflow-card__top"><span class="workflow-icon workflow-icon--amber" aria-hidden="true">03</span><span class="workflow-check" aria-hidden="true">✓</span></span>
+          <strong>Убедительный ответ</strong>
+          <span class="workflow-description">Выбирает сильный аргумент, предлагает улучшения и готовит финальный текст.</span>
+          <span class="chain" aria-label="Цепочка действий">Аргумент <i>→</i> Улучшения <i>→</i> Текст <i>→</i> Ответ</span>
+          <span class="output-type">Результат: готовый ответ</span>
+        </label>
+      </div>
+
+      <section class="input-panel glass-panel" aria-labelledby="input-title">
+        <div class="input-panel__heading">
+          <div>
+            <p class="section-kicker">Шаг 3</p>
+            <h2 id="input-title">Проверьте исходный текст</h2>
+          </div>
+          <span id="character-count" aria-live="polite">0 / 4000</span>
+        </div>
+        <label for="source-text" class="visually-hidden">Исходный текст для AI-цепочки</label>
+        <textarea id="source-text" required rows="9"></textarea>
+        <div class="input-panel__footer">
+          <p>Текст передаётся только в выбранную серверную цепочку.</p>
+          <button id="run-button" class="button button--primary button--run" type="button">
+            <span>Запустить цепочку</span><span aria-hidden="true">→</span>
+          </button>
+        </div>
+      </section>
+    </section>
+
+    <section id="run-panel" class="run-panel glass-panel" aria-labelledby="run-title" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="section-kicker">Выполняется на сервере</p>
+      <h2 id="run-title">AI-цепочка обрабатывает данные</h2>
+      <p id="running-workflow"></p>
+      <p class="elapsed">Прошло: <strong id="elapsed-time">0:00</strong></p>
+      <p>Все этапы выполняются последовательно. Мы показываем общий статус, подтверждённый сервером.</p>
+    </section>
+
+    <div id="status-message" class="status-message" role="status" aria-live="polite"></div>
+
+    <section id="result-panel" class="result-panel glass-panel" aria-labelledby="result-title" hidden>
+      <div class="result-heading">
+        <div>
+          <p class="section-kicker section-kicker--success">Цепочка завершена</p>
+          <h2 id="result-title">Результат</h2>
+        </div>
+        <button id="rerun-button" class="button button--secondary" type="button">Запустить ещё раз</button>
+      </div>
+      <div id="result-content" class="result-content"></div>
+      <details id="raw-result" class="details-card">
+        <summary>Показать JSON</summary>
+        <pre id="raw-json"></pre>
+      </details>
+      <details id="technical-proof" class="details-card">
+        <summary>Техническое подтверждение</summary>
+        <dl id="technical-proof-list"></dl>
+      </details>
+    </section>
+  </main>
+
+  <footer>
+    <span>Платформа AnytoolAI</span>
+    <span>Демонстрационный контур · реальные запросы к AI</span>
+  </footer>
+</body>
+</html>
