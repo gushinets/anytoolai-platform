@@ -595,6 +595,25 @@ def _strip_comments(text: str, markers: tuple[str, ...], jsx: bool = False) -> l
             if looks_like_regex:
                 end = _regex_literal_end(text, i, length)
                 if end is not None:
+                    if jsx:
+                        # A plain `/word` in raw JSX text (`<div>/docs {"openai/gpt-4.1"}</div>`)
+                        # still passes the char-level heuristic above — `>` isn't a value
+                        # character, so `/` after it looks like a regex start — and the "closing"
+                        # `/` `_regex_literal_end` finds can be a real hardcode's own separator,
+                        # not a real regex delimiter at all. Every prior JSX fix in this file
+                        # (`</`, `//`, `/*`) closed one *specific* shape of this same underlying
+                        # problem: for jsx-capable files, a misdetected "regex" span must never
+                        # be silently discarded, because there is no way to be sure it wasn't
+                        # real content. Keeping it in `current` (instead of skipping straight to
+                        # `end`) preserves the conservative, content-preserving guarantee this
+                        # file has held since round 20 for *every* regex-shaped span in JSX
+                        # files, not just the ones a reported example happened to spell out —
+                        # closing the class, not one more instance of it. `.js`/`.ts` keep
+                        # discarding real regex-literal content exactly as before; a regex
+                        # literal's own pattern text isn't somewhere a real hardcode is expected
+                        # to live, and this repo's existing regex-detection regression suite
+                        # already depends on that content being absent from the stripped line.
+                        current.append(text[i:end])
                     i = end
                     last_sig = "]"  # a regex literal is a value; a following `/` is division
                     continue
