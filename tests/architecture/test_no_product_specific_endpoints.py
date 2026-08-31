@@ -4,8 +4,11 @@ import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-ROUTERS_DIR = ROOT / "apps" / "platform-api" / "src" / "anytoolai_platform_api" / "routers"
-MAIN_MODULE = ROOT / "apps" / "platform-api" / "src" / "anytoolai_platform_api" / "main.py"
+# The whole package, not just routers/ + main.py — a router can be defined in any module here
+# (bootstrap.py, a future product_api.py, ...) and wired in via `app.include_router(router)` from
+# main.py, where main.py itself carries no forbidden literal and the defining module would
+# otherwise never be visited by this guard.
+PLATFORM_API_PACKAGE = ROOT / "apps" / "platform-api" / "src" / "anytoolai_platform_api"
 
 # MVP-B products (docs/product-specs/mvp-scope-source-of-truth.md); platform-api routes must stay
 # parameterized on {product_id} instead of hardcoding one of these.
@@ -211,8 +214,7 @@ def _route_path_literals(path: Path) -> list[str]:
 
 def test_no_product_specific_endpoint_paths() -> None:
     offenders: list[str] = []
-    router_files = sorted(ROUTERS_DIR.rglob("*.py"))
-    for path in (*router_files, MAIN_MODULE):
+    for path in sorted(PLATFORM_API_PACKAGE.rglob("*.py")):
         for literal in _route_path_literals(path):
             lowered = literal.lower()
             for term in FORBIDDEN_PRODUCT_PATH_TERMS:

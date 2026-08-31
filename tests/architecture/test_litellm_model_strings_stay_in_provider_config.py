@@ -100,26 +100,46 @@ _COMMENT_MARKERS_BY_SUFFIX: dict[str, tuple[str, ...]] = {
 }
 
 
+_TRIPLE_QUOTES = ('"""', "'''")  # Python triple-quoted strings — a 3-char delimiter, not three
+# single-char ones: `_QUOTE_CHARS`-only tracking closes after the *first* of the three quote
+# chars, then reopens on the second and misreads the third as content, corrupting all quote
+# state for the rest of the string.
+
+
 def _quoted_string_spans(line: str) -> list[tuple[int, int]]:
-    """(start, end) of each quoted string's content (excluding the quote chars) on `line`."""
+    """(start, end) of each quoted string's content (excluding the quote chars) on `line`.
+
+    Uses the same delimiter model as `_strip_comments` (`_TRIPLE_QUOTES` checked before the
+    1-char `_QUOTE_CHARS` fallback) — an interior single/double quote inside a real Python
+    triple-quoted string must not be treated as closing the span, or a URL query value living
+    inside one loses its span and `_is_url_query_value` no longer recognizes it as URL content.
+    """
     spans: list[tuple[int, int]] = []
-    quote_char: str | None = None
+    quote: str | None = None
     content_start = 0
     i = 0
     length = len(line)
     while i < length:
         char = line[i]
-        if quote_char:
+        if quote:
             if char == "\\":
                 i += 2
                 continue
-            if char == quote_char:
+            if line.startswith(quote, i):
                 spans.append((content_start, i))
-                quote_char = None
+                i += len(quote)
+                quote = None
+                continue
             i += 1
             continue
+        triple_quote = next((tq for tq in _TRIPLE_QUOTES if line.startswith(tq, i)), None)
+        if triple_quote:
+            quote = triple_quote
+            content_start = i + 3
+            i += 3
+            continue
         if char in _QUOTE_CHARS:
-            quote_char = char
+            quote = char
             content_start = i + 1
         i += 1
     return spans
@@ -149,12 +169,6 @@ def _is_url_query_value(line: str, spans: list[tuple[int, int]], position: int) 
             prefix = line[start : position + 1]
             return "://" in prefix and bool(_URL_QUERY_KEY_RE.search(prefix))
     return False
-
-
-_TRIPLE_QUOTES = ('"""', "'''")  # Python triple-quoted strings — a 3-char delimiter, not three
-# single-char ones: `_QUOTE_CHARS`-only tracking closes after the *first* of the three quote
-# chars, then reopens on the second and misreads the third as content, corrupting all quote
-# state for the rest of the string.
 
 
 def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
