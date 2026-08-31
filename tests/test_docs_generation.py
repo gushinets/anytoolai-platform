@@ -30,6 +30,45 @@ def test_generated_documents_are_deterministic_and_source_marked() -> None:
         assert module.GENERATED_SOURCES[name] in content
 
 
+def test_config_registry_surfaces_provider_policy_and_action_config_fields() -> None:
+    from dataclasses import fields as dc_fields
+
+    from anytoolai_platform_core.actions.models import ActionConfiguration
+    from anytoolai_platform_core.providers.models import ProviderPolicy
+
+    module = load_module()
+    first = module.render_config_registry()
+    second = module.render_config_registry()
+
+    assert first == second
+    assert "metadata" not in first.lower()
+
+    registry = module._registry()
+    assert registry.provider_policies, "fixture registry must define at least one provider policy"
+    assert registry.action_configurations, "fixture registry must define at least one action config"
+
+    provider_policy_fields = [f.name for f in dc_fields(ProviderPolicy) if f.name != "metadata"]
+    action_config_fields = [f.name for f in dc_fields(ActionConfiguration) if f.name != "metadata"]
+
+    # Every non-metadata dataclass field must have its own column — guards against a future
+    # field silently missing the doc the way temperature/structured_output_mode/schema_version
+    # did before the renderer switched to enumerating dataclass fields.
+    assert "| " + " | ".join(provider_policy_fields) + " |" in first
+    assert "| " + " | ".join(action_config_fields) + " |" in first
+
+    for ref, policy in registry.provider_policies.items():
+        row = "| " + " | ".join(
+            module._format_field_value(getattr(policy, name)) for name in provider_policy_fields
+        ) + " |"
+        assert row in first, f"row for provider policy {ref} must render every field, in order"
+
+    for ref, config in registry.action_configurations.items():
+        row = "| " + " | ".join(
+            module._format_field_value(getattr(config, name)) for name in action_config_fields
+        ) + " |"
+        assert row in first, f"row for action config {ref} must render every field, in order"
+
+
 def test_openapi_includes_handoff_and_runtime_routes() -> None:
     module = load_module()
     openapi = module.render_openapi()
