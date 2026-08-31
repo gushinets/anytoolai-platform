@@ -357,16 +357,23 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
     open `(`, whether the word immediately before it was a control keyword, so its matching `)`
     can override `last_sig` back to a non-value when popped.
 
-    `last_sig` and the current identifier word (`word_buf`/`last_word`, via the nested `_note`
-    helper) are both maintained as persistent state across the whole function, not per physical
-    line: `current` (the stripped-line accumulator) resets at every `\\n`, but a keyword or a
-    control-flow `(` can legitimately be separated from what follows it by a line break or a
-    comment (`if\\n(cond)`, `if // note\\n(cond)`) — computing the preceding word from `current`
-    would silently lose it exactly then, and a single shared update path (`_note`, called from
-    every branch that consumes a real code character) is what keeps `last_sig` and `last_word` in
-    sync instead of drifting the way two independently-updated copies of the same tracking would.
-    `markers` is only non-empty for JS/TS-family suffixes (`.json` has no comment syntax and
-    returns early above), so none of this fires for `.json`.
+    `last_sig` and the current identifier word (`word_buf`/`last_word`) are both maintained as
+    persistent state across the whole function, not per physical line: `current` (the
+    stripped-line accumulator) resets at every `\\n`, but a keyword or a control-flow `(` can
+    legitimately be separated from what follows it by a line break or a comment (`if\\n(cond)`,
+    `if // note\\n(cond)`, `return/*note*//"/`) — computing the preceding word from `current`
+    would silently lose it exactly then.
+
+    `word_buf`/`last_word` finalization is structural, not opt-in per branch: every identifier
+    character (alnum/`_`/`$`) is handled by one dedicated branch at the top of the loop that only
+    ever appends to `word_buf`, and *every other* character — whatever it is, whichever branch
+    ends up handling it — passes through one unconditional `_finalize_word()` call first. A
+    keyword-lookback bug of the "this one branch forgot to flush the pending word" shape (found
+    twice: entering a comment, and a `/` with no separator at all right after a keyword) is
+    structurally impossible under this shape, because no branch *can* skip the flush — it isn't
+    theirs to remember, it already happened before any of them run. `markers` is only non-empty
+    for JS/TS-family suffixes (`.json` has no comment syntax and returns early above), so none of
+    this fires for `.json`.
     """
     if not markers:
         return text.splitlines()
@@ -380,24 +387,22 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
     last_word = ""
     paren_stack: list[bool] = []
 
-    def _note(char: str) -> None:
-        nonlocal last_sig, word_buf, last_word
-        if char.isalnum() or char in "_$":
-            word_buf.append(char)
-            last_sig = char
-        else:
-            if word_buf:
-                last_word = "".join(word_buf)
-                word_buf = []
-            if not char.isspace():
-                last_sig = char
+    def _finalize_word() -> None:
+        nonlocal word_buf, last_word
+        if word_buf:
+            last_word = "".join(word_buf)
+            word_buf = []
 
     i = 0
     length = len(text)
     while i < length:
         char = text[i]
         if char == "\n":
-            _note(char)  # a newline is a word boundary too — finalize a trailing word_buf
+            # Checked unconditionally, before in_block_comment/in_string: a physical line ends
+            # here regardless of what lexical state we're in, and `lines` must stay one entry per
+            # physical line for line-number reporting even *inside* a multi-line string or block
+            # comment — only `in_string`/`in_block_comment` themselves persist across the split.
+            _finalize_word()
             lines.append("".join(current))
             current = []
             i += 1
@@ -422,10 +427,22 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
                 last_sig = char
             i += 1
             continue
+        if char.isalnum() or char in "_$":
+            word_buf.append(char)
+            last_sig = char
+            current.append(char)
+            i += 1
+            continue
+        # Every remaining character is a word boundary of some kind — a real one (whitespace, an
+        # operator, a quote) or the start of a comment/regex literal that isn't itself part of any
+        # identifier — so any word being accumulated is now complete, regardless of which branch
+        # below ends up handling this specific character. (`\n` is handled above, unconditionally,
+        # before this point is ever reached.)
+        _finalize_word()
         if char in _QUOTE_CHARS:
             in_string = char
             current.append(char)
-            _note(char)
+            last_sig = char
             i += 1
             continue
         if text.startswith("/*", i):
@@ -438,18 +455,17 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
             continue
         if char == "(":
             current.append(char)
-            _note(char)
+            last_sig = char
             paren_stack.append(last_word in _JS_CONTROL_KEYWORDS_BEFORE_PAREN)
             i += 1
             continue
         if char == ")":
             is_condition_paren = paren_stack.pop() if paren_stack else False
             current.append(char)
-            _note(char)
-            # A condition paren's close is a statement boundary (not a value) — clear last_sig so
-            # a following `/` reads as a regex start, not division.
-            if is_condition_paren:
-                last_sig = ""
+            # A condition paren's close is a statement boundary (not a value), so a following `/`
+            # should read as a regex start, not division — everything else closes like a normal
+            # value-producing paren.
+            last_sig = "" if is_condition_paren else char
             i += 1
             continue
         if char == "/":
@@ -465,10 +481,10 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
                 if end is not None:
                     i = end
                     last_sig = "]"  # a regex literal is a value; a following `/` is division
-                    word_buf = []
                     continue
         current.append(char)
-        _note(char)
+        if not char.isspace():
+            last_sig = char
         i += 1
     lines.append("".join(current))
     return lines

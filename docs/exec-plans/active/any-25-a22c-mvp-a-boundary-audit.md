@@ -5,9 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-08-31
-- Last updated: 2026-08-31
-- Review date: 2026-08-31
-- Next action: none — implementation, three internal code-review rounds, and sixteen GitHub PR
+- Last updated: 2026-09-01
+- Review date: 2026-09-01
+- Next action: none — implementation, three internal code-review rounds, and seventeen GitHub PR
   review rounds of fixes landed (round 10 replaced the hand-rolled Python/YAML lexer with real
   parsers; round 11 extended router-identity resolution to the whole package and fixed two gaps
   that rewrite itself exposed; round 12 fixed a `__init__.py` relative-import edge case in that
@@ -18,8 +18,10 @@
   generalized both round-14 fixes further (absolute/qualified-relative submodule imports, and a
   control-flow condition's closing paren) after review found each was still scoped to only the
   literal reported example; round 16 replaced the JS/TS scanner's line-scoped keyword lookback
-  with persistent state after review found it lost a keyword across a line break — see those
-  entries); move to `completed/` once merged.
+  with persistent state after review found it lost a keyword across a line break; round 17
+  replaced per-branch opt-in word finalization with a structural, can't-forget-it precondition
+  after a third branch turned up missing the same call — see those entries); move to
+  `completed/` once merged.
 - Blocker: none
 
 ## Goal
@@ -739,6 +741,49 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
   round) replayed with nothing flipped.
   - Re-ran the full `pytest tests/architecture` suite (24 passed) and both changed test files
     against the real repository tree.
+- **Seventeenth GitHub PR review round** (repeat review of commit `9a4d935`) — the round-16
+  newline/comment regression fix held, but one more JS/TS scanner bypass: entering a block comment
+  didn't finalize `word_buf`, so a keyword immediately followed by `/*...*/` and then a regex
+  literal (`return/*note*//"/`) still lost the keyword and misclassified the regex as division.
+  The user explicitly rejected another one-off patch for this specific branch ("НОРМАЛЬНО ПОПРАВЬ!
+  А НЕ КОСТЫЛЬ!") — the right response given the pattern by this point: rounds 15 and 16 each
+  patched one more branch that had forgotten to call the shared finalization helper, and this
+  finding is a third instance of exactly that same omission (the line-comment-marker branch has
+  the identical gap, just not yet reported). Patching the block-comment branch alone would have
+  been the fourth iteration of the same narrow fix, not a real fix of the underlying weakness.
+  - **Root cause, stated plainly:** finalizing `word_buf` into `last_word` was *opt-in per
+    branch* — every branch that consumed a character had to remember to call `_note`/finalize, and
+    any branch that didn't (block-comment entry, and structurally also line-comment entry and the
+    zero-separator `keyword/regex` case where the `/` decision is made *before* any finalization
+    call) silently left `last_word` stale. Three different branches missing the same call across
+    three review rounds is a sign the mechanism itself was the problem, not any one branch.
+  - **Fix:** restructured `_strip_comments` so identifier characters are handled by one dedicated
+    branch at the very top of the "not in an active string/comment" section — the *only* place
+    `word_buf` ever grows — and every other character, before any branch-specific logic runs at
+    all, passes through one unconditional `_finalize_word()` call. No branch can forget to finalize
+    the pending word anymore, because finalization isn't part of any branch's own logic to
+    remember; it already happened as a precondition by the time any branch is reached. This closes
+    the block-comment case from the review, the line-comment case that hadn't been reported yet,
+    and the zero-separator case, all in the same structural change — not three more special cases.
+  - **Caught and fixed a self-introduced regression while restructuring, before calling it done:**
+    an early draft moved the `\n`-handling branch to *after* the `in_block_comment`/`in_string`
+    checks (so it could sit next to the other "word boundary" branches), which broke multi-line
+    string/comment line-splitting — a newline consumed while `in_string`/`in_block_comment` was
+    active no longer flushed `lines`/`current`, collapsing several physical lines' output into one
+    entry and shifting every subsequent line number. Caught by re-running the existing multi-line
+    template-literal regression case, not shipped blind. Fixed by keeping `\n` as the first check
+    in the loop, exactly as before the restructure (unconditional, ahead of `in_block_comment`/
+    `in_string`), and only reordering the *other* branches.
+  - Verified: the exact review case (`return/*note*//"/`) now finds the hardcode; a block comment
+    separating a keyword from its paren (`if/*x*/(ok) /"/...`) is also fixed; a *multi-line* block
+    comment between a keyword and a regex still resolves correctly (and reports the right line
+    number); a real identifier followed by a block comment and then real division
+    (`foo/*c*//2`) is confirmed to stay division, not a wrongly-skipped regex; the multi-line
+    template-literal line-splitting regression case explicitly re-verified line-by-line; the full
+    prior regression table (router identity + every JS/TS case across every round) replayed with
+    nothing flipped.
+  - Re-ran the full `pytest tests/architecture` suite (24 passed) and the changed test file
+    against the real repository tree.
 
 ## Validation
 
@@ -1004,6 +1049,24 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 - [x] `python3 -m pytest tests/architecture -q` (24 passed), both changed files against the real
       repository tree, `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed)
       all green after this round.
+- [x] Reproduced the round-17 finding with a standalone script against current code before
+      changing anything: `function f(){ return/*note*//"/; } ...; const model =
+      "openai/gpt-4.1";` still truncated the real hardcode; also independently confirmed the
+      zero-separator sibling case (`return/"/.test(x); ...`) was broken the same way, before
+      deciding to fix the mechanism rather than the one reported branch.
+- [x] Manual check: the exact review case, a block comment separating a keyword from its paren,
+      and a *multi-line* block comment between a keyword and a regex all now resolve correctly
+      (including correct line numbers); a real identifier followed by a block comment and then
+      real division is confirmed to stay division, not a wrongly-skipped regex.
+- [x] Caught, during the restructure itself (before declaring it done), a self-introduced
+      regression from reordering the `\n` branch: multi-line string/comment line-splitting broke
+      (a newline inside an active string/comment stopped flushing `lines`, collapsing several
+      physical lines into one and shifting every later line number). Fixed by keeping `\n` as the
+      unconditional first check in the loop, exactly as before the restructure; explicitly
+      re-verified the multi-line template-literal case line-by-line after the fix.
+- [x] `python3 -m pytest tests/architecture -q` (24 passed), the changed file against the real
+      repository tree, `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed)
+      all green after this round.
 
 ## Decision log
 
@@ -1048,7 +1111,9 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | `_module_import_aliases`'s submodule-file check now runs for every `ast.ImportFrom` (relative or absolute), not gated on `node.module is None and node.level > 0`. | Round 14's fix matched only the *literal shape* of that round's reported example (`from . import shared`), when the actual determining question — "does `<container>.<name>` match a real submodule file in `module_paths`?" — never depended on whether the import was relative or absolute; the restriction was copied from the review's example rather than derived from the logic, and round 15's absolute-import finding is the direct, predictable consequence. Explicitly verified the one real regression risk this broadening carries — the repo's own dominant pattern, `from anytoolai_platform_api.routers.demo import router as demo_router` — stays correctly unaffected (`router` isn't a submodule of `demo`, so the check still falls through to the pre-existing name-edge mechanism for it). |
 | 2026-08-31 | The JS/TS regex-vs-division heuristic gains paren-structure tracking (`paren_stack`, `_JS_CONTROL_KEYWORDS_BEFORE_PAREN`) so a control-flow condition's closing paren clears `last_sig` instead of marking it a value, rather than leaving `)` universally value-like. | `if (cond) /re/` is a real, common JS/TS idiom (a regex literal in statement position right after a condition) that a receiver-blind `)`-is-always-a-value rule can't get right — the paren that closes a *condition* isn't the same kind of `)` as the paren that closes a *function call*, and only tracking what opened the matching `(` (a keyword vs. anything else) distinguishes them. This is scoped to the smallest structural addition that closes the reported case: it does not attempt to model arrow functions, destructuring, or any other paren-adjacent JS/TS construct not shown broken. **Superseded by round 16**: the keyword lookup this depended on (`_last_word(current)`) was itself line-scoped while `last_sig` persists across lines — see below. |
 | 2026-08-31 | `_last_word(chars)` (a lazy, line-scoped read of `current`) is replaced with a persistent `word_buf`/`last_word` pair, updated incrementally alongside `last_sig` through one shared `_note(char)` closure, rather than kept as a per-call computation. | `current` (the stripped-line accumulator) resets at every physical line by design (each line is reported independently), but `last_sig` is deliberately *not* reset at newlines (that's what lets quote/comment state survive a line break in the first place) — a keyword or a control-flow `(` legitimately separated from what follows it by a line break or a comment (`if\n(cond)`, `return\n/re/`) made `_last_word(current)` silently return "" exactly when it mattered, because it was reading from the wrong-lifetime buffer. This is the same "two independently-updated copies of one state machine drift apart" failure this file's own decision log has already named three times (`SKIP_PATH_PARTS`, `_TRIPLE_QUOTES`, the receiver/alias checks) — the fix is the same each time: one shared update path instead of two. |
-| 2026-08-31 | The newline branch in `_strip_comments` now calls `_note("\n")` before resetting `current`, treating a line break as a word-boundary character. | Found via self-review while implementing the `_last_word` replacement above, not from an external report: without this, `word_buf` never gets finalized into `last_word` when a keyword is immediately followed by a bare newline with nothing else on that physical line (`return\n/re/`) — the *existing* round-14 `_JS_REGEX_KEYWORDS` check has the identical bug the round-16 review reported for the paren case, just without a paren in the way. Fixing the shared root cause (persistent `last_word` tracking) closes both instances at once; this decision records that the newline call site needed the same treatment as every other character-consuming branch, not a separate mechanism. |
+| 2026-08-31 | The newline branch in `_strip_comments` now calls `_note("\n")` before resetting `current`, treating a line break as a word-boundary character. | Found via self-review while implementing the `_last_word` replacement above, not from an external report: without this, `word_buf` never gets finalized into `last_word` when a keyword is immediately followed by a bare newline with nothing else on that physical line (`return\n/re/`) — the *existing* round-14 `_JS_REGEX_KEYWORDS` check has the identical bug the round-16 review reported for the paren case, just without a paren in the way. Fixing the shared root cause (persistent `last_word` tracking) closes both instances at once; this decision records that the newline call site needed the same treatment as every other character-consuming branch, not a separate mechanism. **Superseded by round 17**: per-branch opt-in finalization (`_note`, called from each character-consuming branch individually) was itself the weakness — a fourth branch (block-comment entry) turned up missing the same call; see below. |
+| 2026-08-31 | Per-branch `_note(char)` calls (one per character-consuming branch: string-open, `(`, `)`, generic fall-through, newline) are replaced with a structural split: one dedicated branch handles every identifier character (the only place `word_buf` grows), and one unconditional `_finalize_word()` call runs for every other character before any branch-specific logic sees it — rather than adding a fifth `_note`/finalize call to the block-comment-entry branch the round-17 review reported missing one. | Three review rounds in a row (15, 16, 17) each found a *different* branch that had forgotten to call the shared finalization helper (a paren branch, the newline branch, now block-comment entry) — the same helper existing didn't stop the omission, because calling it was still each branch's own responsibility to remember. The user explicitly rejected patching the fourth instance the same way ("НОРМАЛЬНО ПОПРАВЬ! А НЕ КОСТЫЛЬ!"): making finalization a structural precondition instead of a per-branch opt-in makes the *whole class* of "this branch forgot to flush the word" bug impossible by construction, closing the reported block-comment case, the not-yet-reported line-comment case, and the zero-separator case in one change instead of three more narrow patches. |
+| 2026-08-31 | The `\n`-handling branch stays the unconditional first check in `_strip_comments`'s loop (ahead of `in_block_comment`/`in_string`), not folded into the new "every non-identifier character" tail alongside the other word-boundary branches. | Caught via self-review, not shipped: an intermediate version of the round-17 restructure moved `\n` handling next to the other boundary branches (after the `in_block_comment`/`in_string` checks), which broke multi-line string/comment line-splitting — a newline consumed while inside an active string or block comment stopped flushing `lines`/`current`, collapsing several physical lines' output into one entry and shifting every later line number. `\n` is not like the other boundary characters here: it must end a physical line's output *regardless* of lexical state (`in_string`/`in_block_comment` persist across the split, but the split itself must still happen), which only holds if it's checked before those states get a chance to consume it. |
 
 ## Progress log
 
@@ -1075,6 +1140,7 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | Fourteenth GitHub PR #96 review round (reviewing commit `aa065ea`) escalated the two round-13 out-of-scope decisions as blockers: `from . import shared; shared.router...` and a keyword-preceded regex literal (`return /"/`) were confirmed still-live bypasses, reproduced against current code before touching anything, not just re-affirmations of the earlier documented scope call. Fixed both: `_module_import_aliases` now also resolves `from . import name`/`from .. import name` as a module identity when a submodule file actually named `name` exists (checked via `module_paths`), leaving `from . import name` where `name` is a plain name bound in `__init__.py` to the pre-existing name-edge mechanism, which already covers that sub-case correctly — so the statement's two genuinely ambiguous resolutions are each handled by the mechanism that actually matches them; bare `import X.Y.Z` (no `as`) remains the one still out-of-scope case. Added `_JS_REGEX_KEYWORDS` and `_last_word` (word-level, not char-level, lookback) so a keyword-preceded regex is now correctly distinguished from a real identifier ending the same way (verified an identifier literally named `returned` still divides correctly, confirming word-boundary matching). Corrected the round-13 decision log's two "documented, not used in this repo today" entries rather than leaving them standing as if still accurate — see the superseding entries. Verified: `from . import shared` and `from .. import shared` (two levels) both resolve correctly; the `__init__.py`-bound-name sub-case and a control case stay unaffected; `return`/`typeof`/`instanceof`/`case`-preceded regexes are all caught; all prior regression cases (router and JS/TS) replayed with nothing flipped. `pytest tests/architecture` (24 passed), both changed files against the real repository tree, `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) stay green. | Commit. |
 | 2026-08-31 | Fifteenth GitHub PR #96 review round (repeat review of commit `5d4c6ac9`, GitHub review #5068785118, CI fully green on all three required jobs) found each round-14 fix was itself a narrower generalization than the underlying logic actually supported: `_module_import_aliases`'s submodule-file check only fired for bare relative `from . import name`, missing the identical-logic absolute case `from anytoolai_platform_api.routers import demo`; and the regex heuristic's `)`-is-always-a-value rule missed a control-flow condition's closing paren (`if (ok) /"/...`), a statement boundary rather than a value. Both root-caused as the same mistake one level up from round 13's own diagnosis: fixing the *literal shape* of a reported example instead of the general rule the example was an instance of. Fixed both by generalizing rather than special-casing further: dropped the `node.module is None and node.level > 0` restriction entirely, so every `ast.ImportFrom` (relative or absolute) gets the same submodule-file check — explicitly verified this doesn't regress the repo's own dominant import pattern (`from pkg.routers.demo import router as demo_router`, where `router` isn't a submodule); added `paren_stack`/`_JS_CONTROL_KEYWORDS_BEFORE_PAREN` so a condition paren's close clears `last_sig` instead of marking it a value, while an ordinary function-call paren's close still does. Verified: absolute and qualified-relative submodule imports resolve; the real `main.py` pattern is unaffected; `if`/`while`/`switch`-condition-preceded regexes are all caught; a real function call's division (including one nested inside a condition body) is unaffected; nested parens resolve the stack correctly; the full prior regression table (router identity + JS/TS, all rounds) replayed with nothing flipped. `pytest tests/architecture` (24 passed), both changed files against the real repository tree, `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) stay green. | Commit. |
 | 2026-08-31 | Sixteenth GitHub PR #96 review round (repeat review of commit `bf66d329`) confirmed the router-identity blocker fixed and found one remaining JS/TS scanner gap: the round-15 control-paren heuristic loses a preceding keyword whenever a line break or comment separates it from `(`, because `_last_word` read from `current` (line-scoped, resets every `\n`) while `last_sig` persists across lines — the same "two independently-updated copies of one state machine drift apart" class this file's decision log has already named three times. Reproduced first (`if\n(ok) /"/...` truncates the real hardcode; a comment-separated variant reproduces identically). Fixed at the root rather than patching the paren case alone: replaced the lazy `_last_word(current)` read with a persistent `word_buf`/`last_word` pair maintained by one shared `_note(char)` closure, called from every character-consuming branch (string-open, `(`, `)`, generic fall-through) instead of each managing `last_sig` independently. While rewriting, caught and fixed a second bug in the identical class via self-review before it was externally reported: the newline branch never called `_note` at all, so the *existing* round-14 keyword-regex check (`return\n/re/`, no paren involved) had the same loss-across-a-line-break bug — added a `_note("\n")` call there too, since a newline is itself a word-boundary character. Verified: the exact `if\n(...)` and comment-separated cases now find the hardcode; the analogous `return\n/re/` case is also fixed; every same-line paren/keyword regression case from rounds 14–15 stays unaffected; the full prior regression table (router identity + all JS/TS cases across every round) replayed with nothing flipped. `pytest tests/architecture` (24 passed), both changed files against the real repository tree, `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) stay green. | Commit. |
+| 2026-08-31 | Seventeenth GitHub PR #96 review round (repeat review of commit `9a4d935`) found the round-16 fix held for newlines/line-comments, but block-comment entry didn't call the finalization helper either, so a keyword immediately followed by `/*...*/` and then a regex (`return/*note*//"/`) still lost the keyword. The user explicitly rejected patching this one more branch ("НОРМАЛЬНО ПОПРАВЬ! А НЕ КОСТЫЛЬ!") — the third review round in a row to find a different branch that forgot to call the shared `_note`/finalize helper, evidence the per-branch-opt-in mechanism itself was the weakness, not any one branch. Restructured `_strip_comments` instead of patching further: identifier characters are now handled by exactly one dedicated branch (the only place `word_buf` grows), and every other character passes through one unconditional `_finalize_word()` call before any branch-specific logic runs — no branch can forget to finalize anymore, because it isn't part of any branch's own responsibility. This closes the reported block-comment case, the not-yet-reported line-comment case, and the zero-separator case (`return/"/...`, no space or comment at all) in one change. Caught and fixed a self-introduced regression while restructuring, before calling it done: an intermediate version moved the `\n`-handling branch after the `in_block_comment`/`in_string` checks, which broke multi-line string/comment line-splitting (a newline consumed while inside an active string/comment stopped flushing `lines`, collapsing physical lines and shifting later line numbers) — caught by re-running the existing multi-line template-literal case, fixed by keeping `\n` as the unconditional first check exactly as before. Verified: the exact review case, a block-comment-separated keyword-and-paren, a *multi-line* block comment between a keyword and a regex, and a real identifier followed by a block comment then real division (confirmed to stay division) all resolve correctly; the multi-line line-splitting case re-verified line-by-line; the full prior regression table (router identity + every JS/TS case across every round) replayed with nothing flipped. `pytest tests/architecture` (24 passed), the changed file against the real repository tree, `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) stay green. | Commit. |
 
 ## Open questions
 
