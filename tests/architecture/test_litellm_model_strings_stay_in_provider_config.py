@@ -371,9 +371,14 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
     keyword-lookback bug of the "this one branch forgot to flush the pending word" shape (found
     twice: entering a comment, and a `/` with no separator at all right after a keyword) is
     structurally impossible under this shape, because no branch *can* skip the flush — it isn't
-    theirs to remember, it already happened before any of them run. `markers` is only non-empty
-    for JS/TS-family suffixes (`.json` has no comment syntax and returns early above), so none of
-    this fires for `.json`.
+    theirs to remember, it already happened before any of them run.
+
+    `last_word_is_property` additionally tracks whether the word was reached via a preceding `.`
+    (`config.default`, `obj?.if`) — reserved words are valid JS/TS *property names*, so an
+    IdentifierName spelled like a keyword right after `.`/`?.` is never a real keyword token, and
+    must not be matched against `_JS_REGEX_KEYWORDS`/`_JS_CONTROL_KEYWORDS_BEFORE_PAREN` even
+    though its characters are identical. `markers` is only non-empty for JS/TS-family suffixes
+    (`.json` has no comment syntax and returns early above), so none of this fires for `.json`.
     """
     if not markers:
         return text.splitlines()
@@ -385,12 +390,15 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
     last_sig = ""
     word_buf: list[str] = []
     last_word = ""
+    last_word_is_property = False
+    word_starts_after_dot = False
     paren_stack: list[bool] = []
 
     def _finalize_word() -> None:
-        nonlocal word_buf, last_word
+        nonlocal word_buf, last_word, last_word_is_property
         if word_buf:
             last_word = "".join(word_buf)
+            last_word_is_property = word_starts_after_dot
             word_buf = []
 
     i = 0
@@ -428,6 +436,10 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
             i += 1
             continue
         if char.isalnum() or char in "_$":
+            if not word_buf:
+                # This is the first character of a new word — record whether it directly follows
+                # a `.` (property access) before `last_sig` moves on to this char itself.
+                word_starts_after_dot = last_sig == "."
             word_buf.append(char)
             last_sig = char
             current.append(char)
@@ -456,7 +468,10 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
         if char == "(":
             current.append(char)
             last_sig = char
-            paren_stack.append(last_word in _JS_CONTROL_KEYWORDS_BEFORE_PAREN)
+            is_control_keyword = (
+                last_word in _JS_CONTROL_KEYWORDS_BEFORE_PAREN and not last_word_is_property
+            )
+            paren_stack.append(is_control_keyword)
             i += 1
             continue
         if char == ")":
@@ -474,8 +489,9 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
             # (`foo` vs. `return`) — check the whole preceding word against the keyword set only
             # when the char-level heuristic said "value" (a keyword can flip that to "regex" too;
             # a real identifier never does, so this only ever makes the check more permissive).
+            # A property name spelled like a keyword (`config.default`) is excluded the same way.
             if not looks_like_regex and last_sig.isalpha():
-                looks_like_regex = last_word in _JS_REGEX_KEYWORDS
+                looks_like_regex = last_word in _JS_REGEX_KEYWORDS and not last_word_is_property
             if looks_like_regex:
                 end = _regex_literal_end(text, i, length)
                 if end is not None:
