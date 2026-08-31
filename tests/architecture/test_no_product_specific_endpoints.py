@@ -64,23 +64,34 @@ def _path_argument(node: ast.Call) -> str | None:
 ROUTE_TARGET_CONSTRUCTORS = {"APIRouter", "FastAPI"}
 
 
+def _is_route_target_call(value: ast.expr | None) -> bool:
+    return (
+        isinstance(value, ast.Call)
+        and isinstance(value.func, ast.Name)
+        and value.func.id in ROUTE_TARGET_CONSTRUCTORS
+    )
+
+
 def _router_variable_names(tree: ast.AST) -> set[str]:
-    """Names bound by `<name> = APIRouter(...)`/`FastAPI(...)` in this module.
+    """Names bound by `<name> = APIRouter(...)`/`FastAPI(...)` in this module, including
+    annotated assignments (`app: FastAPI = FastAPI()`, `router: APIRouter = APIRouter()`).
 
     `main.py` binds `app = FastAPI(...)`, not `APIRouter(...)` — `app.add_api_route(...)`/
     `@app.api_route(...)` register routes directly on the app and must be tracked the same way
     `router.get(...)` is, or a hardcoded product path registered straight on `app` bypasses this
-    guard entirely.
+    guard entirely. A type-annotated binding is an `ast.AnnAssign`, not `ast.Assign` — ordinary,
+    valid Python that must be recognized the same way.
     """
     names: set[str] = set()
     for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.Assign)
-            and isinstance(node.value, ast.Call)
-            and isinstance(node.value.func, ast.Name)
-            and node.value.func.id in ROUTE_TARGET_CONSTRUCTORS
-        ):
+        if isinstance(node, ast.Assign) and _is_route_target_call(node.value):
             names.update(target.id for target in node.targets if isinstance(target, ast.Name))
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and _is_route_target_call(node.value)
+        ):
+            names.add(node.target.id)
     return names
 
 

@@ -7,7 +7,7 @@
 - Created: 2026-08-31
 - Last updated: 2026-08-31
 - Review date: 2026-08-31
-- Next action: none — implementation, three internal code-review rounds, and two GitHub PR review
+- Next action: none — implementation, three internal code-review rounds, and three GitHub PR review
   rounds of fixes landed; move to `completed/` once merged.
 - Blocker: none
 
@@ -200,6 +200,25 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
     not inside a string. Verified against the exact JSON-with-URL case from the review (now caught),
     plus every prior true/false-positive case (comment-only lines, `DEFAULT_MODEL = "..." #
     trailing comment`, a `#` inside a quoted string that isn't a comment).
+- [x] Third GitHub PR review round (2026-08-31, PR #96 "Code-ewview (me #3)", reviewing commit
+      `a558d76`) found 2 more gaps in the round-6 fixes themselves, both fixed:
+  - The `FastAPI(...)`-binding fix only handled `ast.Assign` (`app = FastAPI()`). A type-annotated
+    binding — `app: FastAPI = FastAPI()` or `router: APIRouter = APIRouter()`, ordinary valid
+    Python — is a distinct `ast.AnnAssign` node with a singular `.target` instead of `.targets`, so
+    it was never added to `router_names`; a hardcoded product path registered on an annotated
+    `app`/`router` still passed the guard. Fixed: `_router_variable_names` now also matches
+    `ast.AnnAssign` (extracted the shared "is this an `APIRouter`/`FastAPI` call" check into
+    `_is_route_target_call` so both branches can't drift). Verified both an annotated
+    `app.add_api_route(...)` and an annotated `@router.get(...)` are now caught.
+  - The LiteLLM test's `SCAN_EXTS` covers `.js`/`.jsx`/`.ts`/`.tsx`, but neither the model regex nor
+    `_strip_comment` treated backtick (`` ` ``) as a string delimiter — a JS/TS template literal
+    like `` const model = `openai/gpt-4.1`; `` was invisible (the regex only accepted `'`/`"`/`=`/
+    `:`/`,`/bracket/start-of-line immediately before the literal, and a backtick isn't in that set),
+    and `` const url = `https://example.com`; const model = "openai/gpt-4.1"; `` was truncated at
+    the URL's `//` because `_strip_comment` didn't know it was inside a backtick string. Fixed:
+    added backtick to both the regex's allowed-prefix class and `_strip_comment`'s recognized quote
+    characters. Verified both exact cases from the review are now caught, and the GitHub-URL
+    comment false positive from earlier rounds is still excluded.
 
 ## Validation
 
@@ -263,6 +282,15 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
       inside a quoted string and isn't a comment).
 - [x] `python3 -m pytest tests/architecture -q`, `validate_architecture.py`, and `quick-check`
       re-run after this round — 24 passed / passed / 981 passed.
+- [x] Manual check: `app: FastAPI = FastAPI()` + `app.add_api_route("/proposal_ai/status", handler)`
+      and `router: APIRouter = APIRouter()` + `@router.get("/proposal_ai/status")` (both annotated
+      bindings) are caught after the `ast.AnnAssign` fix.
+- [x] Manual check: `` const model = `openai/gpt-4.1`; `` and
+      `` const url = `https://example.com`; const model = "openai/gpt-4.1"; `` are both caught
+      after the backtick fix; the `# see https://github.com/...` comment false positive from
+      earlier rounds is still excluded.
+- [x] `python3 -m pytest tests/architecture -q`, `validate_architecture.py`, and `quick-check`
+      re-run after this round — 24 passed / passed / 981 passed.
 
 ## Decision log
 
@@ -273,6 +301,8 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | `demo.py`'s hardcoded `product_id="kernel_demo"` stays an explicit, documented exception rather than being folded into the forbidden-term check. | `kernel_demo` is the platform's own MVP-A1/A2 smoke product, not a Freelancer product — flagging it would break a legitimate, already-shipped router for no boundary benefit. |
 | 2026-08-31 | `LITELLM_PROVIDERS` is a hardcoded snapshot of `litellm`'s `provider_list`, not a runtime import of `litellm` itself. | `import litellm` anywhere outside the Provider Gateway/adapter layer violates this repo's own boundary (`docs/architecture/llm-runtime.md`); even the dedicated adapter test (`test_litellm_adapter.py`) imports only this repo's `providers.adapters.litellm` module, never raw `litellm` — no precedent for a raw import in tests either. A fully generic `<word>/<word>` pattern was rejected instead of a provider list at all: it matched this repo's own legitimate config-root strings (e.g. `"products/proposal_ai"` in `FreelancerSuiteBundle.config_roots()`). |
 | 2026-08-31 | `test_no_product_specific_endpoints.py` tracks both `APIRouter(...)`- and `FastAPI(...)`-bound variable names as valid route-registration receivers, not just `APIRouter`. | `main.py`'s real binding is `app = FastAPI(...)`; routes can be (and, per the PR review, are a realistic path to be) registered directly on `app` via `add_api_route`/`api_route`, not only via a `router` object — the guard has to cover both binding shapes to actually enforce the boundary it claims to. |
+| 2026-08-31 | `_router_variable_names` treats `ast.Assign` and `ast.AnnAssign` route-target bindings through one shared `_is_route_target_call` check rather than two separate ad hoc conditions. | The AnnAssign gap (round-3 PR review) existed because the Assign-only check was written once and never revisited when AnnAssign was later considered; sharing the "is this an `APIRouter`/`FastAPI` call" predicate removes the class of bug where one binding form's handling drifts from the other's. |
+| 2026-08-31 | Backtick (`` ` ``) is a recognized string delimiter in both `LITELLM_MODEL_STRING_RE`'s prefix class and `_strip_comment`, alongside `'`/`"`. | `SCAN_EXTS` already covers `.js`/`.jsx`/`.ts`/`.tsx`; JS/TS template literals are ordinary syntax in those files, and treating only `'`/`"` as strings left both a detection gap (a backtick-quoted model literal never matched) and a truncation bug (a backtick-quoted URL's `//` was misread as a comment start). |
 
 ## Progress log
 
@@ -285,6 +315,7 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | GitHub PR #96 review round found 6 gaps: 2 stale-doc-text items in this file (gap counts, scan-root descriptions) plus `mvp-a-mvp-b-linear-epics.md`'s stale "Last updated", and 2 substantive test-logic gaps — `LITELLM_MODEL_STRING_RE` still keyed off a `model`-named identifier (missed `DEFAULT_LLM`/`deployment`-named hardcodes) and the endpoint test's route-literal collection grabbed every string arg, not just the path (false-positive risk from `summary=`/`description=` prose). Fixed all six: corrected the doc staleness, rewrote the model-string detector to key off literal position (preceded by quote/`=`/`:`/`,`/bracket/start-of-line) plus a comment stripper instead of the key name, and restricted route-literal collection to `_path_argument` (first positional arg or `path=` keyword). `pytest tests/architecture` (24 passed) and `quick-check` (981 passed) green. | Address the remaining 3 findings in the same PR-review comment block. |
 | 2026-08-31 | Completed the same GitHub PR #96 review block's remaining 3 findings: `ROUTE_REGISTRATION_METHODS` missed `api_route`/`add_api_route` (and the remaining HTTP verbs) so those FastAPI registration styles bypassed the endpoint guard entirely; `SCAN_EXTS` omitted `.json` despite the regex already handling JSON syntax; the provider segment was a 9-name hand-written allowlist that missed any provider not on it (e.g. `xai`, `deepseek`). Fixed all three: expanded `ROUTE_REGISTRATION_METHODS`, added `.json` to `SCAN_EXTS`, and replaced the 9-name list with a 141-name static snapshot of `litellm`'s real `provider_list` (a fully generic pattern was tried first and rejected — it matched this repo's own `"products/proposal_ai"`-style config-root strings). `pytest tests/architecture` (24 passed), `validate-architecture`, and `quick-check` (981 passed) green. | Commit. |
 | 2026-08-31 | Second GitHub PR #96 review round ("Code-ewview (me #2)", reviewing commit `0a3d7cb`) found the two prior fixes were each only partial: the `api_route`/`add_api_route` fix widened the method set but never taught `_router_variable_names` to recognize `app = FastAPI(...)` (only `APIRouter(...)`), so `app.add_api_route(...)`/`@app.api_route(...)` — the exact shape `main.py` actually uses — still bypassed the guard; and `_strip_comment` found `#`/`//` anywhere on the line including inside quoted strings, so a `.json` line with a URL before the `model` field (`{"callback": "https://...", "model": "openai/..."}`) got truncated before the real hardcode was ever inspected. Fixed both: `_router_variable_names` now also matches `FastAPI(...)` bindings via `ROUTE_TARGET_CONSTRUCTORS`, and `_strip_comment` is now quote-state-aware instead of a naive first-occurrence search. Verified both exact bypass cases from the review are now caught, all prior comment-stripping cases still behave correctly, and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Commit. |
+| 2026-08-31 | Third GitHub PR #96 review round ("Code-ewview (me #3)", reviewing commit `a558d76`) found the `FastAPI(...)`-binding fix was itself only partial — it handled `ast.Assign` but not the distinct `ast.AnnAssign` node a type-annotated binding (`app: FastAPI = FastAPI()`, ordinary valid Python) parses to, so an annotated `app`/`router` still bypassed the guard — and that the LiteLLM test's model regex/`_strip_comment` never treated backtick as a string delimiter despite `SCAN_EXTS` covering `.js`/`.jsx`/`.ts`/`.tsx`, so a JS/TS template-literal model string was invisible and a backtick-quoted URL before a model literal on the same line got truncated the same way the round-2 quoted-URL bug did. Fixed both: extracted `_is_route_target_call` so `Assign`/`AnnAssign` share one check, and added backtick to the regex's prefix class and `_strip_comment`'s quote characters. Verified both exact cases from the review are now caught, and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Commit. |
 
 ## Open questions
 

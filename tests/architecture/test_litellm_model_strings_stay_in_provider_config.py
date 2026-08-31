@@ -23,9 +23,11 @@ SCAN_EXTS = {".py", ".ts", ".tsx", ".js", ".jsx", ".yaml", ".yml", ".json"}
 # litellm_params.model). They must appear only in provider policy/model registry files, never
 # hardcoded in application source — regardless of what the surrounding variable/key is named
 # (`DEFAULT_MODEL`, `DEFAULT_LLM`, `deployment`, `model_name`, ...). Detection doesn't key off the
-# name at all: it requires the literal to be immediately preceded by a quote/`=`/`:`/`,`/bracket/
-# start-of-line, which a bare `<provider>/<name>` embedded in prose or a URL path never is (e.g.
-# "github.com/openai/openai-python" — "openai" there is preceded by "/", not by any of those).
+# name at all: it requires the literal to be immediately preceded by a quote (`'`/`"`/`` ` `` —
+# backtick included for JS/TS template literals, since SCAN_EXTS covers .js/.jsx/.ts/.tsx)/`=`/`:`/
+# `,`/bracket/start-of-line, which a bare `<provider>/<name>` embedded in prose or a URL path never
+# is (e.g. "github.com/openai/openai-python" — "openai" there is preceded by "/", not by any of
+# those).
 #
 # ponytail: LITELLM_PROVIDERS is a static snapshot of litellm==1.89.3's provider_list (141 names,
 # not imported at runtime here — importing `litellm` itself would violate this repo's own
@@ -57,7 +59,7 @@ LITELLM_PROVIDERS = [
     "xinference", "zai",
 ]
 LITELLM_MODEL_STRING_RE = re.compile(
-    r"""(?:^|[\s"'=:,\[{(])"""
+    r"""(?:^|[\s"'`=:,\[{(])"""
     rf"""(?:{"|".join(sorted(LITELLM_PROVIDERS, key=len, reverse=True))})"""
     r"/[\w.\-]+"
 )
@@ -74,13 +76,18 @@ def _scan_files() -> list[Path]:
     return files
 
 
+_QUOTE_CHARS = ("'", '"', "`")  # backtick included: JS/TS template literals (SCAN_EXTS has .ts/.js)
+
+
 def _strip_comment(line: str) -> str:
     """Drop a trailing `#`/`//` comment, but never one found inside a quoted string.
 
     A naive `line.find("#"/"//")` truncates at the first occurrence anywhere on the line,
     including inside a string — e.g. `{"callback": "https://example.com", "model": "openai/..."}`
     would be cut at the `//` in the URL, hiding the real `model` field that follows it. Track
-    quote state instead so only a genuine, unquoted comment marker ends the line.
+    quote state instead so only a genuine, unquoted comment marker ends the line. Backticks are
+    tracked as a quote delimiter too, or a JS/TS template literal containing `//` (e.g. a URL) is
+    misread as leaving the string.
     """
     in_string: str | None = None
     i = 0
@@ -95,7 +102,7 @@ def _strip_comment(line: str) -> str:
                 in_string = None
             i += 1
             continue
-        if char in ("'", '"'):
+        if char in _QUOTE_CHARS:
             in_string = char
             i += 1
             continue
