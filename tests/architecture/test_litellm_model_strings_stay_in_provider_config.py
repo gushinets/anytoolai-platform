@@ -17,17 +17,48 @@ SCAN_ROOTS = [ROOT / "apps", ROOT / "packages", ROOT / "extensions", ROOT / "con
 # real litellm-format config values (e.g. test_litellm_adapter.py), unlike the neighbor which
 # filters "tests" per-function instead of via this set.
 SKIP_PATH_PARTS = _NEIGHBOR_SKIP_PATH_PARTS | {"tests"}
-SCAN_EXTS = {".py", ".ts", ".tsx", ".js", ".jsx", ".yaml", ".yml"}
+SCAN_EXTS = {".py", ".ts", ".tsx", ".js", ".jsx", ".yaml", ".yml", ".json"}
 
 # LiteLLM SDK/proxy model strings are "<provider>/<model>" (see configs/kernel/litellm_router.yaml
 # litellm_params.model). They must appear only in provider policy/model registry files, never
-# hardcoded in application source. Anchored to a `model`-named key (any case/spelling —
-# `DEFAULT_MODEL`, `self.default_model: str`, `"model":`, `model:`) immediately followed by
-# `:`/`=`/`==`, so a URL or comment mentioning e.g. "github.com/openai/openai-python" does not
-# false-positive.
+# hardcoded in application source — regardless of what the surrounding variable/key is named
+# (`DEFAULT_MODEL`, `DEFAULT_LLM`, `deployment`, `model_name`, ...). Detection doesn't key off the
+# name at all: it requires the literal to be immediately preceded by a quote/`=`/`:`/`,`/bracket/
+# start-of-line, which a bare `<provider>/<name>` embedded in prose or a URL path never is (e.g.
+# "github.com/openai/openai-python" — "openai" there is preceded by "/", not by any of those).
+#
+# ponytail: LITELLM_PROVIDERS is a static snapshot of litellm==1.89.3's provider_list (141 names,
+# not imported at runtime here — importing `litellm` itself would violate this repo's own
+# litellm-import boundary, see docs/architecture/llm-runtime.md). A provider litellm adds after
+# this snapshot bypasses the guard until this list is refreshed; re-derive it with
+# `python3 -c "import litellm; print(sorted({p.value for p in litellm.provider_list}))"` and paste
+# the result back in when bumping the `litellm` pin materially.
+LITELLM_PROVIDERS = [
+    "a2a", "a2a_agent", "ai21", "ai21_chat", "aiml", "aiohttp_openai", "amazon_nova", "anthropic",
+    "anthropic_text", "apertis", "assemblyai", "auto_router", "aws_polly", "azure", "azure_ai",
+    "azure_text", "baseten", "bedrock", "bedrock_mantle", "black_forest_labs", "bytez", "cerebras",
+    "charity_engine", "chatgpt", "chutes", "clarifai", "cloudflare", "codestral", "cohere",
+    "cohere_chat", "cometapi", "compactifai", "cursor", "custom", "custom_openai", "dashscope",
+    "databricks", "datarobot", "deepgram", "deepinfra", "deepseek", "docker_model_runner",
+    "dotprompt", "elevenlabs", "empower", "fal_ai", "featherless_ai", "fireworks_ai", "friendliai",
+    "galadriel", "gemini", "gigachat", "github", "github_copilot", "gradient_ai", "groq",
+    "helicone", "heroku", "hosted_vllm", "huggingface", "humanloop", "hyperbolic", "inception",
+    "infinity", "jina_ai", "lambda_ai", "langflow", "langfuse", "langgraph", "lemonade",
+    "litellm_agent", "litellm_proxy", "llamafile", "lm_studio", "manus", "maritalk", "meta_llama",
+    "milvus", "minimax", "mistral", "moonshot", "morph", "nano-gpt", "nebius", "neosantara",
+    "nlp_cloud", "novita", "nscale", "nvidia_nim", "nvidia_riva", "oci", "ollama", "ollama_chat",
+    "oobabooga", "openai", "openai_like", "openrouter", "ovhcloud", "perplexity", "petals",
+    "pg_vector", "poe", "predibase", "publicai", "ragflow", "recraft", "reducto", "replicate",
+    "runwayml", "s3_vectors", "sagemaker", "sagemaker_chat", "sagemaker_nova", "sambanova", "sap",
+    "scaleway", "snowflake", "soniox", "stability", "synthetic", "tensormesh",
+    "text-completion-codestral", "text-completion-inception", "text-completion-openai",
+    "together_ai", "topaz", "triton", "v0", "vercel_ai_gateway", "vertex_ai", "vertex_ai_beta",
+    "vllm", "volcengine", "voyage", "wandb", "watsonx", "watsonx_text", "xai", "xiaomi_mimo",
+    "xinference", "zai",
+]
 LITELLM_MODEL_STRING_RE = re.compile(
-    r"""(?i)["']?[\w.]*model[\w]*["']?\s*(?::\s*[\w\[\], ]+)?[:=]+\s*["']?"""
-    r"(?:openai|anthropic|azure|vertex_ai|bedrock|gemini|cohere|mistral|together_ai|groq)"
+    r"""(?:^|[\s"'=:,\[{(])"""
+    rf"""(?:{"|".join(sorted(LITELLM_PROVIDERS, key=len, reverse=True))})"""
     r"/[\w.\-]+"
 )
 
@@ -43,13 +74,25 @@ def _scan_files() -> list[Path]:
     return files
 
 
+def _strip_comment(line: str) -> str:
+    """Drop a trailing `#`/`//` comment so a URL/reference in one doesn't false-positive."""
+    end = len(line)
+    for marker in ("#", "//"):
+        pos = line.find(marker)
+        if pos != -1:
+            end = min(end, pos)
+    return line[:end]
+
+
 def test_litellm_model_strings_only_in_provider_config() -> None:
     offenders: list[str] = []
     for path in _scan_files():
         text = path.read_text(encoding="utf-8", errors="ignore")
-        match = LITELLM_MODEL_STRING_RE.search(text)
-        if match:
-            offenders.append(f"{path.relative_to(ROOT)}: {match.group(0)!r}")
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            match = LITELLM_MODEL_STRING_RE.search(_strip_comment(line))
+            if match:
+                offenders.append(f"{path.relative_to(ROOT)}:{lineno}: {match.group(0)!r}")
+                break
 
     assert offenders == [], "LiteLLM-format model strings found outside provider config: " + ", ".join(
         offenders

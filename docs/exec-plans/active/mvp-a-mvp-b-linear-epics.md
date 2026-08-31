@@ -5,7 +5,7 @@
 - State: active
 - Owner: product/engineering
 - Created: 2026-06-23
-- Last updated: 2026-08-06
+- Last updated: 2026-08-31
 - Review date: 2026-08-06
 - Next action: deliver A20a-c and the MVP-A1 Atom Runtime Proof children.
 - Blocker: none

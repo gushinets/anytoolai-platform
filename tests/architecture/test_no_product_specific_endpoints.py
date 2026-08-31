@@ -29,7 +29,18 @@ FORBIDDEN_PRODUCT_PATH_TERMS = [
     "freelancer",
 ]
 
-ROUTE_REGISTRATION_METHODS = {"get", "post", "put", "delete", "patch"}
+ROUTE_REGISTRATION_METHODS = {
+    "get",
+    "post",
+    "put",
+    "delete",
+    "patch",
+    "options",
+    "head",
+    "trace",
+    "api_route",
+    "add_api_route",
+}
 # `app.include_router(router, prefix=...)` is how main.py could hardcode a product-specific
 # prefix without ever calling APIRouter(...) itself — must be caught alongside APIRouter/route
 # decorators, not just them.
@@ -41,6 +52,13 @@ def _keyword_value(node: ast.Call, keyword: str) -> str | None:
         if kw.arg == keyword and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
             return kw.value.value
     return None
+
+
+def _path_argument(node: ast.Call) -> str | None:
+    """The route's `path`: first positional arg, or the `path=` keyword."""
+    if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+        return node.args[0].value
+    return _keyword_value(node, "path")
 
 
 def _router_variable_names(tree: ast.AST) -> set[str]:
@@ -76,9 +94,11 @@ def _route_path_literals(path: Path) -> list[str]:
             called_on_router = False
 
         if func_name in ROUTE_REGISTRATION_METHODS and called_on_router:
-            for arg in (*node.args, *(kw.value for kw in node.keywords)):
-                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                    literals.append(arg.value)
+            # Only the route's own path, not other string kwargs like `summary=`/`description=`
+            # (free-form prose that could coincidentally contain a forbidden substring).
+            path = _path_argument(node)
+            if path is not None:
+                literals.append(path)
         elif func_name in PREFIX_KEYWORD_CALLS:
             prefix = _keyword_value(node, "prefix")
             if prefix is not None:
