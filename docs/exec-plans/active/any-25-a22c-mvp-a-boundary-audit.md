@@ -7,7 +7,7 @@
 - Created: 2026-08-31
 - Last updated: 2026-09-01
 - Review date: 2026-09-01
-- Next action: none — implementation, three internal code-review rounds, and nineteen GitHub PR
+- Next action: none — implementation, three internal code-review rounds, and twenty GitHub PR
   review rounds of fixes landed (round 10 replaced the hand-rolled Python/YAML lexer with real
   parsers; round 11 extended router-identity resolution to the whole package and fixed two gaps
   that rewrite itself exposed; round 12 fixed a `__init__.py` relative-import edge case in that
@@ -23,8 +23,9 @@
   after a third branch turned up missing the same call; round 18 excluded property-name-spelled-
   like-a-keyword from both keyword checks after review found `config.default` misclassified a
   following division as a regex; round 19 excluded JSX/TSX closing tags (`</div>`) from the same
-  regex heuristic, scoped to `.jsx`/`.tsx` only — see those entries); move to `completed/` once
-  merged.
+  regex heuristic, scoped to `.jsx`/`.tsx` only; round 20 disabled `//` line-comment recognition
+  entirely for JSX-capable files rather than hand-rolling JSX-text-vs-JS-expression tracking —
+  see those entries); move to `completed/` once merged.
 - Blocker: none
 
 ## Goal
@@ -849,6 +850,44 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
     round) replayed with nothing flipped.
   - Re-ran the full `pytest tests/architecture` suite (24 passed) and the changed test file
     against the real repository tree.
+- **Twentieth GitHub PR review round** (repeat review of commit `c81265c`) — the round-19
+  JSX-closing-tag fix is confirmed fixed in code (the review notes the closing-tag *thread*
+  couldn't be marked resolved because that requires a mutation the user declined to retry, not
+  because the fix itself regressed); one distinct blocking gap: the scanner still applies `//`
+  JS-comment rules while scanning raw JSX element *text* (the literal content between a tag's `>`
+  and the next `<`), which isn't JavaScript at all and has no comment syntax. `const el =
+  <div>https://example.com</div>; const model = "openai/gpt-4.1";` truncates at the URL's `//`,
+  hiding the real hardcode that follows on the same physical line. Reproduced first.
+  - **This finding is qualitatively different from every prior round in this file, and treated
+    accordingly.** Every previous JS/TS scanner fix was a *local* character/word-level heuristic
+    (one `/`, one preceding keyword, one paren). Correctly distinguishing "inside raw JSX text"
+    from "inside a JS expression/statement" requires real nested-structure tracking: an
+    opening/closing tag stack, `{...}` expressions embedded in JSX text switching back to JS mode
+    and back again, and TSX's well-known `<T>`-generic-vs-JSX-element ambiguity — genuinely
+    building a second hand-rolled parser, the exact failure mode that already justified moving
+    Python/YAML onto real parsers in round 10, and exactly the ceiling this file's own decision
+    log already named for the JS/TS path ("no dependency-free JS/TS tokenizer available").
+  - **Fix, chosen deliberately over building that tracker:** disable `//` line-comment recognition
+    entirely for JSX-capable files (`.jsx`/`.tsx`), keeping block-comment and regex-literal
+    recognition unaffected (neither is implicated by this finding). This is the *conservative*
+    direction for a boundary guard, not a shortcut: it can only ever cause the scanner to
+    *include* more content in scanning (a real inline `//` comment's text, now also checked
+    against the model-string regex) — never exclude content that should have been checked. A false
+    positive here costs a human one look at one line; a false negative is exactly the silent
+    boundary bypass this whole test exists to prevent. Implemented by excluding `"//"` from the
+    markers considered in the line-comment branch specifically when `jsx` is true — `.js`/`.ts`
+    (which can never contain JSX and where `//` unambiguously always means a real comment) are
+    completely unaffected.
+  - Verified: the exact review case now finds the full hardcode; block comments and the round-19
+    closing-tag regex fix both still work correctly in JSX files; a genuine `//` comment in a JSX
+    file is confirmed to no longer truncate the rest of the line (its content is now scanned
+    instead, the accepted false-positive-safe direction); `.ts` (non-JSX) `//` truncation is
+    confirmed completely unaffected; `pytest tests/architecture` (24 passed) against the real
+    repository tree exercises all real `.jsx`/`.tsx` files with no new false positives from any
+    real inline comment; the full prior regression table (router identity + every JS/TS case
+    across every round) replayed with nothing flipped.
+  - Re-ran the full `pytest tests/architecture` suite (24 passed) and the changed test file
+    against the real repository tree.
 
 ## Validation
 
@@ -1158,6 +1197,18 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
       files with no new false positives), the changed file against the real repository tree,
       `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) all green after
       this round.
+- [x] Reproduced the round-20 finding with a standalone script against current code before
+      changing anything: `const el = <div>https://example.com</div>; const model =
+      "openai/gpt-4.1";` truncated at the URL's `//`, hiding the real hardcode.
+- [x] Manual check: the exact review case now finds the full hardcode; block comments and the
+      round-19 closing-tag regex fix both still work in JSX files; a genuine `//` comment in a JSX
+      file is confirmed to no longer truncate (its content is scanned instead — the accepted,
+      false-positive-safe direction); `.ts` (non-JSX) `//` truncation is confirmed completely
+      unaffected.
+- [x] `python3 -m pytest tests/architecture -q` (24 passed, exercising all real `.jsx`/`.tsx`
+      files with no new false positives from any real inline comment), the changed file against
+      the real repository tree, `validate_architecture.py`, `validate-docs`, and `quick-check`
+      (981 passed) all green after this round.
 
 ## Decision log
 
@@ -1207,6 +1258,7 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | The `\n`-handling branch stays the unconditional first check in `_strip_comments`'s loop (ahead of `in_block_comment`/`in_string`), not folded into the new "every non-identifier character" tail alongside the other word-boundary branches. | Caught via self-review, not shipped: an intermediate version of the round-17 restructure moved `\n` handling next to the other boundary branches (after the `in_block_comment`/`in_string` checks), which broke multi-line string/comment line-splitting — a newline consumed while inside an active string or block comment stopped flushing `lines`/`current`, collapsing several physical lines' output into one entry and shifting every later line number. `\n` is not like the other boundary characters here: it must end a physical line's output *regardless* of lexical state (`in_string`/`in_block_comment` persist across the split, but the split itself must still happen), which only holds if it's checked before those states get a chance to consume it. |
 | 2026-09-01 | Both keyword-matching checks (`_JS_REGEX_KEYWORDS`, `_JS_CONTROL_KEYWORDS_BEFORE_PAREN`) now also require `not last_word_is_property`, tracked via a new `word_starts_after_dot`/`last_word_is_property` pair set at the moment a word starts accumulating (was the char immediately before it a `.`?), rather than matching `last_word` against the keyword set on spelling alone. | Reserved words are valid JS/TS property names (`config.default`, `obj.if`), so an IdentifierName spelled like a keyword right after `.`/`?.` is a real property access, not a keyword token — matching on spelling alone treated `config.default` and the actual `default` keyword identically, letting a following real division be misclassified as a regex start. Checked the sibling paren-keyword check for the identical shape *before* fixing anything (given the established pattern of these two checks sharing bugs — round 16 fixed both symmetric branches together too) and found it broken the same way (`obj.if(x)`), not yet externally reported; fixed both together rather than waiting for a predictable next round to report the second one separately. |
 | 2026-09-01 | `_strip_comments` gains a `jsx: bool = False` parameter that excludes `<` from qualifying as "not a value" (so `</` never starts a regex) only when true; `_regex_offender` passes `path.suffix in (".jsx", ".tsx")`, not applied to plain `.js`/`.ts`. | A JSX/TSX closing tag (`</div>`, `</>`) starts with `</`, and `<` is correctly *not* in `_REGEX_PRECEDED_BY_VALUE` for plain JS/TS (`a < /re/` is a real comparison-then-regex idiom there) — so the ambiguity is genuinely file-type-dependent, not a single universal rule to fix. Checked repo exposure before choosing the fix's shape: 36 real `.jsx`/`.tsx` files exist with real closing tags (real exposure to close) and none contain a `<` immediately followed by a real regex literal in any scanned file, `.jsx`/`.tsx` included (no counter-risk from also narrowing `.jsx`/`.tsx`'s own `a < /re/` case, though the fix doesn't even need to rely on that — it only ever changes behavior when `last_sig == "<"` specifically, i.e. `</`, not a bare `<` followed by whitespace then a regex). |
+| 2026-09-01 | `//` line-comment recognition is disabled entirely for JSX-capable files (`jsx == True`), rather than attempting to track "currently inside raw JSX text" vs. "currently inside a JS expression/statement" with a hand-rolled nested-tag/expression state machine. | Correctly distinguishing JSX element text (no comment syntax at all) from JS code requires real nested-structure tracking — opening/closing tag matching, `{...}` expressions switching back to JS mode and back again, and TSX's `<T>`-generic-vs-JSX-element ambiguity — which is genuinely building a second hand-rolled parser, the exact class of approximation that already justified moving Python/YAML onto real parsers in round 10 and that this file's own decision log already named as this path's accepted ceiling ("no dependency-free JS/TS tokenizer available"). Disabling `//` recognition is the direction that matches this test's actual purpose (a boundary *guard*, not a linter): it can only ever make the scanner check *more* content, never less — a real inline comment's text is now also checked against the model-string regex (occasional false positive, a human looks at one line) instead of the alternative failure mode (a real hardcode silently truncated and missed, which is exactly what this test exists to prevent). Block comments and regex-literal recognition are unaffected — neither is implicated by this finding, and narrowing further than what's demonstrated broken would be the same unjustified scope-creep already rejected elsewhere in this file's decision log. |
 
 ## Progress log
 
@@ -1236,6 +1288,7 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | Seventeenth GitHub PR #96 review round (repeat review of commit `9a4d935`) found the round-16 fix held for newlines/line-comments, but block-comment entry didn't call the finalization helper either, so a keyword immediately followed by `/*...*/` and then a regex (`return/*note*//"/`) still lost the keyword. The user explicitly rejected patching this one more branch ("НОРМАЛЬНО ПОПРАВЬ! А НЕ КОСТЫЛЬ!") — the third review round in a row to find a different branch that forgot to call the shared `_note`/finalize helper, evidence the per-branch-opt-in mechanism itself was the weakness, not any one branch. Restructured `_strip_comments` instead of patching further: identifier characters are now handled by exactly one dedicated branch (the only place `word_buf` grows), and every other character passes through one unconditional `_finalize_word()` call before any branch-specific logic runs — no branch can forget to finalize anymore, because it isn't part of any branch's own responsibility. This closes the reported block-comment case, the not-yet-reported line-comment case, and the zero-separator case (`return/"/...`, no space or comment at all) in one change. Caught and fixed a self-introduced regression while restructuring, before calling it done: an intermediate version moved the `\n`-handling branch after the `in_block_comment`/`in_string` checks, which broke multi-line string/comment line-splitting (a newline consumed while inside an active string/comment stopped flushing `lines`, collapsing physical lines and shifting later line numbers) — caught by re-running the existing multi-line template-literal case, fixed by keeping `\n` as the unconditional first check exactly as before. Verified: the exact review case, a block-comment-separated keyword-and-paren, a *multi-line* block comment between a keyword and a regex, and a real identifier followed by a block comment then real division (confirmed to stay division) all resolve correctly; the multi-line line-splitting case re-verified line-by-line; the full prior regression table (router identity + every JS/TS case across every round) replayed with nothing flipped. `pytest tests/architecture` (24 passed), the changed file against the real repository tree, `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) stay green. | Commit. |
 | 2026-09-01 | Eighteenth GitHub PR #96 review round (repeat review of commit `8606fcc`) found the round-17 structural fix held, but both keyword checks (`_JS_REGEX_KEYWORDS`, `_JS_CONTROL_KEYWORDS_BEFORE_PAREN`) match `last_word` against their keyword sets on spelling alone, so a *property* named like a keyword (`config.default`, `obj.if`) is indistinguishable from the real keyword — reserved words are valid JS/TS property names. `config.default / "openai/gpt-4.1".length` misclassified the following `/` as a regex start, and `_regex_literal_end` then used the `/` inside the nearby model literal as a fake terminator, stripping the `openai/` provider prefix off the hardcode entirely. Reproduced first, then checked the sibling paren-keyword check for the identical shape before fixing anything (given round 16's precedent of both checks sharing bugs) and found `obj.if(x)` broken the same way, not yet reported — fixed both together. Added `last_word_is_property`, set from `word_starts_after_dot` (was the character immediately before the word's first character a `.`?, captured at the moment a new word starts accumulating, before `last_sig` itself moves on) and carried into `last_word_is_property` on finalization; both keyword checks now additionally require `not last_word_is_property`. Verified: the exact review case and the analogous paren case both leave the real hardcode/regex content intact (confirmed by inspecting the stripped output directly, not just the offender result); a genuine `default` keyword (a `switch` statement) and a genuine control keyword before a paren are both still correctly recognized; optional-chaining property access (`config?.return`) is also correctly excluded; the full prior regression table (router identity + every JS/TS case across every round) replayed with nothing flipped. `pytest tests/architecture` (24 passed), the changed file against the real repository tree, `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) stay green. | Commit. |
 | 2026-09-01 | Nineteenth GitHub PR #96 review round (repeat review of commit `2cfeec8`) found the round-18 property-name fix held, but one gap remained specific to `.jsx`/`.tsx`: `<` isn't in `_REGEX_PRECEDED_BY_VALUE` (correctly, for `.js`/`.ts`, where `a < /re/` is a real idiom), so a JSX/TSX closing tag's `</` was misclassified as a regex start, and `_regex_literal_end` could then use a later real model literal's own `/` as a fake terminator, stripping the `openai/` prefix off it. Reproduced first, then checked repo exposure before shaping the fix: 36 real `.jsx`/`.tsx` files with real closing tags exist under `SCAN_ROOTS`, and no scanned file (JSX or not) contains a `<` immediately followed by a real regex literal. Fixed by adding a `jsx: bool = False` parameter to `_strip_comments` (`_regex_offender` passes `path.suffix in (".jsx", ".tsx")`) that excludes `<` from qualifying as "not a value" only when true, so `</` never starts a regex in JSX-capable files while the existing `a < /re/`-is-a-regex behavior for plain `.js`/`.ts` (where no closing tag can ever appear) stays exactly as it was — deliberately not broadened past what the file-type-dependent ambiguity actually justifies. Verified: the exact review case and a JSX fragment closing tag (`</>`) both now find the full hardcode; a real regex literal elsewhere in the same JSX file is still correctly recognized; a real `a < /re/` comparison in a non-JSX file is confirmed unaffected; `pytest tests/architecture` (24 passed) exercises all 36 real `.jsx`/`.tsx` files with no new false positives; the full prior regression table (router identity + every JS/TS case across every round) replayed with nothing flipped. `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) stay green. | Commit. |
+| 2026-09-01 | Twentieth GitHub PR #96 review round (repeat review of commit `c81265c`) confirmed the round-19 closing-tag fix works, and found one distinct, qualitatively different gap: the scanner still applies `//` JS-comment rules while scanning raw JSX element *text* (`<div>https://example.com</div>`), which isn't JavaScript and has no comment syntax at all — a same-line real hardcode after a JSX-text URL was silently truncated. Unlike every prior JS/TS scanner finding in this file (all local character/word heuristics), correctly fixing this needs real nested JSX-text/expression tracking — a second hand-rolled parser, the exact ceiling this file's decision log already accepted for the JS/TS path. Rather than build that tracker, disabled `//` line-comment recognition entirely for JSX-capable files (block comments and regex-literal detection unaffected) — the conservative direction for a boundary guard, since it can only ever make the scanner check more content (occasional false positive on a real inline comment), never silently miss a real hardcode. `.js`/`.ts` (which can never contain JSX) are completely unaffected. Verified: the exact review case now finds the hardcode; block comments and the round-19 regex fix both still work in JSX files; a genuine `//` comment in a JSX file is confirmed to scan its content instead of truncating; `.ts` `//` truncation is confirmed unaffected; `pytest tests/architecture` (24 passed) exercises all real `.jsx`/`.tsx` files with no new false positives from any real inline comment; the full prior regression table (router identity + every JS/TS case across every round) replayed with nothing flipped. `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) stay green. | Commit. |
 
 ## Open questions
 

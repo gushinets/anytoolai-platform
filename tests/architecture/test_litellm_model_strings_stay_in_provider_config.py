@@ -384,9 +384,26 @@ def _strip_comments(text: str, markers: tuple[str, ...], jsx: bool = False) -> l
     a regex literal — `_REGEX_PRECEDED_BY_VALUE` doesn't (and, for plain `.js`/`.ts`, correctly
     shouldn't) include `<`, since `a < /re/` is genuinely a comparison-then-regex there. Scoped to
     JSX-capable files only, so the rare `a < /re/` idiom in a `.js`/`.ts` file (where no closing
-    tag can ever appear) keeps resolving as a regex exactly as before. `markers` is only non-empty
-    for JS/TS-family suffixes (`.json` has no comment syntax and returns early above), so none of
-    this fires for `.json`.
+    tag can ever appear) keeps resolving as a regex exactly as before.
+
+    `jsx` also disables `//` line-comment recognition entirely (block comments and regex literals
+    stay recognized). Raw JSX element text (`<div>https://example.com</div>`) is not JavaScript —
+    it has no comment syntax at all — but this scanner has no notion of "currently inside JSX
+    text" vs. "currently inside a JS expression/statement", and correctly tracking that boundary
+    needs real JSX-aware nesting (opening/closing tags, embedded `{...}` expressions switching
+    back to JS, the `<T>`-generic-vs-JSX-element ambiguity TSX itself is famous for) that a
+    character-level heuristic cannot approximate without becoming a second hand-rolled parser —
+    exactly the failure mode that already justified moving Python/YAML onto real parsers in round
+    10, and exactly what this file's own decision log already accepted as this path's ceiling
+    ("no dependency-free JS/TS tokenizer available"). Given that ceiling, disabling `//` for
+    JSX-capable files is the conservative direction: it can only ever *include* more content in
+    scanning (a real inline comment's text, now also checked against the model-string regex),
+    never exclude content that should be checked — a false positive (a human has to look at one
+    extra line) is an acceptable cost for a boundary guard where the alternative, a silently
+    truncated real hardcode, is not.
+
+    `markers` is only non-empty for JS/TS-family suffixes (`.json` has no comment syntax and
+    returns early above), so none of this fires for `.json`.
     """
     if not markers:
         return text.splitlines()
@@ -469,7 +486,9 @@ def _strip_comments(text: str, markers: tuple[str, ...], jsx: bool = False) -> l
             in_block_comment = True
             i += 2
             continue
-        if any(text.startswith(marker, i) for marker in markers):
+        if any(
+            text.startswith(marker, i) for marker in markers if not (jsx and marker == "//")
+        ):
             newline_pos = text.find("\n", i)
             i = length if newline_pos == -1 else newline_pos
             continue
