@@ -61,15 +61,24 @@ def _path_argument(node: ast.Call) -> str | None:
     return _keyword_value(node, "path")
 
 
+ROUTE_TARGET_CONSTRUCTORS = {"APIRouter", "FastAPI"}
+
+
 def _router_variable_names(tree: ast.AST) -> set[str]:
-    """Names bound by `<name> = APIRouter(...)` in this module."""
+    """Names bound by `<name> = APIRouter(...)`/`FastAPI(...)` in this module.
+
+    `main.py` binds `app = FastAPI(...)`, not `APIRouter(...)` — `app.add_api_route(...)`/
+    `@app.api_route(...)` register routes directly on the app and must be tracked the same way
+    `router.get(...)` is, or a hardcoded product path registered straight on `app` bypasses this
+    guard entirely.
+    """
     names: set[str] = set()
     for node in ast.walk(tree):
         if (
             isinstance(node, ast.Assign)
             and isinstance(node.value, ast.Call)
             and isinstance(node.value.func, ast.Name)
-            and node.value.func.id == "APIRouter"
+            and node.value.func.id in ROUTE_TARGET_CONSTRUCTORS
         ):
             names.update(target.id for target in node.targets if isinstance(target, ast.Name))
     return names

@@ -7,8 +7,8 @@
 - Created: 2026-08-31
 - Last updated: 2026-08-31
 - Review date: 2026-08-31
-- Next action: none — implementation, three internal code-review rounds, and one GitHub PR review
-  round of fixes landed; move to `completed/` once merged.
+- Next action: none — implementation, three internal code-review rounds, and two GitHub PR review
+  rounds of fixes landed; move to `completed/` once merged.
 - Blocker: none
 
 ## Goal
@@ -179,6 +179,27 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
     and `deepseek/deepseek-chat` are now caught; a full re-scan of the real `SCAN_ROOTS` tree with
     all 141 names finds zero false positives (checked names most likely to collide with real repo
     strings — `custom`, `github`, `pg_vector`, `milvus`, `sap`, `v0` — explicitly).
+- [x] Repeat GitHub PR review round (2026-08-31, PR #96 "Code-ewview (me #2)", reviewing commit
+      `0a3d7cb`) found 2 more gaps in the round-4/5 fixes themselves, both fixed:
+  - The `api_route`/`add_api_route` fix from the previous round only widened
+    `ROUTE_REGISTRATION_METHODS`; it didn't touch `_router_variable_names`, which still tracked only
+    `<name> = APIRouter(...)` bindings. `main.py` binds `app = FastAPI(...)`, not `APIRouter(...)`,
+    so `app.add_api_route("/proposal_ai/status", handler)` and
+    `@app.api_route("/proposal_ai/status", methods=["GET"])` — a direct way to register a
+    product-specific endpoint straight on the app — still bypassed the guard entirely. Fixed:
+    `_router_variable_names` (renamed intent unchanged, still tracks the "route target" variable
+    set) now also recognizes `<name> = FastAPI(...)` bindings via a shared
+    `ROUTE_TARGET_CONSTRUCTORS = {"APIRouter", "FastAPI"}`. Verified both direct-`app` bypass cases
+    (decorator and `add_api_route` call) are now caught.
+  - `_strip_comment` found the first `#`/`//` anywhere on the line, including inside a quoted
+    string — now that `.json` is scanned, a line like `{"callback": "https://example.com", "model":
+    "openai/gpt-4.1"}` got truncated at the `//` in the URL, silently hiding the real `model` field
+    that comes after it. The same shape breaks in Python/TS whenever a URL string precedes a
+    hardcoded model literal on one line. Fixed: rewrote `_strip_comment` to track quote state
+    (single/double, with backslash-escape handling) and only treat `#`/`//` as a comment start when
+    not inside a string. Verified against the exact JSON-with-URL case from the review (now caught),
+    plus every prior true/false-positive case (comment-only lines, `DEFAULT_MODEL = "..." #
+    trailing comment`, a `#` inside a quoted string that isn't a comment).
 
 ## Validation
 
@@ -231,6 +252,17 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
       re-run after completing the PR review round — both green.
 - [x] `python3 scripts/agent/runner.py quick-check` re-run after completing the PR review round —
       981 passed.
+- [x] Manual check: `@app.api_route("/proposal_ai/status", methods=["GET"])` and
+      `app.add_api_route("/proposal_ai/status2", handler)` on a `FastAPI()`-bound `app` (matching
+      `main.py`'s real binding shape) are both caught after the `_router_variable_names`/
+      `ROUTE_TARGET_CONSTRUCTORS` fix.
+- [x] Manual check: `{"callback": "https://example.com", "model": "openai/gpt-4.1"}` is now caught
+      (previously the naive `//`-anywhere comment stripper truncated the line at the URL, hiding the
+      `model` field); re-verified every prior `_strip_comment` true/false-positive case still behaves
+      correctly (comment-only lines, trailing `# comment` after a real assignment, a `#` that's
+      inside a quoted string and isn't a comment).
+- [x] `python3 -m pytest tests/architecture -q`, `validate_architecture.py`, and `quick-check`
+      re-run after this round — 24 passed / passed / 981 passed.
 
 ## Decision log
 
@@ -240,6 +272,7 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | LiteLLM-model-string test scans production source only (`apps/`, `packages/`, `extensions/`, `configs/`, excluding `tests/`), not test fixtures. | Tests legitimately assert against the real config values (e.g. `test_litellm_adapter.py` asserting `response.model == "openai/gpt-4.1-mini"`); flagging those would be a false positive, not a real boundary violation. |
 | 2026-08-31 | `demo.py`'s hardcoded `product_id="kernel_demo"` stays an explicit, documented exception rather than being folded into the forbidden-term check. | `kernel_demo` is the platform's own MVP-A1/A2 smoke product, not a Freelancer product — flagging it would break a legitimate, already-shipped router for no boundary benefit. |
 | 2026-08-31 | `LITELLM_PROVIDERS` is a hardcoded snapshot of `litellm`'s `provider_list`, not a runtime import of `litellm` itself. | `import litellm` anywhere outside the Provider Gateway/adapter layer violates this repo's own boundary (`docs/architecture/llm-runtime.md`); even the dedicated adapter test (`test_litellm_adapter.py`) imports only this repo's `providers.adapters.litellm` module, never raw `litellm` — no precedent for a raw import in tests either. A fully generic `<word>/<word>` pattern was rejected instead of a provider list at all: it matched this repo's own legitimate config-root strings (e.g. `"products/proposal_ai"` in `FreelancerSuiteBundle.config_roots()`). |
+| 2026-08-31 | `test_no_product_specific_endpoints.py` tracks both `APIRouter(...)`- and `FastAPI(...)`-bound variable names as valid route-registration receivers, not just `APIRouter`. | `main.py`'s real binding is `app = FastAPI(...)`; routes can be (and, per the PR review, are a realistic path to be) registered directly on `app` via `add_api_route`/`api_route`, not only via a `router` object — the guard has to cover both binding shapes to actually enforce the boundary it claims to. |
 
 ## Progress log
 
@@ -251,6 +284,7 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | Code review round 3 found 3 more gaps: route-registration detector matched any object's `.get()`/etc. (false-positive on `request.query_params.get("view", "task-finder-debug")`), the model-string regex missed `ALL_CAPS`/typed-assignment forms, and the add-product recipe didn't say to extend the forbidden-term list for a new product (plus `ALLOWED_FILES` being dead code since `configs/` wasn't scanned). Fixed all: router-receiver check via `_router_variable_names`, widened regex, recipe/handoff-note note added, `configs/` added to `SCAN_ROOTS`, and replaced the hand-maintained `SKIP_PATH_PARTS` copy with a direct import from the neighbor test (removes the drift risk structurally instead of re-syncing by hand a third time). `pytest tests/architecture` (24 passed) and `quick-check` (981 passed) green. | Await/act on next code review. |
 | 2026-08-31 | GitHub PR #96 review round found 6 gaps: 2 stale-doc-text items in this file (gap counts, scan-root descriptions) plus `mvp-a-mvp-b-linear-epics.md`'s stale "Last updated", and 2 substantive test-logic gaps — `LITELLM_MODEL_STRING_RE` still keyed off a `model`-named identifier (missed `DEFAULT_LLM`/`deployment`-named hardcodes) and the endpoint test's route-literal collection grabbed every string arg, not just the path (false-positive risk from `summary=`/`description=` prose). Fixed all six: corrected the doc staleness, rewrote the model-string detector to key off literal position (preceded by quote/`=`/`:`/`,`/bracket/start-of-line) plus a comment stripper instead of the key name, and restricted route-literal collection to `_path_argument` (first positional arg or `path=` keyword). `pytest tests/architecture` (24 passed) and `quick-check` (981 passed) green. | Address the remaining 3 findings in the same PR-review comment block. |
 | 2026-08-31 | Completed the same GitHub PR #96 review block's remaining 3 findings: `ROUTE_REGISTRATION_METHODS` missed `api_route`/`add_api_route` (and the remaining HTTP verbs) so those FastAPI registration styles bypassed the endpoint guard entirely; `SCAN_EXTS` omitted `.json` despite the regex already handling JSON syntax; the provider segment was a 9-name hand-written allowlist that missed any provider not on it (e.g. `xai`, `deepseek`). Fixed all three: expanded `ROUTE_REGISTRATION_METHODS`, added `.json` to `SCAN_EXTS`, and replaced the 9-name list with a 141-name static snapshot of `litellm`'s real `provider_list` (a fully generic pattern was tried first and rejected — it matched this repo's own `"products/proposal_ai"`-style config-root strings). `pytest tests/architecture` (24 passed), `validate-architecture`, and `quick-check` (981 passed) green. | Commit. |
+| 2026-08-31 | Second GitHub PR #96 review round ("Code-ewview (me #2)", reviewing commit `0a3d7cb`) found the two prior fixes were each only partial: the `api_route`/`add_api_route` fix widened the method set but never taught `_router_variable_names` to recognize `app = FastAPI(...)` (only `APIRouter(...)`), so `app.add_api_route(...)`/`@app.api_route(...)` — the exact shape `main.py` actually uses — still bypassed the guard; and `_strip_comment` found `#`/`//` anywhere on the line including inside quoted strings, so a `.json` line with a URL before the `model` field (`{"callback": "https://...", "model": "openai/..."}`) got truncated before the real hardcode was ever inspected. Fixed both: `_router_variable_names` now also matches `FastAPI(...)` bindings via `ROUTE_TARGET_CONSTRUCTORS`, and `_strip_comment` is now quote-state-aware instead of a naive first-occurrence search. Verified both exact bypass cases from the review are now caught, all prior comment-stripping cases still behave correctly, and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Commit. |
 
 ## Open questions
 

@@ -75,13 +75,34 @@ def _scan_files() -> list[Path]:
 
 
 def _strip_comment(line: str) -> str:
-    """Drop a trailing `#`/`//` comment so a URL/reference in one doesn't false-positive."""
-    end = len(line)
-    for marker in ("#", "//"):
-        pos = line.find(marker)
-        if pos != -1:
-            end = min(end, pos)
-    return line[:end]
+    """Drop a trailing `#`/`//` comment, but never one found inside a quoted string.
+
+    A naive `line.find("#"/"//")` truncates at the first occurrence anywhere on the line,
+    including inside a string — e.g. `{"callback": "https://example.com", "model": "openai/..."}`
+    would be cut at the `//` in the URL, hiding the real `model` field that follows it. Track
+    quote state instead so only a genuine, unquoted comment marker ends the line.
+    """
+    in_string: str | None = None
+    i = 0
+    length = len(line)
+    while i < length:
+        char = line[i]
+        if in_string:
+            if char == "\\":
+                i += 2
+                continue
+            if char == in_string:
+                in_string = None
+            i += 1
+            continue
+        if char in ("'", '"'):
+            in_string = char
+            i += 1
+            continue
+        if char == "#" or (char == "/" and i + 1 < length and line[i + 1] == "/"):
+            return line[:i]
+        i += 1
+    return line
 
 
 def test_litellm_model_strings_only_in_provider_config() -> None:
