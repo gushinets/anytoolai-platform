@@ -13,8 +13,10 @@ Canonical source: configs/kernel via ConfigLoader.
 
 ## Provider policies
 
-- default_fake_provider_v1
-- default_text_generation_v1
+| provider_policy_ref | provider | model | temperature | timeout_seconds | retry_policy | fallback_policy | structured_output_mode | schema_version |
+|---|---|---|---|---|---|---|---|---|
+| default_fake_provider_v1 | fake | fake-json-v1 | 0.0 | 30 | hard_limits.max_physical_provider_calls_per_action=1, transport.litellm_num_retries_per_attempt=0, transport.max_attempts=1, transport.owner=fake_adapter, validation.max_attempts=1, validation.owner=pydanticai | none | json_schema | 1 |
+| default_text_generation_v1 | litellm | anytoolai.default_text | 1.0 | 60 | hard_limits.max_physical_provider_calls_per_action=4, transport.litellm_num_retries_per_attempt=0, transport.max_attempts=2, transport.owner=litellm, validation.max_attempts=2, validation.owner=pydanticai | none | json_schema | 1 |
 
 ## Action definitions
 
@@ -32,28 +34,30 @@ Canonical source: configs/kernel via ConfigLoader.
 
 ## Action configurations
 
-- kernel_demo.compare_and_classify_live_v1
-- kernel_demo.compare_and_classify_v1
-- kernel_demo.compose_persuasive_text_live_v1
-- kernel_demo.compose_persuasive_text_v1
-- kernel_demo.compose_reply_live_v1
-- kernel_demo.compose_reply_v1
-- kernel_demo.detect_issues_live_v1
-- kernel_demo.detect_issues_v1
-- kernel_demo.extract_structured_fields_live_v1
-- kernel_demo.extract_structured_fields_v1
-- kernel_demo.generate_clarifying_questions_live_v1
-- kernel_demo.generate_clarifying_questions_v1
-- kernel_demo.generate_gap_rewrites_live_v1
-- kernel_demo.generate_gap_rewrites_v1
-- kernel_demo.generate_report_live_v1
-- kernel_demo.generate_report_v1
-- kernel_demo.score_match_by_rubric_live_v1
-- kernel_demo.score_match_by_rubric_v1
-- kernel_demo.score_multidimensional_axes_live_v1
-- kernel_demo.score_multidimensional_axes_v1
-- kernel_demo.synthesize_angle_live_v1
-- kernel_demo.synthesize_angle_v1
+| action_config_id | action_type | prompt_ref | provider_policy_ref | schema_version |
+|---|---|---|---|---|
+| kernel_demo.compare_and_classify_live_v1 | text.compare_and_classify | kernel_demo.compare_and_classify.v1 | default_text_generation_v1 | 1 |
+| kernel_demo.compare_and_classify_v1 | text.compare_and_classify | kernel_demo.compare_and_classify.v1 | default_fake_provider_v1 | 1 |
+| kernel_demo.compose_persuasive_text_live_v1 | text.compose_persuasive_text | kernel_demo.compose_persuasive_text.v1 | default_text_generation_v1 | 1 |
+| kernel_demo.compose_persuasive_text_v1 | text.compose_persuasive_text | kernel_demo.compose_persuasive_text.v1 | default_fake_provider_v1 | 1 |
+| kernel_demo.compose_reply_live_v1 | text.compose_reply | kernel_demo.compose_reply.v1 | default_text_generation_v1 | 1 |
+| kernel_demo.compose_reply_v1 | text.compose_reply | kernel_demo.compose_reply.v1 | default_fake_provider_v1 | 1 |
+| kernel_demo.detect_issues_live_v1 | text.detect_issues_by_taxonomy | kernel_demo.detect_issues.v1 | default_text_generation_v1 | 1 |
+| kernel_demo.detect_issues_v1 | text.detect_issues_by_taxonomy | kernel_demo.detect_issues.v1 | default_fake_provider_v1 | 1 |
+| kernel_demo.extract_structured_fields_live_v1 | text.extract_structured_fields | kernel_demo.extract_structured_fields.v1 | default_text_generation_v1 | 1 |
+| kernel_demo.extract_structured_fields_v1 | text.extract_structured_fields | kernel_demo.extract_structured_fields.v1 | default_fake_provider_v1 | 1 |
+| kernel_demo.generate_clarifying_questions_live_v1 | text.generate_clarifying_questions | kernel_demo.generate_clarifying_questions.v1 | default_text_generation_v1 | 1 |
+| kernel_demo.generate_clarifying_questions_v1 | text.generate_clarifying_questions | kernel_demo.generate_clarifying_questions.v1 | default_fake_provider_v1 | 1 |
+| kernel_demo.generate_gap_rewrites_live_v1 | text.generate_gap_rewrites | kernel_demo.generate_gap_rewrites.v1 | default_text_generation_v1 | 1 |
+| kernel_demo.generate_gap_rewrites_v1 | text.generate_gap_rewrites | kernel_demo.generate_gap_rewrites.v1 | default_fake_provider_v1 | 1 |
+| kernel_demo.generate_report_live_v1 | document.generate_from_template | kernel_demo.generate_report.v1 | default_text_generation_v1 | 1 |
+| kernel_demo.generate_report_v1 | document.generate_from_template | kernel_demo.generate_report.v1 | default_fake_provider_v1 | 1 |
+| kernel_demo.score_match_by_rubric_live_v1 | text.score_match_by_rubric | kernel_demo.score_match_by_rubric.v1 | default_text_generation_v1 | 1 |
+| kernel_demo.score_match_by_rubric_v1 | text.score_match_by_rubric | kernel_demo.score_match_by_rubric.v1 | default_fake_provider_v1 | 1 |
+| kernel_demo.score_multidimensional_axes_live_v1 | text.score_multidimensional_axes | kernel_demo.score_multidimensional_axes.v1 | default_text_generation_v1 | 1 |
+| kernel_demo.score_multidimensional_axes_v1 | text.score_multidimensional_axes | kernel_demo.score_multidimensional_axes.v1 | default_fake_provider_v1 | 1 |
+| kernel_demo.synthesize_angle_live_v1 | text.synthesize_angle | kernel_demo.synthesize_angle.v1 | default_text_generation_v1 | 1 |
+| kernel_demo.synthesize_angle_v1 | text.synthesize_angle | kernel_demo.synthesize_angle.v1 | default_fake_provider_v1 | 1 |
 
 ## Workflows
 

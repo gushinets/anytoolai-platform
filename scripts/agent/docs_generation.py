@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from collections.abc import Mapping
+from dataclasses import asdict, fields, is_dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 ROOT = Path(__file__).resolve().parents[2]
 PLATFORM_CORE_SRC = ROOT / "packages" / "backend" / "platform-core" / "src"
@@ -11,6 +13,10 @@ PLATFORM_API_SRC = ROOT / "apps" / "platform-api" / "src"
 for source_root in (PLATFORM_CORE_SRC, PLATFORM_API_SRC):
     if str(source_root) not in sys.path:
         sys.path.insert(0, str(source_root))
+
+if TYPE_CHECKING:
+    from anytoolai_platform_core.actions.models import ActionConfiguration
+    from anytoolai_platform_core.providers.models import ProviderPolicy
 
 GENERATED_SOURCES = {
     "action-registry.md": "configs/kernel/action_definitions/*.yaml",
@@ -50,25 +56,84 @@ def render_action_registry() -> str:
     return "\n".join(lines) + "\n"
 
 
+def _escape_table_cell(value: Any) -> str:
+    return str(value).replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ")
+
+
+def _flatten_dataclass(value: Any, prefix: str = "") -> list[str]:
+    if isinstance(value, dict):
+        parts: list[str] = []
+        for key, nested in sorted(value.items()):
+            parts.extend(_flatten_dataclass(nested, f"{prefix}.{key}" if prefix else key))
+        return parts
+    return [f"{prefix}={value}"]
+
+
+def _format_field_value(value: Any) -> str:
+    if is_dataclass(value):
+        return ", ".join(_flatten_dataclass(asdict(value)))
+    if value is None:
+        return "none"
+    return str(value)
+
+
+def _render_dataclass_table(
+    title: str, items: Mapping[str, Any], model: type, *, skip: frozenset[str] = frozenset()
+) -> list[str]:
+    field_names = [f.name for f in fields(model) if f.name not in skip]
+    lines = [
+        f"## {title}",
+        "",
+        "| " + " | ".join(field_names) + " |",
+        "|" + "---|" * len(field_names),
+    ]
+    for _ref, item in sorted(items.items()):
+        cells = (_format_field_value(getattr(item, name)) for name in field_names)
+        lines.append("| " + " | ".join(_escape_table_cell(cell) for cell in cells) + " |")
+    lines.append("")
+    return lines
+
+
+def _render_provider_policies(provider_policies: Mapping[str, ProviderPolicy]) -> list[str]:
+    from anytoolai_platform_core.providers.models import ProviderPolicy as _ProviderPolicy
+
+    return _render_dataclass_table(
+        "Provider policies", provider_policies, _ProviderPolicy, skip=frozenset({"metadata"})
+    )
+
+
+def _render_action_configurations(
+    action_configurations: Mapping[str, ActionConfiguration],
+) -> list[str]:
+    from anytoolai_platform_core.actions.models import ActionConfiguration as _ActionConfiguration
+
+    return _render_dataclass_table(
+        "Action configurations",
+        action_configurations,
+        _ActionConfiguration,
+        skip=frozenset({"metadata"}),
+    )
+
+
+def _render_key_list_section(title: str, values: Mapping[str, Any]) -> list[str]:
+    return [f"## {title}", "", *[f"- {key}" for key in sorted(values)], ""]
+
+
 def render_config_registry() -> str:
     registry = _registry()
-    sections = (
-        ("Tenants", registry.tenants),
-        ("Regions", registry.regions),
-        ("Provider policies", registry.provider_policies),
-        ("Action definitions", registry.action_definitions),
-        ("Action configurations", registry.action_configurations),
-        ("Workflows", registry.workflows),
-        ("Scenarios", registry.scenarios),
-        ("Products", registry.products),
-        ("Prompts", registry.prompts),
-        ("Schemas", registry.schemas),
-        ("Quotas", registry.quotas),
-        ("Handoffs", registry.handoffs),
-    )
     lines = _header("Config Registry", GENERATED_SOURCES["config-registry.md"])
-    for title, values in sections:
-        lines.extend([f"## {title}", "", *[f"- {key}" for key in sorted(values)], ""])
+    lines.extend(_render_key_list_section("Tenants", registry.tenants))
+    lines.extend(_render_key_list_section("Regions", registry.regions))
+    lines.extend(_render_provider_policies(registry.provider_policies))
+    lines.extend(_render_key_list_section("Action definitions", registry.action_definitions))
+    lines.extend(_render_action_configurations(registry.action_configurations))
+    lines.extend(_render_key_list_section("Workflows", registry.workflows))
+    lines.extend(_render_key_list_section("Scenarios", registry.scenarios))
+    lines.extend(_render_key_list_section("Products", registry.products))
+    lines.extend(_render_key_list_section("Prompts", registry.prompts))
+    lines.extend(_render_key_list_section("Schemas", registry.schemas))
+    lines.extend(_render_key_list_section("Quotas", registry.quotas))
+    lines.extend(_render_key_list_section("Handoffs", registry.handoffs))
     return "\n".join(lines)
 
 
