@@ -131,7 +131,7 @@ def _is_route_target_call(value: ast.expr | None, aliases: dict[str, str]) -> bo
     return False
 
 
-def _router_variable_names(tree: ast.AST) -> set[str]:
+def _router_variable_names(tree: ast.AST, aliases: dict[str, str]) -> set[str]:
     """Names bound by `<name> = APIRouter(...)`/`FastAPI(...)` in this module, including
     annotated assignments (`app: FastAPI = FastAPI()`, `router: APIRouter = APIRouter()`) and
     import-aliased constructors (`from fastapi import FastAPI as F; app = F()`).
@@ -142,7 +142,6 @@ def _router_variable_names(tree: ast.AST) -> set[str]:
     guard entirely. A type-annotated binding is an `ast.AnnAssign`, not `ast.Assign` — ordinary,
     valid Python that must be recognized the same way.
     """
-    aliases = _route_target_import_aliases(tree)
     names: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign) and _is_route_target_call(node.value, aliases):
@@ -158,7 +157,8 @@ def _router_variable_names(tree: ast.AST) -> set[str]:
 
 def _route_path_literals(path: Path) -> list[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"))
-    router_names = _router_variable_names(tree)
+    aliases = _route_target_import_aliases(tree)
+    router_names = _router_variable_names(tree, aliases)
     constants = _module_string_constants(tree)
     literals: list[str] = []
     for node in ast.walk(tree):
@@ -173,6 +173,10 @@ def _route_path_literals(path: Path) -> list[str]:
             called_on_router = isinstance(func.value, ast.Name) and func.value.id in router_names
         else:
             func_name = getattr(func, "id", None)
+            # Resolve an import alias (`APIRouter as R` -> `R(...)`) back to the real
+            # constructor name so its `prefix=` keyword is inspected the same way a bare
+            # `APIRouter(prefix=...)`/`include_router(prefix=...)` call is.
+            func_name = aliases.get(func_name, func_name)
             called_on_router = False
 
         if func_name in ROUTE_REGISTRATION_METHODS and called_on_router:

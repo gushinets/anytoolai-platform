@@ -151,47 +151,62 @@ def _is_url_query_value(line: str, spans: list[tuple[int, int]], position: int) 
     return False
 
 
-def _strip_comment(line: str, markers: tuple[str, ...]) -> str:
-    """Drop a trailing comment (only using `markers`, which are extension-specific — see
-    `_COMMENT_MARKERS_BY_SUFFIX`), but never one found inside a quoted string.
+def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
+    """Comment-stripped lines of `text` (only using `markers` — see `_COMMENT_MARKERS_BY_SUFFIX`),
+    with quote state carried across line boundaries rather than reset at each newline.
 
-    A naive `line.find(marker)` truncates at the first occurrence anywhere on the line, including
-    inside a string — e.g. `{"callback": "https://example.com", "model": "openai/..."}` would be
-    cut at the `//` in the URL, hiding the real `model` field that follows it. Track quote state
-    instead so only a genuine, unquoted comment marker ends the line. Backticks are tracked as a
-    quote delimiter too, or a JS/TS template literal containing `//` (e.g. a URL) is misread as
-    leaving the string.
+    A naive per-line scan truncates at the first marker occurrence anywhere on that line,
+    including inside a string spanning multiple lines — e.g. a Python triple-quoted string whose
+    body contains a bare `#` (or a JS/TS template literal containing `//`): resetting
+    `in_string = None` at the start of the *next* physical line misreads that marker as a real
+    comment and truncates a real hardcode that follows the string's close later on the same
+    (closing) line. Backticks are tracked as a quote delimiter too, alongside `'`/`"`.
     """
     if not markers:
-        return line
+        return text.splitlines()
+
+    lines: list[str] = []
+    current: list[str] = []
     in_string: str | None = None
     i = 0
-    length = len(line)
+    length = len(text)
     while i < length:
-        char = line[i]
+        char = text[i]
+        if char == "\n":
+            lines.append("".join(current))
+            current = []
+            i += 1
+            continue
         if in_string:
-            if char == "\\":
+            if char == "\\" and i + 1 < length and text[i + 1] != "\n":
+                current.append(char)
+                current.append(text[i + 1])
                 i += 2
                 continue
+            current.append(char)
             if char == in_string:
                 in_string = None
             i += 1
             continue
         if char in _QUOTE_CHARS:
             in_string = char
+            current.append(char)
             i += 1
             continue
-        if any(line.startswith(marker, i) for marker in markers):
-            return line[:i]
+        if any(text.startswith(marker, i) for marker in markers):
+            newline_pos = text.find("\n", i)
+            i = length if newline_pos == -1 else newline_pos
+            continue
+        current.append(char)
         i += 1
-    return line
+    lines.append("".join(current))
+    return lines
 
 
-def _first_real_offender(line: str, markers: tuple[str, ...]) -> str | None:
-    stripped = _strip_comment(line, markers)
-    spans = _quoted_string_spans(stripped)
-    for match in LITELLM_MODEL_STRING_RE.finditer(stripped):
-        if not _is_url_query_value(stripped, spans, match.start()):
+def _first_real_offender(stripped_line: str) -> str | None:
+    spans = _quoted_string_spans(stripped_line)
+    for match in LITELLM_MODEL_STRING_RE.finditer(stripped_line):
+        if not _is_url_query_value(stripped_line, spans, match.start()):
             return match.group(0)
     return None
 
@@ -201,8 +216,8 @@ def test_litellm_model_strings_only_in_provider_config() -> None:
     for path in _scan_files():
         markers = _COMMENT_MARKERS_BY_SUFFIX[path.suffix]
         text = path.read_text(encoding="utf-8", errors="ignore")
-        for lineno, line in enumerate(text.splitlines(), start=1):
-            offender = _first_real_offender(line, markers)
+        for lineno, stripped_line in enumerate(_strip_comments(text, markers), start=1):
+            offender = _first_real_offender(stripped_line)
             if offender is not None:
                 offenders.append(f"{path.relative_to(ROOT)}:{lineno}: {offender!r}")
                 break
