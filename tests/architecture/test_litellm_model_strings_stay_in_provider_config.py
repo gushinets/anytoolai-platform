@@ -295,6 +295,14 @@ def _last_word(chars: list[str]) -> str:
     return "".join(reversed(word))
 
 
+# `)` is normally a value-ending character (a function call's result), so `_REGEX_PRECEDED_BY_VALUE`
+# treats a following `/` as division. But `if (cond) /re/` — a control-flow *condition*'s closing
+# paren — is a statement boundary, not a value: what follows isn't "the result of `(cond)`", it's
+# a brand new statement. Distinguishing the two needs the word immediately before the *matching*
+# `(`, not just the last character before `/`.
+_JS_CONTROL_KEYWORDS_BEFORE_PAREN = frozenset({"if", "while", "for", "switch", "catch", "with"})
+
+
 def _regex_literal_end(text: str, start: int, length: int) -> int | None:
     """If `text[start]` (`/`) starts a JS/TS regex literal, the index just past its closing,
     unescaped `/` outside a `[...]` character class — else `None` (no terminator before the next
@@ -357,8 +365,12 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
     quote char (`/"/`): it must be recognized and skipped as its own unit, using the standard
     JS/TS division-vs-regex heuristic (`_REGEX_PRECEDED_BY_VALUE` — a `/` is a regex-literal start
     unless the last significant character before it was part of a value: an identifier/number, a
-    closing `)`/`]`, or a closing quote). `markers` is only non-empty for JS/TS-family suffixes
-    (`.json` has no comment syntax and returns early above), so none of this fires for `.json`.
+    closing `)`/`]`, or a closing quote) — except a control-flow condition's closing paren
+    (`if (cond) /re/`), which is a statement boundary, not a value; `paren_stack` tracks, for each
+    open `(`, whether the word immediately before it was a control keyword, so its matching `)`
+    can override `last_sig` back to a non-value when popped. `markers` is only non-empty for
+    JS/TS-family suffixes (`.json` has no comment syntax and returns early above), so none of this
+    fires for `.json`.
     """
     if not markers:
         return text.splitlines()
@@ -368,6 +380,7 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
     in_string: str | None = None
     in_block_comment = False
     last_sig = ""
+    paren_stack: list[bool] = []
     i = 0
     length = len(text)
     while i < length:
@@ -410,6 +423,20 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
         if any(text.startswith(marker, i) for marker in markers):
             newline_pos = text.find("\n", i)
             i = length if newline_pos == -1 else newline_pos
+            continue
+        if char == "(":
+            paren_stack.append(_last_word(current) in _JS_CONTROL_KEYWORDS_BEFORE_PAREN)
+            current.append(char)
+            last_sig = char
+            i += 1
+            continue
+        if char == ")":
+            is_condition_paren = paren_stack.pop() if paren_stack else False
+            current.append(char)
+            # A condition paren's close is a statement boundary (not a value) — clear last_sig so
+            # a following `/` reads as a regex start, not division.
+            last_sig = "" if is_condition_paren else char
+            i += 1
             continue
         if char == "/":
             looks_like_regex = last_sig not in _REGEX_PRECEDED_BY_VALUE

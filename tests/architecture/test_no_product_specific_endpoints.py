@@ -291,15 +291,19 @@ def _module_import_aliases(
 ) -> dict[str, str]:
     """Maps a local name bound to *a module itself* (not a name defined inside one) to that
     module's dotted name: `import <dotted> as <alias>` (`import anytoolai_platform_api.shared as
-    shared` -> `{"shared": "anytoolai_platform_api.shared"}`), and `from . import name` / `from
-    .. import name` when a submodule file actually named `name` exists in the importing package
-    (checked against `module_paths`, since `from package import name` is otherwise statically
-    ambiguous between "the submodule `package.name`" and "a name defined in `package/__init__.py`"
-    — Python itself only resolves this by trying the attribute first, then the submodule import,
-    at runtime; a real submodule *file* existing is the only static signal available for the
-    submodule case). A `from . import name` whose `name` has no matching submodule file is left to
-    the existing `ast.ImportFrom`-based name-edge handling in `_package_router_names`, which
-    already covers "a name bound inside `__init__.py`" correctly.
+    shared` -> `{"shared": "anytoolai_platform_api.shared"}`), and `from <container> import name`
+    — bare-relative (`from . import name`), qualified-relative (`from .routers import name`), or
+    absolute (`from anytoolai_platform_api.routers import demo`) — whenever a submodule file
+    actually named `name` exists inside `<container>` (checked against `module_paths`, for every
+    `ast.ImportFrom`, regardless of whether it's relative or absolute: the statement is otherwise
+    statically ambiguous between "the submodule `<container>.name`" and "a name defined in
+    `<container>/__init__.py`" — Python itself only resolves this by trying the attribute first,
+    then the submodule import, at runtime; a real submodule *file* existing is the only static
+    signal available for the submodule case). A `from <container> import name` whose `name` has
+    no matching submodule file (the overwhelmingly common case — e.g. `from
+    anytoolai_platform_api.routers.demo import router as demo_router`, where `router` is a name
+    *inside* `demo.py`, not a submodule of it) is left to the existing `ast.ImportFrom`-based
+    name-edge handling in `_package_router_names`, which already covers that correctly.
 
     Deliberately out of scope: bare `import <dotted>` without `as` (Python binds only the
     top-level package name, e.g. `pkg`, not the leaf module — resolving `pkg.sub.mod.router` from
@@ -311,7 +315,7 @@ def _module_import_aliases(
             for alias in node.names:
                 if alias.asname:
                     aliases[alias.asname] = alias.name
-        elif isinstance(node, ast.ImportFrom) and node.module is None and node.level > 0:
+        elif isinstance(node, ast.ImportFrom):
             container_dotted = _resolve_import_module(importing_path, node)
             if container_dotted is None:
                 continue
