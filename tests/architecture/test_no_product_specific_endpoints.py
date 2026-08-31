@@ -155,6 +155,23 @@ def _router_variable_names(tree: ast.AST, aliases: dict[str, str]) -> set[str]:
     return names
 
 
+def _is_router_expr(expr: ast.expr, router_names: set[str]) -> bool:
+    """Whether `expr` evaluates to a router/app object: a tracked name, or a `.router` access on
+    one — recursively, so `app.router.router` (never happens in practice, but costs nothing to
+    allow) is covered the same way `app.router` is.
+
+    `FastAPI.router` is a real, commonly-used public attribute (it IS the app's root
+    `APIRouter`); `app.router.add_api_route(...)` is valid FastAPI usage that registers a route
+    exactly like `app.add_api_route(...)` does, so it must resolve to the same receiver check
+    instead of requiring the receiver to be a bare `ast.Name`.
+    """
+    if isinstance(expr, ast.Name):
+        return expr.id in router_names
+    if isinstance(expr, ast.Attribute) and expr.attr == "router":
+        return _is_router_expr(expr.value, router_names)
+    return False
+
+
 def _route_path_literals(path: Path) -> list[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"))
     aliases = _route_target_import_aliases(tree)
@@ -167,10 +184,10 @@ def _route_path_literals(path: Path) -> list[str]:
         func = node.func
         if isinstance(func, ast.Attribute):
             func_name = func.attr
-            # `router.get(...)` is a route registration only when `router` is a local
-            # APIRouter — otherwise it also matches unrelated `.get(...)` calls, e.g.
-            # `request.query_params.get("view", "task-finder-debug")`.
-            called_on_router = isinstance(func.value, ast.Name) and func.value.id in router_names
+            # `router.get(...)` is a route registration only when `router` resolves to a local
+            # APIRouter/app (including via `.router` on one) — otherwise it also matches
+            # unrelated `.get(...)` calls, e.g. `request.query_params.get("view", "x")`.
+            called_on_router = _is_router_expr(func.value, router_names)
         else:
             func_name = getattr(func, "id", None)
             # Resolve an import alias (`APIRouter as R` -> `R(...)`) back to the real

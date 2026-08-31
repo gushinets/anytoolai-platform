@@ -151,6 +151,12 @@ def _is_url_query_value(line: str, spans: list[tuple[int, int]], position: int) 
     return False
 
 
+_TRIPLE_QUOTES = ('"""', "'''")  # Python triple-quoted strings — a 3-char delimiter, not three
+# single-char ones: `_QUOTE_CHARS`-only tracking closes after the *first* of the three quote
+# chars, then reopens on the second and misreads the third as content, corrupting all quote
+# state for the rest of the string.
+
+
 def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
     """Comment-stripped lines of `text` (only using `markers` — see `_COMMENT_MARKERS_BY_SUFFIX`),
     with quote state carried across line boundaries rather than reset at each newline.
@@ -160,14 +166,16 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
     body contains a bare `#` (or a JS/TS template literal containing `//`): resetting
     `in_string = None` at the start of the *next* physical line misreads that marker as a real
     comment and truncates a real hardcode that follows the string's close later on the same
-    (closing) line. Backticks are tracked as a quote delimiter too, alongside `'`/`"`.
+    (closing) line. Backticks are tracked as a quote delimiter too, alongside single/double
+    quotes. Python triple-quoted strings are tracked as their own 3-char delimiter — see
+    `_TRIPLE_QUOTES`.
     """
     if not markers:
         return text.splitlines()
 
     lines: list[str] = []
     current: list[str] = []
-    in_string: str | None = None
+    in_string: str | None = None  # the exact open delimiter: 1 char, or one of _TRIPLE_QUOTES
     i = 0
     length = len(text)
     while i < length:
@@ -183,10 +191,19 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
                 current.append(text[i + 1])
                 i += 2
                 continue
-            current.append(char)
-            if char == in_string:
+            if text.startswith(in_string, i):
+                current.append(in_string)
+                i += len(in_string)
                 in_string = None
+                continue
+            current.append(char)
             i += 1
+            continue
+        triple_quote = next((tq for tq in _TRIPLE_QUOTES if text.startswith(tq, i)), None)
+        if triple_quote:
+            in_string = triple_quote
+            current.append(triple_quote)
+            i += 3
             continue
         if char in _QUOTE_CHARS:
             in_string = char

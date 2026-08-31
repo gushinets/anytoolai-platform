@@ -7,7 +7,7 @@
 - Created: 2026-08-31
 - Last updated: 2026-08-31
 - Review date: 2026-08-31
-- Next action: none — implementation, three internal code-review rounds, and seven GitHub PR
+- Next action: none — implementation, three internal code-review rounds, and eight GitHub PR
   review rounds of fixes landed; move to `completed/` once merged.
 - Blocker: none
 
@@ -329,6 +329,32 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
     stripping it itself). Verified the exact triple-quoted-string case from the review is now
     caught, plus the analogous JS/TS multi-line template-literal case, and re-ran the full 16-case
     regression table from round 10 (now 18 cases) to confirm nothing else flipped.
+- [x] Eighth GitHub PR review round (2026-08-31, PR #96 "Code-ewview (me #7)", reviewing commit
+      `8b0b9d4`) found 2 more gaps, both fixed with a generalization rather than another one-off
+      special case:
+  - `called_on_router` only accepted a direct `ast.Name` receiver, so `app.router.add_api_route(
+      "/proposal_ai/status", handler)` — valid, commonly-used FastAPI usage (`FastAPI.router` *is*
+    the app's root `APIRouter`, a real public attribute) — was invisible, since the receiver
+    (`app.router`) is an `ast.Attribute`, not a name in `router_names`. Rather than special-casing
+    just `.router`, added `_is_router_expr`, a small recursive check: a name is a router expr if
+    it's in `router_names`; an attribute access is a router expr if its own attribute is `router`
+    and its value is itself a router expr. This covers `app.router` (and, for free, any deeper
+    `x.router.router`-shaped chain, at no extra cost) instead of only the exact case the review
+    named. Verified `app.router.add_api_route(...)` is now caught, and ordinary `router.get(...)`/
+    `app.add_api_route(...)` registrations are unaffected.
+  - `_strip_comments`'/`_quoted_string_spans`' shared `_QUOTE_CHARS` tracking treated `'`/`"`/`` ` ``
+    each as independent 1-char delimiters, so a Python triple-quoted string (`"""..."""`) was
+    misread as: open on the first `"`, close on the second, then treat the third `"` (and
+    everything after) as ordinary code — so an interior single `"` inside the triple-quoted body
+    (`"""first " quote\n..."""`) closed tracking early, leaving the next physical line
+    out-of-string and its leading `#` misread as a real comment. Fixed at the root rather than
+    patching around this one shape: added `_TRIPLE_QUOTES = ('"""', "'''")` and check for a 3-char
+    triple-quote delimiter (longest-match-first) before falling back to the existing 1-char check,
+    so open/close tracking now correctly spans the whole triple-quoted body regardless of interior
+    single/double quotes. Verified the exact interior-quote case from the review is now caught,
+    plus a control case (an ordinary docstring containing `#` and the word "model" but no real
+    hardcode correctly stays unflagged), and re-ran the full 18-case regression table (now 19
+    cases, rounds 4–12) to confirm nothing else flipped.
 
 ## Validation
 
@@ -445,6 +471,16 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
       flipped.
 - [x] `python3 -m pytest tests/architecture -q`, `validate_architecture.py`, and `quick-check`
       re-run after this round — 24 passed / passed / 981 passed.
+- [x] Manual check: `app.router.add_api_route("/proposal_ai/status", handler)` on a
+      `FastAPI()`-bound `app` is now caught via `_is_router_expr`; ordinary `router.get(...)` and
+      `app.add_api_route(...)` registrations are unaffected.
+- [x] Manual check: a triple-quoted string with an interior single `"` before a real trailing
+      `#`-then-hardcode line (the exact review case) is now caught; a control case — an ordinary
+      docstring containing `#` and the word "model" but no real provider/model hardcode — correctly
+      stays unflagged. Re-ran the full 18-case regression table (now 19 cases, rounds 4–12) to
+      confirm nothing else flipped.
+- [x] `python3 -m pytest tests/architecture -q`, `validate_architecture.py`, and `quick-check`
+      re-run after this round — 24 passed / passed / 981 passed.
 
 ## Decision log
 
@@ -466,6 +502,8 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | `_COMMENT_MARKERS_BY_SUFFIX` treats JS/TS comment stripping as `("//",)` only, not `("#", "//")`. | `#` was never valid JS/TS comment syntax to begin with (it's real syntax for private class fields since ES2022) — carrying it over from the Python/YAML entry in round 4 was a straight copy error, not a deliberate tradeoff; it had no upside and one confirmed false-negative failure mode. |
 | 2026-08-31 | `_route_path_literals` and `_router_variable_names` share one `_route_target_import_aliases(tree)` computation (computed once in `_route_path_literals`, passed into `_router_variable_names`) rather than each resolving aliases independently. | The round-11 `APIRouter as R` prefix-extraction gap existed specifically because the alias map was only wired into one of the two places that needed it (`_router_variable_names`'s receiver check) and not the other (`_route_path_literals`'s `PREFIX_KEYWORD_CALLS` check); sharing one computation makes it structurally harder for a future alias-aware feature to only wire in half the call sites. |
 | 2026-08-31 | `_strip_comments` (plural) processes a file's entire text in one pass, carrying `in_string` state across `\n` boundaries, rather than calling a per-line `_strip_comment` independently for each line. | Python triple-quoted strings and JS/TS template literals are ordinary multi-line syntax in the file types this test scans; resetting quote state at every newline is only correct for single-line strings, and the round-11 review showed the gap is real (a `#`/`//` inside a still-open multi-line string was misread as a comment, truncating a real hardcode later on the string's closing line). |
+| 2026-08-31 | `_is_router_expr` is a small recursive check (a name in `router_names`, or a `.router` attribute access on another router expr) rather than special-casing `app.router.add_api_route(...)` as one more literal pattern. | Every round so far that special-cased one exact call shape got caught missing a sibling shape next round (aliases, annotated bindings, qualified access, now `.router`); a recursive structural check closes the whole "any chain of router-valued expressions" class in one place instead of adding another parallel branch that the *next* review round finds a gap next to. |
+| 2026-08-31 | `_TRIPLE_QUOTES` (`"""`/`'''`) is checked as an atomic 3-char delimiter before falling back to the existing 1-char `_QUOTE_CHARS` check, rather than teaching the 1-char tracker to special-case an interior quote. | Treating `"""` as three independent 1-char delimiters is categorically wrong for Python triple-quoted strings (closes after the first char, reopens on the second, and any interior single/double quote inside the body then desyncs tracking for the rest of the file) — this isn't a narrower version of the existing bug, it needed the delimiter itself modeled correctly. |
 
 ## Progress log
 
@@ -482,7 +520,8 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | Fourth GitHub PR #96 review round ("Code-ewview (me #4)", reviewing commit `87814fd`) found: `_path_argument` only accepted a literal `ast.Constant`, so a route path factored into a module-level string constant (`PROPOSAL_STATUS_PATH = "/proposal_ai/status"` then `@router.get(PROPOSAL_STATUS_PATH)`) — ordinary Python style — bypassed the guard entirely; and `_strip_comment` treated `//` as a comment marker universally, but `//` isn't a YAML/JSON comment marker, so a valid unquoted-URL YAML line (`settings: {callback: https://x, model: openai/y}`) got truncated before the real hardcode. Fixed both: added `_module_string_constants`/`_string_value` so a single-constant path/prefix reference resolves (constant concatenation explicitly left unhandled — flagged as "ideally", not blocking, and no router uses that pattern today); replaced the universal comment-marker tuple with `_COMMENT_MARKERS_BY_SUFFIX` so YAML/Python only strip `#`, JS/TS strip `#`+`//`, and JSON strips nothing. Verified both exact cases from the review are now caught, `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Await/act on next code review. |
 | 2026-08-31 | Fifth GitHub PR #96 review round (inline comments, reviewing commit `5045e81`) found: `LITELLM_MODEL_STRING_RE`'s prefix class includes `=`, so a `?model=`/`&provider=` query value inside a URL string false-positived the same as a real assignment; and `_is_route_target_call` only recognized a bare-name constructor call, so a module-qualified `fastapi.FastAPI(...)`/`fastapi.APIRouter(...)` binding still bypassed the endpoint guard. Fixed both: added `_quoted_string_spans`/`_is_url_query_value`/`_first_real_offender` so a candidate match inside a quoted string containing `://` before it is rejected (switched from `.search()` to `.finditer()` to allow skipping a rejected match and trying the next one on the same line); and `_is_route_target_call` now also accepts an `ast.Attribute` callee, checking only the final attribute name (alias-agnostic). Verified both exact cases from the review are now excluded/caught respectively, re-ran the full 14-case regression table spanning rounds 4–9 to confirm no prior case flipped, and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Await/act on next code review. |
 | 2026-08-31 | Sixth GitHub PR #96 review round ("Code-ewview (me #5)", reviewing commit `bd321b6`) found the round-5/round-9 fixes were each still incomplete, plus one clean new gap: (1) `_module_string_constants` missed annotated module constants and, more seriously, let a same-named nested-function local silently overwrite the real module-level value; (2) the round-5 alias fix only covered module-qualified access (`fastapi.FastAPI()`), not an *imported* rebind (`from fastapi import FastAPI as F`) despite the decision log claiming otherwise; (3) `_COMMENT_MARKERS_BY_SUFFIX` treated `#` as a JS/TS comment marker, which it never was (it's private-class-field syntax); (4) `_is_url_query_value` exempted any match sharing a quoted string with an earlier `://`, not just one that's actually a `?key=`/`&key=` token, so a serialized-JSON hardcode got wrongly suppressed. Fixed all four: scoped constant collection to `tree.body`; added `_route_target_import_aliases` to resolve imported rebinds; dropped `#` from the JS/TS marker set; tightened `_is_url_query_value` with `_URL_QUERY_KEY_RE`. Corrected the round-5 decision-log entry's overclaim rather than leaving it standing. Verified all four exact cases from the review, re-ran the full 16-case regression table spanning rounds 4–10 (nothing flipped), and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Await/act on next code review. |
-| 2026-08-31 | Seventh GitHub PR #96 review round ("Code-ewview (me #6)", reviewing commit `1fa87dd`) found the round-10 alias fix was itself only half-applied — it fixed the receiver check in `_router_variable_names` but not the separate `PREFIX_KEYWORD_CALLS` literal-string comparison in `_route_path_literals`, so `from fastapi import APIRouter as R; router = R(prefix="/proposal_ai")` still lost the `/proposal_ai` prefix entirely — plus a clean new gap: `_strip_comment` reset its quote-tracking state at every physical line, so a `#`/`//` still lexically inside a multi-line string (Python triple-quote, JS/TS template literal) on a continuation line was misread as a real comment, truncating a real hardcode later on that line. Fixed both: resolved `func_name` through the same alias map before the `PREFIX_KEYWORD_CALLS` check (and had `_route_path_literals`/`_router_variable_names` share one `_route_target_import_aliases` computation instead of each resolving independently); replaced the per-line `_strip_comment` with a whole-file, state-carrying `_strip_comments`. Verified both exact cases from the review, plus the analogous JS/TS multi-line case, re-ran the full 18-case regression table spanning rounds 4–11 (nothing flipped), and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Commit. |
+| 2026-08-31 | Seventh GitHub PR #96 review round ("Code-ewview (me #6)", reviewing commit `1fa87dd`) found the round-10 alias fix was itself only half-applied — it fixed the receiver check in `_router_variable_names` but not the separate `PREFIX_KEYWORD_CALLS` literal-string comparison in `_route_path_literals`, so `from fastapi import APIRouter as R; router = R(prefix="/proposal_ai")` still lost the `/proposal_ai` prefix entirely — plus a clean new gap: `_strip_comment` reset its quote-tracking state at every physical line, so a `#`/`//` still lexically inside a multi-line string (Python triple-quote, JS/TS template literal) on a continuation line was misread as a real comment, truncating a real hardcode later on that line. Fixed both: resolved `func_name` through the same alias map before the `PREFIX_KEYWORD_CALLS` check (and had `_route_path_literals`/`_router_variable_names` share one `_route_target_import_aliases` computation instead of each resolving independently); replaced the per-line `_strip_comment` with a whole-file, state-carrying `_strip_comments`. Verified both exact cases from the review, plus the analogous JS/TS multi-line case, re-ran the full 18-case regression table spanning rounds 4–11 (nothing flipped), and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Await/act on next code review. |
+| 2026-08-31 | Eighth GitHub PR #96 review round ("Code-ewview (me #7)", reviewing commit `8b0b9d4`) found `app.router.add_api_route(...)` — valid FastAPI usage via the app's public `.router` attribute — still bypassed the endpoint guard (receiver was an `ast.Attribute`, not a tracked `ast.Name`), and that the string-tracker's `_QUOTE_CHARS`-only model misreads Python triple-quoted strings as three independent 1-char delimiters, so an interior single `"` inside a triple-quoted body desynced tracking and let a following `#` on the next line be misread as a real comment. This time fixed both with a generalization instead of another one-off special case: `_is_router_expr` (a small recursive router/`.router`-chain check) replaces the direct-`ast.Name`-only receiver check; `_TRIPLE_QUOTES` is checked as an atomic 3-char delimiter before the 1-char fallback. Verified both exact cases from the review, a control case (an ordinary docstring with `#` and the word "model" but no real hardcode stays unflagged), re-ran the full 19-case regression table spanning rounds 4–12 (nothing flipped), and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Commit. |
 
 ## Open questions
 
