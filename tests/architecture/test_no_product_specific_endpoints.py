@@ -221,7 +221,10 @@ def _resolve_import_module(importing_path: Path, node: ast.ImportFrom) -> str | 
     if node.level == 0:
         return node.module
     parts = _module_dotted_name(importing_path).split(".")
-    base_parts = parts[:-1]  # the importing module's own containing package
+    # A package's __init__.py already IS that package (its dotted name has no trailing
+    # "__init__" — see _module_dotted_name), so a level-1 relative import there stays within
+    # that same package. A regular module's own package is one level up instead.
+    base_parts = parts if importing_path.name == "__init__.py" else parts[:-1]
     for _ in range(node.level - 1):
         base_parts = base_parts[:-1] if base_parts else base_parts
     if node.module:

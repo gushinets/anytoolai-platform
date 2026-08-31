@@ -7,10 +7,12 @@
 - Created: 2026-08-31
 - Last updated: 2026-08-31
 - Review date: 2026-08-31
-- Next action: none — implementation, three internal code-review rounds, and eleven GitHub PR
+- Next action: none — implementation, three internal code-review rounds, and twelve GitHub PR
   review rounds of fixes landed (round 10 replaced the hand-rolled Python/YAML lexer with real
   parsers; round 11 extended router-identity resolution to the whole package and fixed two gaps
-  that rewrite itself exposed — see those entries); move to `completed/` once merged.
+  that rewrite itself exposed; round 12 fixed a `__init__.py` relative-import edge case in that
+  same resolution and a JS/TS block-comment gap — see those entries); move to `completed/` once
+  merged.
 - Blocker: none
 
 ## Goal
@@ -497,6 +499,52 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
   - Re-ran the full 20-case Python/regex regression table plus the 5-case YAML table from round
     10 (25 cases total, all pass) and both test files against the real repository tree, in
     addition to the new-case verification above.
+- **Twelfth GitHub PR review round** ("Code-ewview (me #11)", reviewing commit `b000675`) — two
+  more findings, both verified against current code before touching anything (reproduced each
+  exact failure with a standalone script first, per the established "verify before fixing"
+  discipline):
+  - **`test_no_product_specific_endpoints.py`, blocking.** `_resolve_import_module`'s relative-
+    import resolution was wrong for a package's `__init__.py`: `_module_dotted_name` already
+    drops the trailing `__init__` for that file (so `routers/__init__.py` maps to
+    `anytoolai_platform_api.routers`), but `_resolve_import_module` then unconditionally computed
+    `parts[:-1]` — correct for an ordinary module (whose own dotted name still has its own
+    basename attached, so dropping one component reaches its *containing* package), but wrong for
+    `__init__.py`, whose dotted name already *is* the package itself, not a module inside it.
+    `from .proposal import router` inside `routers/__init__.py` resolved to
+    `anytoolai_platform_api.proposal` instead of `anytoolai_platform_api.routers.proposal`,
+    silently breaking a normal re-export chain (`routers/proposal.py` defines the router,
+    `routers/__init__.py` re-exports it, a third module imports it via the package and registers a
+    product-specific route) — reproduced exactly as described, then fixed by branching on
+    `importing_path.name == "__init__.py"`: for an `__init__.py`, level-1 stays at its own dotted
+    name (already the package); for an ordinary module, level-1 drops to its containing package,
+    unchanged from before. Verified: the exact re-export-through-`__init__.py` chain now resolves
+    end-to-end (three-file synthetic package: `routers/proposal.py` → `routers/__init__.py` → a
+    consuming module registering `/proposal_ai/status`, now caught); a level-2 relative import
+    from an ordinary module (unaffected, still correct); a level-2 relative import from an
+    `__init__.py` (also correct — walks up one additional package level from the package itself);
+    the existing absolute-import case (`main.py`'s real pattern, unaffected).
+  - **`test_litellm_model_strings_stay_in_provider_config.py`, blocking.** `_strip_comments`
+    modeled only JS/TS line comments (`//`), not `/* ... */` block comments — and a stray quote
+    character *inside* an unrecognized block comment (e.g. `/* " */`) opened `in_string` early,
+    so a later, legitimately-quoted `//` (inside a real URL string) got misread as a line-comment
+    start, truncating the rest of the line — including a real hardcode past it. Reproduced the
+    review's exact case first (`/* " */ const callback = "https://example.com"; const model =
+    "openai/gpt-4.1";` truncated to `/* " */ const callback = "https:` before the fix). Fixed by
+    adding a third state (`in_block_comment`, alongside `in_string`) to the existing
+    quote-state-carrying scanner: `/*` (when not already inside a string) starts it, `*/` ends it,
+    and characters inside are dropped without being interpreted as quotes/line-comment starts —
+    the same reason the earlier per-line reset was wrong for multi-line strings (round 11) applies
+    here too, so block comments spanning multiple physical lines are handled by the same
+    character-at-a-time loop rather than a separate pass. Only fires when `markers` is non-empty,
+    which today only happens for the JS/TS-family suffixes (`.json` has no comment syntax and
+    returns early, unaffected). Verified: the exact review case now finds the real
+    `openai/gpt-4.1` hardcode; a block comment spanning multiple physical lines (correct line
+    number reported); an unterminated block comment (no crash/infinite loop, treated as a comment
+    to end of file); a real hardcode followed by a trailing block comment on the same line (still
+    caught); the pre-existing line-comment-inside-a-string regression case from round 7
+    (unaffected).
+  - Re-ran the full 24-pass `pytest tests/architecture` suite (unaffected files untouched) and
+    both changed test files against the real repository tree.
 
 ## Validation
 
@@ -678,6 +726,25 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
       against the real repository tree — passed.
 - [x] `python3 -m pytest tests/architecture -q`, `validate_architecture.py`, and `quick-check`
       re-run after this round — 24 passed / passed / 981 passed.
+- [x] Reproduced both round-12 findings with standalone scripts against current code before
+      changing anything: `_resolve_import_module` resolved `from .proposal import router` inside
+      `routers/__init__.py` to `anytoolai_platform_api.proposal` (wrong) instead of
+      `anytoolai_platform_api.routers.proposal`; `_strip_comments` truncated the exact
+      `/* " */ ... "openai/gpt-4.1"` review case before reaching the real hardcode.
+- [x] Manual check: `__init__.py` level-1 relative import now resolves within its own package; a
+      level-2 relative import from an ordinary module and from an `__init__.py` both resolve
+      correctly; the existing absolute-import case (`main.py`'s real pattern) is unaffected.
+- [x] Manual check: a synthetic 3-file router re-export chain
+      (`routers/proposal.py` → `routers/__init__.py` → a consuming module) now resolves the
+      imported router end-to-end and catches its product-specific route.
+- [x] Manual check: the exact block-comment review case now finds the real hardcode; a block
+      comment spanning multiple physical lines reports the correct line number; an unterminated
+      block comment doesn't crash or infinite-loop; a hardcode followed by a trailing block
+      comment on the same line is still caught; the round-7 line-comment-inside-a-string
+      regression case is unaffected.
+- [x] `python3 -m pytest tests/architecture -q` (24 passed), both changed files individually
+      against the real repository tree, `validate_architecture.py`, `validate-docs`, and
+      `quick-check` (981 passed) all green after this round.
 
 ## Decision log
 
@@ -711,6 +778,8 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | Star imports (`from .shared import *`) and cross-module constant resolution (`_module_string_constants` following an imported constant to its defining module) are explicitly left unhandled this round, documented rather than silently missing. | Neither is used anywhere in this repo today (verified), and both are real added complexity for idioms with no current instance; adding speculative handling for a pattern that hasn't been shown to exist is exactly the scope-creep the "think first" instruction was pushing back against — better to name the gap than pretend the whole-package rewrite makes every future gap in this space impossible. |
 | 2026-08-31 | `_python_offender` switches from `tokenize` to `ast.walk` (`ast.Constant`/`ast.JoinedStr`/`ast.FormattedValue`), rather than teaching the `tokenize`-based scanner about `FSTRING_START`/`FSTRING_MIDDLE`/`FSTRING_END` tokens. | PEP 701 (Python 3.12+, this repo runs 3.14) split f-string tokenization into multiple token kinds, which is exactly the kind of version-coupled lexer detail round 10 already moved this file off of once for a different reason; `ast.walk` gives already-decoded string values directly (no `literal_eval`), comments don't exist in the AST at all (excluded by construction), and the node shapes involved have been stable since Python 3.6 — a strictly simpler and more robust primitive than patching the tokenizer-level workaround. A `JoinedStr` with any `FormattedValue` (real `{expr}` interpolation) is left unresolved and skipped, matching the original intent to never evaluate expressions. |
 | 2026-08-31 | `_yaml_offender` uses `yaml.compose_all` and raises `AssertionError` on a genuine `yaml.YAMLError`, rather than keeping `yaml.compose` with a silent per-file skip on any parse error. | `yaml.compose` only accepts a single document; a valid multi-document file (`---` separated) raised `YAMLError` and the existing `except yaml.YAMLError: return None` turned that into a silent skip of the *entire file* — worse than the pre-round-10 line scanner, which still scanned every line regardless of document structure, and a direct violation of this repo's own no-silent-skips convention. Verified safe against all 27 real `.yaml`/`.yml` files in `SCAN_ROOTS` before making a parse failure fatal — zero existing files trip it. |
+| 2026-08-31 | `_resolve_import_module` branches on `importing_path.name == "__init__.py"` to decide whether level-1 stays at the importing module's own dotted name or drops to its containing package, rather than always dropping one component. | A package's `__init__.py` already represents that package itself (`_module_dotted_name` already strips the trailing `__init__`, matching Python's own `__package__` semantics for a package vs. an ordinary module); always dropping one more component double-counted that for `__init__.py` specifically, silently breaking a common re-export pattern (`__init__.py: from .submodule import x`) that this repo already uses for its own router files. |
+| 2026-08-31 | `_strip_comments` tracks JS/TS `/* ... */` block comments as a third explicit state (`in_block_comment`) inside the same character-at-a-time loop, rather than pre-stripping block comments in a separate pass before the existing quote/line-comment scan. | A block comment can contain a stray quote character, and a separate pre-pass would need its own (necessarily incomplete) notion of "am I inside a string" to avoid stripping a `/* ... */`-shaped sequence that's actually inside a real string literal — the same class of two-independent-copies-of-one-state-machine risk already named in the round-9/round-10 decision log entries about `_TRIPLE_QUOTES`. One shared loop with one shared `in_string` check is the only way a block comment inside a string (kept) and a string-like sequence inside a block comment (ignored) are both handled correctly by construction. |
 
 ## Progress log
 
@@ -732,6 +801,7 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | Ninth GitHub PR #96 review round ("Code-ewview (me #8)", reviewing commit `0b4a469`) found one blocking gap and one non-blocking one: `test_no_product_specific_endpoints.py` only scanned `routers/` + `main.py`, so a router defined in any other package module (e.g. a hypothetical `product_api.py`, wired in from `main.py` via `include_router` alone, which carries no forbidden literal itself) was never visited at all; and `_quoted_string_spans` still used the pre-round-12 1-char-only quote tracker, so a real triple-quoted string with an interior quote before a URL query value false-positived as a hardcode once `_strip_comments` (but not this sibling function) gained triple-quote support. Fixed both: replaced the two-source file scan with `PLATFORM_API_PACKAGE.rglob("*.py")` over the whole package; moved `_TRIPLE_QUOTES` above both quote-tracking functions and gave `_quoted_string_spans` the same triple-quote-first check `_strip_comments` uses, instead of two independently-drifting copies. Also corrected the round-12 log entry's inaccurate claim that both functions had already been fixed together. Caught and fixed a second self-inflicted `"""`-inside-`"""`-docstring syntax bug the same way as round 12 (`ast.parse` before moving on). Verified with a synthetic two-file package reproducing the exact review scenario (old scan: nothing found; new scan: both offenders found) and the exact triple-quote-interior-quote case, re-ran the full 20-case regression table spanning rounds 4–13 (nothing flipped), and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Await/act on next code review. |
 | 2026-08-31 | Tenth GitHub PR #96 review round ("Code-ewview (me #9)", reviewing commit `f96d571`) found two more findings in the same two categories that had already produced repeat bugs across the prior nine rounds: `_router_variable_names` still only recognized a direct constructor-call RHS, so `api = router` left `api` untracked; and `#` inside a YAML block scalar is literal content, not a comment, so `notes: |\n  # fallback openai/gpt-4.1` hid a real hardcode. Rather than add an eleventh special case to either hand-rolled tracker, replaced the underlying approach where it had actually been shown unreliable: `_router_variable_names` gained a fixed-point alias-propagation pass (any-length rebinding chain, not just the one reported); `.py` and `.yaml`/`.yml` scanning moved from the hand-rolled line-based tracker to real parsers (`tokenize` for Python, `yaml.compose` via the already-a-dependency PyYAML for YAML), with `.json`/`.js`-family files kept on the existing tracker since that category of bug was never actually shown to exist there. Caught and fixed a self-introduced off-by-one in `_is_url_query_value`'s span-containment check while rewriting (verified via the regression table before calling it done, not shipped blind). Verified the exact `api = router` case plus an unrequested 2-hop alias chain, the exact YAML block-scalar case, a 23-case regression table (20 prior cases plus 3 new ones the rewrite needed), and a real-repository-tree run of both test files (not just synthetic cases) to confirm no new false positives. `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Commit. |
 | 2026-08-31 | Eleventh GitHub PR #96 review round ("Code-ewview (me #10)", reviewing commit `ae67858`) found the round-10 rewrite itself left 4 gaps: router-identity tracking was still per-file only, so `main.py`'s real pattern (`from anytoolai_platform_api.routers.demo import router as demo_router`) left every imported router name untracked; `ROUTE_REGISTRATION_METHODS` covered only HTTP methods, missing FastAPI's 4 WebSocket registration APIs entirely; the `tokenize`-based Python scanner only inspected `STRING` tokens, so an f-string hardcode (`f"openai/gpt-4.1"`) was invisible under Python 3.12+'s PEP 701 f-string tokenization (a regression versus the pre-round-10 regex scanner); and `yaml.compose()` raising on a valid multi-document file turned into a silent skip of the entire file via the existing `except yaml.YAMLError: return None`. Given the user's explicit instruction to think and plan before touching code again, entered Plan Mode first: verified all four findings directly against current code, investigated and rejected switching router-identity resolution to dynamic FastAPI app introspection (concrete reason: unpinned `fastapi>=0.115` plus the installed 0.137.0's private `_IncludedRouter`/`.original_router` route-flattening internals — see decision log), and only implemented after presenting a complete plan for approval. Fixed all four: `_package_router_names` resolves router identity across the whole package via a single fixed-point loop combining cross-file import-edge propagation (`_resolve_import_module`, handling both absolute and relative imports) with each file's existing local-rebinding propagation; the 4 WebSocket methods were added to `ROUTE_REGISTRATION_METHODS`; `_python_offender` was rewritten from `tokenize` to `ast.walk` over `ast.Constant`/`ast.JoinedStr`/`ast.FormattedValue` (skips any `JoinedStr` with real `{expr}` interpolation, matching the original intent to never evaluate expressions); `_yaml_offender` switched to `yaml.compose_all` and now raises `AssertionError` on a genuine parse failure instead of skipping. Explicitly left out of scope and documented: star imports and cross-module constant resolution, neither used anywhere in this repo today. Verified: the exact `main.py`-shaped absolute-import pattern, a relative-import variant, a 3-file import chain, an import-then-local-realias combo, and 2 control cases (no false positives) for fix 1; all 4 WebSocket methods for fix 2; the exact f-string case plus a genuinely-dynamic f-string (correctly skipped) for fix 3; the exact multi-document YAML case plus all 27 real repo YAML files (zero parse failures) for fix 4; the full prior regression table (23 cases, rounds 4–14) replayed against every rewritten function with nothing flipped; both test files run against the real repository tree, not just synthetic fixtures. `pytest tests/architecture` (24 passed), `validate_architecture.py`, and `quick-check` (981 passed) stay green. | Await/act on next code review. |
+| 2026-08-31 | Twelfth GitHub PR #96 review round ("Code-ewview (me #11)", reviewing commit `b000675`) found two more gaps in the round-11 work: `_resolve_import_module` unconditionally dropped one path component for level-1 relative imports, which is correct for an ordinary module but wrong for a package's `__init__.py` (whose dotted name already IS the package, per `_module_dotted_name`), so `from .proposal import router` inside `routers/__init__.py` resolved to `anytoolai_platform_api.proposal` instead of `anytoolai_platform_api.routers.proposal` — breaking a normal router re-export chain through `__init__.py`; and `_strip_comments` only modeled JS/TS line comments (`//`), not `/* ... */` block comments, so a stray quote inside an unrecognized block comment desynced quote-tracking and caused a later, legitimately-quoted `//` (inside a real URL) to be misread as a line comment, truncating a real hardcode past it. Reproduced both exact cases with standalone scripts before changing anything. Fixed both: `_resolve_import_module` now branches on `importing_path.name == "__init__.py"` (stays at its own dotted name for level-1 instead of dropping a component); `_strip_comments` gained a third state (`in_block_comment`) inside the same character-loop that already carries `in_string` across line boundaries, so a block comment containing a quote and a string containing `/*`-like text are both handled correctly by one shared state machine instead of a second, independently-drifting comment-stripping pass. Verified: the exact re-export-through-`__init__.py` chain (3-file synthetic package) now resolves end-to-end; level-2 relative imports from both an ordinary module and an `__init__.py` stay correct; the existing absolute-import case is unaffected; the exact block-comment review case now finds the hardcode; a block comment spanning multiple physical lines reports the correct line number; an unterminated block comment doesn't hang; a hardcode followed by a trailing same-line block comment is still caught; the round-7 line-comment-inside-a-string case is unaffected. `pytest tests/architecture` (24 passed), both changed files against the real repository tree, `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) stay green. | Commit. |
 
 ## Open questions
 

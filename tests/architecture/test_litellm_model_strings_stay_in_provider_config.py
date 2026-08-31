@@ -284,15 +284,25 @@ def _quoted_string_spans(line: str) -> list[tuple[int, int]]:
 
 
 def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
-    """Comment-stripped lines of `text` (only using `markers`), with quote state carried across
-    line boundaries rather than reset at each newline — a JS/TS template literal containing `//`
-    (e.g. a URL) must not have that `//` misread as a comment start on a later physical line."""
+    """Comment-stripped lines of `text` (only using `markers`, plus JS/TS `/* ... */` block
+    comments whenever `markers` is non-empty), with quote state carried across line boundaries
+    rather than reset at each newline — a JS/TS template literal containing `//` (e.g. a URL)
+    must not have that `//` misread as a comment start on a later physical line.
+
+    Block comments must be recognized as their own state (not just skipped like a line comment):
+    otherwise a stray quote char inside one (`/* " */`) opens `in_string` early, and a real,
+    legitimately-quoted `//` later on the line (e.g. inside a URL) then gets misread as a line
+    comment, truncating a real hardcode past it. `markers` is only non-empty for JS/TS-family
+    suffixes (`.json` has no comment syntax and returns early above), so this never fires for
+    `.json`.
+    """
     if not markers:
         return text.splitlines()
 
     lines: list[str] = []
     current: list[str] = []
     in_string: str | None = None
+    in_block_comment = False
     i = 0
     length = len(text)
     while i < length:
@@ -301,6 +311,13 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
             lines.append("".join(current))
             current = []
             i += 1
+            continue
+        if in_block_comment:
+            if text.startswith("*/", i):
+                in_block_comment = False
+                i += 2
+            else:
+                i += 1
             continue
         if in_string:
             if char == "\\" and i + 1 < length and text[i + 1] != "\n":
@@ -317,6 +334,10 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
             in_string = char
             current.append(char)
             i += 1
+            continue
+        if text.startswith("/*", i):
+            in_block_comment = True
+            i += 2
             continue
         if any(text.startswith(marker, i) for marker in markers):
             newline_pos = text.find("\n", i)
