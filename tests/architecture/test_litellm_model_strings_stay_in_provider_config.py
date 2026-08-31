@@ -280,19 +280,6 @@ _JS_REGEX_KEYWORDS = frozenset(
 )
 
 
-def _last_word(chars: list[str]) -> str:
-    """The identifier word ending at the last non-whitespace position in `chars` (e.g. `["r",
-    "e", "t", "u", "r", "n", " "]` -> `"return"`), or `""` if there isn't one — used to check a
-    preceding keyword against `_JS_REGEX_KEYWORDS` when the last significant *character* alone
-    looks like the end of a value."""
-    i = len(chars) - 1
-    while i >= 0 and chars[i].isspace():
-        i -= 1
-    word: list[str] = []
-    while i >= 0 and (chars[i].isalnum() or chars[i] in "_$"):
-        word.append(chars[i])
-        i -= 1
-    return "".join(reversed(word))
 
 
 # `)` is normally a value-ending character (a function call's result), so `_REGEX_PRECEDED_BY_VALUE`
@@ -368,9 +355,18 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
     closing `)`/`]`, or a closing quote) — except a control-flow condition's closing paren
     (`if (cond) /re/`), which is a statement boundary, not a value; `paren_stack` tracks, for each
     open `(`, whether the word immediately before it was a control keyword, so its matching `)`
-    can override `last_sig` back to a non-value when popped. `markers` is only non-empty for
-    JS/TS-family suffixes (`.json` has no comment syntax and returns early above), so none of this
-    fires for `.json`.
+    can override `last_sig` back to a non-value when popped.
+
+    `last_sig` and the current identifier word (`word_buf`/`last_word`, via the nested `_note`
+    helper) are both maintained as persistent state across the whole function, not per physical
+    line: `current` (the stripped-line accumulator) resets at every `\\n`, but a keyword or a
+    control-flow `(` can legitimately be separated from what follows it by a line break or a
+    comment (`if\\n(cond)`, `if // note\\n(cond)`) — computing the preceding word from `current`
+    would silently lose it exactly then, and a single shared update path (`_note`, called from
+    every branch that consumes a real code character) is what keeps `last_sig` and `last_word` in
+    sync instead of drifting the way two independently-updated copies of the same tracking would.
+    `markers` is only non-empty for JS/TS-family suffixes (`.json` has no comment syntax and
+    returns early above), so none of this fires for `.json`.
     """
     if not markers:
         return text.splitlines()
@@ -380,12 +376,28 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
     in_string: str | None = None
     in_block_comment = False
     last_sig = ""
+    word_buf: list[str] = []
+    last_word = ""
     paren_stack: list[bool] = []
+
+    def _note(char: str) -> None:
+        nonlocal last_sig, word_buf, last_word
+        if char.isalnum() or char in "_$":
+            word_buf.append(char)
+            last_sig = char
+        else:
+            if word_buf:
+                last_word = "".join(word_buf)
+                word_buf = []
+            if not char.isspace():
+                last_sig = char
+
     i = 0
     length = len(text)
     while i < length:
         char = text[i]
         if char == "\n":
+            _note(char)  # a newline is a word boundary too — finalize a trailing word_buf
             lines.append("".join(current))
             current = []
             i += 1
@@ -413,7 +425,7 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
         if char in _QUOTE_CHARS:
             in_string = char
             current.append(char)
-            last_sig = char
+            _note(char)
             i += 1
             continue
         if text.startswith("/*", i):
@@ -425,17 +437,19 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
             i = length if newline_pos == -1 else newline_pos
             continue
         if char == "(":
-            paren_stack.append(_last_word(current) in _JS_CONTROL_KEYWORDS_BEFORE_PAREN)
             current.append(char)
-            last_sig = char
+            _note(char)
+            paren_stack.append(last_word in _JS_CONTROL_KEYWORDS_BEFORE_PAREN)
             i += 1
             continue
         if char == ")":
             is_condition_paren = paren_stack.pop() if paren_stack else False
             current.append(char)
+            _note(char)
             # A condition paren's close is a statement boundary (not a value) — clear last_sig so
             # a following `/` reads as a regex start, not division.
-            last_sig = "" if is_condition_paren else char
+            if is_condition_paren:
+                last_sig = ""
             i += 1
             continue
         if char == "/":
@@ -445,16 +459,16 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
             # when the char-level heuristic said "value" (a keyword can flip that to "regex" too;
             # a real identifier never does, so this only ever makes the check more permissive).
             if not looks_like_regex and last_sig.isalpha():
-                looks_like_regex = _last_word(current) in _JS_REGEX_KEYWORDS
+                looks_like_regex = last_word in _JS_REGEX_KEYWORDS
             if looks_like_regex:
                 end = _regex_literal_end(text, i, length)
                 if end is not None:
                     i = end
                     last_sig = "]"  # a regex literal is a value; a following `/` is division
+                    word_buf = []
                     continue
         current.append(char)
-        if not char.isspace():
-            last_sig = char
+        _note(char)
         i += 1
     lines.append("".join(current))
     return lines
