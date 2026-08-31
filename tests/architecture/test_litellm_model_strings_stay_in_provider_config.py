@@ -395,12 +395,24 @@ def _strip_comments(text: str, markers: tuple[str, ...], jsx: bool = False) -> l
     character-level heuristic cannot approximate without becoming a second hand-rolled parser —
     exactly the failure mode that already justified moving Python/YAML onto real parsers in round
     10, and exactly what this file's own decision log already accepted as this path's ceiling
-    ("no dependency-free JS/TS tokenizer available"). Given that ceiling, disabling `//` for
-    JSX-capable files is the conservative direction: it can only ever *include* more content in
-    scanning (a real inline comment's text, now also checked against the model-string regex),
-    never exclude content that should be checked — a false positive (a human has to look at one
-    extra line) is an acceptable cost for a boundary guard where the alternative, a silently
-    truncated real hardcode, is not.
+    ("no dependency-free JS/TS tokenizer available"). Given that ceiling, `//` in a JSX-capable
+    file is not treated as a truncation point: the conservative direction for a boundary guard is
+    to *include* more content in scanning, never exclude content that should be checked — a false
+    positive (a human has to look at one extra line) is acceptable where the alternative, a
+    silently truncated real hardcode, is not.
+
+    Critically, "not a truncation point" does not mean "run the rest of the lexer over it as if it
+    were code": a `//` comment's own text is still consumed as one inert, verbatim run
+    (`in_line_comment`, reset every `\n` since a `//` comment never spans a line) rather than
+    falling through to the ordinary char-by-char scan — comment prose can coincidentally look like
+    a regex delimiter, a `/* ... */` opener, or a quote, and letting it drive the *same* stateful
+    lexer that parses real code mutates that state for everything *after* the comment too (a
+    genuine `// /* note` comment previously left `in_block_comment` stuck with no real `*/` to
+    ever close it, silently swallowing the rest of the file — a worse failure than the original
+    truncation bug this was meant to fix). Consuming the comment verbatim, with no lexer branch
+    other than "append this character", keeps the comment's own content available for the
+    model-string regex to match against while making it structurally impossible for that content
+    to affect quote/comment/regex state elsewhere.
 
     `markers` is only non-empty for JS/TS-family suffixes (`.json` has no comment syntax and
     returns early above), so none of this fires for `.json`.
@@ -412,6 +424,7 @@ def _strip_comments(text: str, markers: tuple[str, ...], jsx: bool = False) -> l
     current: list[str] = []
     in_string: str | None = None
     in_block_comment = False
+    in_line_comment = False
     last_sig = ""
     word_buf: list[str] = []
     last_word = ""
@@ -435,9 +448,19 @@ def _strip_comments(text: str, markers: tuple[str, ...], jsx: bool = False) -> l
             # here regardless of what lexical state we're in, and `lines` must stay one entry per
             # physical line for line-number reporting even *inside* a multi-line string or block
             # comment — only `in_string`/`in_block_comment` themselves persist across the split.
+            # `in_line_comment` does NOT persist — a `//` comment never spans a line by definition.
             _finalize_word()
+            in_line_comment = False
             lines.append("".join(current))
             current = []
+            i += 1
+            continue
+        if in_line_comment:
+            # Consumed verbatim, one character at a time, through no other branch: this is a real
+            # `//` comment's own text, kept in `current` so the model-string regex can still match
+            # against it, but never given a chance to open a string/block-comment/regex state that
+            # would then apply to the real code that follows.
+            current.append(char)
             i += 1
             continue
         if in_block_comment:
@@ -486,9 +509,16 @@ def _strip_comments(text: str, markers: tuple[str, ...], jsx: bool = False) -> l
             in_block_comment = True
             i += 2
             continue
-        if any(
-            text.startswith(marker, i) for marker in markers if not (jsx and marker == "//")
-        ):
+        if jsx and text.startswith("//", i):
+            # Enter in_line_comment rather than the ordinary marker-based truncation below: the
+            # comment's own text still needs scanning (see the docstring), but must not be handed
+            # to any other branch that could reinterpret it as code.
+            in_line_comment = True
+            current.append("/")
+            current.append("/")
+            i += 2
+            continue
+        if any(text.startswith(marker, i) for marker in markers):
             newline_pos = text.find("\n", i)
             i = length if newline_pos == -1 else newline_pos
             continue
