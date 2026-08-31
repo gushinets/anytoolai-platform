@@ -77,18 +77,34 @@ def _scan_files() -> list[Path]:
 
 
 _QUOTE_CHARS = ("'", '"', "`")  # backtick included: JS/TS template literals (SCAN_EXTS has .ts/.js)
+# `//` is a JS/TS comment marker, never a YAML/JSON one — YAML/JSON allow a bare (unquoted) URL as
+# a scalar value, so treating `//` as a comment start there truncates a real line before the
+# `model` field that follows the URL, e.g. `settings: {callback: https://x, model: openai/y}`.
+_COMMENT_MARKERS_BY_SUFFIX: dict[str, tuple[str, ...]] = {
+    ".py": ("#",),
+    ".yaml": ("#",),
+    ".yml": ("#",),
+    ".json": (),  # JSON has no comment syntax at all
+    ".ts": ("#", "//"),
+    ".tsx": ("#", "//"),
+    ".js": ("#", "//"),
+    ".jsx": ("#", "//"),
+}
 
 
-def _strip_comment(line: str) -> str:
-    """Drop a trailing `#`/`//` comment, but never one found inside a quoted string.
+def _strip_comment(line: str, markers: tuple[str, ...]) -> str:
+    """Drop a trailing comment (only using `markers`, which are extension-specific — see
+    `_COMMENT_MARKERS_BY_SUFFIX`), but never one found inside a quoted string.
 
-    A naive `line.find("#"/"//")` truncates at the first occurrence anywhere on the line,
-    including inside a string — e.g. `{"callback": "https://example.com", "model": "openai/..."}`
-    would be cut at the `//` in the URL, hiding the real `model` field that follows it. Track
-    quote state instead so only a genuine, unquoted comment marker ends the line. Backticks are
-    tracked as a quote delimiter too, or a JS/TS template literal containing `//` (e.g. a URL) is
-    misread as leaving the string.
+    A naive `line.find(marker)` truncates at the first occurrence anywhere on the line, including
+    inside a string — e.g. `{"callback": "https://example.com", "model": "openai/..."}` would be
+    cut at the `//` in the URL, hiding the real `model` field that follows it. Track quote state
+    instead so only a genuine, unquoted comment marker ends the line. Backticks are tracked as a
+    quote delimiter too, or a JS/TS template literal containing `//` (e.g. a URL) is misread as
+    leaving the string.
     """
+    if not markers:
+        return line
     in_string: str | None = None
     i = 0
     length = len(line)
@@ -106,7 +122,7 @@ def _strip_comment(line: str) -> str:
             in_string = char
             i += 1
             continue
-        if char == "#" or (char == "/" and i + 1 < length and line[i + 1] == "/"):
+        if any(line.startswith(marker, i) for marker in markers):
             return line[:i]
         i += 1
     return line
@@ -115,9 +131,10 @@ def _strip_comment(line: str) -> str:
 def test_litellm_model_strings_only_in_provider_config() -> None:
     offenders: list[str] = []
     for path in _scan_files():
+        markers = _COMMENT_MARKERS_BY_SUFFIX[path.suffix]
         text = path.read_text(encoding="utf-8", errors="ignore")
         for lineno, line in enumerate(text.splitlines(), start=1):
-            match = LITELLM_MODEL_STRING_RE.search(_strip_comment(line))
+            match = LITELLM_MODEL_STRING_RE.search(_strip_comment(line, markers))
             if match:
                 offenders.append(f"{path.relative_to(ROOT)}:{lineno}: {match.group(0)!r}")
                 break

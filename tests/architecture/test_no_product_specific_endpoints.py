@@ -47,18 +47,45 @@ ROUTE_REGISTRATION_METHODS = {
 PREFIX_KEYWORD_CALLS = {"APIRouter", "include_router"}
 
 
-def _keyword_value(node: ast.Call, keyword: str) -> str | None:
-    for kw in node.keywords:
-        if kw.arg == keyword and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
-            return kw.value.value
+def _module_string_constants(tree: ast.AST) -> dict[str, str]:
+    """Module-level `<NAME> = "<literal>"` bindings, so `@router.get(PROPOSAL_STATUS_PATH)` is
+    resolved back to its literal instead of being invisible to `_path_argument` (an `ast.Name`,
+    not an `ast.Constant`)."""
+    constants: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Assign)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    constants[target.id] = node.value.value
+    return constants
+
+
+def _string_value(expr: ast.expr | None, constants: dict[str, str]) -> str | None:
+    if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
+        return expr.value
+    if isinstance(expr, ast.Name) and expr.id in constants:
+        return constants[expr.id]
     return None
 
 
-def _path_argument(node: ast.Call) -> str | None:
+def _keyword_value(node: ast.Call, keyword: str, constants: dict[str, str]) -> str | None:
+    for kw in node.keywords:
+        if kw.arg == keyword:
+            return _string_value(kw.value, constants)
+    return None
+
+
+def _path_argument(node: ast.Call, constants: dict[str, str]) -> str | None:
     """The route's `path`: first positional arg, or the `path=` keyword."""
-    if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
-        return node.args[0].value
-    return _keyword_value(node, "path")
+    if node.args:
+        value = _string_value(node.args[0], constants)
+        if value is not None:
+            return value
+    return _keyword_value(node, "path", constants)
 
 
 ROUTE_TARGET_CONSTRUCTORS = {"APIRouter", "FastAPI"}
@@ -98,6 +125,7 @@ def _router_variable_names(tree: ast.AST) -> set[str]:
 def _route_path_literals(path: Path) -> list[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"))
     router_names = _router_variable_names(tree)
+    constants = _module_string_constants(tree)
     literals: list[str] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -116,11 +144,11 @@ def _route_path_literals(path: Path) -> list[str]:
         if func_name in ROUTE_REGISTRATION_METHODS and called_on_router:
             # Only the route's own path, not other string kwargs like `summary=`/`description=`
             # (free-form prose that could coincidentally contain a forbidden substring).
-            path = _path_argument(node)
+            path = _path_argument(node, constants)
             if path is not None:
                 literals.append(path)
         elif func_name in PREFIX_KEYWORD_CALLS:
-            prefix = _keyword_value(node, "prefix")
+            prefix = _keyword_value(node, "prefix", constants)
             if prefix is not None:
                 literals.append(prefix)
     return literals
