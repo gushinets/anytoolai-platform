@@ -263,18 +263,36 @@ _COMMENT_MARKERS_BY_SUFFIX: dict[str, tuple[str, ...]] = {
 # regex literal. Mirrors the standard JS/TS lexer heuristic for the division-vs-regex ambiguity
 # (a `/` after an operator, `(`, `,`, `=`, or start of line is a regex; after a value, a
 # division).
-#
-# ponytail: this is a last-*character* heuristic, not a last-*token* one, so it can't distinguish
-# a real identifier (`foo / 2`, division) from a keyword that also ends in a letter (`return
-# /re/`, a regex) — a keyword-preceded regex literal reads as division and stays unhandled, the
-# same class of narrower-ceiling tradeoff already accepted for this JS/TS path (see the
-# `_COMMENT_MARKERS_BY_SUFFIX` note above). Checked: no file in `_scan_files()` today contains a
-# keyword-preceded regex literal. Upgrade path if one ever does: track the last identifier *word*
-# (not just its last character) and check it against a small JS keyword set
-# (`return`/`typeof`/`instanceof`/`case`/`in`/`of`/`new`/`delete`/`void`/`yield`/...).
 _REGEX_PRECEDED_BY_VALUE = frozenset(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$)]"
 ) | frozenset(_QUOTE_CHARS)
+
+# A last-*character* heuristic alone can't distinguish a real identifier (`foo / 2`, division)
+# from a keyword that also ends in a letter (`return /re/`, a regex) — both end in an
+# identifier-class character. These are the JS/TS keywords after which a value can't precede a
+# `/`, so a following `/` is still a regex literal despite the preceding word looking like a
+# value by its last character alone.
+_JS_REGEX_KEYWORDS = frozenset(
+    {
+        "return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "yield",
+        "case", "do", "else", "throw", "await", "default",
+    }
+)
+
+
+def _last_word(chars: list[str]) -> str:
+    """The identifier word ending at the last non-whitespace position in `chars` (e.g. `["r",
+    "e", "t", "u", "r", "n", " "]` -> `"return"`), or `""` if there isn't one — used to check a
+    preceding keyword against `_JS_REGEX_KEYWORDS` when the last significant *character* alone
+    looks like the end of a value."""
+    i = len(chars) - 1
+    while i >= 0 and chars[i].isspace():
+        i -= 1
+    word: list[str] = []
+    while i >= 0 and (chars[i].isalnum() or chars[i] in "_$"):
+        word.append(chars[i])
+        i -= 1
+    return "".join(reversed(word))
 
 
 def _regex_literal_end(text: str, start: int, length: int) -> int | None:
@@ -393,12 +411,20 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
             newline_pos = text.find("\n", i)
             i = length if newline_pos == -1 else newline_pos
             continue
-        if char == "/" and last_sig not in _REGEX_PRECEDED_BY_VALUE:
-            end = _regex_literal_end(text, i, length)
-            if end is not None:
-                i = end
-                last_sig = "]"  # a regex literal is itself a value; a following `/` is division
-                continue
+        if char == "/":
+            looks_like_regex = last_sig not in _REGEX_PRECEDED_BY_VALUE
+            # `last_sig` alone can't tell a real identifier from a keyword ending the same way
+            # (`foo` vs. `return`) — check the whole preceding word against the keyword set only
+            # when the char-level heuristic said "value" (a keyword can flip that to "regex" too;
+            # a real identifier never does, so this only ever makes the check more permissive).
+            if not looks_like_regex and last_sig.isalpha():
+                looks_like_regex = _last_word(current) in _JS_REGEX_KEYWORDS
+            if looks_like_regex:
+                end = _regex_literal_end(text, i, length)
+                if end is not None:
+                    i = end
+                    last_sig = "]"  # a regex literal is a value; a following `/` is division
+                    continue
         current.append(char)
         if not char.isspace():
             last_sig = char

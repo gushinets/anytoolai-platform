@@ -286,16 +286,24 @@ def _package_router_names(
     return router_names, _module_router_names_by_file(trees, module_paths, router_names)
 
 
-def _module_import_aliases(tree: ast.AST) -> dict[str, str]:
-    """Maps a local name bound by `import <dotted> as <alias>` to the dotted module name it
-    refers to (`import anytoolai_platform_api.shared as shared` ->
-    `{"shared": "anytoolai_platform_api.shared"}`).
+def _module_import_aliases(
+    tree: ast.AST, importing_path: Path, module_paths: dict[str, Path]
+) -> dict[str, str]:
+    """Maps a local name bound to *a module itself* (not a name defined inside one) to that
+    module's dotted name: `import <dotted> as <alias>` (`import anytoolai_platform_api.shared as
+    shared` -> `{"shared": "anytoolai_platform_api.shared"}`), and `from . import name` / `from
+    .. import name` when a submodule file actually named `name` exists in the importing package
+    (checked against `module_paths`, since `from package import name` is otherwise statically
+    ambiguous between "the submodule `package.name`" and "a name defined in `package/__init__.py`"
+    — Python itself only resolves this by trying the attribute first, then the submodule import,
+    at runtime; a real submodule *file* existing is the only static signal available for the
+    submodule case). A `from . import name` whose `name` has no matching submodule file is left to
+    the existing `ast.ImportFrom`-based name-edge handling in `_package_router_names`, which
+    already covers "a name bound inside `__init__.py`" correctly.
 
     Deliberately out of scope: bare `import <dotted>` without `as` (Python binds only the
-    top-level package name, e.g. `pkg`, not the leaf module — resolving `pkg.sub.mod.router`
-    from that would need multi-level attribute-chain resolution) and `from . import name` (statically
-    ambiguous between "a submodule named `name`" and "a name defined in `__init__.py`" without
-    also consulting the filesystem). Neither form is used anywhere in this repo today (verified).
+    top-level package name, e.g. `pkg`, not the leaf module — resolving `pkg.sub.mod.router` from
+    that would need multi-level attribute-chain resolution, not used anywhere in this repo today).
     """
     aliases: dict[str, str] = {}
     for node in ast.walk(tree):
@@ -303,6 +311,14 @@ def _module_import_aliases(tree: ast.AST) -> dict[str, str]:
             for alias in node.names:
                 if alias.asname:
                     aliases[alias.asname] = alias.name
+        elif isinstance(node, ast.ImportFrom) and node.module is None and node.level > 0:
+            container_dotted = _resolve_import_module(importing_path, node)
+            if container_dotted is None:
+                continue
+            for alias in node.names:
+                candidate_dotted = f"{container_dotted}.{alias.name}"
+                if candidate_dotted in module_paths:
+                    aliases[alias.asname or alias.name] = candidate_dotted
     return aliases
 
 
@@ -311,14 +327,14 @@ def _module_router_names_by_file(
     module_paths: dict[str, Path],
     router_names_by_file: dict[Path, set[str]],
 ) -> dict[Path, dict[str, set[str]]]:
-    """For each file, maps a local `import <dotted> as <alias>` name to the set of router names
-    known in the module it refers to, so `shared.router` (an attribute access through a *module*
-    alias, not a name bound directly by `from ... import`) resolves the router the same way
-    `from .shared import router` already does."""
+    """For each file, maps a local module-identity name (see `_module_import_aliases`) to the set
+    of router names known in the module it refers to, so `shared.router` (an attribute access
+    through a *module* identity, not a name bound directly by `from ... import`) resolves the
+    router the same way `from .shared import router` already does."""
     result: dict[Path, dict[str, set[str]]] = {}
     for path, tree in trees.items():
         per_alias: dict[str, set[str]] = {}
-        for local, dotted in _module_import_aliases(tree).items():
+        for local, dotted in _module_import_aliases(tree, path, module_paths).items():
             source_path = module_paths.get(dotted)
             if source_path is not None:
                 per_alias[local] = router_names_by_file[source_path]
