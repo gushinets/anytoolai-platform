@@ -155,6 +155,29 @@ def _router_variable_names(tree: ast.AST, aliases: dict[str, str]) -> set[str]:
             and _is_route_target_call(node.value, aliases)
         ):
             names.add(node.target.id)
+
+    # Propagate simple rebindings of an already-known router/app expression (`api = router`,
+    # `other_app = app.router`) to a fixed point, so a multi-hop chain (`b = a; c = b`) resolves
+    # too — not just the single reassignment a reviewer happens to test. `_is_router_expr` also
+    # covers a `.router` RHS, so `other = app.router` is picked up here for free.
+    changed = True
+    while changed:
+        changed = False
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                targets = node.targets
+                value = node.value
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                targets = [node.target]
+                value = node.value
+            else:
+                continue
+            if value is None or not _is_router_expr(value, names):
+                continue
+            for target in targets:
+                if isinstance(target, ast.Name) and target.id not in names:
+                    names.add(target.id)
+                    changed = True
     return names
 
 

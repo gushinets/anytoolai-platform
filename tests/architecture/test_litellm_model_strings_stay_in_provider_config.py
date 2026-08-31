@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import ast
+import io
 import re
+import tokenize
 from pathlib import Path
+
+import yaml
 
 # Reuse the canonical skip-dir set instead of hand-maintaining a copy that can drift (this file's
 # own copy already diverged from this neighbor's twice across two code-review rounds).
@@ -81,18 +86,133 @@ def _scan_files() -> list[Path]:
     return files
 
 
-_QUOTE_CHARS = ("'", '"', "`")  # backtick included: JS/TS template literals (SCAN_EXTS has .ts/.js)
-# `//` is a JS/TS comment marker, never a YAML/JSON one — YAML/JSON allow a bare (unquoted) URL as
-# a scalar value, so treating `//` as a comment start there truncates a real line before the
-# `model` field that follows the URL, e.g. `settings: {callback: https://x, model: openai/y}`.
+# The `=` immediately preceding a `?key=`/`&key=` URL query value. Anchored (`$`) to the end of
+# the string it's searched against, so it only matches when the query-key syntax sits directly
+# against the candidate match's own prefix `=` — not merely "some `?...=` exists earlier".
+_URL_QUERY_KEY_RE = re.compile(r"[?&][\w.\-]+=$")
+
+
+def _is_url_query_value(value: str, spans: list[tuple[int, int]], position: int) -> bool:
+    """True if `position` (the candidate match's prefix char) is genuinely a `?key=`/`&key=` URL
+    query value: it must be `=`, sit inside one of `spans` (an enclosing string's content) and
+    have a `://` before it within that span, AND have a `?`/`&`-prefixed key directly adjacent to
+    it (`...?model=` / `...&provider=`).
+
+    `position` is the match's *prefix* char, one position before a quoted span's own content
+    start when the prefix char is the opening quote itself — spans are checked with
+    `start - 1 <= position < end` for that reason, not `start <= position < end`.
+
+    The `://`-in-span condition alone is too broad: a serialized-JSON string like
+    `{"callback":"https://example.com","model":"openai/gpt-4.1"}` also contains `://` earlier in
+    the same string, but the real `"model":"openai/..."` field there is a genuine hardcode, not
+    part of the URL — its prefix char is `"`, not `=`, and there's no `?`/`&`-prefixed key right
+    before it.
+    """
+    if value[position] != "=":
+        return False
+    for start, end in spans:
+        if start - 1 <= position < end:
+            prefix = value[start : position + 1]
+            if "://" in prefix and _URL_QUERY_KEY_RE.search(prefix):
+                return True
+    return False
+
+
+def _offending_match(value: str) -> str | None:
+    """First real (non-URL-query) LiteLLM-format `provider/model` match in an already-isolated
+    string value (a Python string-literal's decoded content, or a YAML scalar's decoded content —
+    values a real parser has already separated from comments/surrounding syntax), or `None`."""
+    spans = [(0, len(value))]
+    for match in LITELLM_MODEL_STRING_RE.finditer(value):
+        if not _is_url_query_value(value, spans, match.start()):
+            return match.group(0)
+    return None
+
+
+def _python_offender(path: Path) -> tuple[int, str] | None:
+    """(lineno, matched-text) of the first real hardcode in `path`'s string literals, using the
+    real CPython tokenizer instead of hand-rolled quote/comment tracking.
+
+    Nine review rounds (7, 9, 11, 12, 13) found real bugs in a hand-rolled Python string/comment
+    tracker: triple-quoted strings misread as three 1-char delimiters, an interior quote
+    desyncing tracking, quote state reset per physical line instead of carried across a
+    multi-line string. `tokenize` is the actual language grammar, not an approximation of it —
+    it categorically can't have those bugs (or the next one a future review round would find).
+    `tokenize.STRING` tokens are real string literals with real source positions; `COMMENT`
+    tokens are already excluded from consideration by construction (only STRING tokens are
+    checked), so no separate comment-stripping step is needed at all.
+    """
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    try:
+        tokens = tokenize.generate_tokens(io.StringIO(text).readline)
+        for tok in tokens:
+            if tok.type != tokenize.STRING:
+                continue
+            try:
+                value = ast.literal_eval(tok.string)
+            except (ValueError, SyntaxError):
+                continue
+            if not isinstance(value, str):
+                continue
+            match = _offending_match(value)
+            if match is not None:
+                return tok.start[0], match
+    except (tokenize.TokenError, SyntaxError, IndentationError):
+        pass
+    return None
+
+
+def _iter_yaml_scalars(node: yaml.Node):
+    if isinstance(node, yaml.ScalarNode):
+        yield node
+    elif isinstance(node, yaml.SequenceNode):
+        for item in node.value:
+            yield from _iter_yaml_scalars(item)
+    elif isinstance(node, yaml.MappingNode):
+        for key_node, value_node in node.value:
+            yield from _iter_yaml_scalars(key_node)
+            yield from _iter_yaml_scalars(value_node)
+
+
+def _yaml_offender(path: Path) -> tuple[int, str] | None:
+    """(lineno, matched-text) of the first real hardcode in `path`'s scalar values, using a real
+    YAML parser instead of hand-rolled `#`-is-a-comment tracking.
+
+    `#` is not a comment marker inside a YAML block scalar (`|`/`>`) — it's literal content — and
+    a hand-rolled line scanner has no way to know it's inside one without re-implementing YAML's
+    block-scalar indentation rules. `yaml.compose` already does that correctly; walking its node
+    graph gives real scalar values (block/flow, quoted/unquoted — all resolved the same way) with
+    real source positions, with no separate comment-stripping step needed.
+    """
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    try:
+        root = yaml.compose(text)
+    except yaml.YAMLError:
+        return None
+    if root is None:
+        return None
+    for scalar in _iter_yaml_scalars(root):
+        if not isinstance(scalar.value, str):
+            continue
+        match = _offending_match(scalar.value)
+        if match is not None:
+            return scalar.start_mark.line + 1, match
+    return None
+
+
+# Only `.json`/`.js`/`.jsx`/`.ts`/`.tsx` still go through this line-based scanner. `.json` has no
+# comment syntax at all (the marker set below is empty for it, so `_strip_comments` is a no-op)
+# and only ever contains standard double-quoted strings — none of the ambiguity that motivated
+# moving Python/YAML to real parsers exists in JSON's grammar. `.js`/`.ts` are handled the same
+# way `.py` used to be (regex + hand-rolled quote/comment tracking).
+#
+# ponytail: no JS/TS tokenizer is available here without adding a new dependency, so this path
+# keeps the same class of bug the Python/YAML paths were just moved off of (a comment or a
+# multi-line construct this tracker doesn't model could still misread). Upgrade path: parse with
+# a real JS/TS tokenizer if a bug is ever found here, the same way Python/YAML were fixed.
+_QUOTE_CHARS = ("'", '"', "`")  # backtick included: JS/TS template literals
 _COMMENT_MARKERS_BY_SUFFIX: dict[str, tuple[str, ...]] = {
-    ".py": ("#",),
-    ".yaml": ("#",),
-    ".yml": ("#",),
     ".json": (),  # JSON has no comment syntax at all
-    # `#` is NOT a JS/TS comment marker — it's valid syntax there (private class fields:
-    # `class C { #cache = 1; }`); treating it as one truncated a line before a real model literal
-    # that followed. Only `//` is a genuine JS/TS single-line comment marker here.
     ".ts": ("//",),
     ".tsx": ("//",),
     ".js": ("//",),
@@ -100,96 +220,41 @@ _COMMENT_MARKERS_BY_SUFFIX: dict[str, tuple[str, ...]] = {
 }
 
 
-_TRIPLE_QUOTES = ('"""', "'''")  # Python triple-quoted strings — a 3-char delimiter, not three
-# single-char ones: `_QUOTE_CHARS`-only tracking closes after the *first* of the three quote
-# chars, then reopens on the second and misreads the third as content, corrupting all quote
-# state for the rest of the string.
-
-
 def _quoted_string_spans(line: str) -> list[tuple[int, int]]:
-    """(start, end) of each quoted string's content (excluding the quote chars) on `line`.
-
-    Uses the same delimiter model as `_strip_comments` (`_TRIPLE_QUOTES` checked before the
-    1-char `_QUOTE_CHARS` fallback) — an interior single/double quote inside a real Python
-    triple-quoted string must not be treated as closing the span, or a URL query value living
-    inside one loses its span and `_is_url_query_value` no longer recognizes it as URL content.
-    """
+    """(start, end) of each quoted string's content (excluding the quote chars) on `line`."""
     spans: list[tuple[int, int]] = []
-    quote: str | None = None
+    quote_char: str | None = None
     content_start = 0
     i = 0
     length = len(line)
     while i < length:
         char = line[i]
-        if quote:
+        if quote_char:
             if char == "\\":
                 i += 2
                 continue
-            if line.startswith(quote, i):
+            if char == quote_char:
                 spans.append((content_start, i))
-                i += len(quote)
-                quote = None
-                continue
+                quote_char = None
             i += 1
             continue
-        triple_quote = next((tq for tq in _TRIPLE_QUOTES if line.startswith(tq, i)), None)
-        if triple_quote:
-            quote = triple_quote
-            content_start = i + 3
-            i += 3
-            continue
         if char in _QUOTE_CHARS:
-            quote = char
+            quote_char = char
             content_start = i + 1
         i += 1
     return spans
 
 
-# The `=` immediately preceding a `?key=`/`&key=` URL query value. Anchored (`$`) to the end of
-# the string it's searched against, so it only matches when the query-key syntax sits directly
-# against the candidate match's own prefix `=` — not merely "some `?...=` exists earlier".
-_URL_QUERY_KEY_RE = re.compile(r"[?&][\w.\-]+=$")
-
-
-def _is_url_query_value(line: str, spans: list[tuple[int, int]], position: int) -> bool:
-    """True if `position` (the candidate match's prefix char) is genuinely a `?key=`/`&key=` URL
-    query value: it must be `=`, sit inside a quoted string containing `://` before it, AND have
-    a `?`/`&`-prefixed key directly adjacent to it (`...?model=` / `...&provider=`).
-
-    The first two conditions alone are too broad: a serialized-JSON string like
-    `'{"callback":"https://example.com","model":"openai/gpt-4.1"}'` also contains `://` earlier in
-    the same (outer, single-quoted) string, but the real `"model":"openai/..."` field there is a
-    genuine hardcode, not part of the URL — its prefix char is `"`, not `=`, and there's no
-    `?`/`&`-prefixed key right before it.
-    """
-    if position < 0 or position >= len(line) or line[position] != "=":
-        return False
-    for start, end in spans:
-        if start <= position < end:
-            prefix = line[start : position + 1]
-            return "://" in prefix and bool(_URL_QUERY_KEY_RE.search(prefix))
-    return False
-
-
 def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
-    """Comment-stripped lines of `text` (only using `markers` — see `_COMMENT_MARKERS_BY_SUFFIX`),
-    with quote state carried across line boundaries rather than reset at each newline.
-
-    A naive per-line scan truncates at the first marker occurrence anywhere on that line,
-    including inside a string spanning multiple lines — e.g. a Python triple-quoted string whose
-    body contains a bare `#` (or a JS/TS template literal containing `//`): resetting
-    `in_string = None` at the start of the *next* physical line misreads that marker as a real
-    comment and truncates a real hardcode that follows the string's close later on the same
-    (closing) line. Backticks are tracked as a quote delimiter too, alongside single/double
-    quotes. Python triple-quoted strings are tracked as their own 3-char delimiter — see
-    `_TRIPLE_QUOTES`.
-    """
+    """Comment-stripped lines of `text` (only using `markers`), with quote state carried across
+    line boundaries rather than reset at each newline — a JS/TS template literal containing `//`
+    (e.g. a URL) must not have that `//` misread as a comment start on a later physical line."""
     if not markers:
         return text.splitlines()
 
     lines: list[str] = []
     current: list[str] = []
-    in_string: str | None = None  # the exact open delimiter: 1 char, or one of _TRIPLE_QUOTES
+    in_string: str | None = None
     i = 0
     length = len(text)
     while i < length:
@@ -205,19 +270,10 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
                 current.append(text[i + 1])
                 i += 2
                 continue
-            if text.startswith(in_string, i):
-                current.append(in_string)
-                i += len(in_string)
-                in_string = None
-                continue
             current.append(char)
+            if char == in_string:
+                in_string = None
             i += 1
-            continue
-        triple_quote = next((tq for tq in _TRIPLE_QUOTES if text.startswith(tq, i)), None)
-        if triple_quote:
-            in_string = triple_quote
-            current.append(triple_quote)
-            i += 3
             continue
         if char in _QUOTE_CHARS:
             in_string = char
@@ -234,7 +290,7 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
     return lines
 
 
-def _first_real_offender(stripped_line: str) -> str | None:
+def _line_offender(stripped_line: str) -> str | None:
     spans = _quoted_string_spans(stripped_line)
     for match in LITELLM_MODEL_STRING_RE.finditer(stripped_line):
         if not _is_url_query_value(stripped_line, spans, match.start()):
@@ -242,16 +298,28 @@ def _first_real_offender(stripped_line: str) -> str | None:
     return None
 
 
+def _regex_offender(path: Path) -> tuple[int, str] | None:
+    markers = _COMMENT_MARKERS_BY_SUFFIX[path.suffix]
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    for lineno, stripped_line in enumerate(_strip_comments(text, markers), start=1):
+        offender = _line_offender(stripped_line)
+        if offender is not None:
+            return lineno, offender
+    return None
+
+
 def test_litellm_model_strings_only_in_provider_config() -> None:
     offenders: list[str] = []
     for path in _scan_files():
-        markers = _COMMENT_MARKERS_BY_SUFFIX[path.suffix]
-        text = path.read_text(encoding="utf-8", errors="ignore")
-        for lineno, stripped_line in enumerate(_strip_comments(text, markers), start=1):
-            offender = _first_real_offender(stripped_line)
-            if offender is not None:
-                offenders.append(f"{path.relative_to(ROOT)}:{lineno}: {offender!r}")
-                break
+        if path.suffix == ".py":
+            found = _python_offender(path)
+        elif path.suffix in (".yaml", ".yml"):
+            found = _yaml_offender(path)
+        else:
+            found = _regex_offender(path)
+        if found is not None:
+            lineno, offender = found
+            offenders.append(f"{path.relative_to(ROOT)}:{lineno}: {offender!r}")
 
     assert offenders == [], "LiteLLM-format model strings found outside provider config: " + ", ".join(
         offenders
