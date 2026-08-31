@@ -48,6 +48,7 @@ LiteLLM only behind ProviderGateway adapters, hidden LiteLLM retries disabled, a
 | A12 Scenario runtime API | ANY-22 | Done |
 | A13 Guest identity/quota | ANY-23 | Done |
 | A17 Backend handoff core | ANY-20 | Done |
+| A21b Backend handoff API E2E | ANY-43 | Done |
 
 ### Required Proof Work
 
@@ -67,9 +68,10 @@ LiteLLM only behind ProviderGateway adapters, hidden LiteLLM retries disabled, a
 | A22c Boundary audit | ANY-25 | MVP-A1 gate |
 
 The deterministic gate reports 11/11 standalone and 3/3 composite workflows. The live canary is
-credentialed manual/scheduled evidence; baseline CI remains credential-free. A14 email/paywall
-backend enablement (ANY-36) and A21b backend handoff E2E (ANY-43) remain Platform Core work but do
-not block Atom Runtime Proof.
+credentialed manual/scheduled evidence; baseline CI remains credential-free. A21b backend handoff
+E2E (ANY-43) is done (`apps/platform-api/tests/test_handoffs_api.py`, `postgresql-check`). A14
+email/paywall backend enablement (ANY-36) remains Platform Core work but does not block Atom
+Runtime Proof.
 
 ## MVP-A2 — Client Surfaces
 
