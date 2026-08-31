@@ -7,9 +7,10 @@
 - Created: 2026-08-31
 - Last updated: 2026-08-31
 - Review date: 2026-08-31
-- Next action: none — implementation, three internal code-review rounds, and ten GitHub PR
+- Next action: none — implementation, three internal code-review rounds, and eleven GitHub PR
   review rounds of fixes landed (round 10 replaced the hand-rolled Python/YAML lexer with real
-  parsers instead of another special case — see round-10 entry); move to `completed/` once merged.
+  parsers; round 11 extended router-identity resolution to the whole package and fixed two gaps
+  that rewrite itself exposed — see those entries); move to `completed/` once merged.
 - Blocker: none
 
 ## Goal
@@ -433,6 +434,69 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
     flipped. Also ran the real test against the actual repository tree (not just the synthetic
     cases) to confirm the wider/different scanning mechanism doesn't newly false-positive on real
     project files.
+- [x] Eleventh GitHub PR review round (2026-08-31, PR #96 "Code-ewview (me #10)", reviewing
+      commit `ae67858`) found 4 more findings — 2 in each file, all in the round-10 rewrite
+      itself. This time, before touching any code, entered plan mode at the user's explicit
+      request, wrote and verified a design (see `docs/exec-plans/active/` — the design is
+      recorded below, not as a separate file) *before* implementing, including a documented
+      decision to reject a tempting alternative (see the decision-log entry on dynamic FastAPI
+      introspection) after concretely verifying it would introduce worse fragility than it fixed:
+  - **`test_no_product_specific_endpoints.py`, blocking.** Router identity tracking was still
+    per-file only: `from anytoolai_platform_api.routers.demo import router as demo_router` — the
+    exact pattern `main.py` already uses for all 7 real routers — left the imported name
+    untracked in the importing file, so a hypothetical direct `@router.get(...)` call there
+    (rather than only `app.include_router(...)`, which `main.py` happens to use today) would be
+    invisible. Fixed: split `_router_variable_names` into `_direct_router_names` (unchanged
+    constructor-call pass) and `_propagate_router_aliases` (unchanged local-rebinding pass, now
+    reusable against a pre-seeded set); added `_module_dotted_name`/`_resolve_import_module`
+    (handles both absolute imports — verified against real `main.py`, resolving all 7 real
+    `router as X_router` imports to their source files — and relative imports via `node.level`)
+    and `_package_router_names`, which runs one whole-package fixed point combining cross-file
+    import-edge propagation with the existing per-file alias propagation, so any-length chains
+    (import then local re-alias, multi-file import chains) resolve, not just the one reported
+    hop. `test_no_product_specific_endpoint_paths()` now parses every file once, computes
+    `router_names` for the whole package once, then calls a renamed
+    `_route_path_literals_for_tree` per file with the precomputed pieces — and raises a clear
+    `AssertionError` on a `SyntaxError` instead of silently skipping an unparseable file. Verified
+    the exact review scenario (relative import), the real `main.py`-shaped absolute-import-with-
+    alias pattern, a 3-file import chain, and an import-then-local-re-alias combo — plus two
+    control cases (an unrelated cross-module import that isn't a router; a `main.py`-shaped file
+    using only `include_router`) confirming no new false positives.
+  - **Same file, blocking.** `ROUTE_REGISTRATION_METHODS` covered only HTTP methods; FastAPI's
+    WebSocket registration APIs (`websocket`, `websocket_route`, `add_api_websocket_route`,
+    `add_websocket_route`) were ignored entirely. Fixed: added all four — verified each exists on
+    this project's installed FastAPI (0.137.0) with `path: str` as the first positional argument,
+    so the existing `_path_argument` extraction needed no changes. These automatically benefit
+    from fix one's whole-package router-identity resolution with no separate handling.
+  - **`test_litellm_model_strings_stay_in_provider_config.py`, blocking.** The round-10
+    `tokenize`-based Python scanner only inspected `STRING` tokens; Python 3.12+ tokenizes an
+    f-string as `FSTRING_START`/`MIDDLE`/`END` instead, so `model = f"openai/gpt-4.1"` — a
+    regression versus the original regex scanner, which would have caught it — was invisible.
+    Fixed by switching `_python_offender` from `tokenize` to `ast.walk` entirely (not just to
+    handle f-strings — a strictly more robust primitive for this problem: `JoinedStr`/`Constant`/
+    `FormattedValue` shapes are stable across Python versions, unaffected by tokenizer-level
+    changes; gives already-decoded values with no `ast.literal_eval` failure modes; comments don't
+    exist in the AST at all, excluding them by construction the same way `tokenize.COMMENT`-
+    skipping did). A `JoinedStr` is only checked when every part is a literal `Constant` (no
+    `FormattedValue`, i.e. no real `{expr}` interpolation) — a genuinely dynamic f-string is
+    skipped, matching the original intent. `tokenize`/`io`/`ast.literal_eval` are now unused and
+    removed. Verified the exact `f"openai/gpt-4.1"` case, a genuinely dynamic
+    `f"openai/{name}-v1"` (correctly skipped), and all 12 prior Python regression cases (including
+    the round-13 triple-quote-with-interior-quote case and the round-9 docstring-control case).
+  - **Same file, blocking.** `yaml.compose()` only accepts a single YAML document; a valid
+    multi-document file (`foo: bar\n---\nmodel: openai/gpt-4.1`) raised `YAMLError`, and `except
+    yaml.YAMLError: return None` silently skipped the *entire file* — a worse failure mode than
+    the pre-round-10 line scanner, which still scanned every line regardless of document
+    structure. Fixed: switched to `yaml.compose_all`, iterating every document (verified
+    `compose_all` keeps line numbers absolute across `---` boundaries, not reset per document); a
+    genuine parse failure now raises `AssertionError` instead of silently skipping, matching this
+    repo's anti-silent-skip convention and the review's own suggestion — verified safe by running
+    `yaml.compose_all` against all 27 real `.yaml`/`.yml` files in `SCAN_ROOTS` first (zero parse
+    failures), so this can't newly break on anything that exists today. Verified the exact
+    multi-document case plus all 5 prior YAML regression cases.
+  - Re-ran the full 20-case Python/regex regression table plus the 5-case YAML table from round
+    10 (25 cases total, all pass) and both test files against the real repository tree, in
+    addition to the new-case verification above.
 
 ## Validation
 
@@ -585,6 +649,35 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
       real-parser-based scan doesn't newly false-positive on actual project files.
 - [x] `python3 -m pytest tests/architecture -q`, `validate_architecture.py`, and `quick-check`
       re-run after this round — 24 passed / passed / 981 passed.
+- [x] Before touching code: entered plan mode, verified `_module_dotted_name`/
+      `_resolve_import_module` against real `main.py` imports (all 7 real `router as X_router`
+      imports correctly resolved to source files), confirmed all 4 WebSocket registration methods
+      exist on the installed FastAPI with `path: str` first-positional, prototyped and ran the
+      `ast.walk`-based f-string design against the exact and control cases, confirmed
+      `yaml.compose_all` keeps absolute line numbers across document boundaries, and confirmed all
+      27 real `.yaml`/`.yml` files parse cleanly (so failing loudly on a parse error is safe) —
+      all *before* writing the plan file, per the user's explicit request to think and plan first.
+- [x] Manual check: the exact round-15 relative-import scenario, the real-`main.py`-shaped
+      absolute-import-with-alias pattern, a 3-file import chain, and an import-then-local-re-alias
+      combo are all caught; a control case (unrelated cross-module import, not a router) and a
+      `main.py`-shaped `include_router`-only file both stay clean (no new false positives).
+- [x] Manual check: all 4 WebSocket registration methods (`websocket`, `websocket_route`,
+      `add_api_websocket_route`, `add_websocket_route`) are caught when called on a tracked
+      router.
+- [x] Re-ran all 6 prior `test_no_product_specific_endpoints.py` regression cases (rounds 1–14)
+      against the refactored whole-package implementation — all pass, confirming the refactor
+      didn't change behavior for any previously-verified case.
+- [x] `python3 -m pytest tests/architecture/test_no_product_specific_endpoints.py -q` against the
+      real repository tree — passed.
+- [x] Manual check: `f"openai/gpt-4.1"` (constant-only f-string) is caught; `f"openai/{name}-v1"`
+      (genuinely dynamic) is correctly skipped; re-ran all 12 prior Python regression cases
+      (rounds 4–13) against the `ast.walk`-based rewrite — all pass.
+- [x] Manual check: `foo: bar\n---\nmodel: openai/gpt-4.1` (multi-document YAML) is caught with
+      the correct absolute line number; re-ran all 5 prior YAML regression cases — all pass.
+- [x] `python3 -m pytest tests/architecture/test_litellm_model_strings_stay_in_provider_config.py -q`
+      against the real repository tree — passed.
+- [x] `python3 -m pytest tests/architecture -q`, `validate_architecture.py`, and `quick-check`
+      re-run after this round — 24 passed / passed / 981 passed.
 
 ## Decision log
 
@@ -612,6 +705,12 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | `_TRIPLE_QUOTES` moved above both `_quoted_string_spans` and `_strip_comments`, and both functions now share the identical triple-quote-first delimiter check, instead of each maintaining its own copy. | Round 12 fixed only `_strip_comments`'s copy of this exact tracking logic and the round-12 log entry incorrectly implied `_quoted_string_spans` was fixed too — the same class of "two independent copies of the same state machine drift apart" bug that already bit `SKIP_PATH_PARTS` twice (rounds 1–2) and the receiver/alias checks across `_router_variable_names`/`_route_path_literals` (rounds 10–11). Sharing the constant and the check shape doesn't guarantee no future drift, but removes the most common cause of it (forgetting the sibling copy exists). Superseded by round 10, which moved `.py` off this tracker (and its `_TRIPLE_QUOTES` handling) entirely — see below. |
 | 2026-08-31 | `.py` and `.yaml`/`.yml` files are scanned with real parsers (`tokenize`, `yaml.compose`) instead of a hand-rolled line-based quote/comment tracker; `.json`/`.js`-family files keep the hand-rolled tracker. | Nine of the ten review rounds against these two test files (3, 4, 6, 7, 8, 9, 11, 12, 13) found a real bug in hand-rolled string/comment tracking approximating Python or YAML grammar — each fix closed the reported case but the category kept producing a next one, because a line-based approximation of a language's grammar structurally can't be that grammar. Both languages already have a correct, dependency-free (Python: stdlib `tokenize`; YAML: PyYAML, already a project dependency) implementation of their own grammar available, so using it eliminates the *category*, not just the latest instance. `.json` has no comment syntax and only ever quotes strings (the category of bug that hit Python/YAML doesn't exist in JSON's grammar — never actually reported broken); `.js`/`.ts` have no available stdlib tokenizer, so they keep the same class of residual risk the Python/YAML paths were just moved off of, accepted as a known, narrower ceiling rather than rewritten with a new dependency for a file type this audit hasn't found a real bug in yet. |
 | 2026-08-31 | `_router_variable_names` propagates router/app identity through simple rebindings (`api = router`) to a fixed point, rather than only recognizing a direct constructor-call RHS. | The round-10 review's `api = router` example is the 1-hop case of a general "alias tracking" problem already hit twice before in narrower forms (round 9's module-qualified access, round 10's import alias) — a fixed-point pass over `Assign`/`AnnAssign` nodes whose RHS is already a known router expression solves the general case (any-length alias chain) in one mechanism instead of adding a third special-cased branch for one more specific rebinding shape. |
+| 2026-08-31 | Router-identity resolution stays static (AST over the whole `apps/platform-api` package), rejecting a switch to importing the real `anytoolai_platform_api.main.app` and inspecting its resolved route table. | Investigated before touching code, per the user's explicit "think and plan first" instruction after round 10's rewrite itself produced 4 new gaps. This repo's `fastapi` dependency is unpinned (`fastapi>=0.115`); the installed 0.137.0 defers route flattening behind a private `_IncludedRouter`/`.original_router` indirection, so a correct dynamic table would depend on an internal that can silently change shape on any future FastAPI bump. `app.openapi()` alone (the stable public API) also has blind spots — no WebSocket routes, no `include_in_schema=False` routes. A bounded, inspectable static-analysis gap beats an unbounded private-API fragility risk for a project already burned repeatedly by unreliable detection. |
+| 2026-08-31 | Router-name resolution across the whole package (`_package_router_names`) is a single fixed-point loop combining cross-file import-edge propagation and each file's existing local-rebinding propagation, rather than two separate passes run to convergence independently. | A name can become known only after an imported router alias arrives from another file, and that alias can then itself be locally rebound again in the importing file (or re-exported to a third file); running import-edge propagation and local-alias propagation as two independent one-shot passes would miss any chain where the two interleave, so they share one `while changed` loop over both mechanisms. |
+| 2026-08-31 | `_resolve_import_module` mimics Python's own relative-import resolution (`node.level`) instead of only handling this repo's actual convention (absolute imports). | The round-10 review's own example used a relative import; the resolution logic is a handful of lines given `_module_dotted_name` already exists, and getting the general case right up front is cheaper than shipping an absolute-only version that the next review round would show incomplete against a relative-import file this repo could add tomorrow. |
+| 2026-08-31 | Star imports (`from .shared import *`) and cross-module constant resolution (`_module_string_constants` following an imported constant to its defining module) are explicitly left unhandled this round, documented rather than silently missing. | Neither is used anywhere in this repo today (verified), and both are real added complexity for idioms with no current instance; adding speculative handling for a pattern that hasn't been shown to exist is exactly the scope-creep the "think first" instruction was pushing back against — better to name the gap than pretend the whole-package rewrite makes every future gap in this space impossible. |
+| 2026-08-31 | `_python_offender` switches from `tokenize` to `ast.walk` (`ast.Constant`/`ast.JoinedStr`/`ast.FormattedValue`), rather than teaching the `tokenize`-based scanner about `FSTRING_START`/`FSTRING_MIDDLE`/`FSTRING_END` tokens. | PEP 701 (Python 3.12+, this repo runs 3.14) split f-string tokenization into multiple token kinds, which is exactly the kind of version-coupled lexer detail round 10 already moved this file off of once for a different reason; `ast.walk` gives already-decoded string values directly (no `literal_eval`), comments don't exist in the AST at all (excluded by construction), and the node shapes involved have been stable since Python 3.6 — a strictly simpler and more robust primitive than patching the tokenizer-level workaround. A `JoinedStr` with any `FormattedValue` (real `{expr}` interpolation) is left unresolved and skipped, matching the original intent to never evaluate expressions. |
+| 2026-08-31 | `_yaml_offender` uses `yaml.compose_all` and raises `AssertionError` on a genuine `yaml.YAMLError`, rather than keeping `yaml.compose` with a silent per-file skip on any parse error. | `yaml.compose` only accepts a single document; a valid multi-document file (`---` separated) raised `YAMLError` and the existing `except yaml.YAMLError: return None` turned that into a silent skip of the *entire file* — worse than the pre-round-10 line scanner, which still scanned every line regardless of document structure, and a direct violation of this repo's own no-silent-skips convention. Verified safe against all 27 real `.yaml`/`.yml` files in `SCAN_ROOTS` before making a parse failure fatal — zero existing files trip it. |
 
 ## Progress log
 
@@ -632,6 +731,7 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | Eighth GitHub PR #96 review round ("Code-ewview (me #7)", reviewing commit `8b0b9d4`) found `app.router.add_api_route(...)` — valid FastAPI usage via the app's public `.router` attribute — still bypassed the endpoint guard (receiver was an `ast.Attribute`, not a tracked `ast.Name`), and that the string-tracker's `_QUOTE_CHARS`-only model misreads Python triple-quoted strings as three independent 1-char delimiters, so an interior single `"` inside a triple-quoted body desynced tracking and let a following `#` on the next line be misread as a real comment. This time fixed both with a generalization instead of another one-off special case: `_is_router_expr` (a small recursive router/`.router`-chain check) replaces the direct-`ast.Name`-only receiver check; `_TRIPLE_QUOTES` is checked as an atomic 3-char delimiter before the 1-char fallback. Verified both exact cases from the review, a control case (an ordinary docstring with `#` and the word "model" but no real hardcode stays unflagged), re-ran the full 19-case regression table spanning rounds 4–12 (nothing flipped), and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Await/act on next code review. |
 | 2026-08-31 | Ninth GitHub PR #96 review round ("Code-ewview (me #8)", reviewing commit `0b4a469`) found one blocking gap and one non-blocking one: `test_no_product_specific_endpoints.py` only scanned `routers/` + `main.py`, so a router defined in any other package module (e.g. a hypothetical `product_api.py`, wired in from `main.py` via `include_router` alone, which carries no forbidden literal itself) was never visited at all; and `_quoted_string_spans` still used the pre-round-12 1-char-only quote tracker, so a real triple-quoted string with an interior quote before a URL query value false-positived as a hardcode once `_strip_comments` (but not this sibling function) gained triple-quote support. Fixed both: replaced the two-source file scan with `PLATFORM_API_PACKAGE.rglob("*.py")` over the whole package; moved `_TRIPLE_QUOTES` above both quote-tracking functions and gave `_quoted_string_spans` the same triple-quote-first check `_strip_comments` uses, instead of two independently-drifting copies. Also corrected the round-12 log entry's inaccurate claim that both functions had already been fixed together. Caught and fixed a second self-inflicted `"""`-inside-`"""`-docstring syntax bug the same way as round 12 (`ast.parse` before moving on). Verified with a synthetic two-file package reproducing the exact review scenario (old scan: nothing found; new scan: both offenders found) and the exact triple-quote-interior-quote case, re-ran the full 20-case regression table spanning rounds 4–13 (nothing flipped), and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Await/act on next code review. |
 | 2026-08-31 | Tenth GitHub PR #96 review round ("Code-ewview (me #9)", reviewing commit `f96d571`) found two more findings in the same two categories that had already produced repeat bugs across the prior nine rounds: `_router_variable_names` still only recognized a direct constructor-call RHS, so `api = router` left `api` untracked; and `#` inside a YAML block scalar is literal content, not a comment, so `notes: |\n  # fallback openai/gpt-4.1` hid a real hardcode. Rather than add an eleventh special case to either hand-rolled tracker, replaced the underlying approach where it had actually been shown unreliable: `_router_variable_names` gained a fixed-point alias-propagation pass (any-length rebinding chain, not just the one reported); `.py` and `.yaml`/`.yml` scanning moved from the hand-rolled line-based tracker to real parsers (`tokenize` for Python, `yaml.compose` via the already-a-dependency PyYAML for YAML), with `.json`/`.js`-family files kept on the existing tracker since that category of bug was never actually shown to exist there. Caught and fixed a self-introduced off-by-one in `_is_url_query_value`'s span-containment check while rewriting (verified via the regression table before calling it done, not shipped blind). Verified the exact `api = router` case plus an unrequested 2-hop alias chain, the exact YAML block-scalar case, a 23-case regression table (20 prior cases plus 3 new ones the rewrite needed), and a real-repository-tree run of both test files (not just synthetic cases) to confirm no new false positives. `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Commit. |
+| 2026-08-31 | Eleventh GitHub PR #96 review round ("Code-ewview (me #10)", reviewing commit `ae67858`) found the round-10 rewrite itself left 4 gaps: router-identity tracking was still per-file only, so `main.py`'s real pattern (`from anytoolai_platform_api.routers.demo import router as demo_router`) left every imported router name untracked; `ROUTE_REGISTRATION_METHODS` covered only HTTP methods, missing FastAPI's 4 WebSocket registration APIs entirely; the `tokenize`-based Python scanner only inspected `STRING` tokens, so an f-string hardcode (`f"openai/gpt-4.1"`) was invisible under Python 3.12+'s PEP 701 f-string tokenization (a regression versus the pre-round-10 regex scanner); and `yaml.compose()` raising on a valid multi-document file turned into a silent skip of the entire file via the existing `except yaml.YAMLError: return None`. Given the user's explicit instruction to think and plan before touching code again, entered Plan Mode first: verified all four findings directly against current code, investigated and rejected switching router-identity resolution to dynamic FastAPI app introspection (concrete reason: unpinned `fastapi>=0.115` plus the installed 0.137.0's private `_IncludedRouter`/`.original_router` route-flattening internals — see decision log), and only implemented after presenting a complete plan for approval. Fixed all four: `_package_router_names` resolves router identity across the whole package via a single fixed-point loop combining cross-file import-edge propagation (`_resolve_import_module`, handling both absolute and relative imports) with each file's existing local-rebinding propagation; the 4 WebSocket methods were added to `ROUTE_REGISTRATION_METHODS`; `_python_offender` was rewritten from `tokenize` to `ast.walk` over `ast.Constant`/`ast.JoinedStr`/`ast.FormattedValue` (skips any `JoinedStr` with real `{expr}` interpolation, matching the original intent to never evaluate expressions); `_yaml_offender` switched to `yaml.compose_all` and now raises `AssertionError` on a genuine parse failure instead of skipping. Explicitly left out of scope and documented: star imports and cross-module constant resolution, neither used anywhere in this repo today. Verified: the exact `main.py`-shaped absolute-import pattern, a relative-import variant, a 3-file import chain, an import-then-local-realias combo, and 2 control cases (no false positives) for fix 1; all 4 WebSocket methods for fix 2; the exact f-string case plus a genuinely-dynamic f-string (correctly skipped) for fix 3; the exact multi-document YAML case plus all 27 real repo YAML files (zero parse failures) for fix 4; the full prior regression table (23 cases, rounds 4–14) replayed against every rewritten function with nothing flipped; both test files run against the real repository tree, not just synthetic fixtures. `pytest tests/architecture` (24 passed), `validate_architecture.py`, and `quick-check` (981 passed) stay green. | Await/act on next code review. |
 
 ## Open questions
 

@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import ast
-import io
 import re
-import tokenize
 from pathlib import Path
 
 import yaml
@@ -131,35 +129,61 @@ def _offending_match(value: str) -> str | None:
 
 def _python_offender(path: Path) -> tuple[int, str] | None:
     """(lineno, matched-text) of the first real hardcode in `path`'s string literals, using the
-    real CPython tokenizer instead of hand-rolled quote/comment tracking.
+    real Python AST instead of hand-rolled quote/comment tracking.
 
     Nine review rounds (7, 9, 11, 12, 13) found real bugs in a hand-rolled Python string/comment
-    tracker: triple-quoted strings misread as three 1-char delimiters, an interior quote
-    desyncing tracking, quote state reset per physical line instead of carried across a
-    multi-line string. `tokenize` is the actual language grammar, not an approximation of it —
-    it categorically can't have those bugs (or the next one a future review round would find).
-    `tokenize.STRING` tokens are real string literals with real source positions; `COMMENT`
-    tokens are already excluded from consideration by construction (only STRING tokens are
-    checked), so no separate comment-stripping step is needed at all.
+    tracker; round 14 replaced it with `tokenize`, which round 15 then found only inspects
+    `tokenize.STRING` — Python 3.12+ tokenizes an f-string as `FSTRING_START`/`MIDDLE`/`END`
+    instead, so a plain `model = f"openai/gpt-4.1"` hardcode was invisible (a regression versus
+    the original regex scanner). `ast.walk` sidesteps this rather than teaching the scanner about
+    another token shape: `JoinedStr`/`FormattedValue`/`Constant` node shapes are stable since
+    Python 3.6, unaffected by tokenizer-level changes, give already-decoded string values with no
+    `ast.literal_eval` failure modes, and comments don't exist in the AST at all (excluded from
+    consideration by construction, the same guarantee `tokenize.COMMENT`-skipping gave before —
+    with no separate comment-stripping step needed either way).
+
+    An f-string with real interpolation (`f"openai/{name}"`) is a genuinely dynamic value, not a
+    hardcode — a `JoinedStr` is only checked when *every* part is a literal `Constant` (no
+    `FormattedValue` at all); one with any interpolation is skipped, matching the original
+    (correct) intent to never evaluate expressions.
     """
     text = path.read_text(encoding="utf-8", errors="ignore")
     try:
-        tokens = tokenize.generate_tokens(io.StringIO(text).readline)
-        for tok in tokens:
-            if tok.type != tokenize.STRING:
-                continue
-            try:
-                value = ast.literal_eval(tok.string)
-            except (ValueError, SyntaxError):
-                continue
-            if not isinstance(value, str):
-                continue
-            match = _offending_match(value)
-            if match is not None:
-                return tok.start[0], match
-    except (tokenize.TokenError, SyntaxError, IndentationError):
-        pass
-    return None
+        tree = ast.parse(text)
+    except (SyntaxError, ValueError):
+        return None
+
+    # A JoinedStr's own Constant parts must not also be checked independently as top-level
+    # strings (`ast.walk` visits them too) — that would double-process a plain f-string and could
+    # match an incomplete fragment of a genuinely dynamic one on its own.
+    fstring_part_ids = {
+        id(part)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.JoinedStr)
+        for part in node.values
+    }
+
+    best: tuple[int, str] | None = None
+    for node in ast.walk(tree):
+        value: str | None = None
+        lineno = getattr(node, "lineno", None)
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and id(node) not in fstring_part_ids
+        ):
+            value = node.value
+        elif isinstance(node, ast.JoinedStr) and all(
+            isinstance(part, ast.Constant) and isinstance(part.value, str)
+            for part in node.values
+        ):
+            value = "".join(part.value for part in node.values)
+        if value is None or lineno is None:
+            continue
+        match = _offending_match(value)
+        if match is not None and (best is None or lineno < best[0]):
+            best = (lineno, match)
+    return best
 
 
 def _iter_yaml_scalars(node: yaml.Node):
@@ -180,24 +204,38 @@ def _yaml_offender(path: Path) -> tuple[int, str] | None:
 
     `#` is not a comment marker inside a YAML block scalar (`|`/`>`) — it's literal content — and
     a hand-rolled line scanner has no way to know it's inside one without re-implementing YAML's
-    block-scalar indentation rules. `yaml.compose` already does that correctly; walking its node
-    graph gives real scalar values (block/flow, quoted/unquoted — all resolved the same way) with
-    real source positions, with no separate comment-stripping step needed.
+    block-scalar indentation rules. `yaml.compose_all` already does that correctly (per document);
+    walking each document's node graph gives real scalar values (block/flow, quoted/unquoted —
+    all resolved the same way) with real source positions, with no separate comment-stripping
+    step needed. Uses `compose_all`, not `compose` (round 15: `compose` only accepts a single
+    document and raises on a valid multi-document file, e.g. `foo: bar\\n---\\nmodel:
+    openai/gpt-4.1` — `compose_all` scans every document; line numbers stay absolute across `---`
+    boundaries, not reset per document (verified)).
+
+    A genuine parse failure is a loud test failure, not a silent skip of the whole file — matches
+    this repo's own anti-silent-skip convention, and every real `.yaml`/`.yml` file in
+    `SCAN_ROOTS` parses cleanly today (verified), so this can't newly break on anything that
+    exists.
     """
     text = path.read_text(encoding="utf-8", errors="ignore")
     try:
-        root = yaml.compose(text)
-    except yaml.YAMLError:
-        return None
-    if root is None:
-        return None
-    for scalar in _iter_yaml_scalars(root):
-        if not isinstance(scalar.value, str):
+        documents = list(yaml.compose_all(text))
+    except yaml.YAMLError as exc:
+        raise AssertionError(f"could not parse {path.relative_to(ROOT)} as YAML: {exc}") from exc
+
+    best: tuple[int, str] | None = None
+    for document in documents:
+        if document is None:
             continue
-        match = _offending_match(scalar.value)
-        if match is not None:
-            return scalar.start_mark.line + 1, match
-    return None
+        for scalar in _iter_yaml_scalars(document):
+            if not isinstance(scalar.value, str):
+                continue
+            match = _offending_match(scalar.value)
+            if match is not None:
+                lineno = scalar.start_mark.line + 1
+                if best is None or lineno < best[0]:
+                    best = (lineno, match)
+    return best
 
 
 # Only `.json`/`.js`/`.jsx`/`.ts`/`.tsx` still go through this line-based scanner. `.json` has no
