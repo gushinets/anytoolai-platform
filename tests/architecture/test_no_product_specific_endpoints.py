@@ -165,12 +165,18 @@ def _direct_router_names(tree: ast.AST, aliases: dict[str, str]) -> set[str]:
     return names
 
 
-def _propagate_router_aliases(tree: ast.AST, names: set[str]) -> bool:
+def _propagate_router_aliases(
+    tree: ast.AST,
+    names: set[str],
+    module_router_names: dict[str, set[str]] | None = None,
+) -> bool:
     """Grow `names` (in place) with any local rebinding of an already-known router/app expression
-    (`api = router`, `other_app = app.router`), to a fixed point, so a multi-hop chain
-    (`b = a; c = b`) resolves too — not just a single reassignment. `_is_router_expr` also covers
-    a `.router` RHS, so `other = app.router` is picked up here for free. Returns whether anything
-    was added, so a caller running this across several files can tell when to stop iterating.
+    (`api = router`, `other_app = app.router`, `local = shared.router`), to a fixed point, so a
+    multi-hop chain (`b = a; c = b`) resolves too — not just a single reassignment.
+    `_is_router_expr` also covers a `.router` RHS and a module-alias attribute access, so
+    `other = app.router` / `local = shared.router` are picked up here for free. Returns whether
+    anything was added, so a caller running this across several files can tell when to stop
+    iterating.
     """
     changed_overall = False
     changed = True
@@ -185,7 +191,7 @@ def _propagate_router_aliases(tree: ast.AST, names: set[str]) -> bool:
                 value = node.value
             else:
                 continue
-            if value is None or not _is_router_expr(value, names):
+            if value is None or not _is_router_expr(value, names, module_router_names):
                 continue
             for target in targets:
                 if isinstance(target, ast.Name) and target.id not in names:
@@ -232,11 +238,16 @@ def _resolve_import_module(importing_path: Path, node: ast.ImportFrom) -> str | 
     return ".".join(base_parts) if base_parts else None
 
 
-def _package_router_names(trees: dict[Path, ast.Module]) -> dict[Path, set[str]]:
+def _package_router_names(
+    trees: dict[Path, ast.Module],
+) -> tuple[dict[Path, set[str]], dict[Path, dict[str, set[str]]]]:
     """Router/app variable names per file, resolved across the whole package: a name imported
     from another module in this same package that's a known router there is itself a known
     router here too, propagated to a fixed point so any-length import/alias chains resolve
-    (import then local re-alias, or a chain of imports across several files) — not just one hop.
+    (import then local re-alias, a chain of imports across several files, or an attribute access
+    through a module-alias import) — not just one hop. Returns `(router_names_by_file,
+    module_router_names_by_file)` — the second lets a later pass resolve `shared.router` the same
+    way this function's own `_propagate_router_aliases` calls already do.
     """
     module_paths = {_module_dotted_name(path): path for path in trees}
     per_file_aliases = {path: _route_target_import_aliases(tree) for path, tree in trees.items()}
@@ -266,16 +277,65 @@ def _package_router_names(trees: dict[Path, ast.Module]) -> dict[Path, set[str]]
             ):
                 router_names[importing_path].add(local_name)
                 changed = True
+        # Recomputed each iteration: a module-alias target's own router set can itself still be
+        # growing (e.g. it gained a name via the import-edge loop above just now).
+        module_router_names = _module_router_names_by_file(trees, module_paths, router_names)
         for path, tree in trees.items():
-            if _propagate_router_aliases(tree, router_names[path]):
+            if _propagate_router_aliases(tree, router_names[path], module_router_names[path]):
                 changed = True
-    return router_names
+    return router_names, _module_router_names_by_file(trees, module_paths, router_names)
 
 
-def _is_router_expr(expr: ast.expr, router_names: set[str]) -> bool:
-    """Whether `expr` evaluates to a router/app object: a tracked name, or a `.router` access on
-    one — recursively, so `app.router.router` (never happens in practice, but costs nothing to
-    allow) is covered the same way `app.router` is.
+def _module_import_aliases(tree: ast.AST) -> dict[str, str]:
+    """Maps a local name bound by `import <dotted> as <alias>` to the dotted module name it
+    refers to (`import anytoolai_platform_api.shared as shared` ->
+    `{"shared": "anytoolai_platform_api.shared"}`).
+
+    Deliberately out of scope: bare `import <dotted>` without `as` (Python binds only the
+    top-level package name, e.g. `pkg`, not the leaf module — resolving `pkg.sub.mod.router`
+    from that would need multi-level attribute-chain resolution) and `from . import name` (statically
+    ambiguous between "a submodule named `name`" and "a name defined in `__init__.py`" without
+    also consulting the filesystem). Neither form is used anywhere in this repo today (verified).
+    """
+    aliases: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.asname:
+                    aliases[alias.asname] = alias.name
+    return aliases
+
+
+def _module_router_names_by_file(
+    trees: dict[Path, ast.Module],
+    module_paths: dict[str, Path],
+    router_names_by_file: dict[Path, set[str]],
+) -> dict[Path, dict[str, set[str]]]:
+    """For each file, maps a local `import <dotted> as <alias>` name to the set of router names
+    known in the module it refers to, so `shared.router` (an attribute access through a *module*
+    alias, not a name bound directly by `from ... import`) resolves the router the same way
+    `from .shared import router` already does."""
+    result: dict[Path, dict[str, set[str]]] = {}
+    for path, tree in trees.items():
+        per_alias: dict[str, set[str]] = {}
+        for local, dotted in _module_import_aliases(tree).items():
+            source_path = module_paths.get(dotted)
+            if source_path is not None:
+                per_alias[local] = router_names_by_file[source_path]
+        result[path] = per_alias
+    return result
+
+
+def _is_router_expr(
+    expr: ast.expr,
+    router_names: set[str],
+    module_router_names: dict[str, set[str]] | None = None,
+) -> bool:
+    """Whether `expr` evaluates to a router/app object: a tracked name, a `.router` access on one
+    — recursively, so `app.router.router` (never happens in practice, but costs nothing to allow)
+    is covered the same way `app.router` is — or an attribute access through a module alias
+    (`shared.router`, where `shared` is `import ...shared as shared` and `router` is a known
+    router name in that module — see `_module_router_names_by_file`).
 
     `FastAPI.router` is a real, commonly-used public attribute (it IS the app's root
     `APIRouter`); `app.router.add_api_route(...)` is valid FastAPI usage that registers a route
@@ -284,8 +344,17 @@ def _is_router_expr(expr: ast.expr, router_names: set[str]) -> bool:
     """
     if isinstance(expr, ast.Name):
         return expr.id in router_names
-    if isinstance(expr, ast.Attribute) and expr.attr == "router":
-        return _is_router_expr(expr.value, router_names)
+    if isinstance(expr, ast.Attribute):
+        # Check the module-alias case first: `shared.router` (`shared` a module alias) must not
+        # fall into the ".router" recursion below, which would instead ask "is `shared` itself a
+        # tracked router name?" (no — it's a module alias, a different kind of identity) and
+        # wrongly return False.
+        if module_router_names and isinstance(expr.value, ast.Name):
+            names = module_router_names.get(expr.value.id)
+            if names is not None and expr.attr in names:
+                return True
+        if expr.attr == "router":
+            return _is_router_expr(expr.value, router_names, module_router_names)
     return False
 
 
@@ -294,6 +363,7 @@ def _route_path_literals_for_tree(
     router_names: set[str],
     aliases: dict[str, str],
     constants: dict[str, str],
+    module_router_names: dict[str, set[str]],
 ) -> list[str]:
     literals: list[str] = []
     for node in ast.walk(tree):
@@ -303,9 +373,10 @@ def _route_path_literals_for_tree(
         if isinstance(func, ast.Attribute):
             func_name = func.attr
             # `router.get(...)` is a route registration only when `router` resolves to a local
-            # APIRouter/app (including via `.router` on one) — otherwise it also matches
-            # unrelated `.get(...)` calls, e.g. `request.query_params.get("view", "x")`.
-            called_on_router = _is_router_expr(func.value, router_names)
+            # APIRouter/app (including via `.router` on one, or a module-alias attribute access
+            # like `shared.router`) — otherwise it also matches unrelated `.get(...)` calls, e.g.
+            # `request.query_params.get("view", "x")`.
+            called_on_router = _is_router_expr(func.value, router_names, module_router_names)
         else:
             func_name = getattr(func, "id", None)
             # Resolve an import alias (`APIRouter as R` -> `R(...)`) back to the real
@@ -337,14 +408,18 @@ def test_no_product_specific_endpoint_paths() -> None:
                 f"could not parse {path.relative_to(ROOT)} as Python: {exc}"
             ) from exc
 
-    router_names_by_file = _package_router_names(trees)
+    router_names_by_file, module_router_names_by_file = _package_router_names(trees)
 
     offenders: list[str] = []
     for path, tree in trees.items():
         aliases = _route_target_import_aliases(tree)
         constants = _module_string_constants(tree)
         literals = _route_path_literals_for_tree(
-            tree, router_names_by_file[path], aliases, constants
+            tree,
+            router_names_by_file[path],
+            aliases,
+            constants,
+            module_router_names_by_file[path],
         )
         for literal in literals:
             lowered = literal.lower()

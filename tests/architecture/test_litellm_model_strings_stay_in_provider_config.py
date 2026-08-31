@@ -258,6 +258,48 @@ _COMMENT_MARKERS_BY_SUFFIX: dict[str, tuple[str, ...]] = {
 }
 
 
+# Characters that mean "the token just before this position is a value" (an identifier/number,
+# a closing `)`/`]`, or a closing quote) — i.e. a following `/` is division, not the start of a
+# regex literal. Mirrors the standard JS/TS lexer heuristic for the division-vs-regex ambiguity
+# (a `/` after an operator, `(`, `,`, `=`, or start of line is a regex; after a value, a
+# division).
+#
+# ponytail: this is a last-*character* heuristic, not a last-*token* one, so it can't distinguish
+# a real identifier (`foo / 2`, division) from a keyword that also ends in a letter (`return
+# /re/`, a regex) — a keyword-preceded regex literal reads as division and stays unhandled, the
+# same class of narrower-ceiling tradeoff already accepted for this JS/TS path (see the
+# `_COMMENT_MARKERS_BY_SUFFIX` note above). Checked: no file in `_scan_files()` today contains a
+# keyword-preceded regex literal. Upgrade path if one ever does: track the last identifier *word*
+# (not just its last character) and check it against a small JS keyword set
+# (`return`/`typeof`/`instanceof`/`case`/`in`/`of`/`new`/`delete`/`void`/`yield`/...).
+_REGEX_PRECEDED_BY_VALUE = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$)]"
+) | frozenset(_QUOTE_CHARS)
+
+
+def _regex_literal_end(text: str, start: int, length: int) -> int | None:
+    """If `text[start]` (`/`) starts a JS/TS regex literal, the index just past its closing,
+    unescaped `/` outside a `[...]` character class — else `None` (no terminator before the next
+    newline, so `start` isn't actually a regex literal)."""
+    j = start + 1
+    in_char_class = False
+    while j < length:
+        c = text[j]
+        if c == "\n":
+            return None
+        if c == "\\":
+            j += 2
+            continue
+        if c == "[":
+            in_char_class = True
+        elif c == "]":
+            in_char_class = False
+        elif c == "/" and not in_char_class:
+            return j + 1
+        j += 1
+    return None
+
+
 def _quoted_string_spans(line: str) -> list[tuple[int, int]]:
     """(start, end) of each quoted string's content (excluding the quote chars) on `line`."""
     spans: list[tuple[int, int]] = []
@@ -285,16 +327,20 @@ def _quoted_string_spans(line: str) -> list[tuple[int, int]]:
 
 def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
     """Comment-stripped lines of `text` (only using `markers`, plus JS/TS `/* ... */` block
-    comments whenever `markers` is non-empty), with quote state carried across line boundaries
-    rather than reset at each newline — a JS/TS template literal containing `//` (e.g. a URL)
-    must not have that `//` misread as a comment start on a later physical line.
+    comments and `/regex/` literals whenever `markers` is non-empty), with quote state carried
+    across line boundaries rather than reset at each newline — a JS/TS template literal
+    containing `//` (e.g. a URL) must not have that `//` misread as a comment start on a later
+    physical line.
 
     Block comments must be recognized as their own state (not just skipped like a line comment):
     otherwise a stray quote char inside one (`/* " */`) opens `in_string` early, and a real,
     legitimately-quoted `//` later on the line (e.g. inside a URL) then gets misread as a line
-    comment, truncating a real hardcode past it. `markers` is only non-empty for JS/TS-family
-    suffixes (`.json` has no comment syntax and returns early above), so this never fires for
-    `.json`.
+    comment, truncating a real hardcode past it. The same is true of a regex literal containing a
+    quote char (`/"/`): it must be recognized and skipped as its own unit, using the standard
+    JS/TS division-vs-regex heuristic (`_REGEX_PRECEDED_BY_VALUE` — a `/` is a regex-literal start
+    unless the last significant character before it was part of a value: an identifier/number, a
+    closing `)`/`]`, or a closing quote). `markers` is only non-empty for JS/TS-family suffixes
+    (`.json` has no comment syntax and returns early above), so none of this fires for `.json`.
     """
     if not markers:
         return text.splitlines()
@@ -303,6 +349,7 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
     current: list[str] = []
     in_string: str | None = None
     in_block_comment = False
+    last_sig = ""
     i = 0
     length = len(text)
     while i < length:
@@ -328,11 +375,14 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
             current.append(char)
             if char == in_string:
                 in_string = None
+            if not char.isspace():
+                last_sig = char
             i += 1
             continue
         if char in _QUOTE_CHARS:
             in_string = char
             current.append(char)
+            last_sig = char
             i += 1
             continue
         if text.startswith("/*", i):
@@ -343,7 +393,15 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
             newline_pos = text.find("\n", i)
             i = length if newline_pos == -1 else newline_pos
             continue
+        if char == "/" and last_sig not in _REGEX_PRECEDED_BY_VALUE:
+            end = _regex_literal_end(text, i, length)
+            if end is not None:
+                i = end
+                last_sig = "]"  # a regex literal is itself a value; a following `/` is division
+                continue
         current.append(char)
+        if not char.isspace():
+            last_sig = char
         i += 1
     lines.append("".join(current))
     return lines
