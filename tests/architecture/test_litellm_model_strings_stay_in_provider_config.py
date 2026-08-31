@@ -63,6 +63,10 @@ LITELLM_MODEL_STRING_RE = re.compile(
     rf"""(?:{"|".join(sorted(LITELLM_PROVIDERS, key=len, reverse=True))})"""
     r"/[\w.\-]+"
 )
+# A match still isn't necessarily a real hardcode: `"https://example.com?model=openai/gpt-4.1"` —
+# a `?model=`/`&model=` query value inside a URL string — has `=` right before the provider name,
+# same as a real assignment. `_is_url_query_value` filters those out by checking whether the match
+# sits inside a quoted string that contains `://` before it.
 
 
 def _scan_files() -> list[Path]:
@@ -90,6 +94,41 @@ _COMMENT_MARKERS_BY_SUFFIX: dict[str, tuple[str, ...]] = {
     ".js": ("#", "//"),
     ".jsx": ("#", "//"),
 }
+
+
+def _quoted_string_spans(line: str) -> list[tuple[int, int]]:
+    """(start, end) of each quoted string's content (excluding the quote chars) on `line`."""
+    spans: list[tuple[int, int]] = []
+    quote_char: str | None = None
+    content_start = 0
+    i = 0
+    length = len(line)
+    while i < length:
+        char = line[i]
+        if quote_char:
+            if char == "\\":
+                i += 2
+                continue
+            if char == quote_char:
+                spans.append((content_start, i))
+                quote_char = None
+            i += 1
+            continue
+        if char in _QUOTE_CHARS:
+            quote_char = char
+            content_start = i + 1
+        i += 1
+    return spans
+
+
+def _is_url_query_value(line: str, spans: list[tuple[int, int]], position: int) -> bool:
+    """True if `position` sits inside a quoted string that looks like a URL (`://` appears before
+    `position` within that same string) — a `?model=...`/`&model=...` query value embedded in a
+    URL, not a real provider-config field."""
+    for start, end in spans:
+        if start <= position < end:
+            return "://" in line[start:position]
+    return False
 
 
 def _strip_comment(line: str, markers: tuple[str, ...]) -> str:
@@ -128,15 +167,24 @@ def _strip_comment(line: str, markers: tuple[str, ...]) -> str:
     return line
 
 
+def _first_real_offender(line: str, markers: tuple[str, ...]) -> str | None:
+    stripped = _strip_comment(line, markers)
+    spans = _quoted_string_spans(stripped)
+    for match in LITELLM_MODEL_STRING_RE.finditer(stripped):
+        if not _is_url_query_value(stripped, spans, match.start()):
+            return match.group(0)
+    return None
+
+
 def test_litellm_model_strings_only_in_provider_config() -> None:
     offenders: list[str] = []
     for path in _scan_files():
         markers = _COMMENT_MARKERS_BY_SUFFIX[path.suffix]
         text = path.read_text(encoding="utf-8", errors="ignore")
         for lineno, line in enumerate(text.splitlines(), start=1):
-            match = LITELLM_MODEL_STRING_RE.search(_strip_comment(line, markers))
-            if match:
-                offenders.append(f"{path.relative_to(ROOT)}:{lineno}: {match.group(0)!r}")
+            offender = _first_real_offender(line, markers)
+            if offender is not None:
+                offenders.append(f"{path.relative_to(ROOT)}:{lineno}: {offender!r}")
                 break
 
     assert offenders == [], "LiteLLM-format model strings found outside provider config: " + ", ".join(

@@ -92,11 +92,16 @@ ROUTE_TARGET_CONSTRUCTORS = {"APIRouter", "FastAPI"}
 
 
 def _is_route_target_call(value: ast.expr | None) -> bool:
-    return (
-        isinstance(value, ast.Call)
-        and isinstance(value.func, ast.Name)
-        and value.func.id in ROUTE_TARGET_CONSTRUCTORS
-    )
+    if not isinstance(value, ast.Call):
+        return False
+    func = value.func
+    if isinstance(func, ast.Name):
+        return func.id in ROUTE_TARGET_CONSTRUCTORS
+    # Module-qualified form, e.g. `fastapi.FastAPI()`/`fastapi.APIRouter()` — the import alias
+    # (`fastapi`, `fa`, ...) doesn't matter, only the final attribute name does.
+    if isinstance(func, ast.Attribute):
+        return func.attr in ROUTE_TARGET_CONSTRUCTORS
+    return False
 
 
 def _router_variable_names(tree: ast.AST) -> set[str]:
