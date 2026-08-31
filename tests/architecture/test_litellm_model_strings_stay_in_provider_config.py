@@ -414,6 +414,19 @@ def _strip_comments(text: str, markers: tuple[str, ...], jsx: bool = False) -> l
     model-string regex to match against while making it structurally impossible for that content
     to affect quote/comment/regex state elsewhere.
 
+    `/* ... */` gets the symmetric treatment for the same reason: raw JSX text can contain `/*`
+    literally with no comment semantics at all (only inside a JS expression like `{/* comment
+    */}` does it mean anything), and this scanner has no way to tell the two apart. Rather than
+    open `in_block_comment` (no guaranteed closing `*/` in JSX text, the exact "state leaks past
+    this point" failure already fixed for `//` above) or let the `/` alone reach the regular
+    regex-vs-division decision (risking a stray later `/` on the same line being misread as the
+    literal's closing delimiter and consumed along with whatever real content sits between them —
+    including a real hardcode), `/*` in a JSX-capable file is treated as two fully ordinary,
+    non-comment characters, with `last_sig` deliberately set to bias a *following* `/` toward
+    "division/ordinary text" rather than "regex start" — the same conservative,
+    never-remove-what-might-be-a-hardcode direction this file has favored for JSX-shaped
+    ambiguity since round 20.
+
     `markers` is only non-empty for JS/TS-family suffixes (`.json` has no comment syntax and
     returns early above), so none of this fires for `.json`.
     """
@@ -505,6 +518,23 @@ def _strip_comments(text: str, markers: tuple[str, ...], jsx: bool = False) -> l
             last_sig = char
             i += 1
             continue
+        if jsx and text.startswith("/*", i):
+            # Raw JSX text can contain `/*` literally (`<pre>Use /* to start a comment</pre>`) —
+            # it has no comment semantics there, only inside a JS expression like `{/* comment
+            # */}`, and this scanner can't tell the two apart (see the docstring). Unlike a real
+            # block comment, don't open in_block_comment (no guaranteed closing `*/` exists in
+            # JSX text — the same "leaks state past this point" failure round 21 already fixed
+            # for `//`, just via `/*` instead). Also don't let the `/` alone reach the regular
+            # regex-vs-division decision below: `last_sig = "]"` deliberately biases a *following*
+            # `/` toward "division/ordinary text", not "regex start", so raw JSX text containing
+            # a stray `/` later on the line can't be misread as a regex and consumed forward —
+            # the conservative, content-preserving direction this scanner has favored since round
+            # 20 for anything JSX-text-shaped it can't parse for real.
+            current.append("/")
+            current.append("*")
+            last_sig = "]"
+            i += 2
+            continue
         if text.startswith("/*", i):
             in_block_comment = True
             i += 2
@@ -552,6 +582,15 @@ def _strip_comments(text: str, markers: tuple[str, ...], jsx: bool = False) -> l
             # `</` in a JSX/TSX file is always a closing tag, never a regex literal — see the
             # docstring's `jsx` paragraph. Scoped to JSX-capable files only.
             if looks_like_regex and jsx and last_sig == "<":
+                looks_like_regex = False
+            # A `/` right after `*` is `*/` — the closing delimiter of a real block comment
+            # (harmless to treat as division: a genuine `a * /re/` is not a pattern this repo
+            # uses anywhere) or, in JSX text now passed through as literal characters, the tail
+            # end of what looked like `/* ... */` prose. Without this, that `/` could itself be
+            # misread as opening a *new* fake regex, searching forward for the next unrelated `/`
+            # on the line — including one inside a real hardcode — and consuming everything
+            # between them. Scoped to JSX-capable files only, matching the `<` exclusion above.
+            if looks_like_regex and jsx and last_sig == "*":
                 looks_like_regex = False
             if looks_like_regex:
                 end = _regex_literal_end(text, i, length)
