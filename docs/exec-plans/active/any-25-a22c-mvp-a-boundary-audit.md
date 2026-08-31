@@ -7,7 +7,7 @@
 - Created: 2026-08-31
 - Last updated: 2026-09-01
 - Review date: 2026-09-01
-- Next action: none — implementation, three internal code-review rounds, and eighteen GitHub PR
+- Next action: none — implementation, three internal code-review rounds, and nineteen GitHub PR
   review rounds of fixes landed (round 10 replaced the hand-rolled Python/YAML lexer with real
   parsers; round 11 extended router-identity resolution to the whole package and fixed two gaps
   that rewrite itself exposed; round 12 fixed a `__init__.py` relative-import edge case in that
@@ -22,7 +22,9 @@
   replaced per-branch opt-in word finalization with a structural, can't-forget-it precondition
   after a third branch turned up missing the same call; round 18 excluded property-name-spelled-
   like-a-keyword from both keyword checks after review found `config.default` misclassified a
-  following division as a regex — see those entries); move to `completed/` once merged.
+  following division as a regex; round 19 excluded JSX/TSX closing tags (`</div>`) from the same
+  regex heuristic, scoped to `.jsx`/`.tsx` only — see those entries); move to `completed/` once
+  merged.
 - Blocker: none
 
 ## Goal
@@ -816,6 +818,37 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
     round) replayed with nothing flipped.
   - Re-ran the full `pytest tests/architecture` suite (24 passed) and the changed test file
     against the real repository tree.
+- **Nineteenth GitHub PR review round** (repeat review of commit `2cfeec8`) — the round-18
+  property-name/keyword blocker is fixed; one distinct blocking gap remains, specific to `.jsx`/
+  `.tsx`: a JSX/TSX closing tag (`</div>`, `</>`) starts with `</`, and `<` isn't in
+  `_REGEX_PRECEDED_BY_VALUE` (correctly not, for plain `.js`/`.ts`, where `a < /re/` is a real
+  comparison-then-regex idiom), so the `/` is misclassified as a regex start; `_regex_literal_end`
+  then scans forward and can use the `/` inside a later real `"openai/gpt-4.1"` literal as the
+  fake terminator, stripping the `openai/` provider prefix and defeating the guard. Reproduced
+  first (`const el = <div></div>; const model = "openai/gpt-4.1";` loses the `openai/` prefix).
+  - Checked repo exposure before deciding the fix's shape: 36 real `.jsx`/`.tsx` files exist under
+    `SCAN_ROOTS` with real closing tags, and a grep for any `<` immediately followed by a real
+    regex literal in those files found none — confirming the fix has real exposure to close and no
+    counter-risk to weigh against it.
+  - **Fix, scoped correctly rather than broadened past what's justified:** `_strip_comments` gained
+    a `jsx: bool = False` parameter (`_regex_offender` passes `path.suffix in (".jsx", ".tsx")`),
+    and the regex decision now additionally treats `looks_like_regex` as `False` whenever `jsx` is
+    true and `last_sig == "<"` — i.e. `</` never starts a regex literal, but *only* in JSX-capable
+    files. Deliberately not applied to plain `.js`/`.ts` (no closing tags can ever appear there,
+    and the existing `a < /re/`-is-a-regex behavior — already correct for that file type — stays
+    exactly as it was) — broadening it to all JS/TS-family files would have traded a real, rare
+    idiom's correctness for a case (JSX closing tags) that structurally cannot occur there.
+  - Verified: the exact review case and a JSX fragment closing tag (`</>`) both now find the full
+    hardcode; a real regex literal elsewhere in the same JSX file is still correctly recognized as
+    one; a real `a < /re/` comparison in a non-JSX (`.ts`) file is confirmed unaffected (still
+    treated as a regex, exactly as before this round); the same text with `jsx=True` is confirmed
+    to now resolve as division instead (the accepted, checked-safe tradeoff, since this repo has
+    no such pattern in any real `.jsx`/`.tsx` file today); `pytest tests/architecture` (24 passed)
+    against the real repository tree exercises all 36 real `.jsx`/`.tsx` files with no new false
+    positives; the full prior regression table (router identity + every JS/TS case across every
+    round) replayed with nothing flipped.
+  - Re-ran the full `pytest tests/architecture` suite (24 passed) and the changed test file
+    against the real repository tree.
 
 ## Validation
 
@@ -1111,6 +1144,20 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 - [x] `python3 -m pytest tests/architecture -q` (24 passed), the changed file against the real
       repository tree, `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed)
       all green after this round.
+- [x] Reproduced the round-19 finding with a standalone script against current code before
+      changing anything: `const el = <div></div>; const model = "openai/gpt-4.1";` stripped the
+      `openai/` prefix off the model literal. Checked repo exposure first: 36 real `.jsx`/`.tsx`
+      files with real closing tags exist under `SCAN_ROOTS`, and none contain a `<` immediately
+      followed by a real regex literal (confirming the fix has real exposure and no counter-risk).
+- [x] Manual check: the exact review case and a JSX fragment closing tag (`</>`) both now leave
+      the hardcode intact; a real regex literal elsewhere in the same JSX file is still correctly
+      recognized; a real `a < /re/` comparison in a non-JSX (`.ts`) file is confirmed unaffected —
+      still resolves as a regex exactly as before this round, since `jsx` scopes the exclusion to
+      `.jsx`/`.tsx` only.
+- [x] `python3 -m pytest tests/architecture -q` (24 passed, exercising all 36 real `.jsx`/`.tsx`
+      files with no new false positives), the changed file against the real repository tree,
+      `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) all green after
+      this round.
 
 ## Decision log
 
@@ -1159,6 +1206,7 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | Per-branch `_note(char)` calls (one per character-consuming branch: string-open, `(`, `)`, generic fall-through, newline) are replaced with a structural split: one dedicated branch handles every identifier character (the only place `word_buf` grows), and one unconditional `_finalize_word()` call runs for every other character before any branch-specific logic sees it — rather than adding a fifth `_note`/finalize call to the block-comment-entry branch the round-17 review reported missing one. | Three review rounds in a row (15, 16, 17) each found a *different* branch that had forgotten to call the shared finalization helper (a paren branch, the newline branch, now block-comment entry) — the same helper existing didn't stop the omission, because calling it was still each branch's own responsibility to remember. The user explicitly rejected patching the fourth instance the same way ("НОРМАЛЬНО ПОПРАВЬ! А НЕ КОСТЫЛЬ!"): making finalization a structural precondition instead of a per-branch opt-in makes the *whole class* of "this branch forgot to flush the word" bug impossible by construction, closing the reported block-comment case, the not-yet-reported line-comment case, and the zero-separator case in one change instead of three more narrow patches. |
 | 2026-08-31 | The `\n`-handling branch stays the unconditional first check in `_strip_comments`'s loop (ahead of `in_block_comment`/`in_string`), not folded into the new "every non-identifier character" tail alongside the other word-boundary branches. | Caught via self-review, not shipped: an intermediate version of the round-17 restructure moved `\n` handling next to the other boundary branches (after the `in_block_comment`/`in_string` checks), which broke multi-line string/comment line-splitting — a newline consumed while inside an active string or block comment stopped flushing `lines`/`current`, collapsing several physical lines' output into one entry and shifting every later line number. `\n` is not like the other boundary characters here: it must end a physical line's output *regardless* of lexical state (`in_string`/`in_block_comment` persist across the split, but the split itself must still happen), which only holds if it's checked before those states get a chance to consume it. |
 | 2026-09-01 | Both keyword-matching checks (`_JS_REGEX_KEYWORDS`, `_JS_CONTROL_KEYWORDS_BEFORE_PAREN`) now also require `not last_word_is_property`, tracked via a new `word_starts_after_dot`/`last_word_is_property` pair set at the moment a word starts accumulating (was the char immediately before it a `.`?), rather than matching `last_word` against the keyword set on spelling alone. | Reserved words are valid JS/TS property names (`config.default`, `obj.if`), so an IdentifierName spelled like a keyword right after `.`/`?.` is a real property access, not a keyword token — matching on spelling alone treated `config.default` and the actual `default` keyword identically, letting a following real division be misclassified as a regex start. Checked the sibling paren-keyword check for the identical shape *before* fixing anything (given the established pattern of these two checks sharing bugs — round 16 fixed both symmetric branches together too) and found it broken the same way (`obj.if(x)`), not yet externally reported; fixed both together rather than waiting for a predictable next round to report the second one separately. |
+| 2026-09-01 | `_strip_comments` gains a `jsx: bool = False` parameter that excludes `<` from qualifying as "not a value" (so `</` never starts a regex) only when true; `_regex_offender` passes `path.suffix in (".jsx", ".tsx")`, not applied to plain `.js`/`.ts`. | A JSX/TSX closing tag (`</div>`, `</>`) starts with `</`, and `<` is correctly *not* in `_REGEX_PRECEDED_BY_VALUE` for plain JS/TS (`a < /re/` is a real comparison-then-regex idiom there) — so the ambiguity is genuinely file-type-dependent, not a single universal rule to fix. Checked repo exposure before choosing the fix's shape: 36 real `.jsx`/`.tsx` files exist with real closing tags (real exposure to close) and none contain a `<` immediately followed by a real regex literal in any scanned file, `.jsx`/`.tsx` included (no counter-risk from also narrowing `.jsx`/`.tsx`'s own `a < /re/` case, though the fix doesn't even need to rely on that — it only ever changes behavior when `last_sig == "<"` specifically, i.e. `</`, not a bare `<` followed by whitespace then a regex). |
 
 ## Progress log
 
@@ -1187,6 +1235,7 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | Sixteenth GitHub PR #96 review round (repeat review of commit `bf66d329`) confirmed the router-identity blocker fixed and found one remaining JS/TS scanner gap: the round-15 control-paren heuristic loses a preceding keyword whenever a line break or comment separates it from `(`, because `_last_word` read from `current` (line-scoped, resets every `\n`) while `last_sig` persists across lines — the same "two independently-updated copies of one state machine drift apart" class this file's decision log has already named three times. Reproduced first (`if\n(ok) /"/...` truncates the real hardcode; a comment-separated variant reproduces identically). Fixed at the root rather than patching the paren case alone: replaced the lazy `_last_word(current)` read with a persistent `word_buf`/`last_word` pair maintained by one shared `_note(char)` closure, called from every character-consuming branch (string-open, `(`, `)`, generic fall-through) instead of each managing `last_sig` independently. While rewriting, caught and fixed a second bug in the identical class via self-review before it was externally reported: the newline branch never called `_note` at all, so the *existing* round-14 keyword-regex check (`return\n/re/`, no paren involved) had the same loss-across-a-line-break bug — added a `_note("\n")` call there too, since a newline is itself a word-boundary character. Verified: the exact `if\n(...)` and comment-separated cases now find the hardcode; the analogous `return\n/re/` case is also fixed; every same-line paren/keyword regression case from rounds 14–15 stays unaffected; the full prior regression table (router identity + all JS/TS cases across every round) replayed with nothing flipped. `pytest tests/architecture` (24 passed), both changed files against the real repository tree, `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) stay green. | Commit. |
 | 2026-08-31 | Seventeenth GitHub PR #96 review round (repeat review of commit `9a4d935`) found the round-16 fix held for newlines/line-comments, but block-comment entry didn't call the finalization helper either, so a keyword immediately followed by `/*...*/` and then a regex (`return/*note*//"/`) still lost the keyword. The user explicitly rejected patching this one more branch ("НОРМАЛЬНО ПОПРАВЬ! А НЕ КОСТЫЛЬ!") — the third review round in a row to find a different branch that forgot to call the shared `_note`/finalize helper, evidence the per-branch-opt-in mechanism itself was the weakness, not any one branch. Restructured `_strip_comments` instead of patching further: identifier characters are now handled by exactly one dedicated branch (the only place `word_buf` grows), and every other character passes through one unconditional `_finalize_word()` call before any branch-specific logic runs — no branch can forget to finalize anymore, because it isn't part of any branch's own responsibility. This closes the reported block-comment case, the not-yet-reported line-comment case, and the zero-separator case (`return/"/...`, no space or comment at all) in one change. Caught and fixed a self-introduced regression while restructuring, before calling it done: an intermediate version moved the `\n`-handling branch after the `in_block_comment`/`in_string` checks, which broke multi-line string/comment line-splitting (a newline consumed while inside an active string/comment stopped flushing `lines`, collapsing physical lines and shifting later line numbers) — caught by re-running the existing multi-line template-literal case, fixed by keeping `\n` as the unconditional first check exactly as before. Verified: the exact review case, a block-comment-separated keyword-and-paren, a *multi-line* block comment between a keyword and a regex, and a real identifier followed by a block comment then real division (confirmed to stay division) all resolve correctly; the multi-line line-splitting case re-verified line-by-line; the full prior regression table (router identity + every JS/TS case across every round) replayed with nothing flipped. `pytest tests/architecture` (24 passed), the changed file against the real repository tree, `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) stay green. | Commit. |
 | 2026-09-01 | Eighteenth GitHub PR #96 review round (repeat review of commit `8606fcc`) found the round-17 structural fix held, but both keyword checks (`_JS_REGEX_KEYWORDS`, `_JS_CONTROL_KEYWORDS_BEFORE_PAREN`) match `last_word` against their keyword sets on spelling alone, so a *property* named like a keyword (`config.default`, `obj.if`) is indistinguishable from the real keyword — reserved words are valid JS/TS property names. `config.default / "openai/gpt-4.1".length` misclassified the following `/` as a regex start, and `_regex_literal_end` then used the `/` inside the nearby model literal as a fake terminator, stripping the `openai/` provider prefix off the hardcode entirely. Reproduced first, then checked the sibling paren-keyword check for the identical shape before fixing anything (given round 16's precedent of both checks sharing bugs) and found `obj.if(x)` broken the same way, not yet reported — fixed both together. Added `last_word_is_property`, set from `word_starts_after_dot` (was the character immediately before the word's first character a `.`?, captured at the moment a new word starts accumulating, before `last_sig` itself moves on) and carried into `last_word_is_property` on finalization; both keyword checks now additionally require `not last_word_is_property`. Verified: the exact review case and the analogous paren case both leave the real hardcode/regex content intact (confirmed by inspecting the stripped output directly, not just the offender result); a genuine `default` keyword (a `switch` statement) and a genuine control keyword before a paren are both still correctly recognized; optional-chaining property access (`config?.return`) is also correctly excluded; the full prior regression table (router identity + every JS/TS case across every round) replayed with nothing flipped. `pytest tests/architecture` (24 passed), the changed file against the real repository tree, `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) stay green. | Commit. |
+| 2026-09-01 | Nineteenth GitHub PR #96 review round (repeat review of commit `2cfeec8`) found the round-18 property-name fix held, but one gap remained specific to `.jsx`/`.tsx`: `<` isn't in `_REGEX_PRECEDED_BY_VALUE` (correctly, for `.js`/`.ts`, where `a < /re/` is a real idiom), so a JSX/TSX closing tag's `</` was misclassified as a regex start, and `_regex_literal_end` could then use a later real model literal's own `/` as a fake terminator, stripping the `openai/` prefix off it. Reproduced first, then checked repo exposure before shaping the fix: 36 real `.jsx`/`.tsx` files with real closing tags exist under `SCAN_ROOTS`, and no scanned file (JSX or not) contains a `<` immediately followed by a real regex literal. Fixed by adding a `jsx: bool = False` parameter to `_strip_comments` (`_regex_offender` passes `path.suffix in (".jsx", ".tsx")`) that excludes `<` from qualifying as "not a value" only when true, so `</` never starts a regex in JSX-capable files while the existing `a < /re/`-is-a-regex behavior for plain `.js`/`.ts` (where no closing tag can ever appear) stays exactly as it was — deliberately not broadened past what the file-type-dependent ambiguity actually justifies. Verified: the exact review case and a JSX fragment closing tag (`</>`) both now find the full hardcode; a real regex literal elsewhere in the same JSX file is still correctly recognized; a real `a < /re/` comparison in a non-JSX file is confirmed unaffected; `pytest tests/architecture` (24 passed) exercises all 36 real `.jsx`/`.tsx` files with no new false positives; the full prior regression table (router identity + every JS/TS case across every round) replayed with nothing flipped. `validate_architecture.py`, `validate-docs`, and `quick-check` (981 passed) stay green. | Commit. |
 
 ## Open questions
 

@@ -338,7 +338,7 @@ def _quoted_string_spans(line: str) -> list[tuple[int, int]]:
     return spans
 
 
-def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
+def _strip_comments(text: str, markers: tuple[str, ...], jsx: bool = False) -> list[str]:
     """Comment-stripped lines of `text` (only using `markers`, plus JS/TS `/* ... */` block
     comments and `/regex/` literals whenever `markers` is non-empty), with quote state carried
     across line boundaries rather than reset at each newline — a JS/TS template literal
@@ -377,8 +377,16 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
     (`config.default`, `obj?.if`) — reserved words are valid JS/TS *property names*, so an
     IdentifierName spelled like a keyword right after `.`/`?.` is never a real keyword token, and
     must not be matched against `_JS_REGEX_KEYWORDS`/`_JS_CONTROL_KEYWORDS_BEFORE_PAREN` even
-    though its characters are identical. `markers` is only non-empty for JS/TS-family suffixes
-    (`.json` has no comment syntax and returns early above), so none of this fires for `.json`.
+    though its characters are identical.
+
+    `jsx` (only ever true for `.jsx`/`.tsx`) excludes one more `/`-preceding character from
+    "regex start": `<` directly followed by `/` is a JSX/TSX closing tag (`</div>`, `</>`), never
+    a regex literal — `_REGEX_PRECEDED_BY_VALUE` doesn't (and, for plain `.js`/`.ts`, correctly
+    shouldn't) include `<`, since `a < /re/` is genuinely a comparison-then-regex there. Scoped to
+    JSX-capable files only, so the rare `a < /re/` idiom in a `.js`/`.ts` file (where no closing
+    tag can ever appear) keeps resolving as a regex exactly as before. `markers` is only non-empty
+    for JS/TS-family suffixes (`.json` has no comment syntax and returns early above), so none of
+    this fires for `.json`.
     """
     if not markers:
         return text.splitlines()
@@ -492,6 +500,10 @@ def _strip_comments(text: str, markers: tuple[str, ...]) -> list[str]:
             # A property name spelled like a keyword (`config.default`) is excluded the same way.
             if not looks_like_regex and last_sig.isalpha():
                 looks_like_regex = last_word in _JS_REGEX_KEYWORDS and not last_word_is_property
+            # `</` in a JSX/TSX file is always a closing tag, never a regex literal — see the
+            # docstring's `jsx` paragraph. Scoped to JSX-capable files only.
+            if looks_like_regex and jsx and last_sig == "<":
+                looks_like_regex = False
             if looks_like_regex:
                 end = _regex_literal_end(text, i, length)
                 if end is not None:
@@ -517,7 +529,8 @@ def _line_offender(stripped_line: str) -> str | None:
 def _regex_offender(path: Path) -> tuple[int, str] | None:
     markers = _COMMENT_MARKERS_BY_SUFFIX[path.suffix]
     text = path.read_text(encoding="utf-8", errors="ignore")
-    for lineno, stripped_line in enumerate(_strip_comments(text, markers), start=1):
+    jsx = path.suffix in (".jsx", ".tsx")
+    for lineno, stripped_line in enumerate(_strip_comments(text, markers, jsx), start=1):
         offender = _line_offender(stripped_line)
         if offender is not None:
             return lineno, offender
