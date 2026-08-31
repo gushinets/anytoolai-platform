@@ -7,7 +7,7 @@
 - Created: 2026-08-31
 - Last updated: 2026-08-31
 - Review date: 2026-08-31
-- Next action: none — implementation, three internal code-review rounds, and five GitHub PR review
+- Next action: none — implementation, three internal code-review rounds, and six GitHub PR review
   rounds of fixes landed; move to `completed/` once merged.
 - Blocker: none
 
@@ -266,6 +266,43 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
     the import alias (`fastapi`, `fa`, ...) is irrelevant since only the final attribute name is
     checked, so this covers any alias for free. Verified both `fastapi.FastAPI()` +
     `add_api_route(...)` and `fastapi.APIRouter()` + a decorator are now caught.
+- [x] Sixth GitHub PR review round (2026-08-31, PR #96 "Code-ewview (me #5)", reviewing commit
+      `bd321b6`) found 4 more gaps, all fixed:
+  - `_module_string_constants` only handled `ast.Assign`, missing an annotated module constant
+    (`PROPOSAL_STATUS_PATH: str = "/proposal_ai/status"`, an `ast.AnnAssign`) — invisible to
+    `@router.get(PROPOSAL_STATUS_PATH)` the same way the un-annotated case was in round 8. Worse,
+    it walked the *whole* tree (`ast.walk`), so a same-named local inside a function
+    (`def helper(): PROPOSAL_STATUS_PATH = "/safe"`) could overwrite the real module-level value
+    in the constants map, making a route resolve against the wrong string entirely. Fixed: scoped
+    collection to `tree.body` (top-level statements only) and added the `AnnAssign` branch.
+    Verified an annotated module constant now resolves, and a same-named nested local no longer
+    shadows the real module-level value (route now correctly resolves to
+    `/proposal_ai/status`, not the nested-local `/safe`).
+  - `_is_route_target_call`'s bare-name branch only matched `FastAPI`/`APIRouter` literally, so
+    `from fastapi import FastAPI as F; app = F()` (`func` is `ast.Name(id="F")`) still bypassed the
+    guard despite the round-5 fix's comment/decision-log claiming aliases were handled — that fix
+    only covered the *module-qualified* alias case (`fastapi.FastAPI()`, alias on the module), not
+    an *imported* alias (`F` standing in for `FastAPI` itself). Fixed: added
+    `_route_target_import_aliases` (maps `from fastapi import FastAPI as F` -> `{"F": "FastAPI"}`)
+    and `_is_route_target_call` now also accepts a bare name that resolves through that map.
+    Verified `from fastapi import FastAPI as F` + `F()` + `add_api_route(...)`, and the equivalent
+    `APIRouter as R` + decorator case, are both now caught.
+  - `_COMMENT_MARKERS_BY_SUFFIX` treated `#` as a JS/TS comment marker, but `#` is not JS/TS
+    comment syntax — it's valid in modern private class fields (`class C { #cache = 1; ... }`), so
+    a line like `class C { #cache = 1; static model = "openai/gpt-4.1"; }` got truncated at
+    `#cache` before the real hardcode. Fixed: removed `#` from the `.ts`/`.tsx`/`.js`/`.jsx`
+    entries, leaving only the genuine `//` marker (hashbang support left out per the review's own
+    "if desired" hedge — no hashbang JS/TS files exist in this repo). Verified the exact private-
+    field case is now caught, and real `//` comments are still stripped.
+  - `_is_url_query_value` was broader than intended: it exempted *any* match inside a quoted
+    string that contained `://` anywhere earlier, not just one that's actually part of a `?key=`/
+    `&key=` query token — so a real hardcode sharing a quoted string with an unrelated URL (e.g.
+    `payload = '{"callback":"https://example.com","model":"openai/gpt-4.1"}'`, a serialized-JSON
+    blob) was wrongly suppressed. Fixed: added `_URL_QUERY_KEY_RE` and tightened the check to
+    require the match's prefix char to literally be `=` *and* have a `?`/`&`-prefixed key
+    immediately adjacent to it, not merely "some URL exists somewhere earlier in this string".
+    Verified the serialized-JSON case is now caught while both round-9 URL-query false positives
+    stay excluded.
 
 ## Validation
 
@@ -358,6 +395,20 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
       `ast.Attribute` fix in `_is_route_target_call`.
 - [x] `python3 -m pytest tests/architecture -q`, `validate_architecture.py`, and `quick-check`
       re-run after this round — 24 passed / passed / 981 passed.
+- [x] Manual check: annotated module constant (`PROPOSAL_STATUS_PATH: str = "..."`) resolves, and
+      a same-named nested-function local no longer shadows the real module-level value — the route
+      correctly resolves to `/proposal_ai/status`, not the nested local's `/safe`.
+- [x] Manual check: `from fastapi import FastAPI as F` + `F()` + `add_api_route(...)`, and
+      `from fastapi import APIRouter as R` + `R()` + a decorator, are both caught after the
+      `_route_target_import_aliases` fix.
+- [x] Manual check: `class C { #cache = 1; static model = "openai/gpt-4.1"; }` is caught after
+      removing `#` from the JS/TS comment-marker set; real `// ...` comments still stripped.
+- [x] Manual check: `payload = '{"callback":"https://example.com","model":"openai/gpt-4.1"}'`
+      (serialized JSON in a single-quoted string) is caught after tightening
+      `_is_url_query_value`; the two round-9 URL-query false positives stay excluded. Re-ran the
+      full regression table (now 16 cases, rounds 4–10) to confirm nothing else flipped.
+- [x] `python3 -m pytest tests/architecture -q`, `validate_architecture.py`, and `quick-check`
+      re-run after this round — 24 passed / passed / 981 passed.
 
 ## Decision log
 
@@ -372,8 +423,11 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | Backtick (`` ` ``) is a recognized string delimiter in both `LITELLM_MODEL_STRING_RE`'s prefix class and `_strip_comment`, alongside `'`/`"`. | `SCAN_EXTS` already covers `.js`/`.jsx`/`.ts`/`.tsx`; JS/TS template literals are ordinary syntax in those files, and treating only `'`/`"` as strings left both a detection gap (a backtick-quoted model literal never matched) and a truncation bug (a backtick-quoted URL's `//` was misread as a comment start). |
 | 2026-08-31 | `_path_argument`/`_keyword_value` resolve a single module-level string constant reference, but not constant concatenation (`A + B`) or any other expression form. | The PR review flagged concatenation as "ideally" handled, not blocking; no router in this repo builds a path via constant concatenation today, and generalizing further (binary-op folding, f-strings, imported constants) is real added AST-walking complexity for a pattern that doesn't exist yet — YAGNI until it does. |
 | 2026-08-31 | `_strip_comment`'s comment markers are looked up per file suffix (`_COMMENT_MARKERS_BY_SUFFIX`) instead of a single hardcoded `("#", "//")` tuple. | `//` is a JS/TS-only comment marker; treating it as universal truncated valid YAML (which allows a bare/unquoted URL scalar) and would have silently truncated valid JSON too (which has no comments at all) had a URL ever appeared there before the real hardcoded value. |
-| 2026-08-31 | A candidate `LITELLM_MODEL_STRING_RE` match is rejected if it sits inside a quoted string that contains `://` before it (`_is_url_query_value`), rather than trusting the first regex match unconditionally. | A `?model=`/`&provider=` query parameter inside a URL string reads identically to a real assignment to the regex (both have `=` immediately before the provider name); the "inside a URL" check is scoped to the enclosing quoted string only, so it can't suppress a real hardcode that happens to share a line with an unrelated URL (confirmed against the round-8 YAML unquoted-URL-then-model case, which has no enclosing quote around the model field at all). |
-| 2026-08-31 | `_is_route_target_call` accepts both a bare-name (`FastAPI(...)`) and a module-qualified (`fastapi.FastAPI(...)`) constructor call, checking only the final attribute/name against `ROUTE_TARGET_CONSTRUCTORS`. | The import alias (`fastapi`, `fa`, a `from x import FastAPI as F` rebind, ...) is irrelevant to whether a call constructs a route target; checking only the terminal name/attribute covers every alias without needing to track import statements. |
+| 2026-08-31 | A candidate `LITELLM_MODEL_STRING_RE` match is rejected if it sits inside a quoted string that contains `://` before it (`_is_url_query_value`), rather than trusting the first regex match unconditionally. | A `?model=`/`&provider=` query parameter inside a URL string reads identically to a real assignment to the regex (both have `=` immediately before the provider name); the "inside a URL" check is scoped to the enclosing quoted string only, so it can't suppress a real hardcode that happens to share a line with an unrelated URL (confirmed against the round-8 YAML unquoted-URL-then-model case, which has no enclosing quote around the model field at all). Round 6/"Code-ewview (me #5)" found this was still too broad — "contains `://` before it" alone doesn't confirm the match is *part of* a URL query; tightened to also require the match's prefix char be `=` and a `?`/`&`-prefixed key sit immediately before it (`_URL_QUERY_KEY_RE`), so a real hardcode sharing a quoted string with an unrelated URL (a serialized-JSON blob) is no longer suppressed. |
+| 2026-08-31 | `_module_string_constants` only collects `tree.body` (top-level statements), not the whole tree via `ast.walk`. | Walking the whole tree would let a same-named local inside a function/class shadow the real module-level constant in the resulting dict — a route referencing the module constant would then silently resolve against whatever that unrelated local happened to be, which is worse than not resolving it at all. |
+| 2026-08-31 | `_is_route_target_call` accepts both a bare-name (`FastAPI(...)`) and a module-qualified (`fastapi.FastAPI(...)`) constructor call, checking only the final attribute/name against `ROUTE_TARGET_CONSTRUCTORS`. | The *module* alias (`fastapi`, `fa`, ...) is irrelevant to the qualified form; checking only the terminal attribute covers every module alias without needing to track the `import` statement itself. This entry originally also claimed an *imported* rebind (`from fastapi import FastAPI as F`) was covered — that was wrong (caught by round 6/"Code-ewview (me #5)"): the bare-name branch only ever matched the literal string `"FastAPI"`, so `F()` was invisible until `_route_target_import_aliases` was added (see the entry below). Corrected here rather than left standing, per the round-2 lesson about not letting an inaccurate self-report mislead a future reader. |
+| 2026-08-31 | `_route_target_import_aliases` maps a local import name to the real constructor name (`from fastapi import FastAPI as F` -> `{"F": "FastAPI"}`) by reading `ast.ImportFrom` nodes, rather than trying to infer aliasing from the call site alone. | The call site (`F()`) carries no information about what `F` originally was — only the `import` statement does; a dedicated alias map is the only way to resolve a rebound name, and it's cheap (one pass over `ImportFrom` nodes) compared to full symbol-table resolution. |
+| 2026-08-31 | `_COMMENT_MARKERS_BY_SUFFIX` treats JS/TS comment stripping as `("//",)` only, not `("#", "//")`. | `#` was never valid JS/TS comment syntax to begin with (it's real syntax for private class fields since ES2022) — carrying it over from the Python/YAML entry in round 4 was a straight copy error, not a deliberate tradeoff; it had no upside and one confirmed false-negative failure mode. |
 
 ## Progress log
 
@@ -388,7 +442,8 @@ MVP-B handoff note) — the import/term/prompt boundary enforcement itself alrea
 | 2026-08-31 | Second GitHub PR #96 review round ("Code-ewview (me #2)", reviewing commit `0a3d7cb`) found the two prior fixes were each only partial: the `api_route`/`add_api_route` fix widened the method set but never taught `_router_variable_names` to recognize `app = FastAPI(...)` (only `APIRouter(...)`), so `app.add_api_route(...)`/`@app.api_route(...)` — the exact shape `main.py` actually uses — still bypassed the guard; and `_strip_comment` found `#`/`//` anywhere on the line including inside quoted strings, so a `.json` line with a URL before the `model` field (`{"callback": "https://...", "model": "openai/..."}`) got truncated before the real hardcode was ever inspected. Fixed both: `_router_variable_names` now also matches `FastAPI(...)` bindings via `ROUTE_TARGET_CONSTRUCTORS`, and `_strip_comment` is now quote-state-aware instead of a naive first-occurrence search. Verified both exact bypass cases from the review are now caught, all prior comment-stripping cases still behave correctly, and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Commit. |
 | 2026-08-31 | Third GitHub PR #96 review round ("Code-ewview (me #3)", reviewing commit `a558d76`) found the `FastAPI(...)`-binding fix was itself only partial — it handled `ast.Assign` but not the distinct `ast.AnnAssign` node a type-annotated binding (`app: FastAPI = FastAPI()`, ordinary valid Python) parses to, so an annotated `app`/`router` still bypassed the guard — and that the LiteLLM test's model regex/`_strip_comment` never treated backtick as a string delimiter despite `SCAN_EXTS` covering `.js`/`.jsx`/`.ts`/`.tsx`, so a JS/TS template-literal model string was invisible and a backtick-quoted URL before a model literal on the same line got truncated the same way the round-2 quoted-URL bug did. Fixed both: extracted `_is_route_target_call` so `Assign`/`AnnAssign` share one check, and added backtick to the regex's prefix class and `_strip_comment`'s quote characters. Verified both exact cases from the review are now caught, and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Await/act on next code review. |
 | 2026-08-31 | Fourth GitHub PR #96 review round ("Code-ewview (me #4)", reviewing commit `87814fd`) found: `_path_argument` only accepted a literal `ast.Constant`, so a route path factored into a module-level string constant (`PROPOSAL_STATUS_PATH = "/proposal_ai/status"` then `@router.get(PROPOSAL_STATUS_PATH)`) — ordinary Python style — bypassed the guard entirely; and `_strip_comment` treated `//` as a comment marker universally, but `//` isn't a YAML/JSON comment marker, so a valid unquoted-URL YAML line (`settings: {callback: https://x, model: openai/y}`) got truncated before the real hardcode. Fixed both: added `_module_string_constants`/`_string_value` so a single-constant path/prefix reference resolves (constant concatenation explicitly left unhandled — flagged as "ideally", not blocking, and no router uses that pattern today); replaced the universal comment-marker tuple with `_COMMENT_MARKERS_BY_SUFFIX` so YAML/Python only strip `#`, JS/TS strip `#`+`//`, and JSON strips nothing. Verified both exact cases from the review are now caught, `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Await/act on next code review. |
-| 2026-08-31 | Fifth GitHub PR #96 review round (inline comments, reviewing commit `5045e81`) found: `LITELLM_MODEL_STRING_RE`'s prefix class includes `=`, so a `?model=`/`&provider=` query value inside a URL string false-positived the same as a real assignment; and `_is_route_target_call` only recognized a bare-name constructor call, so a module-qualified `fastapi.FastAPI(...)`/`fastapi.APIRouter(...)` binding still bypassed the endpoint guard. Fixed both: added `_quoted_string_spans`/`_is_url_query_value`/`_first_real_offender` so a candidate match inside a quoted string containing `://` before it is rejected (switched from `.search()` to `.finditer()` to allow skipping a rejected match and trying the next one on the same line); and `_is_route_target_call` now also accepts an `ast.Attribute` callee, checking only the final attribute name (alias-agnostic). Verified both exact cases from the review are now excluded/caught respectively, re-ran the full 14-case regression table spanning rounds 4–9 to confirm no prior case flipped, and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Commit. |
+| 2026-08-31 | Fifth GitHub PR #96 review round (inline comments, reviewing commit `5045e81`) found: `LITELLM_MODEL_STRING_RE`'s prefix class includes `=`, so a `?model=`/`&provider=` query value inside a URL string false-positived the same as a real assignment; and `_is_route_target_call` only recognized a bare-name constructor call, so a module-qualified `fastapi.FastAPI(...)`/`fastapi.APIRouter(...)` binding still bypassed the endpoint guard. Fixed both: added `_quoted_string_spans`/`_is_url_query_value`/`_first_real_offender` so a candidate match inside a quoted string containing `://` before it is rejected (switched from `.search()` to `.finditer()` to allow skipping a rejected match and trying the next one on the same line); and `_is_route_target_call` now also accepts an `ast.Attribute` callee, checking only the final attribute name (alias-agnostic). Verified both exact cases from the review are now excluded/caught respectively, re-ran the full 14-case regression table spanning rounds 4–9 to confirm no prior case flipped, and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Await/act on next code review. |
+| 2026-08-31 | Sixth GitHub PR #96 review round ("Code-ewview (me #5)", reviewing commit `bd321b6`) found the round-5/round-9 fixes were each still incomplete, plus one clean new gap: (1) `_module_string_constants` missed annotated module constants and, more seriously, let a same-named nested-function local silently overwrite the real module-level value; (2) the round-5 alias fix only covered module-qualified access (`fastapi.FastAPI()`), not an *imported* rebind (`from fastapi import FastAPI as F`) despite the decision log claiming otherwise; (3) `_COMMENT_MARKERS_BY_SUFFIX` treated `#` as a JS/TS comment marker, which it never was (it's private-class-field syntax); (4) `_is_url_query_value` exempted any match sharing a quoted string with an earlier `://`, not just one that's actually a `?key=`/`&key=` token, so a serialized-JSON hardcode got wrongly suppressed. Fixed all four: scoped constant collection to `tree.body`; added `_route_target_import_aliases` to resolve imported rebinds; dropped `#` from the JS/TS marker set; tightened `_is_url_query_value` with `_URL_QUERY_KEY_RE`. Corrected the round-5 decision-log entry's overclaim rather than leaving it standing. Verified all four exact cases from the review, re-ran the full 16-case regression table spanning rounds 4–10 (nothing flipped), and `pytest tests/architecture` (24 passed) / `validate-architecture` / `quick-check` (981 passed) stay green. | Commit. |
 
 ## Open questions
 

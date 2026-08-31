@@ -65,8 +65,9 @@ LITELLM_MODEL_STRING_RE = re.compile(
 )
 # A match still isn't necessarily a real hardcode: `"https://example.com?model=openai/gpt-4.1"` —
 # a `?model=`/`&model=` query value inside a URL string — has `=` right before the provider name,
-# same as a real assignment. `_is_url_query_value` filters those out by checking whether the match
-# sits inside a quoted string that contains `://` before it.
+# same as a real assignment. `_is_url_query_value` filters those out, but narrowly: it requires an
+# actual adjacent `?key=`/`&key=` token, not merely "some URL appears earlier in this string" (a
+# real hardcode can share a quoted string with an unrelated URL, e.g. a serialized JSON blob).
 
 
 def _scan_files() -> list[Path]:
@@ -89,10 +90,13 @@ _COMMENT_MARKERS_BY_SUFFIX: dict[str, tuple[str, ...]] = {
     ".yaml": ("#",),
     ".yml": ("#",),
     ".json": (),  # JSON has no comment syntax at all
-    ".ts": ("#", "//"),
-    ".tsx": ("#", "//"),
-    ".js": ("#", "//"),
-    ".jsx": ("#", "//"),
+    # `#` is NOT a JS/TS comment marker — it's valid syntax there (private class fields:
+    # `class C { #cache = 1; }`); treating it as one truncated a line before a real model literal
+    # that followed. Only `//` is a genuine JS/TS single-line comment marker here.
+    ".ts": ("//",),
+    ".tsx": ("//",),
+    ".js": ("//",),
+    ".jsx": ("//",),
 }
 
 
@@ -121,13 +125,29 @@ def _quoted_string_spans(line: str) -> list[tuple[int, int]]:
     return spans
 
 
+# The `=` immediately preceding a `?key=`/`&key=` URL query value. Anchored (`$`) to the end of
+# the string it's searched against, so it only matches when the query-key syntax sits directly
+# against the candidate match's own prefix `=` — not merely "some `?...=` exists earlier".
+_URL_QUERY_KEY_RE = re.compile(r"[?&][\w.\-]+=$")
+
+
 def _is_url_query_value(line: str, spans: list[tuple[int, int]], position: int) -> bool:
-    """True if `position` sits inside a quoted string that looks like a URL (`://` appears before
-    `position` within that same string) — a `?model=...`/`&model=...` query value embedded in a
-    URL, not a real provider-config field."""
+    """True if `position` (the candidate match's prefix char) is genuinely a `?key=`/`&key=` URL
+    query value: it must be `=`, sit inside a quoted string containing `://` before it, AND have
+    a `?`/`&`-prefixed key directly adjacent to it (`...?model=` / `...&provider=`).
+
+    The first two conditions alone are too broad: a serialized-JSON string like
+    `'{"callback":"https://example.com","model":"openai/gpt-4.1"}'` also contains `://` earlier in
+    the same (outer, single-quoted) string, but the real `"model":"openai/..."` field there is a
+    genuine hardcode, not part of the URL — its prefix char is `"`, not `=`, and there's no
+    `?`/`&`-prefixed key right before it.
+    """
+    if position < 0 or position >= len(line) or line[position] != "=":
+        return False
     for start, end in spans:
         if start <= position < end:
-            return "://" in line[start:position]
+            prefix = line[start : position + 1]
+            return "://" in prefix and bool(_URL_QUERY_KEY_RE.search(prefix))
     return False
 
 

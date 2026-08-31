@@ -47,12 +47,18 @@ ROUTE_REGISTRATION_METHODS = {
 PREFIX_KEYWORD_CALLS = {"APIRouter", "include_router"}
 
 
-def _module_string_constants(tree: ast.AST) -> dict[str, str]:
-    """Module-level `<NAME> = "<literal>"` bindings, so `@router.get(PROPOSAL_STATUS_PATH)` is
-    resolved back to its literal instead of being invisible to `_path_argument` (an `ast.Name`,
-    not an `ast.Constant`)."""
+def _module_string_constants(tree: ast.Module) -> dict[str, str]:
+    """Module-level `<NAME> = "<literal>"` / `<NAME>: <type> = "<literal>"` bindings, so
+    `@router.get(PROPOSAL_STATUS_PATH)` is resolved back to its literal instead of being invisible
+    to `_path_argument` (an `ast.Name`, not an `ast.Constant`).
+
+    Scoped to `tree.body` (top-level statements only) — walking the whole tree would also collect
+    a same-named local inside a function/class (`def helper(): PROPOSAL_STATUS_PATH = "/safe"`),
+    which could overwrite the real module-level value and make a route resolve against the wrong
+    string.
+    """
     constants: dict[str, str] = {}
-    for node in ast.walk(tree):
+    for node in tree.body:
         if (
             isinstance(node, ast.Assign)
             and isinstance(node.value, ast.Constant)
@@ -61,6 +67,13 @@ def _module_string_constants(tree: ast.AST) -> dict[str, str]:
             for target in node.targets:
                 if isinstance(target, ast.Name):
                     constants[target.id] = node.value.value
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            constants[node.target.id] = node.value.value
     return constants
 
 
@@ -91,12 +104,26 @@ def _path_argument(node: ast.Call, constants: dict[str, str]) -> str | None:
 ROUTE_TARGET_CONSTRUCTORS = {"APIRouter", "FastAPI"}
 
 
-def _is_route_target_call(value: ast.expr | None) -> bool:
+def _route_target_import_aliases(tree: ast.AST) -> dict[str, str]:
+    """Maps a local import name to the real constructor name it's bound to, e.g.
+    `from fastapi import FastAPI as F` -> `{"F": "FastAPI"}` (a bare
+    `from fastapi import FastAPI` maps `"FastAPI": "FastAPI"`, redundant but harmless)."""
+    aliases: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                if alias.name in ROUTE_TARGET_CONSTRUCTORS:
+                    aliases[alias.asname or alias.name] = alias.name
+    return aliases
+
+
+def _is_route_target_call(value: ast.expr | None, aliases: dict[str, str]) -> bool:
     if not isinstance(value, ast.Call):
         return False
     func = value.func
     if isinstance(func, ast.Name):
-        return func.id in ROUTE_TARGET_CONSTRUCTORS
+        # Bare name, or an import alias (`from fastapi import FastAPI as F` -> `F()`).
+        return func.id in ROUTE_TARGET_CONSTRUCTORS or func.id in aliases
     # Module-qualified form, e.g. `fastapi.FastAPI()`/`fastapi.APIRouter()` — the import alias
     # (`fastapi`, `fa`, ...) doesn't matter, only the final attribute name does.
     if isinstance(func, ast.Attribute):
@@ -106,7 +133,8 @@ def _is_route_target_call(value: ast.expr | None) -> bool:
 
 def _router_variable_names(tree: ast.AST) -> set[str]:
     """Names bound by `<name> = APIRouter(...)`/`FastAPI(...)` in this module, including
-    annotated assignments (`app: FastAPI = FastAPI()`, `router: APIRouter = APIRouter()`).
+    annotated assignments (`app: FastAPI = FastAPI()`, `router: APIRouter = APIRouter()`) and
+    import-aliased constructors (`from fastapi import FastAPI as F; app = F()`).
 
     `main.py` binds `app = FastAPI(...)`, not `APIRouter(...)` — `app.add_api_route(...)`/
     `@app.api_route(...)` register routes directly on the app and must be tracked the same way
@@ -114,14 +142,15 @@ def _router_variable_names(tree: ast.AST) -> set[str]:
     guard entirely. A type-annotated binding is an `ast.AnnAssign`, not `ast.Assign` — ordinary,
     valid Python that must be recognized the same way.
     """
+    aliases = _route_target_import_aliases(tree)
     names: set[str] = set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.Assign) and _is_route_target_call(node.value):
+        if isinstance(node, ast.Assign) and _is_route_target_call(node.value, aliases):
             names.update(target.id for target in node.targets if isinstance(target, ast.Name))
         elif (
             isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and _is_route_target_call(node.value)
+            and _is_route_target_call(node.value, aliases)
         ):
             names.add(node.target.id)
     return names
