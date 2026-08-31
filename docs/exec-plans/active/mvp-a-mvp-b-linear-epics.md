@@ -65,7 +65,7 @@ LiteLLM only behind ProviderGateway adapters, hidden LiteLLM retries disabled, a
 | A21a4 Live-provider canary | ANY-221 | ANY-218/220 |
 | MVP-A1 release gate | ANY-5 | Done |
 | A22b Generated docs | ANY-7 | MVP-A1 gate |
-| A22c Boundary audit | ANY-25 | MVP-A1 gate |
+| A22c Boundary audit | ANY-25 | Done |
 
 The deterministic gate reports 11/11 standalone and 3/3 composite workflows. The live canary is
 credentialed manual/scheduled evidence; baseline CI remains credential-free. A21b backend handoff
