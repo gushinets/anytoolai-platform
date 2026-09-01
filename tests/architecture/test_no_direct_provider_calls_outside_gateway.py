@@ -161,6 +161,42 @@ def test_no_direct_litellm_imports_outside_provider_adapter() -> None:
     )
 
 
+# CLAUDE.md/llm-runtime.md forbid these provider SDKs outside the adapter boundary the same way
+# openai/litellm already are above — the module name each package exposes at import time.
+_OTHER_FORBIDDEN_PROVIDER_MODULES = ["anthropic", "google.genai", "cohere", "mistralai"]
+
+
+def _assert_no_direct_module_imports_outside_adapter(module_name: str) -> None:
+    offenders: list[Path] = []
+    for path in _python_files():
+        if path.is_relative_to(ALLOWED_ADAPTER_MODULE_ROOT):
+            continue
+        if "tests" in path.parts:
+            continue
+        if _imports_module(path, module_name):
+            offenders.append(path)
+
+    assert offenders == [], f"direct {module_name} imports found outside provider adapters: " + ", ".join(
+        str(path.relative_to(ROOT)) for path in offenders
+    )
+
+
+def test_no_direct_anthropic_imports_outside_provider_adapter() -> None:
+    _assert_no_direct_module_imports_outside_adapter("anthropic")
+
+
+def test_no_direct_google_genai_imports_outside_provider_adapter() -> None:
+    _assert_no_direct_module_imports_outside_adapter("google.genai")
+
+
+def test_no_direct_cohere_imports_outside_provider_adapter() -> None:
+    _assert_no_direct_module_imports_outside_adapter("cohere")
+
+
+def test_no_direct_mistralai_imports_outside_provider_adapter() -> None:
+    _assert_no_direct_module_imports_outside_adapter("mistralai")
+
+
 def test_no_direct_pydantic_ai_imports_outside_structured_llm_executor_boundary() -> None:
     offenders: list[Path] = []
     for path in _python_files():
@@ -189,7 +225,12 @@ PROVIDER_JS_PACKAGES = {
     "@mistralai/mistralai",
 }
 _JS_EXTS = {".ts", ".tsx", ".js", ".jsx"}
-_JS_IMPORT_SPECIFIER_RE = re.compile(r"""(?:from|require\()\s*["']([^"']+)["']""")
+# `from "pkg"` (named/default import), `require("pkg")` (CommonJS), a bare side-effect
+# `import "pkg"` (no `from` at all), and a dynamic `import("pkg")`/`await import("pkg")` — all four
+# are real ways to pull in a module, and each is a real, distinct bypass of an import-specifier
+# check that only recognized `from`/`require(`. `import\(?` covers both the side-effect form
+# (bare `import`, no paren) and the dynamic form (`import(`) with one alternative.
+_JS_IMPORT_SPECIFIER_RE = re.compile(r"""(?:from|require\(|import\(?)\s*["']([^"']+)["']""")
 
 
 def _js_files() -> list[Path]:
