@@ -24,13 +24,23 @@ export type HandoffConsentProps = {
   handoffToken: string;
 };
 
-const TERMINAL_STATUSES: ReadonlySet<HandoffStatus> = new Set([
-  "accepted",
-  "declined",
-  "consumed",
-  "expired",
-  "failed",
-]);
+// A `Record<HandoffStatus, boolean>` literal, not a hand-written `Set` -- this fails to typecheck
+// if `HandoffStatus` gains or loses a member and this map isn't updated to classify it, so a new
+// terminal status can't silently fall through `isTerminalHandoffStatus()` as non-terminal the way
+// it could with `ReadonlySet<HandoffStatus>.has()` (any subset of the union typechecks there).
+const HANDOFF_STATUS_IS_TERMINAL: Record<HandoffStatus, boolean> = {
+  created: false,
+  viewed: false,
+  accepted: true,
+  declined: true,
+  consumed: true,
+  expired: true,
+  failed: true,
+};
+
+function isTerminalHandoffStatus(status: HandoffStatus): boolean {
+  return HANDOFF_STATUS_IS_TERMINAL[status];
+}
 
 type ViewState =
   | { kind: "loading" }
@@ -40,7 +50,7 @@ type ViewState =
   | { kind: "terminal"; preview: HandoffPreview };
 
 function stateForPreview(preview: HandoffPreview): ViewState {
-  return TERMINAL_STATUSES.has(preview.status)
+  return isTerminalHandoffStatus(preview.status)
     ? { kind: "terminal", preview }
     : { kind: "consent", preview, pending: null, actionError: null };
 }
