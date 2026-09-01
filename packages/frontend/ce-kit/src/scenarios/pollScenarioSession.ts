@@ -1,6 +1,7 @@
 import type { PlatformApiClient, PlatformApiResult } from "../api/client";
 import { abortedError, timeoutError } from "../api/errors";
 import { getScenarioSession } from "./getScenarioSession";
+import type { ScenarioSessionStatus } from "./scenarioSessionStatus";
 import type { ScenarioSession } from "./types";
 
 /**
@@ -8,7 +9,7 @@ import type { ScenarioSession } from "./types";
  * statuses) because it means the frontend must call `nextAction()` next -- continuing to poll
  * would just idle until `maxDurationMs`. See docs/architecture/scenario-session-model.md.
  */
-const POLL_STOP_STATUSES: ReadonlySet<string> = new Set([
+const POLL_STOP_STATUSES: ReadonlySet<ScenarioSessionStatus> = new Set([
   "completed",
   "failed",
   "expired",

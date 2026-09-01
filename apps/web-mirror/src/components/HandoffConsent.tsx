@@ -13,6 +13,7 @@ import {
   refreshGuestIdentity,
   type AsyncStorage,
   type HandoffPreview,
+  type HandoffStatus,
   type PlatformApiClient,
   type PlatformApiError,
   type PlatformApiResult,
@@ -23,12 +24,13 @@ export type HandoffConsentProps = {
   handoffToken: string;
 };
 
-// ponytail: hand-synced against the backend's HandoffStatus enum
-// (packages/backend/platform-core/.../handoffs/models.py) -- the wire schema types `status` as a
-// bare string, not an enum, so there is no generated source of truth to import here. If the
-// backend adds a new terminal status, update this set too, or Accept/Decline will render on an
-// already-terminal handoff.
-const TERMINAL_STATUSES = new Set(["accepted", "declined", "consumed", "expired", "failed"]);
+const TERMINAL_STATUSES: ReadonlySet<HandoffStatus> = new Set([
+  "accepted",
+  "declined",
+  "consumed",
+  "expired",
+  "failed",
+]);
 
 type ViewState =
   | { kind: "loading" }

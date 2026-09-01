@@ -67,4 +67,10 @@ describe("parseQuotaState", () => {
     const { scenario_id: _scenarioId, ...rest } = VALID_PAYLOAD;
     expect(parseQuotaState(rest)?.scenarioId).toBeNull();
   });
+
+  it("returns null when unit/period/quota_dimension aren't known enum members", () => {
+    expect(parseQuotaState({ ...VALID_PAYLOAD, unit: "monthly_run" })).toBeNull();
+    expect(parseQuotaState({ ...VALID_PAYLOAD, period: "monthly" })).toBeNull();
+    expect(parseQuotaState({ ...VALID_PAYLOAD, quota_dimension: "tenant" })).toBeNull();
+  });
 });

@@ -28,7 +28,7 @@ const REQUEST: CreateHandoffRequest = {
 const CREATED_PAYLOAD = {
   handoff_id: "handoff_123",
   handoff_token: "token_abc",
-  status: "pending",
+  status: "created",
   expires_at: "2026-01-01T00:10:00Z",
 };
 
@@ -54,7 +54,7 @@ describe("createHandoff", () => {
       value: {
         handoffId: "handoff_123",
         handoffToken: "token_abc",
-        status: "pending",
+        status: "created",
         expiresAt: "2026-01-01T00:10:00Z",
       },
       status: 200,
@@ -126,6 +126,17 @@ describe("createHandoff", () => {
         message: "Handoff creation response was invalid.",
       },
     });
+  });
+
+  it("returns an invalid_response result when status is not a known HandoffStatus member", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(200, { ...CREATED_PAYLOAD, status: "pending" }),
+    );
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const result = await createHandoff(client, REQUEST);
+
+    expect(result.ok).toBe(false);
   });
 
   it("propagates a caller-supplied AbortSignal", async () => {

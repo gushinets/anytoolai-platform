@@ -1,6 +1,7 @@
 import type { AssertExactSchemaShape } from "../api/driftAssertions";
 import type { components } from "../api/generated/platformApi";
 import { isNullableString, isRecord } from "../api/parsing";
+import { isHandoffStatus } from "./handoffStatus";
 import type { HandoffPreview } from "./types";
 
 /**
@@ -48,6 +49,9 @@ export function parseHandoffPreview(payload: unknown): HandoffPreview | null {
   if (!isNullableString(targetScenarioSessionId) || !isNullableString(targetJobId)) {
     return null;
   }
+  if (!isHandoffStatus(status)) {
+    return null;
+  }
 
   return {
     handoffId,
@@ -75,7 +79,7 @@ type _HandoffPreviewResponseShapeCheck = AssertExactSchemaShape<
     preview: { [key: string]: unknown };
     source_product_display_name: string;
     source_product_id: string;
-    status: string;
+    status: components["schemas"]["HandoffStatus"];
     target_job_id?: string | null;
     target_product_display_name: string;
     target_product_id: string;

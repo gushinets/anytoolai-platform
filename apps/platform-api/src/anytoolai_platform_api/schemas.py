@@ -5,6 +5,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from anytoolai_platform_core.handoffs.models import HandoffStatus
+from anytoolai_platform_core.products.models import FrontendType
+from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaPeriod, QuotaUnit
+from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
+
 
 class RuntimeRendererHintResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -18,7 +23,7 @@ class RuntimeFrontendResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     frontend_id: str
-    type: str
+    type: FrontendType
     enabled: bool
 
 
@@ -36,10 +41,10 @@ class RuntimeQuotaSummaryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     quota_policy_id: str
-    unit: str
+    unit: QuotaUnit
     limit_count: int
-    period: str
-    dimension: str
+    period: QuotaPeriod
+    dimension: QuotaDimension
 
 
 class RuntimeConfigResponse(BaseModel):
@@ -66,11 +71,11 @@ class QuotaStateResponse(BaseModel):
     guest_id: str
     product_id: str
     quota_policy_id: str
-    quota_dimension: str
+    quota_dimension: QuotaDimension
     dimension_key: str
     scenario_id: str | None = None
-    unit: str
-    period: str
+    unit: QuotaUnit
+    period: QuotaPeriod
     limit_count: int
     used_count: int
     remaining_count: int
@@ -98,7 +103,7 @@ class ScenarioStartResponse(BaseModel):
 
     scenario_session_id: str
     job_id: str
-    status: str
+    status: ScenarioSessionStatus
     allowed_next_actions: list[str] = Field(default_factory=list)
     result_artifact_id: str | None = None
 
@@ -115,7 +120,7 @@ class ScenarioSessionResponse(BaseModel):
 
     scenario_session_id: str
     job_id: str | None
-    status: str
+    status: ScenarioSessionStatus
     current_checkpoint_id: str | None = None
     allowed_next_actions: list[str] = Field(default_factory=list)
     result_artifact_id: str | None = None
@@ -169,7 +174,7 @@ class HandoffCreateResponse(BaseModel):
 
     handoff_id: str
     handoff_token: str
-    status: str
+    status: HandoffStatus
     expires_at: datetime
 
 
@@ -177,7 +182,7 @@ class HandoffPreviewResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     handoff_id: str
-    status: str
+    status: HandoffStatus
     source_product_id: str
     source_product_display_name: str
     target_product_id: str

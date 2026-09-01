@@ -30,13 +30,18 @@ Version: 0.1.0
 - DemoRunRequest
 - ErrorDetailResponse
 - ErrorResponse
+- FrontendType
 - GuestIdentityResponse
 - HTTPValidationError
 - HandoffAcceptRequest
 - HandoffCreateRequest
 - HandoffCreateResponse
 - HandoffPreviewResponse
+- HandoffStatus
+- QuotaDimension
+- QuotaPeriod
 - QuotaStateResponse
+- QuotaUnit
 - ResultArtifactResponse
 - RuntimeConfigResponse
 - RuntimeFrontendResponse
@@ -45,6 +50,7 @@ Version: 0.1.0
 - RuntimeScenarioResponse
 - ScenarioNextActionRequest
 - ScenarioSessionResponse
+- ScenarioSessionStatus
 - ScenarioStartRequest
 - ScenarioStartResponse
 - ValidationError

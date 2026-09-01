@@ -1,3 +1,6 @@
+import type { QuotaDimension, QuotaPeriod, QuotaUnit } from "../quota/quotaEnums";
+import type { FrontendType } from "./frontendType";
+
 export type RuntimeRendererHint = {
   renderer: "json_schema";
   schemaRef: string;
@@ -6,7 +9,7 @@ export type RuntimeRendererHint = {
 
 export type RuntimeFrontend = {
   frontendId: string;
-  type: string;
+  type: FrontendType;
   enabled: boolean;
 };
 
@@ -20,10 +23,10 @@ export type RuntimeScenario = {
 
 export type RuntimeQuotaSummary = {
   quotaPolicyId: string;
-  unit: string;
+  unit: QuotaUnit;
   limitCount: number;
-  period: string;
-  dimension: string;
+  period: QuotaPeriod;
+  dimension: QuotaDimension;
 };
 
 export type RuntimeConfig = {

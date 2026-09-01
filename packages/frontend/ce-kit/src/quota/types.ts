@@ -1,3 +1,5 @@
+import type { QuotaDimension, QuotaPeriod, QuotaUnit } from "./quotaEnums";
+
 export type QuotaRequest = {
   productId: string;
   guestId: string;
@@ -8,11 +10,11 @@ export type QuotaState = {
   guestId: string;
   productId: string;
   quotaPolicyId: string;
-  quotaDimension: string;
+  quotaDimension: QuotaDimension;
   dimensionKey: string;
   scenarioId: string | null;
-  unit: string;
-  period: string;
+  unit: QuotaUnit;
+  period: QuotaPeriod;
   limitCount: number;
   usedCount: number;
   remainingCount: number;

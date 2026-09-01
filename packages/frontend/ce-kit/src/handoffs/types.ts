@@ -1,3 +1,5 @@
+import type { HandoffStatus } from "./handoffStatus";
+
 /**
  * `POST /v1/handoffs` request: mints a fresh handoff token for a definition, scoped to a source
  * scenario session and artifact. The backend is authoritative on whether that source is eligible.
@@ -16,7 +18,7 @@ export type CreateHandoffRequest = {
 export type HandoffCreated = {
   handoffId: string;
   handoffToken: string;
-  status: string;
+  status: HandoffStatus;
   expiresAt: string;
 };
 
@@ -29,7 +31,7 @@ export type HandoffCreated = {
  */
 export type HandoffPreview = {
   handoffId: string;
-  status: string;
+  status: HandoffStatus;
   sourceProductId: string;
   sourceProductDisplayName: string;
   targetProductId: string;

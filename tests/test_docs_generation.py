@@ -89,3 +89,59 @@ def test_openapi_json_is_valid_and_matches_the_live_schema() -> None:
 
     assert "/v1/products/{product_id}/runtime-config" in schema["paths"]
     assert schema == build_openapi_schema()
+
+
+def test_openapi_exposes_closed_enums_for_the_boundary_fields() -> None:
+    # ANY-338: every field the ticket names must resolve to a real enum component in the
+    # generated schema, not FastAPI's default `"type": "string"` for a bare `str` field.
+    module = load_module()
+    schema = json.loads(module.render_openapi_json())
+    components = schema["components"]["schemas"]
+
+    assert components["FrontendType"]["enum"] == ["chrome_extension", "web"]
+    assert components["QuotaUnit"]["enum"] == ["scenario_run"]
+    assert components["QuotaPeriod"]["enum"] == ["lifetime"]
+    assert components["QuotaDimension"]["enum"] == ["product", "scenario"]
+    assert components["ScenarioSessionStatus"]["enum"] == [
+        "started",
+        "waiting_for_user",
+        "running",
+        "completed",
+        "failed",
+        "expired",
+    ]
+    assert components["HandoffStatus"]["enum"] == [
+        "created",
+        "viewed",
+        "accepted",
+        "declined",
+        "consumed",
+        "expired",
+        "failed",
+    ]
+
+    assert components["RuntimeFrontendResponse"]["properties"]["type"] == {
+        "$ref": "#/components/schemas/FrontendType"
+    }
+    quota_summary_props = components["RuntimeQuotaSummaryResponse"]["properties"]
+    assert quota_summary_props["unit"] == {"$ref": "#/components/schemas/QuotaUnit"}
+    assert quota_summary_props["period"] == {"$ref": "#/components/schemas/QuotaPeriod"}
+    assert quota_summary_props["dimension"] == {"$ref": "#/components/schemas/QuotaDimension"}
+
+    quota_state_props = components["QuotaStateResponse"]["properties"]
+    assert quota_state_props["unit"] == {"$ref": "#/components/schemas/QuotaUnit"}
+    assert quota_state_props["period"] == {"$ref": "#/components/schemas/QuotaPeriod"}
+    assert quota_state_props["quota_dimension"] == {"$ref": "#/components/schemas/QuotaDimension"}
+
+    assert components["ScenarioStartResponse"]["properties"]["status"] == {
+        "$ref": "#/components/schemas/ScenarioSessionStatus"
+    }
+    assert components["ScenarioSessionResponse"]["properties"]["status"] == {
+        "$ref": "#/components/schemas/ScenarioSessionStatus"
+    }
+    assert components["HandoffCreateResponse"]["properties"]["status"] == {
+        "$ref": "#/components/schemas/HandoffStatus"
+    }
+    assert components["HandoffPreviewResponse"]["properties"]["status"] == {
+        "$ref": "#/components/schemas/HandoffStatus"
+    }
