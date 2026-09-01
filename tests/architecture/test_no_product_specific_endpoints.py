@@ -64,11 +64,14 @@ PREFIX_KEYWORD_CALLS = {"APIRouter", "include_router"}
 def _string_value(expr: ast.expr | None, constants: dict[str, str]) -> str | None:
     """A literal string, a reference to an already-known module constant, a compile-time
     `"a" + "b"` concatenation of either (recursively, so `"a" + ("b" + C)` folds too), or an
-    f-string with no real interpolation (`f"/proposal_ai/status"`, a `JoinedStr` whose every part
-    is a literal `Constant` — the same "no `FormattedValue`" rule
-    `test_litellm_model_strings_stay_in_provider_config.py`'s `_python_offender` already applies
-    to a `JoinedStr`, applied here too) — `None` for anything genuinely dynamic (`"a" + name`,
-    `f"/{segment}"`), matching this file's existing intent to never evaluate a real expression."""
+    f-string (`ast.JoinedStr`) whose every part is either a literal `Constant` or a
+    `FormattedValue` that itself resolves through this same function (recursively — so
+    `f"/{PRODUCT}/status"` folds when `PRODUCT` is a known constant, the normal way route
+    prefixes/segments get composed) — `None` for anything genuinely dynamic (`"a" + name`,
+    `f"/{segment}"` where `segment` isn't a known constant). A `FormattedValue` with a conversion
+    flag (`f"{x!r}"`) or a format spec (`f"{x:>10}"`) is treated as unresolvable rather than
+    folded: either changes the interpolated text in a way string concatenation alone can't
+    reproduce, and this file's whole approach is to never evaluate a real expression."""
     if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
         return expr.value
     if isinstance(expr, ast.Name) and expr.id in constants:
@@ -78,10 +81,23 @@ def _string_value(expr: ast.expr | None, constants: dict[str, str]) -> str | Non
         right = _string_value(expr.right, constants)
         if left is not None and right is not None:
             return left + right
-    if isinstance(expr, ast.JoinedStr) and all(
-        isinstance(part, ast.Constant) and isinstance(part.value, str) for part in expr.values
-    ):
-        return "".join(part.value for part in expr.values)
+    if isinstance(expr, ast.JoinedStr):
+        parts: list[str] = []
+        for part in expr.values:
+            if isinstance(part, ast.Constant) and isinstance(part.value, str):
+                parts.append(part.value)
+            elif (
+                isinstance(part, ast.FormattedValue)
+                and part.conversion == -1
+                and part.format_spec is None
+            ):
+                resolved = _string_value(part.value, constants)
+                if resolved is None:
+                    return None
+                parts.append(resolved)
+            else:
+                return None
+        return "".join(parts)
     return None
 
 
