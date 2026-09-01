@@ -241,7 +241,12 @@ _JS_EXTS = {".ts", ".tsx", ".js", ".jsx"}
 # also be a no-interpolation template literal (`` import(`openai`) ``, valid JS/TS) — the quote
 # class covers `` ` `` alongside `'`/`"`; a specifier containing real `${...}` interpolation still
 # never equals a plain package name in `PROVIDER_JS_PACKAGES`, so it naturally never false-positives.
-_JS_IMPORT_SPECIFIER_RE = re.compile(r"""(?:from|require\(|import\(?)\s*["'`]([^"'`]+)["'`]""")
+# `require`/`import` and their `(` don't have to be adjacent (`require ("pkg")`, `import
+# ("pkg")` are both valid JS/TS) — `\s*` between the keyword and `\(` tolerates that the same way
+# it already does between the whole call form and the opening quote.
+_JS_IMPORT_SPECIFIER_RE = re.compile(
+    r"""(?:from|require\s*\(|import\s*\(?)\s*["'`]([^"'`]+)["'`]"""
+)
 
 
 def _js_files() -> list[Path]:
