@@ -48,9 +48,15 @@ Follow the step-by-step in `docs/product-specs/add-product-recipe.md`.
 - `docs/architecture/platform-boundaries.md` — allowed/forbidden vocabulary and ownership split.
 - `docs/product-specs/add-product-recipe.md` — the step-by-step to add a product.
 - `scripts/agent/validate_architecture.py` and `tests/architecture/` — the tests that fail your PR
-  if you cross a boundary, including the two added for this audit:
-  `test_no_product_specific_endpoints.py` and
-  `test_litellm_model_strings_stay_in_provider_config.py`.
+  if you cross a boundary, including the two added for this audit
+  (`test_no_product_specific_endpoints.py`,
+  `test_litellm_model_strings_stay_in_provider_config.py`) and the JS/TS-side checks this audit
+  strengthened: `test_no_direct_provider_calls_outside_gateway.py` now also fails on a direct
+  provider SDK import from a Chrome Extension or web package
+  (`test_no_direct_provider_js_sdk_imports`) or a raw HTTP call to a provider API host
+  (`test_no_direct_provider_api_host_references`), and `test_no_prompts_inside_extensions.py` now
+  also fails on a real `{ role: "system", ... }` message shape, not just the literal
+  `prompt_ref`/`provider_policy_ref`/`system prompt` tokens.
   `test_no_product_specific_endpoints.py` checks against a static list of known product names —
   add your new product's name to it when you register the bundle (recipe step 6), don't rely on it
   catching an unlisted product automatically.

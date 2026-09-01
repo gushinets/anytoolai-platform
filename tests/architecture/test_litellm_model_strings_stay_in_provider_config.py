@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import bisect
 import re
 from pathlib import Path
 
@@ -655,58 +656,89 @@ def _strip_comments(text: str, markers: tuple[str, ...], jsx: bool = False) -> l
     return lines
 
 
-# Joins exactly one `+` (with optional surrounding whitespace) between two adjacent quoted
-# strings on the same line — `"openai/" + "gpt-4.1"`. Bounded on purpose: a real JS/TS parser
-# would be needed to fold a multi-line or non-string-literal concatenation (`"openai/" + model`,
-# a `+=`, a chain split across lines), and this file already has a documented ceiling for the
-# JS/TS path ("no JS/TS tokenizer available here without adding a new dependency" above) — this
-# closes the single concrete shape the team-lead review flagged without pretending to solve
-# general JS/TS expression folding.
-# ponytail: same-line-only, string-literal-operand-only string-concat folding for JS/TS. Upgrade
-# path: a real JS/TS tokenizer, same as the block comment above already calls for.
-_CONCAT_JOIN_RE = re.compile(r"^\s*\+\s*$")
+# Joins a run of adjacent quoted-string spans connected only by whitespace, a single `+`, and
+# optional grouping parens — `"openai/" + "gpt-4.1"`, `"openai/" +\n  "gpt-4.1"` (a real newline:
+# `\s` matches it), `"openai/" + ("gpt-4.1")`. Deliberately still bounded to *string-literal*
+# operands only (`"openai/" + model` stays unmatched — `between` then contains the identifier
+# `model`, which `_CONCAT_JOIN_RE` rejects) rather than a full JS/TS expression evaluator — that
+# ceiling is unavoidable without a real JS/TS parser, already documented above for the rest of
+# this file's JS/TS path, and not what any review round has asked for; only the "adjacent strings
+# joined by `+`" shape itself needed to stop being line-scoped.
+# ponytail: string-literal-operand-only string-concat folding for JS/TS (any grouping of `+` and
+# parens, any number of physical lines). Upgrade path: a real JS/TS tokenizer, same as the block
+# comment above already calls for.
+_CONCAT_JOIN_RE = re.compile(r"^[\s()]*\+[\s()]*$")
 
 
-def _concatenated_string_values(line: str, spans: list[tuple[int, int]]) -> list[str]:
-    """Joins runs of adjacent quoted-string spans connected only by whitespace and a `+` into
-    their concatenated content, so `"openai/" + "gpt-4.1"` is checked as one value the same way
-    the Python AST path already folds `"openai/" + "gpt-4.1"` via `_fold_string_concat`."""
+def _concatenated_string_values(text: str, spans: list[tuple[int, int]]) -> list[tuple[int, str]]:
+    """(start offset in `text`, concatenated value) for each run of >=2 adjacent quoted-string
+    spans in `text` connected only by whitespace/parens/a single `+` — so the Python AST path's
+    `_fold_string_concat` and this one fold the same `"openai/" + "gpt-4.1"` shape, regardless of
+    how many physical lines or grouping parens it's spread across."""
     if len(spans) < 2:
         return []
-    values: list[str] = []
+    values: list[tuple[int, str]] = []
     group_start = 0
     for i in range(1, len(spans)):
         prev_end, next_start = spans[i - 1][1], spans[i][0]
-        between = line[prev_end + 1 : next_start - 1]
+        between = text[prev_end + 1 : next_start - 1]
         if not _CONCAT_JOIN_RE.match(between):
             if i - group_start > 1:
-                values.append("".join(line[s:e] for s, e in spans[group_start:i]))
+                start = spans[group_start][0]
+                values.append((start, "".join(text[s:e] for s, e in spans[group_start:i])))
             group_start = i
     if len(spans) - group_start > 1:
-        values.append("".join(line[s:e] for s, e in spans[group_start:]))
+        start = spans[group_start][0]
+        values.append((start, "".join(text[s:e] for s, e in spans[group_start:])))
     return values
 
 
 def _line_offender(stripped_line: str) -> str | None:
+    """A same-line-only offender: a direct regex match, or a same-line-only concatenation. The
+    cross-line concatenation case is handled separately, once per file, by `_regex_offender`'s own
+    whole-text pass below (a per-line loop can't see a concatenation split across physical lines)."""
     spans = _quoted_string_spans(stripped_line)
     for match in LITELLM_MODEL_STRING_RE.finditer(stripped_line):
         if not _is_url_query_value(stripped_line, spans, match.start()):
             return match.group(0)
-    for concatenated in _concatenated_string_values(stripped_line, spans):
+    for _, concatenated in _concatenated_string_values(stripped_line, spans):
         match = _offending_match(concatenated)
         if match is not None:
             return match
     return None
 
 
+def _line_number_at(line_start_offsets: list[int], offset: int) -> int:
+    """1-indexed physical line containing `offset` in the text `line_start_offsets` was built
+    from (`line_start_offsets[i]` is the start offset of 1-indexed line `i + 1`)."""
+    return bisect.bisect_right(line_start_offsets, offset)
+
+
 def _regex_offender(path: Path) -> tuple[int, str] | None:
     markers = _COMMENT_MARKERS_BY_SUFFIX[path.suffix]
     text = path.read_text(encoding="utf-8", errors="ignore")
     jsx = path.suffix in (".jsx", ".tsx")
-    for lineno, stripped_line in enumerate(_strip_comments(text, markers, jsx), start=1):
+    lines = _strip_comments(text, markers, jsx)
+    for lineno, stripped_line in enumerate(lines, start=1):
         offender = _line_offender(stripped_line)
         if offender is not None:
             return lineno, offender
+
+    # A concatenation split across physical lines (`"openai/" +\n  "gpt-4.1"`) is invisible to
+    # the per-line loop above — each line has, at most, one dangling operand with no partner on
+    # that same line. Re-scan the whole (already comment-stripped) file as one string instead, so
+    # `_concatenated_string_values` can see spans that live on different physical lines.
+    full_text = "\n".join(lines)
+    spans = _quoted_string_spans(full_text)
+    line_start_offsets = []
+    offset = 0
+    for line in lines:
+        line_start_offsets.append(offset)
+        offset += len(line) + 1
+    for start, concatenated in _concatenated_string_values(full_text, spans):
+        match = _offending_match(concatenated)
+        if match is not None:
+            return _line_number_at(line_start_offsets, start), match
     return None
 
 
