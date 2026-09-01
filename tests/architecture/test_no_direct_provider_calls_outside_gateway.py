@@ -232,7 +232,11 @@ PROVIDER_JS_PACKAGES = {
     "mistralai",
     "@mistralai/mistralai",
 }
-_JS_EXTS = {".ts", ".tsx", ".js", ".jsx"}
+# The canonical JS-family extension set — matches `scripts/agent/validate_architecture.py`'s own
+# `JS_TS_EXTS`. Public (no leading underscore) so sibling architecture tests import this one
+# instead of hand-rolling their own narrower copy that can silently drift (exactly what happened
+# here: this set omitted `.mjs`/`.cjs` until a real repo-wide check already covered both).
+JS_TS_EXTS = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
 # `from "pkg"` (named/default import), `require("pkg")` (CommonJS), a bare side-effect
 # `import "pkg"` (no `from` at all), and a dynamic `import("pkg")`/`await import("pkg")` — all four
 # are real ways to pull in a module, and each is a real, distinct bypass of an import-specifier
@@ -254,7 +258,7 @@ def _js_files() -> list[Path]:
         path
         for path in ROOT.rglob("*")
         if path.is_file()
-        and path.suffix in _JS_EXTS
+        and path.suffix in JS_TS_EXTS
         and not any(part in SKIP_PATH_PARTS for part in path.parts)
     ]
 
@@ -302,7 +306,7 @@ PROVIDER_API_HOSTS = [
 def test_no_direct_provider_api_host_references() -> None:
     offenders: list[str] = []
     for path in ROOT.rglob("*"):
-        if not (path.is_file() and path.suffix in ({".py"} | _JS_EXTS)):
+        if not (path.is_file() and path.suffix in ({".py"} | JS_TS_EXTS)):
             continue
         if any(part in SKIP_PATH_PARTS for part in path.parts):
             continue

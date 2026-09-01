@@ -7,9 +7,14 @@ from pathlib import Path
 
 import yaml
 
-# Reuse the canonical skip-dir set instead of hand-maintaining a copy that can drift (this file's
-# own copy already diverged from this neighbor's twice across two code-review rounds).
-from test_no_direct_provider_calls_outside_gateway import SKIP_PATH_PARTS as _NEIGHBOR_SKIP_PATH_PARTS
+# Reuse the canonical skip-dir and JS/TS-extension sets instead of hand-maintaining copies that
+# can drift (this file's own `SKIP_PATH_PARTS` copy already diverged from this neighbor's twice
+# across two code-review rounds, and `SCAN_EXTS`'s own JS-family suffixes independently drifted
+# from `.mjs`/`.cjs` support the neighbor already had).
+from test_no_direct_provider_calls_outside_gateway import (
+    JS_TS_EXTS as _NEIGHBOR_JS_TS_EXTS,
+    SKIP_PATH_PARTS as _NEIGHBOR_SKIP_PATH_PARTS,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 ALLOWED_FILES = {
@@ -27,7 +32,7 @@ SCAN_ROOTS = [
 # real litellm-format config values (e.g. test_litellm_adapter.py), unlike the neighbor which
 # filters "tests" per-function instead of via this set.
 SKIP_PATH_PARTS = _NEIGHBOR_SKIP_PATH_PARTS | {"tests"}
-SCAN_EXTS = {".py", ".ts", ".tsx", ".js", ".jsx", ".yaml", ".yml", ".json"}
+SCAN_EXTS = _NEIGHBOR_JS_TS_EXTS | {".py", ".yaml", ".yml", ".json"}
 
 # LiteLLM SDK/proxy model strings are "<provider>/<model>" (see configs/kernel/litellm_router.yaml
 # litellm_params.model). They must appear only in provider policy/model registry files, never
@@ -286,6 +291,8 @@ _COMMENT_MARKERS_BY_SUFFIX: dict[str, tuple[str, ...]] = {
     ".tsx": ("//",),
     ".js": ("//",),
     ".jsx": ("//",),
+    ".mjs": ("//",),  # ES module JS — same comment syntax as .js
+    ".cjs": ("//",),  # CommonJS JS — same comment syntax as .js
 }
 
 

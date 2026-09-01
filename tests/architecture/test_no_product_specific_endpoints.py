@@ -61,10 +61,30 @@ ROUTE_REGISTRATION_METHODS = {
 PREFIX_KEYWORD_CALLS = {"APIRouter", "include_router"}
 
 
+def _string_value(expr: ast.expr | None, constants: dict[str, str]) -> str | None:
+    """A literal string, a reference to an already-known module constant, or a compile-time
+    `"a" + "b"` concatenation of either (recursively, so `"a" + ("b" + C)` folds too) — `None` for
+    anything genuinely dynamic (`"a" + name`), matching this file's existing intent to never
+    evaluate a real expression."""
+    if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
+        return expr.value
+    if isinstance(expr, ast.Name) and expr.id in constants:
+        return constants[expr.id]
+    if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.Add):
+        left = _string_value(expr.left, constants)
+        right = _string_value(expr.right, constants)
+        if left is not None and right is not None:
+            return left + right
+    return None
+
+
 def _module_string_constants(tree: ast.Module) -> dict[str, str]:
-    """Module-level `<NAME> = "<literal>"` / `<NAME>: <type> = "<literal>"` bindings, so
-    `@router.get(PROPOSAL_STATUS_PATH)` is resolved back to its literal instead of being invisible
-    to `_path_argument` (an `ast.Name`, not an `ast.Constant`).
+    """Module-level `<NAME> = "<literal>"` / `<NAME>: <type> = "<literal>"` / `<NAME> = "a" + "b"`
+    bindings, so `@router.get(PROPOSAL_STATUS_PATH)` is resolved back to its literal instead of
+    being invisible to `_path_argument` (an `ast.Name`, not an `ast.Constant`). Built via
+    `_string_value` itself (not a separate `ast.Constant`-only check) so a later constant can
+    reference an earlier one in the same file, and a concatenated value folds the same way a
+    direct route-path concatenation already does.
 
     Scoped to `tree.body` (top-level statements only) — walking the whole tree would also collect
     a same-named local inside a function/class (`def helper(): PROPOSAL_STATUS_PATH = "/safe"`),
@@ -73,30 +93,18 @@ def _module_string_constants(tree: ast.Module) -> dict[str, str]:
     """
     constants: dict[str, str] = {}
     for node in tree.body:
-        if (
-            isinstance(node, ast.Assign)
-            and isinstance(node.value, ast.Constant)
-            and isinstance(node.value.value, str)
-        ):
+        if isinstance(node, ast.Assign):
+            value = _string_value(node.value, constants)
+            if value is None:
+                continue
             for target in node.targets:
                 if isinstance(target, ast.Name):
-                    constants[target.id] = node.value.value
-        elif (
-            isinstance(node, ast.AnnAssign)
-            and isinstance(node.target, ast.Name)
-            and isinstance(node.value, ast.Constant)
-            and isinstance(node.value.value, str)
-        ):
-            constants[node.target.id] = node.value.value
+                    constants[target.id] = value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            value = _string_value(node.value, constants)
+            if value is not None:
+                constants[node.target.id] = value
     return constants
-
-
-def _string_value(expr: ast.expr | None, constants: dict[str, str]) -> str | None:
-    if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
-        return expr.value
-    if isinstance(expr, ast.Name) and expr.id in constants:
-        return constants[expr.id]
-    return None
 
 
 def _keyword_value(node: ast.Call, keyword: str, constants: dict[str, str]) -> str | None:
@@ -116,19 +124,37 @@ def _path_argument(node: ast.Call, constants: dict[str, str]) -> str | None:
 
 
 ROUTE_TARGET_CONSTRUCTORS = {"APIRouter", "FastAPI"}
+# Starlette route-object constructors — `FastAPI(routes=[Route("/proposal_ai/status", endpoint)])`
+# (and the `WebSocketRoute`/`Mount` equivalents) register a route the same way `router.get(...)`
+# does, but as a standalone object construction rather than a method call on a tracked
+# router/app — a call shape `_route_path_literals_for_tree`'s `called_on_router` gate never
+# recognizes, since there is no router/app receiver to check at all.
+ROUTE_OBJECT_CONSTRUCTORS = {"Route", "WebSocketRoute", "Mount"}
 
 
-def _route_target_import_aliases(tree: ast.AST) -> dict[str, str]:
-    """Maps a local import name to the real constructor name it's bound to, e.g.
-    `from fastapi import FastAPI as F` -> `{"F": "FastAPI"}` (a bare
+def _import_aliases_for(tree: ast.AST, tracked_names: set[str]) -> dict[str, str]:
+    """Maps a local import name to the real name it's bound to, for any name in
+    `tracked_names`, e.g. `from fastapi import FastAPI as F` -> `{"F": "FastAPI"}` (a bare
     `from fastapi import FastAPI` maps `"FastAPI": "FastAPI"`, redundant but harmless)."""
     aliases: dict[str, str] = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
             for alias in node.names:
-                if alias.name in ROUTE_TARGET_CONSTRUCTORS:
+                if alias.name in tracked_names:
                     aliases[alias.asname or alias.name] = alias.name
     return aliases
+
+
+def _route_target_import_aliases(tree: ast.AST) -> dict[str, str]:
+    return _import_aliases_for(tree, ROUTE_TARGET_CONSTRUCTORS)
+
+
+def _route_object_import_aliases(tree: ast.AST) -> dict[str, str]:
+    """A separate alias map from `_route_target_import_aliases`, deliberately not merged with
+    it: `_is_route_target_call`/`_direct_router_names` treat *any* name in the router/app alias
+    dict as "this creates a router/app object" — merging `Route`/`WebSocketRoute`/`Mount` into
+    that same dict would wrongly make `x = Route(...)` look like a router/app binding too."""
+    return _import_aliases_for(tree, ROUTE_OBJECT_CONSTRUCTORS)
 
 
 def _is_route_target_call(value: ast.expr | None, aliases: dict[str, str]) -> bool:
@@ -389,6 +415,7 @@ def _route_path_literals_for_tree(
     aliases: dict[str, str],
     constants: dict[str, str],
     module_router_names: dict[str, set[str]],
+    object_aliases: dict[str, str],
 ) -> list[str]:
     literals: list[str] = []
     for node in ast.walk(tree):
@@ -404,10 +431,10 @@ def _route_path_literals_for_tree(
             called_on_router = _is_router_expr(func.value, router_names, module_router_names)
         else:
             func_name = getattr(func, "id", None)
-            # Resolve an import alias (`APIRouter as R` -> `R(...)`) back to the real
-            # constructor name so its `prefix=` keyword is inspected the same way a bare
-            # `APIRouter(prefix=...)`/`include_router(prefix=...)` call is.
-            func_name = aliases.get(func_name, func_name)
+            # Resolve an import alias (`APIRouter as R` -> `R(...)`, or `Route as Rt` -> `Rt(...)`)
+            # back to the real constructor name. A name can only ever be bound to one of these two
+            # disjoint constructor sets, so checking both dicts is unambiguous.
+            func_name = aliases.get(func_name, object_aliases.get(func_name, func_name))
             called_on_router = False
 
         if func_name in ROUTE_REGISTRATION_METHODS and called_on_router:
@@ -420,6 +447,12 @@ def _route_path_literals_for_tree(
             prefix = _keyword_value(node, "prefix", constants)
             if prefix is not None:
                 literals.append(prefix)
+        elif func_name in ROUTE_OBJECT_CONSTRUCTORS:
+            # A standalone `Route(...)`/`WebSocketRoute(...)`/`Mount(...)` construction — never a
+            # method call on a router/app, so no `called_on_router` gate applies here at all.
+            path = _path_argument(node, constants)
+            if path is not None:
+                literals.append(path)
     return literals
 
 
@@ -438,6 +471,7 @@ def test_no_product_specific_endpoint_paths() -> None:
     offenders: list[str] = []
     for path, tree in trees.items():
         aliases = _route_target_import_aliases(tree)
+        object_aliases = _route_object_import_aliases(tree)
         constants = _module_string_constants(tree)
         literals = _route_path_literals_for_tree(
             tree,
@@ -445,6 +479,7 @@ def test_no_product_specific_endpoint_paths() -> None:
             aliases,
             constants,
             module_router_names_by_file[path],
+            object_aliases,
         )
         for literal in literals:
             lowered = literal.lower()
