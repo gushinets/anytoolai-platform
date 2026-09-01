@@ -259,6 +259,17 @@ def _js_files() -> list[Path]:
     ]
 
 
+def _is_forbidden_js_specifier(specifier: str) -> bool:
+    """`specifier` is a forbidden package itself, or a subpath import from one
+    (`openai/resources/chat/completions` from `openai`) — still a direct provider SDK import,
+    just not of the package's own root. The `/` boundary means `openai-compatible` (a different,
+    unrelated package) doesn't false-positive against `openai`."""
+    return any(
+        specifier == package or specifier.startswith(f"{package}/")
+        for package in PROVIDER_JS_PACKAGES
+    )
+
+
 def test_no_direct_provider_js_sdk_imports() -> None:
     offenders: list[str] = []
     for path in _js_files():
@@ -266,7 +277,7 @@ def test_no_direct_provider_js_sdk_imports() -> None:
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
         for match in _JS_IMPORT_SPECIFIER_RE.finditer(text):
-            if match.group(1) in PROVIDER_JS_PACKAGES:
+            if _is_forbidden_js_specifier(match.group(1)):
                 offenders.append(f"{path.relative_to(ROOT)} imports {match.group(1)!r}")
                 break
 
