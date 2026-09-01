@@ -100,6 +100,12 @@ def _imports_provider_adapter(path: Path) -> bool:
 
 
 def _imports_module(path: Path, module_name: str) -> bool:
+    # For a dotted `module_name` (e.g. "google.genai"), the canonical import form for that SDK is
+    # often `from google import genai`, not `import google.genai` — a parent-module-plus-child-name
+    # import that resolves to the exact same object but doesn't literally contain "google.genai"
+    # anywhere in its own AST. Mirrors the same parent+child pattern `_imports_provider_adapter`
+    # already handles for its own "adapters" case above.
+    parent, _, child = module_name.rpartition(".")
     tree = ast.parse(path.read_text(encoding="utf-8", errors="ignore"))
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -110,6 +116,8 @@ def _imports_module(path: Path, module_name: str) -> bool:
                 return True
         if isinstance(node, ast.ImportFrom) and node.module is not None:
             if node.module == module_name or node.module.startswith(f"{module_name}."):
+                return True
+            if parent and node.module == parent and any(alias.name == child for alias in node.names):
                 return True
     return False
 
@@ -229,8 +237,11 @@ _JS_EXTS = {".ts", ".tsx", ".js", ".jsx"}
 # `import "pkg"` (no `from` at all), and a dynamic `import("pkg")`/`await import("pkg")` — all four
 # are real ways to pull in a module, and each is a real, distinct bypass of an import-specifier
 # check that only recognized `from`/`require(`. `import\(?` covers both the side-effect form
-# (bare `import`, no paren) and the dynamic form (`import(`) with one alternative.
-_JS_IMPORT_SPECIFIER_RE = re.compile(r"""(?:from|require\(|import\(?)\s*["']([^"']+)["']""")
+# (bare `import`, no paren) and the dynamic form (`import(`) with one alternative. A specifier can
+# also be a no-interpolation template literal (`` import(`openai`) ``, valid JS/TS) — the quote
+# class covers `` ` `` alongside `'`/`"`; a specifier containing real `${...}` interpolation still
+# never equals a plain package name in `PROVIDER_JS_PACKAGES`, so it naturally never false-positives.
+_JS_IMPORT_SPECIFIER_RE = re.compile(r"""(?:from|require\(|import\(?)\s*["'`]([^"'`]+)["'`]""")
 
 
 def _js_files() -> list[Path]:
