@@ -49,6 +49,11 @@ ROUTE_REGISTRATION_METHODS = {
     "websocket_route",
     "add_api_websocket_route",
     "add_websocket_route",
+    # Starlette methods FastAPI/APIRouter inherit — `add_route(path, endpoint)` registers a route
+    # the same way `add_api_route` does, and `mount(path, app)` registers `path` as a sub-app
+    # prefix; `_path_argument`'s "first positional, or path=" extraction already covers both shapes.
+    "add_route",
+    "mount",
 }
 # `app.include_router(router, prefix=...)` is how main.py could hardcode a product-specific
 # prefix without ever calling APIRouter(...) itself — must be caught alongside APIRouter/route

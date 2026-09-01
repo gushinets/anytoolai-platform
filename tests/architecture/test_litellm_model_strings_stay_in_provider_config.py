@@ -15,7 +15,13 @@ ALLOWED_FILES = {
     ROOT / "configs" / "kernel" / "provider_policies.yaml",
     ROOT / "configs" / "kernel" / "litellm_router.yaml",
 }
-SCAN_ROOTS = [ROOT / "apps", ROOT / "packages", ROOT / "extensions", ROOT / "configs"]
+SCAN_ROOTS = [
+    ROOT / "apps",
+    ROOT / "packages",
+    ROOT / "extensions",
+    ROOT / "configs",
+    ROOT / "scripts",
+]
 # Extra entry beyond the neighbor: skip test fixtures, since they legitimately assert against
 # real litellm-format config values (e.g. test_litellm_adapter.py), unlike the neighbor which
 # filters "tests" per-function instead of via this set.
@@ -163,6 +169,12 @@ def _python_offender(path: Path) -> tuple[int, str] | None:
         for part in node.values
     }
 
+    # A BinOp's own Constant operands must not also be checked independently as top-level strings
+    # (`ast.walk` visits them too) — same double-processing risk `fstring_part_ids` guards against
+    # above, and irrelevant here anyway since a lone fragment ("openai/" or "gpt-4.1") never
+    # matches the provider/model regex on its own.
+    binop_part_ids = {id(part) for node in ast.walk(tree) if isinstance(node, ast.BinOp) for part in (node.left, node.right)}
+
     best: tuple[int, str] | None = None
     for node in ast.walk(tree):
         value: str | None = None
@@ -171,6 +183,7 @@ def _python_offender(path: Path) -> tuple[int, str] | None:
             isinstance(node, ast.Constant)
             and isinstance(node.value, str)
             and id(node) not in fstring_part_ids
+            and id(node) not in binop_part_ids
         ):
             value = node.value
         elif isinstance(node, ast.JoinedStr) and all(
@@ -178,12 +191,29 @@ def _python_offender(path: Path) -> tuple[int, str] | None:
             for part in node.values
         ):
             value = "".join(part.value for part in node.values)
+        elif isinstance(node, ast.BinOp):
+            value = _fold_string_concat(node)
         if value is None or lineno is None:
             continue
         match = _offending_match(value)
         if match is not None and (best is None or lineno < best[0]):
             best = (lineno, match)
     return best
+
+
+def _fold_string_concat(node: ast.expr) -> str | None:
+    """Constant-fold a `"a" + "b"` (compile-time string concatenation) chain into its resulting
+    string, or `None` if any operand isn't itself a plain string constant or foldable BinOp — e.g.
+    `"openai/" + name` (real interpolation) stays `None`, matching this file's existing intent to
+    never evaluate a genuinely dynamic expression."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left = _fold_string_concat(node.left)
+        right = _fold_string_concat(node.right)
+        if left is not None and right is not None:
+            return left + right
+    return None
 
 
 def _iter_yaml_scalars(node: yaml.Node):
@@ -625,11 +655,47 @@ def _strip_comments(text: str, markers: tuple[str, ...], jsx: bool = False) -> l
     return lines
 
 
+# Joins exactly one `+` (with optional surrounding whitespace) between two adjacent quoted
+# strings on the same line — `"openai/" + "gpt-4.1"`. Bounded on purpose: a real JS/TS parser
+# would be needed to fold a multi-line or non-string-literal concatenation (`"openai/" + model`,
+# a `+=`, a chain split across lines), and this file already has a documented ceiling for the
+# JS/TS path ("no JS/TS tokenizer available here without adding a new dependency" above) — this
+# closes the single concrete shape the team-lead review flagged without pretending to solve
+# general JS/TS expression folding.
+# ponytail: same-line-only, string-literal-operand-only string-concat folding for JS/TS. Upgrade
+# path: a real JS/TS tokenizer, same as the block comment above already calls for.
+_CONCAT_JOIN_RE = re.compile(r"^\s*\+\s*$")
+
+
+def _concatenated_string_values(line: str, spans: list[tuple[int, int]]) -> list[str]:
+    """Joins runs of adjacent quoted-string spans connected only by whitespace and a `+` into
+    their concatenated content, so `"openai/" + "gpt-4.1"` is checked as one value the same way
+    the Python AST path already folds `"openai/" + "gpt-4.1"` via `_fold_string_concat`."""
+    if len(spans) < 2:
+        return []
+    values: list[str] = []
+    group_start = 0
+    for i in range(1, len(spans)):
+        prev_end, next_start = spans[i - 1][1], spans[i][0]
+        between = line[prev_end + 1 : next_start - 1]
+        if not _CONCAT_JOIN_RE.match(between):
+            if i - group_start > 1:
+                values.append("".join(line[s:e] for s, e in spans[group_start:i]))
+            group_start = i
+    if len(spans) - group_start > 1:
+        values.append("".join(line[s:e] for s, e in spans[group_start:]))
+    return values
+
+
 def _line_offender(stripped_line: str) -> str | None:
     spans = _quoted_string_spans(stripped_line)
     for match in LITELLM_MODEL_STRING_RE.finditer(stripped_line):
         if not _is_url_query_value(stripped_line, spans, match.start()):
             return match.group(0)
+    for concatenated in _concatenated_string_values(stripped_line, spans):
+        match = _offending_match(concatenated)
+        if match is not None:
+            return match
     return None
 
 
