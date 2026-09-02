@@ -373,6 +373,22 @@ def test_assignment_before_a_local_var_role_declaration_resolves_to_the_hoisted_
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_short_circuit_and_role_reassignment_does_not_replace_the_deterministic_value(
+    tmp_path: Path,
+) -> None:
+    # The RHS of `&&` only evaluates when the LHS is truthy — `isUser && (role = "user")` never
+    # runs the assignment when `isUser` is falsy, exactly like an `if` body that might not run
+    # (round 54).
+    (tmp_path / "chat.ts").write_text(
+        'let role = "system";\n\n'
+        'isUser && (role = "user");\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
     # `role` is deterministically "system" at the use site (round 37): a static reassignment
     # must resolve to the value actually in effect, not to "unresolved" just because a write

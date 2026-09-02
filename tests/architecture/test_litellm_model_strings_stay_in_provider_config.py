@@ -736,3 +736,34 @@ def test_parameter_reassigned_before_a_same_named_var_still_resolves_the_paramet
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == ["model.ts:2: 'openai/gpt-4.1'"], offenders
+
+
+def test_short_circuit_and_reassignment_does_not_replace_the_deterministic_value(tmp_path: Path) -> None:
+    # The RHS of `&&` only evaluates when the LHS is truthy — `useFallback && (provider =
+    # "internal")` never runs the assignment at all when `useFallback` is falsy, exactly like an
+    # `if` body that might not run. `isDeterministicWrite` didn't recognize this AST position as
+    # conditional at all, so the write replaced the reachable set instead of joining it, hiding the
+    # still-reachable "openai" value entirely (round 54).
+    (tmp_path / "model.ts").write_text(
+        'let provider = "openai";\n\n'
+        'useFallback && (provider = "internal");\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:5: 'openai/gpt-4.1'"], offenders
+
+
+def test_ternary_branch_reassignment_does_not_replace_the_deterministic_value(tmp_path: Path) -> None:
+    # Only one branch of a ternary ever runs — a reassignment in `whenTrue`/`whenFalse` is exactly
+    # as conditional as an `if`/`else` arm (round 54).
+    (tmp_path / "model.ts").write_text(
+        'let provider = "openai";\n\n'
+        "useFallback\n"
+        '  ? (provider = "internal")\n'
+        "  : null;\n\n"
+        "const model = `${provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:7: 'openai/gpt-4.1'"], offenders

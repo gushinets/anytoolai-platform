@@ -321,13 +321,31 @@ const CONDITIONAL_PARENT_SLOTS = [
   [ts.SyntaxKind.DoStatement, "statement"],
 ];
 
+// `&&`/`||`/`??`'s right-hand operand only evaluates when the left side's truthiness (or, for
+// `??`, nullishness) allows it — `cond && (x = "y")` never runs the assignment at all when `cond`
+// is falsy, exactly like an `if` body never running (round 54). Checked by operator kind, not
+// just AST shape, since a `BinaryExpression`'s `.right` is otherwise perfectly ordinary — `+`'s
+// right side, for one, always evaluates unconditionally.
+const SHORT_CIRCUIT_OPERATORS = new Set([
+  ts.SyntaxKind.AmpersandAmpersandToken,
+  ts.SyntaxKind.BarBarToken,
+  ts.SyntaxKind.QuestionQuestionToken,
+]);
+
 /** Whether `node` sits in one of the AST slots that only conditionally executes — the `then`/
- * `else` arm of an `if`, a loop body, or anywhere under a `try`/`catch`/`switch` case (treated as
- * conditional unconditionally, the same conservative call the prior resolver already made for
- * these — never wrong-direction, only ever "loses a little precision inside one block"). */
+ * `else` arm of an `if`, a loop body, anywhere under a `try`/`catch`/`switch` case, a short-circuit
+ * operator's right-hand side, or a ternary's `whenTrue`/`whenFalse` branch (treated as conditional
+ * unconditionally, the same conservative call the prior resolver already made for these — never
+ * wrong-direction, only ever "loses a little precision inside one block"). */
 function isConditionalSlot(node, parent) {
   for (const [kind, prop] of CONDITIONAL_PARENT_SLOTS) {
     if (parent.kind === kind && parent[prop] === node) return true;
+  }
+  if (parent.kind === ts.SyntaxKind.BinaryExpression && parent.right === node) {
+    return SHORT_CIRCUIT_OPERATORS.has(parent.operatorToken.kind);
+  }
+  if (parent.kind === ts.SyntaxKind.ConditionalExpression && (parent.whenTrue === node || parent.whenFalse === node)) {
+    return true;
   }
   return (
     parent.kind === ts.SyntaxKind.TryStatement ||
