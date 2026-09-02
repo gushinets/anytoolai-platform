@@ -344,34 +344,93 @@ function resolveExport(analysis, name, seen = new Set()) {
   return null;
 }
 
-/** The `ObjectLiteralExpression` node `expr` structurally evaluates to, if any — a plain inline
- * object literal, or a plain identifier reference whose declaration has exactly one write and
- * that write's own (transparent-wrapper-unwrapped) expression is an object literal. Deliberately
- * much narrower than `replayWrites`' full conditional/union value tracking for strings: an
- * object's *shape* isn't a small combinatorial set of string possibilities the way a folded
- * string is, so this only ever answers "is this *always* this one specific object literal," never
- * "which of several object literals could this be" — a `let`/multiply-reassigned binding, or one
- * whose single write isn't an object literal at all, correctly resolves to nothing here rather
+/** The `ObjectLiteralExpression` node `decl`'s single write structurally evaluates to, if any —
+ * `decl` must have *exactly one* write, and that write's own (transparent-wrapper-unwrapped)
+ * expression must be an object literal. This is *only* about whether `decl` has one unambiguous
+ * originating shape at all — it says nothing about that object's properties staying unmutated
+ * after construction (see `getOrCreatePropertyDecl` for that part) — a `let`/multiply-reassigned
+ * binding, or one whose single write isn't an object literal, correctly has no such shape rather
  * than guessing (round 58). */
-function resolveObjectLiteral(analysis, expr) {
-  if (ts.isObjectLiteralExpression(expr)) return expr;
-  if (!ts.isIdentifier(expr)) return null;
-  const decl = analysis.resolveDecl(expr, expr.text);
+function objectLiteralFromDecl(decl) {
   if (!decl || decl.writes.length !== 1) return null;
   let target = decl.writes[0].expr;
   while (target && TRANSPARENT_WRAPPER_KINDS.has(target.kind)) target = target.expression;
   return target && ts.isObjectLiteralExpression(target) ? target : null;
 }
 
+/** The `ObjectLiteralExpression` node `expr` structurally evaluates to, if any — a plain inline
+ * object literal, or (via `objectLiteralFromDecl`) a plain identifier reference. */
+function resolveObjectLiteral(analysis, expr) {
+  if (ts.isObjectLiteralExpression(expr)) return expr;
+  if (!ts.isIdentifier(expr)) return null;
+  return objectLiteralFromDecl(analysis.resolveDecl(expr, expr.text));
+}
+
+/** Get-or-create the property-write timeline for `objectDecl.propName` — a binding-shaped decl
+ * object (own `writes` array, `scope` copied from `objectDecl`'s own scope, always `mutable`
+ * regardless of whether the object binding itself is `const`, since `const` only prevents
+ * *rebinding* `config` to a new object, never mutating its own properties) stored directly on
+ * `objectDecl` itself, keyed by property name — mirrors `analysis.binding()`'s get-or-create shape
+ * for ordinary bindings, but object properties aren't part of any lexical scope chain, so they
+ * can't live in `declsByScope` the normal way; a direct per-object map is simpler than inventing a
+ * fake scope node for them.
+ *
+ * Seeded, on first creation only, with the object literal's own initializer for this property (if
+ * the object resolves to one via `objectLiteralFromDecl`, and it declares this property at all) —
+ * `own: true`, since constructing the object always deterministically sets it, mirroring how a
+ * declaration's own initializer or a parameter default already gets this treatment. A later
+ * `obj.prop = ...` mutation — collected eagerly during the ordinary pass-2 assignment walk,
+ * *before* this function is ever called, since collection fully finishes before any folding starts
+ * — is pushed directly by that walk, `own: false`, computed for real via `isDeterministicWrite`
+ * exactly like an ordinary reassignment; `propDecl.scope` being a genuine scope node (copied from
+ * the object's own binding) is what makes that determinism check meaningful at all. Explicitly
+ * sorted by position here (once, only on creation) since a mutation can be pushed before this seed
+ * is ever added — this function might not run until long after pass 2 collected every mutation
+ * (round 59: round 58's model only ever looked at the object literal's own initializer, so
+ * `config.primaryProvider = "openai";` — an ordinary, deterministic mutation after construction —
+ * was silently invisible, and the resolver kept treating the property as permanently equal to
+ * its initializer). */
+function getOrCreatePropertyDecl(analysis, objectDecl, propName) {
+  if (!objectDecl.properties) objectDecl.properties = new Map();
+  let propDecl = objectDecl.properties.get(propName);
+  if (propDecl) return propDecl;
+  propDecl = { name: propName, scope: objectDecl.scope, mutable: true, writes: [] };
+  objectDecl.properties.set(propName, propDecl);
+  const objectLiteral = objectLiteralFromDecl(objectDecl);
+  if (objectLiteral) {
+    for (const prop of objectLiteral.properties) {
+      let key = null;
+      let valueExpr = null;
+      if (ts.isPropertyAssignment(prop) && !ts.isComputedPropertyName(prop.name)) {
+        key = ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name) ? prop.name.text : null;
+        valueExpr = prop.initializer;
+      } else if (ts.isShorthandPropertyAssignment(prop)) {
+        key = prop.name.text;
+        valueExpr = prop.name;
+      }
+      if (key === propName) {
+        propDecl.writes.push({ pos: prop.getStart(analysis.sourceFile), expr: valueExpr, own: true });
+        break;
+      }
+    }
+  }
+  propDecl.writes.sort((a, b) => a.pos - b.pos);
+  return propDecl;
+}
+
 /** `objExpr.propName` (from a `PropertyAccessExpression`, or an `ElementAccessExpression` with a
- * static string-literal index — see `foldExprInner`), resolved one of two ways: if `objExpr` is a
- * `NamespaceImport` binding (`import * as providers from "./x"`), `propName` is looked up in the
- * source module's own export graph via `resolveExport`, exactly like an ordinary named import
- * already does; otherwise, `objExpr` is resolved structurally to an object literal (see
- * `resolveObjectLiteral`) and `propName` is looked up among its own (non-computed) properties,
- * `own: false` writes folded through the same `replayWrites`/`isDeterministicWrite` machinery
- * everything else uses (round 58). `null` for anything neither shape covers. */
-function resolvePropertyAccess(analysis, objExpr, propName) {
+ * static string-literal index — see `foldExprInner`) at position `atPos`, resolved one of two
+ * ways: if `objExpr` is a `NamespaceImport` binding (`import * as providers from "./x"`),
+ * `propName` is looked up in the source module's own export graph via `resolveExport`, exactly
+ * like an ordinary named import already does; otherwise, if `objExpr` is a plain identifier with a
+ * binding, `propName`'s own write timeline (`getOrCreatePropertyDecl`) is replayed through the same
+ * `replayWrites` machinery every other binding uses — this is what makes a later `obj.prop = ...`
+ * mutation correctly override or union with the object literal's own initializer (round 58/59).
+ * `objExpr` not being a plain identifier (an inline object literal used directly, e.g.
+ * `({a:"x"}).a` — rare, and has no binding a mutation could ever attach to regardless) falls back
+ * to a direct structural lookup with no mutation tracking, since none is possible there. `null`
+ * for anything none of these shapes covers. */
+function resolvePropertyAccess(analysis, objExpr, propName, atPos) {
   if (ts.isIdentifier(objExpr)) {
     const decl = analysis.resolveDecl(objExpr, objExpr.text);
     if (decl && decl.namespaceOf) {
@@ -379,6 +438,11 @@ function resolvePropertyAccess(analysis, objExpr, propName) {
       const target = targetAnalysis ? resolveExport(targetAnalysis, propName) : null;
       if (!target) return null;
       const set = replayWrites(target.analysis, target.decl, target.analysis.sourceFile.text.length);
+      return set.size ? Array.from(set) : null;
+    }
+    if (decl) {
+      const propDecl = getOrCreatePropertyDecl(analysis, decl, propName);
+      const set = replayWrites(analysis, propDecl, atPos);
       return set.size ? Array.from(set) : null;
     }
   }
@@ -610,15 +674,16 @@ function foldExprInner(analysis, node) {
     }
     case ts.SyntaxKind.PropertyAccessExpression:
       // `providers.primaryProvider` / `config.primaryProvider` — see `resolvePropertyAccess` for
-      // the two shapes this covers (a namespace import, or a statically-known local object
-      // literal). `node.name` is always a plain `Identifier` here (a `PrivateIdentifier` — `#x` —
-      // can't appear outside a class body, and nothing in this resolver models class members).
-      return resolvePropertyAccess(analysis, node.expression, node.name.text);
+      // the shapes this covers (a namespace import, or a local object with its own mutation-aware
+      // property write timeline). `node.name` is always a plain `Identifier` here (a
+      // `PrivateIdentifier` — `#x` — can't appear outside a class body, and nothing in this
+      // resolver models class members).
+      return resolvePropertyAccess(analysis, node.expression, node.name.text, node.getStart(sf));
     case ts.SyntaxKind.ElementAccessExpression:
       // `config["primaryProvider"]` — only a *static* string-literal index is resolvable at all; a
       // computed one (`config[key]`) has no statically-known property name to look up.
       return node.argumentExpression && ts.isStringLiteralLike(node.argumentExpression)
-        ? resolvePropertyAccess(analysis, node.expression, node.argumentExpression.text)
+        ? resolvePropertyAccess(analysis, node.expression, node.argumentExpression.text, node.getStart(sf))
         : null;
     default:
       return null;
@@ -795,6 +860,27 @@ function collectDeclarations(analysis) {
         } else if (COMPOUND_CONDITIONAL_OPERATORS.has(op)) {
           decl.writes.push({ pos: node.left.getStart(sf), rhsExpr: node.right, node, own: false, forceConditional: true });
         }
+      }
+    } else if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ((ts.isPropertyAccessExpression(node.left) && ts.isIdentifier(node.left.name)) ||
+        (ts.isElementAccessExpression(node.left) &&
+          node.left.argumentExpression &&
+          ts.isStringLiteralLike(node.left.argumentExpression))) &&
+      ts.isIdentifier(node.left.expression)
+    ) {
+      // `config.primaryProvider = "openai";` / `config["primaryProvider"] = "openai";` — a direct
+      // static property mutation, tracked on its own per-(object, property) write timeline (round
+      // 59: this was previously invisible entirely, so the resolver kept treating a property as
+      // permanently equal to its object literal's own initializer even after a later, ordinary
+      // mutation). Compound operators (`+=` etc.) on a property aren't modeled — not requested,
+      // and this mirrors how the object-literal support itself started narrow in round 58.
+      const propName = ts.isPropertyAccessExpression(node.left) ? node.left.name.text : node.left.argumentExpression.text;
+      const objDecl = analysis.resolveDecl(node.left.expression, node.left.expression.text);
+      if (objDecl) {
+        const propDecl = getOrCreatePropertyDecl(analysis, objDecl, propName);
+        propDecl.writes.push({ pos: node.left.getStart(sf), expr: node.right, node, own: false });
       }
     }
     ts.forEachChild(node, visit);

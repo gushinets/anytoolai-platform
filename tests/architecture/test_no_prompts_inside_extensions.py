@@ -464,6 +464,21 @@ def test_local_object_literal_role_property_access_is_detected(tmp_path: Path) -
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_object_property_role_mutation_after_construction_is_detected(tmp_path: Path) -> None:
+    # `state.preset = "system";` — an ordinary mutation after construction — was invisible
+    # entirely: the resolver only ever looked at the object literal's own initializer (round 59).
+    (tmp_path / "chat.ts").write_text(
+        "const state = {\n"
+        '  preset: "user",\n'
+        "};\n\n"
+        'state.preset = "system";\n\n'
+        "const messages = [{ role: state.preset }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
     # `role` is deterministically "system" at the use site (round 37): a static reassignment
     # must resolve to the value actually in effect, not to "unresolved" just because a write

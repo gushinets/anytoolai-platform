@@ -922,3 +922,73 @@ def test_reassigned_object_property_access_is_not_a_false_positive(tmp_path: Pat
         encoding="utf-8",
     )
     assert check_litellm_model_strings(tmp_path, [tmp_path], set()) == []
+
+
+def test_object_property_mutation_after_construction_is_detected(tmp_path: Path) -> None:
+    # `config.primaryProvider = "openai";` — an ordinary, deterministic mutation after the object
+    # is constructed — was invisible entirely: the resolver only ever looked at the object
+    # literal's own initializer, so it kept treating the property as permanently equal to that
+    # initializer even after a later mutation overwrote it (round 59).
+    (tmp_path / "model.ts").write_text(
+        "const config = {\n"
+        '  primaryProvider: "internal",\n'
+        "};\n\n"
+        'config.primaryProvider = "openai";\n\n'
+        "const model = `${config.primaryProvider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:7: 'openai/gpt-4.1'"], offenders
+
+
+def test_static_element_assignment_mutation_is_detected(tmp_path: Path) -> None:
+    # `config["primaryProvider"] = "openai";` is the same static property mutation as
+    # `config.primaryProvider = "openai";`, just via bracket notation (round 59).
+    (tmp_path / "model.ts").write_text(
+        "const config = {\n"
+        '  primaryProvider: "internal",\n'
+        "};\n\n"
+        'config["primaryProvider"] = "openai";\n\n'
+        "const model = `${config.primaryProvider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:7: 'openai/gpt-4.1'"], offenders
+
+
+def test_conditional_object_property_mutation_preserves_the_earlier_reachable_value(
+    tmp_path: Path,
+) -> None:
+    # A mutation inside an `if` might not run — the property's original value stays reachable too,
+    # exactly like an ordinary conditional variable reassignment already does (round 59). Uses
+    # "custom" (a real `LITELLM_PROVIDERS` entry, unlike "internal") for the pre-mutation value, so
+    # the gate's own provider-name-aware regex can actually match it as a candidate hardcode; the
+    # gate itself only ever reports the lowest-positioned match per file, so only one of the two
+    # reachable values shows up here even though the resolver tracks both (same as round 52's
+    # equivalent `var`-redeclaration test).
+    (tmp_path / "model.ts").write_text(
+        'const config = { primaryProvider: "custom" };\n\n'
+        "if (useFallback) {\n"
+        '  config.primaryProvider = "openai";\n'
+        "}\n\n"
+        "const model = `${config.primaryProvider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:7: 'custom/gpt-4.1'"], offenders
+
+
+def test_object_property_mutation_after_the_use_site_does_not_apply_retroactively(
+    tmp_path: Path,
+) -> None:
+    # A reference before a later mutation sees only the value in effect at that point — real JS
+    # temporal order, not "any write anywhere in the file" (round 59). Uses "custom" (a real
+    # `LITELLM_PROVIDERS` entry) so the gate's own regex can match the pre-mutation value.
+    (tmp_path / "model.ts").write_text(
+        'const config = { primaryProvider: "custom" };\n\n'
+        "const model = `${config.primaryProvider}/gpt-4.1`;\n\n"
+        'config.primaryProvider = "openai";\n',
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:3: 'custom/gpt-4.1'"], offenders
