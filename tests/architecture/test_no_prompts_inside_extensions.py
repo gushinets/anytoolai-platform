@@ -495,6 +495,46 @@ def test_aliased_object_destructuring_role_is_detected(tmp_path: Path) -> None:
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_destructured_role_parameter_deterministically_assigned_is_detected(tmp_path: Path) -> None:
+    # A `{ role }` parameter created no binding at all (round 62) — the exact gap round 61 closed
+    # for variable declarations, in the separate function-parameter collection path.
+    (tmp_path / "chat.ts").write_text(
+        "function buildMessage({ role }) {\n"
+        '  role = "system";\n\n'
+        "  return [{ role }];\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_destructured_role_parameter_shadows_a_same_named_outer_role(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n\n'
+        "function buildMessage({ role }) {\n"
+        "  return [{ role }];\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []
+
+
+def test_destructuring_alias_key_is_not_treated_as_a_reference(tmp_path: Path) -> None:
+    # In `{ role: preset }`, `role` is a key into the source, not a read of any binding — before
+    # round 62 it was folded like a reference and reported the unrelated outer `role`'s "system"
+    # at that position. `preset` itself is dynamic here, so nothing is a real offender.
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n\n'
+        "function buildMessage(config) {\n"
+        "  const { role: preset } = config;\n"
+        "  return [{ role: preset }];\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []
+
+
 def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
     # `role` is deterministically "system" at the use site (round 37): a static reassignment
     # must resolve to the value actually in effect, not to "unresolved" just because a write

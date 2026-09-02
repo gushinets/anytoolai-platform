@@ -1067,3 +1067,191 @@ def test_object_destructuring_after_a_property_mutation_reflects_the_mutation(tm
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == ["model.ts:6: 'openai/gpt-4.1'"], offenders
+
+
+# Round 62: every remaining place a binding is born, plus every still-fixable documented ceiling,
+# closed in one round rather than one review at a time. Each case below was a real gap.
+
+
+def _litellm(tmp_path: Path, source: str) -> list[str]:
+    (tmp_path / "model.ts").write_text(source, encoding="utf-8")
+    return check_litellm_model_strings(tmp_path, [tmp_path], set())
+
+
+def test_destructured_parameter_deterministically_assigned_is_detected(tmp_path: Path) -> None:
+    # The parameter branch had its own `isIdentifier` guard, so a `{ provider }` parameter created
+    # no binding — the exact gap round 61 closed for variable declarations, in the separate
+    # function-parameter collection path.
+    assert _litellm(
+        tmp_path,
+        "function chooseModel({ provider }) {\n"
+        '  provider = "openai";\n\n'
+        "  return `${provider}/gpt-4.1`;\n"
+        "}\n",
+    ) == ["model.ts:4: 'openai/gpt-4.1'"]
+
+
+def test_destructured_parameter_shadows_a_same_named_outer_provider(tmp_path: Path) -> None:
+    assert (
+        _litellm(
+            tmp_path,
+            'const provider = "openai";\n\n'
+            "function chooseModel({ provider }) {\n"
+            "  return `${provider}/gpt-4.1`;\n"
+            "}\n",
+        )
+        == []
+    )
+
+
+def test_defaulted_destructured_parameter_is_detected(tmp_path: Path) -> None:
+    # The whole pattern's default (`= { provider: "openai" }`) is the destructuring source, exactly
+    # like a declaration's initializer.
+    assert _litellm(
+        tmp_path,
+        "function chooseModel(\n"
+        '  { provider } = { provider: "openai" },\n'
+        ") {\n"
+        "  return `${provider}/gpt-4.1`;\n"
+        "}\n",
+    ) == ["model.ts:4: 'openai/gpt-4.1'"]
+
+
+def test_class_method_parameter_shadows_a_same_named_outer_provider(tmp_path: Path) -> None:
+    # The old parameter branch listed only function declarations/expressions/arrows — a class
+    # method's parameters were never bindings at all, so they didn't shadow either.
+    assert (
+        _litellm(
+            tmp_path,
+            'const provider = "openai";\n\n'
+            "class Picker {\n"
+            "  pick(provider) {\n"
+            "    return `${provider}/gpt-4.1`;\n"
+            "  }\n"
+            "}\n",
+        )
+        == []
+    )
+
+
+def test_catch_clause_variable_shadows_a_same_named_outer_provider(tmp_path: Path) -> None:
+    assert (
+        _litellm(
+            tmp_path,
+            'const provider = "openai";\n\n'
+            "try {\n"
+            "  run();\n"
+            "} catch (provider) {\n"
+            "  const model = `${provider}/gpt-4.1`;\n"
+            "}\n",
+        )
+        == []
+    )
+
+
+def test_function_declaration_name_shadows_a_same_named_outer_provider(tmp_path: Path) -> None:
+    assert (
+        _litellm(
+            tmp_path,
+            'const provider = "openai";\n\n'
+            "function outer() {\n"
+            "  function provider() {}\n"
+            "  return `${provider}/gpt-4.1`;\n"
+            "}\n",
+        )
+        == []
+    )
+
+
+def test_nested_object_destructuring_is_detected(tmp_path: Path) -> None:
+    # Round 61 resolved only one destructuring level; the path now walks every level.
+    assert _litellm(
+        tmp_path,
+        'const config = { llm: { provider: "openai" } };\n'
+        "const { llm: { provider } } = config;\n\n"
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:4: 'openai/gpt-4.1'"]
+
+
+def test_destructuring_default_applies_when_the_key_is_provably_absent(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        "const config = { other: 1 };\n"
+        'const { provider = "openai" } = config;\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:4: 'openai/gpt-4.1'"]
+
+
+def test_destructuring_default_is_not_assumed_for_an_unknown_source(tmp_path: Path) -> None:
+    # An unknown source might carry the key with any value — assuming the default would be a
+    # guess, so the binding stays unresolved (the safe direction).
+    assert (
+        _litellm(
+            tmp_path,
+            'const { provider = "openai" } = getConfig();\n\n'
+            "const model = `${provider}/gpt-4.1`;\n",
+        )
+        == []
+    )
+
+
+def test_object_spread_property_is_detected(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const base = { provider: "openai" };\n'
+        'const config = { ...base, model: "x" };\n\n'
+        "const model = `${config.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:4: 'openai/gpt-4.1'"]
+
+
+def test_later_property_overrides_an_earlier_spread(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const base = { provider: "openai" };\n'
+        'const config = { ...base, provider: "custom" };\n\n'
+        "const model = `${config.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:4: 'custom/gpt-4.1'"]
+
+
+def test_numeric_index_read_and_mutation_are_detected(tmp_path: Path) -> None:
+    # `arr[0]` reads and writes by the key "0", sharing the object-property write timeline.
+    assert _litellm(
+        tmp_path,
+        'const providers = ["custom", "anthropic"];\n'
+        'providers[0] = "openai";\n\n'
+        "const model = `${providers[0]}/gpt-4.1`;\n",
+    ) == ["model.ts:4: 'openai/gpt-4.1'"]
+
+
+def test_compound_assignment_on_a_property_is_detected(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const config = { provider: "open" };\n'
+        'config.provider += "ai";\n\n'
+        "const model = `${config.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:4: 'openai/gpt-4.1'"]
+
+
+def test_string_enum_member_is_detected(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'enum Provider {\n  OpenAI = "openai",\n}\n\n'
+        "const model = `${Provider.OpenAI}/gpt-4.1`;\n",
+    ) == ["model.ts:5: 'openai/gpt-4.1'"]
+
+
+def test_ts_namespace_member_is_detected(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'namespace Providers {\n  export const primary = "openai";\n}\n\n'
+        "const model = `${Providers.primary}/gpt-4.1`;\n",
+    ) == ["model.ts:5: 'openai/gpt-4.1'"]
+
+
+def test_class_static_member_and_its_mutation_are_detected(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'class Config {\n  static provider = "custom";\n}\n\n'
+        'Config.provider = "openai";\n\n'
+        "const model = `${Config.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
