@@ -589,23 +589,35 @@ def js_string_literals(text: str) -> dict[int, tuple[int, str]]:
     return literals
 
 
+# One binding's write history, sorted by position: `(write_position, value_or_None)`. Every
+# `const`/`let`/`var` declaration and every parameter default starts a timeline with one entry;
+# a later bare reassignment reachable from that binding's scope appends another. Resolving a name
+# at a use site takes the *last* entry whose position is at or before the use site — the
+# statically-known value actually in effect there, not just "was this ever reassigned" (see
+# `resolve_js_identifier`).
+_JsTimeline = list[tuple[int, "str | None"]]
+
+
 @dataclass
 class JsModules:
     """Comment-stripped JS/TS sources with their statically-known string declarations.
 
-    `declarations[path][name]` is every `const`/`let`/`var` declaration of `name` in `path`, as
-    `(block_path, value)`: `block_path` is the stack of enclosing `{ ... }` block ids the
-    declaration sits in (`()` at module top level — see `_js_block_path_at`), and `value` is its
-    folded initializer, or `None` when the initializer doesn't fold, or (for `let`/`var`) when
-    the binding is reassigned anywhere within its own scope after declaration. A name resolves at
-    a given use site through `resolve_js_identifier`, which picks the *innermost* declaration
-    whose `block_path` encloses that use site — real lexical shadowing, not "whichever
-    declaration appears last in the file" (which could resolve a different value than the one
-    actually in scope at runtime — see round 36's review)."""
+    `declarations[path][name]` is every distinct binding of `name` in `path`, as `(block_path,
+    timeline)`: `block_path` is the stack of enclosing `{ ... }` block ids the binding's own
+    declaration sits in (`()` at module top level — see `_js_block_path_at`), and `timeline` is
+    its write history — a `const`/`let`/`var` declaration or a parameter default value, followed
+    by any later bare reassignment reachable from that scope, each entry `(position, value)`. A
+    name resolves at a given use site through `resolve_js_identifier`, which first picks the
+    *innermost* binding whose `block_path` encloses that use site — real lexical shadowing, not
+    "whichever declaration appears last in the file" — and then, within that binding's own
+    timeline, the latest write at or before the use site's own position — the value actually in
+    effect there at runtime, not "was this binding ever reassigned at all" (see round 37's
+    review: a `let` that is deterministically reassigned to a known value before a use site is a
+    real, static value, and must resolve to it, not to `None`)."""
 
     texts: dict[Path, str]
     literals: dict[Path, dict[int, tuple[int, str]]] = field(default_factory=dict)
-    declarations: dict[Path, dict[str, list[tuple[tuple[int, ...], str | None]]]] = field(
+    declarations: dict[Path, dict[str, list[tuple[tuple[int, ...], _JsTimeline]]]] = field(
         default_factory=dict
     )
 
@@ -618,16 +630,32 @@ _JS_DECL_RE = re.compile(rf"\b(const|let|var)\s+({_JS_IDENT})\s*(?::[^=;{{}}]+?)
 # assignment (`obj.name = `, not a rebind of `name` itself); `(?![=>])` excludes `==`/`===`
 # comparisons and an arrow function (`name => ...`), neither of which is a write to `name`.
 #
-# ponytail: also matches a `const`/`let`/`var` declaration's own `NAME =` (filtered out by the
-# caller via `decl_name_positions`, not by this regex), and a default-parameter value
-# (`(role = "user") => ...`, a fresh local binding, not a write to any outer `role`) — both push
-# toward *over*-invalidating a same-named outer binding, never toward trusting a stale value,
-# which is the safe direction for a boundary gate. Upgrade path: a real JS/TS parser.
+# ponytail: also matches a `const`/`let`/`var` declaration's own `NAME =` and a parameter
+# default's own `NAME =` — both excluded by the caller via `exempt_positions`, not by this regex
+# — and a nested-block reassignment that is only *conditionally* reached at runtime
+# (`if (cond) { role = "x"; }`), which this still attaches unconditionally to the enclosing
+# binding's timeline. Every one of these pushes toward treating *more* code as a real, static
+# write, never toward missing one — the safe direction for a boundary gate (a false positive here
+# costs one extra line to look at; a false negative hides a real prompt/model/host leak). Upgrade
+# path: a real JS/TS parser.
 _JS_ASSIGNMENT_RE = re.compile(rf"""(?<![\w$.])({_JS_IDENT})\s*=(?![=>])""")
 # `import { A, B as C } from "./x"` (an optional `type` keyword is a TS type-only import — its
 # names are never string values, so it's simply left unmatched).
 _JS_NAMED_IMPORT_RE = re.compile(r"""\bimport\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']""")
 _JS_TEMPLATE_HOLE_RE = re.compile(r"\$\{([^}]*)\}")
+# A `function [NAME](...)` signature's parameter list — one level of nested parens tolerated in
+# `params` (enough for a simple call in a default value, e.g. `(role = pick())`).
+_JS_FUNCTION_SIGNATURE_RE = re.compile(
+    r"\bfunction\b(?:\s+[A-Za-z_$][\w$]*)?\s*\((?P<params>(?:[^()]|\([^()]*\))*)\)"
+)
+# An arrow function's parameter list — identified by what *follows* its closing `)` (an optional
+# TS return-type annotation, then `=>`), the one shape a plain call expression's `(...)` can never
+# be followed by in valid JS/TS syntax, so this doesn't false-trigger on an ordinary call.
+_JS_ARROW_SIGNATURE_RE = re.compile(
+    r"\((?P<params>(?:[^()]|\([^()]*\))*)\)\s*(?::\s*[^={};]+?)?\s*=>"
+)
+# `NAME = <value>` (optionally `NAME: Type = <value>`) inside a parameter list's own text.
+_JS_PARAM_DEFAULT_RE = re.compile(rf"(?<![\w$.])({_JS_IDENT})\s*(?::[^,=()]+?)?=(?!=)")
 
 
 def _js_block_path_at(text: str, spans: list[tuple[int, int]], position: int) -> tuple[int, ...]:
@@ -664,26 +692,36 @@ def _js_block_path_at(text: str, spans: list[tuple[int, int]], position: int) ->
 
 
 def resolve_js_identifier(modules: JsModules, path: Path, name: str, position: int) -> str | None:
-    """The value `name` resolves to at `position` in `path`, honoring lexical shadowing: among
-    every declaration of `name` whose `block_path` encloses `position` (is a prefix of the
-    position's own block path), the innermost one wins — matching real JS scoping instead of
-    "whichever declaration is textually last". `None` if `name` has no declaration at all, or if
-    the one in scope has no statically-known value (an unresolved initializer, or a reassigned
-    `let`/`var`)."""
-    declarations = modules.declarations.get(path, {}).get(name)
-    if not declarations:
+    """The value `name` resolves to at `position` in `path`, honoring lexical shadowing and
+    write order: among every binding of `name` whose `block_path` encloses `position` (is a
+    prefix of the position's own block path), the innermost one wins — matching real JS scoping
+    instead of "whichever declaration is textually last" (round 36). Within that binding's own
+    timeline, the value is the *latest write at or before `position`* — a deterministic
+    reassignment earlier in the same scope is a real, static value and resolves to it, not to
+    `None` just because a write happened after the declaration (round 37) — falling back to
+    `None` only when `name` has no enclosing binding at all, or the latest applicable write's own
+    value didn't fold (a genuinely dynamic expression)."""
+    groups = modules.declarations.get(path, {}).get(name)
+    if not groups:
         return None
     block_path = _js_block_path_at(
         modules.texts[path], _outside_literals(modules.literals[path]), position
     )
-    best_value: str | None = None
+    best_timeline: _JsTimeline | None = None
     best_len = -1
-    for decl_block_path, value in declarations:
-        depth = len(decl_block_path)
-        if depth <= len(block_path) and block_path[:depth] == decl_block_path and depth >= best_len:
+    for group_block_path, timeline in groups:
+        depth = len(group_block_path)
+        if depth <= len(block_path) and block_path[:depth] == group_block_path and depth > best_len:
             best_len = depth
-            best_value = value
-    return best_value
+            best_timeline = timeline
+    if best_timeline is None:
+        return None
+    value: str | None = None
+    for write_position, write_value in best_timeline:
+        if write_position > position:
+            break
+        value = write_value
+    return value
 
 
 def _template_value(modules: JsModules, path: Path, raw: str, literal_start: int) -> str | None:
@@ -783,10 +821,49 @@ def _resolve_js_module(importing: Path, specifier: str) -> Path | None:
     return None
 
 
+def _js_param_default_events(
+    modules: JsModules, path: Path, text: str, spans: list[tuple[int, int]]
+) -> list[tuple[str, tuple[int, ...], int, str | None]]:
+    """`(name, body_block_path, name_position, value)` for every statically-resolvable default
+    parameter value — `function f(role = "system") { ... }`, `(role = "system") => { ... }` —
+    whose function/arrow has a real `{ ... }` body immediately following its parameter list (an
+    ambient/overload signature with no body, or a concise-body arrow with no block at all to
+    anchor the parameter's scope to, e.g. `(role = "system") => role`, is skipped — ponytail:
+    upgrade path is a real JS/TS parser, same ceiling as the rest of this file's JS/TS scanning).
+    `body_block_path` is the block path *inside* that body (where the parameter is actually
+    usable), not the block path of the signature itself. A parameter is always mutable (JS
+    parameters are never `const`), so it's just another timeline-bearing binding — a later
+    reassignment inside the function body attaches to it exactly like a `let`'s would.
+    """
+    events: list[tuple[str, tuple[int, ...], int, str | None]] = []
+    signature_matches = [
+        match for match in _JS_FUNCTION_SIGNATURE_RE.finditer(text) if not _inside_literal(spans, match.start())
+    ] + [
+        match for match in _JS_ARROW_SIGNATURE_RE.finditer(text) if not _inside_literal(spans, match.start())
+    ]
+    for match in signature_matches:
+        after_signature = match.end()
+        brace = text.find("{", after_signature)
+        semicolon = text.find(";", after_signature)
+        if brace == -1 or (semicolon != -1 and semicolon < brace):
+            continue  # no real body (an ambient/overload signature) — nothing to model
+        body_block_path = _js_block_path_at(text, spans, brace + 1)
+        params = match.group("params")
+        params_start = match.start("params")
+        for default_match in _JS_PARAM_DEFAULT_RE.finditer(params):
+            name_pos = params_start + default_match.start(1)
+            if _inside_literal(spans, name_pos):
+                continue
+            value_pos = params_start + default_match.end()
+            value, _ = js_string_expr_at(modules, path, value_pos)
+            events.append((default_match.group(1), body_block_path, name_pos, value))
+    return events
+
+
 def js_modules(paths: Iterable[Path]) -> JsModules:
     """Strip comments, index string literals, and resolve every file's `const`/`let`/`var`
-    declarations (scope- and mutation-aware — see `JsModules`) across relative named imports to
-    a fixed point."""
+    declarations and parameter defaults (scope- and write-order-aware — see `JsModules`) across
+    relative named imports to a fixed point."""
     modules = JsModules(texts={})
     for path in paths:
         text = path.read_text(encoding="utf-8", errors="ignore")
@@ -799,7 +876,13 @@ def js_modules(paths: Iterable[Path]) -> JsModules:
         previous = {path: dict(values) for path, values in modules.declarations.items()}
         for path, text in modules.texts.items():
             spans = _outside_literals(modules.literals[path])
-            found: dict[str, list[tuple[tuple[int, ...], str | None]]] = {}
+            groups: dict[str, dict[tuple[int, ...], _JsTimeline]] = {}
+
+            def add_write(
+                name: str, block_path: tuple[int, ...], position: int, value: str | None
+            ) -> None:
+                groups.setdefault(name, {}).setdefault(block_path, []).append((position, value))
+
             for match in _JS_NAMED_IMPORT_RE.finditer(text):
                 source = _resolve_js_module(path, match.group(2))
                 source = resolved_paths.get(source) if source is not None else None
@@ -810,39 +893,72 @@ def js_modules(paths: Iterable[Path]) -> JsModules:
                     if not names or names[0] == "type":
                         continue
                     exported, local = names[0], names[-1]
-                    # An export can only ever be a module-top-level binding (position 0 always
-                    # resolves to block path `()`), matching real JS/TS export semantics.
-                    value = resolve_js_identifier(modules, source, exported, 0)
-                    found.setdefault(local, []).append(((), value))
+                    # An export's value, from an importer's perspective, is whatever the source
+                    # module's top-level code has settled it to by the time module evaluation
+                    # finishes — resolved at the end of the source text, not at its start (which
+                    # would see no writes at all yet, in this timeline model — every write in a
+                    # module-level `()` binding is, by definition, a real assignment that runs
+                    # during module evaluation).
+                    value = resolve_js_identifier(
+                        modules, source, exported, len(modules.texts[source])
+                    )
+                    add_write(local, (), match.start(), value)
 
             decl_matches = [
                 match for match in _JS_DECL_RE.finditer(text) if not _inside_literal(spans, match.start())
             ]
-            decl_name_positions = {match.start(2) for match in decl_matches}
-            # Every bare `name = ...` reassignment, grouped by name and by the block path it
-            # occurs in — checked below against each declaration's own block path to invalidate
-            # only a binding a reassignment could actually reach (see `JsModules`'s docstring).
-            reassignment_block_paths: dict[str, list[tuple[int, ...]]] = {}
-            for match in _JS_ASSIGNMENT_RE.finditer(text):
-                if match.start(1) in decl_name_positions or _inside_literal(spans, match.start(1)):
-                    continue
-                reassignment_block_paths.setdefault(match.group(1), []).append(
-                    _js_block_path_at(text, spans, match.start(1))
-                )
+            param_events = _js_param_default_events(modules, path, text, spans)
+            # A declaration's or parameter's own `NAME =` must not also be counted as a bare
+            # reassignment of itself below (both match `_JS_ASSIGNMENT_RE`'s shape too).
+            exempt_positions = {match.start(2) for match in decl_matches} | {
+                name_pos for _, _, name_pos, _ in param_events
+            }
 
             for match in decl_matches:
-                keyword, name = match.group(1), match.group(2)
+                name = match.group(2)
                 block_path = _js_block_path_at(text, spans, match.start(2))
                 value, _ = js_string_expr_at(modules, path, match.end())
-                if keyword != "const" and value is not None:
-                    depth = len(block_path)
-                    if any(
-                        assignment_path[:depth] == block_path
-                        for assignment_path in reassignment_block_paths.get(name, [])
+                add_write(name, block_path, match.start(2), value)
+
+            for name, block_path, position, value in param_events:
+                add_write(name, block_path, position, value)
+
+            # A bare reassignment attaches to whichever already-known binding most tightly
+            # encloses it (the innermost group block path that's a prefix of the reassignment's
+            # own) — the same shadowing priority `resolve_js_identifier` itself uses. One with no
+            # enclosing binding at all (an untracked/global name) is simply dropped.
+            for match in _JS_ASSIGNMENT_RE.finditer(text):
+                if match.start(1) in exempt_positions or _inside_literal(spans, match.start(1)):
+                    continue
+                name = match.group(1)
+                candidates = groups.get(name)
+                if not candidates:
+                    continue
+                assignment_block_path = _js_block_path_at(text, spans, match.start(1))
+                best_block_path: tuple[int, ...] | None = None
+                best_len = -1
+                for candidate_block_path in candidates:
+                    depth = len(candidate_block_path)
+                    if (
+                        depth <= len(assignment_block_path)
+                        and assignment_block_path[:depth] == candidate_block_path
+                        and depth > best_len
                     ):
-                        value = None
-                found.setdefault(name, []).append((block_path, value))
-            modules.declarations[path] = found
+                        best_len = depth
+                        best_block_path = candidate_block_path
+                if best_block_path is not None:
+                    value, _ = js_string_expr_at(modules, path, match.end())
+                    candidates[best_block_path].append((match.start(1), value))
+
+            modules.declarations[path] = {
+                name: sorted(
+                    (
+                        (block_path, sorted(timeline))
+                        for block_path, timeline in block_paths.items()
+                    )
+                )
+                for name, block_paths in groups.items()
+            }
         if modules.declarations == previous:
             break
     return modules

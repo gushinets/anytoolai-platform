@@ -213,9 +213,38 @@ def test_nested_scope_role_does_not_shadow_outer_binding(tmp_path: Path) -> None
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
-def test_reassigned_role_is_not_resolved_to_stale_value(tmp_path: Path) -> None:
+def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
+    # `role` is deterministically "system" at the use site (round 37): a static reassignment
+    # must resolve to the value actually in effect, not to "unresolved" just because a write
+    # happened after the declaration.
     (tmp_path / "chat.ts").write_text(
         'let role = "user";\nrole = "system";\n\nconst messages = [{ role }];\n',
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_default_role_and_instructions_parameters_are_detected(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        "function buildMessage(role = \"system\") {\n  return { role };\n}\n", encoding="utf-8"
+    )
+    (tmp_path / "req.ts").write_text(
+        'function buildRequest(instructions = "Write a concise proposal.") {\n'
+        "  return { instructions };\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 2, offenders
+    assert any("chat.ts:2" in o and "role: 'system'" in o for o in offenders)
+    assert any("req.ts:2" in o and "instructions:" in o for o in offenders)
+
+
+def test_non_default_role_parameter_is_not_a_false_positive(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        "function buildMessage(role) {\n  return { role };\n}\n"
+        "function pick(role = getRole()) {\n  return { role };\n}\n",
         encoding="utf-8",
     )
     assert check_prompts_inside_extensions(tmp_path) == []

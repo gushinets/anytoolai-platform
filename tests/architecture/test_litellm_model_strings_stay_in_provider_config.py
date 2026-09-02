@@ -286,14 +286,30 @@ def test_js_template_literal_of_known_constant_is_detected(tmp_path: Path) -> No
     assert offenders == ["config.ts:2: 'openai/gpt-4.1'"], offenders
 
 
-def test_reassigned_js_provider_is_not_resolved_to_stale_value(tmp_path: Path) -> None:
+def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
+    # `provider` is deterministically "openai" at the use site (round 37): a static reassignment
+    # must resolve to the value actually in effect, not to "unresolved" just because a write
+    # happened after the declaration.
     (tmp_path / "config.ts").write_text(
         'let provider = "cohere";\n'
         'provider = "openai";\n\n'
         "const model = `${provider}/gpt-4.1`;\n",
         encoding="utf-8",
     )
-    assert check_litellm_model_strings(tmp_path, [tmp_path], set()) == []
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["config.ts:4: 'openai/gpt-4.1'"], offenders
+
+
+def test_default_js_provider_parameter_is_detected(tmp_path: Path) -> None:
+    (tmp_path / "model.ts").write_text(
+        "function chooseModel(provider = \"openai\") {\n  return `${provider}/gpt-4.1`;\n}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "dynamic.ts").write_text(
+        "function chooseOther(provider) {\n  return `${provider}/gpt-4.1`;\n}\n", encoding="utf-8"
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:2: 'openai/gpt-4.1'"], offenders
 
 
 def test_nested_scope_js_provider_does_not_shadow_outer_binding(tmp_path: Path) -> None:
