@@ -290,6 +290,35 @@ def test_conditional_var_role_redeclaration_preserves_earlier_reachable_value(tm
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_default_exported_role_is_detected(tmp_path: Path) -> None:
+    # A default import/export used no module-graph edge at all — `resolveImports` only ever read
+    # `importClause.namedBindings`, and `export default ...;` is an `ExportAssignment`, a
+    # different AST node the export side never looked at either (round 50).
+    (tmp_path / "role.ts").write_text('export default "system";\n', encoding="utf-8")
+    (tmp_path / "chat.ts").write_text(
+        'import role from "./role";\nconst messages = [{ role }];\n', encoding="utf-8"
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_later_parameter_default_role_resolves_an_earlier_one(tmp_path: Path) -> None:
+    # A braced function's parameters were registered inside the function's own *body* scope, which
+    # a later parameter's default value expression never actually enters syntactically — so it
+    # couldn't see an earlier parameter's binding at all (round 50).
+    (tmp_path / "chat.ts").write_text(
+        "function build(\n"
+        '  role = "system",\n'
+        "  message = { role },\n"
+        ") {\n"
+        "  return message;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
     # `role` is deterministically "system" at the use site (round 37): a static reassignment
     # must resolve to the value actually in effect, not to "unresolved" just because a write

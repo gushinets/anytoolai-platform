@@ -569,3 +569,49 @@ def test_barrel_reexport_resolves_the_real_source_declaration(tmp_path: Path) ->
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == ["a-config.ts:2: 'openai/gpt-4.1'"], offenders
+
+
+def test_default_exported_provider_is_detected(tmp_path: Path) -> None:
+    # A default import/export used no module-graph edge at all — `resolveImports` only ever read
+    # `importClause.namedBindings`, and `export default ...;` is an `ExportAssignment`, a
+    # different AST node the export side never looked at either (round 50).
+    (tmp_path / "provider.ts").write_text('const provider = "openai";\nexport default provider;\n', encoding="utf-8")
+    (tmp_path / "config.ts").write_text(
+        'import provider from "./provider";\nconst model = `${provider}/gpt-4.1`;\n',
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["config.ts:2: 'openai/gpt-4.1'"], offenders
+
+
+def test_default_export_via_named_reexport_is_detected(tmp_path: Path) -> None:
+    # `export { default as provider } from "./x"` re-exports the *default* export under a chosen
+    # name — resolves through the same reserved `"default"` export-map key an ordinary default
+    # import/export uses (round 50).
+    (tmp_path / "provider.ts").write_text('export default "openai";\n', encoding="utf-8")
+    (tmp_path / "barrel.ts").write_text(
+        'export { default as provider } from "./provider";\n', encoding="utf-8"
+    )
+    (tmp_path / "config.ts").write_text(
+        'import { provider } from "./barrel";\nconst model = `${provider}/gpt-4.1`;\n',
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["config.ts:2: 'openai/gpt-4.1'"], offenders
+
+
+def test_later_parameter_default_resolves_an_earlier_one(tmp_path: Path) -> None:
+    # A braced function's parameters were registered inside the function's own *body* scope, which
+    # a later parameter's default value expression never actually enters syntactically — so it
+    # couldn't see an earlier parameter's binding at all (round 50).
+    (tmp_path / "model.ts").write_text(
+        "function chooseModel(\n"
+        '  provider = "openai",\n'
+        "  model = `${provider}/gpt-4.1`,\n"
+        ") {\n"
+        "  return model;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:3: 'openai/gpt-4.1'"], offenders

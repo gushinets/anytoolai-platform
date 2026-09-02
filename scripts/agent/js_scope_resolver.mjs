@@ -78,13 +78,26 @@ function isScopeNode(node) {
  * `isForHeaderNode`), or (for a parameter default's own concise-arrow-body scope, which has no
  * `Block` at all) the `ArrowFunction` node itself. Walks the node's own ancestors, not itself. */
 function nearestScope(node) {
-  let n = node.parent;
-  while (n) {
-    if (isScopeNode(n)) return n;
-    if (n.kind === ts.SyntaxKind.ArrowFunction && n.body && n.body.kind !== ts.SyntaxKind.Block) {
-      return n; // concise (expression) body — the arrow node itself stands in for its own scope
+  let n = node;
+  let parent = n.parent;
+  while (parent) {
+    if (isScopeNode(parent)) return parent;
+    if (parent.kind === ts.SyntaxKind.ArrowFunction && parent.body && parent.body.kind !== ts.SyntaxKind.Block) {
+      return parent; // concise (expression) body — the arrow node itself stands in for its own scope
     }
-    n = n.parent;
+    if (isFunctionLike(parent) && parent.parameters && parent.parameters.includes(n)) {
+      // Climbing up from inside this function's own parameter list (a later parameter's default
+      // value can reference an earlier one, e.g. `(provider = "openai", model = `${provider}/x`)
+      // => ...`) — without this, the walk would skip straight past the function node (it isn't
+      // itself a scope node) to whatever *encloses* the function, since the parameter list isn't
+      // an ancestor of the function's own body. Routes to the exact same scope object the body
+      // itself uses (`paramOwnScope`), so this doesn't change anything about how a write reaching
+      // that scope is judged deterministic — only what's reachable from inside the parameter list
+      // (round 50).
+      return paramOwnScope(parent);
+    }
+    n = parent;
+    parent = n.parent;
   }
   return null;
 }
@@ -545,16 +558,42 @@ function collectDeclarations(analysis) {
 function resolveImports(analysis) {
   const sf = analysis.sourceFile;
   ts.forEachChild(sf, function visit(node) {
-    if (ts.isImportDeclaration(node) && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
+    if (ts.isImportDeclaration(node) && node.importClause) {
       const specifier = node.moduleSpecifier.text;
       const sourcePath = resolveModuleSpecifier(analysis.path, specifier);
-      for (const spec of node.importClause.namedBindings.elements) {
-        const exportedName = (spec.propertyName || spec.name).text;
-        const localName = spec.name.text;
-        const redirect = sourcePath ? { analysis: analyses.get(sourcePath), name: exportedName } : null;
+      if (node.importClause.name) {
+        // `import provider from "./provider"` — a default import redirects to the source
+        // module's "default" export, the same synthetic name an `export default ...;` registers
+        // under (round 49/50: previously only `importClause.namedBindings` was read at all, so a
+        // default import had no binding whatsoever, regardless of what the source module did).
+        const localName = node.importClause.name.text;
+        const redirect = sourcePath ? { analysis: analyses.get(sourcePath), name: "default" } : null;
         const d = { name: localName, scope: sf, mutable: false, writes: [{ pos: 0, own: true, redirect }] };
         analysis.scopeDecls(sf).set(localName, [d]);
       }
+      if (node.importClause.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
+        for (const spec of node.importClause.namedBindings.elements) {
+          const exportedName = (spec.propertyName || spec.name).text;
+          const localName = spec.name.text;
+          const redirect = sourcePath ? { analysis: analyses.get(sourcePath), name: exportedName } : null;
+          const d = { name: localName, scope: sf, mutable: false, writes: [{ pos: 0, own: true, redirect }] };
+          analysis.scopeDecls(sf).set(localName, [d]);
+        }
+      }
+    } else if (ts.isExportAssignment(node) && !node.isExportEquals) {
+      // `export default <expr>;` — not tied to any named declaration (the expression can be a
+      // bare literal, `export default "system";`), so this registers a synthetic anonymous
+      // binding under the reserved name `"default"` whose one write is the assignment's own
+      // expression, deterministic by construction (an `ExportAssignment` can only ever be a
+      // top-level statement). `export { default as name } from "./x"` / `import x from "./y"`
+      // both resolve through this same `"default"` name — no separate handling needed for those,
+      // since `resolveExport`'s existing name lookup is already generic over the name string.
+      // (`node.isExportEquals` is true only for the legacy CommonJS-interop `export = x;` form,
+      // which isn't a default export at all — deliberately left unhandled here.)
+      analysis.exportedNames.set("default", {
+        kind: "local",
+        decl: { name: "default", scope: sf, mutable: false, writes: [{ pos: 0, expr: node.expression, node, own: true }] },
+      });
     } else if (ts.isExportDeclaration(node) && node.exportClause && ts.isNamedExports(node.exportClause)) {
       const specifier = node.moduleSpecifier ? node.moduleSpecifier.text : null;
       for (const spec of node.exportClause.elements) {
