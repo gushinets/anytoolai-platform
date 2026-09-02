@@ -312,6 +312,18 @@ def test_default_js_provider_parameter_is_detected(tmp_path: Path) -> None:
     assert offenders == ["model.ts:2: 'openai/gpt-4.1'"], offenders
 
 
+def test_default_provider_in_concise_arrow_body_is_detected(tmp_path: Path) -> None:
+    # No `{ ... }` block at all — a concise (expression) arrow body, exactly as ordinary a form
+    # of a function/arrow parameter default as the braced ones already covered (round 40). Uses
+    # plain concatenation, not a template literal, so it can't accidentally resolve via a
+    # coincidental `{` inside a `${...}` hole.
+    (tmp_path / "model.ts").write_text(
+        'const chooseModel = (provider = "openai") => provider + "/gpt-4.1";\n', encoding="utf-8"
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:1: 'openai/gpt-4.1'"], offenders
+
+
 def test_conditionally_reachable_provider_is_detected(tmp_path: Path) -> None:
     # `openai/gpt-4.1` remains a real, reachable value whenever `useFallback` is false — the
     # resolver must not discard it just because a later, conditional write also exists (round 38).

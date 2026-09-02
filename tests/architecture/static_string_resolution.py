@@ -712,6 +712,11 @@ def _js_block_path_at(text: str, spans: list[tuple[int, int]], position: int) ->
     loop's braceless body (terminated by a following `while (...)`, not a `;`) isn't modeled —
     ponytail: rare in practice, upgrade path is a real JS/TS parser, same ceiling as the rest of
     this file's JS/TS scanning.
+
+    An arrow function's concise (expression) body is the exact same shape: `(role = "x") => role`
+    has no `{ ... }` either, so its parameter needs the identical treatment — a virtual block
+    pushed right after `=>` whenever it isn't immediately followed by `{`, closed the same way at
+    the expression's own terminating `;` (round 40).
     """
     stack: list[tuple[bool, int]] = []  # (is_real_block, id)
     next_id = 0
@@ -786,6 +791,19 @@ def _js_block_path_at(text: str, spans: list[tuple[int, int]], position: int) ->
                     next_id += 1
                 i = keyword_match.end()
                 continue
+        if char == "=" and text.startswith("=>", i):
+            # An arrow function's own concise (expression) body needs the identical treatment:
+            # `(role = "x") => role` has no `{ ... }` to give the parameter its own scope, but
+            # the parameter is still only meaningful for the single expression that follows —
+            # exactly the same "single statement, no braces" shape a braceless `if`/`for`/`while`
+            # body already gets above, closed by that expression's own terminating `;` the same
+            # way (round 40 — a `{ ... }` body already worked; a concise one didn't).
+            j = skip_ws(i + 2)
+            if j >= length or text[j] != "{":
+                stack.append((False, next_id))
+                next_id += 1
+            i += 2
+            continue
         i += 1
     return tuple(id_ for _, id_ in stack)
 
@@ -943,33 +961,43 @@ def _resolve_js_module(importing: Path, specifier: str) -> Path | None:
     return None
 
 
+def _find_real_brace(text: str, spans: list[tuple[int, int]], start: int) -> int:
+    """The offset of the first `{` at or after `start` that isn't inside a string-literal span
+    (`spans`), or -1 if none exists — a plain `text.find("{", start)` can't tell a real body
+    brace from one that only coincidentally appears inside a template literal's `${` earlier in
+    the search range."""
+    pos = start
+    while True:
+        brace = text.find("{", pos)
+        if brace == -1 or not _inside_literal(spans, brace):
+            return brace
+        pos = brace + 1
+
+
 def _js_param_default_events(
     modules: JsModules, path: Path, text: str, spans: list[tuple[int, int]]
 ) -> list[tuple[str, tuple[int, ...], int, frozenset[str]]]:
     """`(name, body_block_path, name_position, values)` for every default parameter value —
-    `function f(role = "system") { ... }`, `(role = "system") => { ... }` — whose function/arrow
-    has a real `{ ... }` body immediately following its parameter list (an ambient/overload
-    signature with no body, or a concise-body arrow with no block at all to anchor the
-    parameter's scope to, e.g. `(role = "system") => role`, is skipped — ponytail: upgrade path
-    is a real JS/TS parser, same ceiling as the rest of this file's JS/TS scanning).
+    `function f(role = "system") { ... }`, `(role = "system") => { ... }`, and `(role = "system")
+    => role` (a concise/expression arrow body, round 40 — `_js_block_path_at` gives it its own
+    virtual scope the same way a braceless `if`/`for`/`while` body already gets one, so it needs
+    no special-casing here beyond anchoring at the right position). `function`'s own body is
+    never optional (real JS/TS has no concise form for it) — a `function` signature with no `{`
+    body at all before its own terminating `;` is an ambient/overload signature and is skipped.
     `body_block_path` is the block path *inside* that body (where the parameter is actually
     usable), not the block path of the signature itself. A parameter is always mutable (JS
     parameters are never `const`), so it's just another timeline-bearing binding — a later
     reassignment inside the function body attaches to it exactly like a `let`'s would.
     """
     events: list[tuple[str, tuple[int, ...], int, frozenset[str]]] = []
-    signature_matches = [
-        match for match in _JS_FUNCTION_SIGNATURE_RE.finditer(text) if not _inside_literal(spans, match.start())
-    ] + [
-        match for match in _JS_ARROW_SIGNATURE_RE.finditer(text) if not _inside_literal(spans, match.start())
-    ]
-    for match in signature_matches:
-        after_signature = match.end()
-        brace = text.find("{", after_signature)
-        semicolon = text.find(";", after_signature)
-        if brace == -1 or (semicolon != -1 and semicolon < brace):
-            continue  # no real body (an ambient/overload signature) — nothing to model
-        body_block_path = _js_block_path_at(text, spans, brace + 1)
+    length = len(text)
+
+    def skip_ws(j: int) -> int:
+        while j < length and text[j].isspace():
+            j += 1
+        return j
+
+    def collect(match: re.Match, body_block_path: tuple[int, ...]) -> None:
         params = match.group("params")
         params_start = match.start("params")
         for default_match in _JS_PARAM_DEFAULT_RE.finditer(params):
@@ -979,6 +1007,36 @@ def _js_param_default_events(
             value_pos = params_start + default_match.end()
             values, _ = js_string_expr_at(modules, path, value_pos)
             events.append((default_match.group(1), body_block_path, name_pos, values))
+
+    for match in _JS_FUNCTION_SIGNATURE_RE.finditer(text):
+        if _inside_literal(spans, match.start()):
+            continue
+        after_signature = match.end()
+        # `function`'s own return-type annotation (`function f(x): void {`) isn't part of this
+        # regex's own match, so the real body brace can sit an arbitrary distance past
+        # `after_signature` — a forward, span-aware search (not a fixed "next non-ws char" check,
+        # which the arrow branch below can use instead) is still needed here.
+        brace = _find_real_brace(text, spans, after_signature)
+        semicolon = text.find(";", after_signature)
+        if brace == -1 or (semicolon != -1 and semicolon < brace):
+            continue  # no real body (an ambient/overload signature) — nothing to model
+        collect(match, _js_block_path_at(text, spans, brace + 1))
+
+    for match in _JS_ARROW_SIGNATURE_RE.finditer(text):
+        if _inside_literal(spans, match.start()):
+            continue
+        j = skip_ws(match.end())
+        # A `{` right after `=>` anchors inside a real block body; anything else is a concise
+        # (expression) body with no block of its own — `_js_block_path_at` already opens a
+        # virtual scope right after `=>` for that case, so anchoring the query there reflects it.
+        # Unlike the function branch above, this never searches forward for a later `{`: an
+        # arrow's concise body can itself legitimately contain an unrelated `{` (a template
+        # literal's `${`, a parenthesized object literal like `=> ({ role })`), and guessing
+        # which one is "the real body" is exactly the coincidental, fragile behavior this fix
+        # replaces with one rule that's correct unconditionally.
+        body_anchor = j + 1 if j < length and text[j] == "{" else match.end()
+        collect(match, _js_block_path_at(text, spans, body_anchor))
+
     return events
 
 

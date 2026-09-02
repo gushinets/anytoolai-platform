@@ -255,6 +255,16 @@ def test_default_role_and_instructions_parameters_are_detected(tmp_path: Path) -
     assert any("req.ts:2" in o and "instructions:" in o for o in offenders)
 
 
+def test_default_role_parameter_in_concise_arrow_body_is_detected(tmp_path: Path) -> None:
+    # No `{ ... }` block at all — a concise (expression) arrow body, exactly as ordinary a form
+    # of a parameter default as the braced ones already covered (round 40).
+    (tmp_path / "chat.ts").write_text(
+        'const buildMessage = (role = "system") => ({ role });\n', encoding="utf-8"
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_non_default_role_parameter_is_not_a_false_positive(tmp_path: Path) -> None:
     (tmp_path / "chat.ts").write_text(
         "function buildMessage(role) {\n  return { role };\n}\n"
