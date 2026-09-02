@@ -657,3 +657,40 @@ def test_unconditional_parameter_reassignment_inside_body_still_resolves_to_its_
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == ["model.ts:3: 'openai/gpt-4.1'"], offenders
+
+
+def test_body_var_redeclaring_a_parameter_starts_from_the_parameters_value(tmp_path: Path) -> None:
+    # Real JS (`FunctionDeclarationInstantiation`) copies a parameter's own current value into a
+    # same-named body `var` binding at function entry, even with parameter-default expressions
+    # present — before any of the `var`'s own body-level writes run. Splitting the parameter scope
+    # from the body scope (round 51) made a same-named body `var` an entirely independent,
+    # initially-empty binding instead, hiding the parameter's real value from a reference that
+    # comes before the `var`'s own declaration/write (round 52).
+    (tmp_path / "model.ts").write_text(
+        'function chooseModel(provider = "openai") {\n'
+        "  const model = `${provider}/gpt-4.1`;\n"
+        "  var provider;\n\n"
+        "  return model;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:2: 'openai/gpt-4.1'"], offenders
+
+
+def test_body_var_redeclaring_a_parameter_with_its_own_initializer_still_starts_from_the_parameter(
+    tmp_path: Path,
+) -> None:
+    # Same as above, but the body `var` has its own initializer too — that initializer's write
+    # still only takes effect once the `var provider = "internal";` statement itself executes;
+    # a reference earlier in the body sees the parameter's value, not the later initializer's.
+    (tmp_path / "model.ts").write_text(
+        'function chooseModel(provider = "openai") {\n'
+        "  const model = `${provider}/gpt-4.1`;\n"
+        '  var provider = "internal";\n\n'
+        "  return model;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:2: 'openai/gpt-4.1'"], offenders

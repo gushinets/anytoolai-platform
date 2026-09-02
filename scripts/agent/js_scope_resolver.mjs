@@ -227,7 +227,12 @@ function replayWrites(analysis, decl, atPos) {
     // eager resolution made cross-file constant chains depend on file traversal order, since a
     // consumer processed before its dependency's own imports were installed would memoize an
     // "unresolvable" result that a later pass had no way to revisit).
-    const values = write.redirect !== undefined ? resolveRedirectValue(write.redirect) : foldExpr(analysis, write.expr);
+    const values =
+      write.redirect !== undefined
+        ? resolveRedirectValue(write.redirect)
+        : write.copyOf !== undefined
+          ? copyDeclValue(analysis, write.copyOf)
+          : foldExpr(analysis, write.expr);
     const deterministic = write.own || isDeterministicWrite(write.node, decl.scope);
     if (deterministic) {
       reachable = new Set(values || []);
@@ -236,6 +241,18 @@ function replayWrites(analysis, decl, atPos) {
     }
   }
   return reachable;
+}
+
+/** Every statically-known value `decl` (some *other* binding in the same file — a same-named
+ * enclosing parameter, for a body `var`'s function-entry seed value) could hold by the end of the
+ * file, for a write that copies another declaration's value wholesale rather than folding its own
+ * expression (round 52's `copyOf`). No cycle guard needed here the way `resolveRedirectValue`
+ * needs one for import/export chains: only a `var` write ever carries `copyOf`, and it always
+ * points at a *parameter* decl, which can never itself carry a `copyOf` back — so no cycle is
+ * structurally possible. */
+function copyDeclValue(analysis, decl) {
+  const set = replayWrites(analysis, decl, analysis.sourceFile.text.length);
+  return set.size ? Array.from(set) : null;
 }
 
 /** Follows an `export { a as NAME } from "./x"` (or a bare `export { NAME };` re-exporting this
@@ -490,7 +507,29 @@ function collectDeclarations(analysis) {
     const scope = isVar ? nearestFunctionScope(containerNode) || sf : lexicalScope;
     for (const decl of declList.declarations) {
       if (!ts.isIdentifier(decl.name)) continue;
-      const b = analysis.binding(decl.name.text, scope, mutable, isExported);
+      const name = decl.name.text;
+      const isFreshBinding = !analysis.declsByScope.get(scope)?.get(name)?.length;
+      const b = analysis.binding(name, scope, mutable, isExported);
+      if (isVar && isFreshBinding) {
+        // A body `var` that shares a name with an enclosing parameter reuses that parameter's own
+        // *current* value as its initial value at function entry — real JS
+        // (`FunctionDeclarationInstantiation`) copies the parameter binding's value into the newly
+        // created `var` binding when the two share a name, even with parameter-default expressions
+        // present, before any of the `var`'s own body-level writes run. Without this, splitting the
+        // parameter scope from the body scope (round 51) makes a same-named body `var` an entirely
+        // independent, initially-empty binding — hiding the parameter's real value from anything
+        // reading it before the `var`'s own first write (round 52). `pos: 0` sorts first among this
+        // binding's writes regardless of where the `var` itself sits in the body, matching real
+        // JS's function-entry timing; a genuine explicit initializer/write on the same `var`, added
+        // below or elsewhere, still correctly overrides or unions with it in source order.
+        const enclosingFn = scope.kind === ts.SyntaxKind.Block ? scope.parent : null;
+        if (enclosingFn && isFunctionLike(enclosingFn)) {
+          const paramDecls = analysis.declsByScope.get(enclosingFn)?.get(name);
+          if (paramDecls?.length) {
+            b.writes.push({ pos: 0, own: true, copyOf: paramDecls[paramDecls.length - 1] });
+          }
+        }
+      }
       if (decl.initializer) {
         // `own: false` (not unconditionally `true`) so this write's determinism is computed for
         // real by `isDeterministicWrite`, exactly like an ordinary reassignment below — the same

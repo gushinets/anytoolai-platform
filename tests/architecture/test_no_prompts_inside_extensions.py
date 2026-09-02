@@ -338,6 +338,23 @@ def test_body_local_role_does_not_shadow_a_parameter_defaults_outer_reference(tm
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_body_var_redeclaring_a_role_parameter_starts_from_the_parameters_value(tmp_path: Path) -> None:
+    # Real JS copies a parameter's own current value into a same-named body `var` binding at
+    # function entry, before any of the `var`'s own body-level writes run — splitting the
+    # parameter scope from the body scope (round 51) made a same-named body `var` an entirely
+    # independent, initially-empty binding instead (round 52).
+    (tmp_path / "chat.ts").write_text(
+        'function buildMessage(role = "system") {\n'
+        "  const messages = [{ role }];\n"
+        '  var role = "user";\n\n'
+        "  return messages;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
     # `role` is deterministically "system" at the use site (round 37): a static reassignment
     # must resolve to the value actually in effect, not to "unresolved" just because a write
