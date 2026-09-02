@@ -648,7 +648,15 @@ function collectDeclarations(analysis) {
       node.parameters
     ) {
       for (const param of node.parameters) {
-        if (ts.isIdentifier(param.name) && param.initializer) analysis.binding(param.name.text, node, true, false);
+        // Every identifier parameter is a real binding, default value or not — a non-default
+        // parameter (`function f(role) { ... }`) still lexically shadows any same-named outer
+        // binding for the whole function, and still needs somewhere to attach a later
+        // deterministic assignment (round 57: registering only defaulted parameters left a
+        // non-default one entirely absent from `declsByScope`, so a reference to it either
+        // dropped an assignment with nowhere to attach, or — worse — fell through past the
+        // (unregistered) parameter to resolve an outer same-named binding it should have
+        // shadowed, a false positive, not just a missed hardcode).
+        if (ts.isIdentifier(param.name)) analysis.binding(param.name.text, node, true, false);
       }
     }
     ts.forEachChild(node, declare);

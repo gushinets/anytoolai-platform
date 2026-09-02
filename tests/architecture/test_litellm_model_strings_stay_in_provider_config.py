@@ -825,3 +825,34 @@ def test_nested_assignment_inside_compound_logical_assignment_rhs_is_conditional
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == ["model.ts:5: 'openai/gpt-4.1'"], offenders
+
+
+def test_non_default_parameter_deterministically_assigned_is_detected(tmp_path: Path) -> None:
+    # A parameter with no default value was never registered as a binding at all — an assignment
+    # to it had nowhere to attach, so it was silently dropped and the parameter's later use stayed
+    # unresolved even though it's deterministically "openai" at runtime (round 57).
+    (tmp_path / "model.ts").write_text(
+        "function chooseModel(provider) {\n"
+        '  provider = "openai";\n\n'
+        "  return `${provider}/gpt-4.1`;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:4: 'openai/gpt-4.1'"], offenders
+
+
+def test_non_default_parameter_shadows_a_same_named_outer_provider(tmp_path: Path) -> None:
+    # A non-default parameter still lexically shadows a same-named outer binding for the whole
+    # function — unregistered, it let a reference inside the function fall through to the outer
+    # constant instead, a false positive claiming a specific value the parameter's real (dynamic,
+    # caller-provided) runtime value never actually has (round 57).
+    (tmp_path / "model.ts").write_text(
+        'const provider = "openai";\n\n'
+        "function chooseModel(provider) {\n"
+        "  return `${provider}/gpt-4.1`;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == [], offenders

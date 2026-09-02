@@ -403,6 +403,34 @@ def test_self_referential_role_reassignment_resolves_using_the_pre_write_value(t
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_non_default_role_parameter_deterministically_assigned_is_detected(tmp_path: Path) -> None:
+    # A parameter with no default value was never registered as a binding at all — an assignment
+    # to it had nowhere to attach and was silently dropped (round 57).
+    (tmp_path / "chat.ts").write_text(
+        "function buildMessage(role) {\n"
+        '  role = "system";\n\n'
+        "  return [{ role }];\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_non_default_role_parameter_shadows_a_same_named_outer_role(tmp_path: Path) -> None:
+    # A non-default parameter still lexically shadows a same-named outer binding for the whole
+    # function — unregistered, it let a reference inside the function fall through to the outer
+    # "system" constant instead, a false positive (round 57).
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n\n'
+        "function buildMessage(role) {\n"
+        "  return [{ role }];\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []
+
+
 def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
     # `role` is deterministically "system" at the use site (round 37): a static reassignment
     # must resolve to the value actually in effect, not to "unresolved" just because a write
