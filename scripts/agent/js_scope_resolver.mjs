@@ -75,8 +75,9 @@ function isScopeNode(node) {
 }
 
 /** The nearest enclosing scope node for `node` — a `Block`/`SourceFile`/for-loop header (see
- * `isForHeaderNode`), or (for a parameter default's own concise-arrow-body scope, which has no
- * `Block` at all) the `ArrowFunction` node itself. Walks the node's own ancestors, not itself. */
+ * `isForHeaderNode`), the `ArrowFunction` node itself (a parameter default's own concise-arrow-
+ * body scope, which has no `Block` at all), or the enclosing function-like node itself (every
+ * parameter's own scope — see below). Walks the node's own ancestors, not itself. */
 function nearestScope(node) {
   let n = node;
   let parent = n.parent;
@@ -85,28 +86,29 @@ function nearestScope(node) {
     if (parent.kind === ts.SyntaxKind.ArrowFunction && parent.body && parent.body.kind !== ts.SyntaxKind.Block) {
       return parent; // concise (expression) body — the arrow node itself stands in for its own scope
     }
-    if (isFunctionLike(parent) && parent.parameters && parent.parameters.includes(n)) {
-      // Climbing up from inside this function's own parameter list (a later parameter's default
-      // value can reference an earlier one, e.g. `(provider = "openai", model = `${provider}/x`)
-      // => ...`) — without this, the walk would skip straight past the function node (it isn't
-      // itself a scope node) to whatever *encloses* the function, since the parameter list isn't
-      // an ancestor of the function's own body. Routes to the exact same scope object the body
-      // itself uses (`paramOwnScope`), so this doesn't change anything about how a write reaching
-      // that scope is judged deterministic — only what's reachable from inside the parameter list
-      // (round 50).
-      return paramOwnScope(parent);
+    if (isFunctionLike(parent) && ((parent.parameters && parent.parameters.includes(n)) || parent.body === n)) {
+      // The function-like node itself is every parameter's own scope — real JS evaluates
+      // parameter defaults in a distinct "parameter environment" that sits *outside* the
+      // function body's own lexical environment: a later parameter default can see an earlier
+      // parameter, and the body can see every parameter, but a body-local declaration does NOT
+      // shadow a parameter default's own outer reference of the same name (round 51 — round 50's
+      // fix routed parameter defaults into the *body's* own `Block` scope instead of a separate
+      // one, so a same-named body-local `const`/`let` incorrectly won lexical lookup over the
+      // real outer binding a parameter default actually sees at runtime).
+      //
+      // This one function node serves as that separate scope for both directions: reached
+      // directly from inside the parameter list (`parent.parameters.includes(n)` — a later
+      // parameter's default referencing an earlier one), where the walk never touches the body's
+      // own `Block` at all (it isn't an ancestor of anything inside the parameter list), so a
+      // body-local declaration is structurally unreachable from here; and reached one step out
+      // from the body's own `Block` once nothing was found there (`parent.body === n`), which
+      // still finds every parameter, exactly as real JS scoping does.
+      return parent;
     }
     n = parent;
     parent = n.parent;
   }
   return null;
-}
-
-/** The `Block`/`SourceFile`/etc. a parameter's default value is usable within: the function's own
- * body if braced, else the arrow node itself (a synthetic scope for a concise body). */
-function paramOwnScope(fn) {
-  if (fn.body && fn.body.kind === ts.SyntaxKind.Block) return fn.body;
-  return fn; // concise arrow body
 }
 
 /** The nearest enclosing *function* scope for `node` — a braced function/arrow's own body, or
@@ -357,7 +359,15 @@ function isDeterministicWrite(assignmentNode, scope) {
     const parent = node.parent;
     if (!parent) return false;
     if (isConditionalSlot(node, parent)) return false;
-    if (node.kind === ts.SyntaxKind.Block && node !== scope) return false;
+    // A parameter's own scope is its function node itself, not the function's body `Block`
+    // (round 51, so a body-local declaration can't shadow a parameter default's own outer
+    // reference — see `nearestScope`). That makes the function's own top-level body `Block` sit
+    // *between* a body-level write and a parameter's `scope`, which would otherwise wrongly read
+    // as a Block-boundary crossing — that check exists to catch a write nested inside some other,
+    // possibly-conditional inner block, not the function's own unconditional top-level body. So
+    // this one Block, specifically, doesn't count as a crossing.
+    const isOwnFunctionBody = isFunctionLike(scope) && scope.body === node;
+    if (node.kind === ts.SyntaxKind.Block && node !== scope && !isOwnFunctionBody) return false;
     if (isFunctionLike(node) && node !== scope) return false;
     node = parent;
   }
@@ -510,7 +520,10 @@ function collectDeclarations(analysis) {
       (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node)) &&
       node.parameters
     ) {
-      const scope = paramOwnScope(node);
+      // The function node itself is every parameter's own scope, for both braced and concise
+      // bodies alike — see `nearestScope`'s matching case for why this must be a scope distinct
+      // from the function body's own `Block` (round 51).
+      const scope = node;
       for (const param of node.parameters) {
         if (ts.isIdentifier(param.name) && param.initializer) {
           // Unlike a declaration's own initializer above, a parameter default's write stays

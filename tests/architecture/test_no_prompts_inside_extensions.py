@@ -319,6 +319,25 @@ def test_later_parameter_default_role_resolves_an_earlier_one(tmp_path: Path) ->
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_body_local_role_does_not_shadow_a_parameter_defaults_outer_reference(tmp_path: Path) -> None:
+    # A parameter default evaluates in a distinct "parameter environment" outside the function
+    # body's own lexical environment — a same-named body-local declaration does not shadow it
+    # (round 50 routed parameter defaults into the body's own scope, so this incorrectly lost the
+    # outer "system" value; round 51 fixes it).
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n\n'
+        "function buildMessage(\n"
+        "  message = { role },\n"
+        ") {\n"
+        '  const role = "user";\n'
+        "  return message;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
     # `role` is deterministically "system" at the use site (round 37): a static reassignment
     # must resolve to the value actually in effect, not to "unresolved" just because a write

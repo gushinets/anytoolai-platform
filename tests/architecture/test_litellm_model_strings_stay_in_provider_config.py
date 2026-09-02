@@ -615,3 +615,45 @@ def test_later_parameter_default_resolves_an_earlier_one(tmp_path: Path) -> None
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == ["model.ts:3: 'openai/gpt-4.1'"], offenders
+
+
+def test_body_local_declaration_does_not_shadow_a_parameter_defaults_outer_reference(tmp_path: Path) -> None:
+    # A parameter default evaluates in a distinct "parameter environment" that sits *outside* the
+    # function body's own lexical environment — a same-named body-local declaration does not
+    # shadow it, even though it's declared in the same function (round 50 routed parameter
+    # defaults into the body's own scope, so the body-local `provider = "internal"` incorrectly
+    # won lexical lookup over the real outer `"openai"` binding the default actually sees at
+    # runtime; round 51 fixes it).
+    (tmp_path / "model.ts").write_text(
+        'const provider = "openai";\n\n'
+        "function chooseModel(\n"
+        "  model = `${provider}/gpt-4.1`,\n"
+        ") {\n"
+        '  const provider = "internal";\n'
+        "  return model;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:4: 'openai/gpt-4.1'"], offenders
+
+
+def test_unconditional_parameter_reassignment_inside_body_still_resolves_to_its_final_value(
+    tmp_path: Path,
+) -> None:
+    # A parameter's own scope moved to the function node itself (round 51, to keep a body-local
+    # declaration from shadowing a default's outer reference — see the test above), which put the
+    # function's own top-level body `Block` *between* an ordinary body-level write and that scope.
+    # Without an explicit exemption for a function's own body, that would misread every plain,
+    # unconditional reassignment of a parameter from directly inside the body as merely
+    # conditional, losing precision `isDeterministicWrite` already had for this exact shape before
+    # round 51 (self-caught while fixing the shadowing bug above, not part of the review).
+    (tmp_path / "model.ts").write_text(
+        "function pick(provider = \"safe\") {\n"
+        '  provider = "openai";\n'
+        "  return `${provider}/gpt-4.1`;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:3: 'openai/gpt-4.1'"], offenders
