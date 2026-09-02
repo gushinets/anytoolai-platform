@@ -992,3 +992,78 @@ def test_object_property_mutation_after_the_use_site_does_not_apply_retroactivel
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == ["model.ts:3: 'custom/gpt-4.1'"], offenders
+
+
+def test_object_destructuring_is_detected(tmp_path: Path) -> None:
+    # `const { provider } = config;` never created a binding for `provider` at all — the
+    # declaration collector only handled a plain `Identifier` name, so an `ObjectBindingPattern`
+    # was silently skipped entirely (round 61).
+    (tmp_path / "model.ts").write_text(
+        "const config = {\n"
+        '  provider: "openai",\n'
+        "};\n\n"
+        "const { provider } = config;\n\n"
+        "const model = `${provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:7: 'openai/gpt-4.1'"], offenders
+
+
+def test_aliased_object_destructuring_is_detected(tmp_path: Path) -> None:
+    # `const { primaryProvider: provider } = config;` — the same gap, with a renamed binding
+    # (round 61).
+    (tmp_path / "model.ts").write_text(
+        "const config = {\n"
+        '  primaryProvider: "openai",\n'
+        "};\n\n"
+        "const { primaryProvider: provider } = config;\n\n"
+        "const model = `${provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:7: 'openai/gpt-4.1'"], offenders
+
+
+def test_array_destructuring_is_detected(tmp_path: Path) -> None:
+    # `const [primary] = providers;` is the array-pattern equivalent of object destructuring
+    # (round 61).
+    (tmp_path / "model.ts").write_text(
+        'const providers = ["openai", "anthropic"];\n'
+        "const [primary] = providers;\n\n"
+        "const model = `${primary}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:4: 'openai/gpt-4.1'"], offenders
+
+
+def test_destructured_binding_shadows_a_same_named_outer_provider(tmp_path: Path) -> None:
+    # A destructured binding still lexically shadows a same-named outer variable for the rest of
+    # its own scope — unregistered, it let a reference fall through to the outer constant instead
+    # of the destructured (here, dynamic) value, a false positive (round 61).
+    (tmp_path / "model.ts").write_text(
+        'const provider = "openai";\n\n'
+        "function chooseModel(config) {\n"
+        "  const { provider } = config;\n"
+        "  return `${provider}/gpt-4.1`;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == [], offenders
+
+
+def test_object_destructuring_after_a_property_mutation_reflects_the_mutation(tmp_path: Path) -> None:
+    # A destructured binding is a snapshot taken at its own position — it must still reflect an
+    # *earlier* mutation of the source object's property, since round 60's mutation-aware property
+    # resolution is exactly what a destructuring value reuses (round 61).
+    (tmp_path / "model.ts").write_text(
+        'const config = { provider: "internal" };\n'
+        'config.provider = "openai";\n\n'
+        "const { provider } = config;\n\n"
+        "const model = `${provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:6: 'openai/gpt-4.1'"], offenders

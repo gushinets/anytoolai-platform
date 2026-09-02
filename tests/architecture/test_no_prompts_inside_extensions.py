@@ -479,6 +479,22 @@ def test_object_property_role_mutation_after_construction_is_detected(tmp_path: 
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_aliased_object_destructuring_role_is_detected(tmp_path: Path) -> None:
+    # `const { preset: role } = config;` never created a binding for `role` at all — the
+    # declaration collector only handled a plain `Identifier` name, so an `ObjectBindingPattern`
+    # was silently skipped entirely (round 61).
+    (tmp_path / "chat.ts").write_text(
+        "const config = {\n"
+        '  preset: "system",\n'
+        "};\n\n"
+        "const { preset: role } = config;\n\n"
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
     # `role` is deterministically "system" at the use site (round 37): a static reassignment
     # must resolve to the value actually in effect, not to "unresolved" just because a write

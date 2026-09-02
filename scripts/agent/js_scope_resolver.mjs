@@ -262,6 +262,19 @@ function replayWrites(analysis, decl, atPos, excludeWrite = null) {
       values = write.compoundOp === ts.SyntaxKind.PlusEqualsToken ? combine([priorValues, rhsValues]) : null;
     } else if (write.forceConditional) {
       values = foldExpr(analysis, write.rhsExpr);
+    } else if (write.destructureFrom !== undefined) {
+      // `const { provider } = config;` — a snapshot taken *at this destructuring statement's own
+      // position*, not a live link: real JS copies the value out once, so a later
+      // `config.provider = "..."` mutation must never retroactively change what this binding
+      // already holds (round 61). Reuses whichever mutation-aware machinery already exists for
+      // the source shape — `resolvePropertyAccess` (object property, itself already
+      // position-aware and mutation-aware since round 60) or `resolveArrayElement` (array index,
+      // no mutation tracking exists for those at all) — rather than inventing a third value model.
+      const source = write.destructureFrom;
+      values =
+        source.kind === "object"
+          ? resolvePropertyAccess(analysis, source.sourceExpr, source.propName, source.atPos)
+          : resolveArrayElement(analysis, source.sourceExpr, source.index);
     } else {
       values = foldExpr(analysis, write.expr);
     }
@@ -351,11 +364,44 @@ function resolveExport(analysis, name, seen = new Set()) {
  * after construction (see `getOrCreatePropertyDecl` for that part) — a `let`/multiply-reassigned
  * binding, or one whose single write isn't an object literal, correctly has no such shape rather
  * than guessing (round 58). */
-function objectLiteralFromDecl(decl) {
+function singleWriteTarget(decl) {
   if (!decl || decl.writes.length !== 1) return null;
   let target = decl.writes[0].expr;
   while (target && TRANSPARENT_WRAPPER_KINDS.has(target.kind)) target = target.expression;
+  return target || null;
+}
+
+function objectLiteralFromDecl(decl) {
+  const target = singleWriteTarget(decl);
   return target && ts.isObjectLiteralExpression(target) ? target : null;
+}
+
+/** The element at `index` in the `ArrayLiteralExpression` `expr` structurally evaluates to, if
+ * any — a plain inline array literal, or a plain identifier reference with a single write that's
+ * itself an array literal (see `singleWriteTarget` — the same single-shape restriction
+ * `objectLiteralFromDecl` uses, for the same reason: an array's *contents* aren't a small
+ * combinatorial set of possibilities). No mutation tracking exists for array elements at all
+ * (unlike object properties — see `getOrCreatePropertyDecl`) since `arr[0] = x` wasn't requested
+ * and array mutation (`push`/`splice`/index assignment/`length`) is a much larger surface than a
+ * single elementwise write timeline would model correctly; `[..spread]` and an out-of-range index
+ * both correctly resolve to nothing rather than guessing (round 61). */
+function resolveArrayElement(analysis, expr, index) {
+  const target = ts.isArrayLiteralExpression(expr)
+    ? expr
+    : ts.isIdentifier(expr)
+      ? singleWriteTarget(analysis.resolveDecl(expr, expr.text))
+      : null;
+  if (!target || !ts.isArrayLiteralExpression(target)) return null;
+  let i = 0;
+  for (const el of target.elements) {
+    if (ts.isOmittedExpression(el)) {
+      i++;
+      continue;
+    }
+    if (i === index) return ts.isSpreadElement(el) ? null : foldExpr(analysis, el);
+    i++;
+  }
+  return null;
 }
 
 /** The `ObjectLiteralExpression` node `expr` structurally evaluates to, if any — a plain inline
@@ -719,12 +765,37 @@ function collectDeclarations(analysis) {
   // `var` statement it actually targets found no binding registered yet for that name at that
   // scope, and either fell through to some unrelated outer scope's same-named binding or was
   // dropped outright (round 53).
+  // A destructuring `BindingName` — `Identifier`, `ObjectBindingPattern`, or `ArrayBindingPattern`,
+  // arbitrarily nested — registers every *leaf* identifier it names as a real binding, recursively
+  // (round 61: `const { provider } = config;` previously created no binding for `provider` at all,
+  // so a later deterministic reference either found nothing, or — worse, exactly the round-57
+  // parameter shape again — fell through to shadow a same-named outer binding it should have hidden
+  // instead). A rest element (`...rest`) and an omitted array slot (`[, b]`) are handled the same
+  // way as everything else: `...rest` still recurses into its own (always a plain identifier)
+  // `.name`, since it's a real binding too, just one this resolver never attempts to give a value
+  // (see `declareBindingPattern`'s write-attaching counterpart, below); an omitted slot names
+  // nothing, so there's nothing to register.
+  function declareBindingName(bindingName, scope, mutable, isExported) {
+    if (ts.isIdentifier(bindingName)) {
+      analysis.binding(bindingName.text, scope, mutable, isExported);
+      return;
+    }
+    if (ts.isObjectBindingPattern(bindingName) || ts.isArrayBindingPattern(bindingName)) {
+      for (const el of bindingName.elements) {
+        if (!ts.isOmittedExpression(el)) declareBindingName(el.name, scope, mutable, isExported);
+      }
+    }
+  }
+
   function declareList(declList, containerNode, lexicalScope, isExported) {
     const isVar = (declList.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) === 0;
     const mutable = (declList.flags & ts.NodeFlags.Const) === 0;
     const scope = isVar ? nearestFunctionScope(containerNode) || sf : lexicalScope;
     for (const decl of declList.declarations) {
-      if (!ts.isIdentifier(decl.name)) continue;
+      if (!ts.isIdentifier(decl.name)) {
+        declareBindingName(decl.name, scope, mutable, isExported);
+        continue;
+      }
       const name = decl.name.text;
       const isFreshBinding = !analysis.declsByScope.get(scope)?.get(name)?.length;
       const b = analysis.binding(name, scope, mutable, isExported);
@@ -795,12 +866,54 @@ function collectDeclarations(analysis) {
   // the binding it belongs to — every binding it could possibly name already exists from the pass
   // above, so `resolveDecl` here always finds the real one instead of depending on how far
   // traversal has gotten.
+  // The write-attaching counterpart of `declareBindingName` — every leaf identifier in a
+  // destructuring pattern that's a *plain* `Identifier` (not itself a further-nested pattern) gets
+  // a `destructureFrom` write, resolved lazily by `replayWrites` (round 61). Nested patterns
+  // (`const { a: { b } } = x;`) are recursed into for registration (`declareBindingName`, already
+  // done) so shadowing stays correct, but deliberately *not* given a value here: there's no real
+  // AST node representing "the value of the outer `a` slot" that a nested extraction could target
+  // (unlike a real property access, nothing actually binds `a` to an accessible expression) —
+  // narrower than a fully general implementation, but the review's own examples are all one level
+  // deep, and a nested leaf simply stays unresolved (safe direction) rather than guessing. A rest
+  // element (`...rest`) is skipped the same way — it needs "everything except one or more of these
+  // exact properties," a negative-set extraction this resolver has no static value model for.
+  function attachBindingPatternWrites(pattern, scope, mutable, sourceExpr, atPos) {
+    if (ts.isObjectBindingPattern(pattern)) {
+      for (const el of pattern.elements) {
+        if (el.dotDotDotToken || !ts.isIdentifier(el.name)) continue;
+        const propKey = el.propertyName || el.name;
+        const propName = ts.isIdentifier(propKey) || ts.isStringLiteral(propKey) ? propKey.text : null;
+        if (propName === null) continue; // a computed property name has no statically-known key
+        const b = analysis.binding(el.name.text, scope, mutable, false); // already registered
+        b.writes.push({ pos: el.name.getStart(sf), own: true, destructureFrom: { kind: "object", sourceExpr, propName, atPos } });
+      }
+    } else if (ts.isArrayBindingPattern(pattern)) {
+      let index = 0;
+      for (const el of pattern.elements) {
+        if (ts.isOmittedExpression(el)) {
+          index++;
+          continue;
+        }
+        if (el.dotDotDotToken || !ts.isIdentifier(el.name)) {
+          index++;
+          continue;
+        }
+        const b = analysis.binding(el.name.text, scope, mutable, false); // already registered
+        b.writes.push({ pos: el.name.getStart(sf), own: true, destructureFrom: { kind: "array", sourceExpr, index } });
+        index++;
+      }
+    }
+  }
+
   function collectDeclarationList(declList, containerNode, lexicalScope, isExported) {
     const isVar = (declList.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) === 0;
     const mutable = (declList.flags & ts.NodeFlags.Const) === 0;
     const scope = isVar ? nearestFunctionScope(containerNode) || sf : lexicalScope;
     for (const decl of declList.declarations) {
-      if (!ts.isIdentifier(decl.name)) continue;
+      if (!ts.isIdentifier(decl.name)) {
+        if (decl.initializer) attachBindingPatternWrites(decl.name, scope, mutable, decl.initializer, decl.name.getStart(sf));
+        continue;
+      }
       const name = decl.name.text;
       const b = analysis.binding(name, scope, mutable, isExported); // already registered above,
       // including this var's own function-entry `copyOf` seed if it shares a name with an
