@@ -3,6 +3,16 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from static_string_resolution import (
+    PythonModules,
+    iter_source_files,
+    module_import_aliases,
+    parse_python_files,
+    python_modules,
+    python_string_value,
+    resolve_import_module,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 # The whole package, not just routers/ + main.py — a router can be defined in any module here
 # (bootstrap.py, a future product_api.py, ...) and wired in via `app.include_router(router)` from
@@ -60,92 +70,6 @@ ROUTE_REGISTRATION_METHODS = {
 # decorators, not just them.
 PREFIX_KEYWORD_CALLS = {"APIRouter", "include_router"}
 
-
-def _string_value(expr: ast.expr | None, constants: dict[str, str]) -> str | None:
-    """A literal string, a reference to an already-known module constant, a compile-time
-    `"a" + "b"` concatenation of either (recursively, so `"a" + ("b" + C)` folds too), or an
-    f-string (`ast.JoinedStr`) whose every part is either a literal `Constant` or a
-    `FormattedValue` that itself resolves through this same function (recursively — so
-    `f"/{PRODUCT}/status"` folds when `PRODUCT` is a known constant, the normal way route
-    prefixes/segments get composed) — `None` for anything genuinely dynamic (`"a" + name`,
-    `f"/{segment}"` where `segment` isn't a known constant). A `FormattedValue` with a conversion
-    flag (`f"{x!r}"`) or a format spec (`f"{x:>10}"`) is treated as unresolvable rather than
-    folded: either changes the interpolated text in a way string concatenation alone can't
-    reproduce, and this file's whole approach is to never evaluate a real expression."""
-    if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
-        return expr.value
-    if isinstance(expr, ast.Name) and expr.id in constants:
-        return constants[expr.id]
-    if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.Add):
-        left = _string_value(expr.left, constants)
-        right = _string_value(expr.right, constants)
-        if left is not None and right is not None:
-            return left + right
-    if isinstance(expr, ast.JoinedStr):
-        parts: list[str] = []
-        for part in expr.values:
-            if isinstance(part, ast.Constant) and isinstance(part.value, str):
-                parts.append(part.value)
-            elif (
-                isinstance(part, ast.FormattedValue)
-                and part.conversion == -1
-                and part.format_spec is None
-            ):
-                resolved = _string_value(part.value, constants)
-                if resolved is None:
-                    return None
-                parts.append(resolved)
-            else:
-                return None
-        return "".join(parts)
-    return None
-
-
-def _module_string_constants(tree: ast.Module) -> dict[str, str]:
-    """Module-level `<NAME> = "<literal>"` / `<NAME>: <type> = "<literal>"` / `<NAME> = "a" + "b"`
-    bindings, so `@router.get(PROPOSAL_STATUS_PATH)` is resolved back to its literal instead of
-    being invisible to `_path_argument` (an `ast.Name`, not an `ast.Constant`). Built via
-    `_string_value` itself (not a separate `ast.Constant`-only check) so a later constant can
-    reference an earlier one in the same file, and a concatenated value folds the same way a
-    direct route-path concatenation already does.
-
-    Scoped to `tree.body` (top-level statements only) — walking the whole tree would also collect
-    a same-named local inside a function/class (`def helper(): PROPOSAL_STATUS_PATH = "/safe"`),
-    which could overwrite the real module-level value and make a route resolve against the wrong
-    string.
-    """
-    constants: dict[str, str] = {}
-    for node in tree.body:
-        if isinstance(node, ast.Assign):
-            value = _string_value(node.value, constants)
-            if value is None:
-                continue
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    constants[target.id] = value
-        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            value = _string_value(node.value, constants)
-            if value is not None:
-                constants[node.target.id] = value
-    return constants
-
-
-def _keyword_value(node: ast.Call, keyword: str, constants: dict[str, str]) -> str | None:
-    for kw in node.keywords:
-        if kw.arg == keyword:
-            return _string_value(kw.value, constants)
-    return None
-
-
-def _path_argument(node: ast.Call, constants: dict[str, str]) -> str | None:
-    """The route's `path`: first positional arg, or the `path=` keyword."""
-    if node.args:
-        value = _string_value(node.args[0], constants)
-        if value is not None:
-            return value
-    return _keyword_value(node, "path", constants)
-
-
 ROUTE_TARGET_CONSTRUCTORS = {"APIRouter", "FastAPI"}
 # Starlette route-object constructors — `FastAPI(routes=[Route("/proposal_ai/status", endpoint)])`
 # (and the `WebSocketRoute`/`Mount` equivalents) register a route the same way `router.get(...)`
@@ -153,6 +77,26 @@ ROUTE_TARGET_CONSTRUCTORS = {"APIRouter", "FastAPI"}
 # router/app — a call shape `_route_path_literals_for_tree`'s `called_on_router` gate never
 # recognizes, since there is no router/app receiver to check at all.
 ROUTE_OBJECT_CONSTRUCTORS = {"Route", "WebSocketRoute", "Mount"}
+
+
+def _keyword_value(node: ast.Call, keyword: str, modules: PythonModules, path: Path) -> str | None:
+    for kw in node.keywords:
+        if kw.arg == keyword:
+            return python_string_value(kw.value, modules, path)
+    return None
+
+
+def _path_argument(node: ast.Call, modules: PythonModules, path: Path) -> str | None:
+    """The route's `path`: first positional arg, or the `path=` keyword. Resolved through the
+    shared static resolver, so a literal, a same-file constant, a constant imported from another
+    module (`from .paths import PROPOSAL_STATUS_PATH`), a module-qualified constant
+    (`paths.PROPOSAL_STATUS_PATH`), a `+` concatenation, or an f-string of any of those all fold
+    to the path they register."""
+    if node.args:
+        value = python_string_value(node.args[0], modules, path)
+        if value is not None:
+            return value
+    return _keyword_value(node, "path", modules, path)
 
 
 def _import_aliases_for(tree: ast.AST, tracked_names: set[str]) -> dict[str, str]:
@@ -255,45 +199,8 @@ def _propagate_router_aliases(
     return changed_overall
 
 
-def _router_variable_names(tree: ast.AST, aliases: dict[str, str]) -> set[str]:
-    """Per-file router/app names: direct constructor calls plus local alias propagation."""
-    names = _direct_router_names(tree, aliases)
-    _propagate_router_aliases(tree, names)
-    return names
-
-
-def _module_dotted_name(path: Path) -> str:
-    """The dotted module name `path` would import as, e.g.
-    `apps/platform-api/src/anytoolai_platform_api/routers/demo.py` ->
-    `anytoolai_platform_api.routers.demo`."""
-    relative = path.relative_to(PLATFORM_API_PACKAGE.parent)
-    parts = list(relative.with_suffix("").parts)
-    if parts[-1] == "__init__":
-        parts = parts[:-1]
-    return ".".join(parts)
-
-
-def _resolve_import_module(importing_path: Path, node: ast.ImportFrom) -> str | None:
-    """The dotted module name a `from X import Y` statement's `X` refers to, handling both
-    absolute imports (`node.level == 0`, this repo's actual convention — see `main.py`'s
-    `from anytoolai_platform_api.routers.demo import router as demo_router`) and relative ones
-    (`from .shared import router` / `from ..shared import router`, via `node.level`)."""
-    if node.level == 0:
-        return node.module
-    parts = _module_dotted_name(importing_path).split(".")
-    # A package's __init__.py already IS that package (its dotted name has no trailing
-    # "__init__" — see _module_dotted_name), so a level-1 relative import there stays within
-    # that same package. A regular module's own package is one level up instead.
-    base_parts = parts if importing_path.name == "__init__.py" else parts[:-1]
-    for _ in range(node.level - 1):
-        base_parts = base_parts[:-1] if base_parts else base_parts
-    if node.module:
-        base_parts = base_parts + node.module.split(".")
-    return ".".join(base_parts) if base_parts else None
-
-
 def _package_router_names(
-    trees: dict[Path, ast.Module],
+    modules: PythonModules,
 ) -> tuple[dict[Path, set[str]], dict[Path, dict[str, set[str]]]]:
     """Router/app variable names per file, resolved across the whole package: a name imported
     from another module in this same package that's a known router there is itself a known
@@ -303,7 +210,7 @@ def _package_router_names(
     module_router_names_by_file)` — the second lets a later pass resolve `shared.router` the same
     way this function's own `_propagate_router_aliases` calls already do.
     """
-    module_paths = {_module_dotted_name(path): path for path in trees}
+    trees = modules.trees
     per_file_aliases = {path: _route_target_import_aliases(tree) for path, tree in trees.items()}
     router_names = {
         path: _direct_router_names(tree, per_file_aliases[path]) for path, tree in trees.items()
@@ -314,8 +221,7 @@ def _package_router_names(
         for node in ast.walk(tree):
             if not isinstance(node, ast.ImportFrom):
                 continue
-            source_dotted = _resolve_import_module(path, node)
-            source_path = module_paths.get(source_dotted) if source_dotted else None
+            source_path = resolve_import_module(modules, path, node)
             if source_path is None:
                 continue
             for alias in node.names:
@@ -333,71 +239,29 @@ def _package_router_names(
                 changed = True
         # Recomputed each iteration: a module-alias target's own router set can itself still be
         # growing (e.g. it gained a name via the import-edge loop above just now).
-        module_router_names = _module_router_names_by_file(trees, module_paths, router_names)
+        module_router_names = _module_router_names_by_file(modules, router_names)
         for path, tree in trees.items():
             if _propagate_router_aliases(tree, router_names[path], module_router_names[path]):
                 changed = True
-    return router_names, _module_router_names_by_file(trees, module_paths, router_names)
-
-
-def _module_import_aliases(
-    tree: ast.AST, importing_path: Path, module_paths: dict[str, Path]
-) -> dict[str, str]:
-    """Maps a local name bound to *a module itself* (not a name defined inside one) to that
-    module's dotted name: `import <dotted> as <alias>` (`import anytoolai_platform_api.shared as
-    shared` -> `{"shared": "anytoolai_platform_api.shared"}`), and `from <container> import name`
-    — bare-relative (`from . import name`), qualified-relative (`from .routers import name`), or
-    absolute (`from anytoolai_platform_api.routers import demo`) — whenever a submodule file
-    actually named `name` exists inside `<container>` (checked against `module_paths`, for every
-    `ast.ImportFrom`, regardless of whether it's relative or absolute: the statement is otherwise
-    statically ambiguous between "the submodule `<container>.name`" and "a name defined in
-    `<container>/__init__.py`" — Python itself only resolves this by trying the attribute first,
-    then the submodule import, at runtime; a real submodule *file* existing is the only static
-    signal available for the submodule case). A `from <container> import name` whose `name` has
-    no matching submodule file (the overwhelmingly common case — e.g. `from
-    anytoolai_platform_api.routers.demo import router as demo_router`, where `router` is a name
-    *inside* `demo.py`, not a submodule of it) is left to the existing `ast.ImportFrom`-based
-    name-edge handling in `_package_router_names`, which already covers that correctly.
-
-    Deliberately out of scope: bare `import <dotted>` without `as` (Python binds only the
-    top-level package name, e.g. `pkg`, not the leaf module — resolving `pkg.sub.mod.router` from
-    that would need multi-level attribute-chain resolution, not used anywhere in this repo today).
-    """
-    aliases: dict[str, str] = {}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.asname:
-                    aliases[alias.asname] = alias.name
-        elif isinstance(node, ast.ImportFrom):
-            container_dotted = _resolve_import_module(importing_path, node)
-            if container_dotted is None:
-                continue
-            for alias in node.names:
-                candidate_dotted = f"{container_dotted}.{alias.name}"
-                if candidate_dotted in module_paths:
-                    aliases[alias.asname or alias.name] = candidate_dotted
-    return aliases
+    return router_names, _module_router_names_by_file(modules, router_names)
 
 
 def _module_router_names_by_file(
-    trees: dict[Path, ast.Module],
-    module_paths: dict[str, Path],
+    modules: PythonModules,
     router_names_by_file: dict[Path, set[str]],
 ) -> dict[Path, dict[str, set[str]]]:
-    """For each file, maps a local module-identity name (see `_module_import_aliases`) to the set
+    """For each file, maps a local module-identity name (see `module_import_aliases`) to the set
     of router names known in the module it refers to, so `shared.router` (an attribute access
     through a *module* identity, not a name bound directly by `from ... import`) resolves the
     router the same way `from .shared import router` already does."""
-    result: dict[Path, dict[str, set[str]]] = {}
-    for path, tree in trees.items():
-        per_alias: dict[str, set[str]] = {}
-        for local, dotted in _module_import_aliases(tree, path, module_paths).items():
-            source_path = module_paths.get(dotted)
-            if source_path is not None:
-                per_alias[local] = router_names_by_file[source_path]
-        result[path] = per_alias
-    return result
+    return {
+        path: {
+            local: router_names_by_file[source]
+            for local, source in module_import_aliases(modules, path).items()
+            if source in router_names_by_file
+        }
+        for path in modules.trees
+    }
 
 
 def _is_router_expr(
@@ -433,15 +297,15 @@ def _is_router_expr(
 
 
 def _route_path_literals_for_tree(
-    tree: ast.Module,
+    modules: PythonModules,
+    path: Path,
     router_names: set[str],
     aliases: dict[str, str],
-    constants: dict[str, str],
     module_router_names: dict[str, set[str]],
     object_aliases: dict[str, str],
 ) -> list[str]:
     literals: list[str] = []
-    for node in ast.walk(tree):
+    for node in ast.walk(modules.trees[path]):
         if not isinstance(node, ast.Call):
             continue
         func = node.func
@@ -463,51 +327,126 @@ def _route_path_literals_for_tree(
         if func_name in ROUTE_REGISTRATION_METHODS and called_on_router:
             # Only the route's own path, not other string kwargs like `summary=`/`description=`
             # (free-form prose that could coincidentally contain a forbidden substring).
-            path = _path_argument(node, constants)
-            if path is not None:
-                literals.append(path)
+            route_path = _path_argument(node, modules, path)
+            if route_path is not None:
+                literals.append(route_path)
         elif func_name in PREFIX_KEYWORD_CALLS:
-            prefix = _keyword_value(node, "prefix", constants)
+            prefix = _keyword_value(node, "prefix", modules, path)
             if prefix is not None:
                 literals.append(prefix)
         elif func_name in ROUTE_OBJECT_CONSTRUCTORS:
             # A standalone `Route(...)`/`WebSocketRoute(...)`/`Mount(...)` construction — never a
             # method call on a router/app, so no `called_on_router` gate applies here at all.
-            path = _path_argument(node, constants)
-            if path is not None:
-                literals.append(path)
+            route_path = _path_argument(node, modules, path)
+            if route_path is not None:
+                literals.append(route_path)
     return literals
 
 
-def test_no_product_specific_endpoint_paths() -> None:
+def check_product_specific_endpoint_paths(root: Path, package: Path) -> list[str]:
+    """Offender descriptions for every product-specific route path/prefix registered anywhere in
+    `package`. `root` is the tree the package's absolute imports are rooted under (the repo root
+    for the real package; a temp dir for an isolated regression fixture)."""
     trees: dict[Path, ast.Module] = {}
-    for path in sorted(PLATFORM_API_PACKAGE.rglob("*.py")):
+    for path in iter_source_files(package, {".py"}):
         try:
             trees[path] = ast.parse(path.read_text(encoding="utf-8"))
         except SyntaxError as exc:
-            raise AssertionError(
-                f"could not parse {path.relative_to(ROOT)} as Python: {exc}"
-            ) from exc
-
-    router_names_by_file, module_router_names_by_file = _package_router_names(trees)
+            raise AssertionError(f"could not parse {path.relative_to(root)} as Python: {exc}") from exc
+    modules = python_modules(root, trees)
+    router_names_by_file, module_router_names_by_file = _package_router_names(modules)
 
     offenders: list[str] = []
     for path, tree in trees.items():
-        aliases = _route_target_import_aliases(tree)
-        object_aliases = _route_object_import_aliases(tree)
-        constants = _module_string_constants(tree)
         literals = _route_path_literals_for_tree(
-            tree,
+            modules,
+            path,
             router_names_by_file[path],
-            aliases,
-            constants,
+            _route_target_import_aliases(tree),
             module_router_names_by_file[path],
-            object_aliases,
+            _route_object_import_aliases(tree),
         )
         for literal in literals:
             lowered = literal.lower()
             for term in FORBIDDEN_PRODUCT_PATH_TERMS:
                 if term in lowered:
-                    offenders.append(f"{path.relative_to(ROOT)}: {literal!r} contains {term!r}")
+                    offenders.append(f"{path.relative_to(root)}: {literal!r} contains {term!r}")
+    return offenders
 
+
+def test_no_product_specific_endpoint_paths() -> None:
+    offenders = check_product_specific_endpoint_paths(ROOT, PLATFORM_API_PACKAGE)
     assert offenders == [], "product-specific route paths found: " + ", ".join(offenders)
+
+
+# Isolated regressions: each fixture is a tiny package under `tmp_path`, so a gate gap is proven
+# closed by a permanent test rather than by a one-off repro script.
+_PATHS_MODULE = 'PROPOSAL_STATUS_PATH = "/proposal_ai/status"\n'
+
+
+def _write_package(tmp_path: Path, files: dict[str, str]) -> Path:
+    package = tmp_path / "pkg"
+    package.mkdir()
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    for name, body in files.items():
+        (package / name).write_text(body, encoding="utf-8")
+    return package
+
+
+def test_route_path_constant_imported_from_another_module_is_detected(tmp_path: Path) -> None:
+    package = _write_package(
+        tmp_path,
+        {
+            "paths.py": _PATHS_MODULE,
+            "routes.py": (
+                "from fastapi import APIRouter\n"
+                "from pkg.paths import PROPOSAL_STATUS_PATH\n"
+                "router = APIRouter()\n"
+                "@router.get(PROPOSAL_STATUS_PATH)\n"
+                "def status(): ...\n"
+            ),
+        },
+    )
+    offenders = check_product_specific_endpoint_paths(tmp_path, package)
+    assert len(offenders) == 1 and "'/proposal_ai/status'" in offenders[0]
+
+
+def test_route_path_constant_via_module_alias_is_detected(tmp_path: Path) -> None:
+    package = _write_package(
+        tmp_path,
+        {
+            "paths.py": _PATHS_MODULE,
+            "routes.py": (
+                "from fastapi import APIRouter\n"
+                "from pkg import paths\n"
+                "router = APIRouter()\n"
+                "@router.get(paths.PROPOSAL_STATUS_PATH)\n"
+                "def status(): ...\n"
+            ),
+            "relative_routes.py": (
+                "from fastapi import APIRouter\n"
+                "from . import paths as p\n"
+                "router = APIRouter()\n"
+                "@router.get(f\"{p.PROPOSAL_STATUS_PATH}/detail\")\n"
+                "def detail(): ...\n"
+            ),
+        },
+    )
+    offenders = check_product_specific_endpoint_paths(tmp_path, package)
+    assert len(offenders) == 2, offenders
+
+
+def test_dynamic_route_path_is_not_a_false_positive(tmp_path: Path) -> None:
+    package = _write_package(
+        tmp_path,
+        {
+            "routes.py": (
+                "from fastapi import APIRouter\n"
+                "router = APIRouter()\n"
+                "def register(segment: str) -> None:\n"
+                "    router.add_api_route(f\"/products/{segment}\", lambda: None)\n"
+                "    router.add_api_route(\"/products/\" + segment, lambda: None)\n"
+            ),
+        },
+    )
+    assert check_product_specific_endpoint_paths(tmp_path, package) == []

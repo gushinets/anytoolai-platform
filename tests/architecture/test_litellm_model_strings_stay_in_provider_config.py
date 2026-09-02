@@ -1,19 +1,20 @@
 from __future__ import annotations
 
-import ast
-import bisect
 import re
 from pathlib import Path
 
 import yaml
 
-# Reuse the canonical skip-dir and JS/TS-extension sets instead of hand-maintaining copies that
-# can drift (this file's own `SKIP_PATH_PARTS` copy already diverged from this neighbor's twice
-# across two code-review rounds, and `SCAN_EXTS`'s own JS-family suffixes independently drifted
-# from `.mjs`/`.cjs` support the neighbor already had).
-from test_no_direct_provider_calls_outside_gateway import (
-    JS_TS_EXTS as _NEIGHBOR_JS_TS_EXTS,
-    SKIP_PATH_PARTS as _NEIGHBOR_SKIP_PATH_PARTS,
+from static_string_resolution import (
+    JS_TS_EXTS,
+    iter_source_files,
+    js_modules,
+    js_string_literals,
+    js_string_values,
+    line_number_at,
+    parse_python_files,
+    python_modules,
+    python_string_values,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,11 +29,7 @@ SCAN_ROOTS = [
     ROOT / "configs",
     ROOT / "scripts",
 ]
-# Extra entry beyond the neighbor: skip test fixtures, since they legitimately assert against
-# real litellm-format config values (e.g. test_litellm_adapter.py), unlike the neighbor which
-# filters "tests" per-function instead of via this set.
-SKIP_PATH_PARTS = _NEIGHBOR_SKIP_PATH_PARTS | {"tests"}
-SCAN_EXTS = _NEIGHBOR_JS_TS_EXTS | {".py", ".yaml", ".yml", ".json"}
+SCAN_EXTS = JS_TS_EXTS | {".py", ".yaml", ".yml", ".json"}
 
 # LiteLLM SDK/proxy model strings are "<provider>/<model>" (see configs/kernel/litellm_router.yaml
 # litellm_params.model). They must appear only in provider policy/model registry files, never
@@ -76,24 +73,14 @@ LITELLM_PROVIDERS = [
 LITELLM_MODEL_STRING_RE = re.compile(
     r"""(?:^|[\s"'`=:,\[{(])"""
     rf"""(?:{"|".join(sorted(LITELLM_PROVIDERS, key=len, reverse=True))})"""
-    r"/[\w.\-]+"
+    r"/[\w.\-]+",
+    re.MULTILINE,  # `^` is each line's start: JS/TS text is now scanned whole, not per line
 )
 # A match still isn't necessarily a real hardcode: `"https://example.com?model=openai/gpt-4.1"` —
 # a `?model=`/`&model=` query value inside a URL string — has `=` right before the provider name,
 # same as a real assignment. `_is_url_query_value` filters those out, but narrowly: it requires an
 # actual adjacent `?key=`/`&key=` token, not merely "some URL appears earlier in this string" (a
 # real hardcode can share a quoted string with an unrelated URL, e.g. a serialized JSON blob).
-
-
-def _scan_files() -> list[Path]:
-    files: list[Path] = []
-    for root in SCAN_ROOTS:
-        for path in root.rglob("*"):
-            if any(part in SKIP_PATH_PARTS for part in path.parts):
-                continue
-            if path.is_file() and path.suffix in SCAN_EXTS and path not in ALLOWED_FILES:
-                files.append(path)
-    return files
 
 
 # The `=` immediately preceding a `?key=`/`&key=` URL query value. Anchored (`$`) to the end of
@@ -130,8 +117,9 @@ def _is_url_query_value(value: str, spans: list[tuple[int, int]], position: int)
 
 def _offending_match(value: str) -> str | None:
     """First real (non-URL-query) LiteLLM-format `provider/model` match in an already-isolated
-    string value (a Python string-literal's decoded content, or a YAML scalar's decoded content —
-    values a real parser has already separated from comments/surrounding syntax), or `None`."""
+    string value (a Python string-literal's decoded content, a YAML scalar's decoded content, a
+    statically folded JS/TS string expression — values a real parser/resolver has already
+    separated from comments/surrounding syntax), or `None`."""
     spans = [(0, len(value))]
     for match in LITELLM_MODEL_STRING_RE.finditer(value):
         if not _is_url_query_value(value, spans, match.start()):
@@ -139,87 +127,15 @@ def _offending_match(value: str) -> str | None:
     return None
 
 
-def _python_offender(path: Path) -> tuple[int, str] | None:
-    """(lineno, matched-text) of the first real hardcode in `path`'s string literals, using the
-    real Python AST instead of hand-rolled quote/comment tracking.
-
-    Nine review rounds (7, 9, 11, 12, 13) found real bugs in a hand-rolled Python string/comment
-    tracker; round 14 replaced it with `tokenize`, which round 15 then found only inspects
-    `tokenize.STRING` — Python 3.12+ tokenizes an f-string as `FSTRING_START`/`MIDDLE`/`END`
-    instead, so a plain `model = f"openai/gpt-4.1"` hardcode was invisible (a regression versus
-    the original regex scanner). `ast.walk` sidesteps this rather than teaching the scanner about
-    another token shape: `JoinedStr`/`FormattedValue`/`Constant` node shapes are stable since
-    Python 3.6, unaffected by tokenizer-level changes, give already-decoded string values with no
-    `ast.literal_eval` failure modes, and comments don't exist in the AST at all (excluded from
-    consideration by construction, the same guarantee `tokenize.COMMENT`-skipping gave before —
-    with no separate comment-stripping step needed either way).
-
-    An f-string with real interpolation (`f"openai/{name}"`) is a genuinely dynamic value, not a
-    hardcode — a `JoinedStr` is only checked when *every* part is a literal `Constant` (no
-    `FormattedValue` at all); one with any interpolation is skipped, matching the original
-    (correct) intent to never evaluate expressions.
-    """
-    text = path.read_text(encoding="utf-8", errors="ignore")
-    try:
-        tree = ast.parse(text)
-    except (SyntaxError, ValueError):
-        return None
-
-    # A JoinedStr's own Constant parts must not also be checked independently as top-level
-    # strings (`ast.walk` visits them too) — that would double-process a plain f-string and could
-    # match an incomplete fragment of a genuinely dynamic one on its own.
-    fstring_part_ids = {
-        id(part)
-        for node in ast.walk(tree)
-        if isinstance(node, ast.JoinedStr)
-        for part in node.values
-    }
-
-    # A BinOp's own Constant operands must not also be checked independently as top-level strings
-    # (`ast.walk` visits them too) — same double-processing risk `fstring_part_ids` guards against
-    # above, and irrelevant here anyway since a lone fragment ("openai/" or "gpt-4.1") never
-    # matches the provider/model regex on its own.
-    binop_part_ids = {id(part) for node in ast.walk(tree) if isinstance(node, ast.BinOp) for part in (node.left, node.right)}
-
+def _first_offender(values: list[tuple[int, str]]) -> tuple[int, str] | None:
+    """(position, matched-text) of the lowest-positioned real hardcode among `(position, value)`
+    pairs, or `None`."""
     best: tuple[int, str] | None = None
-    for node in ast.walk(tree):
-        value: str | None = None
-        lineno = getattr(node, "lineno", None)
-        if (
-            isinstance(node, ast.Constant)
-            and isinstance(node.value, str)
-            and id(node) not in fstring_part_ids
-            and id(node) not in binop_part_ids
-        ):
-            value = node.value
-        elif isinstance(node, ast.JoinedStr) and all(
-            isinstance(part, ast.Constant) and isinstance(part.value, str)
-            for part in node.values
-        ):
-            value = "".join(part.value for part in node.values)
-        elif isinstance(node, ast.BinOp):
-            value = _fold_string_concat(node)
-        if value is None or lineno is None:
-            continue
+    for position, value in values:
         match = _offending_match(value)
-        if match is not None and (best is None or lineno < best[0]):
-            best = (lineno, match)
+        if match is not None and (best is None or position < best[0]):
+            best = (position, match)
     return best
-
-
-def _fold_string_concat(node: ast.expr) -> str | None:
-    """Constant-fold a `"a" + "b"` (compile-time string concatenation) chain into its resulting
-    string, or `None` if any operand isn't itself a plain string constant or foldable BinOp — e.g.
-    `"openai/" + name` (real interpolation) stays `None`, matching this file's existing intent to
-    never evaluate a genuinely dynamic expression."""
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value
-    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
-        left = _fold_string_concat(node.left)
-        right = _fold_string_concat(node.right)
-        if left is not None and right is not None:
-            return left + right
-    return None
 
 
 def _iter_yaml_scalars(node: yaml.Node):
@@ -234,7 +150,7 @@ def _iter_yaml_scalars(node: yaml.Node):
             yield from _iter_yaml_scalars(value_node)
 
 
-def _yaml_offender(path: Path) -> tuple[int, str] | None:
+def _yaml_offender(root: Path, path: Path) -> tuple[int, str] | None:
     """(lineno, matched-text) of the first real hardcode in `path`'s scalar values, using a real
     YAML parser instead of hand-rolled `#`-is-a-comment tracking.
 
@@ -244,9 +160,8 @@ def _yaml_offender(path: Path) -> tuple[int, str] | None:
     walking each document's node graph gives real scalar values (block/flow, quoted/unquoted —
     all resolved the same way) with real source positions, with no separate comment-stripping
     step needed. Uses `compose_all`, not `compose` (round 15: `compose` only accepts a single
-    document and raises on a valid multi-document file, e.g. `foo: bar\\n---\\nmodel:
-    openai/gpt-4.1` — `compose_all` scans every document; line numbers stay absolute across `---`
-    boundaries, not reset per document (verified)).
+    document and raises on a valid multi-document file — `compose_all` scans every document; line
+    numbers stay absolute across `---` boundaries, not reset per document (verified)).
 
     A genuine parse failure is a loud test failure, not a silent skip of the whole file — matches
     this repo's own anti-silent-skip convention, and every real `.yaml`/`.yml` file in
@@ -257,511 +172,115 @@ def _yaml_offender(path: Path) -> tuple[int, str] | None:
     try:
         documents = list(yaml.compose_all(text))
     except yaml.YAMLError as exc:
-        raise AssertionError(f"could not parse {path.relative_to(ROOT)} as YAML: {exc}") from exc
-
-    best: tuple[int, str] | None = None
-    for document in documents:
-        if document is None:
-            continue
-        for scalar in _iter_yaml_scalars(document):
-            if not isinstance(scalar.value, str):
-                continue
-            match = _offending_match(scalar.value)
-            if match is not None:
-                lineno = scalar.start_mark.line + 1
-                if best is None or lineno < best[0]:
-                    best = (lineno, match)
-    return best
+        raise AssertionError(f"could not parse {path.relative_to(root)} as YAML: {exc}") from exc
+    values = [
+        (scalar.start_mark.line + 1, scalar.value)
+        for document in documents
+        if document is not None
+        for scalar in _iter_yaml_scalars(document)
+        if isinstance(scalar.value, str)
+    ]
+    return _first_offender(values)
 
 
-# Only `.json`/`.js`/`.jsx`/`.ts`/`.tsx` still go through this line-based scanner. `.json` has no
-# comment syntax at all (the marker set below is empty for it, so `_strip_comments` is a no-op)
-# and only ever contains standard double-quoted strings — none of the ambiguity that motivated
-# moving Python/YAML to real parsers exists in JSON's grammar. `.js`/`.ts` are handled the same
-# way `.py` used to be (regex + hand-rolled quote/comment tracking).
-#
-# ponytail: no JS/TS tokenizer is available here without adding a new dependency, so this path
-# keeps the same class of bug the Python/YAML paths were just moved off of (a comment or a
-# multi-line construct this tracker doesn't model could still misread). Upgrade path: parse with
-# a real JS/TS tokenizer if a bug is ever found here, the same way Python/YAML were fixed.
-_QUOTE_CHARS = ("'", '"', "`")  # backtick included: JS/TS template literals
-_COMMENT_MARKERS_BY_SUFFIX: dict[str, tuple[str, ...]] = {
-    ".json": (),  # JSON has no comment syntax at all
-    ".ts": ("//",),
-    ".tsx": ("//",),
-    ".js": ("//",),
-    ".jsx": ("//",),
-    ".mjs": ("//",),  # ES module JS — same comment syntax as .js
-    ".cjs": ("//",),  # CommonJS JS — same comment syntax as .js
-}
-
-
-# Characters that mean "the token just before this position is a value" (an identifier/number,
-# a closing `)`/`]`, or a closing quote) — i.e. a following `/` is division, not the start of a
-# regex literal. Mirrors the standard JS/TS lexer heuristic for the division-vs-regex ambiguity
-# (a `/` after an operator, `(`, `,`, `=`, or start of line is a regex; after a value, a
-# division).
-_REGEX_PRECEDED_BY_VALUE = frozenset(
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$)]"
-) | frozenset(_QUOTE_CHARS)
-
-# A last-*character* heuristic alone can't distinguish a real identifier (`foo / 2`, division)
-# from a keyword that also ends in a letter (`return /re/`, a regex) — both end in an
-# identifier-class character. These are the JS/TS keywords after which a value can't precede a
-# `/`, so a following `/` is still a regex literal despite the preceding word looking like a
-# value by its last character alone.
-_JS_REGEX_KEYWORDS = frozenset(
-    {
-        "return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "yield",
-        "case", "do", "else", "throw", "await", "default",
-    }
-)
-
-
-
-
-# `)` is normally a value-ending character (a function call's result), so `_REGEX_PRECEDED_BY_VALUE`
-# treats a following `/` as division. But `if (cond) /re/` — a control-flow *condition*'s closing
-# paren — is a statement boundary, not a value: what follows isn't "the result of `(cond)`", it's
-# a brand new statement. Distinguishing the two needs the word immediately before the *matching*
-# `(`, not just the last character before `/`.
-_JS_CONTROL_KEYWORDS_BEFORE_PAREN = frozenset({"if", "while", "for", "switch", "catch", "with"})
-
-
-def _regex_literal_end(text: str, start: int, length: int) -> int | None:
-    """If `text[start]` (`/`) starts a JS/TS regex literal, the index just past its closing,
-    unescaped `/` outside a `[...]` character class — else `None` (no terminator before the next
-    newline, so `start` isn't actually a regex literal)."""
-    j = start + 1
-    in_char_class = False
-    while j < length:
-        c = text[j]
-        if c == "\n":
-            return None
-        if c == "\\":
-            j += 2
-            continue
-        if c == "[":
-            in_char_class = True
-        elif c == "]":
-            in_char_class = False
-        elif c == "/" and not in_char_class:
-            return j + 1
-        j += 1
-    return None
-
-
-def _quoted_string_spans(line: str) -> list[tuple[int, int]]:
-    """(start, end) of each quoted string's content (excluding the quote chars) on `line`."""
-    spans: list[tuple[int, int]] = []
-    quote_char: str | None = None
-    content_start = 0
-    i = 0
-    length = len(line)
-    while i < length:
-        char = line[i]
-        if quote_char:
-            if char == "\\":
-                i += 2
-                continue
-            if char == quote_char:
-                spans.append((content_start, i))
-                quote_char = None
-            i += 1
-            continue
-        if char in _QUOTE_CHARS:
-            quote_char = char
-            content_start = i + 1
-        i += 1
-    return spans
-
-
-def _strip_comments(text: str, markers: tuple[str, ...], jsx: bool = False) -> list[str]:
-    """Comment-stripped lines of `text` (only using `markers`, plus JS/TS `/* ... */` block
-    comments and `/regex/` literals whenever `markers` is non-empty), with quote state carried
-    across line boundaries rather than reset at each newline — a JS/TS template literal
-    containing `//` (e.g. a URL) must not have that `//` misread as a comment start on a later
-    physical line.
-
-    Block comments must be recognized as their own state (not just skipped like a line comment):
-    otherwise a stray quote char inside one (`/* " */`) opens `in_string` early, and a real,
-    legitimately-quoted `//` later on the line (e.g. inside a URL) then gets misread as a line
-    comment, truncating a real hardcode past it. The same is true of a regex literal containing a
-    quote char (`/"/`): it must be recognized and skipped as its own unit, using the standard
-    JS/TS division-vs-regex heuristic (`_REGEX_PRECEDED_BY_VALUE` — a `/` is a regex-literal start
-    unless the last significant character before it was part of a value: an identifier/number, a
-    closing `)`/`]`, or a closing quote) — except a control-flow condition's closing paren
-    (`if (cond) /re/`), which is a statement boundary, not a value; `paren_stack` tracks, for each
-    open `(`, whether the word immediately before it was a control keyword, so its matching `)`
-    can override `last_sig` back to a non-value when popped.
-
-    `last_sig` and the current identifier word (`word_buf`/`last_word`) are both maintained as
-    persistent state across the whole function, not per physical line: `current` (the
-    stripped-line accumulator) resets at every `\\n`, but a keyword or a control-flow `(` can
-    legitimately be separated from what follows it by a line break or a comment (`if\\n(cond)`,
-    `if // note\\n(cond)`, `return/*note*//"/`) — computing the preceding word from `current`
-    would silently lose it exactly then.
-
-    `word_buf`/`last_word` finalization is structural, not opt-in per branch: every identifier
-    character (alnum/`_`/`$`) is handled by one dedicated branch at the top of the loop that only
-    ever appends to `word_buf`, and *every other* character — whatever it is, whichever branch
-    ends up handling it — passes through one unconditional `_finalize_word()` call first. A
-    keyword-lookback bug of the "this one branch forgot to flush the pending word" shape (found
-    twice: entering a comment, and a `/` with no separator at all right after a keyword) is
-    structurally impossible under this shape, because no branch *can* skip the flush — it isn't
-    theirs to remember, it already happened before any of them run.
-
-    `last_word_is_property` additionally tracks whether the word was reached via a preceding `.`
-    (`config.default`, `obj?.if`) — reserved words are valid JS/TS *property names*, so an
-    IdentifierName spelled like a keyword right after `.`/`?.` is never a real keyword token, and
-    must not be matched against `_JS_REGEX_KEYWORDS`/`_JS_CONTROL_KEYWORDS_BEFORE_PAREN` even
-    though its characters are identical.
-
-    `jsx` (only ever true for `.jsx`/`.tsx`) excludes one more `/`-preceding character from
-    "regex start": `<` directly followed by `/` is a JSX/TSX closing tag (`</div>`, `</>`), never
-    a regex literal — `_REGEX_PRECEDED_BY_VALUE` doesn't (and, for plain `.js`/`.ts`, correctly
-    shouldn't) include `<`, since `a < /re/` is genuinely a comparison-then-regex there. Scoped to
-    JSX-capable files only, so the rare `a < /re/` idiom in a `.js`/`.ts` file (where no closing
-    tag can ever appear) keeps resolving as a regex exactly as before.
-
-    `jsx` also disables `//` line-comment recognition entirely (block comments and regex literals
-    stay recognized). Raw JSX element text (`<div>https://example.com</div>`) is not JavaScript —
-    it has no comment syntax at all — but this scanner has no notion of "currently inside JSX
-    text" vs. "currently inside a JS expression/statement", and correctly tracking that boundary
-    needs real JSX-aware nesting (opening/closing tags, embedded `{...}` expressions switching
-    back to JS, the `<T>`-generic-vs-JSX-element ambiguity TSX itself is famous for) that a
-    character-level heuristic cannot approximate without becoming a second hand-rolled parser —
-    exactly the failure mode that already justified moving Python/YAML onto real parsers in round
-    10, and exactly what this file's own decision log already accepted as this path's ceiling
-    ("no dependency-free JS/TS tokenizer available"). Given that ceiling, `//` in a JSX-capable
-    file is not treated as a truncation point: the conservative direction for a boundary guard is
-    to *include* more content in scanning, never exclude content that should be checked — a false
-    positive (a human has to look at one extra line) is acceptable where the alternative, a
-    silently truncated real hardcode, is not.
-
-    Critically, "not a truncation point" does not mean "run the rest of the lexer over it as if it
-    were code": a `//` comment's own text is still consumed as one inert, verbatim run
-    (`in_line_comment`, reset every `\n` since a `//` comment never spans a line) rather than
-    falling through to the ordinary char-by-char scan — comment prose can coincidentally look like
-    a regex delimiter, a `/* ... */` opener, or a quote, and letting it drive the *same* stateful
-    lexer that parses real code mutates that state for everything *after* the comment too (a
-    genuine `// /* note` comment previously left `in_block_comment` stuck with no real `*/` to
-    ever close it, silently swallowing the rest of the file — a worse failure than the original
-    truncation bug this was meant to fix). Consuming the comment verbatim, with no lexer branch
-    other than "append this character", keeps the comment's own content available for the
-    model-string regex to match against while making it structurally impossible for that content
-    to affect quote/comment/regex state elsewhere.
-
-    `/* ... */` gets the symmetric treatment for the same reason: raw JSX text can contain `/*`
-    literally with no comment semantics at all (only inside a JS expression like `{/* comment
-    */}` does it mean anything), and this scanner has no way to tell the two apart. Rather than
-    open `in_block_comment` (no guaranteed closing `*/` in JSX text, the exact "state leaks past
-    this point" failure already fixed for `//` above) or let the `/` alone reach the regular
-    regex-vs-division decision (risking a stray later `/` on the same line being misread as the
-    literal's closing delimiter and consumed along with whatever real content sits between them —
-    including a real hardcode), `/*` in a JSX-capable file is treated as two fully ordinary,
-    non-comment characters, with `last_sig` deliberately set to bias a *following* `/` toward
-    "division/ordinary text" rather than "regex start" — the same conservative,
-    never-remove-what-might-be-a-hardcode direction this file has favored for JSX-shaped
-    ambiguity since round 20.
-
-    `markers` is only non-empty for JS/TS-family suffixes (`.json` has no comment syntax and
-    returns early above), so none of this fires for `.json`.
-    """
-    if not markers:
-        return text.splitlines()
-
-    lines: list[str] = []
-    current: list[str] = []
-    in_string: str | None = None
-    in_block_comment = False
-    in_line_comment = False
-    last_sig = ""
-    word_buf: list[str] = []
-    last_word = ""
-    last_word_is_property = False
-    word_starts_after_dot = False
-    paren_stack: list[bool] = []
-
-    def _finalize_word() -> None:
-        nonlocal word_buf, last_word, last_word_is_property
-        if word_buf:
-            last_word = "".join(word_buf)
-            last_word_is_property = word_starts_after_dot
-            word_buf = []
-
-    i = 0
-    length = len(text)
-    while i < length:
-        char = text[i]
-        if char == "\n":
-            # Checked unconditionally, before in_block_comment/in_string: a physical line ends
-            # here regardless of what lexical state we're in, and `lines` must stay one entry per
-            # physical line for line-number reporting even *inside* a multi-line string or block
-            # comment — only `in_string`/`in_block_comment` themselves persist across the split.
-            # `in_line_comment` does NOT persist — a `//` comment never spans a line by definition.
-            _finalize_word()
-            in_line_comment = False
-            lines.append("".join(current))
-            current = []
-            i += 1
-            continue
-        if in_line_comment:
-            # Consumed verbatim, one character at a time, through no other branch: this is a real
-            # `//` comment's own text, kept in `current` so the model-string regex can still match
-            # against it, but never given a chance to open a string/block-comment/regex state that
-            # would then apply to the real code that follows.
-            current.append(char)
-            i += 1
-            continue
-        if in_block_comment:
-            if text.startswith("*/", i):
-                in_block_comment = False
-                i += 2
-            else:
-                i += 1
-            continue
-        if in_string:
-            if char == "\\" and i + 1 < length and text[i + 1] != "\n":
-                current.append(char)
-                current.append(text[i + 1])
-                i += 2
-                continue
-            current.append(char)
-            if char == in_string:
-                in_string = None
-            if not char.isspace():
-                last_sig = char
-            i += 1
-            continue
-        if char.isalnum() or char in "_$":
-            if not word_buf:
-                # This is the first character of a new word — record whether it directly follows
-                # a `.` (property access) before `last_sig` moves on to this char itself.
-                word_starts_after_dot = last_sig == "."
-            word_buf.append(char)
-            last_sig = char
-            current.append(char)
-            i += 1
-            continue
-        # Every remaining character is a word boundary of some kind — a real one (whitespace, an
-        # operator, a quote) or the start of a comment/regex literal that isn't itself part of any
-        # identifier — so any word being accumulated is now complete, regardless of which branch
-        # below ends up handling this specific character. (`\n` is handled above, unconditionally,
-        # before this point is ever reached.)
-        _finalize_word()
-        if char in _QUOTE_CHARS:
-            in_string = char
-            current.append(char)
-            last_sig = char
-            i += 1
-            continue
-        if jsx and text.startswith("/*", i):
-            # Raw JSX text can contain `/*` literally (`<pre>Use /* to start a comment</pre>`) —
-            # it has no comment semantics there, only inside a JS expression like `{/* comment
-            # */}`, and this scanner can't tell the two apart (see the docstring). Unlike a real
-            # block comment, don't open in_block_comment (no guaranteed closing `*/` exists in
-            # JSX text — the same "leaks state past this point" failure round 21 already fixed
-            # for `//`, just via `/*` instead). Also don't let the `/` alone reach the regular
-            # regex-vs-division decision below: `last_sig = "]"` deliberately biases a *following*
-            # `/` toward "division/ordinary text", not "regex start", so raw JSX text containing
-            # a stray `/` later on the line can't be misread as a regex and consumed forward —
-            # the conservative, content-preserving direction this scanner has favored since round
-            # 20 for anything JSX-text-shaped it can't parse for real.
-            current.append("/")
-            current.append("*")
-            last_sig = "]"
-            i += 2
-            continue
-        if text.startswith("/*", i):
-            in_block_comment = True
-            i += 2
-            continue
-        if jsx and text.startswith("//", i):
-            # Enter in_line_comment rather than the ordinary marker-based truncation below: the
-            # comment's own text still needs scanning (see the docstring), but must not be handed
-            # to any other branch that could reinterpret it as code.
-            in_line_comment = True
-            current.append("/")
-            current.append("/")
-            i += 2
-            continue
-        if any(text.startswith(marker, i) for marker in markers):
-            newline_pos = text.find("\n", i)
-            i = length if newline_pos == -1 else newline_pos
-            continue
-        if char == "(":
-            current.append(char)
-            last_sig = char
-            is_control_keyword = (
-                last_word in _JS_CONTROL_KEYWORDS_BEFORE_PAREN and not last_word_is_property
-            )
-            paren_stack.append(is_control_keyword)
-            i += 1
-            continue
-        if char == ")":
-            is_condition_paren = paren_stack.pop() if paren_stack else False
-            current.append(char)
-            # A condition paren's close is a statement boundary (not a value), so a following `/`
-            # should read as a regex start, not division — everything else closes like a normal
-            # value-producing paren.
-            last_sig = "" if is_condition_paren else char
-            i += 1
-            continue
-        if char == "/":
-            looks_like_regex = last_sig not in _REGEX_PRECEDED_BY_VALUE
-            # `last_sig` alone can't tell a real identifier from a keyword ending the same way
-            # (`foo` vs. `return`) — check the whole preceding word against the keyword set only
-            # when the char-level heuristic said "value" (a keyword can flip that to "regex" too;
-            # a real identifier never does, so this only ever makes the check more permissive).
-            # A property name spelled like a keyword (`config.default`) is excluded the same way.
-            if not looks_like_regex and last_sig.isalpha():
-                looks_like_regex = last_word in _JS_REGEX_KEYWORDS and not last_word_is_property
-            # `</` in a JSX/TSX file is always a closing tag, never a regex literal — see the
-            # docstring's `jsx` paragraph. Scoped to JSX-capable files only.
-            if looks_like_regex and jsx and last_sig == "<":
-                looks_like_regex = False
-            # A `/` right after `*` is `*/` — the closing delimiter of a real block comment
-            # (harmless to treat as division: a genuine `a * /re/` is not a pattern this repo
-            # uses anywhere) or, in JSX text now passed through as literal characters, the tail
-            # end of what looked like `/* ... */` prose. Without this, that `/` could itself be
-            # misread as opening a *new* fake regex, searching forward for the next unrelated `/`
-            # on the line — including one inside a real hardcode — and consuming everything
-            # between them. Scoped to JSX-capable files only, matching the `<` exclusion above.
-            if looks_like_regex and jsx and last_sig == "*":
-                looks_like_regex = False
-            if looks_like_regex:
-                end = _regex_literal_end(text, i, length)
-                if end is not None:
-                    if jsx:
-                        # A plain `/word` in raw JSX text (`<div>/docs {"openai/gpt-4.1"}</div>`)
-                        # still passes the char-level heuristic above — `>` isn't a value
-                        # character, so `/` after it looks like a regex start — and the "closing"
-                        # `/` `_regex_literal_end` finds can be a real hardcode's own separator,
-                        # not a real regex delimiter at all. Every prior JSX fix in this file
-                        # (`</`, `//`, `/*`) closed one *specific* shape of this same underlying
-                        # problem: for jsx-capable files, a misdetected "regex" span must never
-                        # be silently discarded, because there is no way to be sure it wasn't
-                        # real content. Keeping it in `current` (instead of skipping straight to
-                        # `end`) preserves the conservative, content-preserving guarantee this
-                        # file has held since round 20 for *every* regex-shaped span in JSX
-                        # files, not just the ones a reported example happened to spell out —
-                        # closing the class, not one more instance of it. `.js`/`.ts` keep
-                        # discarding real regex-literal content exactly as before; a regex
-                        # literal's own pattern text isn't somewhere a real hardcode is expected
-                        # to live, and this repo's existing regex-detection regression suite
-                        # already depends on that content being absent from the stripped line.
-                        current.append(text[i:end])
-                    i = end
-                    last_sig = "]"  # a regex literal is a value; a following `/` is division
-                    continue
-        current.append(char)
-        if not char.isspace():
-            last_sig = char
-        i += 1
-    lines.append("".join(current))
-    return lines
-
-
-# Joins a run of adjacent quoted-string spans connected only by whitespace, a single `+`, and
-# optional grouping parens — `"openai/" + "gpt-4.1"`, `"openai/" +\n  "gpt-4.1"` (a real newline:
-# `\s` matches it), `"openai/" + ("gpt-4.1")`. Deliberately still bounded to *string-literal*
-# operands only (`"openai/" + model` stays unmatched — `between` then contains the identifier
-# `model`, which `_CONCAT_JOIN_RE` rejects) rather than a full JS/TS expression evaluator — that
-# ceiling is unavoidable without a real JS/TS parser, already documented above for the rest of
-# this file's JS/TS path, and not what any review round has asked for; only the "adjacent strings
-# joined by `+`" shape itself needed to stop being line-scoped.
-# ponytail: string-literal-operand-only string-concat folding for JS/TS (any grouping of `+` and
-# parens, any number of physical lines). Upgrade path: a real JS/TS tokenizer, same as the block
-# comment above already calls for.
-_CONCAT_JOIN_RE = re.compile(r"^[\s()]*\+[\s()]*$")
-
-
-def _concatenated_string_values(text: str, spans: list[tuple[int, int]]) -> list[tuple[int, str]]:
-    """(start offset in `text`, concatenated value) for each run of >=2 adjacent quoted-string
-    spans in `text` connected only by whitespace/parens/a single `+` — so the Python AST path's
-    `_fold_string_concat` and this one fold the same `"openai/" + "gpt-4.1"` shape, regardless of
-    how many physical lines or grouping parens it's spread across."""
-    if len(spans) < 2:
-        return []
-    values: list[tuple[int, str]] = []
-    group_start = 0
-    for i in range(1, len(spans)):
-        prev_end, next_start = spans[i - 1][1], spans[i][0]
-        between = text[prev_end + 1 : next_start - 1]
-        if not _CONCAT_JOIN_RE.match(between):
-            if i - group_start > 1:
-                start = spans[group_start][0]
-                values.append((start, "".join(text[s:e] for s, e in spans[group_start:i])))
-            group_start = i
-    if len(spans) - group_start > 1:
-        start = spans[group_start][0]
-        values.append((start, "".join(text[s:e] for s, e in spans[group_start:])))
-    return values
-
-
-def _line_offender(stripped_line: str) -> str | None:
-    """A same-line-only offender: a direct regex match, or a same-line-only concatenation. The
-    cross-line concatenation case is handled separately, once per file, by `_regex_offender`'s own
-    whole-text pass below (a per-line loop can't see a concatenation split across physical lines)."""
-    spans = _quoted_string_spans(stripped_line)
-    for match in LITELLM_MODEL_STRING_RE.finditer(stripped_line):
-        if not _is_url_query_value(stripped_line, spans, match.start()):
-            return match.group(0)
-    for _, concatenated in _concatenated_string_values(stripped_line, spans):
-        match = _offending_match(concatenated)
-        if match is not None:
-            return match
-    return None
-
-
-def _line_number_at(line_start_offsets: list[int], offset: int) -> int:
-    """1-indexed physical line containing `offset` in the text `line_start_offsets` was built
-    from (`line_start_offsets[i]` is the start offset of 1-indexed line `i + 1`)."""
-    return bisect.bisect_right(line_start_offsets, offset)
-
-
-def _regex_offender(path: Path) -> tuple[int, str] | None:
-    markers = _COMMENT_MARKERS_BY_SUFFIX[path.suffix]
+def _json_offender(path: Path) -> tuple[int, str] | None:
+    """`.json` has no comment syntax and only ever contains standard double-quoted strings, so a
+    per-line regex over the raw text is exact here."""
     text = path.read_text(encoding="utf-8", errors="ignore")
-    jsx = path.suffix in (".jsx", ".tsx")
-    lines = _strip_comments(text, markers, jsx)
-    for lineno, stripped_line in enumerate(lines, start=1):
-        offender = _line_offender(stripped_line)
-        if offender is not None:
-            return lineno, offender
-
-    # A concatenation split across physical lines (`"openai/" +\n  "gpt-4.1"`) is invisible to
-    # the per-line loop above — each line has, at most, one dangling operand with no partner on
-    # that same line. Re-scan the whole (already comment-stripped) file as one string instead, so
-    # `_concatenated_string_values` can see spans that live on different physical lines.
-    full_text = "\n".join(lines)
-    spans = _quoted_string_spans(full_text)
-    line_start_offsets = []
-    offset = 0
-    for line in lines:
-        line_start_offsets.append(offset)
-        offset += len(line) + 1
-    for start, concatenated in _concatenated_string_values(full_text, spans):
-        match = _offending_match(concatenated)
-        if match is not None:
-            return _line_number_at(line_start_offsets, start), match
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        spans = [(start + 1, end) for start, (end, _) in js_string_literals(line).items()]
+        for match in LITELLM_MODEL_STRING_RE.finditer(line):
+            if not _is_url_query_value(line, spans, match.start()):
+                return lineno, match.group(0)
     return None
+
+
+def _js_offender(js, path: Path) -> tuple[int, str] | None:
+    """(lineno, matched-text) of the first real hardcode in a JS/TS file: a direct regex match on
+    the comment-stripped text (which also covers `//` prose retained in JSX-capable files, where
+    comment stripping is deliberately disabled), or any *statically folded* string expression —
+    a `+` concatenation across any number of lines/parens, a template literal interpolating a
+    known constant (`` `${provider}/gpt-4.1` `` with `const provider = "openai"`), or a constant
+    imported from a sibling module — resolved by the shared static resolver."""
+    text = js.texts[path]
+    spans = [(start + 1, end) for start, (end, _) in js.literals[path].items()]
+    direct = next(
+        (
+            (match.start(), match.group(0))
+            for match in LITELLM_MODEL_STRING_RE.finditer(text)
+            if not _is_url_query_value(text, spans, match.start())
+        ),
+        None,
+    )
+    folded = _first_offender(js_string_values(js, path))
+    candidates = [found for found in (direct, folded) if found is not None]
+    if not candidates:
+        return None
+    offset, match = min(candidates)
+    return line_number_at(text, offset), match
+
+
+def check_litellm_model_strings(root: Path, scan_roots: list[Path], allowed_files: set[Path]) -> list[str]:
+    """Offender descriptions for every LiteLLM-format model string hardcoded under `scan_roots`
+    (outside `allowed_files`), each rooted under `root` for import resolution and reporting."""
+    files = [
+        path
+        for scan_root in scan_roots
+        for path in iter_source_files(scan_root, SCAN_EXTS, {"tests"})
+        if path not in allowed_files
+    ]
+    # Python goes through the real AST plus the shared static resolver (round 15 found `tokenize`
+    # misses Python 3.12+ f-strings; `ast` node shapes are stable and comments don't exist in the
+    # AST at all). A `"openai/" + "gpt-4.1"` concatenation, an f-string interpolating a known
+    # constant (`PROVIDER = "openai"; MODEL = f"{PROVIDER}/gpt-4.1"`), or a constant imported from
+    # another module all fold to the string they build; a genuinely dynamic value never does.
+    py = python_modules(root, parse_python_files(path for path in files if path.suffix == ".py"))
+    js = js_modules([path for path in files if path.suffix in JS_TS_EXTS])
+
+    offenders: list[str] = []
+    for path in files:
+        if path.suffix == ".py":
+            found = _first_offender(python_string_values(py, path)) if path in py.trees else None
+        elif path.suffix in (".yaml", ".yml"):
+            found = _yaml_offender(root, path)
+        elif path.suffix == ".json":
+            found = _json_offender(path)
+        else:
+            found = _js_offender(js, path)
+        if found is not None:
+            lineno, offender = found
+            offenders.append(f"{path.relative_to(root)}:{lineno}: {offender!r}")
+    return offenders
 
 
 def test_litellm_model_strings_only_in_provider_config() -> None:
-    offenders: list[str] = []
-    for path in _scan_files():
-        if path.suffix == ".py":
-            found = _python_offender(path)
-        elif path.suffix in (".yaml", ".yml"):
-            found = _yaml_offender(path)
-        else:
-            found = _regex_offender(path)
-        if found is not None:
-            lineno, offender = found
-            offenders.append(f"{path.relative_to(ROOT)}:{lineno}: {offender!r}")
-
+    offenders = check_litellm_model_strings(ROOT, SCAN_ROOTS, ALLOWED_FILES)
     assert offenders == [], "LiteLLM-format model strings found outside provider config: " + ", ".join(
         offenders
     )
+
+
+def test_python_fstring_of_known_constant_is_detected(tmp_path: Path) -> None:
+    (tmp_path / "providers.py").write_text('PROVIDER = "openai"\n', encoding="utf-8")
+    (tmp_path / "config.py").write_text(
+        'from providers import PROVIDER\nMODEL = f"{PROVIDER}/gpt-4.1"\n', encoding="utf-8"
+    )
+    (tmp_path / "dynamic.py").write_text(
+        'def model(name: str) -> str:\n    return f"openai/{name}"\n', encoding="utf-8"
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["config.py:2: 'openai/gpt-4.1'"], offenders
+
+
+def test_js_template_literal_of_known_constant_is_detected(tmp_path: Path) -> None:
+    (tmp_path / "providers.ts").write_text('export const provider = "open" + "ai";\n', encoding="utf-8")
+    (tmp_path / "config.ts").write_text(
+        'import { provider } from "./providers";\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "dynamic.ts").write_text(
+        "export const model = (name: string) => `openai/${name}`;\n", encoding="utf-8"
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["config.ts:2: 'openai/gpt-4.1'"], offenders

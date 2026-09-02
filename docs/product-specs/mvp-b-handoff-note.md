@@ -55,8 +55,13 @@ Follow the step-by-step in `docs/product-specs/add-product-recipe.md`.
   provider SDK import from a Chrome Extension or web package
   (`test_no_direct_provider_js_sdk_imports`) or a raw HTTP call to a provider API host
   (`test_no_direct_provider_api_host_references`), and `test_no_prompts_inside_extensions.py` now
-  also fails on a real `{ role: "system", ... }` message shape, not just the literal
-  `prompt_ref`/`provider_policy_ref`/`system prompt` tokens.
+  also fails on a real `{ role: "system", ... }` message shape or an `instructions` /
+  `systemInstruction` / `system` payload, not just the literal
+  `prompt_ref`/`provider_policy_ref`/`system prompt` tokens. All of these resolve string values
+  through one shared static resolver (`tests/architecture/static_string_resolution.py`), so a
+  constant defined in another module, a `+` concatenation, an f-string, or a `${NAME}` template
+  literal is checked as the string it builds — splitting a forbidden value across constants or
+  files does not get past a gate.
   `test_no_product_specific_endpoints.py` checks against a static list of known product names —
   add your new product's name to it when you register the bundle (recipe step 6), don't rely on it
   catching an unlisted product automatically.
