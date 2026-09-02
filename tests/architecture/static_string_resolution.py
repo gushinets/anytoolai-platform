@@ -34,6 +34,7 @@ reachable, not just one — a gate flags a use if *any* reachable value violates
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import os
 import re
@@ -317,7 +318,60 @@ def python_string_values(modules: PythonModules, path: Path) -> list[tuple[int, 
 
 JS_QUOTE_CHARS = ("'", '"', "`")  # backtick included: JS/TS template literals
 
-_JS_SCOPE_RESOLVER_SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "agent" / "js_scope_resolver.mjs"
+_JS_SCOPE_RESOLVER_DIR = Path(__file__).resolve().parents[2] / "scripts" / "agent"
+_JS_SCOPE_RESOLVER_SCRIPT = _JS_SCOPE_RESOLVER_DIR / "js_scope_resolver.mjs"
+_js_scope_resolver_ready = False
+
+
+def _js_scope_resolver_fingerprint() -> str:
+    package_json = _JS_SCOPE_RESOLVER_DIR / "package.json"
+    return hashlib.sha256(package_json.read_bytes()).hexdigest()
+
+
+def _js_scope_resolver_marker() -> Path:
+    return _JS_SCOPE_RESOLVER_DIR / "node_modules" / ".quick-check-fingerprint"
+
+
+def _ensure_js_scope_resolver_dependencies() -> None:
+    """`js_scope_resolver.mjs` needs the `typescript` package (round 45) — installed via its own,
+    standalone `scripts/agent/package.json`, deliberately separate from the frontend workspace's
+    own pnpm-managed `node_modules`: quick-check's baseline CI job (the required check on every
+    PR) never runs `pnpm install`, so the repo root's `node_modules/typescript` isn't guaranteed
+    to exist there, and broadening that job to provision the whole frontend workspace just for
+    this would cut against quick-check's own "no frontend checks" design. A plain, scoped `npm
+    install` — self-installed here, on first use, and cached on disk exactly the way
+    `.quick-check-venv` self-manages the Python side (see `quick_check.py`'s own
+    `dependency_fingerprint()`) — keeps this check self-contained with no CI workflow change: the
+    GitHub-hosted runner images this repo's CI uses already ship Node.js and npm with no setup
+    step (confirmed by the very failure this fixes — the error was `typescript` not being
+    found, not `node`/`npm` being absent)."""
+    global _js_scope_resolver_ready
+    if _js_scope_resolver_ready:
+        return
+    marker = _js_scope_resolver_marker()
+    fingerprint = _js_scope_resolver_fingerprint()
+    if not marker.exists() or marker.read_text(encoding="utf-8").strip() != fingerprint:
+        try:
+            result = subprocess.run(
+                ["npm", "install", "--no-audit", "--no-fund"],
+                cwd=_JS_SCOPE_RESOLVER_DIR,
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+        except FileNotFoundError as exc:
+            raise AssertionError(
+                "npm is required to run the JS/TS architecture gates (it installs "
+                f"{_JS_SCOPE_RESOLVER_DIR}'s own `typescript` dependency) but wasn't found on "
+                "PATH. Install Node.js (npm ships with it)."
+            ) from exc
+        if result.returncode != 0:
+            raise AssertionError(
+                f"npm install for {_JS_SCOPE_RESOLVER_DIR} failed (exit {result.returncode}):\n"
+                f"{result.stderr}"
+            )
+        marker.write_text(fingerprint, encoding="utf-8")
+    _js_scope_resolver_ready = True
 
 
 def js_string_literals(text: str) -> dict[int, tuple[int, str]]:
@@ -379,21 +433,28 @@ class JsModules:
 
 def js_modules(paths: Iterable[Path]) -> JsModules:
     """Parse every JS/TS file in `paths` with the real TypeScript compiler, in one batched call to
-    `scripts/agent/js_scope_resolver.mjs` (`typescript` is already a repo devDependency — no new
-    dependency here), and index each file's statically-resolvable string expressions. See
-    `JsModules` for the result shape, and the script's own module docstring for the resolution
-    model (real lexical scope/shadowing/write-order, no character-level heuristics)."""
+    `scripts/agent/js_scope_resolver.mjs` (self-installs its own `typescript` dependency on first
+    use — see `_ensure_js_scope_resolver_dependencies`), and index each file's
+    statically-resolvable string expressions. See `JsModules` for the result shape, and the
+    script's own module docstring for the resolution model (real lexical scope/shadowing/write-
+    order, no character-level heuristics)."""
     paths = list(paths)
     modules = JsModules(texts={})
     if not paths:
         return modules
-    result = subprocess.run(
-        ["node", str(_JS_SCOPE_RESOLVER_SCRIPT)],
-        input=json.dumps([str(path) for path in paths]),
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
+    _ensure_js_scope_resolver_dependencies()
+    try:
+        result = subprocess.run(
+            ["node", str(_JS_SCOPE_RESOLVER_SCRIPT)],
+            input=json.dumps([str(path) for path in paths]),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except FileNotFoundError as exc:
+        raise AssertionError(
+            "node is required to run the JS/TS architecture gates but wasn't found on PATH."
+        ) from exc
     if result.returncode != 0:
         raise AssertionError(
             f"js_scope_resolver.mjs failed (exit {result.returncode}):\n{result.stderr}"

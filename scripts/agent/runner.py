@@ -58,8 +58,11 @@ POSTGRESQL_PYTEST_TARGETS = [
     "apps/platform-worker/tests",
 ]
 REQUIRED_MODULES = ["pytest", "yaml", "pydantic"]
-REQUIRED_TOOLS = ["uv"]
-OPTIONAL_TOOLS = ["node", "pnpm", "docker"]
+# `node`/`npm`: required, not optional, since round 45 — tests/architecture (part of every
+# quick-check run) shells out to scripts/agent/js_scope_resolver.mjs for real JS/TS parsing, and
+# self-installs that script's own `typescript` dependency via `npm install` on first use.
+REQUIRED_TOOLS = ["uv", "node", "npm"]
+OPTIONAL_TOOLS = ["pnpm", "docker"]
 ACTION_REGISTRY_ROWS = [
     ("A01 `extract_structured`", "`text.extract_structured_fields`"),
     ("A04 `detect_issues`", "`text.detect_issues_by_taxonomy`"),
