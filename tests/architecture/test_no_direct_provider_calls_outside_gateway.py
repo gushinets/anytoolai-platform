@@ -286,13 +286,20 @@ def _host_in(value: str) -> str | None:
 
 def check_provider_api_host_references(root: Path, allowed_python_roots: tuple[Path, ...]) -> list[str]:
     offenders: list[str] = []
-    python_paths = [
+    # The resolver graph is built from *all* Python source, allowed roots included — a disallowed
+    # caller importing a host fragment defined inside an allowed gateway/adapter module
+    # (`from ...gateway.constants import API_PREFIX`) must still resolve that constant. Only the
+    # allowed roots' own files are excluded from *reporting* below, not from what the resolver can
+    # see; excluding them from the resolver's input would make an import from an allowed module
+    # unresolvable everywhere, silently reopening exactly the bypass this check exists to close.
+    all_python_paths = iter_source_files(root, {".py"}, {"tests"})
+    py = python_modules(root, parse_python_files(all_python_paths))
+    reportable_python_paths = [
         path
-        for path in iter_source_files(root, {".py"}, {"tests"})
+        for path in all_python_paths
         if not any(path.is_relative_to(allowed) for allowed in allowed_python_roots)
     ]
-    py = python_modules(root, parse_python_files(python_paths))
-    for path in python_paths:
+    for path in reportable_python_paths:
         host = _host_in(path.read_text(encoding="utf-8", errors="ignore"))
         if host is None:
             resolved = next(
@@ -361,3 +368,19 @@ def test_concatenated_provider_host_is_detected_in_python(tmp_path: Path) -> Non
     assert len(offenders) == 2, offenders
     assert any("client.py" in o and "api.openai.com" in o for o in offenders)
     assert any("fstring.py" in o and "api.mistral.ai" in o for o in offenders)
+
+
+def test_host_fragment_imported_from_allowed_root_is_still_resolved(tmp_path: Path) -> None:
+    allowed = tmp_path / "gateway"
+    allowed.mkdir()
+    (allowed / "constants.py").write_text('API_PREFIX = "https://api."\n', encoding="utf-8")
+    (tmp_path / "consumer.py").write_text(
+        "from gateway.constants import API_PREFIX\nURL = API_PREFIX + \"openai.com/v1/responses\"\n",
+        encoding="utf-8",
+    )
+    offenders = check_provider_api_host_references(tmp_path, (allowed,))
+    assert len(offenders) == 1, offenders
+    assert "consumer.py" in offenders[0] and "api.openai.com" in offenders[0]
+    # The allowed module itself never gets reported, even though it's now part of the resolver
+    # graph — only the disallowed consumer that completed the host is.
+    assert not any("constants.py" in o for o in offenders)

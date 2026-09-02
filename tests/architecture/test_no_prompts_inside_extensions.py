@@ -44,6 +44,23 @@ INSTRUCTION_KEYS = {
 _JS_REQUEST_KEY_RE = re.compile(
     r"""(?<![\w$.?])["']?(role|instructions|systemInstruction|system_instruction|system|systemPrompt|system_prompt)["']?\s*:(?!:)"""
 )
+# ES2015 shorthand property (`{ role, content }`, `{ instructions }`) builds the exact same
+# request object as `{ role: role, ... }` but has no `:` at all — invisible to
+# `_JS_REQUEST_KEY_RE` above, which requires one. Matches a tracked key immediately preceded by
+# `{`/`,` and immediately followed by `,`/`}` (only whitespace allowed on either side, so a
+# colon-form property's *value* position, e.g. `x: role`, never matches — the char right before
+# "role" there is `:`, not `{`/`,`). Reported key is looked up directly in the file's own
+# resolved constants (key and value share one name in shorthand form, so there is no separate
+# value expression to resolve).
+#
+# ponytail: a regex, not a real parser, so it can also match a same-named element inside a plain
+# array literal (`[x, role]`) if `role` happens to be a locally-declared constant too — a false
+# positive (one extra line to look at), not a false negative, which is the direction this file's
+# own conservative design already favors throughout. Upgrade path: a real JS/TS parser, same
+# ceiling already documented for the rest of this repo's JS/TS scanning.
+_JS_SHORTHAND_KEY_RE = re.compile(
+    r"""[{,]\s*(role|instructions|systemInstruction|system_instruction|system|systemPrompt|system_prompt)\s*(?=[,}])"""
+)
 
 
 def _json_prompt_shape(value: object) -> str | None:
@@ -93,17 +110,30 @@ def check_prompts_inside_extensions(extensions_root: Path) -> list[str]:
                 offenders.append(f"{path.relative_to(extensions_root)} contains a prompt-bearing field: {shape}")
         elif path.suffix in JS_TS_EXTS:
             stripped = js.texts[path]
+            found: tuple[int, str, str] | None = None
             for key_match in _JS_REQUEST_KEY_RE.finditer(stripped):
                 key = key_match.group(1)
                 value, _ = js_string_expr_at(js, path, key_match.end())
-                if value is None:
-                    continue
-                if (key == ROLE_KEY and value.lower() == "system") or (key != ROLE_KEY and value.strip()):
-                    offenders.append(
-                        f"{path.relative_to(extensions_root)}:{line_number_at(stripped, key_match.start())} "
-                        f"contains a prompt-bearing field: {key}: {value!r}"
-                    )
+                if value is not None and (
+                    (key == ROLE_KEY and value.lower() == "system") or (key != ROLE_KEY and value.strip())
+                ):
+                    found = (key_match.start(), key, value)
                     break
+            if found is None:
+                for shorthand_match in _JS_SHORTHAND_KEY_RE.finditer(stripped):
+                    key = shorthand_match.group(1)
+                    value = js.constants[path].get(key)
+                    if value is not None and (
+                        (key == ROLE_KEY and value.lower() == "system") or (key != ROLE_KEY and value.strip())
+                    ):
+                        found = (shorthand_match.start(1), key, value)
+                        break
+            if found is not None:
+                position, key, value = found
+                offenders.append(
+                    f"{path.relative_to(extensions_root)}:{line_number_at(stripped, position)} "
+                    f"contains a prompt-bearing field: {key}: {value!r}"
+                )
     return offenders
 
 
@@ -138,6 +168,24 @@ def test_instruction_fields_are_detected(tmp_path: Path) -> None:
     )
     offenders = check_prompts_inside_extensions(tmp_path)
     assert len(offenders) == 3, offenders
+
+
+def test_shorthand_role_and_instructions_are_detected(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n'
+        'const content = "Draft a proposal from this brief";\n'
+        "const messages = [{ role, content }];\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "request.ts").write_text(
+        'const instructions = "Write a concise proposal.";\n'
+        "const body = { instructions };\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 2, offenders
+    assert any("chat.ts:3" in o and "role: 'system'" in o for o in offenders)
+    assert any("request.ts:2" in o and "instructions:" in o for o in offenders)
 
 
 def test_typed_request_shapes_are_not_false_positives(tmp_path: Path) -> None:

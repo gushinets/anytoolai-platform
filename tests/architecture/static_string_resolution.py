@@ -143,6 +143,16 @@ def resolve_import_module(modules: PythonModules, importing_path: Path, node: as
     return modules.module_paths.get(dotted) if dotted else None
 
 
+def module_level_imports(tree: ast.Module) -> list[ast.Import | ast.ImportFrom]:
+    """Only import statements declared at module top level (`tree.body`), not nested inside a
+    function/class. A function-local `from .safe_paths import PATH` only rebinds `PATH` inside
+    that function — it can't and doesn't change the real module-level `PATH` a decorator
+    elsewhere in the file actually sees at runtime, so it must not be treated as if it does. Same
+    module-scope restriction plain assignments already get in `_add_module_level_constants`,
+    applied here to imports."""
+    return [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
+
+
 def module_import_aliases(modules: PythonModules, path: Path) -> dict[str, Path]:
     """Local names bound to *a module itself*: `import a.b as m` -> `{"m": <a/b.py>}`, and
     `from <container> import name` (bare-relative, qualified-relative, or absolute) whenever a
@@ -154,7 +164,7 @@ def module_import_aliases(modules: PythonModules, path: Path) -> dict[str, Path]
     resolution, not used anywhere in this repo today).
     """
     aliases: dict[str, Path] = {}
-    for node in ast.walk(modules.trees[path]):
+    for node in module_level_imports(modules.trees[path]):
         if isinstance(node, ast.Import):
             for alias in node.names:
                 target = modules.module_paths.get(alias.name) if alias.asname else None
@@ -252,7 +262,7 @@ def python_modules(root: Path, trees: dict[Path, ast.Module]) -> PythonModules:
         previous = {path: dict(values) for path, values in modules.constants.items()}
         for path, tree in trees.items():
             imported: dict[str, str] = {}
-            for node in ast.walk(tree):
+            for node in module_level_imports(tree):
                 if not isinstance(node, ast.ImportFrom):
                     continue
                 source = resolve_import_module(modules, path, node)

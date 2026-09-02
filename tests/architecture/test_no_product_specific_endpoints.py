@@ -436,6 +436,28 @@ def test_route_path_constant_via_module_alias_is_detected(tmp_path: Path) -> Non
     assert len(offenders) == 2, offenders
 
 
+def test_function_local_import_does_not_shadow_module_level_constant(tmp_path: Path) -> None:
+    package = _write_package(
+        tmp_path,
+        {
+            "paths.py": 'PATH = "/proposal_ai/status"\n',
+            "safe_paths.py": 'PATH = "/safe"\n',
+            "routes.py": (
+                "from fastapi import APIRouter\n"
+                "from pkg.paths import PATH\n\n"
+                "def helper():\n"
+                "    from pkg.safe_paths import PATH\n"
+                "    return PATH\n\n"
+                "router = APIRouter()\n\n"
+                "@router.get(PATH)\n"
+                "def status(): ...\n"
+            ),
+        },
+    )
+    offenders = check_product_specific_endpoint_paths(tmp_path, package)
+    assert len(offenders) == 1 and "'/proposal_ai/status'" in offenders[0]
+
+
 def test_dynamic_route_path_is_not_a_false_positive(tmp_path: Path) -> None:
     package = _write_package(
         tmp_path,
