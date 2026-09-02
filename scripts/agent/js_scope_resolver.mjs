@@ -122,10 +122,14 @@ class FileAnalysis {
     this.inProgress = new Set();
     this.values = new Map(); // offset -> string[]
     this.roots = []; // [offset, value][]
-    // name -> `{kind: "local", decl}` (a module-level `export const/let/var NAME = ...`) or
-    // `{kind: "reexport", path, name}` (an `export { a as NAME } from "./x"`, or a bare
-    // `export { NAME };` re-exporting this same file's own `NAME`) — see `resolveExport`.
+    // name -> `{kind: "local", decl}` (a module-level `export const/let/var NAME = ...`, or a bare
+    // `export { NAME };` resolved directly to its own local declaration) or `{kind: "reexport",
+    // path, name}` (an `export { a as NAME } from "./x"`) — see `resolveExport`.
     this.exportedNames = new Map();
+    // Every `export * from "./x"` target this file has, as resolved absolute paths — a fallback
+    // `resolveExport` only tries after a direct name lookup misses, since a star export re-exports
+    // whatever its target itself exports, not a specific known set of names (round 47).
+    this.starExports = [];
   }
 
   scopeDecls(scope) {
@@ -137,14 +141,27 @@ class FileAnalysis {
     return m;
   }
 
-  addDecl(name, scope, mutable, initExpr, pos, exported) {
-    const decl = { name, scope, mutable, writes: [{ pos, expr: initExpr, own: true }] };
+  /** Get-or-create the (name, scope) binding. A redeclaration at the same (name, scope) — legal
+   * JS only for `var` (`var provider = "openai"; if (x) { var provider = "internal"; }` is one
+   * runtime binding, not two) — reuses the same binding object rather than creating a second one,
+   * so every write across every redeclaration lands on a single continuous timeline that
+   * `resolveDecl` sees in full. Also used to register a binding with no writes at all yet
+   * (`let provider;`), so a later plain assignment has a declaration to attach its write to
+   * (round 47: previously an uninitialized declaration was never registered, so the first real
+   * assignment had nothing to find and was silently dropped, and each `var` redeclaration got its
+   * own separate `writes` array, so `resolveDecl`'s "last recorded wins" picked only the LAST
+   * declaration and discarded every earlier one's write history). */
+  binding(name, scope, mutable, exported) {
     let byName = this.scopeDecls(scope).get(name);
     if (!byName) {
       byName = [];
       this.scopeDecls(scope).set(name, byName);
     }
-    byName.push(decl);
+    let decl = byName[byName.length - 1];
+    if (!decl) {
+      decl = { name, scope, mutable, writes: [] };
+      byName.push(decl);
+    }
     if (exported && scope.kind === ts.SyntaxKind.SourceFile) {
       this.exportedNames.set(name, { kind: "local", decl });
     }
@@ -228,7 +245,18 @@ function resolveExport(analysis, name, seen = new Set()) {
     return sourceAnalysis ? resolveExport(sourceAnalysis, entry.name, seen) : null;
   }
   const localDecls = analysis.declsByScope.get(analysis.sourceFile)?.get(name);
-  return localDecls?.length ? { analysis, decl: localDecls[localDecls.length - 1] } : null;
+  if (localDecls?.length) return { analysis, decl: localDecls[localDecls.length - 1] };
+  // `export * from "./x"` re-exports whatever `./x` itself exports, under the same name — tried
+  // only after every direct name lookup above has missed, and only recursively through the same
+  // `seen` guard already threading through this whole call, so a star-export cycle (`a.ts` and
+  // `b.ts` each doing `export * from` the other) can't loop forever either (round 47).
+  for (const starPath of analysis.starExports) {
+    const starAnalysis = analyses.get(starPath);
+    if (!starAnalysis) continue;
+    const result = resolveExport(starAnalysis, name, seen);
+    if (result) return result;
+  }
+  return null;
 }
 
 // Guards `resolveRedirectValue`'s own recursion against a genuine circular *value* dependency
@@ -438,9 +466,17 @@ function collectDeclarations(analysis) {
     const mutable = (declList.flags & ts.NodeFlags.Const) === 0;
     const scope = isVar ? nearestFunctionScope(containerNode) || sf : lexicalScope;
     for (const decl of declList.declarations) {
-      if (ts.isIdentifier(decl.name) && decl.initializer) {
-        const d = analysis.addDecl(decl.name.text, scope, mutable, decl.initializer, decl.name.getStart(sf), isExported);
-        d.writes[0].node = decl;
+      if (!ts.isIdentifier(decl.name)) continue;
+      const b = analysis.binding(decl.name.text, scope, mutable, isExported);
+      if (decl.initializer) {
+        // `own: false` (not unconditionally `true`) so this write's determinism is computed for
+        // real by `isDeterministicWrite`, exactly like an ordinary reassignment below — the same
+        // result as before for `let`/`const` (whose own lexical scope trivially *is* wherever
+        // they're declared, so the walk up always reaches `scope` immediately with nothing
+        // conditional crossed) but no longer wrong for `var`, whose `scope` can be an outer
+        // function/module scope while this particular declaration sits inside a conditional block
+        // (round 47).
+        b.writes.push({ pos: decl.name.getStart(sf), expr: decl.initializer, node: decl, own: false });
       }
     }
   }
@@ -464,8 +500,13 @@ function collectDeclarations(analysis) {
       const scope = paramOwnScope(node);
       for (const param of node.parameters) {
         if (ts.isIdentifier(param.name) && param.initializer) {
-          const d = analysis.addDecl(param.name.text, scope, true, param.initializer, param.name.getStart(sf), false);
-          d.writes[0].node = param;
+          // Unlike a declaration's own initializer above, a parameter default's write stays
+          // unconditionally `own: true` — it isn't reached through ordinary statement control
+          // flow at all (whether it applies depends on whether the caller omitted the argument,
+          // not on any AST ancestry `isDeterministicWrite` could see), and there's exactly one
+          // such write per parameter to reason about.
+          const b = analysis.binding(param.name.text, scope, true, false);
+          b.writes.push({ pos: param.name.getStart(sf), expr: param.initializer, node: param, own: true });
         }
       }
     } else if (
@@ -492,13 +533,15 @@ function collectDeclarations(analysis) {
 /** Registers every named import as a module-level binding whose sole "write" is a *lazy*
  * `redirect` (resolved on demand by `resolveRedirectValue`, not eagerly here — round 46: eager
  * resolution needed every file's own imports installed first to see through a multi-hop chain,
- * making the result depend on which order files happened to be traversed in), and every
- * `export { a as b } from "./x"` / bare `export { name };` as a `reexport` entry in
- * `exportedNames` (structural only — which declaration a re-export ultimately names doesn't
- * depend on any value being folded yet, so, unlike the import bindings above, there's nothing
- * here to defer). Both kinds of registration are pure bookkeeping — the imported/re-exported
- * *value* isn't computed until something actually asks for it (see `main`'s own resolution pass),
- * so this function's own run order across files, like `collectDeclarations`'s, doesn't matter. */
+ * making the result depend on which order files happened to be traversed in); every
+ * `export { a as b } from "./x"` as a `reexport` entry in `exportedNames`; a bare `export { name };`
+ * (no `from`) as a direct `local` entry, resolved immediately against this same file's own already-
+ * collected declarations rather than deferred (round 47: deferring it as a self-pointing `reexport`
+ * made `resolveExport` walk straight into its own cycle guard); and every `export * from "./x"` as
+ * an entry in `starExports`, a fallback `resolveExport` only consults after a direct name lookup
+ * misses (round 47). All of this is pure bookkeeping — the imported/re-exported *value* isn't
+ * computed until something actually asks for it (see `main`'s own resolution pass), so this
+ * function's own run order across files, like `collectDeclarations`'s, doesn't matter. */
 function resolveImports(analysis) {
   const sf = analysis.sourceFile;
   ts.forEachChild(sf, function visit(node) {
@@ -514,12 +557,30 @@ function resolveImports(analysis) {
       }
     } else if (ts.isExportDeclaration(node) && node.exportClause && ts.isNamedExports(node.exportClause)) {
       const specifier = node.moduleSpecifier ? node.moduleSpecifier.text : null;
-      const sourcePath = specifier ? resolveModuleSpecifier(analysis.path, specifier) : analysis.path;
       for (const spec of node.exportClause.elements) {
         const sourceName = (spec.propertyName || spec.name).text;
         const localExportedName = spec.name.text;
+        if (!specifier) {
+          // A bare `export { name };` (no `from`) re-exports THIS file's own binding directly.
+          // Recording it as a `reexport` pointing at this same file would make `resolveExport`
+          // walk straight back into its own cycle guard (`<this file>::name` is already in `seen`
+          // from the very call that's looking it up) and give up before ever reaching the local-
+          // declaration fallback — resolving to unresolvable for an ordinary, fully static
+          // same-file re-export (round 47). `collectDeclarations` has already run for every file
+          // by the time any file's `resolveImports` runs, so the local declaration is already
+          // there to resolve directly instead of deferring.
+          const localDecls = analysis.declsByScope.get(sf)?.get(sourceName);
+          if (localDecls?.length) {
+            analysis.exportedNames.set(localExportedName, { kind: "local", decl: localDecls[localDecls.length - 1] });
+            continue;
+          }
+        }
+        const sourcePath = specifier ? resolveModuleSpecifier(analysis.path, specifier) : analysis.path;
         analysis.exportedNames.set(localExportedName, { kind: "reexport", path: sourcePath, name: sourceName });
       }
+    } else if (ts.isExportDeclaration(node) && !node.exportClause && node.moduleSpecifier) {
+      const sourcePath = resolveModuleSpecifier(analysis.path, node.moduleSpecifier.text);
+      if (sourcePath) analysis.starExports.push(sourcePath);
     }
     ts.forEachChild(node, visit);
   });

@@ -263,6 +263,33 @@ def test_var_role_declared_inside_if_block_is_visible_at_function_scope(tmp_path
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_uninitialized_role_with_later_assignment_is_detected(tmp_path: Path) -> None:
+    # `let role;` alone used to register no binding at all, so the later plain assignment had no
+    # declaration to attach its write to and was silently dropped (round 47).
+    (tmp_path / "chat.ts").write_text(
+        'let role;\nrole = "system";\n\nconst messages = [{ role }];\n', encoding="utf-8"
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_conditional_var_role_redeclaration_preserves_earlier_reachable_value(tmp_path: Path) -> None:
+    # A `var` redeclared inside a conditional branch is one runtime binding, not two — when the
+    # branch doesn't run, the earlier ("system") value is still reachable (round 47).
+    (tmp_path / "chat.ts").write_text(
+        "function buildMessage(useFallback) {\n"
+        '  var role = "system";\n\n'
+        "  if (useFallback) {\n"
+        '    var role = "user";\n'
+        "  }\n\n"
+        "  return { role };\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
     # `role` is deterministically "system" at the use site (round 37): a static reassignment
     # must resolve to the value actually in effect, not to "unresolved" just because a write

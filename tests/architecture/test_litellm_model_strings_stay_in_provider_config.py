@@ -496,6 +496,68 @@ def test_multi_hop_import_chain_resolves_regardless_of_file_traversal_order(tmp_
     assert offenders == ["a-config.ts:2: 'openai/gpt-4.1'"], offenders
 
 
+def test_uninitialized_declaration_with_later_assignment_is_detected(tmp_path: Path) -> None:
+    # `let provider;` alone used to register no binding at all, so the later plain assignment had
+    # no declaration to attach its write to and was silently dropped (round 47).
+    (tmp_path / "model.ts").write_text(
+        'let provider;\nprovider = "openai";\n\nconst model = `${provider}/gpt-4.1`;\n',
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:4: 'openai/gpt-4.1'"], offenders
+
+
+def test_conditional_var_redeclaration_preserves_earlier_reachable_value(tmp_path: Path) -> None:
+    # A `var` redeclared inside a conditional branch is one runtime binding, not two — when the
+    # branch doesn't run, the earlier value ("openai") is still reachable. The resolver used to
+    # give each redeclaration its own separate declaration object, so the later one (wrongly
+    # treated as unconditionally deterministic merely for introducing "a" binding) hid the earlier
+    # one entirely — the gate reported only "internal/gpt-4.1" and missed "openai/gpt-4.1" being
+    # reachable at all (round 47). The gate reports the lowest-positioned reachable value per
+    # file, and both candidate values share one position (the template), so the earlier-written
+    # ("openai") one — now visible again — is what's reported.
+    (tmp_path / "model.ts").write_text(
+        "function pick(useFallback) {\n"
+        '  var provider = "openai";\n\n'
+        "  if (useFallback) {\n"
+        '    var provider = "internal";\n'
+        "  }\n\n"
+        "  return `${provider}/gpt-4.1`;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:8: 'openai/gpt-4.1'"], offenders
+
+
+def test_bare_local_reexport_resolves_without_self_cycle(tmp_path: Path) -> None:
+    # A bare `export { name };` (no `from`) re-exporting this same file's own ordinary (no
+    # `export` keyword) local declaration used to be recorded as a self-pointing re-export, so
+    # `resolveExport` walked straight back into its own cycle guard and gave up (round 47).
+    (tmp_path / "z-provider.ts").write_text(
+        'const provider = "openai";\nexport { provider };\n', encoding="utf-8"
+    )
+    (tmp_path / "a-config.ts").write_text(
+        'import { provider } from "./z-provider";\nconst model = `${provider}/gpt-4.1`;\n',
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["a-config.ts:2: 'openai/gpt-4.1'"], offenders
+
+
+def test_star_reexport_resolves_through_the_module_graph(tmp_path: Path) -> None:
+    # `export * from "./x"` was never even read into the export map, so an import going through
+    # one couldn't resolve under any file order (round 47).
+    (tmp_path / "z-provider.ts").write_text('export const provider = "openai";\n', encoding="utf-8")
+    (tmp_path / "index.ts").write_text('export * from "./z-provider";\n', encoding="utf-8")
+    (tmp_path / "a-config.ts").write_text(
+        'import { provider } from "./index";\nconst model = `${provider}/gpt-4.1`;\n',
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["a-config.ts:2: 'openai/gpt-4.1'"], offenders
+
+
 def test_barrel_reexport_resolves_the_real_source_declaration(tmp_path: Path) -> None:
     (tmp_path / "z-provider.ts").write_text('export const provider = "openai";\n', encoding="utf-8")
     (tmp_path / "barrel.ts").write_text(
