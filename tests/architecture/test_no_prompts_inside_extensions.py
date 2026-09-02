@@ -355,6 +355,24 @@ def test_body_var_redeclaring_a_role_parameter_starts_from_the_parameters_value(
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_assignment_before_a_local_var_role_declaration_resolves_to_the_hoisted_binding(
+    tmp_path: Path,
+) -> None:
+    # A `var`'s binding is hoisted to function entry regardless of where its declaration
+    # textually sits — an assignment appearing before the `var` statement still targets that same
+    # hoisted binding (round 53).
+    (tmp_path / "chat.ts").write_text(
+        "function buildMessage() {\n"
+        '  role = "system";\n'
+        "  var role;\n\n"
+        "  return [{ role }];\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
     # `role` is deterministically "system" at the use site (round 37): a static reassignment
     # must resolve to the value actually in effect, not to "unresolved" just because a write

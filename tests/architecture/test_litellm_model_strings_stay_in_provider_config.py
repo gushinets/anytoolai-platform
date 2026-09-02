@@ -694,3 +694,45 @@ def test_body_var_redeclaring_a_parameter_with_its_own_initializer_still_starts_
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == ["model.ts:2: 'openai/gpt-4.1'"], offenders
+
+
+def test_assignment_before_a_local_var_declaration_resolves_to_the_hoisted_binding(tmp_path: Path) -> None:
+    # A `var`'s binding is hoisted to function entry regardless of where its declaration
+    # textually sits — an assignment appearing before the `var` statement still targets that same
+    # hoisted binding, not some unrelated outer scope's same-named binding (round 53: a single
+    # source-order traversal made binding *existence* depend on how far traversal had gotten, so
+    # this assignment found no binding registered yet and was silently dropped).
+    (tmp_path / "model.ts").write_text(
+        "function chooseModel() {\n"
+        '  provider = "openai";\n'
+        "  var provider;\n\n"
+        "  return `${provider}/gpt-4.1`;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:5: 'openai/gpt-4.1'"], offenders
+
+
+def test_parameter_reassigned_before_a_same_named_var_still_resolves_the_parameters_original_value(
+    tmp_path: Path,
+) -> None:
+    # The hoisted `var provider;` binding already exists at function entry — a reassignment that
+    # textually precedes its declaration statement still targets *that* hoisted binding, not the
+    # parameter's own. An earlier reference (the `model` template) therefore still sees the
+    # parameter's own function-entry value, unaffected by a reassignment that happens later at
+    # runtime (round 53: this reassignment was, at the time of traversal, wrongly attached to the
+    # *parameter's* own binding instead — because the `var`'s binding didn't exist yet — which then
+    # leaked into the round-52 function-entry seed via `copyDeclValue`, since that seed replays the
+    # parameter's own timeline in full).
+    (tmp_path / "model.ts").write_text(
+        'function chooseModel(provider = "openai") {\n'
+        "  const model = `${provider}/gpt-4.1`;\n\n"
+        '  provider = "internal";\n'
+        "  var provider;\n\n"
+        "  return model;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:2: 'openai/gpt-4.1'"], offenders

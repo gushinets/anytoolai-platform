@@ -501,7 +501,16 @@ function collectDeclarations(analysis) {
   // Block-crossing check then correctly still treats the write itself as conditional, since the
   // `if` block isn't the binding's own scope — a `var` assigned inside a branch that might not
   // run is exactly as uncertain as a `let` would be there).
-  function collectDeclarationList(declList, containerNode, lexicalScope, isExported) {
+  //
+  // Binding *existence* is collected in a first pass, over the whole file, before any write is
+  // attached to anything — real JS hoists a `var`'s binding (and a function's parameters) to
+  // function entry regardless of where its declaration textually sits, so an assignment appearing
+  // *before* a `var` statement must still resolve to that same hoisted binding. A single
+  // source-order traversal doing both at once got this wrong: an assignment visited before the
+  // `var` statement it actually targets found no binding registered yet for that name at that
+  // scope, and either fell through to some unrelated outer scope's same-named binding or was
+  // dropped outright (round 53).
+  function declareList(declList, containerNode, lexicalScope, isExported) {
     const isVar = (declList.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) === 0;
     const mutable = (declList.flags & ts.NodeFlags.Const) === 0;
     const scope = isVar ? nearestFunctionScope(containerNode) || sf : lexicalScope;
@@ -515,13 +524,27 @@ function collectDeclarations(analysis) {
         // *current* value as its initial value at function entry — real JS
         // (`FunctionDeclarationInstantiation`) copies the parameter binding's value into the newly
         // created `var` binding when the two share a name, even with parameter-default expressions
-        // present, before any of the `var`'s own body-level writes run. Without this, splitting the
-        // parameter scope from the body scope (round 51) makes a same-named body `var` an entirely
-        // independent, initially-empty binding — hiding the parameter's real value from anything
-        // reading it before the `var`'s own first write (round 52). `pos: 0` sorts first among this
-        // binding's writes regardless of where the `var` itself sits in the body, matching real
-        // JS's function-entry timing; a genuine explicit initializer/write on the same `var`, added
-        // below or elsewhere, still correctly overrides or unions with it in source order.
+        // present, before any of the `var`'s own body-level writes run (round 52). Seeded HERE, in
+        // this first (binding-existence) pass — not in the second, write-attaching pass below —
+        // specifically because an assignment positioned *before* the `var` statement now correctly
+        // resolves to (and pushes its own write onto) this same binding, thanks to the hoisting fix
+        // above; if seeding waited for the write-attaching pass to actually reach this `var`
+        // statement, that earlier assignment's write would already be sitting in `b.writes` by
+        // then, making a `b.writes.length === 0` freshness check see "not empty" and skip seeding
+        // entirely (round 53 self-caught: this exact bug, in this exact fix, on the first attempt).
+        // Seeding here instead only requires the *parameter's own decl object* to already exist —
+        // not yet its own write, only attached in the second pass below — since `copyOf` stores a
+        // reference to resolve lazily, well after every pass has finished; the enclosing function's
+        // parameters are always registered before its own nested `var`s reach this point, since a
+        // pre-order walk visits the function node itself (and its parameters) before recursing into
+        // its body.
+        //
+        // `paramDecls` reflects only the parameter's *own* writes once fully attached (its default
+        // value, plus any reassignment that genuinely targets the parameter itself with no
+        // same-named `var` around) — with hoisting fixed, every body-level write to a name that
+        // also names a parameter resolves to *this* `var` binding, never falls through to the
+        // parameter's, so `copyDeclValue` never sees anything past the parameter's own
+        // function-entry value.
         const enclosingFn = scope.kind === ts.SyntaxKind.Block ? scope.parent : null;
         if (enclosingFn && isFunctionLike(enclosingFn)) {
           const paramDecls = analysis.declsByScope.get(enclosingFn)?.get(name);
@@ -530,6 +553,41 @@ function collectDeclarations(analysis) {
           }
         }
       }
+    }
+  }
+
+  function declare(node) {
+    if (ts.isVariableStatement(node)) {
+      const isExported = (ts.getCombinedModifierFlags(node) & ts.ModifierFlags.Export) !== 0;
+      declareList(node.declarationList, node, nearestScope(node) || sf, isExported);
+    } else if (isForHeaderNode(node) && node.initializer && ts.isVariableDeclarationList(node.initializer)) {
+      declareList(node.initializer, node, node, false);
+    } else if (
+      (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node)) &&
+      node.parameters
+    ) {
+      for (const param of node.parameters) {
+        if (ts.isIdentifier(param.name) && param.initializer) analysis.binding(param.name.text, node, true, false);
+      }
+    }
+    ts.forEachChild(node, declare);
+  }
+  declare(sf);
+
+  // Second pass, in source order as before: attach every initializer/default/assignment write to
+  // the binding it belongs to — every binding it could possibly name already exists from the pass
+  // above, so `resolveDecl` here always finds the real one instead of depending on how far
+  // traversal has gotten.
+  function collectDeclarationList(declList, containerNode, lexicalScope, isExported) {
+    const isVar = (declList.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) === 0;
+    const mutable = (declList.flags & ts.NodeFlags.Const) === 0;
+    const scope = isVar ? nearestFunctionScope(containerNode) || sf : lexicalScope;
+    for (const decl of declList.declarations) {
+      if (!ts.isIdentifier(decl.name)) continue;
+      const name = decl.name.text;
+      const b = analysis.binding(name, scope, mutable, isExported); // already registered above,
+      // including this var's own function-entry `copyOf` seed if it shares a name with an
+      // enclosing parameter — see `declareList`'s first pass, above.
       if (decl.initializer) {
         // `own: false` (not unconditionally `true`) so this write's determinism is computed for
         // real by `isDeterministicWrite`, exactly like an ordinary reassignment below — the same
@@ -570,7 +628,7 @@ function collectDeclarations(analysis) {
           // flow at all (whether it applies depends on whether the caller omitted the argument,
           // not on any AST ancestry `isDeterministicWrite` could see), and there's exactly one
           // such write per parameter to reason about.
-          const b = analysis.binding(param.name.text, scope, true, false);
+          const b = analysis.binding(param.name.text, scope, true, false); // already registered above
           b.writes.push({ pos: param.name.getStart(sf), expr: param.initializer, node: param, own: true });
         }
       }
