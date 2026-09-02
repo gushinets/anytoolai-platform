@@ -23,6 +23,7 @@ couldn't actually know.
 from __future__ import annotations
 
 import ast
+import itertools
 import os
 import re
 from dataclasses import dataclass, field
@@ -589,13 +590,19 @@ def js_string_literals(text: str) -> dict[int, tuple[int, str]]:
     return literals
 
 
-# One binding's write history, sorted by position: `(write_position, value_or_None)`. Every
-# `const`/`let`/`var` declaration and every parameter default starts a timeline with one entry;
-# a later bare reassignment reachable from that binding's scope appends another. Resolving a name
-# at a use site takes the *last* entry whose position is at or before the use site — the
-# statically-known value actually in effect there, not just "was this ever reassigned" (see
-# `resolve_js_identifier`).
-_JsTimeline = list[tuple[int, "str | None"]]
+# One binding's write history, sorted by position: `(write_position, write_block_path,
+# possible_values)`. Every `const`/`let`/`var` declaration, every parameter default, and every
+# import starts a timeline with one entry (`write_block_path` equal to the binding's own
+# `block_path` — see `JsModules`); a later bare reassignment reachable from that binding's scope
+# appends another, at *its own* (possibly deeper) block path. `possible_values` is the set of
+# statically-known strings that write could produce — empty means "genuinely dynamic, nothing
+# known here". Resolving a name at a use site replays the timeline up to that use site: a write
+# at the binding's own block path is a *deterministic* one (a straight-line statement, always
+# reached before the use site) and replaces whatever was reachable before it; a write at a
+# strictly deeper block path is only *conditionally* reached (inside an `if`/loop/etc. that might
+# not execute) and adds its values to what's already reachable, without discarding them — see
+# `resolve_js_identifier`.
+_JsTimeline = list[tuple[int, tuple[int, ...], frozenset[str]]]
 
 
 @dataclass
@@ -605,15 +612,17 @@ class JsModules:
     `declarations[path][name]` is every distinct binding of `name` in `path`, as `(block_path,
     timeline)`: `block_path` is the stack of enclosing `{ ... }` block ids the binding's own
     declaration sits in (`()` at module top level — see `_js_block_path_at`), and `timeline` is
-    its write history — a `const`/`let`/`var` declaration or a parameter default value, followed
-    by any later bare reassignment reachable from that scope, each entry `(position, value)`. A
-    name resolves at a given use site through `resolve_js_identifier`, which first picks the
-    *innermost* binding whose `block_path` encloses that use site — real lexical shadowing, not
-    "whichever declaration appears last in the file" — and then, within that binding's own
-    timeline, the latest write at or before the use site's own position — the value actually in
-    effect there at runtime, not "was this binding ever reassigned at all" (see round 37's
-    review: a `let` that is deterministically reassigned to a known value before a use site is a
-    real, static value, and must resolve to it, not to `None`)."""
+    its write history (see `_JsTimeline`). A name resolves at a given use site through
+    `resolve_js_identifier`, which first picks the *innermost* binding whose `block_path`
+    encloses that use site — real lexical shadowing, not "whichever declaration appears last in
+    the file" (round 36) — and then, within that binding's own timeline, the set of every
+    statically-known value still reachable at the use site's own position: a deterministic write
+    replaces the reachable set, a conditional one only adds to it (round 38 — a use site can be
+    reached with more than one possible value when a write sits behind a branch the resolver
+    can't evaluate, e.g. `if (cond) { role = "user"; }`; discarding the pre-branch value there
+    would hide a real violation still reachable when the branch doesn't run). Round 37: a
+    deterministic reassignment (no branch involved) is a real, static value and must resolve to
+    it, not to "unresolved" just because a write happened after the declaration."""
 
     texts: dict[Path, str]
     literals: dict[Path, dict[int, tuple[int, str]]] = field(default_factory=dict)
@@ -691,66 +700,93 @@ def _js_block_path_at(text: str, spans: list[tuple[int, int]], position: int) ->
     return tuple(stack)
 
 
-def resolve_js_identifier(modules: JsModules, path: Path, name: str, position: int) -> str | None:
-    """The value `name` resolves to at `position` in `path`, honoring lexical shadowing and
-    write order: among every binding of `name` whose `block_path` encloses `position` (is a
-    prefix of the position's own block path), the innermost one wins — matching real JS scoping
-    instead of "whichever declaration is textually last" (round 36). Within that binding's own
-    timeline, the value is the *latest write at or before `position`* — a deterministic
-    reassignment earlier in the same scope is a real, static value and resolves to it, not to
-    `None` just because a write happened after the declaration (round 37) — falling back to
-    `None` only when `name` has no enclosing binding at all, or the latest applicable write's own
-    value didn't fold (a genuinely dynamic expression)."""
+def resolve_js_identifier(modules: JsModules, path: Path, name: str, position: int) -> frozenset[str]:
+    """Every statically-known string `name` could hold at `position` in `path`, honoring lexical
+    shadowing: among every binding of `name` whose `block_path` encloses `position` (is a prefix
+    of the position's own block path), the innermost one wins — matching real JS scoping instead
+    of "whichever declaration is textually last" (round 36). Within that binding's own timeline,
+    replay every write up to and including `position`: a write at the binding's own block path is
+    deterministic (a straight-line statement) and *replaces* the reachable set; a write at a
+    deeper block path is only conditionally reached and *adds* to it, never discarding a value
+    that's still reachable when that branch doesn't run (round 38). Empty when `name` has no
+    enclosing binding at all, or nothing in its timeline up to `position` resolved to anything
+    statically known."""
     groups = modules.declarations.get(path, {}).get(name)
     if not groups:
-        return None
+        return frozenset()
     block_path = _js_block_path_at(
         modules.texts[path], _outside_literals(modules.literals[path]), position
     )
     best_timeline: _JsTimeline | None = None
+    best_group_block_path: tuple[int, ...] | None = None
     best_len = -1
     for group_block_path, timeline in groups:
         depth = len(group_block_path)
         if depth <= len(block_path) and block_path[:depth] == group_block_path and depth > best_len:
             best_len = depth
+            best_group_block_path = group_block_path
             best_timeline = timeline
     if best_timeline is None:
-        return None
-    value: str | None = None
-    for write_position, write_value in best_timeline:
+        return frozenset()
+    reachable: set[str] = set()
+    for write_position, write_block_path, write_values in best_timeline:
         if write_position > position:
             break
-        value = write_value
-    return value
+        if write_block_path == best_group_block_path:
+            reachable = set(write_values)
+        else:
+            reachable |= write_values
+    return frozenset(reachable)
 
 
 def _template_value(modules: JsModules, path: Path, raw: str, literal_start: int) -> str | None:
     """A template literal's content with each `${NAME}` hole filled from a known constant —
-    `None` if any hole is anything but a bare known identifier (`${provider()}`, `${a + b}`,
+    Empty if any hole is anything but a bare known identifier (`${provider()}`, `${a + b}`,
     `${cfg.model}`: genuinely dynamic, or at least not statically known here). Every hole is
     resolved as of `literal_start` (the enclosing template literal's own opening-backtick
     offset), not its own position inside `raw` — every hole in one template literal shares that
     literal's lexical scope regardless of where inside the (otherwise opaque, from this scanner's
-    perspective) literal text it sits."""
-    out: list[str] = []
+    perspective) literal text it sits. Multiple reachable values per hole (round 38 — a hole can
+    resolve to more than one statically-known string when it's behind a conditional write)
+    combine with the surrounding literal text and each other via `_combine`."""
+    segments: list[frozenset[str]] = []
     pos = 0
     for hole in _JS_TEMPLATE_HOLE_RE.finditer(raw):
+        segments.append(frozenset({raw[pos : hole.start()]}))
         name = hole.group(1).strip()
-        value = resolve_js_identifier(modules, path, name, literal_start)
-        if value is None:
-            return None
-        out.append(raw[pos : hole.start()])
-        out.append(value)
+        segments.append(resolve_js_identifier(modules, path, name, literal_start))
         pos = hole.end()
-    out.append(raw[pos:])
-    return "".join(out)
+    segments.append(frozenset({raw[pos:]}))
+    return _combine(segments)
 
 
-def js_string_expr_at(modules: JsModules, path: Path, pos: int) -> tuple[str | None, int]:
+def _combine(parts: list[frozenset[str]]) -> frozenset[str]:
+    """Cartesian-product join of each operand's own set of statically-known possible values —
+    empty (unresolvable) if any operand's own set is empty, or if the combined product would be
+    pathologically large.
+
+    ponytail: the size cap is a hard limit, not real path-sensitive analysis — a real hardcode
+    fed by more than a couple of conditional branches in one expression is vanishingly unlikely,
+    and even if missed here, the same literal value very likely also appears reachable through a
+    simpler branch elsewhere in the same file. Upgrade path: a real JS/TS parser with proper
+    control-flow analysis, same ceiling as the rest of this file's JS/TS scanning."""
+    if any(not part for part in parts):
+        return frozenset()
+    size = 1
+    for part in parts:
+        size *= len(part)
+        if size > 256:
+            return frozenset()
+    return frozenset("".join(combo) for combo in itertools.product(*parts))
+
+
+def js_string_expr_at(modules: JsModules, path: Path, pos: int) -> tuple[frozenset[str], int]:
     """Fold the string expression starting at `pos`: operands (a quoted literal, a template
     literal with known-constant holes, a known constant name, or a parenthesized expression)
-    joined by `+`. Returns `(value, end)`; `value` is `None` when any operand is genuinely
-    dynamic (an unknown name, a call, a member expression) or nothing string-like starts here.
+    joined by `+`. Returns `(values, end)`; `values` is the set of statically-known strings the
+    expression could resolve to — empty when any operand is genuinely dynamic (an unknown name, a
+    call, a member expression) or nothing string-like starts here; more than one value when an
+    operand is itself multi-valued (round 38 — reachable through more than one conditional write).
     A `+` chain is followed to its end either way, so `end` is past the whole expression."""
     text = modules.texts[path]
     literals = modules.literals[path]
@@ -761,14 +797,13 @@ def js_string_expr_at(modules: JsModules, path: Path, pos: int) -> tuple[str | N
             i += 1
         return i
 
-    parts: list[str] = []
-    resolvable = True
+    parts: list[frozenset[str]] = []
     i = skip_ws(pos)
     while True:
         if i < length and text[i] in JS_QUOTE_CHARS and i in literals:
             end, quote = literals[i]
             raw = text[i + 1 : end]
-            part = _template_value(modules, path, raw, i) if quote == "`" else raw
+            part = _template_value(modules, path, raw, i) if quote == "`" else frozenset({raw})
             i = end + 1
         elif i < length and text[i] == "(":
             part, i = js_string_expr_at(modules, path, i + 1)
@@ -776,25 +811,22 @@ def js_string_expr_at(modules: JsModules, path: Path, pos: int) -> tuple[str | N
             if i < length and text[i] == ")":
                 i += 1
             else:
-                return None, i
+                return frozenset(), i
         elif (match := _JS_IDENT_RE.match(text, i)) is not None:
             part = resolve_js_identifier(modules, path, match.group(0), i)
             i = match.end()
             # `name.member` / `name(...)` / `name[...]` — not the bare constant, a real
             # expression: unresolvable, and the chain stops here.
             if skip_ws(i) < length and text[skip_ws(i)] in ".([":
-                return None, i
+                return frozenset(), i
         else:
-            return None, i
-        if part is None:
-            resolvable = False
-        else:
-            parts.append(part)
+            return frozenset(), i
+        parts.append(part)
         j = skip_ws(i)
         if j < length and text[j] == "+" and not text.startswith("++", j):
             i = skip_ws(j + 1)
             continue
-        return ("".join(parts) if resolvable else None), i
+        return _combine(parts), i
 
 
 def _outside_literals(literals: dict[int, tuple[int, str]]) -> list[tuple[int, int]]:
@@ -823,19 +855,19 @@ def _resolve_js_module(importing: Path, specifier: str) -> Path | None:
 
 def _js_param_default_events(
     modules: JsModules, path: Path, text: str, spans: list[tuple[int, int]]
-) -> list[tuple[str, tuple[int, ...], int, str | None]]:
-    """`(name, body_block_path, name_position, value)` for every statically-resolvable default
-    parameter value — `function f(role = "system") { ... }`, `(role = "system") => { ... }` —
-    whose function/arrow has a real `{ ... }` body immediately following its parameter list (an
-    ambient/overload signature with no body, or a concise-body arrow with no block at all to
-    anchor the parameter's scope to, e.g. `(role = "system") => role`, is skipped — ponytail:
-    upgrade path is a real JS/TS parser, same ceiling as the rest of this file's JS/TS scanning).
+) -> list[tuple[str, tuple[int, ...], int, frozenset[str]]]:
+    """`(name, body_block_path, name_position, values)` for every default parameter value —
+    `function f(role = "system") { ... }`, `(role = "system") => { ... }` — whose function/arrow
+    has a real `{ ... }` body immediately following its parameter list (an ambient/overload
+    signature with no body, or a concise-body arrow with no block at all to anchor the
+    parameter's scope to, e.g. `(role = "system") => role`, is skipped — ponytail: upgrade path
+    is a real JS/TS parser, same ceiling as the rest of this file's JS/TS scanning).
     `body_block_path` is the block path *inside* that body (where the parameter is actually
     usable), not the block path of the signature itself. A parameter is always mutable (JS
     parameters are never `const`), so it's just another timeline-bearing binding — a later
     reassignment inside the function body attaches to it exactly like a `let`'s would.
     """
-    events: list[tuple[str, tuple[int, ...], int, str | None]] = []
+    events: list[tuple[str, tuple[int, ...], int, frozenset[str]]] = []
     signature_matches = [
         match for match in _JS_FUNCTION_SIGNATURE_RE.finditer(text) if not _inside_literal(spans, match.start())
     ] + [
@@ -855,15 +887,15 @@ def _js_param_default_events(
             if _inside_literal(spans, name_pos):
                 continue
             value_pos = params_start + default_match.end()
-            value, _ = js_string_expr_at(modules, path, value_pos)
-            events.append((default_match.group(1), body_block_path, name_pos, value))
+            values, _ = js_string_expr_at(modules, path, value_pos)
+            events.append((default_match.group(1), body_block_path, name_pos, values))
     return events
 
 
 def js_modules(paths: Iterable[Path]) -> JsModules:
     """Strip comments, index string literals, and resolve every file's `const`/`let`/`var`
-    declarations and parameter defaults (scope- and write-order-aware — see `JsModules`) across
-    relative named imports to a fixed point."""
+    declarations and parameter defaults (scope-, write-order-, and branch-aware — see
+    `JsModules`) across relative named imports to a fixed point."""
     modules = JsModules(texts={})
     for path in paths:
         text = path.read_text(encoding="utf-8", errors="ignore")
@@ -879,9 +911,15 @@ def js_modules(paths: Iterable[Path]) -> JsModules:
             groups: dict[str, dict[tuple[int, ...], _JsTimeline]] = {}
 
             def add_write(
-                name: str, block_path: tuple[int, ...], position: int, value: str | None
+                name: str,
+                group_block_path: tuple[int, ...],
+                write_block_path: tuple[int, ...],
+                position: int,
+                values: frozenset[str],
             ) -> None:
-                groups.setdefault(name, {}).setdefault(block_path, []).append((position, value))
+                groups.setdefault(name, {}).setdefault(group_block_path, []).append(
+                    (position, write_block_path, values)
+                )
 
             for match in _JS_NAMED_IMPORT_RE.finditer(text):
                 source = _resolve_js_module(path, match.group(2))
@@ -899,10 +937,10 @@ def js_modules(paths: Iterable[Path]) -> JsModules:
                     # would see no writes at all yet, in this timeline model — every write in a
                     # module-level `()` binding is, by definition, a real assignment that runs
                     # during module evaluation).
-                    value = resolve_js_identifier(
+                    values = resolve_js_identifier(
                         modules, source, exported, len(modules.texts[source])
                     )
-                    add_write(local, (), match.start(), value)
+                    add_write(local, (), (), match.start(), values)
 
             decl_matches = [
                 match for match in _JS_DECL_RE.finditer(text) if not _inside_literal(spans, match.start())
@@ -917,16 +955,19 @@ def js_modules(paths: Iterable[Path]) -> JsModules:
             for match in decl_matches:
                 name = match.group(2)
                 block_path = _js_block_path_at(text, spans, match.start(2))
-                value, _ = js_string_expr_at(modules, path, match.end())
-                add_write(name, block_path, match.start(2), value)
+                values, _ = js_string_expr_at(modules, path, match.end())
+                add_write(name, block_path, block_path, match.start(2), values)
 
-            for name, block_path, position, value in param_events:
-                add_write(name, block_path, position, value)
+            for name, block_path, position, values in param_events:
+                add_write(name, block_path, block_path, position, values)
 
             # A bare reassignment attaches to whichever already-known binding most tightly
             # encloses it (the innermost group block path that's a prefix of the reassignment's
-            # own) — the same shadowing priority `resolve_js_identifier` itself uses. One with no
-            # enclosing binding at all (an untracked/global name) is simply dropped.
+            # own) — the same shadowing priority `resolve_js_identifier` itself uses — at *its
+            # own* block path, so `resolve_js_identifier` can tell a deterministic write (same
+            # depth as the binding) from a conditional one (deeper) and combine values
+            # accordingly. One with no enclosing binding at all (an untracked/global name) is
+            # simply dropped.
             for match in _JS_ASSIGNMENT_RE.finditer(text):
                 if match.start(1) in exempt_positions or _inside_literal(spans, match.start(1)):
                     continue
@@ -947,13 +988,13 @@ def js_modules(paths: Iterable[Path]) -> JsModules:
                         best_len = depth
                         best_block_path = candidate_block_path
                 if best_block_path is not None:
-                    value, _ = js_string_expr_at(modules, path, match.end())
-                    candidates[best_block_path].append((match.start(1), value))
+                    values, _ = js_string_expr_at(modules, path, match.end())
+                    candidates[best_block_path].append((match.start(1), assignment_block_path, values))
 
             modules.declarations[path] = {
                 name: sorted(
                     (
-                        (block_path, sorted(timeline))
+                        (block_path, sorted(timeline, key=lambda entry: (entry[0], entry[1])))
                         for block_path, timeline in block_paths.items()
                     )
                 )
@@ -968,7 +1009,9 @@ def js_string_values(modules: JsModules, path: Path) -> list[tuple[int, str]]:
     """Every statically-resolvable string expression in `path`, as `(offset, value)` in the
     comment-stripped text. Candidate starts are every string literal and every use of a known
     constant name (not a `.member` access); a resolved expression consumes its whole `+` chain,
-    so a folded value is reported once, as a whole, not also per fragment."""
+    so a folded expression's every possible value (round 38 — an expression reachable through a
+    conditional write can have more than one) is reported once each, as a whole, not also per
+    fragment."""
     text = modules.texts[path]
     spans = _outside_literals(modules.literals[path])
     known_names = modules.declarations.get(path, {})
@@ -985,8 +1028,8 @@ def js_string_values(modules: JsModules, path: Path) -> list[tuple[int, str]]:
     for start in sorted(starts):
         if start < consumed_until:
             continue
-        value, end = js_string_expr_at(modules, path, start)
-        if value is not None:
-            values.append((start, value))
+        resolved, end = js_string_expr_at(modules, path, start)
+        if resolved:
+            values.extend((start, value) for value in sorted(resolved))
             consumed_until = end
     return values

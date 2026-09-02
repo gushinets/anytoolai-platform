@@ -74,6 +74,22 @@ _JS_SHORTHAND_KEY_RE = re.compile(
 )
 
 
+def _offending_value(key: str, values: frozenset[str]) -> str | None:
+    """The first forbidden value in `values` (a resolved `role`/instruction field's every
+    statically-known possible value — round 38: a value reachable only through a conditional
+    write is still a real, reachable value, so a use is offending if *any* of them is, not only
+    if the whole expression resolves to a single, unconditional one), sorted for a deterministic
+    report, or `None` if none of them are forbidden."""
+    return next(
+        (
+            value
+            for value in sorted(values)
+            if (key == ROLE_KEY and value.lower() == "system") or (key != ROLE_KEY and value.strip())
+        ),
+        None,
+    )
+
+
 def _json_prompt_shape(value: object) -> str | None:
     """First prompt-bearing key in a parsed JSON document, walked structurally."""
     if isinstance(value, dict):
@@ -124,20 +140,18 @@ def check_prompts_inside_extensions(extensions_root: Path) -> list[str]:
             found: tuple[int, str, str] | None = None
             for key_match in _JS_REQUEST_KEY_RE.finditer(stripped):
                 key = key_match.group(1)
-                value, _ = js_string_expr_at(js, path, key_match.end())
-                if value is not None and (
-                    (key == ROLE_KEY and value.lower() == "system") or (key != ROLE_KEY and value.strip())
-                ):
-                    found = (key_match.start(), key, value)
+                values, _ = js_string_expr_at(js, path, key_match.end())
+                offending = _offending_value(key, values)
+                if offending is not None:
+                    found = (key_match.start(), key, offending)
                     break
             if found is None:
                 for shorthand_match in _JS_SHORTHAND_KEY_RE.finditer(stripped):
                     key = shorthand_match.group(1)
-                    value = resolve_js_identifier(js, path, key, shorthand_match.start(1))
-                    if value is not None and (
-                        (key == ROLE_KEY and value.lower() == "system") or (key != ROLE_KEY and value.strip())
-                    ):
-                        found = (shorthand_match.start(1), key, value)
+                    values = resolve_js_identifier(js, path, key, shorthand_match.start(1))
+                    offending = _offending_value(key, values)
+                    if offending is not None:
+                        found = (shorthand_match.start(1), key, offending)
                         break
             if found is not None:
                 position, key, value = found
@@ -248,6 +262,36 @@ def test_non_default_role_parameter_is_not_a_false_positive(tmp_path: Path) -> N
         encoding="utf-8",
     )
     assert check_prompts_inside_extensions(tmp_path) == []
+
+
+def test_conditionally_reachable_forbidden_role_is_detected(tmp_path: Path) -> None:
+    # `role` is "system" whenever `useUserRole` is false — a real, reachable runtime value, not
+    # merely the value the resolver happens to see last in the source (round 38).
+    (tmp_path / "chat.ts").write_text(
+        'let role = "system";\n\n'
+        "if (useUserRole) {\n"
+        '  role = "user";\n'
+        "}\n\n"
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_conditionally_reachable_safe_role_does_not_mask_deterministic_one(tmp_path: Path) -> None:
+    # The mirror image: a conditional branch introduces a *safe* alternative, but the
+    # unconditional value is still "system" and must still be caught.
+    (tmp_path / "chat.ts").write_text(
+        'let role = "user";\n\n'
+        "if (useSystemRole) {\n"
+        '  role = "system";\n'
+        "}\n\n"
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
 def test_comment_between_role_and_colon_is_detected_in_tsx(tmp_path: Path) -> None:

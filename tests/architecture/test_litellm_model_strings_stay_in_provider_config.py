@@ -312,6 +312,21 @@ def test_default_js_provider_parameter_is_detected(tmp_path: Path) -> None:
     assert offenders == ["model.ts:2: 'openai/gpt-4.1'"], offenders
 
 
+def test_conditionally_reachable_provider_is_detected(tmp_path: Path) -> None:
+    # `openai/gpt-4.1` remains a real, reachable value whenever `useFallback` is false — the
+    # resolver must not discard it just because a later, conditional write also exists (round 38).
+    (tmp_path / "config.ts").write_text(
+        'let provider = "openai";\n\n'
+        "if (useFallback) {\n"
+        '  provider = "internal";\n'
+        "}\n\n"
+        "const model = `${provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["config.ts:7: 'openai/gpt-4.1'"], offenders
+
+
 def test_nested_scope_js_provider_does_not_shadow_outer_binding(tmp_path: Path) -> None:
     (tmp_path / "config.ts").write_text(
         'const provider = "openai";\n\n'
