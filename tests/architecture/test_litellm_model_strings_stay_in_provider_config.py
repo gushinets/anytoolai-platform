@@ -197,13 +197,14 @@ def _json_offender(path: Path) -> tuple[int, str] | None:
 
 def _js_offender(js, path: Path) -> tuple[int, str] | None:
     """(lineno, matched-text) of the first real hardcode in a JS/TS file: a direct regex match on
-    the comment-stripped text (which also covers `//` prose retained in JSX-capable files, where
-    comment stripping is deliberately disabled), or any *statically folded* string expression —
-    a `+` concatenation across any number of lines/parens, a template literal interpolating a
-    known constant (`` `${provider}/gpt-4.1` `` with `const provider = "openai"`), or a constant
-    imported from a sibling module — resolved by the shared static resolver."""
+    the comment-blanked text (every comment, in every file type, is already replaced with
+    same-length whitespace by the real parser — see `static_string_resolution.js_modules`), or
+    any *statically folded* string expression — a `+` concatenation across any number of
+    lines/parens, a template literal interpolating a known constant (`` `${provider}/gpt-4.1` ``
+    with `const provider = "openai"`), or a constant imported from a sibling module, all resolved
+    through real lexical scope and write order by the shared static resolver."""
     text = js.texts[path]
-    spans = [(start + 1, end) for start, (end, _) in js.literals[path].items()]
+    spans = [(start + 1, end) for start, (end, _) in js_string_literals(text).items()]
     direct = next(
         (
             (match.start(), match.group(0))
@@ -391,6 +392,21 @@ def test_concise_arrow_parameter_does_not_leak_past_array_comma(tmp_path: Path) 
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == ["config.ts:5: 'openai/gpt-4.1'"], offenders
+
+
+def test_concise_arrow_parameter_does_not_leak_past_object_property_comma(tmp_path: Path) -> None:
+    # The comma after the `normalize` property ends the arrow's own body — the sibling `model`
+    # property must still resolve `provider` through the outer binding, not the arrow's own
+    # leaked parameter. Single line deliberately: the multi-line form could otherwise close the
+    # scope via ASI/newline instead of via the object-literal comma this actually tests for
+    # (round 42).
+    (tmp_path / "config.ts").write_text(
+        'const provider = "openai";\n'
+        'const config = { normalize: (provider = "internal") => provider, model: `${provider}/gpt-4.1` };\n',
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["config.ts:2: 'openai/gpt-4.1'"], offenders
 
 
 def test_nested_scope_js_provider_does_not_shadow_outer_binding(tmp_path: Path) -> None:

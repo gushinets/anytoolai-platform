@@ -42,35 +42,30 @@ INSTRUCTION_KEYS = {
     "systemPrompt",
     "system_prompt",
 }
-# For a `.jsx`/`.tsx` file, `strip_js_comments` deliberately preserves `/* ... */` text verbatim
-# (it can't tell raw JSX element text from real JS expression syntax — see its own docstring), so
-# a real block comment sitting inside genuine object-literal syntax (`role /* note */: value`)
-# stays in the "stripped" text `_JS_REQUEST_KEY_RE`/`_JS_SHORTHAND_KEY_RE` scan. `_WS_OR_COMMENT`
-# tolerates zero or more of either between the tracked key and its surrounding punctuation, so
-# such a comment doesn't defeat the whitespace-only adjacency these regexes otherwise require. For
-# a non-JSX file the comment is already stripped away entirely by `strip_js_comments`, so this
-# alternation simply never has anything to match there — no behavior change for `.ts`/`.js`.
-_WS_OR_COMMENT = r"(?:\s|/\*[\s\S]*?\*/)*"
+# `static_string_resolution.js_modules` blanks every comment (regardless of file type) to
+# same-length whitespace before this file ever sees the text, so a real comment sitting inside
+# object-literal syntax (`role /* note */: value`) is already invisible to these regexes — plain
+# `\s*` is all that's needed here; no JSX-specific comment handling required.
 _PROMPT_KEY_ALTERNATION = r"role|instructions|systemInstruction|system_instruction|system|systemPrompt|system_prompt"
 _JS_REQUEST_KEY_RE = re.compile(
-    rf"""(?<![\w$.?])["']?({_PROMPT_KEY_ALTERNATION})["']?{_WS_OR_COMMENT}:(?!:)"""
+    rf"""(?<![\w$.?])["']?({_PROMPT_KEY_ALTERNATION})["']?\s*:(?!:)"""
 )
 # ES2015 shorthand property (`{ role, content }`, `{ instructions }`) builds the exact same
 # request object as `{ role: role, ... }` but has no `:` at all — invisible to
 # `_JS_REQUEST_KEY_RE` above, which requires one. Matches a tracked key immediately preceded by
-# `{`/`,` and immediately followed by `,`/`}` (only whitespace/comments allowed on either side, so
-# a colon-form property's *value* position, e.g. `x: role`, never matches — the char right before
+# `{`/`,` and immediately followed by `,`/`}` (only whitespace allowed on either side, so a
+# colon-form property's *value* position, e.g. `x: role`, never matches — the char right before
 # "role" there is `:`, not `{`/`,`). Reported key is resolved through the shared JS resolver at
 # its own position (key and value share one name in shorthand form, so there is no separate value
-# expression to resolve, but the *name* can still be shadowed/reassigned like any other binding).
+# expression to resolve, but the *name* can still be shadowed/reassigned like any other binding —
+# real lexical scope and write order, resolved by a real parser, not approximated here at all).
 #
 # ponytail: a regex, not a real parser, so it can also match a same-named element inside a plain
 # array literal (`[x, role]`) if `role` happens to be a locally-declared constant too — a false
 # positive (one extra line to look at), not a false negative, which is the direction this file's
-# own conservative design already favors throughout. Upgrade path: a real JS/TS parser, same
-# ceiling already documented for the rest of this repo's JS/TS scanning.
+# own conservative design already favors throughout.
 _JS_SHORTHAND_KEY_RE = re.compile(
-    rf"""[{{,]{_WS_OR_COMMENT}({_PROMPT_KEY_ALTERNATION}){_WS_OR_COMMENT}(?=[,}}])"""
+    rf"""[{{,]\s*({_PROMPT_KEY_ALTERNATION})\s*(?=[,}}])"""
 )
 
 
@@ -140,7 +135,7 @@ def check_prompts_inside_extensions(extensions_root: Path) -> list[str]:
             found: tuple[int, str, str] | None = None
             for key_match in _JS_REQUEST_KEY_RE.finditer(stripped):
                 key = key_match.group(1)
-                values, _ = js_string_expr_at(js, path, key_match.end())
+                values = js_string_expr_at(js, path, key_match.end())
                 offending = _offending_value(key, values)
                 if offending is not None:
                     found = (key_match.start(), key, offending)
@@ -274,6 +269,18 @@ def test_concise_arrow_role_parameter_does_not_leak_past_array_comma(tmp_path: P
         '  (role = "user") => role,\n'
         "  { role },\n"
         "];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_concise_arrow_role_parameter_does_not_leak_past_object_property_comma(tmp_path: Path) -> None:
+    # Single line deliberately: the multi-line form could otherwise close the scope via
+    # ASI/newline instead of via the object-literal comma this actually tests for (round 42).
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n'
+        'const config = { normalize: (role = "user") => role, message: { role } };\n',
         encoding="utf-8",
     )
     offenders = check_prompts_inside_extensions(tmp_path)
