@@ -591,35 +591,118 @@ def js_string_literals(text: str) -> dict[int, tuple[int, str]]:
 
 @dataclass
 class JsModules:
-    """Comment-stripped JS/TS sources with their statically-known string constants."""
+    """Comment-stripped JS/TS sources with their statically-known string declarations.
+
+    `declarations[path][name]` is every `const`/`let`/`var` declaration of `name` in `path`, as
+    `(block_path, value)`: `block_path` is the stack of enclosing `{ ... }` block ids the
+    declaration sits in (`()` at module top level — see `_js_block_path_at`), and `value` is its
+    folded initializer, or `None` when the initializer doesn't fold, or (for `let`/`var`) when
+    the binding is reassigned anywhere within its own scope after declaration. A name resolves at
+    a given use site through `resolve_js_identifier`, which picks the *innermost* declaration
+    whose `block_path` encloses that use site — real lexical shadowing, not "whichever
+    declaration appears last in the file" (which could resolve a different value than the one
+    actually in scope at runtime — see round 36's review)."""
 
     texts: dict[Path, str]
     literals: dict[Path, dict[int, tuple[int, str]]] = field(default_factory=dict)
-    constants: dict[Path, dict[str, str]] = field(default_factory=dict)
+    declarations: dict[Path, dict[str, list[tuple[tuple[int, ...], str | None]]]] = field(
+        default_factory=dict
+    )
 
 
 _JS_IDENT = r"[A-Za-z_$][\w$]*"
 _JS_IDENT_RE = re.compile(_JS_IDENT)
 # `const NAME = ...` / `let NAME: string = ...` / `export var NAME = ...` (`(?!=)`: not `==`).
-_JS_CONST_DECL_RE = re.compile(rf"\b(?:const|let|var)\s+({_JS_IDENT})\s*(?::[^=;{{}}]+?)?=(?!=)")
+_JS_DECL_RE = re.compile(rf"\b(const|let|var)\s+({_JS_IDENT})\s*(?::[^=;{{}}]+?)?=(?!=)")
+# A bare `NAME = ...` reassignment (no `const`/`let`/`var`) — `(?<![\w$.])` excludes a member
+# assignment (`obj.name = `, not a rebind of `name` itself); `(?![=>])` excludes `==`/`===`
+# comparisons and an arrow function (`name => ...`), neither of which is a write to `name`.
+#
+# ponytail: also matches a `const`/`let`/`var` declaration's own `NAME =` (filtered out by the
+# caller via `decl_name_positions`, not by this regex), and a default-parameter value
+# (`(role = "user") => ...`, a fresh local binding, not a write to any outer `role`) — both push
+# toward *over*-invalidating a same-named outer binding, never toward trusting a stale value,
+# which is the safe direction for a boundary gate. Upgrade path: a real JS/TS parser.
+_JS_ASSIGNMENT_RE = re.compile(rf"""(?<![\w$.])({_JS_IDENT})\s*=(?![=>])""")
 # `import { A, B as C } from "./x"` (an optional `type` keyword is a TS type-only import — its
 # names are never string values, so it's simply left unmatched).
 _JS_NAMED_IMPORT_RE = re.compile(r"""\bimport\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']""")
 _JS_TEMPLATE_HOLE_RE = re.compile(r"\$\{([^}]*)\}")
 
 
-def _template_value(raw: str, constants: dict[str, str]) -> str | None:
+def _js_block_path_at(text: str, spans: list[tuple[int, int]], position: int) -> tuple[int, ...]:
+    """The stack of enclosing `{ ... }` block ids immediately before `position` — `()` at module
+    top level, a longer tuple inside nested blocks. Each `{` outside a string-literal span (a
+    `{`/`}` inside a string's own text must not count — `spans`, from `js_string_literals`,
+    excludes it) opens a new, uniquely-numbered block; its matching `}` closes it. A
+    declaration's block path being a *prefix* of a use site's block path means the declaration's
+    scope encloses that use site — real JS lexical (block) scoping for `const`/`let`, and object
+    literals/array literals never contain a declaration statement, so the extra "blocks" this
+    coarse counting adds for them are harmless: they can only make a use site look more deeply
+    nested than its true statement-level scope, which prefix-matching absorbs without ever
+    finding an unrelated declaration (each block id is unique and genuinely encloses only what's
+    textually between its `{` and matching `}`). A reasonable, conservative-direction
+    approximation for `var` too (real `var` is function-scoped and can escape an enclosing
+    non-function block that this treats as its own scope — narrower than reality, so this can
+    only miss a `var` that's really in scope, never wrongly resolve one that isn't).
+    """
+    stack: list[int] = []
+    next_id = 0
+    span_end_by_start = dict(spans)
+    i = 0
+    while i < position:
+        if i in span_end_by_start:
+            i = span_end_by_start[i] + 1
+            continue
+        if text[i] == "{":
+            stack.append(next_id)
+            next_id += 1
+        elif text[i] == "}" and stack:
+            stack.pop()
+        i += 1
+    return tuple(stack)
+
+
+def resolve_js_identifier(modules: JsModules, path: Path, name: str, position: int) -> str | None:
+    """The value `name` resolves to at `position` in `path`, honoring lexical shadowing: among
+    every declaration of `name` whose `block_path` encloses `position` (is a prefix of the
+    position's own block path), the innermost one wins — matching real JS scoping instead of
+    "whichever declaration is textually last". `None` if `name` has no declaration at all, or if
+    the one in scope has no statically-known value (an unresolved initializer, or a reassigned
+    `let`/`var`)."""
+    declarations = modules.declarations.get(path, {}).get(name)
+    if not declarations:
+        return None
+    block_path = _js_block_path_at(
+        modules.texts[path], _outside_literals(modules.literals[path]), position
+    )
+    best_value: str | None = None
+    best_len = -1
+    for decl_block_path, value in declarations:
+        depth = len(decl_block_path)
+        if depth <= len(block_path) and block_path[:depth] == decl_block_path and depth >= best_len:
+            best_len = depth
+            best_value = value
+    return best_value
+
+
+def _template_value(modules: JsModules, path: Path, raw: str, literal_start: int) -> str | None:
     """A template literal's content with each `${NAME}` hole filled from a known constant —
     `None` if any hole is anything but a bare known identifier (`${provider()}`, `${a + b}`,
-    `${cfg.model}`: genuinely dynamic, or at least not statically known here)."""
+    `${cfg.model}`: genuinely dynamic, or at least not statically known here). Every hole is
+    resolved as of `literal_start` (the enclosing template literal's own opening-backtick
+    offset), not its own position inside `raw` — every hole in one template literal shares that
+    literal's lexical scope regardless of where inside the (otherwise opaque, from this scanner's
+    perspective) literal text it sits."""
     out: list[str] = []
     pos = 0
     for hole in _JS_TEMPLATE_HOLE_RE.finditer(raw):
         name = hole.group(1).strip()
-        if name not in constants:
+        value = resolve_js_identifier(modules, path, name, literal_start)
+        if value is None:
             return None
         out.append(raw[pos : hole.start()])
-        out.append(constants[name])
+        out.append(value)
         pos = hole.end()
     out.append(raw[pos:])
     return "".join(out)
@@ -633,7 +716,6 @@ def js_string_expr_at(modules: JsModules, path: Path, pos: int) -> tuple[str | N
     A `+` chain is followed to its end either way, so `end` is past the whole expression."""
     text = modules.texts[path]
     literals = modules.literals[path]
-    constants = modules.constants[path]
     length = len(text)
 
     def skip_ws(i: int) -> int:
@@ -648,7 +730,7 @@ def js_string_expr_at(modules: JsModules, path: Path, pos: int) -> tuple[str | N
         if i < length and text[i] in JS_QUOTE_CHARS and i in literals:
             end, quote = literals[i]
             raw = text[i + 1 : end]
-            part = _template_value(raw, constants) if quote == "`" else raw
+            part = _template_value(modules, path, raw, i) if quote == "`" else raw
             i = end + 1
         elif i < length and text[i] == "(":
             part, i = js_string_expr_at(modules, path, i + 1)
@@ -658,7 +740,7 @@ def js_string_expr_at(modules: JsModules, path: Path, pos: int) -> tuple[str | N
             else:
                 return None, i
         elif (match := _JS_IDENT_RE.match(text, i)) is not None:
-            part = constants.get(match.group(0))
+            part = resolve_js_identifier(modules, path, match.group(0), i)
             i = match.end()
             # `name.member` / `name(...)` / `name[...]` — not the bare constant, a real
             # expression: unresolvable, and the chain stops here.
@@ -702,24 +784,22 @@ def _resolve_js_module(importing: Path, specifier: str) -> Path | None:
 
 
 def js_modules(paths: Iterable[Path]) -> JsModules:
-    """Strip comments, index string literals, and resolve every file's string constants
-    (`const`/`let`/`var` bindings whose value folds) across relative named imports to a fixed
-    point. Constants are one flat namespace per file (ponytail: no scope tracking — a shadowed
-    same-named binding resolves to whichever declaration comes last; upgrade path: a real
-    parser, as the module docstring already calls for)."""
+    """Strip comments, index string literals, and resolve every file's `const`/`let`/`var`
+    declarations (scope- and mutation-aware — see `JsModules`) across relative named imports to
+    a fixed point."""
     modules = JsModules(texts={})
     for path in paths:
         text = path.read_text(encoding="utf-8", errors="ignore")
         modules.texts[path] = strip_js_comments(text, jsx=path.suffix in (".jsx", ".tsx"))
         modules.literals[path] = js_string_literals(modules.texts[path])
-        modules.constants[path] = {}
+        modules.declarations[path] = {}
     resolved_paths = {path.resolve(): path for path in modules.texts}
 
     for _ in range(50):
-        previous = {path: dict(values) for path, values in modules.constants.items()}
+        previous = {path: dict(values) for path, values in modules.declarations.items()}
         for path, text in modules.texts.items():
             spans = _outside_literals(modules.literals[path])
-            found: dict[str, str] = {}
+            found: dict[str, list[tuple[tuple[int, ...], str | None]]] = {}
             for match in _JS_NAMED_IMPORT_RE.finditer(text):
                 source = _resolve_js_module(path, match.group(2))
                 source = resolved_paths.get(source) if source is not None else None
@@ -730,17 +810,40 @@ def js_modules(paths: Iterable[Path]) -> JsModules:
                     if not names or names[0] == "type":
                         continue
                     exported, local = names[0], names[-1]
-                    value = modules.constants[source].get(exported)
-                    if value is not None:
-                        found[local] = value
-            for match in _JS_CONST_DECL_RE.finditer(text):
-                if _inside_literal(spans, match.start()):
+                    # An export can only ever be a module-top-level binding (position 0 always
+                    # resolves to block path `()`), matching real JS/TS export semantics.
+                    value = resolve_js_identifier(modules, source, exported, 0)
+                    found.setdefault(local, []).append(((), value))
+
+            decl_matches = [
+                match for match in _JS_DECL_RE.finditer(text) if not _inside_literal(spans, match.start())
+            ]
+            decl_name_positions = {match.start(2) for match in decl_matches}
+            # Every bare `name = ...` reassignment, grouped by name and by the block path it
+            # occurs in — checked below against each declaration's own block path to invalidate
+            # only a binding a reassignment could actually reach (see `JsModules`'s docstring).
+            reassignment_block_paths: dict[str, list[tuple[int, ...]]] = {}
+            for match in _JS_ASSIGNMENT_RE.finditer(text):
+                if match.start(1) in decl_name_positions or _inside_literal(spans, match.start(1)):
                     continue
+                reassignment_block_paths.setdefault(match.group(1), []).append(
+                    _js_block_path_at(text, spans, match.start(1))
+                )
+
+            for match in decl_matches:
+                keyword, name = match.group(1), match.group(2)
+                block_path = _js_block_path_at(text, spans, match.start(2))
                 value, _ = js_string_expr_at(modules, path, match.end())
-                if value is not None:
-                    found[match.group(1)] = value
-            modules.constants[path] = found
-        if modules.constants == previous:
+                if keyword != "const" and value is not None:
+                    depth = len(block_path)
+                    if any(
+                        assignment_path[:depth] == block_path
+                        for assignment_path in reassignment_block_paths.get(name, [])
+                    ):
+                        value = None
+                found.setdefault(name, []).append((block_path, value))
+            modules.declarations[path] = found
+        if modules.declarations == previous:
             break
     return modules
 
@@ -752,10 +855,10 @@ def js_string_values(modules: JsModules, path: Path) -> list[tuple[int, str]]:
     so a folded value is reported once, as a whole, not also per fragment."""
     text = modules.texts[path]
     spans = _outside_literals(modules.literals[path])
-    constants = modules.constants[path]
+    known_names = modules.declarations.get(path, {})
     starts = {start for start, _ in spans}
     for match in _JS_IDENT_RE.finditer(text):
-        if match.group(0) not in constants or _inside_literal(spans, match.start()):
+        if match.group(0) not in known_names or _inside_literal(spans, match.start()):
             continue
         if text[: match.start()].rstrip().endswith("."):
             continue  # `obj.NAME` is a member access, not the constant

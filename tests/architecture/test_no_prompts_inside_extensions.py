@@ -8,6 +8,7 @@ from static_string_resolution import (
     js_modules,
     js_string_expr_at,
     line_number_at,
+    resolve_js_identifier,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,17 +42,27 @@ INSTRUCTION_KEYS = {
     "systemPrompt",
     "system_prompt",
 }
+# For a `.jsx`/`.tsx` file, `strip_js_comments` deliberately preserves `/* ... */` text verbatim
+# (it can't tell raw JSX element text from real JS expression syntax — see its own docstring), so
+# a real block comment sitting inside genuine object-literal syntax (`role /* note */: value`)
+# stays in the "stripped" text `_JS_REQUEST_KEY_RE`/`_JS_SHORTHAND_KEY_RE` scan. `_WS_OR_COMMENT`
+# tolerates zero or more of either between the tracked key and its surrounding punctuation, so
+# such a comment doesn't defeat the whitespace-only adjacency these regexes otherwise require. For
+# a non-JSX file the comment is already stripped away entirely by `strip_js_comments`, so this
+# alternation simply never has anything to match there — no behavior change for `.ts`/`.js`.
+_WS_OR_COMMENT = r"(?:\s|/\*[\s\S]*?\*/)*"
+_PROMPT_KEY_ALTERNATION = r"role|instructions|systemInstruction|system_instruction|system|systemPrompt|system_prompt"
 _JS_REQUEST_KEY_RE = re.compile(
-    r"""(?<![\w$.?])["']?(role|instructions|systemInstruction|system_instruction|system|systemPrompt|system_prompt)["']?\s*:(?!:)"""
+    rf"""(?<![\w$.?])["']?({_PROMPT_KEY_ALTERNATION})["']?{_WS_OR_COMMENT}:(?!:)"""
 )
 # ES2015 shorthand property (`{ role, content }`, `{ instructions }`) builds the exact same
 # request object as `{ role: role, ... }` but has no `:` at all — invisible to
 # `_JS_REQUEST_KEY_RE` above, which requires one. Matches a tracked key immediately preceded by
-# `{`/`,` and immediately followed by `,`/`}` (only whitespace allowed on either side, so a
-# colon-form property's *value* position, e.g. `x: role`, never matches — the char right before
-# "role" there is `:`, not `{`/`,`). Reported key is looked up directly in the file's own
-# resolved constants (key and value share one name in shorthand form, so there is no separate
-# value expression to resolve).
+# `{`/`,` and immediately followed by `,`/`}` (only whitespace/comments allowed on either side, so
+# a colon-form property's *value* position, e.g. `x: role`, never matches — the char right before
+# "role" there is `:`, not `{`/`,`). Reported key is resolved through the shared JS resolver at
+# its own position (key and value share one name in shorthand form, so there is no separate value
+# expression to resolve, but the *name* can still be shadowed/reassigned like any other binding).
 #
 # ponytail: a regex, not a real parser, so it can also match a same-named element inside a plain
 # array literal (`[x, role]`) if `role` happens to be a locally-declared constant too — a false
@@ -59,7 +70,7 @@ _JS_REQUEST_KEY_RE = re.compile(
 # own conservative design already favors throughout. Upgrade path: a real JS/TS parser, same
 # ceiling already documented for the rest of this repo's JS/TS scanning.
 _JS_SHORTHAND_KEY_RE = re.compile(
-    r"""[{,]\s*(role|instructions|systemInstruction|system_instruction|system|systemPrompt|system_prompt)\s*(?=[,}])"""
+    rf"""[{{,]{_WS_OR_COMMENT}({_PROMPT_KEY_ALTERNATION}){_WS_OR_COMMENT}(?=[,}}])"""
 )
 
 
@@ -122,7 +133,7 @@ def check_prompts_inside_extensions(extensions_root: Path) -> list[str]:
             if found is None:
                 for shorthand_match in _JS_SHORTHAND_KEY_RE.finditer(stripped):
                     key = shorthand_match.group(1)
-                    value = js.constants[path].get(key)
+                    value = resolve_js_identifier(js, path, key, shorthand_match.start(1))
                     if value is not None and (
                         (key == ROLE_KEY and value.lower() == "system") or (key != ROLE_KEY and value.strip())
                     ):
@@ -186,6 +197,59 @@ def test_shorthand_role_and_instructions_are_detected(tmp_path: Path) -> None:
     assert len(offenders) == 2, offenders
     assert any("chat.ts:3" in o and "role: 'system'" in o for o in offenders)
     assert any("request.ts:2" in o and "instructions:" in o for o in offenders)
+
+
+def test_nested_scope_role_does_not_shadow_outer_binding(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n\n'
+        "function helper() {\n"
+        '  const role = "user";\n'
+        "  return role;\n"
+        "}\n\n"
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_reassigned_role_is_not_resolved_to_stale_value(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        'let role = "user";\nrole = "system";\n\nconst messages = [{ role }];\n',
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []
+
+
+def test_comment_between_role_and_colon_is_detected_in_tsx(tmp_path: Path) -> None:
+    (tmp_path / "chat.tsx").write_text(
+        'const SYSTEM_ROLE = "system";\n\n'
+        "const messages = [\n"
+        "  {\n"
+        "    role /* request role */: SYSTEM_ROLE,\n"
+        '    content: "Draft a proposal",\n'
+        "  },\n"
+        "];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_comment_before_shorthand_role_is_detected_in_tsx(tmp_path: Path) -> None:
+    (tmp_path / "chat.tsx").write_text(
+        'const role = "system";\n\n'
+        "const messages = [\n"
+        "  {\n"
+        "    /* request role */\n"
+        "    role,\n"
+        '    content: "Draft a proposal",\n'
+        "  },\n"
+        "];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
 def test_typed_request_shapes_are_not_false_positives(tmp_path: Path) -> None:

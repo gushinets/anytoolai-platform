@@ -284,3 +284,27 @@ def test_js_template_literal_of_known_constant_is_detected(tmp_path: Path) -> No
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == ["config.ts:2: 'openai/gpt-4.1'"], offenders
+
+
+def test_reassigned_js_provider_is_not_resolved_to_stale_value(tmp_path: Path) -> None:
+    (tmp_path / "config.ts").write_text(
+        'let provider = "cohere";\n'
+        'provider = "openai";\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    assert check_litellm_model_strings(tmp_path, [tmp_path], set()) == []
+
+
+def test_nested_scope_js_provider_does_not_shadow_outer_binding(tmp_path: Path) -> None:
+    (tmp_path / "config.ts").write_text(
+        'const provider = "openai";\n\n'
+        "function helper() {\n"
+        '  const provider = "cohere";\n'
+        "  return provider;\n"
+        "}\n\n"
+        "const model = `${provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["config.ts:8: 'openai/gpt-4.1'"], offenders
