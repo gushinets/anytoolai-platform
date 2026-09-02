@@ -431,6 +431,39 @@ def test_non_default_role_parameter_shadows_a_same_named_outer_role(tmp_path: Pa
     assert check_prompts_inside_extensions(tmp_path) == []
 
 
+def test_namespace_import_property_access_role_is_detected(tmp_path: Path) -> None:
+    # `import * as roles from "./roles"` never registered a binding for `roles` at all, and
+    # `roles.privileged` (a `PropertyAccessExpression`) was never resolved either (round 58).
+    (tmp_path / "roles.ts").write_text('export const privileged = "system";\n', encoding="utf-8")
+    (tmp_path / "chat.ts").write_text(
+        'import * as roles from "./roles";\n\n'
+        "const messages = [\n"
+        "  { role: roles.privileged },\n"
+        "];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_local_object_literal_role_property_access_is_detected(tmp_path: Path) -> None:
+    # `config.preset`, where `config` is a fully static local object literal, is ordinary
+    # TypeScript with no object/member lookup model before this round (round 58). The source
+    # property name deliberately doesn't itself end in "role" (case-insensitively) — the text-
+    # level system-role-shape fallback matches any key ending that way (`role["']?\s*:...`, no
+    # word-boundary anchor), so the only way to catch this fixture is resolving the actual
+    # `role: config.preset` use site.
+    (tmp_path / "chat.ts").write_text(
+        "const config = {\n"
+        '  preset: "system",\n'
+        "};\n\n"
+        "const messages = [{ role: config.preset }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
     # `role` is deterministically "system" at the use site (round 37): a static reassignment
     # must resolve to the value actually in effect, not to "unresolved" just because a write

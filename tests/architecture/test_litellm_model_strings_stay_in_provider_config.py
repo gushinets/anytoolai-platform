@@ -856,3 +856,69 @@ def test_non_default_parameter_shadows_a_same_named_outer_provider(tmp_path: Pat
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == [], offenders
+
+
+def test_namespace_import_property_access_is_detected(tmp_path: Path) -> None:
+    # `import * as providers from "./providers"` never registered a binding for `providers` at
+    # all, and `providers.primaryProvider` (a `PropertyAccessExpression`) was never resolved by
+    # `foldExprInner` either — the resolver had no way to fold either half of this ordinary
+    # cross-module property access (round 58).
+    (tmp_path / "providers.ts").write_text('export const primaryProvider = "openai";\n', encoding="utf-8")
+    (tmp_path / "config.ts").write_text(
+        'import * as providers from "./providers";\n\n'
+        "const model = `${providers.primaryProvider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["config.ts:3: 'openai/gpt-4.1'"], offenders
+
+
+def test_local_object_literal_property_access_is_detected(tmp_path: Path) -> None:
+    # `config.primaryProvider`, where `config` is a fully static local object literal, is ordinary
+    # TypeScript — the resolver had no model for object/member lookup at all (round 58).
+    (tmp_path / "model.ts").write_text(
+        "const config = {\n"
+        '  primaryProvider: "openai",\n'
+        "};\n\n"
+        "const model = `${config.primaryProvider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:5: 'openai/gpt-4.1'"], offenders
+
+
+def test_element_access_with_a_static_string_key_is_detected(tmp_path: Path) -> None:
+    # `config["primaryProvider"]` is the same static property lookup as `config.primaryProvider`,
+    # just via bracket notation with a literal key (round 58).
+    (tmp_path / "model.ts").write_text(
+        'const config = { primaryProvider: "openai" };\n\n'
+        'const model = `${config["primaryProvider"]}/gpt-4.1`;\n',
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:3: 'openai/gpt-4.1'"], offenders
+
+
+def test_element_access_with_a_dynamic_key_is_not_a_false_positive(tmp_path: Path) -> None:
+    # `config[key]` has no statically-known property name to look up — must stay unresolved rather
+    # than guessing (round 58).
+    (tmp_path / "model.ts").write_text(
+        'const config = { primaryProvider: "openai" };\n\n'
+        "function pick(key) {\n"
+        "  return `${config[key]}/gpt-4.1`;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    assert check_litellm_model_strings(tmp_path, [tmp_path], set()) == []
+
+
+def test_reassigned_object_property_access_is_not_a_false_positive(tmp_path: Path) -> None:
+    # A `let` reassigned to a second object literal has no single, unambiguous shape — resolving
+    # its property to either literal's value would be a guess, not a static fact (round 58).
+    (tmp_path / "model.ts").write_text(
+        'let config = { primaryProvider: "openai" };\n'
+        'config = { primaryProvider: "internal" };\n\n'
+        "const model = `${config.primaryProvider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    assert check_litellm_model_strings(tmp_path, [tmp_path], set()) == []

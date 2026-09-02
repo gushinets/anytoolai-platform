@@ -344,6 +344,57 @@ function resolveExport(analysis, name, seen = new Set()) {
   return null;
 }
 
+/** The `ObjectLiteralExpression` node `expr` structurally evaluates to, if any — a plain inline
+ * object literal, or a plain identifier reference whose declaration has exactly one write and
+ * that write's own (transparent-wrapper-unwrapped) expression is an object literal. Deliberately
+ * much narrower than `replayWrites`' full conditional/union value tracking for strings: an
+ * object's *shape* isn't a small combinatorial set of string possibilities the way a folded
+ * string is, so this only ever answers "is this *always* this one specific object literal," never
+ * "which of several object literals could this be" — a `let`/multiply-reassigned binding, or one
+ * whose single write isn't an object literal at all, correctly resolves to nothing here rather
+ * than guessing (round 58). */
+function resolveObjectLiteral(analysis, expr) {
+  if (ts.isObjectLiteralExpression(expr)) return expr;
+  if (!ts.isIdentifier(expr)) return null;
+  const decl = analysis.resolveDecl(expr, expr.text);
+  if (!decl || decl.writes.length !== 1) return null;
+  let target = decl.writes[0].expr;
+  while (target && TRANSPARENT_WRAPPER_KINDS.has(target.kind)) target = target.expression;
+  return target && ts.isObjectLiteralExpression(target) ? target : null;
+}
+
+/** `objExpr.propName` (from a `PropertyAccessExpression`, or an `ElementAccessExpression` with a
+ * static string-literal index — see `foldExprInner`), resolved one of two ways: if `objExpr` is a
+ * `NamespaceImport` binding (`import * as providers from "./x"`), `propName` is looked up in the
+ * source module's own export graph via `resolveExport`, exactly like an ordinary named import
+ * already does; otherwise, `objExpr` is resolved structurally to an object literal (see
+ * `resolveObjectLiteral`) and `propName` is looked up among its own (non-computed) properties,
+ * `own: false` writes folded through the same `replayWrites`/`isDeterministicWrite` machinery
+ * everything else uses (round 58). `null` for anything neither shape covers. */
+function resolvePropertyAccess(analysis, objExpr, propName) {
+  if (ts.isIdentifier(objExpr)) {
+    const decl = analysis.resolveDecl(objExpr, objExpr.text);
+    if (decl && decl.namespaceOf) {
+      const targetAnalysis = analyses.get(decl.namespaceOf);
+      const target = targetAnalysis ? resolveExport(targetAnalysis, propName) : null;
+      if (!target) return null;
+      const set = replayWrites(target.analysis, target.decl, target.analysis.sourceFile.text.length);
+      return set.size ? Array.from(set) : null;
+    }
+  }
+  const objectLiteral = resolveObjectLiteral(analysis, objExpr);
+  if (!objectLiteral) return null;
+  for (const prop of objectLiteral.properties) {
+    if (ts.isPropertyAssignment(prop) && !ts.isComputedPropertyName(prop.name)) {
+      const key = ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name) ? prop.name.text : null;
+      if (key === propName) return foldExpr(analysis, prop.initializer);
+    } else if (ts.isShorthandPropertyAssignment(prop) && prop.name.text === propName) {
+      return foldExpr(analysis, prop.name);
+    }
+  }
+  return null;
+}
+
 // Guards `resolveRedirectValue`'s own recursion against a genuine circular *value* dependency
 // (not just a re-export chain, already guarded by `resolveExport`'s own `seen` set) — e.g. two
 // files whose exported constants each reference the other's, directly or transitively. Keyed by
@@ -557,6 +608,18 @@ function foldExprInner(analysis, node) {
       const set = replayWrites(analysis, decl, atPos, enclosingWrite);
       return set.size ? Array.from(set) : null;
     }
+    case ts.SyntaxKind.PropertyAccessExpression:
+      // `providers.primaryProvider` / `config.primaryProvider` — see `resolvePropertyAccess` for
+      // the two shapes this covers (a namespace import, or a statically-known local object
+      // literal). `node.name` is always a plain `Identifier` here (a `PrivateIdentifier` — `#x` —
+      // can't appear outside a class body, and nothing in this resolver models class members).
+      return resolvePropertyAccess(analysis, node.expression, node.name.text);
+    case ts.SyntaxKind.ElementAccessExpression:
+      // `config["primaryProvider"]` — only a *static* string-literal index is resolvable at all; a
+      // computed one (`config[key]`) has no statically-known property name to look up.
+      return node.argumentExpression && ts.isStringLiteralLike(node.argumentExpression)
+        ? resolvePropertyAccess(analysis, node.expression, node.argumentExpression.text)
+        : null;
     default:
       return null;
   }
@@ -781,6 +844,17 @@ function resolveImports(analysis) {
           const d = { name: localName, scope: sf, mutable: false, writes: [{ pos: 0, own: true, redirect }] };
           analysis.scopeDecls(sf).set(localName, [d]);
         }
+      }
+      if (node.importClause.namedBindings && ts.isNamespaceImport(node.importClause.namedBindings)) {
+        // `import * as providers from "./providers"` — `providers` itself never folds to a string
+        // (it isn't a value at all, just a namespace object), so it's registered with no writes of
+        // its own; `namespaceOf` is read directly by `resolvePropertyAccess` when a later
+        // `providers.someExport` needs to resolve *through* it into the source module's own export
+        // graph, reusing `resolveExport` exactly as an ordinary named import already does (round
+        // 58).
+        const localName = node.importClause.namedBindings.name.text;
+        const d = { name: localName, scope: sf, mutable: false, writes: [], namespaceOf: sourcePath };
+        analysis.scopeDecls(sf).set(localName, [d]);
       }
     } else if (ts.isExportAssignment(node) && !node.isExportEquals) {
       // `export default <expr>;` — not tied to any named declaration (the expression can be a
