@@ -265,6 +265,21 @@ def test_default_role_parameter_in_concise_arrow_body_is_detected(tmp_path: Path
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_concise_arrow_role_parameter_does_not_leak_past_array_comma(tmp_path: Path) -> None:
+    # The comma ends the arrow's own body — the next array element must still resolve `role`
+    # through the outer "system" binding, not the arrow's own leaked "user" parameter (round 41).
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n\n'
+        "const values = [\n"
+        '  (role = "user") => role,\n'
+        "  { role },\n"
+        "];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_non_default_role_parameter_is_not_a_false_positive(tmp_path: Path) -> None:
     (tmp_path / "chat.ts").write_text(
         "function buildMessage(role) {\n  return { role };\n}\n"

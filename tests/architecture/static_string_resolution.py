@@ -715,13 +715,46 @@ def _js_block_path_at(text: str, spans: list[tuple[int, int]], position: int) ->
 
     An arrow function's concise (expression) body is the exact same shape: `(role = "x") => role`
     has no `{ ... }` either, so its parameter needs the identical treatment — a virtual block
-    pushed right after `=>` whenever it isn't immediately followed by `{`, closed the same way at
-    the expression's own terminating `;` (round 40).
+    pushed right after `=>` whenever it isn't immediately followed by `{` (round 40).
+
+    A *statement* (a braceless control-flow body) only ever ends at `;`/`}` — but a concise arrow
+    is an *expression*, and an expression can end several other ways a bare `;`/`}` check misses:
+    a `,` separating it from the next element in an enclosing array/call/object (`[f(x) => x,
+    next]`), the enclosing bracket's own closing `)`/`]` when there's no trailing comma at all
+    (`foo((x) => x)`), or automatic semicolon insertion at a newline with no brackets still open
+    (`const f = (x) => x\n\nconst g = 1`, valid, semicolon-free TS/JS). Every virtual block —
+    control-flow or arrow-body alike — is pushed with the current *bracket depth* (`(`/`[`
+    nesting, tracked together since either can enclose a comma-separated list) it was opened at,
+    and closes on whichever of these comes first: a `;`/newline while global bracket depth is 0
+    (the two situations where JS statements actually end — a newline is treated as unconditional
+    ASI here; round 41's own known ceiling: a multi-line expression that continues past a newline
+    via a trailing operator with no enclosing brackets at all, e.g. `const x = a +\n  b`, closes
+    prematurely — rare in practice, and typically avoided with explicit parens anyway), a comma
+    at exactly the block's own opening bracket depth (a sibling list/argument boundary), or a
+    `)`/`]` that brings bracket depth strictly below the block's own opening depth (the enclosing
+    bracket itself just closed). A chain of braceless `if (a) if (b) x = 1;` closes together the
+    same way it always has, since they share one bracket depth and one terminating point. A `do`
+    loop's braceless body (terminated by a following `while (...)`, not a `;`) isn't modeled —
+    ponytail: rare in practice, upgrade path is a real JS/TS parser, same ceiling as the rest of
+    this file's JS/TS scanning.
+
+    ponytail: a comma inside an object literal's `{ ... }` (a real block, not counted toward
+    bracket depth here) isn't recognized as a sibling-property boundary the way one inside `(...)`
+    /`[...]` is — a `{`/`}` can't be reliably told apart from an ordinary statement block (a
+    function/if/etc. body, where a comma has entirely different meaning, e.g. a multi-declarator
+    `let a = 1, b = 2;`) without a real parser. An arrow assigned as one object property's value,
+    immediately followed by a comma and another property that reads an outer same-named binding,
+    is the one shape this can still miss. Upgrade path: a real JS/TS parser.
     """
-    stack: list[tuple[bool, int]] = []  # (is_real_block, id)
+    # Stack entries: `[is_real_block, id, bracket_depth_at_open, body_starts_at]`. `body_starts_at`
+    # (real blocks: unused) is the position of the virtual block's own first real body character —
+    # ASI/newline closing (below) only applies once the scan has actually reached it, so the
+    # whitespace/newline *between* a guard/`=>` and a body that starts on the next line (`if
+    # (cond)\n  role = "x";`, `(x) =>\n  x`) is never mistaken for the body's own end.
+    stack: list[list] = []
     next_id = 0
     span_end_by_start = dict(spans)
-    paren_depth = 0
+    bracket_depth = 0
     length = len(text)
 
     def skip_ws(j: int) -> int:
@@ -729,22 +762,32 @@ def _js_block_path_at(text: str, spans: list[tuple[int, int]], position: int) ->
             j += 1
         return j
 
+    def pop_virtuals_below(new_depth: int) -> None:
+        while stack and not stack[-1][0] and stack[-1][2] > new_depth:
+            stack.pop()
+
+    def push_virtual(body_starts_at: int) -> None:
+        nonlocal next_id
+        stack.append([False, next_id, bracket_depth, body_starts_at])
+        next_id += 1
+
     i = 0
     while i < position:
         if i in span_end_by_start:
             i = span_end_by_start[i] + 1
             continue
         char = text[i]
-        if char == "(":
-            paren_depth += 1
+        if char in "([":
+            bracket_depth += 1
             i += 1
             continue
-        if char == ")":
-            paren_depth = max(0, paren_depth - 1)
+        if char in ")]":
+            bracket_depth = max(0, bracket_depth - 1)
+            pop_virtuals_below(bracket_depth)
             i += 1
             continue
         if char == "{":
-            stack.append((True, next_id))
+            stack.append([True, next_id, 0, 0])
             next_id += 1
             i += 1
             continue
@@ -755,8 +798,13 @@ def _js_block_path_at(text: str, spans: list[tuple[int, int]], position: int) ->
                 stack.pop()
             i += 1
             continue
-        if char == ";" and paren_depth == 0:
-            while stack and not stack[-1][0]:
+        if char in ";\n" and bracket_depth == 0:
+            while stack and not stack[-1][0] and stack[-1][3] <= i:
+                stack.pop()
+            i += 1
+            continue
+        if char == "," and bracket_depth > 0:
+            while stack and not stack[-1][0] and stack[-1][2] == bracket_depth:
                 stack.pop()
             i += 1
             continue
@@ -787,25 +835,17 @@ def _js_block_path_at(text: str, spans: list[tuple[int, int]], position: int) ->
                 next_word = _JS_IDENT_RE.match(text, j)
                 is_else_if = keyword == "else" and next_word is not None and next_word.group(0) == "if"
                 if not is_else_if and (j >= length or text[j] != "{"):
-                    stack.append((False, next_id))
-                    next_id += 1
+                    push_virtual(j)
                 i = keyword_match.end()
                 continue
         if char == "=" and text.startswith("=>", i):
-            # An arrow function's own concise (expression) body needs the identical treatment:
-            # `(role = "x") => role` has no `{ ... }` to give the parameter its own scope, but
-            # the parameter is still only meaningful for the single expression that follows —
-            # exactly the same "single statement, no braces" shape a braceless `if`/`for`/`while`
-            # body already gets above, closed by that expression's own terminating `;` the same
-            # way (round 40 — a `{ ... }` body already worked; a concise one didn't).
             j = skip_ws(i + 2)
             if j >= length or text[j] != "{":
-                stack.append((False, next_id))
-                next_id += 1
+                push_virtual(j)
             i += 2
             continue
         i += 1
-    return tuple(id_ for _, id_ in stack)
+    return tuple(id_ for is_real, id_, _, _ in stack)
 
 
 def resolve_js_identifier(modules: JsModules, path: Path, name: str, position: int) -> frozenset[str]:

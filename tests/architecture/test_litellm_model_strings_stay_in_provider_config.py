@@ -365,6 +365,34 @@ def test_braceless_while_loop_write_does_not_mask_provider(tmp_path: Path) -> No
     assert offenders == ["config.ts:6: 'openai/gpt-4.1'"], offenders
 
 
+def test_concise_arrow_parameter_does_not_leak_past_asi_newline(tmp_path: Path) -> None:
+    # Semicolon-free TS: the arrow's own concise body ends at the newline, not at the file's
+    # next `;` — the outer `provider` must still be "openai" for the later template (round 41).
+    (tmp_path / "config.ts").write_text(
+        'const provider = "openai"\n\n'
+        'const normalize = (provider = "internal") => provider\n\n'
+        "const model = `${provider}/gpt-4.1`\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["config.ts:5: 'openai/gpt-4.1'"], offenders
+
+
+def test_concise_arrow_parameter_does_not_leak_past_array_comma(tmp_path: Path) -> None:
+    # The comma ends the arrow's own body — the next array element must still resolve `provider`
+    # through the outer binding, not the arrow's own leaked parameter (round 41).
+    (tmp_path / "config.ts").write_text(
+        'const provider = "openai";\n\n'
+        "const values = [\n"
+        '  (provider = "internal") => provider,\n'
+        "  `${provider}/gpt-4.1`,\n"
+        "];\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["config.ts:5: 'openai/gpt-4.1'"], offenders
+
+
 def test_nested_scope_js_provider_does_not_shadow_outer_binding(tmp_path: Path) -> None:
     (tmp_path / "config.ts").write_text(
         'const provider = "openai";\n\n'
