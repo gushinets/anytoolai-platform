@@ -375,6 +375,7 @@ def _ensure_js_scope_resolver_dependencies() -> None:
             cwd=_JS_SCOPE_RESOLVER_DIR,
             capture_output=True,
             text=True,
+            encoding="utf-8",
             timeout=180,
         )
         if result.returncode != 0:
@@ -461,6 +462,14 @@ def js_modules(paths: Iterable[Path]) -> JsModules:
         input=json.dumps([str(path) for path in paths]),
         capture_output=True,
         text=True,
+        # Explicit, not the platform default: `text=True` alone decodes stdout/stderr with
+        # `locale.getpreferredencoding()`, which on `windows-latest` CI is cp1252, not UTF-8 — the
+        # script's stdout is the JSON-serialized text of every real source file scanned, which can
+        # (and, in this repo's own prose-heavy comments, does) contain multi-byte UTF-8 sequences
+        # cp1252 can't decode at all (round 49: a real CI failure — every byte 0x80-0xFF is
+        # *something* in cp1252, but 0x90 specifically is undefined there, so decoding crashed on
+        # the reader thread instead of just mangling the text).
+        encoding="utf-8",
         timeout=120,
     )
     if result.returncode != 0:
