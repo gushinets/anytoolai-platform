@@ -294,6 +294,35 @@ def test_conditionally_reachable_safe_role_does_not_mask_deterministic_one(tmp_p
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_braceless_conditional_write_does_not_mask_forbidden_role(tmp_path: Path) -> None:
+    # `if (cond) role = "user";` has no `{}` at all, but is exactly as conditional as the braced
+    # form — `"system"` remains reachable whenever `useUserRole` is false (round 39).
+    (tmp_path / "chat.ts").write_text(
+        'let role = "system";\n\n'
+        "if (useUserRole)\n"
+        '  role = "user";\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_braceless_else_if_chain_still_resolves_correctly(tmp_path: Path) -> None:
+    # Both the `if` and `else if` bodies are braceless — chained single-statement control flow.
+    (tmp_path / "chat.ts").write_text(
+        'let role = "user";\n\n'
+        "if (a)\n"
+        '  role = "safe";\n'
+        "else if (b)\n"
+        '  role = "system";\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_comment_between_role_and_colon_is_detected_in_tsx(tmp_path: Path) -> None:
     (tmp_path / "chat.tsx").write_text(
         'const SYSTEM_ROLE = "system";\n\n'

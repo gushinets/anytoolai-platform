@@ -665,39 +665,129 @@ _JS_ARROW_SIGNATURE_RE = re.compile(
 )
 # `NAME = <value>` (optionally `NAME: Type = <value>`) inside a parameter list's own text.
 _JS_PARAM_DEFAULT_RE = re.compile(rf"(?<![\w$.])({_JS_IDENT})\s*(?::[^,=()]+?)?=(?!=)")
+# `if`/`for`/`while` (each followed by a `(...)` guard clause) and `else` (no guard) — JS/TS
+# control-flow keywords whose single-statement body, when not wrapped in `{ ... }`, still needs
+# its own "virtual" block in `_js_block_path_at` (round 39: `if (cond) role = "x";`, with no
+# braces at all, must be recognized as conditional the same way `if (cond) { role = "x"; }` is).
+_JS_CONTROL_KEYWORD_RE = re.compile(r"\b(if|else|for|while)\b")
+
+
+def _js_word_is_property(text: str, position: int) -> bool:
+    """Whether the identifier/keyword-spelled word starting at `position` is reached via a
+    preceding `.` (`obj.if`, `obj.for` — legal JS property names spelled like reserved words) —
+    never a real keyword token in that case."""
+    j = position - 1
+    while j >= 0 and text[j].isspace():
+        j -= 1
+    return j >= 0 and text[j] == "."
 
 
 def _js_block_path_at(text: str, spans: list[tuple[int, int]], position: int) -> tuple[int, ...]:
-    """The stack of enclosing `{ ... }` block ids immediately before `position` — `()` at module
-    top level, a longer tuple inside nested blocks. Each `{` outside a string-literal span (a
-    `{`/`}` inside a string's own text must not count — `spans`, from `js_string_literals`,
-    excludes it) opens a new, uniquely-numbered block; its matching `}` closes it. A
-    declaration's block path being a *prefix* of a use site's block path means the declaration's
-    scope encloses that use site — real JS lexical (block) scoping for `const`/`let`, and object
-    literals/array literals never contain a declaration statement, so the extra "blocks" this
-    coarse counting adds for them are harmless: they can only make a use site look more deeply
-    nested than its true statement-level scope, which prefix-matching absorbs without ever
-    finding an unrelated declaration (each block id is unique and genuinely encloses only what's
-    textually between its `{` and matching `}`). A reasonable, conservative-direction
-    approximation for `var` too (real `var` is function-scoped and can escape an enclosing
-    non-function block that this treats as its own scope — narrower than reality, so this can
-    only miss a `var` that's really in scope, never wrongly resolve one that isn't).
+    """The stack of enclosing block ids immediately before `position` — `()` at module top level,
+    a longer tuple inside nested blocks. Each `{` outside a string-literal span (a `{`/`}` inside
+    a string's own text must not count — `spans`, from `js_string_literals`, excludes it) opens a
+    new, uniquely-numbered *real* block; its matching `}` closes it. A declaration's block path
+    being a *prefix* of a use site's block path means the declaration's scope encloses that use
+    site — real JS lexical (block) scoping for `const`/`let`, and object literals/array literals
+    never contain a declaration statement, so the extra "blocks" this coarse counting adds for
+    them are harmless: they can only make a use site look more deeply nested than its true
+    statement-level scope, which prefix-matching absorbs without ever finding an unrelated
+    declaration (each block id is unique and genuinely encloses only what's textually between its
+    `{` and matching `}`). A reasonable, conservative-direction approximation for `var` too (real
+    `var` is function-scoped and can escape an enclosing non-function block this treats as its
+    own scope — narrower than reality, so this can only miss a `var` that's really in scope,
+    never wrongly resolve one that isn't).
+
+    JS/TS control flow doesn't require braces at all: `if (cond) role = "x";` is exactly as
+    conditional as `if (cond) { role = "x"; }`, but has no `{`/`}` for the counting above to see
+    at all. Immediately after an `if`/`for`/`while`'s own `(...)` guard (or immediately after a
+    bare `else`, unless it's `else if` — the following `if` handles its own body, so `else` alone
+    needs no separate scope) — whenever the next token isn't `{` — a *virtual* block (same
+    globally-unique id space as real ones, so it deepens a block path the identical way) is
+    pushed instead, standing in for the single statement that follows. It's popped at that
+    statement's own terminating `;` (tracked with `;` inside any open, un-skipped `(...)`
+    correctly excluded — a `for (init; cond; update)`'s own semicolons don't end anything), along
+    with every other virtual block still open at that same `;` (closing a chain of braceless
+    `if (a) if (b) x = 1;` together, since they all end at the one shared statement). A `do`
+    loop's braceless body (terminated by a following `while (...)`, not a `;`) isn't modeled —
+    ponytail: rare in practice, upgrade path is a real JS/TS parser, same ceiling as the rest of
+    this file's JS/TS scanning.
     """
-    stack: list[int] = []
+    stack: list[tuple[bool, int]] = []  # (is_real_block, id)
     next_id = 0
     span_end_by_start = dict(spans)
+    paren_depth = 0
+    length = len(text)
+
+    def skip_ws(j: int) -> int:
+        while j < length and text[j].isspace():
+            j += 1
+        return j
+
     i = 0
     while i < position:
         if i in span_end_by_start:
             i = span_end_by_start[i] + 1
             continue
-        if text[i] == "{":
-            stack.append(next_id)
+        char = text[i]
+        if char == "(":
+            paren_depth += 1
+            i += 1
+            continue
+        if char == ")":
+            paren_depth = max(0, paren_depth - 1)
+            i += 1
+            continue
+        if char == "{":
+            stack.append((True, next_id))
             next_id += 1
-        elif text[i] == "}" and stack:
-            stack.pop()
+            i += 1
+            continue
+        if char == "}":
+            while stack and not stack[-1][0]:
+                stack.pop()
+            if stack:
+                stack.pop()
+            i += 1
+            continue
+        if char == ";" and paren_depth == 0:
+            while stack and not stack[-1][0]:
+                stack.pop()
+            i += 1
+            continue
+        if char.isalpha():
+            keyword_match = _JS_CONTROL_KEYWORD_RE.match(text, i)
+            if keyword_match is not None and not _js_word_is_property(text, i):
+                keyword = keyword_match.group(1)
+                j = keyword_match.end()
+                if keyword in ("if", "for", "while"):
+                    j = skip_ws(j)
+                    if j < length and text[j] == "(":
+                        depth = 0
+                        k = j
+                        while k < length:
+                            if k in span_end_by_start:
+                                k = span_end_by_start[k] + 1
+                                continue
+                            if text[k] == "(":
+                                depth += 1
+                            elif text[k] == ")":
+                                depth -= 1
+                                if depth == 0:
+                                    k += 1
+                                    break
+                            k += 1
+                        j = k
+                j = skip_ws(j)
+                next_word = _JS_IDENT_RE.match(text, j)
+                is_else_if = keyword == "else" and next_word is not None and next_word.group(0) == "if"
+                if not is_else_if and (j >= length or text[j] != "{"):
+                    stack.append((False, next_id))
+                    next_id += 1
+                i = keyword_match.end()
+                continue
         i += 1
-    return tuple(stack)
+    return tuple(id_ for _, id_ in stack)
 
 
 def resolve_js_identifier(modules: JsModules, path: Path, name: str, position: int) -> frozenset[str]:

@@ -327,6 +327,32 @@ def test_conditionally_reachable_provider_is_detected(tmp_path: Path) -> None:
     assert offenders == ["config.ts:7: 'openai/gpt-4.1'"], offenders
 
 
+def test_braceless_conditional_write_does_not_mask_provider(tmp_path: Path) -> None:
+    # `if (cond) provider = "";` has no `{}` at all, but is exactly as conditional as the braced
+    # form — `openai/gpt-4.1` remains reachable whenever `useFallback` is false (round 39).
+    (tmp_path / "config.ts").write_text(
+        'let provider = "openai";\n\n'
+        "if (useFallback)\n"
+        '  provider = "";\n\n'
+        'const model = provider + "/gpt-4.1";\n',
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["config.ts:6: 'openai/gpt-4.1'"], offenders
+
+
+def test_braceless_while_loop_write_does_not_mask_provider(tmp_path: Path) -> None:
+    (tmp_path / "config.ts").write_text(
+        'let provider = "openai";\n\n'
+        "while (useFallback)\n"
+        '  provider = "internal";\n\n'
+        'const model = provider + "/gpt-4.1";\n',
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["config.ts:6: 'openai/gpt-4.1'"], offenders
+
+
 def test_nested_scope_js_provider_does_not_shadow_outer_binding(tmp_path: Path) -> None:
     (tmp_path / "config.ts").write_text(
         'const provider = "openai";\n\n'
