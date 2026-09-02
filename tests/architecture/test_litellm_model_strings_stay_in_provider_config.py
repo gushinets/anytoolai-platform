@@ -421,3 +421,18 @@ def test_nested_scope_js_provider_does_not_shadow_outer_binding(tmp_path: Path) 
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == ["config.ts:8: 'openai/gpt-4.1'"], offenders
+
+
+def test_provider_mutation_inside_uncalled_arrow_does_not_override_outer_value(tmp_path: Path) -> None:
+    # `setFallback` is only *defined* here, never called — at module evaluation `provider` is
+    # still deterministically "openai", so the real model is `openai/gpt-4.1`. A write reachable
+    # only by crossing into a nested function/arrow can never be assumed to have run just because
+    # its source position precedes the use site (round 44).
+    (tmp_path / "model.ts").write_text(
+        'let provider = "openai";\n\n'
+        'const setFallback = () => provider = "internal";\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:5: 'openai/gpt-4.1'"], offenders

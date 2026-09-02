@@ -222,6 +222,21 @@ def test_nested_scope_role_does_not_shadow_outer_binding(tmp_path: Path) -> None
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_role_mutation_inside_uncalled_arrow_does_not_override_outer_value(tmp_path: Path) -> None:
+    # `switchToUser` is only *defined* here, never called — `{ role }` is still deterministically
+    # a system-role message at runtime. A write reachable only by crossing into a nested
+    # function/arrow can never be assumed to have run just because its source position precedes
+    # the use site (round 44).
+    (tmp_path / "chat.ts").write_text(
+        'let role = "system";\n\n'
+        'const switchToUser = () => role = "user";\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
     # `role` is deterministically "system" at the use site (round 37): a static reassignment
     # must resolve to the value actually in effect, not to "unresolved" just because a write

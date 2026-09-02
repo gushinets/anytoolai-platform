@@ -197,12 +197,38 @@ function isConditionalSlot(node, parent) {
 }
 
 /** Whether a write reaching `scope` from `assignmentNode` is a *deterministic* one — walking up
- * from the assignment, it never passes through a conditional slot (see `isConditionalSlot`) or
- * any nested `Block` other than `scope` itself, all the way up to `scope`. This is the one test
- * that correctly treats a *braceless* `if (cond) role = "x";` exactly like the braced form: the
- * braceless body's `ExpressionStatement` sits directly in `IfStatement.thenStatement` — no
- * `Block` node exists there at all for a text-position/brace-counting heuristic to see, but a
- * real parent pointer sees the slot immediately. */
+ * from the assignment, it never passes through a conditional slot (see `isConditionalSlot`), any
+ * nested `Block` other than `scope` itself, or any function-like node other than `scope` itself
+ * — all the way up to `scope`. This is the one test that correctly treats a *braceless*
+ * `if (cond) role = "x";` exactly like the braced form: the braceless body's `ExpressionStatement`
+ * sits directly in `IfStatement.thenStatement` — no `Block` node exists there at all for a
+ * text-position/brace-counting heuristic to see, but a real parent pointer sees the slot
+ * immediately.
+ *
+ * The function-like check matters just as much as the Block one, for the same underlying reason:
+ * a write inside a nested function/arrow is only reached if and when that function is *called* —
+ * never assumable from its mere textual position, since defining a function isn't running it. A
+ * *braced* arrow/function body already gets this for free (its own `Block` isn't `scope`, so the
+ * Block check alone already returns conditional) — but a *concise* arrow body has no `Block` at
+ * all (`() => role = "x"` puts the assignment directly under the `ArrowFunction` node, no
+ * wrapping statement or block in between), so without this explicit check a write nested inside
+ * an uncalled concise arrow would walk straight up to `scope` and be wrongly read as
+ * deterministic, exactly as if it always ran before the very next statement (round 44). */
+function isFunctionLike(node) {
+  switch (node.kind) {
+    case ts.SyntaxKind.ArrowFunction:
+    case ts.SyntaxKind.FunctionExpression:
+    case ts.SyntaxKind.FunctionDeclaration:
+    case ts.SyntaxKind.MethodDeclaration:
+    case ts.SyntaxKind.GetAccessor:
+    case ts.SyntaxKind.SetAccessor:
+    case ts.SyntaxKind.Constructor:
+      return true;
+    default:
+      return false;
+  }
+}
+
 function isDeterministicWrite(assignmentNode, scope) {
   let node = assignmentNode;
   while (node !== scope) {
@@ -210,6 +236,7 @@ function isDeterministicWrite(assignmentNode, scope) {
     if (!parent) return false;
     if (isConditionalSlot(node, parent)) return false;
     if (node.kind === ts.SyntaxKind.Block && node !== scope) return false;
+    if (isFunctionLike(node) && node !== scope) return false;
     node = parent;
   }
   return true;
