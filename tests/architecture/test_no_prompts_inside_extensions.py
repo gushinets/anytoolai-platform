@@ -237,6 +237,32 @@ def test_role_mutation_inside_uncalled_arrow_does_not_override_outer_value(tmp_p
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_role_survives_as_const_assertion(tmp_path: Path) -> None:
+    # `as const` is a compile-time-only TypeScript annotation — the runtime value is exactly the
+    # inner literal, "system" (round 46).
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system" as const;\nconst messages = [{ role }];\n', encoding="utf-8"
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_var_role_declared_inside_if_block_is_visible_at_function_scope(tmp_path: Path) -> None:
+    # `var` is function-scoped, not block-scoped — it escapes the `if` block the same way real JS
+    # hoisting does, unlike `let`/`const` (round 46).
+    (tmp_path / "chat.ts").write_text(
+        "function buildMessage(enabled) {\n"
+        "  if (enabled) {\n"
+        '    var role = "system";\n'
+        "  }\n"
+        "  return { role };\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
     # `role` is deterministically "system" at the use site (round 37): a static reassignment
     # must resolve to the value actually in effect, not to "unresolved" just because a write

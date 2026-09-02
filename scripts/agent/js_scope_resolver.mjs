@@ -56,13 +56,27 @@ function blankComments(text, scriptKind) {
   return chars.join("");
 }
 
-function isScopeNode(node) {
-  return node.kind === ts.SyntaxKind.SourceFile || node.kind === ts.SyntaxKind.Block;
+// A `for`/`for-in`/`for-of` header's own `let`/`const` binding (`for (let i = 0; ...)`) is
+// visible throughout the loop's condition/update/body but lives nowhere a `Block` can represent
+// — its declaration is a sibling of the body, not an ancestor of it. Treating the loop statement
+// itself as a scope node (round 46) lets `nearestScope` find it as the header's home while
+// walking up from anywhere inside the loop, the same way a concise arrow's own node already
+// stands in for a body-less scope.
+function isForHeaderNode(node) {
+  return (
+    node.kind === ts.SyntaxKind.ForStatement ||
+    node.kind === ts.SyntaxKind.ForInStatement ||
+    node.kind === ts.SyntaxKind.ForOfStatement
+  );
 }
 
-/** The nearest enclosing scope node for `node` — a `Block`/`SourceFile`, or (for a parameter
- * default's own concise-arrow-body scope, which has no `Block` at all) the `ArrowFunction` node
- * itself. Walks the node's own ancestors, not itself. */
+function isScopeNode(node) {
+  return node.kind === ts.SyntaxKind.SourceFile || node.kind === ts.SyntaxKind.Block || isForHeaderNode(node);
+}
+
+/** The nearest enclosing scope node for `node` — a `Block`/`SourceFile`/for-loop header (see
+ * `isForHeaderNode`), or (for a parameter default's own concise-arrow-body scope, which has no
+ * `Block` at all) the `ArrowFunction` node itself. Walks the node's own ancestors, not itself. */
 function nearestScope(node) {
   let n = node.parent;
   while (n) {
@@ -82,6 +96,21 @@ function paramOwnScope(fn) {
   return fn; // concise arrow body
 }
 
+/** The nearest enclosing *function* scope for `node` — a braced function/arrow's own body, or
+ * `SourceFile` at module level — skipping every intervening `Block`/for-header/if/etc. along the
+ * way. This is `var`'s real scope (function- or module-scoped, unlike `let`/`const`'s block
+ * scope): `if (enabled) { var provider = "..."; }` still puts `provider` in the *function's* own
+ * scope, not the `if` block's, exactly like real JS hoisting (round 46). */
+function nearestFunctionScope(node) {
+  let n = node.parent;
+  while (n) {
+    if (n.kind === ts.SyntaxKind.SourceFile) return n;
+    if (isFunctionLike(n)) return n.body && n.body.kind === ts.SyntaxKind.Block ? n.body : n;
+    n = n.parent;
+  }
+  return null;
+}
+
 class FileAnalysis {
   constructor(sourceFile, text) {
     this.sourceFile = sourceFile;
@@ -93,7 +122,10 @@ class FileAnalysis {
     this.inProgress = new Set();
     this.values = new Map(); // offset -> string[]
     this.roots = []; // [offset, value][]
-    this.exportedNames = new Map(); // name -> decl info (module-level `export const/let/var`)
+    // name -> `{kind: "local", decl}` (a module-level `export const/let/var NAME = ...`) or
+    // `{kind: "reexport", path, name}` (an `export { a as NAME } from "./x"`, or a bare
+    // `export { NAME };` re-exporting this same file's own `NAME`) — see `resolveExport`.
+    this.exportedNames = new Map();
   }
 
   scopeDecls(scope) {
@@ -114,7 +146,7 @@ class FileAnalysis {
     }
     byName.push(decl);
     if (exported && scope.kind === ts.SyntaxKind.SourceFile) {
-      this.exportedNames.set(name, decl);
+      this.exportedNames.set(name, { kind: "local", decl });
     }
     return decl;
   }
@@ -157,9 +189,13 @@ function replayWrites(analysis, decl, atPos) {
   let reachable = new Set();
   for (const write of decl.writes) {
     if (write.pos > atPos) break;
-    // An imported binding's "write" is already resolved against the source file it came from
-    // (see `resolveImports`) — there's no local expression node to fold here.
-    const values = "resolved" in write ? write.resolved : foldExpr(analysis, write.expr);
+    // An imported binding's "write" has no local expression to fold — its value comes from
+    // wherever the import points, resolved lazily (see `resolveRedirectValue`) each time it's
+    // actually needed rather than once, eagerly, when the import itself is first seen (round 46:
+    // eager resolution made cross-file constant chains depend on file traversal order, since a
+    // consumer processed before its dependency's own imports were installed would memoize an
+    // "unresolvable" result that a later pass had no way to revisit).
+    const values = write.redirect !== undefined ? resolveRedirectValue(write.redirect) : foldExpr(analysis, write.expr);
     const deterministic = write.own || isDeterministicWrite(write.node, decl.scope);
     if (deterministic) {
       reachable = new Set(values || []);
@@ -168,6 +204,51 @@ function replayWrites(analysis, decl, atPos) {
     }
   }
   return reachable;
+}
+
+/** Follows an `export { a as NAME } from "./x"` (or a bare `export { NAME };` re-exporting this
+ * same file's own binding) to the real declaration it ultimately names — recursively, since a
+ * re-export can itself point at another re-export, with `seen` guarding against a circular chain
+ * (`a.ts` re-exports from `b.ts`, which re-exports back from `a.ts`). A name that was never
+ * exported at all, directly or via a re-export, still resolves through this same path: a bare
+ * `export { NAME }` re-exporting an ordinary (no `export` keyword of its own) local binding falls
+ * back to that file's own top-level scope directly. */
+function resolveExport(analysis, name, seen = new Set()) {
+  const key = `${analysis.path}::${name}`;
+  if (seen.has(key)) return null;
+  seen.add(key);
+  const entry = analysis.exportedNames.get(name);
+  if (entry?.kind === "local") return { analysis, decl: entry.decl };
+  if (entry?.kind === "reexport") {
+    // `entry.path` is always a concrete path when the re-export is resolvable at all — a bare
+    // `export { NAME };` (no `from`) is recorded with the *current* file's own path, not left
+    // unset — so a genuinely unresolvable specifier (an external package, or a file outside this
+    // batch) correctly falls through to `null` here instead of silently searching this file.
+    const sourceAnalysis = entry.path ? analyses.get(entry.path) : null;
+    return sourceAnalysis ? resolveExport(sourceAnalysis, entry.name, seen) : null;
+  }
+  const localDecls = analysis.declsByScope.get(analysis.sourceFile)?.get(name);
+  return localDecls?.length ? { analysis, decl: localDecls[localDecls.length - 1] } : null;
+}
+
+// Guards `resolveRedirectValue`'s own recursion against a genuine circular *value* dependency
+// (not just a re-export chain, already guarded by `resolveExport`'s own `seen` set) — e.g. two
+// files whose exported constants each reference the other's, directly or transitively. Keyed by
+// declaration object identity (stable across repeated lookups of the same binding), not by name,
+// so two different bindings that happen to share a name never collide.
+const redirectInProgress = new Set();
+
+function resolveRedirectValue(redirect) {
+  if (!redirect) return null;
+  const target = resolveExport(redirect.analysis, redirect.name);
+  if (!target || redirectInProgress.has(target.decl)) return null;
+  redirectInProgress.add(target.decl);
+  try {
+    const set = replayWrites(target.analysis, target.decl, target.analysis.sourceFile.text.length);
+    return set.size ? Array.from(set) : null;
+  } finally {
+    redirectInProgress.delete(target.decl);
+  }
 }
 
 const CONDITIONAL_PARENT_SLOTS = [
@@ -280,6 +361,17 @@ function foldExpr(analysis, node) {
   return result;
 }
 
+// TypeScript-only wrapper expressions that carry no runtime effect at all — `as`/`satisfies`/the
+// legacy `<Type>expr` cast, and `!` (non-null assertion) — each just wraps `.expression` with
+// type information the compiler erases; the runtime value is exactly the inner expression's
+// (round 46). Folding through them is a plain unwrap, not a fold of their own.
+const TRANSPARENT_WRAPPER_KINDS = new Set([
+  ts.SyntaxKind.AsExpression,
+  ts.SyntaxKind.SatisfiesExpression,
+  ts.SyntaxKind.TypeAssertionExpression,
+  ts.SyntaxKind.NonNullExpression,
+]);
+
 function foldExprInner(analysis, node) {
   const sf = analysis.sourceFile;
   switch (node.kind) {
@@ -287,6 +379,10 @@ function foldExprInner(analysis, node) {
     case ts.SyntaxKind.NoSubstitutionTemplateLiteral:
       return [node.text];
     case ts.SyntaxKind.ParenthesizedExpression:
+    case ts.SyntaxKind.AsExpression:
+    case ts.SyntaxKind.SatisfiesExpression:
+    case ts.SyntaxKind.TypeAssertionExpression:
+    case ts.SyntaxKind.NonNullExpression:
       return foldExpr(analysis, node.expression);
     case ts.SyntaxKind.TemplateExpression: {
       const parts = [[node.head.text]];
@@ -321,6 +417,7 @@ function isRootExpr(node) {
   const p = node.parent;
   if (!p) return true;
   if (p.kind === ts.SyntaxKind.ParenthesizedExpression) return false;
+  if (TRANSPARENT_WRAPPER_KINDS.has(p.kind)) return false;
   if (p.kind === ts.SyntaxKind.BinaryExpression && p.operatorToken.kind === ts.SyntaxKind.PlusToken) return false;
   if (p.kind === ts.SyntaxKind.TemplateSpan) return false;
   return true;
@@ -329,17 +426,37 @@ function isRootExpr(node) {
 function collectDeclarations(analysis) {
   const sf = analysis.sourceFile;
 
+  // `var` is function/module-scoped and hoists out of every enclosing block, unlike `let`/
+  // `const` — `if (enabled) { var provider = "x"; }` still declares `provider` in the *function*
+  // (or module) scope, not the `if` block's, so a reference outside that block can still find it
+  // (round 46: `nearestFunctionScope` finds that real scope; `isDeterministicWrite`'s existing
+  // Block-crossing check then correctly still treats the write itself as conditional, since the
+  // `if` block isn't the binding's own scope — a `var` assigned inside a branch that might not
+  // run is exactly as uncertain as a `let` would be there).
+  function collectDeclarationList(declList, containerNode, lexicalScope, isExported) {
+    const isVar = (declList.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) === 0;
+    const mutable = (declList.flags & ts.NodeFlags.Const) === 0;
+    const scope = isVar ? nearestFunctionScope(containerNode) || sf : lexicalScope;
+    for (const decl of declList.declarations) {
+      if (ts.isIdentifier(decl.name) && decl.initializer) {
+        const d = analysis.addDecl(decl.name.text, scope, mutable, decl.initializer, decl.name.getStart(sf), isExported);
+        d.writes[0].node = decl;
+      }
+    }
+  }
+
   function visit(node) {
     if (ts.isVariableStatement(node)) {
       const isExported = (ts.getCombinedModifierFlags(node) & ts.ModifierFlags.Export) !== 0;
-      const scope = nearestScope(node) || sf;
-      const mutable = (node.declarationList.flags & ts.NodeFlags.Const) === 0;
-      for (const decl of node.declarationList.declarations) {
-        if (ts.isIdentifier(decl.name) && decl.initializer) {
-          const d = analysis.addDecl(decl.name.text, scope, mutable, decl.initializer, decl.name.getStart(sf), isExported);
-          d.writes[0].node = decl;
-        }
-      }
+      collectDeclarationList(node.declarationList, node, nearestScope(node) || sf, isExported);
+    } else if (
+      isForHeaderNode(node) &&
+      node.initializer &&
+      ts.isVariableDeclarationList(node.initializer)
+    ) {
+      // The header's own scope is the loop statement itself (see `isForHeaderNode`) — there's no
+      // `Block` a bare `for (let i = 0; ...)` header could live in.
+      collectDeclarationList(node.initializer, node, node, false);
     } else if (
       (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node)) &&
       node.parameters
@@ -372,30 +489,36 @@ function collectDeclarations(analysis) {
   }
 }
 
+/** Registers every named import as a module-level binding whose sole "write" is a *lazy*
+ * `redirect` (resolved on demand by `resolveRedirectValue`, not eagerly here — round 46: eager
+ * resolution needed every file's own imports installed first to see through a multi-hop chain,
+ * making the result depend on which order files happened to be traversed in), and every
+ * `export { a as b } from "./x"` / bare `export { name };` as a `reexport` entry in
+ * `exportedNames` (structural only — which declaration a re-export ultimately names doesn't
+ * depend on any value being folded yet, so, unlike the import bindings above, there's nothing
+ * here to defer). Both kinds of registration are pure bookkeeping — the imported/re-exported
+ * *value* isn't computed until something actually asks for it (see `main`'s own resolution pass),
+ * so this function's own run order across files, like `collectDeclarations`'s, doesn't matter. */
 function resolveImports(analysis) {
   const sf = analysis.sourceFile;
   ts.forEachChild(sf, function visit(node) {
     if (ts.isImportDeclaration(node) && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
       const specifier = node.moduleSpecifier.text;
       const sourcePath = resolveModuleSpecifier(analysis.path, specifier);
-      const sourceAnalysis = sourcePath ? analyses.get(sourcePath) : null;
       for (const spec of node.importClause.namedBindings.elements) {
         const exportedName = (spec.propertyName || spec.name).text;
         const localName = spec.name.text;
-        let values = null;
-        if (sourceAnalysis) {
-          const exportedDecl = sourceAnalysis.exportedNames.get(exportedName);
-          if (exportedDecl) {
-            const endPos = sourceAnalysis.sourceFile.text.length;
-            const set = replayWrites(sourceAnalysis, exportedDecl, endPos);
-            values = set.size ? Array.from(set) : null;
-          }
-        }
-        // A module-level synthetic declaration whose sole "write" is the already-resolved
-        // imported value — reuses the same write/replay machinery so shadowing a local
-        // re-export or re-binding the import name (rare) still behaves consistently.
-        const d = { name: localName, scope: sf, mutable: false, writes: [{ pos: 0, own: true, resolved: values }] };
+        const redirect = sourcePath ? { analysis: analyses.get(sourcePath), name: exportedName } : null;
+        const d = { name: localName, scope: sf, mutable: false, writes: [{ pos: 0, own: true, redirect }] };
         analysis.scopeDecls(sf).set(localName, [d]);
+      }
+    } else if (ts.isExportDeclaration(node) && node.exportClause && ts.isNamedExports(node.exportClause)) {
+      const specifier = node.moduleSpecifier ? node.moduleSpecifier.text : null;
+      const sourcePath = specifier ? resolveModuleSpecifier(analysis.path, specifier) : analysis.path;
+      for (const spec of node.exportClause.elements) {
+        const sourceName = (spec.propertyName || spec.name).text;
+        const localExportedName = spec.name.text;
+        analysis.exportedNames.set(localExportedName, { kind: "reexport", path: sourcePath, name: sourceName });
       }
     }
     ts.forEachChild(node, visit);

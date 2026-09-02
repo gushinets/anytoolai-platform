@@ -38,6 +38,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -332,6 +333,23 @@ def _js_scope_resolver_marker() -> Path:
     return _JS_SCOPE_RESOLVER_DIR / "node_modules" / ".quick-check-fingerprint"
 
 
+def _require_tool(name: str) -> str:
+    """Resolve `name` to its full path via `shutil.which`, which — unlike a bare command name
+    passed straight to `subprocess.run(..., shell=False)` — applies `PATHEXT` on Windows. npm
+    ships as `npm.cmd`; Windows `CreateProcess` (what `subprocess` calls without `shell=True`)
+    only launches an exact executable it's given, so a bare `"npm"` fails to resolve there even
+    when it's genuinely on `PATH` (round 46's `windows-latest` CI failure: `npm ... wasn't found
+    on PATH`, though `node` itself — a real `.exe` — resolved fine). `runner.py`'s own
+    `probe_tool()` already does this same resolution; this mirrors it."""
+    resolved = shutil.which(name)
+    if resolved is None:
+        raise AssertionError(
+            f"{name} is required to run the JS/TS architecture gates but wasn't found on PATH."
+            + (" Install Node.js (npm ships with it)." if name == "npm" else "")
+        )
+    return resolved
+
+
 def _ensure_js_scope_resolver_dependencies() -> None:
     """`js_scope_resolver.mjs` needs the `typescript` package (round 45) — installed via its own,
     standalone `scripts/agent/package.json`, deliberately separate from the frontend workspace's
@@ -351,20 +369,14 @@ def _ensure_js_scope_resolver_dependencies() -> None:
     marker = _js_scope_resolver_marker()
     fingerprint = _js_scope_resolver_fingerprint()
     if not marker.exists() or marker.read_text(encoding="utf-8").strip() != fingerprint:
-        try:
-            result = subprocess.run(
-                ["npm", "install", "--no-audit", "--no-fund"],
-                cwd=_JS_SCOPE_RESOLVER_DIR,
-                capture_output=True,
-                text=True,
-                timeout=180,
-            )
-        except FileNotFoundError as exc:
-            raise AssertionError(
-                "npm is required to run the JS/TS architecture gates (it installs "
-                f"{_JS_SCOPE_RESOLVER_DIR}'s own `typescript` dependency) but wasn't found on "
-                "PATH. Install Node.js (npm ships with it)."
-            ) from exc
+        npm = _require_tool("npm")
+        result = subprocess.run(
+            [npm, "install", "--no-audit", "--no-fund"],
+            cwd=_JS_SCOPE_RESOLVER_DIR,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
         if result.returncode != 0:
             raise AssertionError(
                 f"npm install for {_JS_SCOPE_RESOLVER_DIR} failed (exit {result.returncode}):\n"
@@ -443,18 +455,14 @@ def js_modules(paths: Iterable[Path]) -> JsModules:
     if not paths:
         return modules
     _ensure_js_scope_resolver_dependencies()
-    try:
-        result = subprocess.run(
-            ["node", str(_JS_SCOPE_RESOLVER_SCRIPT)],
-            input=json.dumps([str(path) for path in paths]),
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-    except FileNotFoundError as exc:
-        raise AssertionError(
-            "node is required to run the JS/TS architecture gates but wasn't found on PATH."
-        ) from exc
+    node = _require_tool("node")
+    result = subprocess.run(
+        [node, str(_JS_SCOPE_RESOLVER_SCRIPT)],
+        input=json.dumps([str(path) for path in paths]),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
     if result.returncode != 0:
         raise AssertionError(
             f"js_scope_resolver.mjs failed (exit {result.returncode}):\n{result.stderr}"

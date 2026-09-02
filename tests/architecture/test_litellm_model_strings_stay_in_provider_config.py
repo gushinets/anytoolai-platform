@@ -436,3 +436,74 @@ def test_provider_mutation_inside_uncalled_arrow_does_not_override_outer_value(t
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == ["model.ts:5: 'openai/gpt-4.1'"], offenders
+
+
+def test_provider_survives_as_const_assertion(tmp_path: Path) -> None:
+    # `as const` is a compile-time-only TypeScript annotation — the runtime value is exactly the
+    # inner literal, "openai" (round 46).
+    (tmp_path / "model.ts").write_text(
+        'const provider = "openai" as const;\nconst model = `${provider}/gpt-4.1`;\n',
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:2: 'openai/gpt-4.1'"], offenders
+
+
+def test_var_declared_inside_if_block_is_visible_at_function_scope(tmp_path: Path) -> None:
+    # `var` is function-scoped, not block-scoped — it escapes the `if` block the same way real JS
+    # hoisting does, unlike `let`/`const` (round 46). The write itself still correctly stays
+    # conditional (added to the reachable set, not replacing anything), since the `if` might not
+    # run — there's nothing else in scope for the deterministic branch to replace here anyway.
+    (tmp_path / "model.ts").write_text(
+        "function buildModel(enabled) {\n"
+        "  if (enabled) {\n"
+        '    var provider = "openai";\n'
+        "  }\n"
+        '  return `${provider}/gpt-4.1`;\n'
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:5: 'openai/gpt-4.1'"], offenders
+
+
+def test_for_header_declaration_is_visible_inside_the_loop_body(tmp_path: Path) -> None:
+    (tmp_path / "model.ts").write_text(
+        'for (let provider = "openai", i = 0; i < 1; i++) {\n'
+        "  const model = `${provider}/gpt-4.1`;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:2: 'openai/gpt-4.1'"], offenders
+
+
+def test_multi_hop_import_chain_resolves_regardless_of_file_traversal_order(tmp_path: Path) -> None:
+    # Filenames deliberately put the consumer (a-config.ts) before the intermediate (m-alias.ts)
+    # and the source (z-provider.ts) in sorted/traversal order — resolution must not depend on
+    # every file's own imports already being installed by the time a dependent file is processed
+    # (round 46: eager, single-pass resolution made this order-dependent).
+    (tmp_path / "z-provider.ts").write_text('export const provider = "openai";\n', encoding="utf-8")
+    (tmp_path / "m-alias.ts").write_text(
+        'import { provider } from "./z-provider";\nexport const MODEL_PROVIDER = provider;\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "a-config.ts").write_text(
+        'import { MODEL_PROVIDER } from "./m-alias";\nconst model = `${MODEL_PROVIDER}/gpt-4.1`;\n',
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["a-config.ts:2: 'openai/gpt-4.1'"], offenders
+
+
+def test_barrel_reexport_resolves_the_real_source_declaration(tmp_path: Path) -> None:
+    (tmp_path / "z-provider.ts").write_text('export const provider = "openai";\n', encoding="utf-8")
+    (tmp_path / "barrel.ts").write_text(
+        'export { provider as MODEL_PROVIDER } from "./z-provider";\n', encoding="utf-8"
+    )
+    (tmp_path / "a-config.ts").write_text(
+        'import { MODEL_PROVIDER } from "./barrel";\nconst model = `${MODEL_PROVIDER}/gpt-4.1`;\n',
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["a-config.ts:2: 'openai/gpt-4.1'"], offenders
