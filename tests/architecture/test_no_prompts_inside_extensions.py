@@ -389,6 +389,20 @@ def test_short_circuit_and_role_reassignment_does_not_replace_the_deterministic_
     assert len(offenders) == 1 and "role: 'system'" in offenders[0]
 
 
+def test_self_referential_role_reassignment_resolves_using_the_pre_write_value(tmp_path: Path) -> None:
+    # Real JS evaluates an assignment's RHS fully, using the pre-write state, before ever
+    # committing the new value — `role = role + "tem"`'s own `role` reference inside the RHS
+    # previously hit the fold cycle guard and lost the value entirely (round 56).
+    (tmp_path / "chat.ts").write_text(
+        'let role = "sys";\n'
+        'role = role + "tem";\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
 def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
     # `role` is deterministically "system" at the use site (round 37): a static reassignment
     # must resolve to the value actually in effect, not to "unresolved" just because a write

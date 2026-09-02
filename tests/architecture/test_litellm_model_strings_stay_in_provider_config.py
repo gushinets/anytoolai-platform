@@ -767,3 +767,61 @@ def test_ternary_branch_reassignment_does_not_replace_the_deterministic_value(tm
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == ["model.ts:7: 'openai/gpt-4.1'"], offenders
+
+
+def test_self_referential_reassignment_resolves_using_the_pre_write_value(tmp_path: Path) -> None:
+    # Real JS evaluates an assignment's RHS fully, using the *pre-write* state, before ever
+    # committing the new value. `provider = provider + "ai"`'s own `provider` reference inside the
+    # RHS is textually *after* `provider =`, so resolving it at its own natural position always
+    # included this same not-yet-applied write, hit the fold cycle guard, and lost the value
+    # entirely rather than resolving to "open" + "ai" (round 56).
+    (tmp_path / "model.ts").write_text(
+        'let provider = "open";\n'
+        'provider = provider + "ai";\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:4: 'openai/gpt-4.1'"], offenders
+
+
+def test_compound_plus_equals_concatenates_the_pre_write_value(tmp_path: Path) -> None:
+    # `provider += "ai"` was never even recorded as a write at all — the collector only matched
+    # a plain `=` assignment (round 56).
+    (tmp_path / "model.ts").write_text(
+        'let provider = "open";\n'
+        'provider += "ai";\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:4: 'openai/gpt-4.1'"], offenders
+
+
+def test_logical_or_equals_from_a_falsy_value_is_detected(tmp_path: Path) -> None:
+    # `provider ||= "openai"` only assigns when `provider` is currently falsy — never recorded as
+    # a write at all before this round, so the gate saw only the empty initializer (round 56).
+    (tmp_path / "model.ts").write_text(
+        'let provider = "";\n'
+        'provider ||= "openai";\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:4: 'openai/gpt-4.1'"], offenders
+
+
+def test_nested_assignment_inside_compound_logical_assignment_rhs_is_conditional(tmp_path: Path) -> None:
+    # `enabled &&= (provider = "internal")` never runs the nested assignment at all when `enabled`
+    # is falsy — the exact same short-circuit round 54 already modeled for the plain `&&`
+    # operator, just on its compound-assignment form (`&&=`), which used a different operator
+    # token round 54 didn't check for (round 56, self-caught while extending that fix — not part
+    # of any review).
+    (tmp_path / "model.ts").write_text(
+        'let provider = "openai";\n\n'
+        'enabled &&= (provider = "internal");\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["model.ts:5: 'openai/gpt-4.1'"], offenders

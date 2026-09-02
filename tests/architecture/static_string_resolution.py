@@ -376,6 +376,13 @@ def _ensure_js_scope_resolver_dependencies() -> None:
             capture_output=True,
             text=True,
             encoding="utf-8",
+            # `npm` is itself a Node.js process under the hood — a well-documented Node/Windows
+            # quirk (nodejs/node#10836) makes `process.stdin` access hang when its stdin handle is
+            # inherited from a non-interactive parent without ever being closed, even for a command
+            # that never actually reads input. Left unset, this inherits the test runner's own
+            # stdin; explicitly closing it removes that hang path (round 55, found via the same
+            # hang in `runner.py`'s `probe_tool` on a real `windows-latest` run).
+            stdin=subprocess.DEVNULL,
             timeout=180,
         )
         if result.returncode != 0:

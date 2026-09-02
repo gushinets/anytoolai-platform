@@ -217,9 +217,29 @@ function resolveModuleSpecifier(fromPath, specifier) {
  * braced or braceless `if`/`for`/`while`/`try`/nested block/etc. — is only conditionally reached
  * (adds to the set without discarding what came before). Mirrors the prior resolver's model
  * exactly, but decided from real parent pointers instead of approximated bracket-depth counting. */
-function replayWrites(analysis, decl, atPos) {
+// `+=` combines the binding's own pre-write value with the folded RHS via string concatenation —
+// the only compound arithmetic operator this resolver models (round 56, "at minimum"). `||=`/
+// `&&=`/`??=` are inherently conditional *by the operator itself*, independent of AST position —
+// whether the new value actually takes effect depends on the runtime truthiness/nullishness of
+// the *current* value, exactly like `x || (x = y)` already is after round 54's short-circuit fix
+// — so these are never treated as deterministic (`forceConditional`), and their own contribution
+// is just the folded RHS: the old value's survival, when the assignment doesn't trigger, is
+// already implied by not replacing the reachable set, the same way an `if`-guarded write works.
+const COMPOUND_STRING_OPERATORS = new Set([ts.SyntaxKind.PlusEqualsToken]);
+const COMPOUND_CONDITIONAL_OPERATORS = new Set([
+  ts.SyntaxKind.BarBarEqualsToken,
+  ts.SyntaxKind.AmpersandAmpersandEqualsToken,
+  ts.SyntaxKind.QuestionQuestionEqualsToken,
+]);
+
+function replayWrites(analysis, decl, atPos, excludeWrite = null) {
   let reachable = new Set();
   for (const write of decl.writes) {
+    // A write never sees itself — needed when `atPos` and this write's own `pos` coincide (see
+    // `selfReferenceContext`: a self-referential RHS, `provider = provider + "ai"`, resolves its
+    // own `provider` at exactly this write's position, and the plain `write.pos > atPos` check
+    // below alone wouldn't exclude an *equal* position).
+    if (write === excludeWrite) continue;
     if (write.pos > atPos) break;
     // An imported binding's "write" has no local expression to fold — its value comes from
     // wherever the import points, resolved lazily (see `resolveRedirectValue`) each time it's
@@ -227,13 +247,25 @@ function replayWrites(analysis, decl, atPos) {
     // eager resolution made cross-file constant chains depend on file traversal order, since a
     // consumer processed before its dependency's own imports were installed would memoize an
     // "unresolvable" result that a later pass had no way to revisit).
-    const values =
-      write.redirect !== undefined
-        ? resolveRedirectValue(write.redirect)
-        : write.copyOf !== undefined
-          ? copyDeclValue(analysis, write.copyOf)
-          : foldExpr(analysis, write.expr);
-    const deterministic = write.own || isDeterministicWrite(write.node, decl.scope);
+    let values;
+    if (write.redirect !== undefined) {
+      values = resolveRedirectValue(write.redirect);
+    } else if (write.copyOf !== undefined) {
+      values = copyDeclValue(analysis, write.copyOf);
+    } else if (write.compoundOp !== undefined) {
+      // Real JS reads the current value, then computes, then commits — `replayWrites` on `decl`
+      // itself, up to (but excluding) this exact write, gives that pre-write state directly,
+      // reusing the same self-reference machinery an ordinary `provider = provider + "ai"` needs.
+      const priorSet = replayWrites(analysis, decl, write.pos, write);
+      const priorValues = priorSet.size ? Array.from(priorSet) : null;
+      const rhsValues = foldExpr(analysis, write.rhsExpr);
+      values = write.compoundOp === ts.SyntaxKind.PlusEqualsToken ? combine([priorValues, rhsValues]) : null;
+    } else if (write.forceConditional) {
+      values = foldExpr(analysis, write.rhsExpr);
+    } else {
+      values = foldExpr(analysis, write.expr);
+    }
+    const deterministic = write.own || (!write.forceConditional && isDeterministicWrite(write.node, decl.scope));
     if (deterministic) {
       reachable = new Set(values || []);
     } else if (values) {
@@ -241,6 +273,27 @@ function replayWrites(analysis, decl, atPos) {
     }
   }
   return reachable;
+}
+
+/** Whether `node` (an identifier resolving to `decl`) sits inside the RHS of one of `decl`'s own
+ * writes — if so, real JS evaluates that RHS fully, using the value `decl` had *immediately
+ * before* this write, before ever committing the new one; a self-reference there must never see
+ * itself as already having happened just because its own literal text position sits inside the
+ * RHS (round 56: `provider = provider + "ai"`'s own `provider` reference is textually *after*
+ * `provider =`, so resolving it at its own natural position always included this same
+ * not-yet-applied write, hit the fold cycle guard, and lost the value entirely). A purely
+ * structural check — the same AST node always gives the same answer regardless of which caller
+ * folds it first, so it stays correct under `foldExpr`'s permanent per-node memoization no matter
+ * the traversal order that happens to reach it. */
+function selfReferenceContext(node, decl) {
+  let n = node;
+  while (n) {
+    for (const write of decl.writes) {
+      if (write.expr === n || write.rhsExpr === n) return write;
+    }
+    n = n.parent;
+  }
+  return null;
 }
 
 /** Every statically-known value `decl` (some *other* binding in the same file — a same-named
@@ -323,13 +376,21 @@ const CONDITIONAL_PARENT_SLOTS = [
 
 // `&&`/`||`/`??`'s right-hand operand only evaluates when the left side's truthiness (or, for
 // `??`, nullishness) allows it — `cond && (x = "y")` never runs the assignment at all when `cond`
-// is falsy, exactly like an `if` body never running (round 54). Checked by operator kind, not
-// just AST shape, since a `BinaryExpression`'s `.right` is otherwise perfectly ordinary — `+`'s
-// right side, for one, always evaluates unconditionally.
+// is falsy, exactly like an `if` body never running (round 54) — and their compound-assignment
+// forms (`&&=`/`||=`/`??=`) are the exact same short-circuit on the exact same AST shape
+// (`BinaryExpression.right`), just with a compound operator token instead of the plain one:
+// `enabled &&= (provider = "internal")` never runs the nested assignment at all when `enabled` is
+// falsy, for the identical reason (round 56, self-caught while extending round 54's own fix to
+// compound assignment writes — not part of any review). Checked by operator kind, not just AST
+// shape, since a `BinaryExpression`'s `.right` is otherwise perfectly ordinary — `+`'s right side,
+// for one, always evaluates unconditionally.
 const SHORT_CIRCUIT_OPERATORS = new Set([
   ts.SyntaxKind.AmpersandAmpersandToken,
   ts.SyntaxKind.BarBarToken,
   ts.SyntaxKind.QuestionQuestionToken,
+  ts.SyntaxKind.AmpersandAmpersandEqualsToken,
+  ts.SyntaxKind.BarBarEqualsToken,
+  ts.SyntaxKind.QuestionQuestionEqualsToken,
 ]);
 
 /** Whether `node` sits in one of the AST slots that only conditionally executes — the `then`/
@@ -491,7 +552,9 @@ function foldExprInner(analysis, node) {
     case ts.SyntaxKind.Identifier: {
       const decl = analysis.resolveDecl(node, node.text);
       if (!decl) return null;
-      const set = replayWrites(analysis, decl, node.getStart(sf));
+      const enclosingWrite = selfReferenceContext(node, decl);
+      const atPos = enclosingWrite ? enclosingWrite.pos : node.getStart(sf);
+      const set = replayWrites(analysis, decl, atPos, enclosingWrite);
       return set.size ? Array.from(set) : null;
     }
     default:
@@ -650,14 +713,17 @@ function collectDeclarations(analysis) {
           b.writes.push({ pos: param.name.getStart(sf), expr: param.initializer, node: param, own: true });
         }
       }
-    } else if (
-      ts.isBinaryExpression(node) &&
-      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-      ts.isIdentifier(node.left)
-    ) {
+    } else if (ts.isBinaryExpression(node) && ts.isIdentifier(node.left)) {
+      const op = node.operatorToken.kind;
       const decl = analysis.resolveDecl(node, node.left.text);
       if (decl && decl.mutable) {
-        decl.writes.push({ pos: node.left.getStart(sf), expr: node.right, node, own: false });
+        if (op === ts.SyntaxKind.EqualsToken) {
+          decl.writes.push({ pos: node.left.getStart(sf), expr: node.right, node, own: false });
+        } else if (COMPOUND_STRING_OPERATORS.has(op)) {
+          decl.writes.push({ pos: node.left.getStart(sf), rhsExpr: node.right, node, own: false, compoundOp: op });
+        } else if (COMPOUND_CONDITIONAL_OPERATORS.has(op)) {
+          decl.writes.push({ pos: node.left.getStart(sf), rhsExpr: node.right, node, own: false, forceConditional: true });
+        }
       }
     }
     ts.forEachChild(node, visit);
