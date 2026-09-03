@@ -43,10 +43,13 @@ New duplication outside this Core/SDK pair needs an architectural decision and a
 ### Boundaries
 
 Parse and validate once at the trust boundary (HTTP, YAML, provider output, browser message,
-storage). After that boundary, code uses a typed model.
+storage). After that boundary, use the narrowest contract owned by that layer. Usually that is a
+typed model; a runtime-configured payload may remain a mapping when a referenced JSON Schema owns
+its concrete shape.
 
-Do **not** keep probing `dict[str, Any]`, `unknown`, or string keys in business logic after the
-parser has accepted the payload.
+Do **not** keep probing `dict[str, Any]`, `unknown`, or string keys after the parser has accepted a
+concrete shape owned by that layer. Generic schema-ref traversal may inspect mappings, but it must
+not invent product-specific shape in a platform layer.
 
 ### One concept, one source of truth
 
@@ -65,9 +68,9 @@ business thresholds need a named constant or a config field.
 - Do not invent a default to hide missing required data.
 - `a or b or c` is forbidden when it substitutes missing **business** data with a different
   meaning (`status or "completed"`, `name or "Anonymous"`).
-- `a or b or c` is allowed only for an **explicit, documented configuration precedence** (for
-  example env, then file, then a declared default). Silent loader fallback and hidden merge stay
-  forbidden; see [`docs/architecture/config-model.md`](../architecture/config-model.md).
+- `a or b or c` is allowed only when the owning settings/configuration layer already defines and
+  documents that precedence. Registry-owned config has no loader-level fallback, hidden merge, or
+  hidden default; see [`docs/architecture/config-model.md`](../architecture/config-model.md).
 
 ### Abstraction
 
@@ -96,11 +99,16 @@ gate, wiping hundreds of existing violations, or enabling mypy are separate plan
 
 ### Models at trust boundaries
 
-HTTP requests/responses, YAML configs, provider payloads, and persisted JSON go through Pydantic
-models. Boundary models use `extra="forbid"`. Use `strict=True` only where coercion would hide an
-error; do not apply it indiscriminately to YAML or HTTP models.
+Use the boundary pattern owned by the layer:
 
-Follow existing `ContractModel` / `StrEnum` patterns. Do not introduce a parallel DTO base class.
+- `platform-api` HTTP DTOs use its existing Pydantic `BaseModel` pattern with `extra="forbid"`;
+- `platform-sdk` public contracts use the existing `ContractModel` / `StrEnum` patterns;
+- `platform-core` config, domain, and provider boundaries use the existing frozen dataclasses,
+  `ConfigLoader` checks, JSON Schema validation, and provider-adapter normalization.
+
+Do not introduce another DTO base class or import SDK contracts into Core/API to unify these
+representations. Use `strict=True` only where coercion would hide an error; do not apply it
+indiscriminately to YAML or HTTP inputs.
 
 Closed HTTP fields use the Core `StrEnum`, not `str`, so OpenAPI emits an `enum` rather than an
 open string. Do not widen that field back to `str` in the API layer.
@@ -120,8 +128,10 @@ a type.
 
 ### `Any`
 
-`Any` is allowed only on the trust-boundary parameter or payload. Narrow it to a concrete type in
-the same module before other code consumes it.
+Narrow `Any` to the narrowest contract owned by the current layer before business logic consumes
+it. When a referenced JSON Schema owns a runtime-configured payload's concrete shape, `Any` may
+remain at the HTTP DTO boundary and Core may narrow it to `Mapping[str, Any]` after object
+validation. Do not add product-specific DTOs to generic platform layers only to eliminate `Any`.
 
 ### Comparisons and error codes
 
@@ -133,9 +143,9 @@ Tests that assert the wire value may use the literal once.
 
 ### Config loading
 
-Pydantic models check shape. The config loader loads files and checks cross-references. Do not add
-new hand-rolled `.get(...)` / `isinstance(...)` shape checks. Rewriting the existing loader is a
-separate plan.
+`ConfigLoader` owns YAML/JSON shape checks and cross-reference validation through its existing
+helpers and structured errors. Extend that pattern; do not add a second Pydantic config-model
+layer. Rewriting the existing loader is a separate plan.
 
 ## Frontend
 

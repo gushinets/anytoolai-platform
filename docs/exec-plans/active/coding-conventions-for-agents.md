@@ -7,7 +7,7 @@
 - Created: 2026-08-19
 - Last updated: 2026-09-04
 - Review date: 2026-09-04
-- Next action: obtain required human approval and merge PR #83.
+- Next action: push the review fixes and verify required checks for PR #83.
 - Blocker: none
 
 ## Goal
@@ -63,6 +63,7 @@ and changed code stays typed, fail-fast, and reviewable without adding a root `r
 - [x] Update the PR body to the dedicated `## Linear issue` format.
 - [x] Fix the stale-PR metadata workflow checkout exposed by the live canary.
 - [x] Re-run current repository and GitHub validation.
+- [x] Align trust-boundary guidance with current API, SDK, and Core ownership after review.
 
 ## Validation
 
@@ -95,6 +96,7 @@ and changed code stays typed, fail-fast, and reviewable without adding a root `r
 | 2026-09-03 | Live metadata canary failed at historical base `337699a` because the validator did not exist there; switched the trusted checkout to current default-branch `github.sha`. | Push the rebased branch and verify the synchronize run. |
 | 2026-09-03 | `doctor`, `validate-docs`, generated-doc check, 13 focused tests, and quick-check passed in the repository-managed environment; quick-check reported 986 passed, 3 skipped, and 397 deselected. | Verify GitHub after the final plan update. |
 | 2026-09-04 | Required GitHub checks passed on the rebased PR, including metadata, full-check, atoms proof, PostgreSQL concurrency, Windows, and production Compose smoke. | Obtain required human approval and merge. |
+| 2026-09-04 | Verified three blocking review comments against current API, SDK, Core, and config implementations; narrowed the conventions without changing runtime code; `quick-check` passed (986 passed, 3 skipped, 397 deselected). | Push and verify GitHub. |
 
 ## Open questions
 
