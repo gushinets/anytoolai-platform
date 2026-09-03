@@ -68,6 +68,20 @@ _JS_SHORTHAND_KEY_RE = re.compile(
     rf"""[{{,]\s*({_PROMPT_KEY_ALTERNATION})\s*(?=[,}}])"""
 )
 
+# A staged request object built via member assignment (`const req = {}; req.role = X;` /
+# `request["role"] = X;`) contains neither a `role:` key nor shorthand syntax — invisible to the
+# two regexes above even though the shared resolver can already resolve `X` statically. The
+# literal `.`/`[` immediately before the key text means these can't false-match a longer
+# identifier substring (`.myrole` has no literal `.` right before `role`). `(?!=)` after the `=`
+# excludes `==`/`===` (a comparison, not an assignment).
+#
+# ponytail: plain `=` only — compound assignment (`.role ??= x`, `+=`) is a deliberate, narrower
+# scope cut; add if a real case shows up.
+_JS_DOT_ASSIGN_KEY_RE = re.compile(rf"""\.({_PROMPT_KEY_ALTERNATION})\s*=(?!=)""")
+_JS_BRACKET_ASSIGN_KEY_RE = re.compile(
+    rf"""\[\s*["']({_PROMPT_KEY_ALTERNATION})["']\s*\]\s*=(?!=)"""
+)
+
 
 def _offending_value(key: str, values: frozenset[str]) -> str | None:
     """The first forbidden value in `values` (a resolved `role`/instruction field's every
@@ -147,6 +161,22 @@ def check_prompts_inside_extensions(extensions_root: Path) -> list[str]:
                     offending = _offending_value(key, values)
                     if offending is not None:
                         found = (shorthand_match.start(1), key, offending)
+                        break
+            if found is None:
+                for assign_match in _JS_DOT_ASSIGN_KEY_RE.finditer(stripped):
+                    key = assign_match.group(1)
+                    values = js_string_expr_at(js, path, assign_match.end())
+                    offending = _offending_value(key, values)
+                    if offending is not None:
+                        found = (assign_match.start(1), key, offending)
+                        break
+            if found is None:
+                for assign_match in _JS_BRACKET_ASSIGN_KEY_RE.finditer(stripped):
+                    key = assign_match.group(1)
+                    values = js_string_expr_at(js, path, assign_match.end())
+                    offending = _offending_value(key, values)
+                    if offending is not None:
+                        found = (assign_match.start(1), key, offending)
                         break
             if found is not None:
                 position, key, value = found
@@ -797,6 +827,57 @@ def test_role_set_to_null_suppresses_the_default(tmp_path: Path) -> None:
         "const state = { preset: null };\n\n"
         'const { preset: role = "system" } = state;\n\n'
         "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []
+
+
+def test_role_set_via_dot_assignment_is_detected(tmp_path: Path) -> None:
+    # Round 68 (team lead #4) — a staged request object built via member assignment
+    # (`req.role = X`) contains neither a `role:` key nor shorthand syntax, but must still be
+    # caught since the shared resolver can already resolve `X` statically.
+    (tmp_path / "chat.ts").write_text(
+        'const SYSTEM_ROLE = "system";\n\n'
+        "const req = {};\n"
+        "req.role = SYSTEM_ROLE;\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0], offenders
+
+
+def test_role_set_via_bracket_assignment_is_detected(tmp_path: Path) -> None:
+    # Round 68 (team lead #4) — the same bypass, bracket-access form.
+    (tmp_path / "chat.ts").write_text(
+        'const SYSTEM_ROLE = "system";\n\n'
+        "const req = {};\n"
+        'req["role"] = SYSTEM_ROLE;\n',
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0], offenders
+
+
+def test_instructions_set_via_dot_assignment_is_detected(tmp_path: Path) -> None:
+    # Round 68 (team lead #4) — the same bypass for an instruction key, not just `role`.
+    (tmp_path / "chat.ts").write_text(
+        'const PROMPT = "You are a helpful assistant.";\n\n'
+        "const request = {};\n"
+        "request.instructions = PROMPT;\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "instructions: 'You are a helpful assistant.'" in offenders[0], offenders
+
+
+def test_role_comparison_via_dot_access_is_not_a_false_positive(tmp_path: Path) -> None:
+    # Round 68 (team lead #4) — `===` is a comparison, not an assignment; `(?!=)` must reject it
+    # so the new dot-assignment regex doesn't match `==`/`===`.
+    (tmp_path / "chat.ts").write_text(
+        'const req = { role: "user" };\n\n'
+        'if (req.role === "system") {\n'
+        "  // no-op\n"
+        "}\n",
         encoding="utf-8",
     )
     assert check_prompts_inside_extensions(tmp_path) == []

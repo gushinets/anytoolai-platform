@@ -8,8 +8,8 @@ from static_string_resolution import (
     iter_source_files,
     module_import_aliases,
     parse_python_files,
+    python_expr_values,
     python_modules,
-    python_string_value,
     resolve_import_module,
 )
 
@@ -79,23 +79,24 @@ ROUTE_TARGET_CONSTRUCTORS = {"APIRouter", "FastAPI"}
 ROUTE_OBJECT_CONSTRUCTORS = {"Route", "WebSocketRoute", "Mount"}
 
 
-def _keyword_value(node: ast.Call, keyword: str, modules: PythonModules, path: Path) -> str | None:
+def _keyword_value(node: ast.Call, keyword: str, modules: PythonModules, path: Path) -> frozenset[str]:
     for kw in node.keywords:
         if kw.arg == keyword:
-            return python_string_value(kw.value, modules, path)
-    return None
+            return python_expr_values(kw.value, modules, path)
+    return frozenset()
 
 
-def _path_argument(node: ast.Call, modules: PythonModules, path: Path) -> str | None:
-    """The route's `path`: first positional arg, or the `path=` keyword. Resolved through the
-    shared static resolver, so a literal, a same-file constant, a constant imported from another
-    module (`from .paths import PROPOSAL_STATUS_PATH`), a module-qualified constant
-    (`paths.PROPOSAL_STATUS_PATH`), a `+` concatenation, or an f-string of any of those all fold
-    to the path they register."""
+def _path_argument(node: ast.Call, modules: PythonModules, path: Path) -> frozenset[str]:
+    """The route's `path`: first positional arg, or the `path=` keyword — every statically-known
+    reachable value (a name reassigned inside a conditional branch resolves to the full set, not
+    just one). Resolved through the shared static resolver, so a literal, a same-file constant, a
+    constant imported from another module (`from .paths import PROPOSAL_STATUS_PATH`), a module-
+    qualified constant (`paths.PROPOSAL_STATUS_PATH`, including through a bare dotted import), a
+    `+` concatenation, or an f-string of any of those all fold to the path(s) they register."""
     if node.args:
-        value = python_string_value(node.args[0], modules, path)
-        if value is not None:
-            return value
+        values = python_expr_values(node.args[0], modules, path)
+        if values:
+            return values
     return _keyword_value(node, "path", modules, path)
 
 
@@ -327,19 +328,13 @@ def _route_path_literals_for_tree(
         if func_name in ROUTE_REGISTRATION_METHODS and called_on_router:
             # Only the route's own path, not other string kwargs like `summary=`/`description=`
             # (free-form prose that could coincidentally contain a forbidden substring).
-            route_path = _path_argument(node, modules, path)
-            if route_path is not None:
-                literals.append(route_path)
+            literals.extend(_path_argument(node, modules, path))
         elif func_name in PREFIX_KEYWORD_CALLS:
-            prefix = _keyword_value(node, "prefix", modules, path)
-            if prefix is not None:
-                literals.append(prefix)
+            literals.extend(_keyword_value(node, "prefix", modules, path))
         elif func_name in ROUTE_OBJECT_CONSTRUCTORS:
             # A standalone `Route(...)`/`WebSocketRoute(...)`/`Mount(...)` construction — never a
             # method call on a router/app, so no `called_on_router` gate applies here at all.
-            route_path = _path_argument(node, modules, path)
-            if route_path is not None:
-                literals.append(route_path)
+            literals.extend(_path_argument(node, modules, path))
     return literals
 
 
@@ -472,3 +467,69 @@ def test_dynamic_route_path_is_not_a_false_positive(tmp_path: Path) -> None:
         },
     )
     assert check_product_specific_endpoint_paths(tmp_path, package) == []
+
+
+def test_route_path_constant_conditionally_reassigned_is_detected(tmp_path: Path) -> None:
+    # Round 68 (team lead #4) — the review's own repro: a module-level constant reassigned inside
+    # an `if` is invisible to `_add_module_level_constants` unless it walks into the branch, so
+    # the forbidden value registered only when `ENABLE_PROPOSAL` is truthy went undetected.
+    package = _write_package(
+        tmp_path,
+        {
+            "routes.py": (
+                "from fastapi import APIRouter\n"
+                "import os\n\n"
+                'PATH = "/safe"\n'
+                'if os.environ.get("ENABLE_PROPOSAL"):\n'
+                '    PATH = "/proposal_ai/status"\n\n'
+                "router = APIRouter()\n"
+                "@router.get(PATH)\n"
+                "def status(): ...\n"
+            ),
+        },
+    )
+    offenders = check_product_specific_endpoint_paths(tmp_path, package)
+    assert len(offenders) == 1 and "'/proposal_ai/status'" in offenders[0]
+
+
+def test_route_path_constant_with_only_safe_branches_is_not_a_false_positive(tmp_path: Path) -> None:
+    # Negative control for the fix above: unioning reachable values across an `if`/`else` must not
+    # manufacture an offender when neither branch is forbidden.
+    package = _write_package(
+        tmp_path,
+        {
+            "routes.py": (
+                "from fastapi import APIRouter\n"
+                "import os\n\n"
+                "if os.environ.get('SHORT'):\n"
+                '    PATH = "/s"\n'
+                "else:\n"
+                '    PATH = "/status"\n\n'
+                "router = APIRouter()\n"
+                "@router.get(PATH)\n"
+                "def status(): ...\n"
+            ),
+        },
+    )
+    assert check_product_specific_endpoint_paths(tmp_path, package) == []
+
+
+def test_route_path_constant_via_bare_dotted_import_is_detected(tmp_path: Path) -> None:
+    # Round 68 (team lead #4) — the review's own repro: `import pkg.paths` (no `as`) binds only
+    # the top-level name `pkg`; `pkg.paths.PROPOSAL_STATUS_PATH` is a two-level attribute chain the
+    # old single-hop `ast.Attribute` match couldn't structurally reach.
+    package = _write_package(
+        tmp_path,
+        {
+            "paths.py": _PATHS_MODULE,
+            "routes.py": (
+                "from fastapi import APIRouter\n"
+                "import pkg.paths\n"
+                "router = APIRouter()\n"
+                "@router.get(pkg.paths.PROPOSAL_STATUS_PATH)\n"
+                "def status(): ...\n"
+            ),
+        },
+    )
+    offenders = check_product_specific_endpoint_paths(tmp_path, package)
+    assert len(offenders) == 1 and "'/proposal_ai/status'" in offenders[0]

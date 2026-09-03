@@ -115,8 +115,13 @@ class PythonModules:
     trees: dict[Path, ast.Module]
     module_paths: dict[str, Path | None] = field(default_factory=dict)
     module_names: dict[Path, str] = field(default_factory=dict)
-    constants: dict[Path, dict[str, str]] = field(default_factory=dict)
+    constants: dict[Path, dict[str, frozenset[str]]] = field(default_factory=dict)
     module_aliases: dict[Path, dict[str, Path]] = field(default_factory=dict)
+    # Local top-level names bound by a bare `import a.b...` (no `as`) — `alias.name.split(".")[0]`
+    # for each. Used only to let `python_expr_values`'s `ast.Attribute` case recognize a
+    # multi-level dotted chain rooted at one of these names (`pkg.paths.NAME`) as reachable through
+    # an ordinary import, without `module_aliases` needing a one-hop-only entry for it.
+    bare_import_roots: dict[Path, set[str]] = field(default_factory=dict)
 
 
 def parse_python_files(paths: Iterable[Path]) -> dict[Path, ast.Module]:
@@ -174,9 +179,9 @@ def module_import_aliases(modules: PythonModules, path: Path) -> dict[str, Path]
     submodule file actually named `name` exists in `<container>` — the only static signal that
     separates "the submodule `<container>.name`" from "a name defined in `<container>/__init__.py`".
 
-    Deliberately out of scope: bare `import a.b` without `as` (Python binds only the top-level
-    package name `a`; resolving `a.b.NAME` from that needs multi-level attribute-chain
-    resolution, not used anywhere in this repo today).
+    A bare `import a.b` without `as` isn't one of these (Python binds only the top-level package
+    name `a`, not `a.b`) — see `bare_import_roots`/`_bare_dotted_import_roots` instead, which lets
+    `python_expr_values` resolve a multi-level chain like `a.b.NAME` rooted at that bare-bound name.
     """
     aliases: dict[str, Path] = {}
     for node in module_level_imports(modules.trees[path]):
@@ -196,29 +201,75 @@ def module_import_aliases(modules: PythonModules, path: Path) -> dict[str, Path]
     return aliases
 
 
-def python_string_value(expr: ast.expr | None, modules: PythonModules, path: Path) -> str | None:
-    """A literal string, a module constant (local, imported, or accessed through a module alias
-    as `paths.NAME`), a `"a" + "b"` concatenation of either (recursively), or an f-string whose
-    every part is a literal or a `FormattedValue` that itself resolves — `None` for anything
-    genuinely dynamic. A `FormattedValue` with a conversion flag (`f"{x!r}"`) or a format spec
-    (`f"{x:>10}"`) is unresolvable: either changes the text in a way concatenation can't
-    reproduce, and this resolver never evaluates a real expression."""
+def _bare_dotted_import_roots(tree: ast.Module) -> set[str]:
+    """Local top-level names bound by a bare `import a.b...` (no `as`) — Python's own binding
+    rule for that form: only the top-level package name (`a`) is bound, not the full dotted path.
+    Kept separate from `module_import_aliases` (which maps a name to *one specific module file*)
+    since a bare-imported root isn't itself a module reference — it only becomes one once
+    `python_expr_values` sees the rest of the dotted chain used against it."""
+    return {
+        alias.name.split(".", 1)[0]
+        for node in module_level_imports(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+        if alias.asname is None
+    }
+
+
+def _attribute_chain(expr: ast.expr) -> tuple[str | None, list[str]]:
+    """Walk a chain of `ast.Attribute` nodes down to its root: `a.b.c` -> `("a", ["b", "c"])`.
+    `(None, [])` for anything that doesn't bottom out on a plain name (e.g. `f().attr`)."""
+    attrs: list[str] = []
+    node: ast.expr = expr
+    while isinstance(node, ast.Attribute):
+        attrs.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        attrs.reverse()
+        return node.id, attrs
+    return None, []
+
+
+def python_expr_values(expr: ast.expr | None, modules: PythonModules, path: Path) -> frozenset[str]:
+    """Every statically-known string value `expr` could take — a literal string, a module
+    constant (local, imported, or accessed through a module alias or a bare dotted import as
+    `paths.NAME`/`pkg.paths.NAME`), a `"a" + "b"` concatenation of either (recursively), or an
+    f-string whose every part is a literal or a `FormattedValue` that itself resolves. Empty for
+    anything genuinely dynamic. A `FormattedValue` with a conversion flag (`f"{x!r}"`) or a format
+    spec (`f"{x:>10}"`) is unresolvable: either changes the text in a way concatenation can't
+    reproduce, and this resolver never evaluates a real expression.
+
+    A name reachable through more than one statically-known value (reassigned inside a module-
+    level `if`) resolves to the full set, not just one (see `_add_module_level_constants`). `+`/
+    an f-string only folds when every operand/part resolves to exactly *one* value each — a
+    deliberate, narrower scope cut: nothing in this repo combines a conditionally-reachable name
+    with concatenation, and folding that case for real needs a Cartesian product across every
+    operand/part's reachable set, not built here."""
     constants = modules.constants.get(path, {})
     if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
-        return expr.value
+        return frozenset({expr.value})
     if isinstance(expr, ast.Name):
-        return constants.get(expr.id)
-    if isinstance(expr, ast.Attribute) and isinstance(expr.value, ast.Name):
-        target = modules.module_aliases.get(path, {}).get(expr.value.id)
-        if target is not None:
-            return modules.constants.get(target, {}).get(expr.attr)
-        return None
+        return constants.get(expr.id, frozenset())
+    if isinstance(expr, ast.Attribute):
+        base, chain = _attribute_chain(expr)
+        if base is None or not chain:
+            return frozenset()
+        if len(chain) == 1:
+            target = modules.module_aliases.get(path, {}).get(base)
+            if target is not None:
+                return modules.constants.get(target, {}).get(chain[0], frozenset())
+        if len(chain) >= 2 and base in modules.bare_import_roots.get(path, set()):
+            dotted_module = ".".join([base, *chain[:-1]])
+            target = modules.module_paths.get(dotted_module)
+            if target is not None:
+                return modules.constants.get(target, {}).get(chain[-1], frozenset())
+        return frozenset()
     if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.Add):
-        left = python_string_value(expr.left, modules, path)
-        right = python_string_value(expr.right, modules, path)
-        if left is not None and right is not None:
-            return left + right
-        return None
+        left = python_expr_values(expr.left, modules, path)
+        right = python_expr_values(expr.right, modules, path)
+        if len(left) == 1 and len(right) == 1:
+            return frozenset({next(iter(left)) + next(iter(right))})
+        return frozenset()
     if isinstance(expr, ast.JoinedStr):
         parts: list[str] = []
         for part in expr.values:
@@ -229,32 +280,51 @@ def python_string_value(expr: ast.expr | None, modules: PythonModules, path: Pat
                 and part.conversion == -1
                 and part.format_spec is None
             ):
-                resolved = python_string_value(part.value, modules, path)
-                if resolved is None:
-                    return None
-                parts.append(resolved)
+                resolved = python_expr_values(part.value, modules, path)
+                if len(resolved) != 1:
+                    return frozenset()
+                parts.append(next(iter(resolved)))
             else:
-                return None
-        return "".join(parts)
-    return None
+                return frozenset()
+        return frozenset({"".join(parts)})
+    return frozenset()
 
 
 def _add_module_level_constants(modules: PythonModules, path: Path) -> None:
     """Add top-level `NAME = <resolvable>` / `NAME: T = <resolvable>` bindings to
     `modules.constants[path]` in place, in source order, so a later binding can reference an
-    earlier one in the same pass. `tree.body` only: a same-named local inside a function can't
-    overwrite the real module-level value."""
-    for node in modules.trees[path].body:
-        if isinstance(node, ast.Assign):
-            targets = [t.id for t in node.targets if isinstance(t, ast.Name)]
-        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            targets = [node.target.id]
-        else:
-            continue
-        value = python_string_value(node.value, modules, path)
-        if value is not None:
+    earlier one in the same pass. `tree.body` only (recursing into `ast.If` branches, see below):
+    a same-named local inside a function can't overwrite the real module-level value.
+
+    A binding directly in a body (not itself inside an `ast.If`) *replaces* the name's reachable
+    set — deterministic, straight-line code, same as before this round. One found inside an
+    `ast.If`'s `body`/`orelse` (recursed into, so `elif`/nested `if` chains both work) instead
+    *unions* its value into whatever the name already carries — the branch may or may not run, so
+    the value from before it is still reachable too. Only `ast.If` is modeled; `try`/`for`/
+    `while`/`with` stay out of scope (not raised by any review round so far)."""
+
+    def visit(stmts: list[ast.stmt], conditional: bool) -> None:
+        for node in stmts:
+            if isinstance(node, ast.If):
+                visit(node.body, True)
+                visit(node.orelse, True)
+                continue
+            if isinstance(node, ast.Assign):
+                targets = [t.id for t in node.targets if isinstance(t, ast.Name)]
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                targets = [node.target.id]
+            else:
+                continue
+            values = python_expr_values(node.value, modules, path)
+            if not values:
+                continue
             for name in targets:
-                modules.constants[path][name] = value
+                if conditional:
+                    modules.constants[path][name] = modules.constants[path].get(name, frozenset()) | values
+                else:
+                    modules.constants[path][name] = values
+
+    visit(modules.trees[path].body, False)
 
 
 def python_modules(root: Path, trees: dict[Path, ast.Module]) -> PythonModules:
@@ -269,6 +339,7 @@ def python_modules(root: Path, trees: dict[Path, ast.Module]) -> PythonModules:
             modules.module_paths[name] = None if name in modules.module_paths else path
     modules.constants = {path: {} for path in trees}
     modules.module_aliases = {path: module_import_aliases(modules, path) for path in trees}
+    modules.bare_import_roots = {path: _bare_dotted_import_roots(tree) for path, tree in trees.items()}
 
     # ponytail: bounded fixed-point iteration (each pass re-resolves every module); a cycle of
     # mutually-shadowing bindings can't oscillate forever thanks to the cap. Upgrade path: a
@@ -276,7 +347,7 @@ def python_modules(root: Path, trees: dict[Path, ast.Module]) -> PythonModules:
     for _ in range(50):
         previous = {path: dict(values) for path, values in modules.constants.items()}
         for path, tree in trees.items():
-            imported: dict[str, str] = {}
+            imported: dict[str, frozenset[str]] = {}
             for node in module_level_imports(tree):
                 if not isinstance(node, ast.ImportFrom):
                     continue
@@ -285,7 +356,7 @@ def python_modules(root: Path, trees: dict[Path, ast.Module]) -> PythonModules:
                     continue
                 for alias in node.names:
                     value = modules.constants[source].get(alias.name)
-                    if value is not None:
+                    if value:
                         imported[alias.asname or alias.name] = value
             modules.constants[path] = imported
             _add_module_level_constants(modules, path)
@@ -295,16 +366,18 @@ def python_modules(root: Path, trees: dict[Path, ast.Module]) -> PythonModules:
 
 
 def python_string_values(modules: PythonModules, path: Path) -> list[tuple[int, str]]:
-    """Every statically-resolvable string expression in `path`, as `(lineno, value)` — a
-    resolved expression is reported once as a whole (its sub-parts are not also reported
-    separately, so a folded concatenation/f-string can't also match on a fragment)."""
+    """Every statically-resolvable string expression in `path`, as `(lineno, value)` — one entry
+    per reachable value (an expression with more than one statically-known possible value,
+    reassigned inside a conditional branch, is reported once per value, matching `js_string_values`
+    on the JS/TS side), and a resolved expression's sub-parts are not also reported separately, so
+    a folded concatenation/f-string can't also match on a fragment."""
     found: list[tuple[int, str]] = []
 
     def visit(node: ast.AST) -> None:
         if isinstance(node, ast.expr):
-            value = python_string_value(node, modules, path)
-            if value is not None:
-                found.append((node.lineno, value))
+            values = python_expr_values(node, modules, path)
+            if values:
+                found.extend((node.lineno, value) for value in values)
                 return
         for child in ast.iter_child_nodes(node):
             visit(child)
