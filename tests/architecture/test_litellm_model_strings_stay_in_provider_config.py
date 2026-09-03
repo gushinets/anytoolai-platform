@@ -1744,3 +1744,33 @@ def test_and_operator_keeps_the_blanket_check_unlike_nullish_and_or(tmp_path: Pa
         'const { provider = "openai" } = config;\n\n'
         "const model = `${provider}/gpt-4.1`;\n",
     ) == ["model.ts:9: 'openai/gpt-4.1'"]
+
+
+# Round 67: a destructuring default fires only on `undefined`, never on `null` or any other
+# falsy-but-defined value — round 66's allowlist only covered string/template/numeric literals,
+# so `null`/`false`/other primitive literals fell through to "not guaranteed," wrongly injecting a
+# default that can never actually run at runtime.
+
+
+def test_null_value_suppresses_the_default(tmp_path: Path) -> None:
+    assert (
+        _litellm(
+            tmp_path,
+            "const config = { provider: null };\n\n"
+            'const { provider = "openai" } = config;\n\n'
+            "const model = `${provider}/gpt-4.1`;\n",
+        )
+        == []
+    )
+
+
+def test_boolean_literal_suppresses_the_default(tmp_path: Path) -> None:
+    assert (
+        _litellm(
+            tmp_path,
+            "const config = { provider: false };\n\n"
+            'const { provider = "openai" } = config;\n\n'
+            "const model = `${provider}/gpt-4.1`;\n",
+        )
+        == []
+    )

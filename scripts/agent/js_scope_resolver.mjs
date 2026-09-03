@@ -620,17 +620,28 @@ function definitelyHasPath(analysis, expr, path, ctx) {
 }
 
 // Leaf expression *kinds* whose result is structurally guaranteed to never literally be
-// `undefined`, regardless of what any sub-expression evaluates to (round 66): a string/template/
-// numeric literal is just itself; `+` coerces both operands to a string (or `NaN`) no matter what
-// they are, `undefined + "x"` included. Deliberately narrow — a `CallExpression`, `NewExpression`,
-// or any other dynamic/unresolved shape stays unproven (see the review this round fixed: treating
-// *any* non-identifier leaf as proof was the exact bug, since an ordinary function call can return
-// `undefined`).
+// `undefined`, regardless of what any sub-expression evaluates to (round 66) — the actual
+// predicate is "can this evaluate to `undefined`," not "is it a string": `null` and `false` are
+// both definitely non-`undefined` too (round 67 — a destructuring default fires *only* on
+// `undefined`, never on `null` or any other falsy-but-defined value, so treating every primitive
+// literal *except* strings/numbers as unproven was its own false-positive, injecting a default
+// that can never actually run), alongside every other atomic JS/TS primitive-literal token
+// (BigInt, regex) that carries the same guarantee for the same reason a string literal does — it
+// *is* its own value, with no sub-expression to evaluate at all. `+` coerces both operands to a
+// string (or `NaN`) no matter what they are, `undefined + "x"` included. Deliberately narrow
+// beyond this — a `CallExpression`, `NewExpression`, or any other dynamic/unresolved shape stays
+// unproven (see the review round 66 fixed: treating *any* non-identifier leaf as proof was the
+// exact bug, since an ordinary function call can return `undefined`).
 const NEVER_UNDEFINED_LEAF_KINDS = new Set([
   ts.SyntaxKind.StringLiteral,
   ts.SyntaxKind.NoSubstitutionTemplateLiteral,
   ts.SyntaxKind.TemplateExpression,
   ts.SyntaxKind.NumericLiteral,
+  ts.SyntaxKind.BigIntLiteral,
+  ts.SyntaxKind.RegularExpressionLiteral,
+  ts.SyntaxKind.NullKeyword,
+  ts.SyntaxKind.TrueKeyword,
+  ts.SyntaxKind.FalseKeyword,
 ]);
 
 function definitelyHasPathInner(analysis, expr, path, ctx) {
