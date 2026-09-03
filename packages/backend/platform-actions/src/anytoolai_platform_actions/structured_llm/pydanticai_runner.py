@@ -13,6 +13,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 from pydantic_ai.models.function import FunctionModel
+from pydantic_ai.output import PromptedOutput, StructuredDict
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RequestUsage
 
@@ -27,8 +28,7 @@ from anytoolai_platform_core.structured_output.errors import (
     StructuredOutputValidationError,
 )
 from anytoolai_platform_core.structured_output.validator import (
-    parse_json_object,
-    validate_structured_output,
+    validate_structured_output_value,
 )
 
 
@@ -36,7 +36,6 @@ from anytoolai_platform_core.structured_output.validator import (
 class PydanticAIValidationState:
     request: ProviderRequest
     request_executor: Callable[[ProviderRequest], Awaitable[ProviderResponse]]
-    parsed_output: Mapping[str, Any] | None = None
     last_response: ProviderResponse | None = None
     semantic_attempt_index: int = 0
     pydantic_run_id: str | None = None
@@ -115,12 +114,17 @@ class PydanticAIStructuredRunner:
                 metadata={"provider_policy_ref": response.provider_policy_ref},
             )
 
-        agent = Agent[PydanticAIValidationState, str](
+        schema = request.response_schema
+        output_type: Any = (
+            str if schema is None else PromptedOutput(StructuredDict(dict(schema)), template=False)
+        )
+
+        agent = Agent[PydanticAIValidationState, Any](
             model=FunctionModel(
                 function=model_request,
                 model_name="function:anytoolai_provider_gateway",
             ),
-            output_type=str,
+            output_type=output_type,
             retries={"output": max(validation_max_attempts - 1, 0)},
             deps_type=PydanticAIValidationState,
             name="structured_llm_validation",
@@ -129,20 +133,19 @@ class PydanticAIStructuredRunner:
         @agent.output_validator
         def _validate_output(
             ctx: RunContext[PydanticAIValidationState],
-            data: str,
-        ) -> str:
+            data: Any,
+        ) -> Any:
             ctx.deps.pydantic_run_id = ctx.run_id
             if ctx.deps.request.response_schema is None:
                 return data
             try:
-                parsed = parse_json_object(data)
-                validation_result = validate_structured_output(
+                validation_result = validate_structured_output_value(
                     data,
                     schema=dict(ctx.deps.request.response_schema),
                 )
             except StructuredOutputError as exc:
                 raise ModelRetry(str(exc)) from exc
-            normalized_output = validation_result.normalized_output or parsed
+            normalized_output = validation_result.normalized_output
             if cross_validator is not None:
                 try:
                     cross_validator.validate(
@@ -154,8 +157,7 @@ class PydanticAIStructuredRunner:
                     # model's next attempt; it is never the user-facing safe error
                     # (str(exc)/exc.details.safe_message stay generic for callers).
                     raise ModelRetry(exc.reason) from exc
-            ctx.deps.parsed_output = normalized_output
-            return data
+            return normalized_output
 
         try:
             result = await agent.run(
@@ -178,12 +180,13 @@ class PydanticAIStructuredRunner:
             raise RuntimeError(
                 "PydanticAI validation run completed without a provider response"
             )
+        structured_output = None if request.response_schema is None else result.output
         return PydanticAIValidationResult(
-            output_text=result.output,
-            structured_output=state.parsed_output,
+            output_text=state.last_response.output_text,
+            structured_output=structured_output,
             last_response=replace(
                 state.last_response,
-                structured_output=state.parsed_output,
+                structured_output=structured_output,
                 pydantic_run_id=result.run_id,
             ),
             pydantic_run_id=result.run_id,
