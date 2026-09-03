@@ -1601,3 +1601,49 @@ def test_chained_member_read_through_an_import_sees_the_source_module_mutation(t
     )
     offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
     assert offenders == ["a-model.ts:3: 'openai/gpt-4.1'"], offenders
+
+
+# Round 64: `defaultedValues`'s absence check asked "does the source's *original literal* declare
+# this key," blind to the member-write timeline round 60/63 built for everything else — a
+# deterministic `config.provider = "internal";` before `const { provider = "openai" } = config`
+# never stopped `"openai"` from being wrongly treated as reachable, since the check only ever saw
+# the empty `{}` the binding started from. `definitelyHasPath` answers the same question the value
+# read already does, off the same write timeline.
+
+
+def test_deterministic_property_added_after_an_empty_literal_suppresses_the_default(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        "const config = {};\n\n"
+        'config.provider = "custom";\n\n'
+        'const { provider = "openai" } = config;\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'custom/gpt-4.1'"]
+
+
+def test_conditional_property_added_after_an_empty_literal_does_not_suppress_the_default(tmp_path: Path) -> None:
+    # A *conditional* write never proves presence, so the default must stay reachable too — unlike
+    # the deterministic case above. `"internal"` (not a recognized LiteLLM provider, same
+    # placeholder the review's own example used) isolates this: if the fix wrongly suppressed the
+    # default the same way it correctly suppresses it for a deterministic write, this file would
+    # report no offender at all.
+    assert _litellm(
+        tmp_path,
+        "const config = {};\n\n"
+        'if (Math.random() > 0.5) config.provider = "internal";\n\n'
+        'const { provider = "openai" } = config;\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+def test_default_still_never_guessed_for_a_genuinely_unknown_source(tmp_path: Path) -> None:
+    # `definitelyHasPath` alone would say "not guaranteed present" for an opaque function-call
+    # result too — the companion known-shape check (`owners`) is what keeps this one unresolved.
+    assert (
+        _litellm(
+            tmp_path,
+            'const { provider = "openai" } = getConfig();\n\n'
+            "const model = `${provider}/gpt-4.1`;\n",
+        )
+        == []
+    )

@@ -589,24 +589,144 @@ function literalValues(analysis, literal, path, ctx, containers) {
   return maybe;
 }
 
-/** Whether a container literal *provably* lacks `key`: a fully known literal that could not
- * possibly carry it — an object literal with no spread and no unknown computed key that simply
- * doesn't declare it, or an array literal with no spread whose element at that index is missing
- * or omitted. A class can't be judged (instance/prototype members make absence unknowable). */
-function literalLacks(analysis, literal, key) {
-  if (ts.isArrayLiteralExpression(literal)) {
-    if (literal.elements.some((el) => ts.isSpreadElement(el))) return false;
-    if (!STATIC_KEY.test(key)) return true;
-    const el = literal.elements[Number(key)];
-    return el === undefined || ts.isOmittedExpression(el);
+/** Whether `path` is *guaranteed* present — a definite, non-optional member — on the value
+ * `expr` evaluates to in context `ctx`: the same traversal `exprValues` does (identical
+ * flattening, replay, and capture/detach rules — round 64's own "same state model" requirement),
+ * but combined with AND at every branch point (a ternary/short-circuit only guarantees a key when
+ * *every* branch does — the opposite of the OR-shaped union a *value* read needs there), and a
+ * write only counts once it reaches this exact leaf (`rest.length === 0`) — a deterministic write
+ * guarantees presence even with an unfoldable RHS, since knowing *that* a value exists and knowing
+ * *what* it is are different questions. This alone isn't the whole absence check `defaultedValues`
+ * needs (a `false` here means "not proven present," which covers both "known to be absent" and
+ * "no idea" — an opaque source, e.g. a function call, is `false` here too) — see `defaultedValues`
+ * for how this pairs with `exprValues(..., true)` (a known-shape check) to keep the same
+ * never-guess-from-an-unknown-source rule this file has always followed. Never guesses toward
+ * `true` from ambiguity: an unresolved spread, an ambiguous/unknown computed key, or a class
+ * (whose instance/prototype members are unknowable) all leave `false`. */
+function definitelyHasPath(analysis, expr, path, ctx) {
+  if (!expr || pathDepth >= MAX_PATH_DEPTH) return false;
+  pathDepth++;
+  try {
+    return definitelyHasPathInner(analysis, expr, path, ctx);
+  } finally {
+    pathDepth--;
   }
-  if (!ts.isObjectLiteralExpression(literal)) return false;
-  for (const prop of literal.properties) {
+}
+
+function definitelyHasPathInner(analysis, expr, path, ctx) {
+  while (expr && (ts.isParenthesizedExpression(expr) || TRANSPARENT_WRAPPER_KINDS.has(expr.kind))) expr = expr.expression;
+  if (!path.length) return true; // the value itself, whatever it turns out to be, is already "here"
+  if (ts.isConditionalExpression(expr)) {
+    return definitelyHasPath(analysis, expr.whenTrue, path, ctx) && definitelyHasPath(analysis, expr.whenFalse, path, ctx);
+  }
+  if (ts.isBinaryExpression(expr) && SHORT_CIRCUIT_OPERATORS.has(expr.operatorToken.kind) && !isAssignmentOperator(expr.operatorToken.kind)) {
+    return definitelyHasPath(analysis, expr.left, path, ctx) && definitelyHasPath(analysis, expr.right, path, ctx);
+  }
+  if (isContainerLiteral(expr)) return literalDefinitelyHas(analysis, expr, path, ctx);
+  if (ts.isPropertyAccessExpression(expr) || ts.isElementAccessExpression(expr)) {
+    const keys = memberKeys(analysis, expr);
+    if (!keys || keys.length !== 1) return false; // an ambiguous/unknown key can't guarantee anything
+    return definitelyHasPath(analysis, expr.expression, [keys[0], ...path], { ...ctx, refDepth: ctx.refDepth + 1 });
+  }
+  if (!ts.isIdentifier(expr)) return false;
+  const decl = analysis.resolveDecl(expr, expr.text);
+  if (!decl || decl.namespaceOf || decl.enumNode || decl.tsNamespace) return false;
+  const enclosingWrite = selfReferenceContext(expr, decl);
+  const readCtx = enclosingWrite ? ctxAt(enclosingWrite.pos) : ctx;
+  return replayPathDefinitelyHas(analysis, decl, path, readCtx, enclosingWrite);
+}
+
+/** `definitelyHasPath`'s counterpart to `replayPath` — same event list, same position/match/
+ * capture-detach filtering, but a monotonic boolean instead of a replayed value set: a
+ * deterministic exact-leaf contribution proves presence forever after (nothing here models
+ * `delete`), a conditional one never proves it alone but doesn't erase presence already proven
+ * earlier either, and a deterministic rebind/replace at or above the captured depth ends the
+ * timeline exactly where `replayPath` would stop looking too — without asserting presence from
+ * the rebind's own new value, which is a fresh, separately-asked question. */
+function replayPathDefinitelyHas(analysis, decl, path, ctx, excludeWrite = null) {
+  const events = decl.writes.map((write) => ({ write, depth: 0 }));
+  for (const write of decl.memberWrites || []) {
+    if (write.chain.length <= path.length) events.push({ write, depth: write.chain.length });
+  }
+  events.sort((a, b) => a.write.pos - b.write.pos);
+  let certain = false;
+  let detached = false;
+  for (const { write, depth } of events) {
+    if (write === excludeWrite) continue;
+    if (write.pos > ctx.atPos) break;
+    let deterministic = write.own || (!write.forceConditional && isDeterministicWrite(write.node, decl.scope));
+    if (depth > 0) {
+      let matches = true;
+      for (let i = 0; i < depth; i++) {
+        const keys = memberKeys(analysis, write.chain[i]);
+        if (keys && !keys.includes(path[i])) {
+          matches = false;
+          break;
+        }
+        if (!keys || keys.length > 1) deterministic = false;
+      }
+      if (!matches) continue;
+    }
+    if (write.pos > ctx.bindPos) {
+      if (depth <= ctx.refDepth) {
+        if (deterministic) break;
+        detached = true;
+        continue;
+      }
+      if (detached) deterministic = false;
+    }
+    if (deterministic && writeDefinitelyHas(analysis, write, path.slice(depth), ctx)) certain = true;
+  }
+  return certain;
+}
+
+function writeDefinitelyHas(analysis, write, rest, ctx) {
+  if (write.redirect !== undefined) {
+    if (!write.redirect) return false;
+    const target = resolveExport(write.redirect.analysis, write.redirect.name);
+    return target ? replayPathDefinitelyHas(target.analysis, target.decl, rest, ctxAt(EOF(target.analysis))) : false;
+  }
+  if (write.copyOf !== undefined) return replayPathDefinitelyHas(analysis, write.copyOf, rest, ctxAt(EOF(analysis)));
+  if (write.compoundOp !== undefined) return rest.length === 0; // `+=` always leaves a string, never a container
+  if (write.destructureFrom !== undefined) {
+    const d = write.destructureFrom;
+    if (d.restOmit || d.restSkip !== undefined) return false; // presence through a rest element isn't modeled
+    return definitelyHasPath(analysis, d.sourceExpr, [...d.path, ...rest], { atPos: d.atPos, bindPos: d.atPos, refDepth: d.path.length });
+  }
+  const expr = write.forceConditional ? write.rhsExpr : write.expr;
+  return definitelyHasPath(analysis, expr, rest, { atPos: ctx.atPos, bindPos: write.pos, refDepth: 0 });
+}
+
+/** `literalValues`'s counterpart: whether a container literal *structurally guarantees* `path` —
+ * an object literal's own exact (unambiguous), non-spread-shadowed property, or an array's
+ * element by index with nothing at or after a `...spread`. A class is never certain (instance/
+ * prototype members are unknowable); an unresolved spread, once reached without an exact winning
+ * match found after it (reverse walk, latest-wins, same order as `literalValues`), also ends the
+ * search unresolved rather than guessing through it. */
+function literalDefinitelyHas(analysis, literal, path, ctx) {
+  const [key, ...rest] = path;
+  if (ts.isArrayLiteralExpression(literal)) {
+    if (!STATIC_KEY.test(key)) return false;
+    const index = Number(key);
+    for (let i = 0; i < literal.elements.length; i++) {
+      const el = literal.elements[i];
+      if (ts.isSpreadElement(el)) return false;
+      if (i === index) return !ts.isOmittedExpression(el) && definitelyHasPath(analysis, el, rest, ctx);
+    }
+    return false;
+  }
+  if (!ts.isObjectLiteralExpression(literal)) return false; // a class: instance/prototype members unknowable
+  for (let i = literal.properties.length - 1; i >= 0; i--) {
+    const prop = literal.properties[i];
     if (ts.isSpreadAssignment(prop)) return false;
     const keys = propertyKeys(analysis, prop);
-    if (!keys || keys.includes(key)) return false;
+    if (keys && !keys.includes(key)) continue; // definitely not this property, keep looking
+    if (!keys || keys.length > 1) return false; // might be this property, might not — never certain either way
+    if (ts.isPropertyAssignment(prop)) return definitelyHasPath(analysis, prop.initializer, rest, ctx);
+    if (ts.isShorthandPropertyAssignment(prop)) return definitelyHasPath(analysis, prop.name, rest, ctx);
+    return false;
   }
-  return true;
+  return false;
 }
 
 /** A destructured binding's value: the source's `path` (+ whatever `rest` is read below the
@@ -629,16 +749,26 @@ function destructureValues(analysis, d, rest, ctx, containers) {
 }
 
 /** `keys` (+ `rest`) read off `source`, where `defaults[i]` — if any — replaces the container
- * reached after `keys[0..i-1]` whenever `keys[i]` is *provably* absent from it (round 62/63):
- * never merely because the source is unknown, which would be a guess. A source that could be
- * several containers, only some lacking the key, contributes both the found value and the default. */
+ * reached after `keys[0..i-1]` whenever `keys[i]` isn't *guaranteed* to be there (round 64,
+ * `definitelyHasPath` — round 62/63's own version of this check only asked "does the source's
+ * *original literal* declare this key," blind to every member write recorded since, so a
+ * deterministic `config.provider = "internal";` before `const { provider = "openai" } = config`
+ * didn't stop `"openai"` from being wrongly treated as reachable). Two independent questions,
+ * both required, keep the original "never guess from an unknown source" rule intact: `owners`
+ * (unchanged from round 62 — a structural container-shape lookup) answers "is anything about this
+ * position's shape known at all," so a destructuring off a function call's result still resolves
+ * to nothing rather than guessing a default; `definitelyHasPath` answers "given everything this
+ * resolver *does* know, including every write since, is the key guaranteed present" — only a
+ * `false` there, on an otherwise-known shape, lets the default through, so a merely *conditional*
+ * write still leaves both the found value and the default reachable, exactly as real JS would. */
 function defaultedValues(analysis, source, keys, defaults, rest, copyDepth, atPos, bindPos, containers) {
   const ctx = { atPos, bindPos, refDepth: keys.length + copyDepth };
   let out = exprValues(analysis, source, [...keys, ...rest], ctx, containers);
   for (let i = 0; i < keys.length; i++) {
     if (!defaults[i]) continue;
+    if (definitelyHasPath(analysis, source, keys.slice(0, i + 1), ctx)) continue; // guaranteed present
     const owners = exprValues(analysis, source, keys.slice(0, i), ctx, true);
-    if (!owners || !owners.some((literal) => literalLacks(analysis, literal, keys[i]))) continue;
+    if (!owners) continue; // an opaque source (e.g. a function call) — never guess a default here
     out = union(out, defaultedValues(analysis, defaults[i], keys.slice(i + 1), defaults.slice(i + 1), rest, copyDepth, atPos, bindPos, containers));
   }
   return out;

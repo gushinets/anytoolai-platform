@@ -745,3 +745,16 @@ def test_chained_role_read_sees_a_nested_member_write(tmp_path: Path) -> None:
     )
     offenders = check_prompts_inside_extensions(tmp_path)
     assert len(offenders) == 1 and "role: 'system'" in offenders[0], offenders
+
+
+def test_role_deterministically_added_after_an_empty_literal_suppresses_the_default(tmp_path: Path) -> None:
+    # Round 64 — the review's own prompt-boundary case: `state.preset = "user"` before
+    # `const { preset: role = "system" } = state` must leave only `"user"` reachable as the role.
+    (tmp_path / "chat.ts").write_text(
+        "const state = {};\n\n"
+        'state.preset = "user";\n\n'
+        'const { preset: role = "system" } = state;\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []
