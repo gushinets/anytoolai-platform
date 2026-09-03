@@ -2,13 +2,13 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Linear: [ANY-410](https://linear.app/paveldik/issue/ANY-410/align-repository-scope-with-web-first-product-validation)
 - Created: 2026-09-03
 - Last updated: 2026-09-04
 - Review date: 2026-09-04
-- Next action: commit the aligned documentation as one reviewable commit.
+- Next action: create a separate ProposalAI vertical-slice implementation plan.
 - Blocker: none
 
 ## Goal
@@ -120,12 +120,9 @@ remain a capability inventory rather than committed releases.
   files.
 - [x] Step 15: Review the final diff for one source of truth, no implementation claims, no new
   abstractions, and no accidental changes to existing untracked files.
-- [ ] Step 16: Commit the aligned documentation as one reviewable documentation commit.
-- [ ] Step 17: Move this plan to `docs/exec-plans/completed/` and record the commit and validation
+- [x] Step 16: Commit the aligned documentation as one reviewable documentation commit.
+- [x] Step 17: Move this plan to `docs/exec-plans/completed/` and record the commit and validation
   evidence in its progress log.
-- [ ] Step 18: Create a separate active implementation plan for the ProposalAI vertical slice. That
-  plan begins with tests for the real `/r/{artifact_id}` renderer and the copy-button activation
-  path; it must not assume that a generic framework exists before the first product proves it.
 
 ## Validation
 
@@ -166,6 +163,7 @@ the relevant backend, frontend, and full checks.
 | 2026-09-03 | Updated current repo guidance and marked the old Linear issue map as a non-controlling legacy snapshot pending a separate Linear audit. | Run the complete documentation validation set. |
 | 2026-09-03 | Validation passed under the repository-managed environment. System Python reports false OpenAPI drift because it has FastAPI 0.115.6 instead of managed 0.137.0; the existing `generated-doc-locked-environment-parity.md` plan owns that runner defect. | Review the complete documentation diff. |
 | 2026-09-03 | Independent review found five documentation inconsistencies; all were fixed, validation reran cleanly, and focused re-review returned no remaining findings. | Commit the aligned documentation. |
+| 2026-09-04 | Committed the aligned documentation as `930ef6df`; all documented checks passed and the plan moved to `completed/`. | Open the ANY-410 pull request, then plan the ProposalAI vertical slice separately. |
 
 ## Open questions
 
