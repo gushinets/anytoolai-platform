@@ -207,6 +207,68 @@ def test_schema_missing_top_level_object_type_fails_fast_with_clear_error() -> N
         )
 
 
+def test_schema_with_old_style_ref_fails_fast_with_clear_error() -> None:
+    """StructuredDict's own "type": "object" guard passes for a schema using the old-style
+    "definitions"/"$ref" pair instead of "$defs", but Agent construction then raises a raw
+    KeyError from pydantic's JSON-schema generator -- a different internal exception for the
+    same underlying "cannot bind this schema" condition the previous test covers. Assert it
+    surfaces as the same kind of clear RuntimeError, not the raw KeyError."""
+
+    async def request_executor(_request: ProviderRequest) -> ProviderResponse:
+        raise AssertionError("request_executor should not be called for a malformed schema")
+
+    runner = PydanticAIStructuredRunner()
+    request = _base_request(
+        action_config_id="kernel_demo.old_style_ref_v1",
+        response_schema={
+            "type": "object",
+            "properties": {"child": {"$ref": "#/definitions/Foo"}},
+            "definitions": {"Foo": {"type": "string"}},
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="kernel_demo.old_style_ref_v1"):
+        asyncio.run(
+            runner.run(
+                request,
+                request_executor=request_executor,
+                validation_max_attempts=2,
+            )
+        )
+
+
+def test_non_finite_numeric_value_retries_and_then_exhausts() -> None:
+    """pydantic-core and jsonschema.validate() both silently accept a bare NaN/Infinity in an
+    already-decoded value, unlike the raw-text parser AnyToolAI's final validation uses -- assert
+    it is rejected inside PydanticAI's own retry loop instead of reaching a false "success"."""
+    attempts: list[ProviderRequest] = []
+
+    async def request_executor(request: ProviderRequest) -> ProviderResponse:
+        attempts.append(request)
+        return ProviderResponse(
+            provider_policy_ref=request.provider_policy_ref,
+            provider="fake",
+            model="fake-json-v1",
+            output_text='{"name": NaN}',
+            status=ProviderCallStatus.succeeded,
+        )
+
+    runner = PydanticAIStructuredRunner()
+    request = _base_request(response_schema=SCHEMA)
+
+    with pytest.raises(PydanticAIValidationExhaustedError) as exc_info:
+        asyncio.run(
+            runner.run(
+                request,
+                request_executor=request_executor,
+                validation_max_attempts=2,
+            )
+        )
+
+    assert len(attempts) == 2
+    assert exc_info.value.last_response.output_text == '{"name": NaN}'
+
+
 def test_cross_validator_retry_then_succeeds() -> None:
     class RejectOnceValidator(ActionOutputCrossValidator):
         def __init__(self) -> None:
