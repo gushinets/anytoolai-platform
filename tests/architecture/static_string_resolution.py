@@ -325,7 +325,11 @@ def _add_module_level_constants(modules: PythonModules, path: Path) -> None:
     else: X = "b"` must resolve `X` to `{"a", "b"}` only, since no runtime path still has `"bad"`
     reachable at the join point; the live-union approach a prior round shipped would incorrectly
     keep `"bad"` alive forever once it was ever written). Only `ast.If` is modeled; `try`/`for`/
-    `while`/`with` stay out of scope (not raised by any review round so far)."""
+    `while`/`with` stay out of scope (not raised by any review round so far). `PATH += "x"`
+    (`ast.AugAssign`, `+` only) is handled like any other deterministic write — it replaces the
+    name's reachable set with the Cartesian product (`_combine`) of its own previous set and the
+    RHS's, so a value built up across more than one statement (including across an `ast.If`
+    branch, via the same entry-state/join machinery above) is still seen, not silently dropped."""
 
     def visit(stmts: list[ast.stmt]) -> None:
         for node in stmts:
@@ -343,11 +347,19 @@ def _add_module_level_constants(modules: PythonModules, path: Path) -> None:
                 continue
             if isinstance(node, ast.Assign):
                 targets = [t.id for t in node.targets if isinstance(t, ast.Name)]
+                values = python_expr_values(node.value, modules, path)
             elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
                 targets = [node.target.id]
+                values = python_expr_values(node.value, modules, path)
+            elif isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name) and isinstance(
+                node.op, ast.Add
+            ):
+                targets = [node.target.id]
+                previous = modules.constants[path].get(node.target.id, frozenset())
+                rhs = python_expr_values(node.value, modules, path)
+                values = _combine([previous, rhs])
             else:
                 continue
-            values = python_expr_values(node.value, modules, path)
             if not values:
                 continue
             for name in targets:

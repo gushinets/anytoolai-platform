@@ -631,3 +631,50 @@ def test_sequential_writes_inside_one_branch_only_the_final_one_survives_to_the_
         },
     )
     assert check_product_specific_endpoint_paths(tmp_path, package) == []
+
+
+def test_deterministic_augmented_assignment_string_construction_is_detected(tmp_path: Path) -> None:
+    # Round 70 (me #54) — the review's own repro: `+=` (`ast.AugAssign`) was skipped entirely by
+    # `_add_module_level_constants`, so a fully deterministic, statically-known route path
+    # assembled with `+=` left the resolver holding the stale pre-assignment value.
+    package = _write_package(
+        tmp_path,
+        {
+            "routes.py": (
+                "from fastapi import APIRouter\n\n"
+                'PATH = "/proposal"\n'
+                'PATH += "_ai/status"\n\n'
+                "router = APIRouter()\n"
+                "@router.get(PATH)\n"
+                "def status(): ...\n"
+            ),
+        },
+    )
+    offenders = check_product_specific_endpoint_paths(tmp_path, package)
+    assert len(offenders) == 1 and "'/proposal_ai/status'" in offenders[0]
+
+
+def test_augmented_assignment_reachable_on_only_one_branch_keeps_both_results_at_the_join(
+    tmp_path: Path,
+) -> None:
+    # Round 70 (me #54) — a conditional `+=`: the branch that runs it produces a different,
+    # forbidden value than the branch (here, the implicit "condition false" path) that doesn't —
+    # both the original and the augmented result must survive to the join so the forbidden one is
+    # still caught, exactly like any other conditional write.
+    package = _write_package(
+        tmp_path,
+        {
+            "routes.py": (
+                "from fastapi import APIRouter\n\n"
+                'PATH = "/proposal"\n\n'
+                "flag = True\n"
+                "if flag:\n"
+                '    PATH += "_ai/status"\n\n'
+                "router = APIRouter()\n"
+                "@router.get(PATH)\n"
+                "def status(): ...\n"
+            ),
+        },
+    )
+    offenders = check_product_specific_endpoint_paths(tmp_path, package)
+    assert len(offenders) == 1 and "'/proposal_ai/status'" in offenders[0]
