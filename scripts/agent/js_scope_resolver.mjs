@@ -216,20 +216,33 @@ function resolveModuleSpecifier(fromPath, specifier) {
   return null;
 }
 
-/** Every statically-known value a scoped binding could hold at `atPos`, replaying its write
- * history up to that point: a write that's a direct sibling statement in the binding's own scope
- * is deterministic (replaces the reachable set); a write nested inside anything else — a
- * braced or braceless `if`/`for`/`while`/`try`/nested block/etc. — is only conditionally reached
- * (adds to the set without discarding what came before). Mirrors the prior resolver's model
- * exactly, but decided from real parent pointers instead of approximated bracket-depth counting. */
-// `+=` combines the binding's own pre-write value with the folded RHS via string concatenation —
-// the only compound arithmetic operator this resolver models (round 56, "at minimum"). `||=`/
-// `&&=`/`??=` are inherently conditional *by the operator itself*, independent of AST position —
-// whether the new value actually takes effect depends on the runtime truthiness/nullishness of
-// the *current* value, exactly like `x || (x = y)` already is after round 54's short-circuit fix
-// — so these are never treated as deterministic (`forceConditional`), and their own contribution
-// is just the folded RHS: the old value's survival, when the assignment doesn't trigger, is
-// already implied by not replacing the reachable set, the same way an `if`-guarded write works.
+// ─── Member paths ────────────────────────────────────────────────────────────────────────────
+//
+// Every read this resolver performs is one shape: `(root binding, key path, position)`. A bare
+// identifier is the empty path; `config.llm.provider` is `config` + `["llm", "provider"]`; a
+// destructured `const { llm: { provider } } = config` is the same path taken at the destructuring
+// statement's own position. Every *member* assignment — `config.llm = ...`, `config.llm.provider
+// += ...`, `config[KEY] = ...` — is a write recorded on the *root* binding with its key chain
+// (`decl.memberWrites`), not on some per-property side structure. One replay (`replayPath`)
+// merges the binding's own writes and every member write that touches a prefix of the path, in
+// source order: a write to `config.llm` at level 1 supplies the value for `config.llm.provider`
+// by walking its new value structurally one more level; a write to `config.llm.provider` at
+// level 2 supplies it directly; a rebinding of `config` at level 0 resets everything.
+//
+// Round 63: the previous model (rounds 58–62) hung a per-property write timeline off a
+// *single-shape* container — so any read that had to cross a container that had since been
+// *replaced* (a nested destructuring's intermediate segment, a chained `a.b.c` read, a spread
+// from a mutated base, a class static replaced then read through) silently fell back to the
+// original literal or resolved to nothing at all. There is no per-property structure any more:
+// mutation, replacement, and rebinding are all just writes at some depth on one timeline.
+
+/** `+=` combines the target's own pre-write value with the folded RHS via string concatenation —
+ * the only compound arithmetic operator this resolver models (round 56). `||=`/`&&=`/`??=` are
+ * inherently conditional *by the operator itself*, independent of AST position — whether the new
+ * value actually takes effect depends on the runtime truthiness/nullishness of the *current*
+ * value — so these are never treated as deterministic (`forceConditional`), and their own
+ * contribution is just the folded RHS: the old value's survival, when the assignment doesn't
+ * trigger, is already implied by not replacing the reachable set. */
 const COMPOUND_STRING_OPERATORS = new Set([ts.SyntaxKind.PlusEqualsToken]);
 const COMPOUND_CONDITIONAL_OPERATORS = new Set([
   ts.SyntaxKind.BarBarEqualsToken,
@@ -237,82 +250,210 @@ const COMPOUND_CONDITIONAL_OPERATORS = new Set([
   ts.SyntaxKind.QuestionQuestionEqualsToken,
 ]);
 
-function replayWrites(analysis, decl, atPos, excludeWrite = null) {
+const STATIC_KEY = /^\d+$/;
+const EOF = (analysis) => analysis.sourceFile.text.length;
+
+function union(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  return Array.from(new Set([...a, ...b]));
+}
+
+/** A read context. `atPos` is where the value is read. `bindPos`/`refDepth` describe a *captured
+ * reference* (round 63): when a read walks through a value that was bound earlier — a literal's
+ * member that is another binding (`config = { llm: inner }`), a destructured object (`const
+ * { llm } = config`), a spread's copied members — the binding it lands on was fixed at `bindPos`,
+ * and only the first `refDepth` path segments were *copied* then. Writes at or above that depth
+ * after `bindPos` (a rebinding, a replacement of the captured slot) no longer concern the object
+ * this read holds a reference to; writes *below* that depth (a mutation of the shared object
+ * itself) still do, because JS objects are references, not copies. A plain read has
+ * `bindPos === atPos`, where none of this matters. */
+function ctxAt(atPos) {
+  return { atPos, bindPos: atPos, refDepth: 0 };
+}
+
+/** Every statically-known value of `path` read off `decl` in context `ctx` (or, with
+ * `containers`, every container literal node it could be): the binding's own writes and every
+ * member write on a prefix of `path`, replayed in source order up to `ctx.atPos`. A write that's
+ * a direct sibling statement in the binding's own scope is deterministic (replaces the reachable
+ * set); one nested inside anything conditional — an `if`/loop/`try` body, a short-circuit RHS, a
+ * ternary branch — or one whose member key is only ambiguously known, is only conditionally
+ * reached (adds to the set without discarding what came before). `excludeWrite` is the one write
+ * a self-referential RHS must not see (see `selfReferenceContext`). */
+function replayPath(analysis, decl, path, ctx, excludeWrite = null, containers = false) {
+  const events = decl.writes.map((write) => ({ write, depth: 0 }));
+  for (const write of decl.memberWrites || []) {
+    if (write.chain.length <= path.length) events.push({ write, depth: write.chain.length });
+  }
+  events.sort((a, b) => a.write.pos - b.write.pos);
   let reachable = new Set();
-  for (const write of decl.writes) {
-    // A write never sees itself — needed when `atPos` and this write's own `pos` coincide (see
-    // `selfReferenceContext`: a self-referential RHS, `provider = provider + "ai"`, resolves its
-    // own `provider` at exactly this write's position, and the plain `write.pos > atPos` check
-    // below alone wouldn't exclude an *equal* position).
+  let detached = false; // a captured slot was *conditionally* overwritten after `bindPos`
+  for (const { write, depth } of events) {
     if (write === excludeWrite) continue;
-    if (write.pos > atPos) break;
-    // An imported binding's "write" has no local expression to fold — its value comes from
-    // wherever the import points, resolved lazily (see `resolveRedirectValue`) each time it's
-    // actually needed rather than once, eagerly, when the import itself is first seen (round 46:
-    // eager resolution made cross-file constant chains depend on file traversal order, since a
-    // consumer processed before its dependency's own imports were installed would memoize an
-    // "unresolvable" result that a later pass had no way to revisit).
-    let values;
-    if (write.redirect !== undefined) {
-      values = resolveRedirectValue(write.redirect);
-    } else if (write.copyOf !== undefined) {
-      values = copyDeclValue(analysis, write.copyOf);
-    } else if (write.compoundOp !== undefined) {
-      // Real JS reads the current value, then computes, then commits — `replayWrites` on `decl`
-      // itself, up to (but excluding) this exact write, gives that pre-write state directly,
-      // reusing the same self-reference machinery an ordinary `provider = provider + "ai"` needs.
-      const priorSet = replayWrites(analysis, decl, write.pos, write);
-      const priorValues = priorSet.size ? Array.from(priorSet) : null;
-      const rhsValues = foldExpr(analysis, write.rhsExpr);
-      values = write.compoundOp === ts.SyntaxKind.PlusEqualsToken ? combine([priorValues, rhsValues]) : null;
-    } else if (write.forceConditional) {
-      values = foldExpr(analysis, write.rhsExpr);
-    } else if (write.destructureFrom !== undefined) {
-      values = resolveDestructuring(analysis, write.destructureFrom); // see `resolveDestructuring`
-    } else {
-      values = foldExpr(analysis, write.expr);
+    if (write.pos > ctx.atPos) break;
+    let deterministic = write.own || (!write.forceConditional && isDeterministicWrite(write.node, decl.scope));
+    if (depth > 0) {
+      // `config[KEY] = ...`: a key that folds to exactly `path[i]` matches; one that folds to a
+      // set containing it *might*; one that doesn't fold at all could be anything — the last two
+      // are conditional matches. A key that folds to something else entirely can't be this slot.
+      let matches = true;
+      for (let i = 0; i < depth; i++) {
+        const keys = memberKeys(analysis, write.chain[i]);
+        if (keys && !keys.includes(path[i])) {
+          matches = false;
+          break;
+        }
+        if (!keys || keys.length > 1) deterministic = false;
+      }
+      if (!matches) continue;
     }
-    const deterministic = write.own || (!write.forceConditional && isDeterministicWrite(write.node, decl.scope));
+    if (write.pos > ctx.bindPos) {
+      if (depth <= ctx.refDepth) {
+        // The captured reference was rebound/replaced after it was taken: nothing later on this
+        // binding's timeline can reach the object this read holds — unless the overwrite itself
+        // might not have happened, in which case everything after is merely uncertain.
+        if (deterministic) break;
+        detached = true;
+        continue;
+      }
+      if (detached) deterministic = false;
+    }
+    const values = writeValues(analysis, decl, write, path.slice(0, depth), path.slice(depth), ctx, containers);
     if (deterministic) {
       reachable = new Set(values || []);
     } else if (values) {
       for (const v of values) reachable.add(v);
     }
   }
-  return reachable;
+  return reachable.size ? Array.from(reachable) : null;
+}
+
+/** What one write contributes to a read of `rest` below the slot it targets (`matched` is the
+ * path prefix that slot sits at — needed by `+=`, which reads its own target's prior value). */
+function writeValues(analysis, decl, write, matched, rest, ctx, containers) {
+  if (write.redirect !== undefined) return redirectValues(write.redirect, rest, containers);
+  if (write.copyOf !== undefined) {
+    return replayPath(analysis, write.copyOf, rest, ctxAt(EOF(analysis)), null, containers);
+  }
+  if (write.compoundOp !== undefined) {
+    if (rest.length || containers) return null; // a string has no members
+    // Real JS reads the current value, then computes, then commits — replaying the target itself
+    // up to (but excluding) this exact write gives that pre-write state directly.
+    const prior = replayPath(analysis, decl, matched, { ...ctx, atPos: write.pos }, write);
+    return write.compoundOp === ts.SyntaxKind.PlusEqualsToken ? combine([prior, foldExpr(analysis, write.rhsExpr)]) : null;
+  }
+  if (write.destructureFrom !== undefined) return destructureValues(analysis, write.destructureFrom, rest, ctx, containers);
+  const expr = write.forceConditional ? write.rhsExpr : write.expr;
+  return exprValues(analysis, expr, rest, { atPos: ctx.atPos, bindPos: write.pos, refDepth: 0 }, containers);
+}
+
+// Guards `redirectValues`'s own recursion against a genuine circular *value* dependency (not just a
+// re-export chain, already guarded by `resolveExport`'s own `seen` set) — e.g. two files whose
+// exported constants each reference the other's. Keyed by declaration object identity.
+const redirectInProgress = new Set();
+
+/** An imported binding's "write" has no local expression to fold — its value comes from wherever
+ * the import points, resolved lazily each time it's needed rather than once when the import is
+ * first seen (round 46: eager resolution made cross-file chains depend on traversal order). */
+function redirectValues(redirect, rest, containers) {
+  if (!redirect) return null; // an import whose specifier resolves to no file in this batch
+  const target = resolveExport(redirect.analysis, redirect.name);
+  if (!target || redirectInProgress.has(target.decl)) return null;
+  redirectInProgress.add(target.decl);
+  try {
+    return replayPath(target.analysis, target.decl, rest, ctxAt(EOF(target.analysis)), null, containers);
+  } finally {
+    redirectInProgress.delete(target.decl);
+  }
+}
+
+const MAX_PATH_DEPTH = 32; // ponytail: backstop for spread cycles (`a = {...b}; b = {...a}`)
+let pathDepth = 0;
+
+/** The values (or container literals) of `path` read off the *expression* `expr` in context
+ * `ctx` — the single entry point every member read goes through. A member access flattens into
+ * its object's path (`a.b.c` + `[d]` → `a` + `["b","c","d"]`); an identifier replays its binding;
+ * an inline literal is walked structurally; a ternary or short-circuit expression contributes
+ * both branches. `null` means "nothing statically known here." */
+function exprValues(analysis, expr, path, ctx, containers = false) {
+  if (!expr || pathDepth >= MAX_PATH_DEPTH) return null;
+  pathDepth++;
+  try {
+    return exprValuesInner(analysis, expr, path, ctx, containers);
+  } finally {
+    pathDepth--;
+  }
+}
+
+function exprValuesInner(analysis, expr, path, ctx, containers) {
+  while (expr && (ts.isParenthesizedExpression(expr) || TRANSPARENT_WRAPPER_KINDS.has(expr.kind))) expr = expr.expression;
+  if (ts.isConditionalExpression(expr)) {
+    return union(exprValues(analysis, expr.whenTrue, path, ctx, containers), exprValues(analysis, expr.whenFalse, path, ctx, containers));
+  }
+  if (ts.isBinaryExpression(expr) && SHORT_CIRCUIT_OPERATORS.has(expr.operatorToken.kind) && !isAssignmentOperator(expr.operatorToken.kind)) {
+    return union(exprValues(analysis, expr.left, path, ctx, containers), exprValues(analysis, expr.right, path, ctx, containers));
+  }
+  if (isContainerLiteral(expr)) return path.length ? literalValues(analysis, expr, path, ctx, containers) : containers ? [expr] : null;
+  if (ts.isPropertyAccessExpression(expr) || ts.isElementAccessExpression(expr)) {
+    const keys = memberKeys(analysis, expr);
+    if (!keys) return null;
+    const inner = { ...ctx, refDepth: ctx.refDepth + 1 };
+    let out = null;
+    for (const key of keys) out = union(out, exprValues(analysis, expr.expression, [key, ...path], inner, containers));
+    return out;
+  }
+  if (!ts.isIdentifier(expr)) return path.length || containers ? null : foldExpr(analysis, expr);
+  const decl = analysis.resolveDecl(expr, expr.text);
+  if (!decl) return null;
+  if (decl.namespaceOf) {
+    // `import * as providers from "./x"; providers.primary` — looked up in the source module's own
+    // export graph, exactly like an ordinary named import (round 58).
+    if (!path.length) return null;
+    const targetAnalysis = analyses.get(decl.namespaceOf);
+    const target = targetAnalysis ? resolveExport(targetAnalysis, path[0]) : null;
+    return target ? replayPath(target.analysis, target.decl, path.slice(1), ctxAt(EOF(target.analysis)), null, containers) : null;
+  }
+  if (decl.tsNamespace) {
+    // `namespace Providers { export const primary = "openai"; }` → `Providers.primary`: a member
+    // is an ordinary binding scoped to the namespace's own `ModuleBlock`, replayed in full.
+    if (!path.length) return null;
+    const inner = analysis.declsByScope.get(decl.tsNamespace)?.get(path[0]);
+    return inner?.length ? replayPath(analysis, inner[inner.length - 1], path.slice(1), ctxAt(EOF(analysis)), null, containers) : null;
+  }
+  if (decl.enumNode) {
+    // `enum Provider { OpenAI = "openai" }` → `Provider.OpenAI`: a string enum member is its
+    // initializer; a numeric/auto member has no string value and correctly resolves to nothing.
+    if (path.length !== 1 || containers) return null;
+    for (const member of decl.enumNode.members) {
+      const name = ts.isIdentifier(member.name) || ts.isStringLiteral(member.name) ? member.name.text : null;
+      if (name === path[0]) return member.initializer ? foldExpr(analysis, member.initializer) : null;
+    }
+    return null;
+  }
+  // A reference sitting inside the RHS of one of its own target's writes (`provider = provider +
+  // "ai"`, `config.provider = config.provider + "ai"`) reads the state *immediately before* that
+  // write — the write itself is excluded and its own position becomes the cutoff (round 56).
+  const enclosingWrite = selfReferenceContext(expr, decl);
+  const readCtx = enclosingWrite ? ctxAt(enclosingWrite.pos) : ctx;
+  return replayPath(analysis, decl, path, readCtx, enclosingWrite, containers);
+}
+
+function isAssignmentOperator(kind) {
+  return kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
 }
 
 /** Whether `node` (an identifier resolving to `decl`) sits inside the RHS of one of `decl`'s own
- * writes — if so, real JS evaluates that RHS fully, using the value `decl` had *immediately
- * before* this write, before ever committing the new one; a self-reference there must never see
- * itself as already having happened just because its own literal text position sits inside the
- * RHS (round 56: `provider = provider + "ai"`'s own `provider` reference is textually *after*
- * `provider =`, so resolving it at its own natural position always included this same
- * not-yet-applied write, hit the fold cycle guard, and lost the value entirely). A purely
- * structural check — the same AST node always gives the same answer regardless of which caller
- * folds it first, so it stays correct under `foldExpr`'s permanent per-node memoization no matter
- * the traversal order that happens to reach it. */
+ * writes — binding writes and member writes alike. A purely *structural* check — the same AST
+ * node always gives the same answer regardless of which caller folds it first, so it stays
+ * correct under `foldExpr`'s permanent per-node memoization no matter the traversal order. */
 function selfReferenceContext(node, decl) {
-  let n = node;
-  while (n) {
-    for (const write of decl.writes) {
+  const writes = decl.memberWrites ? [...decl.writes, ...decl.memberWrites] : decl.writes;
+  for (let n = node; n; n = n.parent) {
+    for (const write of writes) {
       if (write.expr === n || write.rhsExpr === n) return write;
     }
-    n = n.parent;
   }
   return null;
-}
-
-/** Every statically-known value `decl` (some *other* binding in the same file — a same-named
- * enclosing parameter, for a body `var`'s function-entry seed value) could hold by the end of the
- * file, for a write that copies another declaration's value wholesale rather than folding its own
- * expression (round 52's `copyOf`). No cycle guard needed here the way `resolveRedirectValue`
- * needs one for import/export chains: only a `var` write ever carries `copyOf`, and it always
- * points at a *parameter* decl, which can never itself carry a `copyOf` back — so no cycle is
- * structurally possible. */
-function copyDeclValue(analysis, decl) {
-  const set = replayWrites(analysis, decl, analysis.sourceFile.text.length);
-  return set.size ? Array.from(set) : null;
 }
 
 /** Follows an `export { a as NAME } from "./x"` (or a bare `export { NAME };` re-exporting this
@@ -351,20 +492,6 @@ function resolveExport(analysis, name, seen = new Set()) {
   return null;
 }
 
-/** The `ObjectLiteralExpression` node `decl`'s single write structurally evaluates to, if any —
- * `decl` must have *exactly one* write, and that write's own (transparent-wrapper-unwrapped)
- * expression must be an object literal. This is *only* about whether `decl` has one unambiguous
- * originating shape at all — it says nothing about that object's properties staying unmutated
- * after construction (see `getOrCreatePropertyDecl` for that part) — a `let`/multiply-reassigned
- * binding, or one whose single write isn't an object literal, correctly has no such shape rather
- * than guessing (round 58). */
-function singleWriteTarget(decl) {
-  if (!decl || decl.writes.length !== 1) return null;
-  let target = decl.writes[0].expr;
-  while (target && TRANSPARENT_WRAPPER_KINDS.has(target.kind)) target = target.expression;
-  return target || null;
-}
-
 function isContainerLiteral(node) {
   return (
     !!node &&
@@ -375,49 +502,55 @@ function isContainerLiteral(node) {
   );
 }
 
-/** The *container* — object literal, array literal, or class body — `decl` structurally is, if
- * any: a class declaration's own name (`classNode`, set at registration), or a binding with
- * exactly one write whose (transparent-wrapper-unwrapped) expression is such a literal. The
- * single-shape restriction is deliberate (round 58): a container's *shape* isn't a small
- * combinatorial set of possibilities the way a folded string is, so a `let` rebound to a second
- * literal resolves to no shape here rather than guessing which. */
-function containerLiteralFromDecl(analysis, decl) {
-  if (!decl) return null;
-  if (decl.classNode) return decl.classNode;
-  const target = singleWriteTarget(decl);
-  return isContainerLiteral(target) ? target : null;
+/** The one string key a static member target names, or `null`: `obj.prop`, `obj["prop"]`, or
+ * `obj[0]` (a numeric index reads and writes as the key `"0"`, so arrays and objects share one
+ * member model). Never folds anything — safe to call during declaration collection. */
+function staticMemberKey(expr) {
+  if (ts.isPropertyAccessExpression(expr)) return ts.isIdentifier(expr.name) ? expr.name.text : null;
+  if (ts.isElementAccessExpression(expr) && expr.argumentExpression) {
+    const arg = expr.argumentExpression;
+    return ts.isStringLiteralLike(arg) || ts.isNumericLiteral(arg) ? arg.text : null;
+  }
+  return null;
 }
 
-/** `containerLiteralFromDecl`, for an arbitrary expression: the literal itself when written
- * inline, else a plain identifier's binding's container. */
-function containerLiteral(analysis, expr) {
-  if (isContainerLiteral(expr)) return expr;
-  if (!ts.isIdentifier(expr)) return null;
-  return containerLiteralFromDecl(analysis, analysis.resolveDecl(expr, expr.text));
+/** Every key a member access could name: the static one, or — for a computed `obj[key]` — every
+ * string `key` folds to (`const KEY = "provider"; config[KEY]`, round 63). `null` when unknown. */
+function memberKeys(analysis, expr) {
+  const key = staticMemberKey(expr);
+  if (key !== null) return [key];
+  if (ts.isElementAccessExpression(expr) && expr.argumentExpression) return foldExpr(analysis, expr.argumentExpression);
+  return null;
 }
 
-const STATIC_KEY = /^\d+$/;
+/** Every key an object-literal member could declare — static, or every string a computed
+ * `[KEY]: ...` name folds to. `null` when unknown. */
+function propertyKeys(analysis, prop) {
+  const name = prop.name;
+  if (!name) return null;
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) return [name.text];
+  if (ts.isComputedPropertyName(name)) return foldExpr(analysis, name.expression);
+  return null;
+}
 
-/** The member `key` a container literal structurally declares, as `{ expr, pos }`, or `null`. One
- * lookup for every container kind (round 62): an object literal's own property (plain,
- * string-keyed, numeric-keyed, or shorthand), following an object spread — `{ ...base, x: "y" }`
- * — into its source's own literal, walked in *reverse* so a later member wins over an earlier one
- * and over an earlier spread, exactly as at runtime; an array literal's element by index string
- * (`"0"`), so `arr[0]` and `const [a] = arr` read the same way `obj.prop` does — but nothing at or
- * after a `...spread` element, whose index is unknowable; a class's own `static` property
- * initializer. `null` means "not statically declared here," which is *not* the same as
- * "statically absent" (an unresolvable spread source could still contribute it) — see
- * `memberStaticallyAbsent` for the stronger claim a destructuring default needs. */
-function literalMember(analysis, literal, key, depth = 0) {
-  if (!literal || depth > 8) return null;
-  const sf = analysis.sourceFile;
+/** `path` read structurally off a container literal: an array by index string (`"0"`, nothing at
+ * or after a `...spread` element, whose index is unknowable), a class's own `static` property
+ * initializer, or an object literal's property — walked in *reverse* so a later member wins over
+ * an earlier one and over an earlier spread, exactly as at runtime. A spread (`{ ...base }`) is
+ * read *through* (`base` + the same path) at the literal's own evaluation position with the
+ * spread's first level marked as copied (see `ctx`); an unresolvable spread is skipped, not
+ * fatal: a member declared before it stays reachable, the safe direction for the gates this
+ * feeds. A computed key that folds to several strings, or to nothing, *might* be this key, so its
+ * value joins the result without ending the walk. */
+function literalValues(analysis, literal, path, ctx, containers) {
+  const [key, ...rest] = path;
   if (ts.isArrayLiteralExpression(literal)) {
     if (!STATIC_KEY.test(key)) return null;
     const index = Number(key);
     for (let i = 0; i < literal.elements.length; i++) {
       const el = literal.elements[i];
       if (ts.isSpreadElement(el)) return null;
-      if (i === index) return ts.isOmittedExpression(el) ? null : { expr: el, pos: el.getStart(sf) };
+      if (i === index) return ts.isOmittedExpression(el) ? null : exprValues(analysis, el, rest, ctx, containers);
     }
     return null;
   }
@@ -430,204 +563,85 @@ function literalMember(analysis, literal, key, depth = 0) {
         (ts.isIdentifier(member.name) || ts.isStringLiteral(member.name) || ts.isNumericLiteral(member.name)) &&
         member.name.text === key
       ) {
-        return { expr: member.initializer, pos: member.getStart(sf) };
+        return exprValues(analysis, member.initializer, rest, ctx, containers);
       }
     }
     return null;
   }
   if (!ts.isObjectLiteralExpression(literal)) return null;
+  let maybe = null;
   for (let i = literal.properties.length - 1; i >= 0; i--) {
     const prop = literal.properties[i];
-    if (ts.isPropertyAssignment(prop)) {
-      const name = prop.name;
-      if ((ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) && name.text === key) {
-        return { expr: prop.initializer, pos: prop.getStart(sf) };
-      }
-    } else if (ts.isShorthandPropertyAssignment(prop)) {
-      if (prop.name.text === key) return { expr: prop.name, pos: prop.getStart(sf) };
-    } else if (ts.isSpreadAssignment(prop)) {
-      // An unresolvable spread source is skipped, not treated as fatal: a member declared before
-      // it stays a *reachable* value (the spread might not carry that key at all), which is the
-      // safe direction for the gates this feeds — a possibly-overridden value is still possible.
-      const found = literalMember(analysis, containerLiteral(analysis, prop.expression), key, depth + 1);
-      if (found) return found;
+    if (ts.isSpreadAssignment(prop)) {
+      const spreadCtx = { atPos: ctx.atPos, bindPos: ctx.bindPos, refDepth: 1 };
+      const found = exprValues(analysis, prop.expression, path, spreadCtx, containers);
+      if (found) return union(maybe, found);
+      continue;
     }
+    const keys = propertyKeys(analysis, prop);
+    if (keys && !keys.includes(key)) continue;
+    let value = null;
+    if (ts.isPropertyAssignment(prop)) value = exprValues(analysis, prop.initializer, rest, ctx, containers);
+    else if (ts.isShorthandPropertyAssignment(prop)) value = exprValues(analysis, prop.name, rest, ctx, containers);
+    if (keys && keys.length === 1) return union(maybe, value);
+    maybe = union(maybe, value);
   }
-  return null;
+  return maybe;
 }
 
-/** Whether `key` is *provably* not a member of the container `expr` structurally evaluates to — a
- * fully known literal that could not possibly carry it: an object literal with no spread and no
- * computed key that simply doesn't declare it, or an array literal with no spread whose element at
- * that index is missing or omitted. Distinct from `literalMember` returning `null`, which also
- * covers "the container isn't statically known at all": only this stronger claim lets a
- * destructuring default (`const { provider = "openai" } = config`) be applied — an unknown source
- * might hold *any* value for the key, so assuming its default would be a guess (round 62). */
-function memberStaticallyAbsent(analysis, expr, key) {
-  const literal = containerLiteral(analysis, expr);
-  if (!literal) return false;
+/** Whether a container literal *provably* lacks `key`: a fully known literal that could not
+ * possibly carry it — an object literal with no spread and no unknown computed key that simply
+ * doesn't declare it, or an array literal with no spread whose element at that index is missing
+ * or omitted. A class can't be judged (instance/prototype members make absence unknowable). */
+function literalLacks(analysis, literal, key) {
   if (ts.isArrayLiteralExpression(literal)) {
     if (literal.elements.some((el) => ts.isSpreadElement(el))) return false;
     if (!STATIC_KEY.test(key)) return true;
     const el = literal.elements[Number(key)];
     return el === undefined || ts.isOmittedExpression(el);
   }
-  if (ts.isObjectLiteralExpression(literal)) {
-    const dynamic = literal.properties.some(
-      (p) => ts.isSpreadAssignment(p) || (ts.isPropertyAssignment(p) && ts.isComputedPropertyName(p.name)),
-    );
-    return !dynamic && literalMember(analysis, literal, key) === null;
+  if (!ts.isObjectLiteralExpression(literal)) return false;
+  for (const prop of literal.properties) {
+    if (ts.isSpreadAssignment(prop)) return false;
+    const keys = propertyKeys(analysis, prop);
+    if (!keys || keys.includes(key)) return false;
   }
-  return false; // a class: instance/prototype members make absence unknowable statically
+  return true;
 }
 
-/** The one string key a static member target names, or `null`: `obj.prop`, `obj["prop"]`, or
- * `obj[0]` (a numeric index reads and writes as the key `"0"`, so arrays and objects share one
- * member model) — never a computed `obj[key]`, which has no statically-known key at all. */
-function staticMemberKey(expr) {
-  if (ts.isPropertyAccessExpression(expr)) return ts.isIdentifier(expr.name) ? expr.name.text : null;
-  if (ts.isElementAccessExpression(expr) && expr.argumentExpression) {
-    const arg = expr.argumentExpression;
-    return ts.isStringLiteralLike(arg) || ts.isNumericLiteral(arg) ? arg.text : null;
+/** A destructured binding's value: the source's `path` (+ whatever `rest` is read below the
+ * binding), taken at the destructuring statement's own position — `path` itself was *copied*
+ * then, so a later replacement of any segment of it doesn't reach this binding, while a later
+ * mutation *inside* the object it holds does (see `ctx`). A rest element reads the same source
+ * minus its siblings' keys (object) or shifted past its position (array); its own value is a fresh
+ * container nothing can name. Per-element defaults apply at every level — see `defaultedValues`. */
+function destructureValues(analysis, d, rest, ctx, containers) {
+  let copyDepth = 0;
+  if (d.restOmit) {
+    if (!rest.length || d.restOmit.has(rest[0])) return null;
+    copyDepth = 1;
+  } else if (d.restSkip !== undefined) {
+    if (!rest.length || !STATIC_KEY.test(rest[0])) return null;
+    rest = [String(Number(rest[0]) + d.restSkip), ...rest.slice(1)];
+    copyDepth = 1;
   }
-  return null;
+  return defaultedValues(analysis, d.sourceExpr, d.path, d.defaults, rest, copyDepth, ctx.atPos, d.atPos, containers);
 }
 
-/** Get-or-create the property-write timeline for `objectDecl.propName` — a binding-shaped decl
- * object (own `writes` array, `scope` copied from `objectDecl`'s own scope, always `mutable`
- * regardless of whether the object binding itself is `const`, since `const` only prevents
- * *rebinding* `config` to a new object, never mutating its own properties) stored directly on
- * `objectDecl` itself, keyed by property name — mirrors `analysis.binding()`'s get-or-create shape
- * for ordinary bindings, but object properties aren't part of any lexical scope chain, so they
- * can't live in `declsByScope` the normal way; a direct per-object map is simpler than inventing a
- * fake scope node for them.
- *
- * Seeded, on first creation only, with the object literal's own initializer for this property (if
- * the container resolves to one via `containerLiteralFromDecl`, and it declares this key at all) —
- * `own: true`, since constructing the object always deterministically sets it, mirroring how a
- * declaration's own initializer or a parameter default already gets this treatment. A later
- * `obj.prop = ...` mutation — collected eagerly during the ordinary pass-2 assignment walk,
- * *before* this function is ever called, since collection fully finishes before any folding starts
- * — is pushed directly by that walk, `own: false`, computed for real via `isDeterministicWrite`
- * exactly like an ordinary reassignment; `propDecl.scope` being a genuine scope node (copied from
- * the object's own binding) is what makes that determinism check meaningful at all. Explicitly
- * sorted by position here (once, only on creation) since a mutation can be pushed before this seed
- * is ever added — this function might not run until long after pass 2 collected every mutation
- * (round 59: round 58's model only ever looked at the object literal's own initializer, so
- * `config.primaryProvider = "openai";` — an ordinary, deterministic mutation after construction —
- * was silently invisible, and the resolver kept treating the property as permanently equal to
- * its initializer). */
-function getOrCreatePropertyDecl(analysis, objectDecl, key) {
-  if (!objectDecl.properties) objectDecl.properties = new Map();
-  let propDecl = objectDecl.properties.get(key);
-  if (propDecl) return propDecl;
-  propDecl = { name: key, scope: objectDecl.scope, mutable: true, writes: [] };
-  objectDecl.properties.set(key, propDecl);
-  // The seed is whatever the container's own literal declares for this key — an object property
-  // (through spreads), an array element by index, or a class `static` initializer — all one lookup
-  // (`literalMember`, round 62), so a later `arr[0] = ...` or `Config.provider = ...` mutation
-  // pushed onto this same timeline overrides/unions with it exactly like `obj.prop = ...` does.
-  const seed = literalMember(analysis, containerLiteralFromDecl(analysis, objectDecl), key);
-  if (seed) propDecl.writes.push({ pos: seed.pos, expr: seed.expr, own: true });
-  propDecl.writes.sort((a, b) => a.pos - b.pos);
-  return propDecl;
-}
-
-/** `objExpr.propName` (from a `PropertyAccessExpression`, or an `ElementAccessExpression` with a
- * static string-literal index — see `foldExprInner`) at position `atPos`, resolved one of two
- * ways: if `objExpr` is a `NamespaceImport` binding (`import * as providers from "./x"`),
- * `propName` is looked up in the source module's own export graph via `resolveExport`, exactly
- * like an ordinary named import already does; otherwise, if `objExpr` is a plain identifier with a
- * binding, `propName`'s own write timeline (`getOrCreatePropertyDecl`) is replayed through the same
- * `replayWrites` machinery every other binding uses — this is what makes a later `obj.prop = ...`
- * mutation correctly override or union with the object literal's own initializer (round 58/59).
- * `objExpr` not being a plain identifier (an inline object literal used directly, e.g.
- * `({a:"x"}).a` — rare, and has no binding a mutation could ever attach to regardless) falls back
- * to a direct structural lookup with no mutation tracking, since none is possible there. `null`
- * for anything none of these shapes covers. */
-function resolvePropertyAccess(analysis, objExpr, key, atPos) {
-  if (ts.isIdentifier(objExpr)) {
-    const decl = analysis.resolveDecl(objExpr, objExpr.text);
-    if (!decl) return null;
-    if (decl.namespaceOf) {
-      const targetAnalysis = analyses.get(decl.namespaceOf);
-      const target = targetAnalysis ? resolveExport(targetAnalysis, key) : null;
-      if (!target) return null;
-      const set = replayWrites(target.analysis, target.decl, target.analysis.sourceFile.text.length);
-      return set.size ? Array.from(set) : null;
-    }
-    if (decl.tsNamespace) {
-      // `namespace Providers { export const primary = "openai"; }` → `Providers.primary`: a member
-      // is an ordinary binding scoped to the namespace's own `ModuleBlock` (a scope node since
-      // round 62), replayed in full — so a `let` reassigned inside the namespace resolves like any
-      // other binding would.
-      const inner = analysis.declsByScope.get(decl.tsNamespace)?.get(key);
-      if (!inner?.length) return null;
-      const set = replayWrites(analysis, inner[inner.length - 1], analysis.sourceFile.text.length);
-      return set.size ? Array.from(set) : null;
-    }
-    if (decl.enumNode) {
-      // `enum Provider { OpenAI = "openai" }` → `Provider.OpenAI`: a string enum member is its
-      // initializer; a numeric/auto member has no string value and correctly resolves to nothing.
-      for (const member of decl.enumNode.members) {
-        const name = ts.isIdentifier(member.name) || ts.isStringLiteral(member.name) ? member.name.text : null;
-        if (name === key) return member.initializer ? foldExpr(analysis, member.initializer) : null;
-      }
-      return null;
-    }
-    const propDecl = getOrCreatePropertyDecl(analysis, decl, key);
-    const set = replayWrites(analysis, propDecl, atPos);
-    return set.size ? Array.from(set) : null;
+/** `keys` (+ `rest`) read off `source`, where `defaults[i]` — if any — replaces the container
+ * reached after `keys[0..i-1]` whenever `keys[i]` is *provably* absent from it (round 62/63):
+ * never merely because the source is unknown, which would be a guess. A source that could be
+ * several containers, only some lacking the key, contributes both the found value and the default. */
+function defaultedValues(analysis, source, keys, defaults, rest, copyDepth, atPos, bindPos, containers) {
+  const ctx = { atPos, bindPos, refDepth: keys.length + copyDepth };
+  let out = exprValues(analysis, source, [...keys, ...rest], ctx, containers);
+  for (let i = 0; i < keys.length; i++) {
+    if (!defaults[i]) continue;
+    const owners = exprValues(analysis, source, keys.slice(0, i), ctx, true);
+    if (!owners || !owners.some((literal) => literalLacks(analysis, literal, keys[i]))) continue;
+    out = union(out, defaultedValues(analysis, defaults[i], keys.slice(i + 1), defaults.slice(i + 1), rest, copyDepth, atPos, bindPos, containers));
   }
-  // Not a binding at all — an inline literal used directly (`({ a: "x" }).a`), or an intermediate
-  // node of a nested destructuring walk: a direct structural lookup, since nothing could ever have
-  // mutated a value no binding names.
-  const member = literalMember(analysis, containerLiteral(analysis, objExpr), key);
-  return member ? foldExpr(analysis, member.expr) : null;
-}
-
-/** A destructured binding's value — a snapshot taken *at the destructuring statement's own
- * position*, never a live link (real JS copies the value out once; a later mutation of the source
- * must not retroactively change what the binding already holds). `path` is the chain of member
- * keys from `sourceExpr` down to this leaf: one key for `const { provider } = config`, more for a
- * nested pattern (`const { a: { b } } = x` → `["a", "b"]`, round 62 — every intermediate step is a
- * structural walk into the source's own literal, since nothing binds an intermediate slot to any
- * expression a mutation could target; only the final step goes through the mutation-aware,
- * position-aware `resolvePropertyAccess`). A per-element default (`{ provider = "openai" }`)
- * applies only when the key is *provably* absent from a fully known source — never merely because
- * the source is unknown, which would be a guess (see `memberStaticallyAbsent`). */
-function resolveDestructuring(analysis, d) {
-  let expr = d.sourceExpr;
-  for (let i = 0; i < d.path.length - 1; i++) {
-    const member = literalMember(analysis, containerLiteral(analysis, expr), d.path[i]);
-    if (!member) return null;
-    expr = member.expr;
-    while (expr && TRANSPARENT_WRAPPER_KINDS.has(expr.kind)) expr = expr.expression;
-  }
-  const key = d.path[d.path.length - 1];
-  const values = resolvePropertyAccess(analysis, expr, key, d.atPos);
-  if (values) return values;
-  return d.defaultExpr && memberStaticallyAbsent(analysis, expr, key) ? foldExpr(analysis, d.defaultExpr) : null;
-}
-
-// Guards `resolveRedirectValue`'s own recursion against a genuine circular *value* dependency
-// (not just a re-export chain, already guarded by `resolveExport`'s own `seen` set) — e.g. two
-// files whose exported constants each reference the other's, directly or transitively. Keyed by
-// declaration object identity (stable across repeated lookups of the same binding), not by name,
-// so two different bindings that happen to share a name never collide.
-const redirectInProgress = new Set();
-
-function resolveRedirectValue(redirect) {
-  if (!redirect) return null;
-  const target = resolveExport(redirect.analysis, redirect.name);
-  if (!target || redirectInProgress.has(target.decl)) return null;
-  redirectInProgress.add(target.decl);
-  try {
-    const set = replayWrites(target.analysis, target.decl, target.analysis.sourceFile.text.length);
-    return set.size ? Array.from(set) : null;
-  } finally {
-    redirectInProgress.delete(target.decl);
-  }
+  return out;
 }
 
 const CONDITIONAL_PARENT_SLOTS = [
@@ -756,7 +770,7 @@ function combine(parts) {
 
 /** Fold `node` to every statically-known string value it could produce — a literal, a template
  * (each hole resolved at its own true position), a `+` chain, a parenthesized sub-expression, or
- * an identifier resolved through real lexical scope and write-order (see `replayWrites`). `null`
+ * an identifier resolved through real lexical scope and write-order (see `replayPath`). `null`
  * for anything genuinely dynamic (a call, a member access, an unknown name). Memoized per node
  * with cycle protection (a value that depends on itself, directly or through an import cycle,
  * resolves to unresolvable rather than looping). */
@@ -813,23 +827,21 @@ function foldExprInner(analysis, node) {
         const right = foldExpr(analysis, node.right);
         return combine([left, right]);
       }
+      // `a || "x"` / `a ?? "x"` / `a && "x"` evaluates to one operand or the other — both are
+      // reachable (round 63), the same union a conditional write already produces.
+      if (SHORT_CIRCUIT_OPERATORS.has(node.operatorToken.kind) && !isAssignmentOperator(node.operatorToken.kind)) {
+        return union(foldExpr(analysis, node.left), foldExpr(analysis, node.right));
+      }
       return null;
     }
-    case ts.SyntaxKind.Identifier: {
-      const decl = analysis.resolveDecl(node, node.text);
-      if (!decl) return null;
-      const enclosingWrite = selfReferenceContext(node, decl);
-      const atPos = enclosingWrite ? enclosingWrite.pos : node.getStart(sf);
-      const set = replayWrites(analysis, decl, atPos, enclosingWrite);
-      return set.size ? Array.from(set) : null;
-    }
+    case ts.SyntaxKind.ConditionalExpression:
+      return union(foldExpr(analysis, node.whenTrue), foldExpr(analysis, node.whenFalse));
+    case ts.SyntaxKind.Identifier:
     case ts.SyntaxKind.PropertyAccessExpression:
-    case ts.SyntaxKind.ElementAccessExpression: {
-      // `obj.prop` / `obj["prop"]` / `arr[0]` — see `resolvePropertyAccess` for every container
-      // shape this covers; a computed `obj[key]` has no static key and resolves to nothing.
-      const key = staticMemberKey(node);
-      return key === null ? null : resolvePropertyAccess(analysis, node.expression, key, node.getStart(sf));
-    }
+    case ts.SyntaxKind.ElementAccessExpression:
+      // A binding read, or `obj.prop` / `obj["prop"]` / `arr[0]` / `obj[KEY]` — one path model for
+      // every container shape and every mutation kind, see `exprValues`.
+      return exprValues(analysis, node, [], ctxAt(node.getStart(sf)));
     default:
       return null;
   }
@@ -922,7 +934,7 @@ function collectDeclarations(analysis) {
         // value, plus any reassignment that genuinely targets the parameter itself with no
         // same-named `var` around) — with hoisting fixed, every body-level write to a name that
         // also names a parameter resolves to *this* `var` binding, never falls through to the
-        // parameter's, so `copyDeclValue` never sees anything past the parameter's own
+        // parameter's, so a `copyOf` replay never sees anything past the parameter's own
         // function-entry value.
         const enclosingFn = scope.kind === ts.SyntaxKind.Block ? scope.parent : null;
         if (enclosingFn && isFunctionLike(enclosingFn)) {
@@ -963,10 +975,11 @@ function collectDeclarations(analysis) {
       // given a value (a thrown value is dynamic), registered for correct shadowing (round 62).
       declareBindingName(node.variableDeclaration.name, node.block, true, false);
     } else if (ts.isClassDeclaration(node) && node.name) {
-      // Registered so `Config.provider` can resolve a `static` initializer through the same
-      // member model as an object literal (`literalMember`), and so the name shadows correctly.
+      // The class body is the binding's own container value, so `Config.provider` resolves a
+      // `static` initializer through the same member model as an object literal, and a later
+      // `Config.provider = ...` mutation lands on the same timeline (`literalValues`).
       const d = analysis.binding(node.name.text, nearestScope(node) || sf, true, false);
-      d.classNode = node;
+      d.writes.push({ pos: node.getStart(sf), expr: node, own: true });
     } else if (ts.isEnumDeclaration(node)) {
       const d = analysis.binding(node.name.text, nearestScope(node) || sf, false, false);
       d.enumNode = node;
@@ -983,40 +996,59 @@ function collectDeclarations(analysis) {
   // above, so `resolveDecl` here always finds the real one instead of depending on how far
   // traversal has gotten.
   // The write-attaching counterpart of `declareBindingName` — every leaf identifier in a
-  // destructuring pattern gets a `destructureFrom` write (resolved lazily by `replayWrites`, see
-  // `resolveDestructuring`), carrying the full `path` of member keys from `sourceExpr` down to
-  // that leaf, so a nested pattern (`const { a: { b } } = x;` → `["a", "b"]`) resolves through
-  // every level rather than only the first (round 61 stopped at one level; round 62 recurses),
-  // plus the element's own default (`{ provider = "openai" }`) for `resolveDestructuring` to apply
-  // when — and only when — the key is provably absent from a fully known source. An object
+  // destructuring pattern gets a `destructureFrom` write (resolved lazily by `replayPath`, see
+  // `destructureValues`), carrying the full `path` of member keys from `sourceExpr` down to that
+  // leaf, so a nested pattern (`const { a: { b } } = x;` → `["a", "b"]`) resolves through every
+  // level (round 62), plus one default per level (`{ a: { b = "x" } = {} }` → `[aDefault,
+  // bDefault]`, round 63 — round 62 kept only the leaf's) for `defaultedValues` to apply when —
+  // and only when — that level's key is provably absent from a fully known container. An object
   // pattern's key is the alias's property name if any, else the shorthand name itself; an array
-  // pattern's key is the element's index as a string, the same key `arr[0]` reads by. Only a rest
-  // element (`...rest`) is registered but never valued: "everything except these named keys" is a
-  // negative-set extraction this resolver has no static value model for.
-  function attachBindingPatternWrites(pattern, scope, mutable, sourceExpr, atPos, path = []) {
+  // pattern's key is the element's index as a string, the same key `arr[0]` reads by. A rest
+  // element (`{ a, ...rest }` / `[a, ...rest]`) is a binding whose *members* read through to the
+  // source minus its siblings' keys, or shifted past its own position (round 63).
+  function bindingElementKey(el, position, isObject) {
+    if (!isObject) return String(position);
+    const propKey = el.propertyName || el.name;
+    return ts.isIdentifier(propKey) || ts.isStringLiteral(propKey) || ts.isNumericLiteral(propKey) ? propKey.text : null;
+  }
+
+  function attachBindingPatternWrites(pattern, scope, mutable, sourceExpr, atPos, path = [], defaults = []) {
     const isObject = ts.isObjectBindingPattern(pattern);
     let index = 0;
     for (const el of pattern.elements) {
       const position = index++;
-      if (ts.isOmittedExpression(el) || el.dotDotDotToken) continue;
-      let key;
-      if (isObject) {
-        const propKey = el.propertyName || el.name;
-        key = ts.isIdentifier(propKey) || ts.isStringLiteral(propKey) || ts.isNumericLiteral(propKey) ? propKey.text : null;
-        if (key === null) continue; // a computed property name has no statically-known key
-      } else {
-        key = String(position);
+      if (ts.isOmittedExpression(el)) continue;
+      if (el.dotDotDotToken) {
+        if (!ts.isIdentifier(el.name)) continue; // `...[a, b]` — a pattern inside a rest: not modeled
+        const b = analysis.binding(el.name.text, scope, mutable, false); // already registered
+        const d = { sourceExpr, path, defaults, atPos };
+        if (isObject) {
+          d.restOmit = new Set();
+          let sibling = 0;
+          for (const other of pattern.elements) {
+            const key = other === el || ts.isOmittedExpression(other) ? null : bindingElementKey(other, sibling, true);
+            sibling++;
+            if (key !== null) d.restOmit.add(key);
+          }
+        } else {
+          d.restSkip = position;
+        }
+        b.writes.push({ pos: el.name.getStart(sf), own: true, destructureFrom: d });
+        continue;
       }
+      const key = bindingElementKey(el, position, isObject);
+      if (key === null) continue; // a computed property name has no statically-known key
       const fullPath = [...path, key];
+      const fullDefaults = [...defaults, el.initializer || null];
       if (ts.isIdentifier(el.name)) {
         const b = analysis.binding(el.name.text, scope, mutable, false); // already registered
         b.writes.push({
           pos: el.name.getStart(sf),
           own: true,
-          destructureFrom: { sourceExpr, path: fullPath, atPos, defaultExpr: el.initializer || null },
+          destructureFrom: { sourceExpr, path: fullPath, defaults: fullDefaults, atPos },
         });
       } else {
-        attachBindingPatternWrites(el.name, scope, mutable, sourceExpr, atPos, fullPath);
+        attachBindingPatternWrites(el.name, scope, mutable, sourceExpr, atPos, fullPath, fullDefaults);
       }
     }
   }
@@ -1094,28 +1126,33 @@ function collectDeclarations(analysis) {
       }
     } else if (
       ts.isBinaryExpression(node) &&
-      (ts.isPropertyAccessExpression(node.left) || ts.isElementAccessExpression(node.left)) &&
-      ts.isIdentifier(node.left.expression) &&
-      staticMemberKey(node.left) !== null
+      (ts.isPropertyAccessExpression(node.left) || ts.isElementAccessExpression(node.left))
     ) {
-      // `config.primaryProvider = "openai";` / `config["primaryProvider"] = ...` / `arr[0] = ...`
-      // — a direct static member mutation, tracked on its own per-(container, key) write timeline
-      // (round 59), with the same operator set an ordinary binding gets (round 62): `+=` reads
-      // the pre-write value through the same self-reference machinery, `||=`/`&&=`/`??=` stay
-      // always-conditional. A namespace import, TS `enum`, or TS `namespace` can't be mutated
-      // this way at all (it's a compile error), so nothing is recorded for those.
+      // `config.provider = ...` / `config.llm.provider += ...` / `config[KEY] = ...` / `arr[0] = ...`
+      // — a member mutation at any depth, recorded on the *root* binding with its access chain
+      // (keys resolved lazily by `memberKeys`, since a computed key can't be folded before every
+      // write is collected), with the same operator set an ordinary binding gets: `+=` reads the
+      // pre-write value, `||=`/`&&=`/`??=` stay always-conditional. A namespace import, TS
+      // `enum`, or TS `namespace` can't be mutated this way (it's a compile error), and
+      // `this.x = ...` has no binding at all, so nothing is recorded for those.
       const op = node.operatorToken.kind;
-      const key = staticMemberKey(node.left);
-      const objDecl = analysis.resolveDecl(node.left.expression, node.left.expression.text);
+      const chain = [];
+      let root = node.left;
+      while (ts.isPropertyAccessExpression(root) || ts.isElementAccessExpression(root)) {
+        chain.unshift(root);
+        root = root.expression;
+        while (ts.isParenthesizedExpression(root) || TRANSPARENT_WRAPPER_KINDS.has(root.kind)) root = root.expression;
+      }
+      const objDecl = ts.isIdentifier(root) ? analysis.resolveDecl(root, root.text) : null;
       if (objDecl && !objDecl.namespaceOf && !objDecl.enumNode && !objDecl.tsNamespace) {
-        const propDecl = getOrCreatePropertyDecl(analysis, objDecl, key);
+        if (!objDecl.memberWrites) objDecl.memberWrites = [];
         const pos = node.left.getStart(sf);
         if (op === ts.SyntaxKind.EqualsToken) {
-          propDecl.writes.push({ pos, expr: node.right, node, own: false });
+          objDecl.memberWrites.push({ pos, chain, expr: node.right, node, own: false });
         } else if (COMPOUND_STRING_OPERATORS.has(op)) {
-          propDecl.writes.push({ pos, rhsExpr: node.right, node, own: false, compoundOp: op });
+          objDecl.memberWrites.push({ pos, chain, rhsExpr: node.right, node, own: false, compoundOp: op });
         } else if (COMPOUND_CONDITIONAL_OPERATORS.has(op)) {
-          propDecl.writes.push({ pos, rhsExpr: node.right, node, own: false, forceConditional: true });
+          objDecl.memberWrites.push({ pos, chain, rhsExpr: node.right, node, own: false, forceConditional: true });
         }
       }
     }
@@ -1125,13 +1162,16 @@ function collectDeclarations(analysis) {
   visit(sf);
   for (const byName of analysis.declsByScope.values()) {
     for (const decls of byName.values()) {
-      for (const d of decls) d.writes.sort((a, b) => a.pos - b.pos);
+      for (const d of decls) {
+        d.writes.sort((a, b) => a.pos - b.pos);
+        if (d.memberWrites) d.memberWrites.sort((a, b) => a.pos - b.pos);
+      }
     }
   }
 }
 
 /** Registers every named import as a module-level binding whose sole "write" is a *lazy*
- * `redirect` (resolved on demand by `resolveRedirectValue`, not eagerly here — round 46: eager
+ * `redirect` (resolved on demand by `redirectValues`, not eagerly here — round 46: eager
  * resolution needed every file's own imports installed first to see through a multi-hop chain,
  * making the result depend on which order files happened to be traversed in); every
  * `export { a as b } from "./x"` as a `reexport` entry in `exportedNames`; a bare `export { name };`
@@ -1170,7 +1210,7 @@ function resolveImports(analysis) {
       if (node.importClause.namedBindings && ts.isNamespaceImport(node.importClause.namedBindings)) {
         // `import * as providers from "./providers"` — `providers` itself never folds to a string
         // (it isn't a value at all, just a namespace object), so it's registered with no writes of
-        // its own; `namespaceOf` is read directly by `resolvePropertyAccess` when a later
+        // its own; `namespaceOf` is read directly by `exprValues` when a later
         // `providers.someExport` needs to resolve *through* it into the source module's own export
         // graph, reusing `resolveExport` exactly as an ordinary named import already does (round
         // 58).
@@ -1190,7 +1230,7 @@ function resolveImports(analysis) {
       // which isn't a default export at all — deliberately left unhandled here.)
       analysis.exportedNames.set("default", {
         kind: "local",
-        decl: { name: "default", scope: sf, mutable: false, writes: [{ pos: 0, expr: node.expression, node, own: true }] },
+        decl: { name: "default", scope: sf, mutable: false, writes: [{ pos: node.expression.getStart(sf), expr: node.expression, node, own: true }] },
       });
     } else if (ts.isExportDeclaration(node) && node.exportClause && ts.isNamedExports(node.exportClause)) {
       const specifier = node.moduleSpecifier ? node.moduleSpecifier.text : null;

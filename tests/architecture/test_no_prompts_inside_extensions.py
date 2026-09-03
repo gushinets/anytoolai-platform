@@ -709,3 +709,39 @@ def test_typed_request_shapes_are_not_false_positives(tmp_path: Path) -> None:
     )
     (tmp_path / "manifest.json").write_text('{"name": "ext", "version": "1.0"}\n', encoding="utf-8")
     assert check_prompts_inside_extensions(tmp_path) == []
+
+
+def test_nested_destructured_role_sees_an_intermediate_property_replaced_before_it(tmp_path: Path) -> None:
+    # Round 63 — the review's prompt-boundary case: the nested pattern's intermediate `message`
+    # step walked the original literal, never the replacement.
+    (tmp_path / "chat.ts").write_text(
+        'const state = { message: { preset: "user" } };\n\n'
+        'state.message = { preset: "system" };\n\n'
+        "const { message: { preset: role } } = state;\n\n"
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0], offenders
+
+
+def test_nested_destructured_role_does_not_see_an_intermediate_replacement_after_it(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        'const state = { message: { preset: "user" } };\n\n'
+        "const { message: { preset: role } } = state;\n\n"
+        'state.message = { preset: "system" };\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []
+
+
+def test_chained_role_read_sees_a_nested_member_write(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        'const state = { message: { preset: "user" } };\n\n'
+        'state.message.preset = "system";\n\n'
+        "const messages = [{ role: state.message.preset }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0], offenders

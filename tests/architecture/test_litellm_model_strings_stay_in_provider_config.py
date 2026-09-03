@@ -1255,3 +1255,349 @@ def test_class_static_member_and_its_mutation_are_detected(tmp_path: Path) -> No
         'Config.provider = "openai";\n\n'
         "const model = `${Config.provider}/gpt-4.1`;\n",
     ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+# Round 63: one path model for every member read. A read is `(root binding, key path, position)`;
+# a member assignment at any depth is a write on the root binding with its key chain; one replay
+# merges both by position. Before this, an intermediate segment of a nested destructuring, a
+# chained `a.b.c` read, a nested member write, a spread from a mutated base, and a class static
+# replaced then read through all either read the *original* literal or resolved to nothing.
+
+
+def test_nested_destructuring_sees_an_intermediate_property_replaced_before_it(tmp_path: Path) -> None:
+    # The review's own case: `config.llm = {...}` sat on the `llm` property timeline, but the
+    # nested pattern's intermediate `llm` step walked the original literal structurally.
+    assert _litellm(
+        tmp_path,
+        'const config = { llm: { provider: "internal" } };\n\n'
+        'config.llm = { provider: "openai" };\n\n'
+        "const { llm: { provider } } = config;\n\n"
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+def test_nested_destructuring_does_not_see_an_intermediate_replacement_after_it(tmp_path: Path) -> None:
+    assert (
+        _litellm(
+            tmp_path,
+            'const config = { llm: { provider: "internal" } };\n\n'
+            "const { llm: { provider } } = config;\n\n"
+            'config.llm = { provider: "openai" };\n\n'
+            "const model = `${provider}/gpt-4.1`;\n",
+        )
+        == []
+    )
+
+
+def test_nested_destructuring_sees_a_conditional_intermediate_replacement(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const config = { llm: { provider: "internal" } };\n\n'
+        'if (Math.random() > 0.5) config.llm = { provider: "openai" };\n\n'
+        "const { llm: { provider } } = config;\n\n"
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+def test_nested_destructuring_sees_an_intermediate_replaced_by_another_binding(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const alt = { provider: "openai" };\n'
+        'const config = { llm: { provider: "internal" } };\n\n'
+        "config.llm = alt;\n\n"
+        "const { llm: { provider } } = config;\n\n"
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:8: 'openai/gpt-4.1'"]
+
+
+def test_chained_member_read_is_detected(tmp_path: Path) -> None:
+    # `config.llm.provider` — the object of the outer access is itself an access, which the old
+    # single-level model had no binding for at all.
+    assert _litellm(
+        tmp_path,
+        'const config = { llm: { provider: "openai" } };\n\n'
+        "const model = `${config.llm.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:3: 'openai/gpt-4.1'"]
+
+
+def test_chained_member_read_sees_an_intermediate_replacement(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const config = { llm: { provider: "internal" } };\n\n'
+        'config.llm = { provider: "openai" };\n\n'
+        "const model = `${config.llm.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:5: 'openai/gpt-4.1'"]
+
+
+def test_nested_member_write_is_detected_by_chain_and_by_destructuring(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const config = { llm: { provider: "internal" } };\n\n'
+        'config.llm.provider = "openai";\n\n'
+        "const model = `${config.llm.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:5: 'openai/gpt-4.1'"]
+    assert _litellm(
+        tmp_path,
+        'const config = { llm: { provider: "internal" } };\n\n'
+        'config.llm.provider = "openai";\n\n'
+        "const { llm: { provider } } = config;\n\n"
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+def test_whole_object_rebinding_is_detected_through_a_chain(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'let config = { llm: { provider: "internal" } };\n\n'
+        'config = { llm: { provider: "openai" } };\n\n'
+        "const model = `${config.llm.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:5: 'openai/gpt-4.1'"]
+
+
+def test_spread_reads_the_base_as_mutated_at_spread_time(tmp_path: Path) -> None:
+    # `{ ...base }` copies `base`'s members *as they are when the spread runs*: a mutation before
+    # it is copied, a mutation of the copied slot after it is not.
+    assert _litellm(
+        tmp_path,
+        'const base = { provider: "internal" };\n\n'
+        'base.provider = "openai";\n\n'
+        "const config = { ...base };\n\n"
+        "const model = `${config.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+    assert (
+        _litellm(
+            tmp_path,
+            'const base = { provider: "internal" };\n\n'
+            "const config = { ...base };\n\n"
+            'base.provider = "openai";\n\n'
+            "const model = `${config.provider}/gpt-4.1`;\n",
+        )
+        == []
+    )
+
+
+def test_spread_shares_nested_objects_by_reference(tmp_path: Path) -> None:
+    # A spread copies one level; `config.llm` and `base.llm` are the *same* object afterwards, so a
+    # later mutation inside it is visible through both.
+    assert _litellm(
+        tmp_path,
+        'const base = { llm: { provider: "internal" } };\n\n'
+        "const config = { ...base };\n\n"
+        'base.llm.provider = "openai";\n\n'
+        "const model = `${config.llm.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+def test_object_held_in_a_literal_reflects_mutation_but_not_rebinding_of_its_binding(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const inner = { provider: "internal" };\n'
+        "const config = { llm: inner };\n\n"
+        'inner.provider = "openai";\n\n'
+        "const model = `${config.llm.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:6: 'openai/gpt-4.1'"]
+    assert (
+        _litellm(
+            tmp_path,
+            'let inner = { provider: "internal" };\n'
+            "const config = { llm: inner };\n\n"
+            'inner = { provider: "openai" };\n\n'
+            "const model = `${config.llm.provider}/gpt-4.1`;\n",
+        )
+        == []
+    )
+
+
+def test_destructured_object_reflects_mutation_but_not_replacement_of_its_source_slot(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const config = { llm: { provider: "internal" } };\n\n'
+        "const { llm } = config;\n\n"
+        'config.llm.provider = "openai";\n\n'
+        "const model = `${llm.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+    assert (
+        _litellm(
+            tmp_path,
+            'const config = { llm: { provider: "internal" } };\n\n'
+            "const { llm } = config;\n\n"
+            'config.llm = { provider: "openai" };\n\n'
+            "const model = `${llm.provider}/gpt-4.1`;\n",
+        )
+        == []
+    )
+
+
+def test_destructured_string_is_a_snapshot(tmp_path: Path) -> None:
+    assert (
+        _litellm(
+            tmp_path,
+            'const config = { llm: { provider: "internal" } };\n\n'
+            "const { llm: { provider } } = config;\n\n"
+            'config.llm.provider = "openai";\n\n'
+            "const model = `${provider}/gpt-4.1`;\n",
+        )
+        == []
+    )
+
+
+def test_destructured_object_then_member_read_sees_a_prior_replacement(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const config = { llm: { provider: "internal" } };\n\n'
+        'config.llm = { provider: "openai" };\n\n'
+        "const { llm } = config;\n\n"
+        "const model = `${llm.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+def test_property_compound_assignment_reads_its_own_prior_value(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const config = { llm: { provider: "open" } };\n\n'
+        'config.llm.provider = config.llm.provider + "ai";\n\n'
+        "const model = `${config.llm.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:5: 'openai/gpt-4.1'"]
+    assert _litellm(
+        tmp_path,
+        'class Config {\n  static provider = "open";\n}\n\n'
+        'Config.provider += "ai";\n\n'
+        "const model = `${Config.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+def test_intermediate_destructuring_default_applies_when_that_level_is_absent(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        "const config = {};\n\n"
+        'const { llm: { provider } = { provider: "openai" } } = config;\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:5: 'openai/gpt-4.1'"]
+    # A default whose value is another binding is that binding's object, mutations included.
+    assert _litellm(
+        tmp_path,
+        'const fallback = { provider: "internal" };\n\n'
+        "const { llm = fallback } = {};\n\n"
+        'fallback.provider = "openai";\n\n'
+        "const model = `${llm.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+def test_destructuring_default_applies_when_only_some_reachable_shapes_lack_the_key(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        "const flag = Math.random() > 0.5;\n"
+        'const config = flag ? { llm: { provider: "internal" } } : { llm: {} };\n\n'
+        'const { llm: { provider = "openai" } } = config;\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:6: 'openai/gpt-4.1'"]
+
+
+def test_rest_element_reads_through_to_the_source_minus_its_siblings(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const config = { a: "x", provider: "openai" };\n\n'
+        "const { a, ...rest } = config;\n\n"
+        "const model = `${rest.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:5: 'openai/gpt-4.1'"]
+    assert (
+        _litellm(
+            tmp_path,
+            'const config = { provider: "openai", other: "internal" };\n\n'
+            "const { provider, ...rest } = config;\n\n"
+            "const model = `${rest.provider}/gpt-4.1`;\n",
+        )
+        == []
+    )
+
+
+def test_array_rest_element_reads_shifted_past_its_position(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const providers = ["internal", "x", "y"];\n\n'
+        'providers[2] = "openai";\n\n'
+        "const [, ...tail] = providers;\n\n"
+        "const model = `${tail[1]}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+def test_array_element_replaced_then_destructured_nested(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const providers = [{ name: "internal" }];\n\n'
+        'providers[0] = { name: "openai" };\n\n'
+        "const [{ name }] = providers;\n\n"
+        "const model = `${name}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+def test_computed_key_that_folds_to_a_constant_is_detected(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const KEY = "provider";\n'
+        'const config = { provider: "internal" };\n\n'
+        'config[KEY] = "openai";\n\n'
+        "const model = `${config[KEY]}/gpt-4.1`;\n",
+    ) == ["model.ts:6: 'openai/gpt-4.1'"]
+    assert _litellm(
+        tmp_path,
+        'const KEY = "provider";\n'
+        'const config = { [KEY]: "openai" };\n\n'
+        "const model = `${config.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:4: 'openai/gpt-4.1'"]
+
+
+def test_computed_write_with_an_unknown_key_is_a_possible_value(tmp_path: Path) -> None:
+    # `config[key] = "openai"` with a dynamic key might target any slot: the safe direction for a
+    # gate is to treat the written value as reachable, never to assume it missed.
+    assert _litellm(
+        tmp_path,
+        "const key = String(Math.random());\n"
+        'const config = { provider: "internal" };\n\n'
+        'config[key] = "openai";\n\n'
+        "const model = `${config.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:6: 'openai/gpt-4.1'"]
+
+
+def test_class_static_container_replaced_then_read_through(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'class Config {\n  static llm = { provider: "internal" };\n}\n\n'
+        'Config.llm = { provider: "openai" };\n\n'
+        "const model = `${Config.llm.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+def test_ternary_and_short_circuit_values_contribute_both_branches(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        "const flag = Math.random() > 0.5;\n"
+        'const provider = flag ? "internal" : "openai";\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:4: 'openai/gpt-4.1'"]
+    assert _litellm(
+        tmp_path,
+        'const provider = process.env.PROVIDER ?? "openai";\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:3: 'openai/gpt-4.1'"]
+    assert _litellm(
+        tmp_path,
+        "const flag = Math.random() > 0.5;\n"
+        'const config = flag ? { provider: "internal" } : { provider: "openai" };\n\n'
+        "const model = `${config.provider}/gpt-4.1`;\n",
+    ) == ["model.ts:4: 'openai/gpt-4.1'"]
+
+
+def test_chained_member_read_through_an_import_sees_the_source_module_mutation(tmp_path: Path) -> None:
+    (tmp_path / "z-config.ts").write_text(
+        'export const config = { llm: { provider: "internal" } };\n\n'
+        'config.llm = { provider: "openai" };\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "a-model.ts").write_text(
+        'import { config } from "./z-config";\n\n'
+        "const model = `${config.llm.provider}/gpt-4.1`;\n",
+        encoding="utf-8",
+    )
+    offenders = check_litellm_model_strings(tmp_path, [tmp_path], set())
+    assert offenders == ["a-model.ts:3: 'openai/gpt-4.1'"], offenders
