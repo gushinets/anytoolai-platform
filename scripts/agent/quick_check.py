@@ -28,6 +28,7 @@ PYTEST_TARGETS = [
     "tests/test_runner.py",
     "tests/test_docs_generation.py",
     "tests/test_validate_docs.py",
+    "tests/test_validate_pr_metadata.py",
     "tests/test_collect_context.py",
     "tests/test_kernel_demo_smoke.py",
     "tests/test_atoms_proof.py",
