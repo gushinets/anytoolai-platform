@@ -136,7 +136,14 @@ describe("createHandoff", () => {
 
     const result = await createHandoff(client, REQUEST);
 
-    expect(result.ok).toBe(false);
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: "invalid_response",
+        status: 200,
+        message: "Handoff creation response was invalid.",
+      },
+    });
   });
 
   it("propagates a caller-supplied AbortSignal", async () => {

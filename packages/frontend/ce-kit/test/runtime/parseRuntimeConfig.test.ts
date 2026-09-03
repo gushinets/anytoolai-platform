@@ -58,17 +58,42 @@ describe("parseRuntimeConfig", () => {
   });
 
   it("returns null when a scenario's quota summary has an unknown unit/period/dimension", () => {
-    const payload = {
-      ...VALID_PAYLOAD,
-      quota_summary: {
-        quota_policy_id: "p1",
-        unit: "monthly_run",
-        limit_count: 3,
-        period: "lifetime",
-        dimension: "product",
-      },
-    };
-    expect(parseRuntimeConfig(payload)).toBeNull();
+    expect(
+      parseRuntimeConfig({
+        ...VALID_PAYLOAD,
+        quota_summary: {
+          quota_policy_id: "p1",
+          unit: "monthly_run",
+          limit_count: 3,
+          period: "lifetime",
+          dimension: "product",
+        },
+      }),
+    ).toBeNull();
+    expect(
+      parseRuntimeConfig({
+        ...VALID_PAYLOAD,
+        quota_summary: {
+          quota_policy_id: "p1",
+          unit: "scenario_run",
+          limit_count: 3,
+          period: "monthly",
+          dimension: "product",
+        },
+      }),
+    ).toBeNull();
+    expect(
+      parseRuntimeConfig({
+        ...VALID_PAYLOAD,
+        quota_summary: {
+          quota_policy_id: "p1",
+          unit: "scenario_run",
+          limit_count: 3,
+          period: "lifetime",
+          dimension: "tenant",
+        },
+      }),
+    ).toBeNull();
   });
 
   it("returns null when frontend_ids lists an id frontends doesn't have", () => {
