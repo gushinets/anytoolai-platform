@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Any, Awaitable, Callable, Mapping
 
-from pydantic_ai import Agent, ModelRetry, UnexpectedModelBehavior
+from pydantic_ai import Agent, ModelRetry, UnexpectedModelBehavior, UserError
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -115,9 +115,22 @@ class PydanticAIStructuredRunner:
             )
 
         schema = request.response_schema
-        output_type: Any = (
-            str if schema is None else PromptedOutput(StructuredDict(dict(schema)), template=False)
-        )
+        if schema is None:
+            output_type: Any = str
+        else:
+            try:
+                output_type = PromptedOutput(StructuredDict(dict(schema)), template=False)
+            except UserError as exc:
+                # StructuredDict requires a top-level "type": "object" (or a directly resolvable
+                # $ref) to bind as PydanticAI's output contract -- a config-authoring defect, not
+                # a per-request failure retrying would fix, so fail fast with the offending
+                # action_config_id instead of letting pydantic_ai's internal UserError surface.
+                raise RuntimeError(
+                    "response_schema for action_config_id="
+                    f"{request.action_config_id!r} is not a valid PydanticAI structured-output "
+                    "schema (must be a top-level JSON object schema): "
+                    f"{exc}"
+                ) from exc
 
         agent = Agent[PydanticAIValidationState, Any](
             model=FunctionModel(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -27,9 +28,26 @@ class StructuredOutputValidationResult:
     contract: StructuredOutputContract
 
 
+# Mirrors pydantic_ai's own markdown-fence tolerance (pydantic_ai._utils.strip_markdown_fences)
+# so AnyToolAI's mandatory final-validate parses the same text PydanticAI already accepted for a
+# schema-bound structured action -- otherwise a fenced response PydanticAI validates successfully
+# (spending no retry budget) fails final validation on the still-fenced raw text and surfaces an
+# uncaught error instead of the intended PydanticAI ModelRetry/exhaustion path.
+_MARKDOWN_FENCES_PATTERN = re.compile(r"```(?:\w+)?\r?\n(\{.*?\})\s*(?:\r?\n?```|\Z)", flags=re.DOTALL)
+
+
+def _strip_markdown_fences(text: str) -> str:
+    if text.startswith("{"):
+        return text
+    match = _MARKDOWN_FENCES_PATTERN.search(text)
+    if match:
+        return match.group(1)
+    return text
+
+
 def parse_json_value(raw: str) -> Any:
     try:
-        return parse_strict_json(raw)
+        return parse_strict_json(_strip_markdown_fences(raw))
     except json.JSONDecodeError as exc:
         raise StructuredOutputMalformedJsonError("Malformed JSON") from exc
 

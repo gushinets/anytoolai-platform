@@ -182,6 +182,31 @@ def test_malformed_json_retries_and_then_exhausts() -> None:
     assert exc_info.value.last_response.output_text == "not json at all"
 
 
+def test_schema_missing_top_level_object_type_fails_fast_with_clear_error() -> None:
+    """StructuredDict requires a top-level `"type": "object"` (or a directly resolvable $ref)
+    to bind as PydanticAI's output contract. A config schema missing it is an authoring defect,
+    not a per-request failure retrying would fix -- assert it surfaces as a clear RuntimeError
+    naming the action_config_id instead of pydantic_ai's internal UserError leaking out."""
+
+    async def request_executor(_request: ProviderRequest) -> ProviderResponse:
+        raise AssertionError("request_executor should not be called for a malformed schema")
+
+    runner = PydanticAIStructuredRunner()
+    request = _base_request(
+        action_config_id="kernel_demo.bad_schema_v1",
+        response_schema={"properties": {"name": {"type": "string"}}},
+    )
+
+    with pytest.raises(RuntimeError, match="kernel_demo.bad_schema_v1"):
+        asyncio.run(
+            runner.run(
+                request,
+                request_executor=request_executor,
+                validation_max_attempts=2,
+            )
+        )
+
+
 def test_cross_validator_retry_then_succeeds() -> None:
     class RejectOnceValidator(ActionOutputCrossValidator):
         def __init__(self) -> None:
