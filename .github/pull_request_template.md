@@ -1,3 +1,18 @@
+<!--
+Required PR title format: ANY-<number> - <summary>
+Example: ANY-338 - Propagate Core closed enums through OpenAPI and CE-kit boundaries
+Pattern: ^ANY-[1-9][0-9]* - \S.*$
+
+Existing open PRs are not rewritten. Older titles must be updated before the PR's next edit,
+synchronize, or reopen event after the validation workflow is merged.
+-->
+
+## Linear issue
+
+<!-- Full Linear issue URL is required. Do not invent a ticket number. -->
+
+https://linear.app/paveldik/issue/ANY-000/replace-with-real-issue
+
 ## Summary
 
 What changed?
