@@ -619,14 +619,41 @@ function definitelyHasPath(analysis, expr, path, ctx) {
   }
 }
 
+// Leaf expression *kinds* whose result is structurally guaranteed to never literally be
+// `undefined`, regardless of what any sub-expression evaluates to (round 66): a string/template/
+// numeric literal is just itself; `+` coerces both operands to a string (or `NaN`) no matter what
+// they are, `undefined + "x"` included. Deliberately narrow — a `CallExpression`, `NewExpression`,
+// or any other dynamic/unresolved shape stays unproven (see the review this round fixed: treating
+// *any* non-identifier leaf as proof was the exact bug, since an ordinary function call can return
+// `undefined`).
+const NEVER_UNDEFINED_LEAF_KINDS = new Set([
+  ts.SyntaxKind.StringLiteral,
+  ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+  ts.SyntaxKind.TemplateExpression,
+  ts.SyntaxKind.NumericLiteral,
+]);
+
 function definitelyHasPathInner(analysis, expr, path, ctx) {
   while (expr && (ts.isParenthesizedExpression(expr) || TRANSPARENT_WRAPPER_KINDS.has(expr.kind))) expr = expr.expression;
   if (ts.isConditionalExpression(expr)) {
     return definitelyHasPath(analysis, expr.whenTrue, path, ctx) && definitelyHasPath(analysis, expr.whenFalse, path, ctx);
   }
   if (ts.isBinaryExpression(expr) && SHORT_CIRCUIT_OPERATORS.has(expr.operatorToken.kind) && !isAssignmentOperator(expr.operatorToken.kind)) {
+    const op = expr.operatorToken.kind;
+    if (!path.length && (op === ts.SyntaxKind.QuestionQuestionToken || op === ts.SyntaxKind.BarBarToken)) {
+      // `a ?? b` / `a || b`, asked about the value itself (not a deeper member of it): whichever
+      // side actually runs, the result is guaranteed non-`undefined` as soon as `b` alone is —
+      // the *left* side, when it's the one that wins, is by definition non-nullish (`??`) or
+      // truthy (`||`), hence already non-`undefined` on its own, with nothing to prove about it.
+      // `&&`'s "left wins" branch is exactly *`a`'s own* falsy value instead, which could
+      // genuinely be `undefined` — no such shortcut for it, so it keeps the blanket AND below (as
+      // does either operator once there's a deeper path left to check: which side wins no longer
+      // settles *that*, since a non-nullish/truthy `a` says nothing about whether `a.foo` exists).
+      return definitelyHasPath(analysis, expr.right, path, ctx);
+    }
     return definitelyHasPath(analysis, expr.left, path, ctx) && definitelyHasPath(analysis, expr.right, path, ctx);
   }
+  if (ts.isBinaryExpression(expr) && expr.operatorToken.kind === ts.SyntaxKind.PlusToken) return !path.length;
   if (ts.isVoidExpression(expr)) return false; // `void x` always evaluates to `undefined`
   if (isContainerLiteral(expr)) return path.length ? literalDefinitelyHas(analysis, expr, path, ctx) : true;
   if (ts.isPropertyAccessExpression(expr) || ts.isElementAccessExpression(expr)) {
@@ -634,7 +661,8 @@ function definitelyHasPathInner(analysis, expr, path, ctx) {
     if (!keys || keys.length !== 1) return false; // an ambiguous/unknown key can't guarantee anything
     return definitelyHasPath(analysis, expr.expression, [keys[0], ...path], { ...ctx, refDepth: ctx.refDepth + 1 });
   }
-  if (!ts.isIdentifier(expr)) return !path.length; // any other self-contained expression: a real value, nothing further to descend into
+  if (!path.length && NEVER_UNDEFINED_LEAF_KINDS.has(expr.kind)) return true;
+  if (!ts.isIdentifier(expr)) return false; // an unresolved/dynamic expression (a call, ...) — never guess
   const decl = analysis.resolveDecl(expr, expr.text);
   if (!decl || decl.namespaceOf || decl.enumNode || decl.tsNamespace) return false; // includes the global `undefined`, which resolves no local decl
   const enclosingWrite = selfReferenceContext(expr, decl);

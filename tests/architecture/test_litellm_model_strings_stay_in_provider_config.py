@@ -1693,3 +1693,54 @@ def test_conditional_removal_keeps_the_default_reachable_alongside_the_original_
         'const { provider = "openai" } = config;\n\n'
         "const model = `${provider}/gpt-4.1`;\n",
     ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+# Round 66: a leaf's own expression shape matters for "guaranteed non-`undefined`," not just
+# whether *some* write reaches it — round 65 treated *any* non-identifier leaf (a call included) as
+# proof, since a function can obviously return `undefined`. `??`/`||` get their own operator-
+# specific rule (the fallback alone can guarantee the whole expression, regardless of the left
+# side), which `&&` does not share.
+
+
+def test_property_from_a_call_result_does_not_suppress_the_default(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        "function getProvider() {\n"
+        '  return "internal";\n'
+        "}\n\n"
+        "const config = { provider: getProvider() };\n\n"
+        'const { provider = "openai" } = config;\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:9: 'openai/gpt-4.1'"]
+
+
+def test_nullish_fallback_to_a_literal_suppresses_the_default_regardless_of_the_call(tmp_path: Path) -> None:
+    # `getProvider() ?? "custom"` is guaranteed non-`undefined` because `"custom"` alone is —
+    # whatever the call actually returns doesn't matter, and the resolver can't fold it anyway, so
+    # only `"custom"` is a statically known value; `"openai"` must not leak in as a false positive.
+    assert _litellm(
+        tmp_path,
+        "function getProvider() {\n"
+        '  return "internal";\n'
+        "}\n\n"
+        'const config = { provider: getProvider() ?? "custom" };\n\n'
+        'const { provider = "openai" } = config;\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:9: 'custom/gpt-4.1'"]
+
+
+def test_and_operator_keeps_the_blanket_check_unlike_nullish_and_or(tmp_path: Path) -> None:
+    # `&&`'s own "left wins" branch is `a`'s own (possibly `undefined`) falsy value, unlike `??`/
+    # `||` — so a call result on either side must still leave the default reachable. `"internal"`
+    # (not a recognized LiteLLM provider) isolates this: the gate reports one offender per file, so
+    # a real provider name on the `&&` side would compete with the default for the same report —
+    # this only needs to show the default is *not* wrongly suppressed.
+    assert _litellm(
+        tmp_path,
+        "function flag() {\n"
+        "  return true;\n"
+        "}\n\n"
+        'const config = { provider: flag() && "internal" };\n\n'
+        'const { provider = "openai" } = config;\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:9: 'openai/gpt-4.1'"]

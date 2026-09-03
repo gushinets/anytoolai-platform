@@ -772,3 +772,19 @@ def test_role_explicitly_reset_to_undefined_does_not_suppress_the_default(tmp_pa
     )
     offenders = check_prompts_inside_extensions(tmp_path)
     assert len(offenders) == 1 and "role: 'system'" in offenders[0], offenders
+
+
+def test_role_from_a_call_result_does_not_suppress_the_default(tmp_path: Path) -> None:
+    # Round 66 — the review's own prompt-boundary case: a call can return `undefined` at runtime,
+    # so the `"system"` default must stay reachable.
+    (tmp_path / "chat.ts").write_text(
+        "function getRole() {\n"
+        '  return "user";\n'
+        "}\n\n"
+        "const state = { preset: getRole() };\n\n"
+        'const { preset: role = "system" } = state;\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0], offenders
