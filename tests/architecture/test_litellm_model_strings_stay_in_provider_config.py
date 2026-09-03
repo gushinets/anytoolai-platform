@@ -1647,3 +1647,49 @@ def test_default_still_never_guessed_for_a_genuinely_unknown_source(tmp_path: Pa
         )
         == []
     )
+
+
+# Round 65: a destructuring default fires when the extracted value is `undefined`, not merely when
+# the property was never declared — `definitelyHasPath` (round 64) blindly treated any exact-leaf
+# write as proof of presence and only ever accumulated `false → true`, so an explicit `= undefined`
+# and a later deterministic rebind that drops the key were both missed.
+
+
+def test_explicit_undefined_assignment_does_not_suppress_the_default(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const config = { provider: "custom" };\n\n'
+        "config.provider = undefined;\n\n"
+        'const { provider = "openai" } = config;\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+def test_root_object_rebound_to_empty_does_not_suppress_the_default(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'let config = { provider: "custom" };\n\n'
+        "config = {};\n\n"
+        'const { provider = "openai" } = config;\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+def test_intermediate_object_replaced_with_empty_does_not_suppress_a_nested_default(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'const config = { llm: { provider: "custom" } };\n\n'
+        "config.llm = {};\n\n"
+        'const { llm: { provider = "openai" } } = config;\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]
+
+
+def test_conditional_removal_keeps_the_default_reachable_alongside_the_original_value(tmp_path: Path) -> None:
+    assert _litellm(
+        tmp_path,
+        'let config = { provider: "internal" };\n\n'
+        "if (Math.random() > 0.5) config = {};\n\n"
+        'const { provider = "openai" } = config;\n\n'
+        "const model = `${provider}/gpt-4.1`;\n",
+    ) == ["model.ts:7: 'openai/gpt-4.1'"]

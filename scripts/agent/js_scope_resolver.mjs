@@ -589,20 +589,26 @@ function literalValues(analysis, literal, path, ctx, containers) {
   return maybe;
 }
 
-/** Whether `path` is *guaranteed* present — a definite, non-optional member — on the value
- * `expr` evaluates to in context `ctx`: the same traversal `exprValues` does (identical
- * flattening, replay, and capture/detach rules — round 64's own "same state model" requirement),
- * but combined with AND at every branch point (a ternary/short-circuit only guarantees a key when
- * *every* branch does — the opposite of the OR-shaped union a *value* read needs there), and a
- * write only counts once it reaches this exact leaf (`rest.length === 0`) — a deterministic write
- * guarantees presence even with an unfoldable RHS, since knowing *that* a value exists and knowing
- * *what* it is are different questions. This alone isn't the whole absence check `defaultedValues`
- * needs (a `false` here means "not proven present," which covers both "known to be absent" and
- * "no idea" — an opaque source, e.g. a function call, is `false` here too) — see `defaultedValues`
- * for how this pairs with `exprValues(..., true)` (a known-shape check) to keep the same
- * never-guess-from-an-unknown-source rule this file has always followed. Never guesses toward
- * `true` from ambiguity: an unresolved spread, an ambiguous/unknown computed key, or a class
- * (whose instance/prototype members are unknowable) all leave `false`. */
+/** Whether `path` is *guaranteed* present **and non-`undefined`** on the value `expr` evaluates
+ * to in context `ctx` — a real destructuring default fires exactly when the extracted value is
+ * `undefined`, not merely when the property was never declared (round 65: round 64's own version
+ * of this check treated *any* exact-leaf write as proof, even an explicit `config.provider =
+ * undefined;`, since reaching the leaf at all short-circuited straight to `true` without asking
+ * what the leaf's own value actually is). Same traversal `exprValues` does (identical flattening,
+ * replay, and capture/detach rules), combined with AND at every branch point (a ternary/
+ * short-circuit only guarantees non-`undefined` when *every* branch does — the opposite of the
+ * OR-shaped union a *value* read needs there). At the exact leaf (`path.length === 0`): `void x`
+ * is always `undefined`; a container literal (constructing one is never `undefined`) or any other
+ * self-contained expression (a string, a template, a `+`, a call result, ...) counts as defined;
+ * an identifier defers to its own binding's timeline — including the global `undefined`, which
+ * resolves no local declaration and so correctly falls through to `false` on its own, no special
+ * case needed. This alone isn't the whole absence check `defaultedValues` needs (a `false` here
+ * means "not guaranteed defined," which covers both "known absent/undefined" and "no idea" — an
+ * opaque source, e.g. a function call's own result at a deeper, undescendable path, is `false`
+ * here too) — see `defaultedValues` for how this pairs with `exprValues(..., true)` (a known-shape
+ * check) to keep the never-guess-from-an-unknown-source rule this file has always followed. Never
+ * guesses toward `true` from ambiguity: an unresolved spread, an ambiguous/unknown computed key,
+ * or a class (whose instance/prototype members are unknowable) all leave `false`. */
 function definitelyHasPath(analysis, expr, path, ctx) {
   if (!expr || pathDepth >= MAX_PATH_DEPTH) return false;
   pathDepth++;
@@ -615,34 +621,38 @@ function definitelyHasPath(analysis, expr, path, ctx) {
 
 function definitelyHasPathInner(analysis, expr, path, ctx) {
   while (expr && (ts.isParenthesizedExpression(expr) || TRANSPARENT_WRAPPER_KINDS.has(expr.kind))) expr = expr.expression;
-  if (!path.length) return true; // the value itself, whatever it turns out to be, is already "here"
   if (ts.isConditionalExpression(expr)) {
     return definitelyHasPath(analysis, expr.whenTrue, path, ctx) && definitelyHasPath(analysis, expr.whenFalse, path, ctx);
   }
   if (ts.isBinaryExpression(expr) && SHORT_CIRCUIT_OPERATORS.has(expr.operatorToken.kind) && !isAssignmentOperator(expr.operatorToken.kind)) {
     return definitelyHasPath(analysis, expr.left, path, ctx) && definitelyHasPath(analysis, expr.right, path, ctx);
   }
-  if (isContainerLiteral(expr)) return literalDefinitelyHas(analysis, expr, path, ctx);
+  if (ts.isVoidExpression(expr)) return false; // `void x` always evaluates to `undefined`
+  if (isContainerLiteral(expr)) return path.length ? literalDefinitelyHas(analysis, expr, path, ctx) : true;
   if (ts.isPropertyAccessExpression(expr) || ts.isElementAccessExpression(expr)) {
     const keys = memberKeys(analysis, expr);
     if (!keys || keys.length !== 1) return false; // an ambiguous/unknown key can't guarantee anything
     return definitelyHasPath(analysis, expr.expression, [keys[0], ...path], { ...ctx, refDepth: ctx.refDepth + 1 });
   }
-  if (!ts.isIdentifier(expr)) return false;
+  if (!ts.isIdentifier(expr)) return !path.length; // any other self-contained expression: a real value, nothing further to descend into
   const decl = analysis.resolveDecl(expr, expr.text);
-  if (!decl || decl.namespaceOf || decl.enumNode || decl.tsNamespace) return false;
+  if (!decl || decl.namespaceOf || decl.enumNode || decl.tsNamespace) return false; // includes the global `undefined`, which resolves no local decl
   const enclosingWrite = selfReferenceContext(expr, decl);
   const readCtx = enclosingWrite ? ctxAt(enclosingWrite.pos) : ctx;
   return replayPathDefinitelyHas(analysis, decl, path, readCtx, enclosingWrite);
 }
 
 /** `definitelyHasPath`'s counterpart to `replayPath` — same event list, same position/match/
- * capture-detach filtering, but a monotonic boolean instead of a replayed value set: a
- * deterministic exact-leaf contribution proves presence forever after (nothing here models
- * `delete`), a conditional one never proves it alone but doesn't erase presence already proven
- * earlier either, and a deterministic rebind/replace at or above the captured depth ends the
- * timeline exactly where `replayPath` would stop looking too — without asserting presence from
- * the rebind's own new value, which is a fresh, separately-asked question. */
+ * capture-detach filtering, and the same *replace*-vs-*combine* structure the value replay itself
+ * uses, just over a boolean instead of a set: a deterministic exact-leaf contribution *replaces*
+ * the running verdict with its own (round 65 — round 64 only ever OR'd a monotonic `false → true`,
+ * so a later deterministic write that plainly removes the key, e.g. `config = {};` after an
+ * earlier write established it, could never undo an already-`true` verdict); a conditional one
+ * combines with AND (guaranteed only when the state was already guaranteed *and* this write, if it
+ * fires, keeps it so — matching the reviewer's own "both the executed and non-executed outcomes"
+ * framing); and a deterministic rebind/replace at or above the captured depth ends the timeline
+ * exactly where `replayPath` would stop looking too, without asserting anything from the rebind's
+ * own new value there, a fresh, separately-asked question. */
 function replayPathDefinitelyHas(analysis, decl, path, ctx, excludeWrite = null) {
   const events = decl.writes.map((write) => ({ write, depth: 0 }));
   for (const write of decl.memberWrites || []) {
@@ -675,7 +685,8 @@ function replayPathDefinitelyHas(analysis, decl, path, ctx, excludeWrite = null)
       }
       if (detached) deterministic = false;
     }
-    if (deterministic && writeDefinitelyHas(analysis, write, path.slice(depth), ctx)) certain = true;
+    const contributes = writeDefinitelyHas(analysis, write, path.slice(depth), ctx);
+    certain = deterministic ? contributes : certain && contributes;
   }
   return certain;
 }
