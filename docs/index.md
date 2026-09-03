@@ -47,6 +47,7 @@ This directory is the system of record for agents. Keep it current. If a decisio
 - `product-specs/mvp-scope-source-of-truth.md`
 - `product-specs/kernel-demo.md`
 - `product-specs/freelancer-suite-v0.md`
+- `product-specs/atom-ready-product-inventory.md`
 
 ## Agent operations
 

@@ -6,3 +6,4 @@
 - `mvp-b-freelancer-validation-bundle.md` — Freelancer Validation Bundle product set, order, and kernel boundary.
 - `kernel-demo.md` — internal MVP-A smoke product.
 - `freelancer-suite-v0.md` — MVP-B product bundle details.
+- `atom-ready-product-inventory.md` — 11 atoms, 21 text-first products that assemble from them, and workflow-run counts.
