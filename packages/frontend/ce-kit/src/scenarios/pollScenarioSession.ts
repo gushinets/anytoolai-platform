@@ -8,20 +8,13 @@ import type { ScenarioSession } from "./types";
  * Statuses that stop polling. `waiting_for_user` stops here too (not just the workflow-terminal
  * statuses) because it means the frontend must call `nextAction()` next -- continuing to poll
  * would just idle until `maxDurationMs`. See docs/architecture/scenario-session-model.md.
- *
- * A `Record<ScenarioSessionStatus, boolean>` literal, not a hand-written `Set` -- this fails to
- * typecheck if `ScenarioSessionStatus` gains or loses a member and this map isn't updated to
- * classify it, so a new stop status can't silently fall through as non-stopping the way it could
- * with `ReadonlySet<ScenarioSessionStatus>.has()` (any subset of the union typechecks there).
  */
-const SCENARIO_SESSION_STATUS_STOPS_POLLING: Record<ScenarioSessionStatus, boolean> = {
-  started: false,
-  running: false,
-  waiting_for_user: true,
-  completed: true,
-  failed: true,
-  expired: true,
-};
+const POLL_STOP_STATUSES: ReadonlySet<ScenarioSessionStatus> = new Set([
+  "waiting_for_user",
+  "completed",
+  "failed",
+  "expired",
+]);
 
 const DEFAULT_INTERVAL_MS = 2_000;
 const DEFAULT_MAX_DURATION_MS = 60_000;
@@ -91,7 +84,7 @@ export async function pollScenarioSession(
       // and this intentionally ends the entire poll rather than retrying the request.
       return { reason: result.error.type === "timeout" ? "timeout" : "error", result };
     }
-    if (SCENARIO_SESSION_STATUS_STOPS_POLLING[result.value.status]) {
+    if (POLL_STOP_STATUSES.has(result.value.status)) {
       return { reason: "session_status", result };
     }
 
