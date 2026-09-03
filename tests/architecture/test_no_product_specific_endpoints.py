@@ -533,3 +533,101 @@ def test_route_path_constant_via_bare_dotted_import_is_detected(tmp_path: Path) 
     )
     offenders = check_product_specific_endpoint_paths(tmp_path, package)
     assert len(offenders) == 1 and "'/proposal_ai/status'" in offenders[0]
+
+
+def test_conditionally_reassigned_constant_composed_via_concatenation_is_detected(tmp_path: Path) -> None:
+    # Round 69 (me #53) — the review's own repro: round 68 made a conditionally reassigned name
+    # resolve to its full reachable set, but `+`/f-strings only folded when every operand had
+    # exactly one value, so composing that set with a literal (`PREFIX + "/status"`) went right
+    # back to unresolved instead of folding to the Cartesian product of both.
+    package = _write_package(
+        tmp_path,
+        {
+            "routes.py": (
+                "from fastapi import APIRouter\n"
+                "import os\n\n"
+                'PREFIX = "/safe"\n\n'
+                'if os.environ.get("ENABLE_PROPOSAL"):\n'
+                '    PREFIX = "/proposal_ai"\n\n'
+                'PATH = PREFIX + "/status"\n\n'
+                "router = APIRouter()\n"
+                "@router.get(PATH)\n"
+                "def status(): ...\n"
+            ),
+        },
+    )
+    offenders = check_product_specific_endpoint_paths(tmp_path, package)
+    assert len(offenders) == 1 and "'/proposal_ai/status'" in offenders[0]
+
+
+def test_conditionally_reassigned_constant_composed_via_fstring_is_detected(tmp_path: Path) -> None:
+    # Round 69 (me #53) — the same composition bypass, f-string form, without an intermediate
+    # `PATH` constant at all.
+    package = _write_package(
+        tmp_path,
+        {
+            "routes.py": (
+                "from fastapi import APIRouter\n"
+                "import os\n\n"
+                'PREFIX = "/safe"\n\n'
+                'if os.environ.get("ENABLE_PROPOSAL"):\n'
+                '    PREFIX = "/proposal_ai"\n\n'
+                "router = APIRouter()\n"
+                '@router.get(f"{PREFIX}/status")\n'
+                "def status(): ...\n"
+            ),
+        },
+    )
+    offenders = check_product_specific_endpoint_paths(tmp_path, package)
+    assert len(offenders) == 1 and "'/proposal_ai/status'" in offenders[0]
+
+
+def test_both_branches_overwriting_a_forbidden_value_drops_it_at_the_join(tmp_path: Path) -> None:
+    # Round 69 (me #53) — the review's own branch-state repro: unioning each branch's write
+    # straight into the live, already-accumulated state kept the initial forbidden value reachable
+    # forever, even though every runtime path through the `if`/`else` overwrites it with a safe
+    # value before the route is registered. The join must be over the two branches' *resulting*
+    # states, not a running union of every write ever seen.
+    package = _write_package(
+        tmp_path,
+        {
+            "routes.py": (
+                "from fastapi import APIRouter\n\n"
+                'PATH = "/proposal_ai/status"\n\n'
+                "flag = True\n"
+                "if flag:\n"
+                '    PATH = "/safe-a"\n'
+                "else:\n"
+                '    PATH = "/safe-b"\n\n'
+                "router = APIRouter()\n"
+                "@router.get(PATH)\n"
+                "def status(): ...\n"
+            ),
+        },
+    )
+    assert check_product_specific_endpoint_paths(tmp_path, package) == []
+
+
+def test_sequential_writes_inside_one_branch_only_the_final_one_survives_to_the_join(
+    tmp_path: Path,
+) -> None:
+    # Round 69 (me #53) — within a single branch, an earlier write must not also survive to the
+    # join alongside a later one that replaces it — only that branch's own final value does.
+    package = _write_package(
+        tmp_path,
+        {
+            "routes.py": (
+                "from fastapi import APIRouter\n\n"
+                "flag = True\n"
+                "if flag:\n"
+                '    PATH = "/proposal_ai/status"\n'
+                '    PATH = "/safe"\n'
+                "else:\n"
+                '    PATH = "/also-safe"\n\n'
+                "router = APIRouter()\n"
+                "@router.get(PATH)\n"
+                "def status(): ...\n"
+            ),
+        },
+    )
+    assert check_product_specific_endpoint_paths(tmp_path, package) == []

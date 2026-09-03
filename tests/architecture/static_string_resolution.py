@@ -230,21 +230,45 @@ def _attribute_chain(expr: ast.expr) -> tuple[str | None, list[str]]:
     return None, []
 
 
+# A real hardcode fed by more than a couple of conditional branches combined in one expression is
+# vanishingly unlikely, and would very likely also be reachable through a simpler branch
+# elsewhere — matches `MAX_COMBINATIONS` in `js_scope_resolver.mjs` exactly (same cap, same
+# reasoning, the JS/TS side's own long-standing Cartesian-product bound).
+_MAX_COMBINATIONS = 256
+
+
+def _combine(parts: list[frozenset[str]]) -> frozenset[str]:
+    """Every possible concatenation of one value from each of `parts`, in order — empty if any
+    part is itself unresolved (empty), or if the combination count would exceed
+    `_MAX_COMBINATIONS` (mirrors `combine()` in `js_scope_resolver.mjs`)."""
+    size = 1
+    for part in parts:
+        if not part:
+            return frozenset()
+        size *= len(part)
+        if size > _MAX_COMBINATIONS:
+            return frozenset()
+    combos = {""}
+    for part in parts:
+        combos = {prefix + value for prefix in combos for value in part}
+    return frozenset(combos)
+
+
 def python_expr_values(expr: ast.expr | None, modules: PythonModules, path: Path) -> frozenset[str]:
     """Every statically-known string value `expr` could take — a literal string, a module
     constant (local, imported, or accessed through a module alias or a bare dotted import as
-    `paths.NAME`/`pkg.paths.NAME`), a `"a" + "b"` concatenation of either (recursively), or an
-    f-string whose every part is a literal or a `FormattedValue` that itself resolves. Empty for
-    anything genuinely dynamic. A `FormattedValue` with a conversion flag (`f"{x!r}"`) or a format
-    spec (`f"{x:>10}"`) is unresolvable: either changes the text in a way concatenation can't
-    reproduce, and this resolver never evaluates a real expression.
+    `paths.NAME`/`pkg.paths.NAME`), a `"a" + "b"` concatenation of either (recursively, as a
+    Cartesian product of every operand's reachable values via `_combine`), or an f-string whose
+    every part is a literal or a `FormattedValue` that itself resolves (same Cartesian product
+    across parts). Empty for anything genuinely dynamic. A `FormattedValue` with a conversion flag
+    (`f"{x!r}"`) or a format spec (`f"{x:>10}"`) is unresolvable: either changes the text in a way
+    concatenation can't reproduce, and this resolver never evaluates a real expression.
 
     A name reachable through more than one statically-known value (reassigned inside a module-
-    level `if`) resolves to the full set, not just one (see `_add_module_level_constants`). `+`/
-    an f-string only folds when every operand/part resolves to exactly *one* value each — a
-    deliberate, narrower scope cut: nothing in this repo combines a conditionally-reachable name
-    with concatenation, and folding that case for real needs a Cartesian product across every
-    operand/part's reachable set, not built here."""
+    level `if`) resolves to the full set, not just one (see `_add_module_level_constants`) — and
+    composing it with `+`/an f-string composes the *sets*, not just a single value, so a
+    conditionally-reachable name can't silently go unresolved (and therefore unreported) just by
+    being concatenated with something else."""
     constants = modules.constants.get(path, {})
     if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
         return frozenset({expr.value})
@@ -267,26 +291,21 @@ def python_expr_values(expr: ast.expr | None, modules: PythonModules, path: Path
     if isinstance(expr, ast.BinOp) and isinstance(expr.op, ast.Add):
         left = python_expr_values(expr.left, modules, path)
         right = python_expr_values(expr.right, modules, path)
-        if len(left) == 1 and len(right) == 1:
-            return frozenset({next(iter(left)) + next(iter(right))})
-        return frozenset()
+        return _combine([left, right])
     if isinstance(expr, ast.JoinedStr):
-        parts: list[str] = []
+        parts: list[frozenset[str]] = []
         for part in expr.values:
             if isinstance(part, ast.Constant) and isinstance(part.value, str):
-                parts.append(part.value)
+                parts.append(frozenset({part.value}))
             elif (
                 isinstance(part, ast.FormattedValue)
                 and part.conversion == -1
                 and part.format_spec is None
             ):
-                resolved = python_expr_values(part.value, modules, path)
-                if len(resolved) != 1:
-                    return frozenset()
-                parts.append(next(iter(resolved)))
+                parts.append(python_expr_values(part.value, modules, path))
             else:
                 return frozenset()
-        return frozenset({"".join(parts)})
+        return _combine(parts)
     return frozenset()
 
 
@@ -296,18 +315,31 @@ def _add_module_level_constants(modules: PythonModules, path: Path) -> None:
     earlier one in the same pass. `tree.body` only (recursing into `ast.If` branches, see below):
     a same-named local inside a function can't overwrite the real module-level value.
 
-    A binding directly in a body (not itself inside an `ast.If`) *replaces* the name's reachable
-    set — deterministic, straight-line code, same as before this round. One found inside an
-    `ast.If`'s `body`/`orelse` (recursed into, so `elif`/nested `if` chains both work) instead
-    *unions* its value into whatever the name already carries — the branch may or may not run, so
-    the value from before it is still reachable too. Only `ast.If` is modeled; `try`/`for`/
+    A binding replaces the name's reachable set — ordinary, deterministic, source-order semantics,
+    the same within an `ast.If` branch as in straight-line code. An `ast.If` itself evaluates its
+    `body` and `orelse` (recursed into, so `elif`/nested `if` chains both work) each from the exact
+    same *entry* state — the state as of just before the `if` — independently of one another, then
+    joins the two *resulting* states by union, name by name, once both branches are done. Round 69:
+    this — not unioning each write into the live state as it's *found* — is what keeps a value
+    correctly dropped when every branch unconditionally overwrites it (`X = "bad"; if c: X = "a"
+    else: X = "b"` must resolve `X` to `{"a", "b"}` only, since no runtime path still has `"bad"`
+    reachable at the join point; the live-union approach a prior round shipped would incorrectly
+    keep `"bad"` alive forever once it was ever written). Only `ast.If` is modeled; `try`/`for`/
     `while`/`with` stay out of scope (not raised by any review round so far)."""
 
-    def visit(stmts: list[ast.stmt], conditional: bool) -> None:
+    def visit(stmts: list[ast.stmt]) -> None:
         for node in stmts:
             if isinstance(node, ast.If):
-                visit(node.body, True)
-                visit(node.orelse, True)
+                entry = dict(modules.constants[path])
+                visit(node.body)
+                then_state = dict(modules.constants[path])
+                modules.constants[path] = dict(entry)
+                visit(node.orelse)
+                else_state = dict(modules.constants[path])
+                modules.constants[path] = {
+                    name: then_state.get(name, frozenset()) | else_state.get(name, frozenset())
+                    for name in {*then_state, *else_state}
+                }
                 continue
             if isinstance(node, ast.Assign):
                 targets = [t.id for t in node.targets if isinstance(t, ast.Name)]
@@ -319,12 +351,9 @@ def _add_module_level_constants(modules: PythonModules, path: Path) -> None:
             if not values:
                 continue
             for name in targets:
-                if conditional:
-                    modules.constants[path][name] = modules.constants[path].get(name, frozenset()) | values
-                else:
-                    modules.constants[path][name] = values
+                modules.constants[path][name] = values
 
-    visit(modules.trees[path].body, False)
+    visit(modules.trees[path].body)
 
 
 def python_modules(root: Path, trees: dict[Path, ast.Module]) -> PythonModules:
