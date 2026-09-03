@@ -5,9 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-08-19
-- Last updated: 2026-09-03
-- Review date: 2026-09-03
-- Next action: confirm required GitHub checks and request final review.
+- Last updated: 2026-09-04
+- Review date: 2026-09-04
+- Next action: obtain required human approval and merge PR #83.
 - Blocker: none
 
 ## Goal
@@ -62,7 +62,7 @@ and changed code stays typed, fail-fast, and reviewable without adding a root `r
 - [x] Rebase PR #83 onto current `origin/main` without restoring stale pre-#98 metadata.
 - [x] Update the PR body to the dedicated `## Linear issue` format.
 - [x] Fix the stale-PR metadata workflow checkout exposed by the live canary.
-- [ ] Re-run current repository and GitHub validation.
+- [x] Re-run current repository and GitHub validation.
 
 ## Validation
 
@@ -72,7 +72,7 @@ and changed code stays typed, fail-fast, and reviewable without adding a root `r
   in the repository-managed locked environment.
 - [x] `python scripts/agent/runner.py quick-check` — 986 passed, 3 skipped, 397 deselected.
 - [x] Focused documentation and PR metadata tests: 13 passed.
-- [ ] GitHub required checks, including `Linear PR metadata`.
+- [x] GitHub required checks, including `Linear PR metadata`.
 - [x] Manual check: no production source files changed.
 
 ## Decision log
@@ -94,6 +94,7 @@ and changed code stays typed, fail-fast, and reviewable without adding a root `r
 | 2026-09-03 | Rebased the two ANY-337 commits onto `a316d9a3` (`origin/main`, including PR #98); no conflicts occurred and the seven-file diff stayed in scope. | Update PR metadata and run current validation. |
 | 2026-09-03 | Live metadata canary failed at historical base `337699a` because the validator did not exist there; switched the trusted checkout to current default-branch `github.sha`. | Push the rebased branch and verify the synchronize run. |
 | 2026-09-03 | `doctor`, `validate-docs`, generated-doc check, 13 focused tests, and quick-check passed in the repository-managed environment; quick-check reported 986 passed, 3 skipped, and 397 deselected. | Verify GitHub after the final plan update. |
+| 2026-09-04 | Required GitHub checks passed on the rebased PR, including metadata, full-check, atoms proof, PostgreSQL concurrency, Windows, and production Compose smoke. | Obtain required human approval and merge. |
 
 ## Open questions
 
