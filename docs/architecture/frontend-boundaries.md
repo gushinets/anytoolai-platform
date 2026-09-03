@@ -28,9 +28,14 @@ They must not:
 - call LLM providers directly;
 - own authoritative scenario state.
 
-MVP-A2 Client Surfaces owns shared `ce-kit`, web mirror, and shared browser journeys. Product-owned
-Chrome Extensions remain in Freelancer Suite and must consume CE-kit rather than copy transport,
-storage, identity, quota, polling, result, or handoff code. MVP-A1 has no frontend dependency.
+MVP-A2 Client Surfaces owns shared `ce-kit`, the `apps/web-mirror` multi-product host, and shared
+browser journeys. Freelancer Suite owns each product's web definition/page and any optional
+product-specific Chrome Extension. Product surfaces consume shared clients rather than copy
+transport, storage, identity, quota, polling, result, next-action, event, or handoff code. MVP-A1 has
+no frontend dependency.
+
+Inside `apps/web-mirror`, the composition layer may import the shared product runtime and enabled
+product definitions. Shared runtime must not import individual products or contain product meaning.
 
 After A13/A15 (ANY-8, ANY-170/ANY-171/ANY-226), `createGuestIdentity()`, `getQuota()`,
 `startScenario()` (via `prepareScenarioStart()`), `getScenarioSession()`, `pollScenarioSession()`,
@@ -166,9 +171,10 @@ Recommended frontend behavior for `429 quota_exhausted`:
 Frontend-safe responses must not expose prompts, provider policies, provider/model names, retry
 budgets, PydanticAI run ids, LiteLLM response ids, or raw unsafe exception text.
 
-Product Chrome Extensions complete through CE-kit and the frontend-safe result API. Opening the
-same result in web mirror is an optional MVP-A2 integration, never a prerequisite for MVP-A1 or an
-individual Freelancer product.
+Web product pages and optional product Chrome Extensions complete through shared client contracts
+and the frontend-safe result API. Product pages use `/products/{product_id}` in `apps/web-mirror`;
+shared result and consent routes remain backend-state consumers. None of these surfaces is a
+prerequisite for MVP-A1.
 
 ## A12b public result artifact contract
 

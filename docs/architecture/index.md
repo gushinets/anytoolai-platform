@@ -14,4 +14,4 @@ Read these in order for MVP-A/MVP-B source alignment:
 10. `event-taxonomy.md` - MVP-A platform events and dimensions.
 11. `quota-model.md` - guest quota and email/paywall conversion path.
 12. `handoff-model.md` - backend-owned source-to-target session transfer.
-13. `frontend-boundaries.md` - CE/web mirror limits and shared `ce-kit`.
+13. `frontend-boundaries.md` - multi-product web host, optional CE limits, and shared client contracts.
