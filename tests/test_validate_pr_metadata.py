@@ -74,6 +74,31 @@ def test_rejects_multiple_urls_in_linear_section(validator) -> None:
         validator.validate_pr_metadata("ANY-338 - Something", body)
 
 
+def test_rejects_linear_section_inside_fenced_code_block(validator) -> None:
+    body = """## Summary
+
+```markdown
+## Linear issue
+
+https://linear.app/paveldik/issue/ANY-338/not-rendered-metadata
+```
+"""
+
+    with pytest.raises(validator.MetadataError, match="exactly one rendered"):
+        validator.validate_pr_metadata("ANY-338 - Something", body)
+
+
+def test_rejects_multiple_rendered_linear_sections(validator) -> None:
+    body = pr_body() + """
+## Linear issue
+
+https://linear.app/paveldik/issue/ANY-338/duplicate
+"""
+
+    with pytest.raises(validator.MetadataError, match="exactly one rendered"):
+        validator.validate_pr_metadata("ANY-338 - Something", body)
+
+
 def test_ignores_follow_up_ticket_links_outside_linear_section(validator) -> None:
     body = pr_body() + "\n## Follow-up debt\n\nhttps://linear.app/paveldik/issue/ANY-339/other\n"
 

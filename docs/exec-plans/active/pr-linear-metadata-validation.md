@@ -7,10 +7,8 @@
 - Created: 2026-09-03
 - Last updated: 2026-09-03
 - Review date: 2026-09-03
-- Next action: rerun `quick-check` from a clean checkout without generated extension dependencies
-  or locked `.agent` evidence files, then move this plan to completed.
-- Blocker: local `quick-check` scans an existing `extensions/kernel-demo-ce/node_modules` tree and
-  cannot overwrite two existing `.agent/atoms-proof` evidence paths; neither state belongs to this change.
+- Next action: merge PR #98 after review.
+- Blocker: none
 
 ## Goal
 
@@ -53,9 +51,9 @@ Make PR-to-Linear issue resolution deterministic from a canonical PR title and o
 ## Validation
 
 - [x] `python scripts/agent/runner.py doctor`
-- [x] focused PR metadata tests: 8 passed
-- [ ] `python scripts/agent/runner.py quick-check`: 973 passed, 3 skipped, 3 local-state
-  failures unrelated to this diff (generated extension `node_modules`; locked `.agent` evidence).
+- [x] focused PR metadata tests: 10 passed
+- [x] Clean GitHub baseline: Ubuntu, Windows, `full-check`, PostgreSQL, atoms proof, and both
+  Compose smoke jobs passed on PR #98.
 
 ## Decision log
 
@@ -64,13 +62,16 @@ Make PR-to-Linear issue resolution deterministic from a canonical PR title and o
 | 2026-09-03 | Parse exactly one valid URL from the dedicated `## Linear issue` section. | Keeps the PR-ticket contract deterministic while allowing unrelated Linear links in follow-up debt. |
 | 2026-09-03 | Use only Python's standard library. | The validation is small, deterministic, and needs no new dependency. |
 | 2026-09-03 | Do not rewrite open PRs; validate them on their next edited, synchronize, or reopened event. | The workflow changes enforcement without mutating existing PR metadata or rulesets. |
+| 2026-09-03 | Run the workflow via `pull_request_target` and check out only the base SHA. | PR-head code must not be able to weaken its own metadata gate. |
+| 2026-09-03 | Ignore fenced Markdown and require exactly one rendered Linear section. | Code examples and duplicate sections must not create ambiguous metadata. |
 
 ## Progress log
 
 | Date | Progress | Next |
 |---|---|---|
 | 2026-09-03 | Design approved; repository and payments-portal precedent inspected. | Run doctor and start the failing-test cycle. |
-| 2026-09-03 | Added the template contract, stdlib validator, workflow, and 8 focused tests; scoped checks pass. | Rerun the full baseline from a clean checkout. |
+| 2026-09-03 | Added the template contract, stdlib validator, workflow, and focused tests; scoped checks pass. | Rerun the full baseline from a clean checkout. |
+| 2026-09-03 | Clean GitHub CI passed; review identified three metadata bypasses. Added trusted-base execution and two parser regressions. | Merge after review. |
 
 ## Open questions
 
