@@ -33,7 +33,8 @@
 ## Product boundary
 
 - [ ] `kernel_demo` remains smoke-only and not a user product.
-- [ ] MVP-B product meaning stays in product configs/prompts/schemas/renderers/CE wrappers.
+- [ ] MVP-B product meaning stays in product configs/prompts/schemas/web definitions/pages/renderers,
+  handoff maps, events, and optional CE wrappers.
 - [ ] MVP-B changes do not require `platform-core` changes.
 
 ## Validation
