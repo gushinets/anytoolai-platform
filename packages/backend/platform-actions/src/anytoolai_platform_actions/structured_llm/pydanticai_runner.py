@@ -28,7 +28,7 @@ from anytoolai_platform_core.structured_output.errors import (
     StructuredOutputValidationError,
 )
 from anytoolai_platform_core.structured_output.validator import (
-    validate_structured_output_value,
+    validate_structured_output,
 )
 
 
@@ -157,9 +157,19 @@ class PydanticAIStructuredRunner:
             ctx.deps.pydantic_run_id = ctx.run_id
             if ctx.deps.request.response_schema is None:
                 return data
+            # Re-derive from the raw provider text with the same canonical, strict validator
+            # `executor.py`'s `_finalize_response` uses -- not from `data`, PydanticAI's own more
+            # lenient parse of that text (it tolerates markdown fences and other formatting
+            # PydanticAI's own parser accepts, `parse_strict_json` does not). Using one shared
+            # strict check for both the retry loop and the final gate guarantees nothing that
+            # passes here can later fail final validation: a still-fenced or otherwise malformed
+            # response now consumes PydanticAI's own retry budget instead of reaching a false
+            # "success" that crashes downstream.
+            last_response = ctx.deps.last_response
+            assert last_response is not None
             try:
-                validation_result = validate_structured_output_value(
-                    data,
+                validation_result = validate_structured_output(
+                    last_response.output_text,
                     schema=dict(ctx.deps.request.response_schema),
                 )
             except StructuredOutputError as exc:

@@ -255,11 +255,12 @@ def test_structured_llm_executor_consumes_typed_pydanticai_output(
     }
 
 
-def test_structured_llm_executor_accepts_markdown_fenced_schema_response() -> None:
-    """PydanticAI's own object output processor strips ```json fences before validating a
-    schema-bound response, so it accepts a fenced reply without spending retry budget.
-    AnyToolAI's independent mandatory final validation re-parses the same raw provider text and
-    must accept the same fenced response, not diverge from what PydanticAI already validated."""
+def test_structured_llm_executor_rejects_markdown_fenced_schema_response() -> None:
+    """PydanticAI's own object output processor tolerates ```json fences, but the platform-owned
+    final parser (`validate_structured_output`) must stay strict per architecture policy -- and
+    PydanticAIStructuredRunner's output validator re-checks every attempt against that same
+    strict parser (not PydanticAI's more lenient parse), so a fenced response is invalid JSON and
+    must retry/fail instead of being silently accepted through a parsing heuristic."""
     registry = build_config_registry(CONFIG_ROOT)
     spy_gateway = _FixedResponseSpyGateway(
         '```json\n'
@@ -286,13 +287,10 @@ def test_structured_llm_executor_accepts_markdown_fenced_schema_response() -> No
     )
     session = object()
 
-    response = asyncio.run(executor.execute(request, session=session))
+    with pytest.raises(StructuredOutputValidationError) as exc_info:
+        asyncio.run(executor.execute(request, session=session))
 
-    assert response.structured_output == {
-        "values": {"budget": "5000", "timeline": "Q1"},
-        "missing_fields": [],
-    }
-    assert len(spy_gateway.requests) == 1
+    assert exc_info.value.details.reason == "malformed_json"
 
 
 def test_structured_llm_executor_routes_calls_through_provider_gateway() -> None:

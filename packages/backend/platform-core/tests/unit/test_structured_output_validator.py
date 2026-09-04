@@ -5,7 +5,6 @@ from anytoolai_platform_core.structured_output.errors import StructuredOutputMal
 from anytoolai_platform_core.structured_output.validator import (
     parse_json_object,
     parse_json_value,
-    validate_structured_output_value,
 )
 
 
@@ -24,40 +23,15 @@ def test_parse_json_object_still_accepts_ordinary_numbers() -> None:
     assert parse_json_object('{"values": {"budget": 500}}') == {"values": {"budget": 500}}
 
 
-def test_parse_json_object_strips_markdown_fences() -> None:
-    """PydanticAI's own object output processor tolerates a ```json fenced response before
-    validating it (pydantic_ai._utils.strip_markdown_fences); AnyToolAI's mandatory final
-    re-validation of the same raw text must accept it too, or a schema-bound response PydanticAI
-    already validated successfully would fail final validation on the still-fenced text."""
-    assert parse_json_object('```json\n{"name": "Ada"}\n```') == {"name": "Ada"}
-
-
-def test_parse_json_object_leaves_unfenced_text_untouched() -> None:
+def test_parse_json_object_rejects_markdown_fenced_text() -> None:
+    """The platform-owned final parser must stay strict -- a fenced response is invalid JSON
+    and must be handled by PydanticAI's retry loop (see PydanticAIStructuredRunner._validate_output,
+    which re-validates the same raw text with this canonical parser), not silently accepted here
+    via a prompt-text parsing heuristic."""
     with pytest.raises(StructuredOutputMalformedJsonError):
-        parse_json_object("not json, and not fenced either")
+        parse_json_object('```json\n{"name": "Ada"}\n```')
 
 
-def test_parse_json_object_treats_empty_string_as_empty_object() -> None:
-    """pydantic-core's object validator falls back to '{}' for an empty/falsy string
-    (`data or '{}'`) rather than treating it as malformed -- match that fallback."""
-    assert parse_json_object("") == {}
-
-
-def test_validate_structured_output_value_rejects_non_finite_float() -> None:
-    """Unlike parse_strict_json on raw text, pydantic-core and jsonschema.validate() both
-    silently accept a bare NaN/Infinity already decoded into a Python float -- e.g. the value
-    PydanticAI's own object output processor hands to the runner's output validator for a
-    schema-bound response. Reject it here too so both validation passes agree."""
+def test_parse_json_object_rejects_empty_string() -> None:
     with pytest.raises(StructuredOutputMalformedJsonError):
-        validate_structured_output_value(
-            {"score": float("nan")},
-            schema={"type": "object", "properties": {"score": {"type": "number"}}},
-        )
-
-
-def test_validate_structured_output_value_still_accepts_ordinary_floats() -> None:
-    result = validate_structured_output_value(
-        {"score": 1.5},
-        schema={"type": "object", "properties": {"score": {"type": "number"}}},
-    )
-    assert result.normalized_output == {"score": 1.5}
+        parse_json_object("")
