@@ -105,13 +105,14 @@ does not gate the MVP-A1 Atom Runtime Proof.
   to `main` via the `atoms-proof` job in `.github/workflows/backend.yml` (ANY-391)
 - credentialed live-provider canary, separate from baseline CI
 
-Web mirror, shared CE-kit, kernel-demo CE, consent, paywall/onboarding, and browser smoke belong to
-MVP-A2. MVP-B products each get separate product-owned Chrome Extensions.
+The multi-product web host, shared client contracts, kernel-demo CE, consent, paywall/onboarding, and
+browser smoke belong to MVP-A2. MVP-B products get product-owned web definitions/pages; dedicated
+Chrome Extensions are optional follow-up surfaces.
 
 ## Out Of Scope
 
 - real Freelancer products as full user releases
-- eight production Chrome Extensions
+- production Chrome Extensions unless separately justified by a product
 - full admin
 - billing
 - Stripe / YooKassa
@@ -229,5 +230,5 @@ MVP-A1 Atom Runtime Proof is done when:
 - The completion gate has no dependency on CE-kit, web mirror, Chrome, consent, or email/paywall UI.
 
 The most important acceptance criterion: a Freelancer product bundle can be added without changing
-`platform-core`; its Chrome Extension consumes MVP-A2 CE-kit contracts without making web mirror a
-prerequisite.
+product-neutral execution contracts; its web page consumes MVP-A2 shared client contracts without
+putting product semantics into the shared runtime or `platform-core`.

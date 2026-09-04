@@ -26,11 +26,13 @@ MVP-A2: Client Surfaces.
 MVP-B: Freelancer Validation Bundle v0.
 
 MVP-A is delivered in two milestones. MVP-A1 proves the platform execution kernel and all 11
-generic atoms without depending on web or Chrome UI. MVP-A2 delivers shared CE-kit, web mirror,
-handoff consent, paywall/onboarding, and kernel-demo client surfaces. MVP-B validates the kernel
-with thin product bundles and separate product-owned Chrome Extensions.
+generic atoms without depending on web or Chrome UI. MVP-A2 delivers shared client contracts, the
+multi-product web host, handoff consent, paywall/onboarding, and kernel-demo client surfaces. MVP-B
+validates the kernel with six web-first product bundles; product Chrome Extensions are optional.
 
-The controlling concept source for MVP-A/MVP-B scope is mirrored in `docs/product-specs/mvp-scope-source-of-truth.md`. Keep repo-local docs and scaffold aligned with that file.
+The controlling source for current MVP-A/MVP-B scope is
+`docs/product-specs/mvp-scope-source-of-truth.md`. Keep repo-local docs and scaffold aligned with
+that file; earlier external concept documents are historical context.
 
 ## LLM runtime decision
 
@@ -63,8 +65,9 @@ Deep rules live in `docs/architecture/llm-runtime.md`.
 - `kernel_demo` is the only platform smoke product: backend/CLI proof belongs to MVP-A1 and its
   reference Chrome Extension belongs to MVP-A2.
 - Platform Core owns frontend-safe result/artifact APIs and backend runtime state.
-- Client Surfaces owns shared CE-kit, web mirror, and shared browser journeys.
-- Freelancer product meaning belongs to MVP-B config, prompts, schemas, renderers, and CE wrappers.
+- Client Surfaces owns shared client contracts, the multi-product web host, and shared browser journeys.
+- Freelancer product meaning belongs to MVP-B config, prompts, schemas, web definitions/pages,
+  renderers, handoff maps, events, and optional CE wrappers.
 
 ## Before coding
 
@@ -181,3 +184,5 @@ the missing contract or decision.
 ## Agent style
 
 Prefer boring, explicit, searchable code. Avoid clever abstractions until a second product or workflow proves the need.
+
+Coding conventions for new and changed code: `docs/agent/coding-conventions.md`.

@@ -15,6 +15,7 @@ REQUIRED_INDEX_LINKS = (
     "architecture/package-layering.md",
     "architecture/llm-runtime.md",
     "agent/harness-engineering-map.md",
+    "agent/coding-conventions.md",
 )
 GUIDANCE = "See docs/index.md and docs/exec-plans/template.md."
 

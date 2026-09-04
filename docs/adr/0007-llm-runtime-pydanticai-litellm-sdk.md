@@ -11,7 +11,9 @@ MVP-A Platform Kernel needs one generic structured LLM executor that can run pro
 The library decision must preserve the MVP-A/MVP-B boundary:
 
 - MVP-A owns the platform runtime.
-- MVP-B adds product configs, prompts, schemas, workflows, renderers, handoff maps, and thin Chrome Extension wrappers.
+- MVP-B adds product configs, prompts, schemas, workflows, renderers, handoff maps, and product
+  frontend definitions. ADR-0008 makes web pages the current validation surface; thin Chrome
+  Extension wrappers remain optional when a product requires extension delivery.
 - Freelancer product meaning must not enter `platform-core`.
 - Provider calls must not bypass Provider Gateway.
 

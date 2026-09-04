@@ -2,103 +2,112 @@
 
 ## Goal
 
-Validate that real CE-first Freelancer products can be added after MVP-A1 Atom Runtime Proof and on
-the required MVP-A2 CE-kit contracts without changing `platform-core`.
+Validate that real web-first Freelancer products can be added after MVP-A1 Atom Runtime Proof and
+on the required MVP-A2 Client Surfaces contracts without changing product-neutral execution
+contracts.
 
-MVP-B is not a separate backend. It is a validation bundle made from product configs, prompts, schemas, workflows, CE wrappers, result renderers, handoff maps, and product events.
+MVP-B is not a separate backend. It is a validation bundle made from product configs, prompts,
+schemas, workflows, web definitions/pages, result renderers, handoff maps, product events, and
+runtime E2E evidence.
 
 ## In Scope
 
-- product configs
-- product prompts
-- product schemas
-- product workflows
-- product-specific action configs
-- CE wrappers
-- CE product UX
-- result renderers
-- handoff maps
-- product events
+- product configs;
+- product prompts;
+- product schemas;
+- product workflows;
+- product-specific action configs;
+- web product definitions and pages hosted by `apps/web-mirror`;
+- result renderers;
+- handoff maps;
+- product events;
+- deterministic fixtures and complete browser/runtime E2E evidence.
 
-## Product Set
+Dedicated Chrome Extensions are optional follow-up surfaces. Add one only when browser-context
+capture or extension distribution is a validated product requirement.
 
-MVP-B contains eight thin Freelancer validation products:
+## Validation Set
 
-- ProposalAI
-- Acceptance Builder
-- Case Study
-- Scope Guard
-- Task Finder
-- Send-Ready
-- Brief Decoder
-- Persuasion Lens
+MVP-B validates six products in this order:
 
-Each product has one coordinating Linear parent and exactly three delivery children:
+1. ProposalAI: `A06` / `text.compose_persuasive_text`.
+2. Client Update Writer: `A07` / `text.compose_reply`, with PrepaidRequest and ReplyDraft as modes.
+3. Brief Decoder: `A01 + A04 -> A05`, results to `A10`.
+4. Acceptance Builder: `A01 + A11` or `A02`, results to `A10`.
+5. Task Finder: `A11 + A02`, with `A01` and `A09` optional.
+6. Send-Ready: `A04 + A03`, then a user-selected gap to `A08` in a second scenario run.
 
-1. `<Product> Bundle And Workflow` owns product config, prompts, strict schemas, workflow, renderer
-   contract, events, handoff contracts, and deterministic fixtures.
-2. `<Product> Chrome Extension` owns the dedicated manifest and product UX using
-   `packages/frontend/ce-kit`.
-3. `<Product> Runtime E2E And QA` owns the complete CE → CE-kit → API → scenario → workflow →
-   result → copy/handoff proof.
+ProposalAI proves the shortest complete web path. Client Update Writer proves real reuse before
+shared UI is extracted. Brief Decoder and Acceptance Builder prove one `immediate` same-tab handoff.
+Task Finder proves score-based value delivery. Send-Ready proves the two-run selected-gap flow
+without mapping DSL array indexing.
 
-The parent completes only when all three children complete. Bundle children depend on B01 and the
-required MVP-A1 atom packs. Chrome Extension children depend on their bundle and the required
-MVP-A2 CE-kit slices, but never on web mirror. Runtime E2E children depend on bundle plus CE and,
-where configured, the B06 handoff map and A18 client handoff integration.
+The 21 concepts in `atom-ready-product-inventory.md` remain a capability inventory. They are not an
+alternative MVP-B release train.
 
-## Product Order
+## Product Delivery Shape
 
-After MVP-A1, all 11 atom action types are proven individually and in composite workflows. MVP-B
-should mostly be prompts, schemas, workflows, CE UX, renderers, fixtures, and handoff maps.
+Each validation product needs two independently reviewable outcomes:
 
-Recommended order:
+1. `Bundle And Workflow`: product config, prompts, strict schemas, workflow, action configs,
+   renderer contract, events, handoff contracts where applicable, and deterministic fixtures.
+2. `Web Runtime E2E And QA`: product page in `apps/web-mirror` and the complete web -> shared client
+   -> API -> scenario -> workflow -> result -> activation/handoff proof.
 
-1. ProposalAI: `A06` / `text.compose_persuasive_text`
-2. Acceptance Builder: `A01 + A07 + A10`
-3. Case Study + Upsell: `A01 + A09 + A07 + A10`
-4. Scope Guard: `A01 + A04 + A11 + A07`
-5. Task Finder: `A01 + A11 + A02 + A09`
-6. Send-Ready: `A04 + A11 + A02 + A08`
-7. Brief Decoder: `A01 + A04 + A05 + A10`
-8. Persuasion Lens: `A03 + A04 + A09 + A08 + A06`
+This is a delivery boundary, not a requirement to create a fixed number of Linear child issues.
+Product planning may split work further when a reviewable vertical requires it.
 
-ProposalAI should be the first real product after the kernel because it has one workflow, one atom, a clear CE surface, and a quick `result copied` aha moment.
+Bundle work depends on MVP-A1 and the required atom packs. Web work depends on the bundle and the
+required MVP-A2 client-event, result-rendering, product-host, and handoff slices.
 
-Every product extension completes through CE-kit scenario polling and the frontend-safe result API.
-Opening a result in web mirror is optional MVP-A2 integration, not product Definition of Done.
+## Handoff Validation
 
-## Handoff Examples
+The first required handoff is:
 
-Real Freelancer handoffs appear in MVP-B, including:
+```text
+Brief Decoder -> Acceptance Builder
+```
 
-- Task Finder -> ProposalAI
-- ProposalAI -> Send-Ready
-- Brief Decoder -> Scope Guard
-- Brief Decoder -> Acceptance Builder
+It reuses the existing backend-owned bearer token, safe preview, acceptance, expiry, replay
+protection, and source/target session linkage. Navigation stays in the same tab and the target start
+policy is `immediate`.
 
-## Rule
+The CTA means "create draft". Acceptance queues Acceptance Builder immediately; editing the result
+is local editing or a new ordinary scenario run, not deferred continuation.
 
-MVP-B must not change Platform Kernel.
+Later supported handoff candidates include:
 
-Allowed:
+```text
+Task Finder -> ProposalAI
+ProposalAI -> Send-Ready
+```
 
-- add `product.yaml`
-- add `scenarios.yaml`
-- add `workflows.yaml`
-- add `action_configs.yaml`
-- add prompts
-- add schemas
-- add CE result renderer
-- add handoff map
+Deferred handoff continuation is outside the first validation set.
 
-Undesirable:
+## Platform Boundary
 
-- changing workflow runner
-- changing action runner
-- adding product-specific backend endpoints
-- adding Freelancer-specific code in `platform-core`
+Product delivery must not:
 
-If a product bundle requires changing core, update MVP-A1 contracts first; the kernel was not
-complete enough. If multiple extensions require missing shared client behavior, update MVP-A2
-Client Surfaces rather than duplicating it in product extensions.
+- add Freelancer meaning to `platform-core`;
+- change atoms, action runner, workflow runner, Provider Gateway, scenario/quota/handoff runtime, or
+  mapping DSL;
+- add product-specific backend endpoints;
+- copy shared client transport or state-management code into product pages.
+
+Product-neutral Client Surfaces enablement may add the allowlisted `POST /v1/client-events`
+contract, platform event types, shared client support, and tests. That work belongs to MVP-A2 and is
+not product-specific MVP-B runtime behavior.
+
+If a product needs a missing generic execution capability, update the controlling platform contract
+explicitly rather than hiding the change inside the product bundle. If a second product repeats
+frontend behavior, extract only that proven repetition into the shared web runtime.
+
+## Definition Of Done
+
+MVP-B validation is complete when all six products have:
+
+- a validated product bundle and workflow;
+- a working web page using frontend-safe Platform API contracts;
+- product-specific activation defined with its producer and blind spots;
+- deterministic runtime and browser E2E evidence;
+- no product semantics or provider/model decisions in shared frontend or Platform Core code.
