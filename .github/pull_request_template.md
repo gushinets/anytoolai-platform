@@ -34,6 +34,12 @@ Out of scope:
 - [ ] extensions contain no prompts
 - [ ] provider calls go through Provider Gateway
 
+## Coding conventions
+
+- [ ] new and changed code follows `docs/agent/coding-conventions.md`
+- [ ] closed sets stay typed; generated unions are not weakened to `string`
+- [ ] boundary parsers reject unknown closed-set values
+
 ## Runtime guarantees
 
 - [ ] scenario_session_id preserved where relevant

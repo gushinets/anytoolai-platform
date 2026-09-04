@@ -7,6 +7,12 @@
 - [ ] No prompts in extensions.
 - [ ] No direct provider calls outside Provider Gateway.
 
+## Code quality
+
+- [ ] New and changed code follows `docs/agent/coding-conventions.md`.
+- [ ] Closed sets stay typed; generated unions are not weakened to `string`.
+- [ ] Boundary parsers reject unknown closed-set values.
+
 ## Contracts
 
 - [ ] Input/output schemas updated.
@@ -27,7 +33,8 @@
 ## Product boundary
 
 - [ ] `kernel_demo` remains smoke-only and not a user product.
-- [ ] MVP-B product meaning stays in product configs/prompts/schemas/renderers/CE wrappers.
+- [ ] MVP-B product meaning stays in product configs/prompts/schemas/web definitions/pages/renderers,
+  handoff maps, events, and optional CE wrappers.
 - [ ] MVP-B changes do not require `platform-core` changes.
 
 ## Validation

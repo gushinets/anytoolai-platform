@@ -6,7 +6,7 @@ This directory is the system of record for agents. Keep it current. If a decisio
 
 - `../AGENTS.md` — short map for agents.
 - `../ARCHITECTURE.md` — top-level system map.
-- `product-specs/mvp-scope-source-of-truth.md` — repo-local mirror of the controlling MVP-A/MVP-B concept source.
+- `product-specs/mvp-scope-source-of-truth.md` — controlling repository source for current MVP-A/MVP-B scope.
 - `core-beliefs.md` — golden principles.
 - `glossary.md` — common terms.
 
@@ -38,6 +38,7 @@ This directory is the system of record for agents. Keep it current. If a decisio
 - `adr/0005-separate-product-chrome-extensions.md`
 - `adr/0006-event-log-as-core.md`
 - `adr/0007-llm-runtime-pydanticai-litellm-sdk.md`
+- `adr/0008-web-first-multi-product-host.md`
 
 ## Product specs
 
@@ -47,10 +48,13 @@ This directory is the system of record for agents. Keep it current. If a decisio
 - `product-specs/mvp-scope-source-of-truth.md`
 - `product-specs/kernel-demo.md`
 - `product-specs/freelancer-suite-v0.md`
+- `product-specs/atom-ready-product-inventory.md`
+- `superpowers/specs/2026-09-03-web-first-product-framework-design.md`
 
 ## Agent operations
 
 - `agent/harness-engineering-map.md`
+- `agent/coding-conventions.md`
 - `agent/codex-operating-model.md`
 - `agent/prompting-guidelines.md`
 - `agent/review-checklist.md`

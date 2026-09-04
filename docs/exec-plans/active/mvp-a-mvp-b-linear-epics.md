@@ -5,9 +5,10 @@
 - State: active
 - Owner: product/engineering
 - Created: 2026-06-23
-- Last updated: 2026-08-31
-- Review date: 2026-08-06
-- Next action: deliver A20a-c and the MVP-A1 Atom Runtime Proof children.
+- Last updated: 2026-09-03
+- Review date: 2026-09-03
+- Next action: audit the existing Freelancer Suite issues against the controlling six-product
+  web-first validation set before changing Linear.
 - Blocker: none
 
 ## Delivery Model
@@ -20,9 +21,14 @@
   [Freelancer Suite](https://linear.app/paveldik/project/freelancer-suite-7671004850e2/overview).
 
 Platform Core owns runtime state and frontend-safe backend contracts. Client Surfaces owns shared
-CE-kit, web mirror, and shared browser journeys. Freelancer Suite owns product bundles and eight
-product-specific Chrome Extensions. Web mirror is not a dependency of MVP-A1 or an individual
-Freelancer product.
+client contracts, the multi-product web host, and shared browser journeys. Freelancer Suite owns
+product bundles, web definitions/pages, renderers, events, handoff maps, and optional product Chrome
+Extensions. The web host is not a dependency of MVP-A1.
+
+The MVP-B issue map below is a legacy snapshot of the existing Linear structure created under the
+earlier CE-first plan. It does not override `docs/product-specs/mvp-scope-source-of-truth.md` and
+must not be treated as the current release train. Reclassifying, closing, or replacing Linear issues
+requires a separate audited Linear change.
 
 LLM runtime rules apply across all projects: PydanticAI only inside the structured executor,
 LiteLLM only behind ProviderGateway adapters, hidden LiteLLM retries disabled, and one
@@ -97,8 +103,11 @@ workflow definitions, quota authority, artifact state, or handoff state.
 B01 (ANY-32) defines the product template and bundle loader. B06 (ANY-26) owns declarative
 cross-product handoff maps. B11 (ANY-17) owns shared product events and deterministic fixtures.
 
-Each product parent has exactly three children: bundle/workflow, dedicated Chrome Extension, and
-runtime E2E/QA.
+The current validation set is ProposalAI, Client Update Writer, Brief Decoder, Acceptance Builder,
+Task Finder, and Send-Ready. Each needs bundle/workflow plus web runtime E2E/QA outcomes; dedicated
+Chrome Extensions are optional.
+
+The table records the legacy issue structure for audit only:
 
 | Product parent | Bundle child | CE child | E2E child | Workflow |
 |---|---|---|---|---|
@@ -111,7 +120,7 @@ runtime E2E/QA.
 | Case Study ANY-16 | ANY-233 | ANY-241 | ANY-249 | A01 → A09 → A07 → A10 |
 | Persuasion Lens ANY-38 | ANY-234 | ANY-242 | ANY-250 | A03 → A04 → A09 → A08 → A06 |
 
-Dependency rules:
+Legacy dependency rules to audit:
 
 - bundle children depend on B01, the MVP-A1 release gate (ANY-5), and the required A20 atom packs;
 - CE children depend on their bundle plus A15b/A15c and, where needed, A18a;

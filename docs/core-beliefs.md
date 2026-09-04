@@ -2,8 +2,9 @@
 
 ## 1. Platform first, products second
 
-MVP-A1 proves Platform Kernel without a UI dependency. MVP-A2 delivers shared client surfaces.
-MVP-B validates product bundles and product-owned Chrome Extensions on top of those contracts.
+MVP-A1 proves Platform Kernel without a UI dependency. MVP-A2 delivers shared client contracts and
+the multi-product web host. MVP-B validates web-first product bundles on top of those contracts;
+dedicated Chrome Extensions are optional product surfaces.
 
 ## 2. Backend-defined workflows
 
@@ -43,4 +44,7 @@ Prefer boring, explicit, searchable code over clever abstractions. Agents should
 
 ## 11. Scope protection beats premature product pull
 
-Do not build MVP-A "like ProposalAI" or any other Freelancer product. First prove the kernel can run the need as a config-defined workflow; product meaning belongs in MVP-B.
+Do not build MVP-A "like ProposalAI" or any other Freelancer product. First prove the kernel can run
+the need as a config-defined workflow; product meaning belongs in MVP-B. A capability inventory is
+not a release plan, and shared UI abstractions are extracted only after a second product proves the
+repetition.
