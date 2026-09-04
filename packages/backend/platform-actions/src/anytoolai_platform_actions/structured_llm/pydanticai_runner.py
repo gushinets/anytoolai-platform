@@ -4,6 +4,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Awaitable, Callable, Mapping
 
 from pydantic_ai import Agent, ModelRetry, UnexpectedModelBehavior
+from pydantic_ai.exceptions import UserError
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -142,7 +143,15 @@ class PydanticAIStructuredRunner:
             # whichever internal exception pydantic_ai/pydantic happens to raise leak out raw.
             try:
                 agent = _build_agent(PromptedOutput(StructuredDict(dict(schema)), template=False))
-            except Exception as exc:
+            except (UserError, KeyError) as exc:
+                # UserError: StructuredDict's own check_object_json_schema() rejects a schema
+                # without a top-level "type": "object" (and no directly resolvable $ref).
+                # KeyError: pydantic's JSON-schema generator raises this raw from Agent()
+                # construction for an old-style "definitions"/"$ref" pair instead of "$defs" --
+                # StructuredDict's own guard doesn't catch that shape. Both are the same
+                # "this config schema cannot be bound as PydanticAI output" authoring defect;
+                # anything else (a real TypeError, assertion, or future pydantic_ai/pydantic
+                # regression) must keep propagating instead of being mislabeled as this.
                 raise RuntimeError(
                     "response_schema for action_config_id="
                     f"{request.action_config_id!r} could not be bound as a PydanticAI "
