@@ -48,3 +48,9 @@ or workflow logic.
 ## Composition
 
 `apps/platform-api` wires platform runtime and product bundles. Product bundles use `platform-sdk`.
+
+## Adding a product
+
+`docs/product-specs/add-product-recipe.md` is the step-by-step for adding an MVP-B product without
+changing this file's allowed/forbidden list. `docs/product-specs/mvp-b-handoff-note.md` is the
+handoff note for the MVP-B team summarizing what MVP-A1 proves and what stays out of bounds.

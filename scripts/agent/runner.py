@@ -58,8 +58,11 @@ POSTGRESQL_PYTEST_TARGETS = [
     "apps/platform-worker/tests",
 ]
 REQUIRED_MODULES = ["pytest", "yaml", "pydantic"]
-REQUIRED_TOOLS = ["uv"]
-OPTIONAL_TOOLS = ["node", "pnpm", "docker"]
+# `node`/`npm`: required, not optional, since round 45 — tests/architecture (part of every
+# quick-check run) shells out to scripts/agent/js_scope_resolver.mjs for real JS/TS parsing, and
+# self-installs that script's own `typescript` dependency via `npm install` on first use.
+REQUIRED_TOOLS = ["uv", "node", "npm"]
+OPTIONAL_TOOLS = ["pnpm", "docker"]
 ACTION_REGISTRY_ROWS = [
     ("A01 `extract_structured`", "`text.extract_structured_fields`"),
     ("A04 `detect_issues`", "`text.detect_issues_by_taxonomy`"),
@@ -282,6 +285,16 @@ def probe_tool(tool: str) -> tuple[bool, str]:
             check=False,
             capture_output=True,
             text=True,
+            # `npm`/`node`-backed tools are themselves a Node.js process under the hood — a
+            # well-documented Node/Windows quirk (nodejs/node#10836) makes `process.stdin` access
+            # hang when its stdin handle is inherited from a non-interactive parent (a CI runner's
+            # own stdin) without ever being closed, even for a command that never actually reads
+            # input. Left unset, this call inherits the caller's stdin by default; explicitly
+            # closing it here removes that hang path entirely (round 55: `npm --version` timing out
+            # after 10s on a real `windows-latest` `doctor` run, while `node --version` — a real
+            # `.exe`, launched without any of `npm`'s own Node-process-startup stdin touches —
+            # resolved fine).
+            stdin=subprocess.DEVNULL,
             timeout=10,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:

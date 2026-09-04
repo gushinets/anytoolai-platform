@@ -1,15 +1,883 @@
+import json
+import re
 from pathlib import Path
+
+from static_string_resolution import (
+    JS_TS_EXTS,
+    iter_source_files,
+    js_modules,
+    js_string_expr_at,
+    line_number_at,
+    resolve_js_identifier,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 EXTENSIONS = ROOT / "extensions"
 
+FORBIDDEN_TOKENS = ["system prompt", "prompt_ref", "provider_policy_ref"]
+
+# A real LLM message object's system role, regardless of quote style or exact key spacing:
+# `{ role: "system", content: "..." }`, `{"role": "system", ...}` (JSON), `role: 'system'`. The
+# forbidden literal tokens above catch a prompt referenced *by name* (`prompt_ref`) or labeled as
+# such in prose (`system prompt`); this catches the actual message *shape* a real prompt payload
+# takes, which contains neither of those tokens. Text-level, so it also covers `.md`/`.json` and
+# a payload serialized inside a string.
+_SYSTEM_ROLE_MESSAGE_RE = re.compile(r"""role["']?\s*:\s*["'`]system["'`]""", re.IGNORECASE)
+
+# Request-shape keys that *carry* a prompt in every real provider/platform request format:
+# `role` (a chat message — forbidden when it resolves to the system role) and the instruction
+# fields (`instructions` — OpenAI Responses; `systemInstruction`/`system_instruction` — Gemini;
+# `system` — Anthropic Messages; `systemPrompt`/`system_prompt` — common app-level names) —
+# forbidden whenever their value is a statically-known string at all, since an extension has no
+# business assembling *any* instruction text; it sends typed platform requests. Values are
+# resolved through the shared static resolver, so `role: SYSTEM_ROLE` with
+# `const SYSTEM_ROLE = "system"` (or imported from a sibling module), a concatenated or
+# template-built instruction, etc. are all seen as the string they are.
+ROLE_KEY = "role"
+INSTRUCTION_KEYS = {
+    "instructions",
+    "systemInstruction",
+    "system_instruction",
+    "system",
+    "systemPrompt",
+    "system_prompt",
+}
+# `static_string_resolution.js_modules` blanks every comment (regardless of file type) to
+# same-length whitespace before this file ever sees the text, so a real comment sitting inside
+# object-literal syntax (`role /* note */: value`) is already invisible to these regexes — plain
+# `\s*` is all that's needed here; no JSX-specific comment handling required.
+_PROMPT_KEY_ALTERNATION = r"role|instructions|systemInstruction|system_instruction|system|systemPrompt|system_prompt"
+_JS_REQUEST_KEY_RE = re.compile(
+    rf"""(?<![\w$.?])["']?({_PROMPT_KEY_ALTERNATION})["']?\s*:(?!:)"""
+)
+# ES2015 shorthand property (`{ role, content }`, `{ instructions }`) builds the exact same
+# request object as `{ role: role, ... }` but has no `:` at all — invisible to
+# `_JS_REQUEST_KEY_RE` above, which requires one. Matches a tracked key immediately preceded by
+# `{`/`,` and immediately followed by `,`/`}` (only whitespace allowed on either side, so a
+# colon-form property's *value* position, e.g. `x: role`, never matches — the char right before
+# "role" there is `:`, not `{`/`,`). Reported key is resolved through the shared JS resolver at
+# its own position (key and value share one name in shorthand form, so there is no separate value
+# expression to resolve, but the *name* can still be shadowed/reassigned like any other binding —
+# real lexical scope and write order, resolved by a real parser, not approximated here at all).
+#
+# ponytail: a regex, not a real parser, so it can also match a same-named element inside a plain
+# array literal (`[x, role]`) if `role` happens to be a locally-declared constant too — a false
+# positive (one extra line to look at), not a false negative, which is the direction this file's
+# own conservative design already favors throughout.
+_JS_SHORTHAND_KEY_RE = re.compile(
+    rf"""[{{,]\s*({_PROMPT_KEY_ALTERNATION})\s*(?=[,}}])"""
+)
+
+# A staged request object built via member assignment (`const req = {}; req.role = X;` /
+# `request["role"] = X;`) contains neither a `role:` key nor shorthand syntax — invisible to the
+# two regexes above even though the shared resolver can already resolve `X` statically. The
+# literal `.`/`[` immediately before the key text means these can't false-match a longer
+# identifier substring (`.myrole` has no literal `.` right before `role`). `(?!=)` after the `=`
+# excludes `==`/`===` (a comparison, not an assignment).
+#
+# ponytail: plain `=` only — compound assignment (`.role ??= x`, `+=`) is a deliberate, narrower
+# scope cut; add if a real case shows up.
+_JS_DOT_ASSIGN_KEY_RE = re.compile(rf"""\.({_PROMPT_KEY_ALTERNATION})\s*=(?!=)""")
+_JS_BRACKET_ASSIGN_KEY_RE = re.compile(
+    rf"""\[\s*["']({_PROMPT_KEY_ALTERNATION})["']\s*\]\s*=(?!=)"""
+)
+
+
+def _offending_value(key: str, values: frozenset[str]) -> str | None:
+    """The first forbidden value in `values` (a resolved `role`/instruction field's every
+    statically-known possible value — round 38: a value reachable only through a conditional
+    write is still a real, reachable value, so a use is offending if *any* of them is, not only
+    if the whole expression resolves to a single, unconditional one), sorted for a deterministic
+    report, or `None` if none of them are forbidden."""
+    return next(
+        (
+            value
+            for value in sorted(values)
+            if (key == ROLE_KEY and value.lower() == "system") or (key != ROLE_KEY and value.strip())
+        ),
+        None,
+    )
+
+
+def _json_prompt_shape(value: object) -> str | None:
+    """First prompt-bearing key in a parsed JSON document, walked structurally."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key == ROLE_KEY and isinstance(item, str) and item.lower() == "system":
+                return f"{key}: {item!r}"
+            if key in INSTRUCTION_KEYS and isinstance(item, str) and item.strip():
+                return f"{key}: {item!r}"
+            found = _json_prompt_shape(item)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for item in value:
+            found = _json_prompt_shape(item)
+            if found is not None:
+                return found
+    return None
+
+
+def check_prompts_inside_extensions(extensions_root: Path) -> list[str]:
+    offenders: list[str] = []
+    files = [
+        path
+        for path in iter_source_files(extensions_root, JS_TS_EXTS | {".md", ".json"})
+        if path.name not in {"AGENTS.md", "README.md"}
+    ]
+    js = js_modules([path for path in files if path.suffix in JS_TS_EXTS])
+    for path in files:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        lowered = text.lower()
+        for token in FORBIDDEN_TOKENS:
+            if token in lowered:
+                offenders.append(f"{path.relative_to(extensions_root)} contains frontend-forbidden token {token!r}")
+        match = _SYSTEM_ROLE_MESSAGE_RE.search(text)
+        if match is not None:
+            offenders.append(
+                f"{path.relative_to(extensions_root)} contains a system-role message shape: {match.group(0)!r}"
+            )
+        if path.suffix == ".json":
+            try:
+                shape = _json_prompt_shape(json.loads(text))
+            except ValueError:
+                shape = None  # not strict JSON (e.g. a tsconfig with comments): text checks above still ran
+            if shape is not None:
+                offenders.append(f"{path.relative_to(extensions_root)} contains a prompt-bearing field: {shape}")
+        elif path.suffix in JS_TS_EXTS:
+            stripped = js.texts[path]
+            found: tuple[int, str, str] | None = None
+            for key_match in _JS_REQUEST_KEY_RE.finditer(stripped):
+                key = key_match.group(1)
+                values = js_string_expr_at(js, path, key_match.end())
+                offending = _offending_value(key, values)
+                if offending is not None:
+                    found = (key_match.start(), key, offending)
+                    break
+            if found is None:
+                for shorthand_match in _JS_SHORTHAND_KEY_RE.finditer(stripped):
+                    key = shorthand_match.group(1)
+                    values = resolve_js_identifier(js, path, key, shorthand_match.start(1))
+                    offending = _offending_value(key, values)
+                    if offending is not None:
+                        found = (shorthand_match.start(1), key, offending)
+                        break
+            if found is None:
+                for assign_match in _JS_DOT_ASSIGN_KEY_RE.finditer(stripped):
+                    key = assign_match.group(1)
+                    values = js_string_expr_at(js, path, assign_match.end())
+                    offending = _offending_value(key, values)
+                    if offending is not None:
+                        found = (assign_match.start(1), key, offending)
+                        break
+            if found is None:
+                for assign_match in _JS_BRACKET_ASSIGN_KEY_RE.finditer(stripped):
+                    key = assign_match.group(1)
+                    values = js_string_expr_at(js, path, assign_match.end())
+                    offending = _offending_value(key, values)
+                    if offending is not None:
+                        found = (assign_match.start(1), key, offending)
+                        break
+            if found is not None:
+                position, key, value = found
+                offenders.append(
+                    f"{path.relative_to(extensions_root)}:{line_number_at(stripped, position)} "
+                    f"contains a prompt-bearing field: {key}: {value!r}"
+                )
+    return offenders
+
 
 def test_no_prompts_inside_extensions() -> None:
-    forbidden = ["system prompt", "prompt_ref", "provider_policy_ref"]
-    for path in EXTENSIONS.rglob("*"):
-        if path.is_file() and path.suffix in {".ts", ".tsx", ".md", ".json"}:
-            if path.name in {"AGENTS.md", "README.md"}:
-                continue
-            text = path.read_text(encoding="utf-8", errors="ignore").lower()
-            for token in forbidden:
-                assert token not in text, f"{path} contains frontend-forbidden token {token}"
+    offenders = check_prompts_inside_extensions(EXTENSIONS)
+    assert offenders == [], "prompts found inside extensions: " + ", ".join(offenders)
+
+
+def test_constant_indirected_system_role_is_detected(tmp_path: Path) -> None:
+    (tmp_path / "roles.ts").write_text('export const SYSTEM_ROLE = "sys" + "tem";\n', encoding="utf-8")
+    (tmp_path / "chat.ts").write_text(
+        'import { SYSTEM_ROLE } from "./roles";\n'
+        'const messages = [{ role: SYSTEM_ROLE, content: "Draft a proposal..." }];\n',
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "chat.ts:2" in offenders[0] and "role: 'system'" in offenders[0]
+
+
+def test_instruction_fields_are_detected(tmp_path: Path) -> None:
+    (tmp_path / "request.ts").write_text(
+        'const TONE = "formal";\n'
+        "const body = { model: pick(), instructions: `Write a ${TONE} proposal for the client.` };\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "gemini.js").write_text(
+        'const req = { "systemInstruction": "You are a proposal writer" };\n', encoding="utf-8"
+    )
+    (tmp_path / "payload.json").write_text(
+        '{"messages": [{"role": "user", "content": "hi"}], "system": "Be concise."}\n',
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 3, offenders
+
+
+def test_shorthand_role_and_instructions_are_detected(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n'
+        'const content = "Draft a proposal from this brief";\n'
+        "const messages = [{ role, content }];\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "request.ts").write_text(
+        'const instructions = "Write a concise proposal.";\n'
+        "const body = { instructions };\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 2, offenders
+    assert any("chat.ts:3" in o and "role: 'system'" in o for o in offenders)
+    assert any("request.ts:2" in o and "instructions:" in o for o in offenders)
+
+
+def test_nested_scope_role_does_not_shadow_outer_binding(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n\n'
+        "function helper() {\n"
+        '  const role = "user";\n'
+        "  return role;\n"
+        "}\n\n"
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_role_mutation_inside_uncalled_arrow_does_not_override_outer_value(tmp_path: Path) -> None:
+    # `switchToUser` is only *defined* here, never called — `{ role }` is still deterministically
+    # a system-role message at runtime. A write reachable only by crossing into a nested
+    # function/arrow can never be assumed to have run just because its source position precedes
+    # the use site (round 44).
+    (tmp_path / "chat.ts").write_text(
+        'let role = "system";\n\n'
+        'const switchToUser = () => role = "user";\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_role_survives_as_const_assertion(tmp_path: Path) -> None:
+    # `as const` is a compile-time-only TypeScript annotation — the runtime value is exactly the
+    # inner literal, "system" (round 46).
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system" as const;\nconst messages = [{ role }];\n', encoding="utf-8"
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_var_role_declared_inside_if_block_is_visible_at_function_scope(tmp_path: Path) -> None:
+    # `var` is function-scoped, not block-scoped — it escapes the `if` block the same way real JS
+    # hoisting does, unlike `let`/`const` (round 46).
+    (tmp_path / "chat.ts").write_text(
+        "function buildMessage(enabled) {\n"
+        "  if (enabled) {\n"
+        '    var role = "system";\n'
+        "  }\n"
+        "  return { role };\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_uninitialized_role_with_later_assignment_is_detected(tmp_path: Path) -> None:
+    # `let role;` alone used to register no binding at all, so the later plain assignment had no
+    # declaration to attach its write to and was silently dropped (round 47).
+    (tmp_path / "chat.ts").write_text(
+        'let role;\nrole = "system";\n\nconst messages = [{ role }];\n', encoding="utf-8"
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_conditional_var_role_redeclaration_preserves_earlier_reachable_value(tmp_path: Path) -> None:
+    # A `var` redeclared inside a conditional branch is one runtime binding, not two — when the
+    # branch doesn't run, the earlier ("system") value is still reachable (round 47).
+    (tmp_path / "chat.ts").write_text(
+        "function buildMessage(useFallback) {\n"
+        '  var role = "system";\n\n'
+        "  if (useFallback) {\n"
+        '    var role = "user";\n'
+        "  }\n\n"
+        "  return { role };\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_default_exported_role_is_detected(tmp_path: Path) -> None:
+    # A default import/export used no module-graph edge at all — `resolveImports` only ever read
+    # `importClause.namedBindings`, and `export default ...;` is an `ExportAssignment`, a
+    # different AST node the export side never looked at either (round 50).
+    (tmp_path / "role.ts").write_text('export default "system";\n', encoding="utf-8")
+    (tmp_path / "chat.ts").write_text(
+        'import role from "./role";\nconst messages = [{ role }];\n', encoding="utf-8"
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_later_parameter_default_role_resolves_an_earlier_one(tmp_path: Path) -> None:
+    # A braced function's parameters were registered inside the function's own *body* scope, which
+    # a later parameter's default value expression never actually enters syntactically — so it
+    # couldn't see an earlier parameter's binding at all (round 50).
+    (tmp_path / "chat.ts").write_text(
+        "function build(\n"
+        '  role = "system",\n'
+        "  message = { role },\n"
+        ") {\n"
+        "  return message;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_body_local_role_does_not_shadow_a_parameter_defaults_outer_reference(tmp_path: Path) -> None:
+    # A parameter default evaluates in a distinct "parameter environment" outside the function
+    # body's own lexical environment — a same-named body-local declaration does not shadow it
+    # (round 50 routed parameter defaults into the body's own scope, so this incorrectly lost the
+    # outer "system" value; round 51 fixes it).
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n\n'
+        "function buildMessage(\n"
+        "  message = { role },\n"
+        ") {\n"
+        '  const role = "user";\n'
+        "  return message;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_body_var_redeclaring_a_role_parameter_starts_from_the_parameters_value(tmp_path: Path) -> None:
+    # Real JS copies a parameter's own current value into a same-named body `var` binding at
+    # function entry, before any of the `var`'s own body-level writes run — splitting the
+    # parameter scope from the body scope (round 51) made a same-named body `var` an entirely
+    # independent, initially-empty binding instead (round 52).
+    (tmp_path / "chat.ts").write_text(
+        'function buildMessage(role = "system") {\n'
+        "  const messages = [{ role }];\n"
+        '  var role = "user";\n\n'
+        "  return messages;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_assignment_before_a_local_var_role_declaration_resolves_to_the_hoisted_binding(
+    tmp_path: Path,
+) -> None:
+    # A `var`'s binding is hoisted to function entry regardless of where its declaration
+    # textually sits — an assignment appearing before the `var` statement still targets that same
+    # hoisted binding (round 53).
+    (tmp_path / "chat.ts").write_text(
+        "function buildMessage() {\n"
+        '  role = "system";\n'
+        "  var role;\n\n"
+        "  return [{ role }];\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_short_circuit_and_role_reassignment_does_not_replace_the_deterministic_value(
+    tmp_path: Path,
+) -> None:
+    # The RHS of `&&` only evaluates when the LHS is truthy — `isUser && (role = "user")` never
+    # runs the assignment when `isUser` is falsy, exactly like an `if` body that might not run
+    # (round 54).
+    (tmp_path / "chat.ts").write_text(
+        'let role = "system";\n\n'
+        'isUser && (role = "user");\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_self_referential_role_reassignment_resolves_using_the_pre_write_value(tmp_path: Path) -> None:
+    # Real JS evaluates an assignment's RHS fully, using the pre-write state, before ever
+    # committing the new value — `role = role + "tem"`'s own `role` reference inside the RHS
+    # previously hit the fold cycle guard and lost the value entirely (round 56).
+    (tmp_path / "chat.ts").write_text(
+        'let role = "sys";\n'
+        'role = role + "tem";\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_non_default_role_parameter_deterministically_assigned_is_detected(tmp_path: Path) -> None:
+    # A parameter with no default value was never registered as a binding at all — an assignment
+    # to it had nowhere to attach and was silently dropped (round 57).
+    (tmp_path / "chat.ts").write_text(
+        "function buildMessage(role) {\n"
+        '  role = "system";\n\n'
+        "  return [{ role }];\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_non_default_role_parameter_shadows_a_same_named_outer_role(tmp_path: Path) -> None:
+    # A non-default parameter still lexically shadows a same-named outer binding for the whole
+    # function — unregistered, it let a reference inside the function fall through to the outer
+    # "system" constant instead, a false positive (round 57).
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n\n'
+        "function buildMessage(role) {\n"
+        "  return [{ role }];\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []
+
+
+def test_namespace_import_property_access_role_is_detected(tmp_path: Path) -> None:
+    # `import * as roles from "./roles"` never registered a binding for `roles` at all, and
+    # `roles.privileged` (a `PropertyAccessExpression`) was never resolved either (round 58).
+    (tmp_path / "roles.ts").write_text('export const privileged = "system";\n', encoding="utf-8")
+    (tmp_path / "chat.ts").write_text(
+        'import * as roles from "./roles";\n\n'
+        "const messages = [\n"
+        "  { role: roles.privileged },\n"
+        "];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_local_object_literal_role_property_access_is_detected(tmp_path: Path) -> None:
+    # `config.preset`, where `config` is a fully static local object literal, is ordinary
+    # TypeScript with no object/member lookup model before this round (round 58). The source
+    # property name deliberately doesn't itself end in "role" (case-insensitively) — the text-
+    # level system-role-shape fallback matches any key ending that way (`role["']?\s*:...`, no
+    # word-boundary anchor), so the only way to catch this fixture is resolving the actual
+    # `role: config.preset` use site.
+    (tmp_path / "chat.ts").write_text(
+        "const config = {\n"
+        '  preset: "system",\n'
+        "};\n\n"
+        "const messages = [{ role: config.preset }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_object_property_role_mutation_after_construction_is_detected(tmp_path: Path) -> None:
+    # `state.preset = "system";` — an ordinary mutation after construction — was invisible
+    # entirely: the resolver only ever looked at the object literal's own initializer (round 59).
+    (tmp_path / "chat.ts").write_text(
+        "const state = {\n"
+        '  preset: "user",\n'
+        "};\n\n"
+        'state.preset = "system";\n\n'
+        "const messages = [{ role: state.preset }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_aliased_object_destructuring_role_is_detected(tmp_path: Path) -> None:
+    # `const { preset: role } = config;` never created a binding for `role` at all — the
+    # declaration collector only handled a plain `Identifier` name, so an `ObjectBindingPattern`
+    # was silently skipped entirely (round 61).
+    (tmp_path / "chat.ts").write_text(
+        "const config = {\n"
+        '  preset: "system",\n'
+        "};\n\n"
+        "const { preset: role } = config;\n\n"
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_destructured_role_parameter_deterministically_assigned_is_detected(tmp_path: Path) -> None:
+    # A `{ role }` parameter created no binding at all (round 62) — the exact gap round 61 closed
+    # for variable declarations, in the separate function-parameter collection path.
+    (tmp_path / "chat.ts").write_text(
+        "function buildMessage({ role }) {\n"
+        '  role = "system";\n\n'
+        "  return [{ role }];\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_destructured_role_parameter_shadows_a_same_named_outer_role(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n\n'
+        "function buildMessage({ role }) {\n"
+        "  return [{ role }];\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []
+
+
+def test_destructuring_alias_key_is_not_treated_as_a_reference(tmp_path: Path) -> None:
+    # In `{ role: preset }`, `role` is a key into the source, not a read of any binding — before
+    # round 62 it was folded like a reference and reported the unrelated outer `role`'s "system"
+    # at that position. `preset` itself is dynamic here, so nothing is a real offender.
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n\n'
+        "function buildMessage(config) {\n"
+        "  const { role: preset } = config;\n"
+        "  return [{ role: preset }];\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []
+
+
+def test_deterministic_reassignment_resolves_to_its_final_value(tmp_path: Path) -> None:
+    # `role` is deterministically "system" at the use site (round 37): a static reassignment
+    # must resolve to the value actually in effect, not to "unresolved" just because a write
+    # happened after the declaration.
+    (tmp_path / "chat.ts").write_text(
+        'let role = "user";\nrole = "system";\n\nconst messages = [{ role }];\n',
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_default_role_and_instructions_parameters_are_detected(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        "function buildMessage(role = \"system\") {\n  return { role };\n}\n", encoding="utf-8"
+    )
+    (tmp_path / "req.ts").write_text(
+        'function buildRequest(instructions = "Write a concise proposal.") {\n'
+        "  return { instructions };\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 2, offenders
+    assert any("chat.ts:2" in o and "role: 'system'" in o for o in offenders)
+    assert any("req.ts:2" in o and "instructions:" in o for o in offenders)
+
+
+def test_default_role_parameter_in_concise_arrow_body_is_detected(tmp_path: Path) -> None:
+    # No `{ ... }` block at all — a concise (expression) arrow body, exactly as ordinary a form
+    # of a parameter default as the braced ones already covered (round 40).
+    (tmp_path / "chat.ts").write_text(
+        'const buildMessage = (role = "system") => ({ role });\n', encoding="utf-8"
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_concise_arrow_role_parameter_does_not_leak_past_array_comma(tmp_path: Path) -> None:
+    # The comma ends the arrow's own body — the next array element must still resolve `role`
+    # through the outer "system" binding, not the arrow's own leaked "user" parameter (round 41).
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n\n'
+        "const values = [\n"
+        '  (role = "user") => role,\n'
+        "  { role },\n"
+        "];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_concise_arrow_role_parameter_does_not_leak_past_object_property_comma(tmp_path: Path) -> None:
+    # Single line deliberately: the multi-line form could otherwise close the scope via
+    # ASI/newline instead of via the object-literal comma this actually tests for (round 42).
+    (tmp_path / "chat.ts").write_text(
+        'const role = "system";\n'
+        'const config = { normalize: (role = "user") => role, message: { role } };\n',
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_non_default_role_parameter_is_not_a_false_positive(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        "function buildMessage(role) {\n  return { role };\n}\n"
+        "function pick(role = getRole()) {\n  return { role };\n}\n",
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []
+
+
+def test_conditionally_reachable_forbidden_role_is_detected(tmp_path: Path) -> None:
+    # `role` is "system" whenever `useUserRole` is false — a real, reachable runtime value, not
+    # merely the value the resolver happens to see last in the source (round 38).
+    (tmp_path / "chat.ts").write_text(
+        'let role = "system";\n\n'
+        "if (useUserRole) {\n"
+        '  role = "user";\n'
+        "}\n\n"
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_conditionally_reachable_safe_role_does_not_mask_deterministic_one(tmp_path: Path) -> None:
+    # The mirror image: a conditional branch introduces a *safe* alternative, but the
+    # unconditional value is still "system" and must still be caught.
+    (tmp_path / "chat.ts").write_text(
+        'let role = "user";\n\n'
+        "if (useSystemRole) {\n"
+        '  role = "system";\n'
+        "}\n\n"
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_braceless_conditional_write_does_not_mask_forbidden_role(tmp_path: Path) -> None:
+    # `if (cond) role = "user";` has no `{}` at all, but is exactly as conditional as the braced
+    # form — `"system"` remains reachable whenever `useUserRole` is false (round 39).
+    (tmp_path / "chat.ts").write_text(
+        'let role = "system";\n\n'
+        "if (useUserRole)\n"
+        '  role = "user";\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_braceless_else_if_chain_still_resolves_correctly(tmp_path: Path) -> None:
+    # Both the `if` and `else if` bodies are braceless — chained single-statement control flow.
+    (tmp_path / "chat.ts").write_text(
+        'let role = "user";\n\n'
+        "if (a)\n"
+        '  role = "safe";\n'
+        "else if (b)\n"
+        '  role = "system";\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_comment_between_role_and_colon_is_detected_in_tsx(tmp_path: Path) -> None:
+    (tmp_path / "chat.tsx").write_text(
+        'const SYSTEM_ROLE = "system";\n\n'
+        "const messages = [\n"
+        "  {\n"
+        "    role /* request role */: SYSTEM_ROLE,\n"
+        '    content: "Draft a proposal",\n'
+        "  },\n"
+        "];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_comment_before_shorthand_role_is_detected_in_tsx(tmp_path: Path) -> None:
+    (tmp_path / "chat.tsx").write_text(
+        'const role = "system";\n\n'
+        "const messages = [\n"
+        "  {\n"
+        "    /* request role */\n"
+        "    role,\n"
+        '    content: "Draft a proposal",\n'
+        "  },\n"
+        "];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0]
+
+
+def test_typed_request_shapes_are_not_false_positives(tmp_path: Path) -> None:
+    (tmp_path / "types.ts").write_text(
+        "interface Message { role: string; content: string }\n"
+        'const user = { role: "user", content: input };\n'
+        "const passthrough = { instructions: response.instructions };\n"
+        "const ok = cond ? system : fallback;\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "manifest.json").write_text('{"name": "ext", "version": "1.0"}\n', encoding="utf-8")
+    assert check_prompts_inside_extensions(tmp_path) == []
+
+
+def test_nested_destructured_role_sees_an_intermediate_property_replaced_before_it(tmp_path: Path) -> None:
+    # Round 63 — the review's prompt-boundary case: the nested pattern's intermediate `message`
+    # step walked the original literal, never the replacement.
+    (tmp_path / "chat.ts").write_text(
+        'const state = { message: { preset: "user" } };\n\n'
+        'state.message = { preset: "system" };\n\n'
+        "const { message: { preset: role } } = state;\n\n"
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0], offenders
+
+
+def test_nested_destructured_role_does_not_see_an_intermediate_replacement_after_it(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        'const state = { message: { preset: "user" } };\n\n'
+        "const { message: { preset: role } } = state;\n\n"
+        'state.message = { preset: "system" };\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []
+
+
+def test_chained_role_read_sees_a_nested_member_write(tmp_path: Path) -> None:
+    (tmp_path / "chat.ts").write_text(
+        'const state = { message: { preset: "user" } };\n\n'
+        'state.message.preset = "system";\n\n'
+        "const messages = [{ role: state.message.preset }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0], offenders
+
+
+def test_role_deterministically_added_after_an_empty_literal_suppresses_the_default(tmp_path: Path) -> None:
+    # Round 64 — the review's own prompt-boundary case: `state.preset = "user"` before
+    # `const { preset: role = "system" } = state` must leave only `"user"` reachable as the role.
+    (tmp_path / "chat.ts").write_text(
+        "const state = {};\n\n"
+        'state.preset = "user";\n\n'
+        'const { preset: role = "system" } = state;\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []
+
+
+def test_role_explicitly_reset_to_undefined_does_not_suppress_the_default(tmp_path: Path) -> None:
+    # Round 65 — the review's own prompt-boundary case: an explicit `= undefined` still makes the
+    # extracted value `undefined` at runtime, so the `"system"` default fires every time.
+    (tmp_path / "chat.ts").write_text(
+        'const state = { preset: "user" };\n\n'
+        "state.preset = undefined;\n\n"
+        'const { preset: role = "system" } = state;\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0], offenders
+
+
+def test_role_from_a_call_result_does_not_suppress_the_default(tmp_path: Path) -> None:
+    # Round 66 — the review's own prompt-boundary case: a call can return `undefined` at runtime,
+    # so the `"system"` default must stay reachable.
+    (tmp_path / "chat.ts").write_text(
+        "function getRole() {\n"
+        '  return "user";\n'
+        "}\n\n"
+        "const state = { preset: getRole() };\n\n"
+        'const { preset: role = "system" } = state;\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0], offenders
+
+
+def test_role_set_to_null_suppresses_the_default(tmp_path: Path) -> None:
+    # Round 67 — the review's own prompt-boundary case: `null` is never `undefined`, so the
+    # `"system"` default never fires and must not be reported.
+    (tmp_path / "chat.ts").write_text(
+        "const state = { preset: null };\n\n"
+        'const { preset: role = "system" } = state;\n\n'
+        "const messages = [{ role }];\n",
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []
+
+
+def test_role_set_via_dot_assignment_is_detected(tmp_path: Path) -> None:
+    # Round 68 (team lead #4) — a staged request object built via member assignment
+    # (`req.role = X`) contains neither a `role:` key nor shorthand syntax, but must still be
+    # caught since the shared resolver can already resolve `X` statically.
+    (tmp_path / "chat.ts").write_text(
+        'const SYSTEM_ROLE = "system";\n\n'
+        "const req = {};\n"
+        "req.role = SYSTEM_ROLE;\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0], offenders
+
+
+def test_role_set_via_bracket_assignment_is_detected(tmp_path: Path) -> None:
+    # Round 68 (team lead #4) — the same bypass, bracket-access form.
+    (tmp_path / "chat.ts").write_text(
+        'const SYSTEM_ROLE = "system";\n\n'
+        "const req = {};\n"
+        'req["role"] = SYSTEM_ROLE;\n',
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "role: 'system'" in offenders[0], offenders
+
+
+def test_instructions_set_via_dot_assignment_is_detected(tmp_path: Path) -> None:
+    # Round 68 (team lead #4) — the same bypass for an instruction key, not just `role`.
+    (tmp_path / "chat.ts").write_text(
+        'const PROMPT = "You are a helpful assistant.";\n\n'
+        "const request = {};\n"
+        "request.instructions = PROMPT;\n",
+        encoding="utf-8",
+    )
+    offenders = check_prompts_inside_extensions(tmp_path)
+    assert len(offenders) == 1 and "instructions: 'You are a helpful assistant.'" in offenders[0], offenders
+
+
+def test_role_comparison_via_dot_access_is_not_a_false_positive(tmp_path: Path) -> None:
+    # Round 68 (team lead #4) — `===` is a comparison, not an assignment; `(?!=)` must reject it
+    # so the new dot-assignment regex doesn't match `==`/`===`.
+    (tmp_path / "chat.ts").write_text(
+        'const req = { role: "user" };\n\n'
+        'if (req.role === "system") {\n'
+        "  // no-op\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    assert check_prompts_inside_extensions(tmp_path) == []

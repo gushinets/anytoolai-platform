@@ -1,0 +1,8 @@
+{
+  "name": "anytoolai-agent-scripts",
+  "private": true,
+  "description": "Standalone runtime dependencies for scripts/agent/*.mjs, installed separately from the frontend workspace's own pnpm-managed node_modules — js_scope_resolver.mjs must resolve `typescript` in quick-check's baseline CI job, which never runs `pnpm install` (see js_scope_resolver.mjs's own comment and docs/exec-plans/active/any-25-a22c-mvp-a-boundary-audit.md round 45).",
+  "dependencies": {
+    "typescript": "5.9.3"
+  }
+}
