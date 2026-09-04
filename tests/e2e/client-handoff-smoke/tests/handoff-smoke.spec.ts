@@ -23,7 +23,7 @@ interface HandoffPreviewResponse {
 
 interface ScenarioSessionResponse {
   scenario_session_id: string;
-  job_id: string;
+  job_id: string | null;
 }
 
 const EXTENSION_PATH =

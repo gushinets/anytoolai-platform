@@ -65,8 +65,8 @@ export function baseConfig({ tsconfigRootDir, react = false, ignores = [] } = {}
       ? [
           {
             files: ["**/*.tsx"],
-            plugins: { "react-hooks": reactHooks },
-            rules: reactHooks.configs.recommended.rules,
+            plugins: reactHooks.configs.flat.recommended.plugins,
+            rules: reactHooks.configs.flat.recommended.rules,
           },
         ]
       : []),
