@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-08-19
 - Last updated: 2026-09-04
 - Review date: 2026-09-04
-- Next action: push the review fixes and verify required checks for PR #83.
+- Next action: merge PR #83 after required approval.
 - Blocker: none
 
 ## Goal
@@ -97,6 +97,7 @@ and changed code stays typed, fail-fast, and reviewable without adding a root `r
 | 2026-09-03 | `doctor`, `validate-docs`, generated-doc check, 13 focused tests, and quick-check passed in the repository-managed environment; quick-check reported 986 passed, 3 skipped, and 397 deselected. | Verify GitHub after the final plan update. |
 | 2026-09-04 | Required GitHub checks passed on the rebased PR, including metadata, full-check, atoms proof, PostgreSQL concurrency, Windows, and production Compose smoke. | Obtain required human approval and merge. |
 | 2026-09-04 | Verified three blocking review comments against current API, SDK, Core, and config implementations; narrowed the conventions without changing runtime code; `quick-check` passed (986 passed, 3 skipped, 397 deselected). | Push and verify GitHub. |
+| 2026-09-04 | Review fixes were pushed, all required checks passed, and all implementation review threads were resolved; archived the completed plan. | Obtain required approval and merge PR #83. |
 
 ## Open questions
 
