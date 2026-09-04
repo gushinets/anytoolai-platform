@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0",
     "test": "vitest run",
     "generate-api-types": "node scripts/generate-api-types.mjs",
     "generate-api-types:check": "node scripts/generate-api-types.mjs --check"

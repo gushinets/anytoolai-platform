@@ -68,7 +68,7 @@ describe("createWindowNavigator", () => {
     const win = { location: { assign: vi.fn() } };
     const navigate = createWindowNavigator(win);
 
-    navigate("https://web.example.com/handoff/token_abc");
+    void navigate("https://web.example.com/handoff/token_abc");
 
     expect(win.location.assign).toHaveBeenCalledWith("https://web.example.com/handoff/token_abc");
   });

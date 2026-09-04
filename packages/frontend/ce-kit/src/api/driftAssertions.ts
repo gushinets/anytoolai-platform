@@ -44,6 +44,7 @@ type ExtraShapeKeys<T extends object, Shape extends object> = {
  * Whether `K` is an optional property of `T`. `{} extends Pick<T, K>` is true exactly when picking
  * just that one property still allows an empty object -- i.e. the property can be omitted.
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- deliberate: `{}` is the "no required properties" check the optionality test relies on, not an accidental any-value type.
 type IsOptionalKey<T extends object, K extends keyof T> = {} extends Pick<T, K> ? true : false;
 
 /**

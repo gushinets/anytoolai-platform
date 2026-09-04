@@ -386,6 +386,7 @@ def frontend_check() -> int:
     return run_sequence(
         [
             ["pnpm", "install", "--frozen-lockfile"],
+            ["pnpm", "-r", "lint"],
             ["pnpm", "-r", "typecheck"],
             ["pnpm", "-r", "test"],
             ["pnpm", "-r", "--if-present", "generate-api-types:check"],

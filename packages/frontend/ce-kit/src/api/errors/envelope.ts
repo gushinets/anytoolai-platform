@@ -15,7 +15,7 @@ export function parseBackendErrorEnvelope(payload: unknown): BackendErrorDetail 
     return null;
   }
 
-  const error = (payload as { error: unknown }).error;
+  const error = payload.error;
   if (typeof error !== "object" || error === null) {
     return null;
   }
