@@ -54,6 +54,7 @@ This directory is the system of record for agents. Keep it current. If a decisio
 ## Agent operations
 
 - `agent/harness-engineering-map.md`
+- `agent/coding-conventions.md`
 - `agent/codex-operating-model.md`
 - `agent/prompting-guidelines.md`
 - `agent/review-checklist.md`

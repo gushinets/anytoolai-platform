@@ -184,3 +184,5 @@ the missing contract or decision.
 ## Agent style
 
 Prefer boring, explicit, searchable code. Avoid clever abstractions until a second product or workflow proves the need.
+
+Coding conventions for new and changed code: `docs/agent/coding-conventions.md`.
