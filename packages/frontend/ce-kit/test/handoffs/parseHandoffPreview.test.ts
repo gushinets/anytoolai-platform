@@ -72,4 +72,8 @@ describe("parseHandoffPreview", () => {
     expect(parseHandoffPreview({ ...VALID_PAYLOAD, target_scenario_session_id: 123 })).toBeNull();
     expect(parseHandoffPreview({ ...VALID_PAYLOAD, target_job_id: 123 })).toBeNull();
   });
+
+  it("returns null when status is not a known HandoffStatus member", () => {
+    expect(parseHandoffPreview({ ...VALID_PAYLOAD, status: "pending" })).toBeNull();
+  });
 });

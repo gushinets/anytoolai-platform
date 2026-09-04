@@ -16,3 +16,16 @@ export function isStringArray(value: unknown): value is string[] {
 export function isNullableString(value: unknown): value is string | null | undefined {
   return value === undefined || value === null || typeof value === "string";
 }
+
+/**
+ * Builds a runtime membership guard for a generated closed-set string union `T` from an
+ * exhaustive value map. `values` is typed `Record<T, true>`, so the call site itself -- not just
+ * this helper -- fails to typecheck if `T` gains or loses a member and the map isn't updated to
+ * match, the same compile-time completeness every hand-written `isX()` guard in ce-kit relied on
+ * before they shared this helper.
+ */
+export function makeEnumGuard<T extends string>(
+  values: Record<T, true>,
+): (value: string) => value is T {
+  return (value: string): value is T => Object.hasOwn(values, value);
+}

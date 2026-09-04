@@ -75,6 +75,27 @@ describe("pollScenarioSession", () => {
     expect(result.result.ok && result.result.value.status).toBe("completed");
   });
 
+  it("stops with reason 'error' and invalid_response, without retrying, on an unrecognized status", async () => {
+    // ANY-338 motivating case: a status the CE-kit ScenarioSessionStatus guard doesn't recognize
+    // (e.g. a status the backend hasn't shipped a value for yet) must stop polling immediately via
+    // invalid_response, not spin until maxDurationMs treating it as just another non-terminal
+    // status.
+    const fetchImpl = vi.fn(async () => jsonResponse(200, sessionPayload("cancelled")));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const result = await pollScenarioSession(client, "scenario_session_123", {
+      intervalMs: 1_000,
+      maxDurationMs: 60_000,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result.reason).toBe("error");
+    expect(result.result).toEqual({
+      ok: false,
+      error: { type: "invalid_response", status: 200, message: expect.any(String) },
+    });
+  });
+
   it("stops with reason 'error' on a backend error without retrying", async () => {
     const fetchImpl = vi.fn(async () =>
       jsonResponse(404, {

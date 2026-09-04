@@ -57,6 +57,14 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "FrontendType": {
+        "enum": [
+          "chrome_extension",
+          "web"
+        ],
+        "title": "FrontendType",
+        "type": "string"
+      },
       "GuestIdentityResponse": {
         "additionalProperties": false,
         "properties": {
@@ -154,8 +162,7 @@
             "type": "string"
           },
           "status": {
-            "title": "Status",
-            "type": "string"
+            "$ref": "#/components/schemas/HandoffStatus"
           }
         },
         "required": [
@@ -193,8 +200,7 @@
             "type": "string"
           },
           "status": {
-            "title": "Status",
-            "type": "string"
+            "$ref": "#/components/schemas/HandoffStatus"
           },
           "target_job_id": {
             "anyOf": [
@@ -245,6 +251,34 @@
         "title": "HandoffPreviewResponse",
         "type": "object"
       },
+      "HandoffStatus": {
+        "enum": [
+          "created",
+          "viewed",
+          "accepted",
+          "declined",
+          "consumed",
+          "expired",
+          "failed"
+        ],
+        "title": "HandoffStatus",
+        "type": "string"
+      },
+      "QuotaDimension": {
+        "enum": [
+          "product",
+          "scenario"
+        ],
+        "title": "QuotaDimension",
+        "type": "string"
+      },
+      "QuotaPeriod": {
+        "enum": [
+          "lifetime"
+        ],
+        "title": "QuotaPeriod",
+        "type": "string"
+      },
       "QuotaStateResponse": {
         "additionalProperties": false,
         "properties": {
@@ -265,16 +299,14 @@
             "type": "integer"
           },
           "period": {
-            "title": "Period",
-            "type": "string"
+            "$ref": "#/components/schemas/QuotaPeriod"
           },
           "product_id": {
             "title": "Product Id",
             "type": "string"
           },
           "quota_dimension": {
-            "title": "Quota Dimension",
-            "type": "string"
+            "$ref": "#/components/schemas/QuotaDimension"
           },
           "quota_policy_id": {
             "title": "Quota Policy Id",
@@ -296,8 +328,7 @@
             "title": "Scenario Id"
           },
           "unit": {
-            "title": "Unit",
-            "type": "string"
+            "$ref": "#/components/schemas/QuotaUnit"
           },
           "used_count": {
             "title": "Used Count",
@@ -319,6 +350,13 @@
         ],
         "title": "QuotaStateResponse",
         "type": "object"
+      },
+      "QuotaUnit": {
+        "enum": [
+          "scenario_run"
+        ],
+        "title": "QuotaUnit",
+        "type": "string"
       },
       "ResultArtifactResponse": {
         "additionalProperties": false,
@@ -453,8 +491,7 @@
             "type": "string"
           },
           "type": {
-            "title": "Type",
-            "type": "string"
+            "$ref": "#/components/schemas/FrontendType"
           }
         },
         "required": [
@@ -469,24 +506,21 @@
         "additionalProperties": false,
         "properties": {
           "dimension": {
-            "title": "Dimension",
-            "type": "string"
+            "$ref": "#/components/schemas/QuotaDimension"
           },
           "limit_count": {
             "title": "Limit Count",
             "type": "integer"
           },
           "period": {
-            "title": "Period",
-            "type": "string"
+            "$ref": "#/components/schemas/QuotaPeriod"
           },
           "quota_policy_id": {
             "title": "Quota Policy Id",
             "type": "string"
           },
           "unit": {
-            "title": "Unit",
-            "type": "string"
+            "$ref": "#/components/schemas/QuotaUnit"
           }
         },
         "required": [
@@ -626,8 +660,7 @@
             "type": "string"
           },
           "status": {
-            "title": "Status",
-            "type": "string"
+            "$ref": "#/components/schemas/ScenarioSessionStatus"
           }
         },
         "required": [
@@ -637,6 +670,18 @@
         ],
         "title": "ScenarioSessionResponse",
         "type": "object"
+      },
+      "ScenarioSessionStatus": {
+        "enum": [
+          "started",
+          "waiting_for_user",
+          "running",
+          "completed",
+          "failed",
+          "expired"
+        ],
+        "title": "ScenarioSessionStatus",
+        "type": "string"
       },
       "ScenarioStartRequest": {
         "additionalProperties": false,
@@ -719,8 +764,7 @@
             "type": "string"
           },
           "status": {
-            "title": "Status",
-            "type": "string"
+            "$ref": "#/components/schemas/ScenarioSessionStatus"
           }
         },
         "required": [

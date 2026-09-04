@@ -63,6 +63,10 @@ describe("parseScenarioSessionSnapshot", () => {
     const { job_id: _jobId, ...rest } = VALID_PAYLOAD;
     expect(parseScenarioSessionSnapshot(rest)).toBeNull();
   });
+
+  it("returns null when status is not a known ScenarioSessionStatus member", () => {
+    expect(parseScenarioSessionSnapshot({ ...VALID_PAYLOAD, status: "cancelled" })).toBeNull();
+  });
 });
 
 describe("parseScenarioSession", () => {
