@@ -185,10 +185,28 @@ def test_frontend_check_uses_frozen_install_and_real_checks(monkeypatch) -> None
     assert runner.frontend_check() == 0
     assert commands == [
         ["pnpm", "install", "--frozen-lockfile"],
+        ["pnpm", "-r", "lint"],
         ["pnpm", "-r", "typecheck"],
         ["pnpm", "-r", "test"],
         ["pnpm", "-r", "--if-present", "generate-api-types:check"],
         ["pnpm", "-r", "build"],
+    ]
+
+
+def test_run_sequence_stops_and_propagates_on_first_failure(monkeypatch) -> None:
+    runner = load_runner_module()
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str]) -> int:
+        commands.append(list(command))
+        return 1 if command == ["pnpm", "-r", "lint"] else 0
+
+    monkeypatch.setattr(runner, "run", fake_run)
+
+    assert runner.frontend_check() == 1
+    assert commands == [
+        ["pnpm", "install", "--frozen-lockfile"],
+        ["pnpm", "-r", "lint"],
     ]
 
 

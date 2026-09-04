@@ -16,6 +16,16 @@ import { chromium, test, expect, type BrowserContext, type Page } from "@playwri
  * before running this spec via `python scripts/agent/runner.py client-handoff-smoke`.
  */
 
+interface HandoffPreviewResponse {
+  target_scenario_session_id: string | null;
+  target_job_id: string | null;
+}
+
+interface ScenarioSessionResponse {
+  scenario_session_id: string;
+  job_id: string | null;
+}
+
 const EXTENSION_PATH =
   process.env.EXTENSION_PATH ??
   join(import.meta.dirname, "../../../../extensions/kernel-demo-ce/.output/chrome-mv3");
@@ -117,7 +127,7 @@ test.describe("ANY-224 client handoff integration smoke", () => {
       await expect(consentPage.getByRole("button", { name: "Accept" })).toHaveCount(0);
 
       const preview = await consentPage.request.get(`${platformApiBaseUrl}/v1/handoffs/${handoffToken}`);
-      const body = await preview.json();
+      const body = (await preview.json()) as HandoffPreviewResponse;
       expect(body.target_scenario_session_id).toBeTruthy();
       expect(body.target_job_id).toBeTruthy();
 
@@ -128,7 +138,7 @@ test.describe("ANY-224 client handoff integration smoke", () => {
         `${platformApiBaseUrl}/v1/scenario-sessions/${body.target_scenario_session_id}`,
       );
       expect(targetSession.ok()).toBe(true);
-      const targetSessionBody = await targetSession.json();
+      const targetSessionBody = (await targetSession.json()) as ScenarioSessionResponse;
       expect(targetSessionBody.scenario_session_id).toBe(body.target_scenario_session_id);
       expect(targetSessionBody.job_id).toBe(body.target_job_id);
 
@@ -149,7 +159,7 @@ test.describe("ANY-224 client handoff integration smoke", () => {
       await expect(consentPage.getByText(/declined/i)).toBeVisible();
 
       const preview = await consentPage.request.get(`${platformApiBaseUrl}/v1/handoffs/${handoffToken}`);
-      const body = await preview.json();
+      const body = (await preview.json()) as HandoffPreviewResponse;
       expect(body.target_scenario_session_id).toBeNull();
     });
   });

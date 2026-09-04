@@ -241,17 +241,17 @@ describe("PlatformApiClient.createGuestIdentity", () => {
     const store = new Map<string, string>([["anytoolai.guest_id", "guest_original"]]);
     let getCallCount = 0;
     const storage: AsyncStorage = {
-      get: vi.fn(async (key) => {
+      get: vi.fn(async (key: string) => {
         getCallCount += 1;
         if (getCallCount === 1) {
           return store.get(key);
         }
         throw new Error("storage read failed");
       }),
-      set: vi.fn(async (key, value) => {
+      set: vi.fn(async (key: string, value: string) => {
         store.set(key, value);
       }),
-      remove: vi.fn(async (key) => {
+      remove: vi.fn(async (key: string) => {
         store.delete(key);
       }),
     };
@@ -280,7 +280,7 @@ describe("PlatformApiClient.createGuestIdentity", () => {
     const store = new Map<string, string>();
     let getCallCount = 0;
     const storage: AsyncStorage = {
-      get: vi.fn(async (key) => {
+      get: vi.fn(async (key: string) => {
         getCallCount += 1;
         if (getCallCount === 1) {
           return undefined;
@@ -288,10 +288,10 @@ describe("PlatformApiClient.createGuestIdentity", () => {
         store.set(key, "guest_written_concurrently");
         return store.get(key);
       }),
-      set: vi.fn(async (key, value) => {
+      set: vi.fn(async (key: string, value: string) => {
         store.set(key, value);
       }),
-      remove: vi.fn(async (key) => {
+      remove: vi.fn(async (key: string) => {
         store.delete(key);
       }),
     };
@@ -337,17 +337,17 @@ describe("PlatformApiClient.createGuestIdentity", () => {
     const store = new Map<string, string>();
     let getCallCount = 0;
     const storage: AsyncStorage = {
-      get: vi.fn(async (key) => {
+      get: vi.fn(async (key: string) => {
         getCallCount += 1;
         if (getCallCount === 1) {
           throw new Error("transient storage read failure");
         }
         return store.get(key);
       }),
-      set: vi.fn(async (key, value) => {
+      set: vi.fn(async (key: string, value: string) => {
         store.set(key, value);
       }),
-      remove: vi.fn(async (key) => {
+      remove: vi.fn(async (key: string) => {
         store.delete(key);
       }),
     };
