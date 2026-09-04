@@ -36,14 +36,21 @@ It must not know product semantics such as ProposalAI, Brief, Upwork, Scope Cree
 
 Everything that knows Freelancer product meaning belongs in MVP-B Freelancer Suite. Everything that
 runs atoms, workflows, scenario sessions, events, artifacts, quota, and backend handoff belongs in
-MVP-A1 Platform Core. Frontend-safe result consumption, CE-kit, web mirror, shared handoff consent,
-and Kernel Demo CE/browser proof belong in MVP-A2 Client Surfaces; the result/artifact API and
-backend state remain owned by Platform Core.
+MVP-A1 Platform Core. Frontend-safe result consumption, shared client contracts, the multi-product
+web host, shared handoff consent, and Kernel Demo CE/browser proof belong in MVP-A2 Client Surfaces;
+the result/artifact API and backend state remain owned by Platform Core.
 
-Each Freelancer product owns its product bundle/workflow and a separate Chrome Extension. Product
-extensions use CE-kit and contain no prompts, provider/model selection, or workflow logic. They do
-not depend on the web mirror.
+Each Freelancer product owns its product bundle/workflow, web definition/page, renderer meaning,
+events, and handoff maps. A dedicated Chrome Extension is optional and product-owned when justified.
+All product surfaces use shared client contracts and contain no prompts, provider/model selection,
+or workflow logic.
 
 ## Composition
 
 `apps/platform-api` wires platform runtime and product bundles. Product bundles use `platform-sdk`.
+
+## Adding a product
+
+`docs/product-specs/add-product-recipe.md` is the step-by-step for adding an MVP-B product without
+changing this file's allowed/forbidden list. `docs/product-specs/mvp-b-handoff-note.md` is the
+handoff note for the MVP-B team summarizing what MVP-A1 proves and what stays out of bounds.
