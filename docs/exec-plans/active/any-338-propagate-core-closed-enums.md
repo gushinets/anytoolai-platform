@@ -8,10 +8,10 @@
   landed before this file existed; see `docs/exec-plans/active/any-305-validator-ref-config-registry.md`'s
   own round-1 finding for why this file exists at all: ANY-338's round-3 review flagged the same
   "no exec plan for non-trivial work" gap).
-- Last updated: 2026-09-02
-- Review date: 2026-09-02
-- Next action: none — implementation and code-review rounds 1-3 addressed; move to `completed/`
-  once merged.
+- Last updated: 2026-09-04
+- Review date: 2026-09-04
+- Next action: none — implementation, code-review rounds 1-3, PR review rounds "me #1"/"me #2",
+  and team-lead review round 4 all addressed; move to `completed/` once merged.
 - Blocker: none
 
 ## Goal
@@ -47,7 +47,11 @@ consumers) so unknown values fail parsing (`invalid_response`) instead of silent
   file's `AssertExactSchemaShape` check to reference the generated enum component instead of
   `string`.
 - Retype `pollScenarioSession.ts`'s `POLL_STOP_STATUSES` as `ReadonlySet<ScenarioSessionStatus>`
-  (round 1), then as an exhaustive `Record<ScenarioSessionStatus, boolean>` (round-1 review fix).
+  (round 1), then as an exhaustive `Record<ScenarioSessionStatus, boolean>` (round-1 review fix),
+  then restored to `ReadonlySet<ScenarioSessionStatus>` per the ticket's literal requirement (PR
+  review blocker, "me #1"/"me #2"), and finally derived from an exhaustive
+  `Record<ScenarioSessionStatus, boolean>` so it keeps both the required public type and
+  compile-time completeness (team-lead review round 4). See Decision log.
 - `apps/web-mirror/src/components/HandoffConsent.tsx`: retype `TERMINAL_STATUSES` against
   `HandoffStatus`, delete the `ponytail:` hand-sync comment; later replaced with an exhaustive
   `Record<HandoffStatus, boolean>` (round-1 review fix, see Progress log).
@@ -135,14 +139,43 @@ consumers) so unknown values fail parsing (`invalid_response`) instead of silent
       "do not create two runtime mirrors" requirement for quota specifically).
 - [x] Code review round 3 (2026-09-02) — only finding: this exec plan didn't exist. Backfilled as
       this file.
+- [x] PR review "me #1" (GitHub PR #97 inline comment, 2026-09-02) — blocker: `pollScenarioSession.ts`
+      still had to expose `ReadonlySet<ScenarioSessionStatus>` per the ticket's literal scope
+      wording; the round-1 `Record<ScenarioSessionStatus, boolean>` violated that even though it
+      was exhaustive. Strengthened two test assertions in the same pass (`createHandoff.test.ts`
+      exact `invalid_response` shape, `parseRuntimeConfig.test.ts` separate invalid unit/period/
+      dimension cases) — committed as `0a1dacc`.
+- [x] PR review "me #2" (re-review, 2026-09-02) — confirmed `0a1dacc`'s test strengthening had no
+      new issues; the `ReadonlySet` blocker was still open on that head. No new fix in this round.
+- [x] Fixed the `ReadonlySet` blocker: `POLL_STOP_STATUSES` back to
+      `ReadonlySet<ScenarioSessionStatus>` with `.has()` at the call site — committed as `8e4fd5d`.
+- [x] Team-lead review round 4 (2026-09-04) — 5 minor, non-blocking findings, all fixed:
+  - `POLL_STOP_STATUSES` was a plain `ReadonlySet` literal again, losing the exhaustiveness
+    `Record<Enum, boolean>` gave it (same drift class as `HandoffConsent.tsx`'s
+    `HANDOFF_STATUS_IS_TERMINAL`, which stayed a `Record`) — now derived from an exhaustive
+    `SCENARIO_SESSION_STATUS_STOPS_POLLING: Record<ScenarioSessionStatus, boolean>` map, keeping
+    both the required `ReadonlySet<ScenarioSessionStatus>` type and compile-time completeness.
+  - No poll-level regression test for the ticket's own motivating case (`"cancelled"`) — added to
+    `pollScenarioSession.test.ts`: a 200 with an unrecognized status stops after one GET with
+    `invalid_response`, not a timeout.
+  - This exec plan and the PR #97 description were stale vs. HEAD (still described the poll set as
+    a plain exhaustive `Record`, no mention of `0a1dacc`/`8e4fd5d`) — both updated.
+  - `tests/test_docs_generation.py`'s enum-values assertions were copied literal lists — switched
+    to `list(FrontendType)`/etc. against the real Core `StrEnum`s, so a future Core member addition
+    fails with a clear signal instead of silently matching a stale literal.
+  - Hand-written `makeEnumGuard()` value lists — confirmed already-accepted residual debt (see
+    Follow-up debt); no change, per the team lead's own framing ("residual, not a miss").
 
 ## Validation
 
 - [x] `pnpm --filter @anytoolai/ce-kit exec tsc --noEmit` (after round 1's implementation and
       after round 1's review fixes).
 - [x] `pnpm --filter @anytoolai/web-mirror exec tsc --noEmit` (same two points).
-- [x] `pnpm --filter @anytoolai/ce-kit test` — 287 passed.
+- [x] `pnpm --filter @anytoolai/ce-kit test` — 287 passed, then 288 after team-lead round 4's new
+      `pollScenarioSession.test.ts` case.
 - [x] `pnpm --filter @anytoolai/web-mirror test` — 26 passed.
+- [x] `python -m pytest tests/test_docs_generation.py` — green after switching enum assertions to
+      `list(<CoreEnum>)`.
 - [x] `python scripts/agent/runner.py quick-check` — 987 passed.
 - [x] `python scripts/agent/runner.py full-check` — backend baseline, frontend typecheck/tests/
       build, `generate-docs --check`, `generate-api-types:check`, freelancer-suite product tests —
@@ -159,6 +192,9 @@ consumers) so unknown values fail parsing (`invalid_response`) instead of silent
 | 2026-09-02 | `TERMINAL_STATUSES`/`POLL_STOP_STATUSES` became exhaustive `Record<Enum, boolean>` maps instead of staying `ReadonlySet<Enum>`. | Round-1 review: a `ReadonlySet<Enum>` only constrains *elements*, not completeness — the compiler doesn't fail when the enum gains a member (e.g. a future `revoked` `HandoffStatus`) that never gets added to the set, silently reproducing the exact hand-sync bug the deleted `ponytail:` comment warned about. `Record<Enum, boolean>` requires a key for every member, so a new member fails compilation until explicitly classified terminal/non-terminal. |
 | 2026-09-02 | Did not attempt to derive `makeEnumGuard()`'s runtime value lists from `platformApi.ts` (e.g. via a codegen step or a runtime-schema library). | Round-2 review raised this as a residual gap. `openapi-typescript` only emits these enums as TS string-literal unions, which erase at runtime — there is no runtime array to derive from without either extending codegen (out of scope, not asked for) or adding a runtime-schema dependency, which the ticket explicitly forbids ("Adding a runtime-schema dependency"). Residual risk is bounded: `makeEnumGuard`'s `Record<T, true>` parameter still catches a hand-written list that drifts from `T` at the call site. |
 | 2026-09-02 | Backfilled this exec plan after implementation, rather than blocking further review rounds on writing it first. | Round-3 review found no exec plan existed under `docs/exec-plans/active/`, per `CLAUDE.md`'s "before coding" requirement — a genuine process gap for a 30-file, cross-cutting-mechanism diff. Code was already implemented, reviewed three times, and committed by the time this was caught; user asked to backfill rather than revert and redo the process, which would have discarded validated work for no correctness benefit. |
+| 2026-09-02 | Reverted `POLL_STOP_STATUSES` from `Record<ScenarioSessionStatus, boolean>` back to `ReadonlySet<ScenarioSessionStatus>`. | PR review ("me #1"/"me #2") blocker: the ticket's scope explicitly names `ReadonlySet<ScenarioSessionStatus>` for this field — the round-1 fix's `Record` form, though exhaustive, violated that literal contract. Committed as `8e4fd5d`. |
+| 2026-09-04 | Kept `POLL_STOP_STATUSES` as the required `ReadonlySet<ScenarioSessionStatus>` but derived it from a new `SCENARIO_SESSION_STATUS_STOPS_POLLING: Record<ScenarioSessionStatus, boolean>` map instead of a hand-written `Set` literal. | Team-lead review round 4: a bare `ReadonlySet` literal reintroduced the same non-exhaustiveness gap round-1 review fixed (any subset of the union typechecks against `ReadonlySet<Enum>`), while `HandoffConsent.tsx`'s terminal-status check stayed the stronger `Record` form — same drift class, two patterns. Deriving the set from an exhaustive `Record` keeps both properties without violating the ticket's stated type. |
+| 2026-09-04 | Switched `tests/test_docs_generation.py`'s enum assertions from copied literal lists to `list(<CoreEnum>)` against the real `platform-core` `StrEnum`s. | Team-lead review round 4: a hand-copied list matches today but gives no signal if Core gains a member later; comparing against the enum itself fails loudly instead. |
 
 ## Progress log
 
@@ -167,7 +203,11 @@ consumers) so unknown values fail parsing (`invalid_response`) instead of silent
 | 2026-09-02 | Implemented per `plans/ANY-338.md`'s design: backend enum retyping, OpenAPI/CE-kit regeneration, four new guard modules, narrowed DTOs/parsers/drift-checks, `pollScenarioSession` retype, `HandoffConsent.tsx` retype, backend + CE-kit tests. `quick-check` (987 passed) and `full-check` green. Committed as `8ac9fb7`. | Await code review. |
 | 2026-09-02 | Code review round 1 found 3 gaps (non-exhaustive terminal/stop status sets x2, duplicated guard pattern x4 files). Fixed all three: `Record<Enum, boolean>` maps, shared `makeEnumGuard()`, fixed a stale `TERMINAL_STATUSES` name reference in `classify.ts`. Verified `Record<T, true>`-as-parameter still catches drift via an isolated `tsc` check. Both packages' typecheck/tests and `full-check` re-run green. Committed as `89c6055`. | Await round-2 review. |
 | 2026-09-02 | Code review round 2 (4 finder agents + verifier) found 2 soft cleanup items (hand-written enum value lists, inconsistent file granularity), both confirmed non-blocking and intentional/unfixable-in-scope. No code changes. | Await round-3 review. |
-| 2026-09-02 | Code review round 3 found this exec plan was missing (`CLAUDE.md` "before coding" requirement). Backfilled this file. | Move to `completed/` once merged. |
+| 2026-09-02 | Code review round 3 found this exec plan was missing (`CLAUDE.md` "before coding" requirement). Backfilled this file. | Await PR review. |
+| 2026-09-02 | PR review "me #1" found a blocker (`POLL_STOP_STATUSES` violated the ticket's literal `ReadonlySet<ScenarioSessionStatus>` requirement); also strengthened two test assertions (`createHandoff.test.ts`, `parseRuntimeConfig.test.ts`) in the same pass. Committed as `0a1dacc`. | Fix the blocker. |
+| 2026-09-02 | Restored `POLL_STOP_STATUSES` to `ReadonlySet<ScenarioSessionStatus>`. Committed as `8e4fd5d`. | Await re-review. |
+| 2026-09-02 | PR review "me #2" confirmed `0a1dacc` had no new issues and that the blocker was fixed by `8e4fd5d`. | Await team-lead review. |
+| 2026-09-04 | Team-lead review round 4 found 5 minor, non-blocking findings; fixed 4 (derived `POLL_STOP_STATUSES` from an exhaustive `Record`, added a poll-level regression test for an unrecognized status, updated this exec plan and the PR description, switched `test_docs_generation.py` to compare against real Core enums) and left the 5th (hand-written `makeEnumGuard()` value lists) as already-accepted follow-up debt. `pnpm --filter @anytoolai/ce-kit test` — 288 passed; `pytest tests/test_docs_generation.py` — green. | Move to `completed/` once merged. |
 
 ## Open questions
 

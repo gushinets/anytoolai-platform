@@ -8,13 +8,26 @@ import type { ScenarioSession } from "./types";
  * Statuses that stop polling. `waiting_for_user` stops here too (not just the workflow-terminal
  * statuses) because it means the frontend must call `nextAction()` next -- continuing to poll
  * would just idle until `maxDurationMs`. See docs/architecture/scenario-session-model.md.
+ *
+ * The public type is the `ReadonlySet<ScenarioSessionStatus>` the ticket requires, but it's
+ * derived from this `Record<ScenarioSessionStatus, boolean>` literal, not hand-written -- the
+ * `Record` fails to typecheck if `ScenarioSessionStatus` gains or loses a member and this map
+ * isn't updated to classify it, closing the gap a hand-written `Set` literal would silently leave
+ * (any subset of the union typechecks against `ReadonlySet<ScenarioSessionStatus>`).
  */
-const POLL_STOP_STATUSES: ReadonlySet<ScenarioSessionStatus> = new Set([
-  "waiting_for_user",
-  "completed",
-  "failed",
-  "expired",
-]);
+const SCENARIO_SESSION_STATUS_STOPS_POLLING: Record<ScenarioSessionStatus, boolean> = {
+  started: false,
+  running: false,
+  waiting_for_user: true,
+  completed: true,
+  failed: true,
+  expired: true,
+};
+const POLL_STOP_STATUSES: ReadonlySet<ScenarioSessionStatus> = new Set(
+  (Object.keys(SCENARIO_SESSION_STATUS_STOPS_POLLING) as ScenarioSessionStatus[]).filter(
+    (status) => SCENARIO_SESSION_STATUS_STOPS_POLLING[status],
+  ),
+);
 
 const DEFAULT_INTERVAL_MS = 2_000;
 const DEFAULT_MAX_DURATION_MS = 60_000;
