@@ -1,6 +1,7 @@
 import type { AssertExactSchemaShape } from "../api/driftAssertions";
 import type { components } from "../api/generated/platformApi";
 import { isRecord } from "../api/parsing";
+import { isHandoffStatus } from "./handoffStatus";
 import type { HandoffCreated } from "./types";
 
 /**
@@ -28,6 +29,9 @@ export function parseHandoffCreated(payload: unknown): HandoffCreated | null {
   ) {
     return null;
   }
+  if (!isHandoffStatus(status)) {
+    return null;
+  }
 
   return { handoffId, handoffToken, status, expiresAt };
 }
@@ -41,7 +45,7 @@ type _HandoffCreateResponseShapeCheck = AssertExactSchemaShape<
     expires_at: string;
     handoff_id: string;
     handoff_token: string;
-    status: string;
+    status: components["schemas"]["HandoffStatus"];
   }
 >;
 const _assertHandoffCreateResponseShapeMatchesGenerated: _HandoffCreateResponseShapeCheck = true;

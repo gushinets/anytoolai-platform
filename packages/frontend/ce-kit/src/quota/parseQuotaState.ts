@@ -1,6 +1,7 @@
 import type { AssertExactSchemaShape } from "../api/driftAssertions";
 import type { components } from "../api/generated/platformApi";
 import { isNullableString, isRecord } from "../api/parsing";
+import { isQuotaDimension, isQuotaPeriod, isQuotaUnit } from "./quotaEnums";
 import type { QuotaState } from "./types";
 
 /**
@@ -46,6 +47,9 @@ export function parseQuotaState(payload: unknown): QuotaState | null {
   if (!isNullableString(scenarioId)) {
     return null;
   }
+  if (!isQuotaDimension(quotaDimension) || !isQuotaUnit(unit) || !isQuotaPeriod(period)) {
+    return null;
+  }
 
   return {
     guestId,
@@ -73,13 +77,13 @@ type _QuotaStateShapeCheck = AssertExactSchemaShape<
     exhausted: boolean;
     guest_id: string;
     limit_count: number;
-    period: string;
+    period: components["schemas"]["QuotaPeriod"];
     product_id: string;
-    quota_dimension: string;
+    quota_dimension: components["schemas"]["QuotaDimension"];
     quota_policy_id: string;
     remaining_count: number;
     scenario_id?: string | null;
-    unit: string;
+    unit: components["schemas"]["QuotaUnit"];
     used_count: number;
   }
 >;

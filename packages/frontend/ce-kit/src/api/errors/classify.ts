@@ -187,9 +187,10 @@ export function isGuestIdentityNotFound(error: PlatformApiError): boolean {
  * Deliberately excludes `isHandoffGuestIdentityInvalid()`'s 404 case -- refetching that would just
  * return the same non-terminal, actionable preview -- see that guard's docstring.
  *
- * ponytail: this OR-list is a manually-synced membership set, like `TERMINAL_STATUSES` in
- * `HandoffConsent.tsx` -- a new backend error code that logically belongs here needs a matching
- * guard added to this list by hand; nothing enforces that at compile time.
+ * ponytail: this OR-list is a manually-synced membership set -- unlike `HandoffConsent.tsx`'s
+ * `HANDOFF_STATUS_IS_TERMINAL` (an exhaustive `Record<HandoffStatus, boolean>`), a new backend
+ * error code that logically belongs here needs a matching guard added to this list by hand;
+ * nothing enforces that at compile time.
  */
 export function isHandoffActionRefetchable(error: PlatformApiError): boolean {
   return (

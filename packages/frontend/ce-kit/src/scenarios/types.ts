@@ -1,3 +1,5 @@
+import type { ScenarioSessionStatus } from "./scenarioSessionStatus";
+
 export type ScenarioStartRequest = {
   productId: string;
   scenarioId: string;
@@ -12,7 +14,7 @@ export type ScenarioStartRequest = {
 export type ScenarioSessionSnapshot = {
   scenarioSessionId: string;
   jobId: string | null;
-  status: string;
+  status: ScenarioSessionStatus;
   allowedNextActions: string[];
   resultArtifactId: string | null;
 };

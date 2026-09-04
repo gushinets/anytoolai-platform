@@ -1,6 +1,8 @@
 import type { AssertExactSchemaShape } from "../api/driftAssertions";
 import type { components } from "../api/generated/platformApi";
 import { isRecord, isStringArray } from "../api/parsing";
+import { isQuotaDimension, isQuotaPeriod, isQuotaUnit } from "../quota/quotaEnums";
+import { isFrontendType } from "./frontendType";
 import type {
   RuntimeConfig,
   RuntimeFrontend,
@@ -123,6 +125,9 @@ function _parseFrontend(value: unknown): RuntimeFrontend | null {
   if (typeof frontendId !== "string" || typeof type !== "string" || typeof enabled !== "boolean") {
     return null;
   }
+  if (!isFrontendType(type)) {
+    return null;
+  }
   return { frontendId, type, enabled };
 }
 
@@ -185,6 +190,9 @@ function _parseQuotaSummary(value: unknown): RuntimeQuotaSummary | null {
   ) {
     return null;
   }
+  if (!isQuotaUnit(unit) || !isQuotaPeriod(period) || !isQuotaDimension(dimension)) {
+    return null;
+  }
   return { quotaPolicyId, unit, limitCount, period, dimension };
 }
 
@@ -207,7 +215,7 @@ void _assertRuntimeConfigShapeMatchesGenerated;
 
 type _RuntimeFrontendShapeCheck = AssertExactSchemaShape<
   components["schemas"]["RuntimeFrontendResponse"],
-  { frontend_id: string; type: string; enabled: boolean }
+  { frontend_id: string; type: components["schemas"]["FrontendType"]; enabled: boolean }
 >;
 const _assertRuntimeFrontendShapeMatchesGenerated: _RuntimeFrontendShapeCheck = true;
 void _assertRuntimeFrontendShapeMatchesGenerated;
@@ -234,7 +242,13 @@ void _assertRuntimeRendererHintShapeMatchesGenerated;
 
 type _RuntimeQuotaSummaryShapeCheck = AssertExactSchemaShape<
   components["schemas"]["RuntimeQuotaSummaryResponse"],
-  { quota_policy_id: string; unit: string; limit_count: number; period: string; dimension: string }
+  {
+    quota_policy_id: string;
+    unit: components["schemas"]["QuotaUnit"];
+    limit_count: number;
+    period: components["schemas"]["QuotaPeriod"];
+    dimension: components["schemas"]["QuotaDimension"];
+  }
 >;
 const _assertRuntimeQuotaSummaryShapeMatchesGenerated: _RuntimeQuotaSummaryShapeCheck = true;
 void _assertRuntimeQuotaSummaryShapeMatchesGenerated;

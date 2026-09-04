@@ -249,6 +249,11 @@ export interface components {
         ErrorResponse: {
             error: components["schemas"]["ErrorDetailResponse"];
         };
+        /**
+         * FrontendType
+         * @enum {string}
+         */
+        FrontendType: "chrome_extension" | "web";
         /** GuestIdentityResponse */
         GuestIdentityResponse: {
             /** Guest Id */
@@ -286,8 +291,7 @@ export interface components {
             handoff_id: string;
             /** Handoff Token */
             handoff_token: string;
-            /** Status */
-            status: string;
+            status: components["schemas"]["HandoffStatus"];
         };
         /** HandoffPreviewResponse */
         HandoffPreviewResponse: {
@@ -306,8 +310,7 @@ export interface components {
             source_product_display_name: string;
             /** Source Product Id */
             source_product_id: string;
-            /** Status */
-            status: string;
+            status: components["schemas"]["HandoffStatus"];
             /** Target Job Id */
             target_job_id?: string | null;
             /** Target Product Display Name */
@@ -319,6 +322,21 @@ export interface components {
             /** Target Scenario Session Id */
             target_scenario_session_id?: string | null;
         };
+        /**
+         * HandoffStatus
+         * @enum {string}
+         */
+        HandoffStatus: "created" | "viewed" | "accepted" | "declined" | "consumed" | "expired" | "failed";
+        /**
+         * QuotaDimension
+         * @enum {string}
+         */
+        QuotaDimension: "product" | "scenario";
+        /**
+         * QuotaPeriod
+         * @enum {string}
+         */
+        QuotaPeriod: "lifetime";
         /** QuotaStateResponse */
         QuotaStateResponse: {
             /** Dimension Key */
@@ -329,23 +347,25 @@ export interface components {
             guest_id: string;
             /** Limit Count */
             limit_count: number;
-            /** Period */
-            period: string;
+            period: components["schemas"]["QuotaPeriod"];
             /** Product Id */
             product_id: string;
-            /** Quota Dimension */
-            quota_dimension: string;
+            quota_dimension: components["schemas"]["QuotaDimension"];
             /** Quota Policy Id */
             quota_policy_id: string;
             /** Remaining Count */
             remaining_count: number;
             /** Scenario Id */
             scenario_id?: string | null;
-            /** Unit */
-            unit: string;
+            unit: components["schemas"]["QuotaUnit"];
             /** Used Count */
             used_count: number;
         };
+        /**
+         * QuotaUnit
+         * @enum {string}
+         */
+        QuotaUnit: "scenario_run";
         /** ResultArtifactResponse */
         ResultArtifactResponse: {
             /**
@@ -394,21 +414,17 @@ export interface components {
             enabled: boolean;
             /** Frontend Id */
             frontend_id: string;
-            /** Type */
-            type: string;
+            type: components["schemas"]["FrontendType"];
         };
         /** RuntimeQuotaSummaryResponse */
         RuntimeQuotaSummaryResponse: {
-            /** Dimension */
-            dimension: string;
+            dimension: components["schemas"]["QuotaDimension"];
             /** Limit Count */
             limit_count: number;
-            /** Period */
-            period: string;
+            period: components["schemas"]["QuotaPeriod"];
             /** Quota Policy Id */
             quota_policy_id: string;
-            /** Unit */
-            unit: string;
+            unit: components["schemas"]["QuotaUnit"];
         };
         /** RuntimeRendererHintResponse */
         RuntimeRendererHintResponse: {
@@ -451,9 +467,13 @@ export interface components {
             result_artifact_id?: string | null;
             /** Scenario Session Id */
             scenario_session_id: string;
-            /** Status */
-            status: string;
+            status: components["schemas"]["ScenarioSessionStatus"];
         };
+        /**
+         * ScenarioSessionStatus
+         * @enum {string}
+         */
+        ScenarioSessionStatus: "started" | "waiting_for_user" | "running" | "completed" | "failed" | "expired";
         /** ScenarioStartRequest */
         ScenarioStartRequest: {
             /** Frontend Id */
@@ -477,8 +497,7 @@ export interface components {
             result_artifact_id?: string | null;
             /** Scenario Session Id */
             scenario_session_id: string;
-            /** Status */
-            status: string;
+            status: components["schemas"]["ScenarioSessionStatus"];
         };
         /** ValidationError */
         ValidationError: {

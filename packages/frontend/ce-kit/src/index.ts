@@ -37,6 +37,8 @@ export { refreshGuestIdentity } from "./identity/refreshGuestIdentity";
 export type { RefreshGuestIdentityOptions } from "./identity/refreshGuestIdentity";
 export { getQuota } from "./quota/getQuota";
 export type { QuotaRequest, QuotaState } from "./quota/types";
+export { isQuotaDimension, isQuotaPeriod, isQuotaUnit } from "./quota/quotaEnums";
+export type { QuotaDimension, QuotaPeriod, QuotaUnit } from "./quota/quotaEnums";
 export { startScenario } from "./scenarios/startScenario";
 export { prepareScenarioStart } from "./scenarios/prepareScenarioStart";
 export type {
@@ -58,9 +60,12 @@ export type {
   ScenarioSessionSnapshot,
   ScenarioStartRequest,
 } from "./scenarios/types";
+export { isScenarioSessionStatus } from "./scenarios/scenarioSessionStatus";
+export type { ScenarioSessionStatus } from "./scenarios/scenarioSessionStatus";
 
-export { getRuntimeConfig } from "./runtime";
+export { getRuntimeConfig, isFrontendType } from "./runtime";
 export type {
+  FrontendType,
   RuntimeConfig,
   RuntimeFrontend,
   RuntimeQuotaSummary,
@@ -86,6 +91,8 @@ export type {
   HandoffCreated,
   HandoffPreview,
 } from "./handoffs/types";
+export { isHandoffStatus } from "./handoffs/handoffStatus";
+export type { HandoffStatus } from "./handoffs/handoffStatus";
 export { openHandoffConsent } from "./handoffs/openHandoffConsent";
 export type { OpenHandoffConsentOptions } from "./handoffs/openHandoffConsent";
 export type { Navigate } from "./handoffs/navigation";

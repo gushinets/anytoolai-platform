@@ -1,6 +1,7 @@
 import type { AssertExactSchemaShape } from "../api/driftAssertions";
 import type { components } from "../api/generated/platformApi";
 import { isNullableString, isRecord, isStringArray } from "../api/parsing";
+import { isScenarioSessionStatus } from "./scenarioSessionStatus";
 import type { ScenarioSession, ScenarioSessionSnapshot } from "./types";
 
 /**
@@ -33,6 +34,9 @@ export function parseScenarioSessionSnapshot(payload: unknown): ScenarioSessionS
     typeof status !== "string" ||
     (!allowedNextActionsAbsent && !isStringArray(allowedNextActions))
   ) {
+    return null;
+  }
+  if (!isScenarioSessionStatus(status)) {
     return null;
   }
   // `job_id` is a required (but nullable) property on both response models -- the key must be
@@ -99,7 +103,7 @@ type _ScenarioSessionResponseShapeCheck = AssertExactSchemaShape<
     job_id: string | null;
     result_artifact_id?: string | null;
     scenario_session_id: string;
-    status: string;
+    status: components["schemas"]["ScenarioSessionStatus"];
   }
 >;
 const _assertScenarioSessionResponseShapeMatchesGenerated: _ScenarioSessionResponseShapeCheck = true;
@@ -112,7 +116,7 @@ type _ScenarioStartResponseShapeCheck = AssertExactSchemaShape<
     job_id: string;
     result_artifact_id?: string | null;
     scenario_session_id: string;
-    status: string;
+    status: components["schemas"]["ScenarioSessionStatus"];
   }
 >;
 const _assertScenarioStartResponseShapeMatchesGenerated: _ScenarioStartResponseShapeCheck = true;

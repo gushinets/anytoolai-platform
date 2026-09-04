@@ -89,3 +89,52 @@ def test_openapi_json_is_valid_and_matches_the_live_schema() -> None:
 
     assert "/v1/products/{product_id}/runtime-config" in schema["paths"]
     assert schema == build_openapi_schema()
+
+
+def test_openapi_exposes_closed_enums_for_the_boundary_fields() -> None:
+    # ANY-338: every field the ticket names must resolve to a real enum component in the
+    # generated schema, not FastAPI's default `"type": "string"` for a bare `str` field.
+    # Enum values are compared against the Core StrEnums themselves, not copied literal lists, so
+    # a future member added to a Core enum fails here with a clear diff instead of silently
+    # passing a stale hand-written list.
+    from anytoolai_platform_core.handoffs.models import HandoffStatus
+    from anytoolai_platform_core.products.models import FrontendType
+    from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaPeriod, QuotaUnit
+    from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
+
+    module = load_module()
+    schema = json.loads(module.render_openapi_json())
+    components = schema["components"]["schemas"]
+
+    assert components["FrontendType"]["enum"] == list(FrontendType)
+    assert components["QuotaUnit"]["enum"] == list(QuotaUnit)
+    assert components["QuotaPeriod"]["enum"] == list(QuotaPeriod)
+    assert components["QuotaDimension"]["enum"] == list(QuotaDimension)
+    assert components["ScenarioSessionStatus"]["enum"] == list(ScenarioSessionStatus)
+    assert components["HandoffStatus"]["enum"] == list(HandoffStatus)
+
+    assert components["RuntimeFrontendResponse"]["properties"]["type"] == {
+        "$ref": "#/components/schemas/FrontendType"
+    }
+    quota_summary_props = components["RuntimeQuotaSummaryResponse"]["properties"]
+    assert quota_summary_props["unit"] == {"$ref": "#/components/schemas/QuotaUnit"}
+    assert quota_summary_props["period"] == {"$ref": "#/components/schemas/QuotaPeriod"}
+    assert quota_summary_props["dimension"] == {"$ref": "#/components/schemas/QuotaDimension"}
+
+    quota_state_props = components["QuotaStateResponse"]["properties"]
+    assert quota_state_props["unit"] == {"$ref": "#/components/schemas/QuotaUnit"}
+    assert quota_state_props["period"] == {"$ref": "#/components/schemas/QuotaPeriod"}
+    assert quota_state_props["quota_dimension"] == {"$ref": "#/components/schemas/QuotaDimension"}
+
+    assert components["ScenarioStartResponse"]["properties"]["status"] == {
+        "$ref": "#/components/schemas/ScenarioSessionStatus"
+    }
+    assert components["ScenarioSessionResponse"]["properties"]["status"] == {
+        "$ref": "#/components/schemas/ScenarioSessionStatus"
+    }
+    assert components["HandoffCreateResponse"]["properties"]["status"] == {
+        "$ref": "#/components/schemas/HandoffStatus"
+    }
+    assert components["HandoffPreviewResponse"]["properties"]["status"] == {
+        "$ref": "#/components/schemas/HandoffStatus"
+    }
