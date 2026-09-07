@@ -427,7 +427,7 @@ def frontend_workspace_lint_preflight() -> int:
         for package_json in sorted(ROOT.glob(f"{pattern}/package.json")):
             scripts = json.loads(package_json.read_text(encoding="utf-8")).get("scripts", {})
             if "lint" not in scripts:
-                missing.append(str(package_json.parent.relative_to(ROOT)))
+                missing.append(package_json.parent.relative_to(ROOT).as_posix())
     if missing:
         for workspace in missing:
             print(
