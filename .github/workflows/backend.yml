@@ -152,6 +152,7 @@ jobs:
           -e packages/backend/platform-sdk
           -e packages/backend/platform-core
           -e packages/backend/platform-actions
+          -e packages/backend/product-platforms/freelancer-suite
           -e apps/platform-api
           -e apps/platform-worker
       - name: Run all PostgreSQL production-semantics tests
