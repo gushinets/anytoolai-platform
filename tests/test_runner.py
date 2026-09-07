@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import subprocess
 import sys
 import urllib.parse
 from pathlib import Path
@@ -19,6 +21,22 @@ def load_runner_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def fake_pnpm_list_run(project_paths: list[Path]):
+    """Stubs `subprocess.run(["pnpm", "list", "-r", "--depth", "-1", "--json"], ...)`.
+
+    `baseline`'s CI job (where this test module's pytest run actually happens, via
+    `quick-check`) has no `pnpm` on PATH -- only `frontend`/`full-check`/`client-handoff-smoke` do
+    -- so `_pnpm_workspace_member_dirs()` must never shell out to a real `pnpm` from a test.
+    """
+
+    def run(command, **kwargs):
+        assert command == ["pnpm", "list", "-r", "--depth", "-1", "--json"]
+        payload = [{"name": path.name, "path": str(path)} for path in project_paths]
+        return subprocess.CompletedProcess(command, 0, stdout=json.dumps(payload), stderr="")
+
+    return run
 
 
 def test_full_check_uses_uv_for_freelancer_suite_install(monkeypatch) -> None:
@@ -181,6 +199,7 @@ def test_frontend_check_uses_frozen_install_and_real_checks(monkeypatch) -> None
         "run",
         lambda command: commands.append(list(command)) or 0,
     )
+    monkeypatch.setattr(runner.subprocess, "run", fake_pnpm_list_run([]))
 
     assert runner.frontend_check() == 0
     assert commands == [
@@ -200,22 +219,20 @@ def test_frontend_check_fails_when_a_workspace_has_no_lint_script(
     repo_root = tmp_path / "repo"
     linted = repo_root / "packages" / "frontend" / "linted"
     unlinted = repo_root / "packages" / "frontend" / "unlinted"
+    repo_root.mkdir(parents=True)
     linted.mkdir(parents=True)
     unlinted.mkdir(parents=True)
+    (repo_root / "package.json").write_text('{"name": "root"}', encoding="utf-8")
     (linted / "package.json").write_text(
         '{"name": "linted", "scripts": {"lint": "eslint ."}}', encoding="utf-8"
     )
     (unlinted / "package.json").write_text(
         '{"name": "unlinted", "scripts": {"typecheck": "tsc --noEmit"}}', encoding="utf-8"
     )
-    # A comment and a blank line right after `packages:` -- valid YAML pnpm parses correctly, but
-    # a prior hand-rolled line-based parser here stopped at the first non-`-` line and silently
-    # produced an empty workspace list (a vacuously-passing preflight). This is why
-    # frontend_workspace_lint_preflight() now asks pnpm itself for workspace members instead.
-    (repo_root / "pnpm-workspace.yaml").write_text(
-        'packages:\n  # frontend workspaces\n\n  - "packages/frontend/*"\n', encoding="utf-8"
-    )
     monkeypatch.setattr(runner, "ROOT", repo_root)
+    monkeypatch.setattr(
+        runner.subprocess, "run", fake_pnpm_list_run([repo_root, linted, unlinted])
+    )
     commands: list[list[str]] = []
     monkeypatch.setattr(runner, "run", lambda command: commands.append(list(command)) or 0)
 
@@ -224,7 +241,19 @@ def test_frontend_check_fails_when_a_workspace_has_no_lint_script(
     assert exit_code != 0
     # Never even reaches `pnpm install` -- the missing-lint workspace is caught up front.
     assert commands == []
+    # The workspace root itself (present in `pnpm list`'s own output) must not be treated as a
+    # maintained frontend workspace that needs `scripts.lint`.
     assert "packages/frontend/unlinted" in capsys.readouterr().err
+
+
+def test_pnpm_workspace_member_dirs_asks_pnpm_and_excludes_root(monkeypatch, tmp_path) -> None:
+    runner = load_runner_module()
+    repo_root = tmp_path / "repo"
+    member = repo_root / "packages" / "frontend" / "ce-kit"
+    monkeypatch.setattr(runner, "ROOT", repo_root)
+    monkeypatch.setattr(runner.subprocess, "run", fake_pnpm_list_run([repo_root, member]))
+
+    assert runner._pnpm_workspace_member_dirs() == [member]
 
 
 def test_run_sequence_stops_and_propagates_on_first_failure(monkeypatch) -> None:
@@ -236,6 +265,7 @@ def test_run_sequence_stops_and_propagates_on_first_failure(monkeypatch) -> None
         return 1 if command == ["pnpm", "-r", "lint"] else 0
 
     monkeypatch.setattr(runner, "run", fake_run)
+    monkeypatch.setattr(runner.subprocess, "run", fake_pnpm_list_run([]))
 
     assert runner.frontend_check() == 1
     assert commands == [
