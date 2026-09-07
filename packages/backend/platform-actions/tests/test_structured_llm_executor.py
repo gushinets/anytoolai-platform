@@ -203,6 +203,96 @@ def test_platform_actions_package_declares_runtime_dependencies() -> None:
     }
 
 
+def test_structured_llm_executor_consumes_typed_pydanticai_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A valid schema-backed response reaches PydanticAI's own typed mapping result
+    (not a raw-string side channel) before AnyToolAI's independent final validation
+    re-derives the same normalized mapping from the raw text for persistence."""
+    registry = build_config_registry(CONFIG_ROOT)
+    spy_gateway = _FixedResponseSpyGateway(
+        '{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": []}'
+    )
+    executor = StructuredLlmActionExecutor(
+        config_registry=registry,
+        provider_gateway=spy_gateway,
+    )
+
+    captured_results: list[Any] = []
+    real_run = PydanticAIStructuredRunner.run
+
+    async def spying_run(self: Any, *args: Any, **kwargs: Any) -> Any:
+        result = await real_run(self, *args, **kwargs)
+        captured_results.append(result)
+        return result
+
+    monkeypatch.setattr(PydanticAIStructuredRunner, "run", spying_run)
+
+    request = StructuredLlmActionRequest(
+        tenant_id="tenant_demo",
+        region="eu-central",
+        product_id="kernel_demo",
+        frontend_id="kernel_demo_ce",
+        scenario_session_id="scenario_session_demo",
+        job_id="job_demo",
+        workflow_id="kernel_demo.single_action_extract_v1",
+        workflow_version=1,
+        step_id="extract",
+        action_run_id="action_run_demo",
+        action_config_id="kernel_demo.extract_structured_fields_v1",
+        input_payload={"source_text": "Budget and timeline details"},
+    )
+    session = object()
+
+    response = asyncio.run(executor.execute(request, session=session))
+
+    assert len(captured_results) == 1
+    assert isinstance(captured_results[0].structured_output, dict)
+    assert captured_results[0].structured_output == response.structured_output
+    assert response.structured_output == {
+        "values": {"budget": "5000", "timeline": "Q1"},
+        "missing_fields": [],
+    }
+
+
+def test_structured_llm_executor_rejects_markdown_fenced_schema_response() -> None:
+    """PydanticAI's own object output processor tolerates ```json fences, but the platform-owned
+    final parser (`validate_structured_output`) must stay strict per architecture policy -- and
+    PydanticAIStructuredRunner's output validator re-checks every attempt against that same
+    strict parser (not PydanticAI's more lenient parse), so a fenced response is invalid JSON and
+    must retry/fail instead of being silently accepted through a parsing heuristic."""
+    registry = build_config_registry(CONFIG_ROOT)
+    spy_gateway = _FixedResponseSpyGateway(
+        '```json\n'
+        '{"values": {"budget": "5000", "timeline": "Q1"}, "missing_fields": []}\n'
+        '```'
+    )
+    executor = StructuredLlmActionExecutor(
+        config_registry=registry,
+        provider_gateway=spy_gateway,
+    )
+    request = StructuredLlmActionRequest(
+        tenant_id="tenant_demo",
+        region="eu-central",
+        product_id="kernel_demo",
+        frontend_id="kernel_demo_ce",
+        scenario_session_id="scenario_session_demo",
+        job_id="job_demo",
+        workflow_id="kernel_demo.single_action_extract_v1",
+        workflow_version=1,
+        step_id="extract",
+        action_run_id="action_run_demo",
+        action_config_id="kernel_demo.extract_structured_fields_v1",
+        input_payload={"source_text": "Budget and timeline details"},
+    )
+    session = object()
+
+    with pytest.raises(StructuredOutputValidationError) as exc_info:
+        asyncio.run(executor.execute(request, session=session))
+
+    assert exc_info.value.details.reason == "malformed_json"
+
+
 def test_structured_llm_executor_routes_calls_through_provider_gateway() -> None:
     registry = build_config_registry(CONFIG_ROOT)
     spy_gateway = _FixedResponseSpyGateway(
