@@ -47,7 +47,11 @@ or workflow logic.
 
 ## Composition
 
-`apps/platform-api` wires platform runtime and product bundles. Product bundles use `platform-sdk`.
+`apps/platform-api` (`bootstrap.py`), `apps/platform-worker` (`composition.py`), and
+`scripts/agent/validate_configs.py` each wire the platform runtime with the identical default
+product bundle set (`ANY-32`) — every runtime/validation entry point must see the same product
+definitions. These are the only modules allowed to import a product-platforms package; Platform
+Core and Platform Actions stay bundle-ignorant. Product bundles use `platform-sdk`.
 
 ## Adding a product
 

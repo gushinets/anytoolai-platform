@@ -13,3 +13,12 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# Product config roots (product.yaml, action_configs.yaml, workflows.yaml, scenarios.yaml,
+# schemas.yaml, prompts.yaml, ...) live under anytoolai_freelancer_suite/products/ alongside the
+# package's own .py files. setuptools only packages .py files by default -- without this,
+# ProductBundle.config_roots() resolves paths via self._package_dir() that exist in an editable
+# install but silently vanish from a real wheel (ANY-32 code review finding). Covered by
+# tests/test_packaging.py.
+[tool.setuptools.package-data]
+anytoolai_freelancer_suite = ["**/*.yaml", "**/*.yml", "**/*.json", "**/*.md"]

@@ -34,6 +34,11 @@ GENERIC_DATABASE_URL_ENV = "DATABASE_URL"
 # inside the kernel config root, not a composed ProductBundle.
 RESERVED_BUNDLE_IDS: tuple[str, ...] = (PlatformActionsBundle.bundle_id, "kernel_demo")
 
+# Named (not inline) so apps/platform-worker/composition.py and scripts/agent/validate_configs.py
+# -- the only other modules allowed to import a product-platforms package (ANY-32 code review
+# finding) -- can be tested against the exact same default bundle set this composition root uses.
+DEFAULT_PRODUCT_BUNDLES: tuple[ProductBundle, ...] = (FreelancerSuiteBundle(),)
+
 
 @dataclass(frozen=True)
 class RuntimeStorageDependencies:
@@ -59,7 +64,7 @@ def build_runtime(
     kernel-level labels plus each bundle's own `bundle_id`, in the order given -- not a fabricated
     literal. A caller that passes `bundles` explicitly (e.g. a test-only fixture bundle) fully
     replaces the production default; it is never combined with it."""
-    resolved_bundles = list(bundles) if bundles is not None else [FreelancerSuiteBundle()]
+    resolved_bundles = list(bundles) if bundles is not None else list(DEFAULT_PRODUCT_BUNDLES)
     _check_bundle_ids_are_unique(resolved_bundles)
     extra_product_roots = [
         root for bundle in resolved_bundles for root in bundle.config_roots()

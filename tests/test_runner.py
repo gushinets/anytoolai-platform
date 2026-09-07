@@ -1182,8 +1182,9 @@ def test_quick_check_dependency_fingerprint_inputs_match_quick_check_module() ->
     runner = load_runner_module()
     quick_check = load_quick_check_module()
 
-    assert set(runner.QUICK_CHECK_DEPENDENCY_FINGERPRINT_INPUTS) == set(
-        quick_check.DEPENDENCY_FINGERPRINT_INPUTS
+    assert (
+        runner.QUICK_CHECK_DEPENDENCY_FINGERPRINT_INPUTS
+        == quick_check.DEPENDENCY_FINGERPRINT_INPUTS
     )
 
 

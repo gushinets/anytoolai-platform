@@ -2,7 +2,9 @@
 
 How to add an MVP-B product without touching `platform-core`, `platform-actions`, or
 `apps/platform-api` route code. This is the practical handoff criterion from `A22c` (`ANY-25`):
-a real product ships through configs, prompts, schemas, and a CE wrapper only.
+a real product ships through configs, prompts, and schemas. A dedicated Chrome Extension is
+optional backlog, not required by the bundle contract (`ANY-32`) — `apps/web-mirror`'s shared web
+mirror is the default client surface.
 
 See `docs/architecture/platform-boundaries.md` for the allowed/forbidden vocabulary this recipe
 must stay inside, and `tests/architecture/` for the tests that enforce it.
@@ -42,20 +44,24 @@ must stay inside, and `tests/architecture/` for the tests that enforce it.
    strings live only in `configs/kernel/provider_policies.yaml` and
    `configs/kernel/litellm_router.yaml` — never hardcoded in bundle or action code
    (`tests/architecture/test_litellm_model_strings_stay_in_provider_config.py`).
-6. **Register the bundle.** Wire the new bundle into `apps/platform-api/bootstrap.py`'s
-   `build_runtime` (the only module allowed to import a product-platforms package — see
-   `tests/architecture/test_freelancer_suite_import_boundary.py`), e.g. by adding it to the
-   production default bundle list. This does not add product-specific routes: every platform-api
-   endpoint stays parameterized on `{product_id}`
-   (`tests/architecture/test_no_product_specific_endpoints.py`). That test's forbidden-term list
-   is a static backstop of known/candidate Freelancer product names, not a general proof and not
-   tied to what is actually implemented. Add your new product's name to
-   `FORBIDDEN_PRODUCT_PATH_TERMS` in that test file too, so a future accidental hardcode of *this*
-   product's path also fails the gate.
-7. **Chrome Extension.** Build a separate CE for the product using shared `packages/frontend/ce-kit`
-   (transport, storage, identity, quota, start, polling, result, handoff helpers). The extension
-   contains no prompts, no provider/model selection, and no workflow logic — it calls the platform
-   API and renders results.
+6. **Register the bundle.** Wire the new bundle into the production default bundle list used by
+   every runtime composition boundary that needs your product's config: `apps/platform-api/bootstrap.py`'s
+   `build_runtime`, `apps/platform-worker/composition.py`'s `build_worker`, and
+   `scripts/agent/validate_configs.py`. These are the only modules allowed to import a
+   product-platforms package (see `tests/architecture/test_freelancer_suite_import_boundary.py`);
+   keep their default bundle lists identical, or the API and worker can disagree on which product
+   configs exist. This does not add product-specific routes: every platform-api endpoint stays
+   parameterized on `{product_id}` (`tests/architecture/test_no_product_specific_endpoints.py`).
+   That test's forbidden-term list is a static backstop of known/candidate Freelancer product
+   names, not a general proof and not tied to what is actually implemented. Add your new product's
+   name to `FORBIDDEN_PRODUCT_PATH_TERMS` in that test file too, so a future accidental hardcode of
+   *this* product's path also fails the gate.
+7. **Chrome Extension (optional).** The bundle contract does not require a dedicated CE
+   (`ANY-32`); the shared web mirror (`apps/web-mirror`) is the default client surface for a new
+   product's web pages and result renderers. If the product still needs a standalone CE, build it
+   on shared `packages/frontend/ce-kit` (transport, storage, identity, quota, start, polling,
+   result, handoff helpers) with no prompts, no provider/model selection, and no workflow logic —
+   it only calls the platform API and renders results.
 8. **Verify the boundary, not just the feature.** Run `python scripts/agent/runner.py
    validate-architecture` and `pytest tests/architecture` before calling the product done. A green
    architecture gate is part of the product's definition of done, not a one-time audit.

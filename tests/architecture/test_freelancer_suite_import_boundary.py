@@ -18,12 +18,15 @@ def validate_architecture_module():
     return module
 
 
-def test_freelancer_suite_is_imported_only_from_bootstrap(validate_architecture_module) -> None:
-    """ANY-32: anytoolai_freelancer_suite is a product bundle package -- only
-    apps/platform-api/bootstrap.py (the application composition root) may import it. Real-repo
-    check; the regression fixtures below prove the AST-based detection itself works."""
+def test_freelancer_suite_is_imported_only_from_the_composition_boundaries(
+    validate_architecture_module,
+) -> None:
+    """ANY-32: anytoolai_freelancer_suite is a product bundle package -- only the three
+    runtime/validation composition boundaries (apps/platform-api/bootstrap.py,
+    apps/platform-worker/composition.py, scripts/agent/validate_configs.py) may import it.
+    Real-repo check; the regression fixtures below prove the AST-based detection itself works."""
     errors = validate_architecture_module.check_freelancer_suite_import_boundary(
-        [ROOT / "apps", ROOT / "packages"]
+        [ROOT / "apps", ROOT / "packages", ROOT / "scripts", ROOT / "extensions"]
     )
 
     assert errors == [], "unexpected anytoolai_freelancer_suite importer(s): " + ", ".join(errors)
@@ -89,6 +92,22 @@ def test_forbidden_import_is_detected(
 def test_bootstrap_own_import_is_not_flagged(validate_architecture_module) -> None:
     errors = validate_architecture_module.check_freelancer_suite_import_boundary(
         [ROOT / "apps" / "platform-api"]
+    )
+
+    assert errors == []
+
+
+def test_worker_composition_own_import_is_not_flagged(validate_architecture_module) -> None:
+    errors = validate_architecture_module.check_freelancer_suite_import_boundary(
+        [ROOT / "apps" / "platform-worker"]
+    )
+
+    assert errors == []
+
+
+def test_validate_configs_own_import_is_not_flagged(validate_architecture_module) -> None:
+    errors = validate_architecture_module.check_freelancer_suite_import_boundary(
+        [ROOT / "scripts"]
     )
 
     assert errors == []

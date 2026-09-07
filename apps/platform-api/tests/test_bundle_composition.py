@@ -27,9 +27,9 @@ for src_path in (PLATFORM_CORE_SRC, PLATFORM_SDK_SRC, PLATFORM_API_SRC):
     if str(src_path) not in sys.path:
         sys.path.insert(0, str(src_path))
 
-from anytoolai_platform_api import bootstrap
-from anytoolai_platform_core.config.errors import RegistryLoadError
-from anytoolai_platform_sdk import ProductBundle
+from anytoolai_platform_api import bootstrap  # noqa: E402
+from anytoolai_platform_core.config.errors import RegistryLoadError  # noqa: E402
+from anytoolai_platform_sdk import ProductBundle  # noqa: E402
 
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_PRODUCT_DIR = Path(__file__).resolve().parent / "fixtures" / "fixture_product"

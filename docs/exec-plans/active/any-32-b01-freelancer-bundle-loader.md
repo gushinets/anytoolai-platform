@@ -98,30 +98,43 @@ Real product behavior/content for any of the 6 named products (ANY-227 and sibli
 framework, a product-event/metric registry (ANY-17), product-specific backend endpoints, runtime
 editing UI, dedicated Chrome Extensions.
 
-### Known follow-up: `apps/platform-worker` does not compose `ProductBundle`s
+### Resolved follow-up: `apps/platform-worker` and `validate-configs` now compose `ProductBundle`s
 
-`apps/platform-worker/src/anytoolai_platform_worker/composition.py`'s `build_worker()` calls
-`build_config_registry(config_root)` with no `extra_product_roots` and never imports
-`FreelancerSuiteBundle`/`ProductBundle` — only `apps/platform-api/bootstrap.py` does. Today this is
-harmless: `FreelancerSuiteBundle.config_roots()` is `[]`, so platform-api's registry and
-platform-worker's registry are identical in production regardless. It stops being harmless the
-moment a real product bundle (starting with ProposalAI in ANY-227) contributes a non-empty
-`config_roots()` — platform-api would then validate and accept scenario starts referencing that
-product's workflows while platform-worker's own registry lacks them, so a claimed job fails at
-execution time on a missing workflow/action lookup even though the API layer accepted it.
+Originally deferred here as a known gap through Cycles 1-3 (see below), then fixed as a blocking
+finding in a subsequent code review round (`plans/ANY-32.md`'s "Code-review (me #1)"): the gap
+described was real and would have surfaced the moment ANY-227 gave `FreelancerSuiteBundle` a
+non-empty `config_roots()` — `apps/platform-api` could validate/accept a scenario start referencing
+a product workflow that `apps/platform-worker`'s own registry never loaded, failing the job at
+execution time rather than at request time; and `scripts/agent/validate_configs.py`, the required
+`validate-configs` CI gate, would not have validated that product's config at all.
 
-Deliberately not wired in this ticket (flagged in code review cycle 1, addressed here rather than
-in code): doing so is more than a mechanical copy of `bootstrap.py`'s pattern — it also requires an
-architecture decision this ticket's contract doesn't currently make, namely which composition roots
-are allowed to import a product-platforms package. `scripts/agent/validate_architecture.py`'s
-`check_freelancer_suite_import_boundary` (ATAI008) currently asserts exactly one allowed importer
-(`apps/platform-api/src/anytoolai_platform_api/bootstrap.py`); adding platform-worker as a second
-importer means updating that boundary check (and its test fixtures) at the same time as the worker
-wiring, which is a broader change than "fix what B01 shipped." Tracked as a required prerequisite
-for ANY-227 (the first ticket that gives `FreelancerSuiteBundle.config_roots()` real content): that
-ticket (or a dedicated follow-up filed alongside it) must either wire `build_worker()` to accept
-`bundles` the same way `build_runtime()` does, or explicitly justify why platform-api and
-platform-worker are allowed to see different product registries.
+Fixed by making all three the only modules allowed to import a product-platforms package, each
+composing the identical default bundle set:
+
+- `apps/platform-api/src/anytoolai_platform_api/bootstrap.py` and
+  `apps/platform-worker/src/anytoolai_platform_worker/composition.py` each expose a
+  `DEFAULT_PRODUCT_BUNDLES` constant (currently `(FreelancerSuiteBundle(),)`); `build_worker()`
+  gained the same `bundles: Sequence[ProductBundle] | None = None` parameter `build_runtime()` has.
+- `scripts/agent/validate_configs.py` gained the platform-sdk/freelancer-suite `sys.path` entries
+  and its own `DEFAULT_PRODUCT_BUNDLES`, and now loads `ConfigLoader` with the same
+  `extra_product_roots`.
+- `scripts/agent/validate_architecture.py`'s `check_freelancer_suite_import_boundary` (ATAI008) now
+  allows all three paths as importers instead of hard-coding `bootstrap.py` alone, and scans
+  `scripts/` and `extensions/` in addition to `apps/`/`packages/`.
+- `tests/architecture/test_bundle_composition_parity.py` proves all three resolve the identical
+  `DEFAULT_PRODUCT_BUNDLES` bundle_id sequence (meaningful today despite every bundle currently
+  contributing zero config roots) and that `build_runtime()`/`build_worker()` land on the same
+  registry `products`/`workflows` contents end to end.
+- `docs/architecture/package-layering.md` and `platform-boundaries.md`, and `AGENTS.md`'s
+  non-negotiable-boundaries list, were updated to name all three composition boundaries instead of
+  `apps/platform-api` alone.
+
+Original Cycle 1-3 framing, kept for history: doing this was judged to be more than a mechanical
+copy of `bootstrap.py`'s pattern since it required an architecture decision this ticket's contract
+didn't originally make (which composition roots may import a product-platforms package), so it was
+deferred as a required prerequisite for ANY-227 rather than bundled into the loader's first cycles.
+The subsequent review round made that decision explicitly and closed the gap before ANY-227 needed
+it.
 
 ## Verification
 

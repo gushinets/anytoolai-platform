@@ -30,8 +30,11 @@ allowed and forbidden, and where to look before writing product code.
   `products/<name>/` config roots.
 - A `provider_policy_ref` from `configs/kernel/provider_policies.yaml` (add a new one there if you
   need different model/temperature/retry settings — never hardcode a model string elsewhere).
-- A dedicated Chrome Extension per product, built on shared `packages/frontend/ce-kit`.
-- Registering your bundle in `apps/platform-api` composition.
+- A dedicated Chrome Extension per product, built on shared `packages/frontend/ce-kit` — optional
+  backlog, not required by the bundle contract (`ANY-32`). The shared web mirror
+  (`apps/web-mirror`) is the default client surface.
+- Registering your bundle in `apps/platform-api`, `apps/platform-worker`, and
+  `scripts/agent/validate_configs.py` composition (all three must compose the same bundle set).
 
 Follow the step-by-step in `docs/product-specs/add-product-recipe.md`.
 

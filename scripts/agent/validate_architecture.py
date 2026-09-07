@@ -73,15 +73,19 @@ PRODUCT_PLATFORMS_FORBIDDEN_IMPORTS = {
     "anytoolai_platform_worker",
 }
 
-# ANY-32: the Freelancer Suite bundle is composed only at the application boundary. Everywhere
-# else (platform-core, platform-actions, every other platform-api module) must stay bundle-
-# ignorant -- only apps/platform-api's own composition root may import it.
+# ANY-32: the Freelancer Suite bundle is composed only at the three runtime/validation
+# composition boundaries. Everywhere else (platform-core, platform-actions, every other
+# platform-api/platform-worker module) must stay bundle-ignorant -- only these three modules may
+# import it, and all three must compose the identical default bundle set (code review finding:
+# apps/platform-worker and scripts/agent/validate_configs.py previously composed none of it).
 FREELANCER_SUITE_MODULE = "anytoolai_freelancer_suite"
 FREELANCER_SUITE_PACKAGE_DIR = (
     ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite"
 )
-FREELANCER_SUITE_ALLOWED_IMPORTER = (
-    ROOT / "apps" / "platform-api" / "src" / "anytoolai_platform_api" / "bootstrap.py"
+FREELANCER_SUITE_ALLOWED_IMPORTERS = (
+    ROOT / "apps" / "platform-api" / "src" / "anytoolai_platform_api" / "bootstrap.py",
+    ROOT / "apps" / "platform-worker" / "src" / "anytoolai_platform_worker" / "composition.py",
+    ROOT / "scripts" / "agent" / "validate_configs.py",
 )
 
 JS_MODULE_IMPORT_RE = re.compile(
@@ -261,11 +265,13 @@ def check_product_platforms_boundary(product_platforms: Path) -> list[str]:
 
 
 def check_freelancer_suite_import_boundary(roots: list[Path]) -> list[str]:
-    """ATAI008: anytoolai_freelancer_suite is a product-platforms bundle package -- the
-    application composition root (apps/platform-api/bootstrap.py) is the only place allowed to
+    """ATAI008: anytoolai_freelancer_suite is a product-platforms bundle package -- only the
+    three runtime/validation composition boundaries (apps/platform-api/bootstrap.py,
+    apps/platform-worker/composition.py, scripts/agent/validate_configs.py) are allowed to
     import it (ANY-32). Everything else under `roots` (platform-core, platform-actions, the
-    loader/registry extension points, every other platform-api module) must stay bundle-
-    ignorant. The package's own source/tests are excluded -- they legitimately import themselves."""
+    loader/registry extension points, every other platform-api/platform-worker module) must stay
+    bundle-ignorant. The package's own source/tests are excluded -- they legitimately import
+    themselves."""
     errors: list[str] = []
     for root in roots:
         for path in iter_code_files(root):
@@ -273,14 +279,16 @@ def check_freelancer_suite_import_boundary(roots: list[Path]) -> list[str]:
                 continue
             if FREELANCER_SUITE_PACKAGE_DIR in path.parents:
                 continue
-            if path == FREELANCER_SUITE_ALLOWED_IMPORTER:
+            if path in FREELANCER_SUITE_ALLOWED_IMPORTERS:
                 continue
             imports = imported_python_modules(path)
             if imports_module(imports, FREELANCER_SUITE_MODULE):
                 errors.append(
                     "ATAI008 "
                     f"{path}: anytoolai_freelancer_suite must be imported only from "
-                    "apps/platform-api/src/anytoolai_platform_api/bootstrap.py"
+                    "apps/platform-api/src/anytoolai_platform_api/bootstrap.py, "
+                    "apps/platform-worker/src/anytoolai_platform_worker/composition.py, or "
+                    "scripts/agent/validate_configs.py"
                 )
     return errors
 
@@ -308,7 +316,9 @@ def main() -> int:
     errors += check_llm_provider_boundary([ROOT / "apps", ROOT / "packages", ROOT / "extensions"])
     errors += check_product_platforms_boundary(ROOT / "packages" / "backend" / "product-platforms")
     errors += check_extensions_boundary(ROOT / "extensions")
-    errors += check_freelancer_suite_import_boundary([ROOT / "apps", ROOT / "packages"])
+    errors += check_freelancer_suite_import_boundary(
+        [ROOT / "apps", ROOT / "packages", ROOT / "scripts", ROOT / "extensions"]
+    )
 
     if errors:
         for error in errors:
