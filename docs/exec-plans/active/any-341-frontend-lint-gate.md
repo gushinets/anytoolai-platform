@@ -7,7 +7,7 @@
 - Created: 2026-09-04 (backfilled — implementation and three code-review rounds had already
   landed before this file existed; see `docs/exec-plans/active/any-338-propagate-core-closed-enums.md`'s
   own round-3 finding for the precedent).
-- Last updated: 2026-09-04
+- Last updated: 2026-09-05
 - Review date: 2026-09-04
 - Next action: none — implementation and code-review rounds 1-3 addressed; move to `completed/`
   once merged.
