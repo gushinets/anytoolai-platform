@@ -65,8 +65,18 @@ export function baseConfig({ tsconfigRootDir, react = false, ignores = [] } = {}
       ? [
           {
             files: ["**/*.tsx"],
-            plugins: reactHooks.configs.flat.recommended.plugins,
-            rules: reactHooks.configs.flat.recommended.rules,
+            plugins: { "react-hooks": reactHooks },
+            // Deliberately not `reactHooks.configs.recommended`/`configs.flat.recommended`: as of
+            // v7 both resolve to the same rule map, which now also bundles React Compiler
+            // diagnostic rules (`config`, `immutability`, `purity`, `refs`, `static-components`,
+            // ...) alongside the two classic hooks-correctness rules. This repo deliberately
+            // avoids the compiler-adjacent rule set (see the `eslint-plugin-react-hooks` version
+            // note below) -- hand-listing keeps only the two rules this lint gate is meant to
+            // enforce, regardless of what a future plugin release adds to "recommended".
+            rules: {
+              "react-hooks/rules-of-hooks": "error",
+              "react-hooks/exhaustive-deps": "warn",
+            },
           },
         ]
       : []),
