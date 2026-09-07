@@ -72,8 +72,10 @@ introducing a formatter, broad stylistic enforcement, or a second competing lint
       unscoped makes ESLint try to type-check every file in the workspace, including its own
       `eslint.config.mjs`), a Node-globals block for `.js`/`.mjs`/`.cjs` build/config scripts, and
       `eslint-plugin-react-hooks`'s two correctness rules (`rules-of-hooks`, `exhaustive-deps`,
-      pinned `^5.2.0` — `6.x`+ is a compiler-adjacent rewrite requiring `@babel/core`) for
-      workspaces with JSX.
+      hand-listed rather than spread from `configs.recommended`/`configs.flat.recommended` — on
+      `^7.1.1` those presets also bundle React Compiler diagnostic rules; `^7.1.1` is required for
+      declared ESLint 10 peer support, `5.x`/`6.x` only declare up to `eslint ^9`) for workspaces
+      with JSX.
 - [x] Per-workspace `eslint.config.mjs` in all 7 workspaces, each a few lines calling
       `baseConfig()` with its own `tsconfigRootDir`/`react`/`ignores`; the one workspace with zero
       TypeScript (`tests/e2e/stakeholder-demo-browser`) gets its own minimal `@eslint/js` +
@@ -113,7 +115,7 @@ introducing a formatter, broad stylistic enforcement, or a second competing lint
 | Date | Decision | Why |
 |---|---|---|
 | 2026-09-04 | ESLint 10 (not the researched ESLint 9) + `typescript-eslint@^8.69.0`. | `eslint@9.x` installs as deprecated/EOL right now; `typescript-eslint`/`@eslint/js` both declare `eslint ^10.0.0` support. |
-| 2026-09-04 | `eslint-plugin-react-hooks` pinned to `^5.2.0`, not latest `7.x`. | `6.x`+ is a rewrite requiring `@babel/core` with a much larger, compiler-adjacent rule set; `5.2.0` is the last version with just the two correctness rules and no extra runtime deps. |
+| 2026-09-05 | `eslint-plugin-react-hooks` bumped `^5.2.0` → `^7.1.1`; `configs.recommended`/`configs.flat.recommended` deliberately not used — `rules-of-hooks`/`exhaustive-deps` hand-listed instead. | CodeRabbit review on PR #101: `5.2.0`'s peer range tops out at `eslint ^9.0.0`, doesn't declare the repo's pinned `eslint ^10.9.1`; only `7.1.0+` does. But `7.x`'s `recommended`/`flat.recommended` presets (verified by reading the published bundle directly) resolve to the same rule map, which also bundles React Compiler diagnostic rules (`config`, `immutability`, `purity`, `refs`, `static-components`, ...) — exactly the compiler-adjacent surface `5.2.0` was originally chosen to avoid. Hand-listing just the two intended rules keeps that scope while satisfying the ESLint 10 peer requirement, and survives future plugin bumps changing what "recommended" means. |
 | 2026-09-04 | `require-await`/`no-unnecessary-type-assertion` turned off for test files/helpers (`**/*.test.ts(x)`, `**/test/**`, `**/tests/**`), not the whole monorepo. | Round-1 review: an unscoped, monorepo-wide disable (the initial cut) would also mask a real defect in production code. Neither rule catches an unsafe/untyped value; disabling them only where this codebase's `vi.fn()`-based test doubles use the pattern deliberately keeps the "correctness and unsafe constructs" gate intact for `src/`. The ~9 production-code sites this uncovered were fixed at their source instead of suppressed. |
 | 2026-09-04 | `chrome.tabs.sendMessage`'s response typed via explicit generics at the call site, not a post-hoc `as` cast. | The default-`any` response generic meant `no-unnecessary-type-assertion` couldn't distinguish "asserting a type onto `any`" from a genuinely redundant assertion — deleting the assertion (as the rule suggested) would have silently left the value `any`. Verified the fix produces a real (non-`any`) type with a throwaway `const x: never = ...` probe before and after. |
 | 2026-09-04 | Reverted `localStorageAdapter.ts`/`inMemoryAsyncStorage.ts` from a mechanical `async` → plain-function-+`Promise.resolve()` rewrite back to real `async` methods, with a scoped `require-await` override instead. | Round-2 review: the mechanical rewrite changed real behavior — a synchronous `localStorage.setItem`/`removeItem` throw (QuotaExceededError, private-browsing SecurityError) used to become a rejected Promise via the implicit `async` wrapper; as a plain function it now throws synchronously instead, before any Promise exists. `async` here is load-bearing (throw → rejection conversion), not test-mock convenience. |
