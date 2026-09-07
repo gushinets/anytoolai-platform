@@ -39,8 +39,10 @@ scaffold removed).
    production to `[FreelancerSuiteBundle()]`. Flattens `bundle.config_roots()` across bundles, in
    the order given, into `extra_product_roots`. `loaded_bundles` now reports
    `["platform_actions", "kernel_demo", *(b.bundle_id for b in bundles)]` — the bundles actually
-   composed, not a fabricated literal. This is the only module allowed to import
-   `anytoolai_freelancer_suite` (see boundary proof, item 6).
+   composed, not a fabricated literal. At the time this landed, this was the only module allowed
+   to import `anytoolai_freelancer_suite`; a later code-review round made
+   `apps/platform-worker/composition.py` and `scripts/agent/validate_configs.py` co-equal
+   composition boundaries (see "Resolved follow-up" below and boundary proof, item 6).
 4. **`FreelancerSuiteBundle` cleanup**
    (`packages/backend/product-platforms/freelancer-suite/`): `config_roots()` returns `[]`; the
    eight placeholder `products/<name>/` directories (each only a `README.md`, no real config) are
@@ -60,12 +62,14 @@ scaffold removed).
 6. **Architecture proof for the new path**
    (`scripts/agent/validate_architecture.py`'s new `check_freelancer_suite_import_boundary`,
    wired into `main()` as `ATAI008`; `tests/architecture/test_freelancer_suite_import_boundary.py`):
-   asserts `anytoolai_freelancer_suite` is imported only from
+   at the time this landed, asserted `anytoolai_freelancer_suite` was imported only from
    `apps/platform-api/src/anytoolai_platform_api/bootstrap.py` across `apps/` and `packages/`
    (the package's own source/tests excluded), plus a text-level check that
    `config/loader.py`/`bootstrap/registry.py` carry no `anytoolai_freelancer`/`FreelancerSuiteBundle`
    token. Regression fixtures prove the AST-based detection itself (a `tmp_path` package with an
-   offending import) rather than only asserting today's real-repo state is clean.
+   offending import) rather than only asserting today's real-repo state is clean. Now widened
+   (see "Resolved follow-up" below) to also allow `apps/platform-worker/composition.py` and
+   `scripts/agent/validate_configs.py`, and to scan `scripts/`/`extensions/` too.
 7. **Docs**: `docs/product-specs/add-product-recipe.md` and `docs/product-specs/mvp-b-handoff-note.md`
    rewritten to drop the "eight-product working example" framing and describe the new
    `_package_dir()`-resolved, `ConfigLoader.extra_product_roots`-loaded contract. `README.md`'s
@@ -135,6 +139,20 @@ didn't originally make (which composition roots may import a product-platforms p
 deferred as a required prerequisite for ANY-227 rather than bundled into the loader's first cycles.
 The subsequent review round made that decision explicitly and closed the gap before ANY-227 needed
 it.
+
+**Follow-up finding on this same fix (`plans/ANY-32.md`'s second "Code-review" round):** the
+above remediation copied `bootstrap.py`'s duplicate-`bundle_id` guard into the API only, so a
+duplicate composed `bundle_id` still failed API startup but not worker/`validate-configs` startup.
+Fixed by extracting the check into a shared, product-neutral
+`anytoolai_platform_core.config.errors.check_ids_are_unique()` (plain id strings in, not
+`ProductBundle` instances — platform-core still never imports `ProductBundle` or a
+product-platforms package) that all three composition boundaries call before flattening
+`config_roots()`. `bootstrap.py`'s local `_check_bundle_ids_are_unique()` was deleted in favor of
+calling the shared function directly.
+`tests/architecture/test_bundle_composition_parity.py::test_duplicate_bundle_id_fails_consistently_across_all_three_composition_boundaries`
+proves a duplicate `bundle_id` now fails identically (same `config_duplicate_bundle_id` error
+code) via `build_runtime(bundles=...)`, `build_worker(bundles=...)`, and `validate_configs.main()`
+with a monkeypatched `DEFAULT_PRODUCT_BUNDLES`.
 
 ## Verification
 

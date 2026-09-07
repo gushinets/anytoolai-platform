@@ -180,3 +180,36 @@ class RegistryLoadError(ConfigError):
 
         details = "\n\n".join(str(error) for error in self.errors)
         return f"{base}\n\n{details}"
+
+
+def check_ids_are_unique(
+    ids: Iterable[str],
+    *,
+    reserved: Iterable[str] = (),
+    ref_type: str = "id",
+    context: str = "composed ids",
+) -> None:
+    """Raise RegistryLoadError if `ids` contains a repeat, or a value already in `reserved`.
+
+    Takes plain id strings, not ProductBundle instances, so every composition boundary
+    (apps/platform-api/bootstrap.py, apps/platform-worker/composition.py,
+    scripts/agent/validate_configs.py) can share this one check instead of each hand-rolling its
+    own (ANY-32 code review finding: only bootstrap.py had a duplicate-bundle_id check, so a
+    duplicate could pass worker/validate-configs startup while failing the API)."""
+    seen = set(reserved)
+    errors: list[ConfigError] = []
+    for value in ids:
+        if value in seen:
+            errors.append(
+                ConfigError(
+                    code=f"config_duplicate_{ref_type}",
+                    message=f"Duplicate {ref_type} '{value}' in {context}",
+                    config_id=value,
+                    ref_type=ref_type,
+                    ref_value=value,
+                )
+            )
+        else:
+            seen.add(value)
+    if errors:
+        raise RegistryLoadError(f"Duplicate {ref_type} in {context}", errors=errors)

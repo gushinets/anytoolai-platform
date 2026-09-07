@@ -25,6 +25,7 @@ from anytoolai_platform_core.actions.runner import ActionRunner, ActionRunServic
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
+from anytoolai_platform_core.config.errors import check_ids_are_unique
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
@@ -92,6 +93,11 @@ def build_worker(
 
     if config_registry is None:
         resolved_bundles = list(bundles) if bundles is not None else list(DEFAULT_PRODUCT_BUNDLES)
+        check_ids_are_unique(
+            (bundle.bundle_id for bundle in resolved_bundles),
+            ref_type="bundle_id",
+            context="composed bundles",
+        )
         extra_product_roots = [
             root for bundle in resolved_bundles for root in bundle.config_roots()
         ]

@@ -20,7 +20,11 @@ for source_root in (PLATFORM_CORE_SRC, PLATFORM_SDK_SRC, FREELANCER_SUITE_SRC):
         sys.path.insert(0, str(source_root))
 
 from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle  # noqa: E402
-from anytoolai_platform_core.config.errors import ConfigError, RegistryLoadError  # noqa: E402
+from anytoolai_platform_core.config.errors import (  # noqa: E402
+    ConfigError,
+    RegistryLoadError,
+    check_ids_are_unique,
+)
 from anytoolai_platform_core.config.loader import ConfigLoader  # noqa: E402
 
 # Mirrors apps/platform-api/bootstrap.py's and apps/platform-worker/composition.py's identically-
@@ -31,11 +35,16 @@ DEFAULT_PRODUCT_BUNDLES = (FreelancerSuiteBundle(),)
 
 def main() -> int:
     config_root = ROOT / "configs" / "kernel"
-    extra_product_roots = [
-        root for bundle in DEFAULT_PRODUCT_BUNDLES for root in bundle.config_roots()
-    ]
 
     try:
+        check_ids_are_unique(
+            (bundle.bundle_id for bundle in DEFAULT_PRODUCT_BUNDLES),
+            ref_type="bundle_id",
+            context="composed bundles",
+        )
+        extra_product_roots = [
+            root for bundle in DEFAULT_PRODUCT_BUNDLES for root in bundle.config_roots()
+        ]
         ConfigLoader(config_root, extra_product_roots=extra_product_roots).load()
     except RegistryLoadError as error:
         print(str(error), file=sys.stderr)

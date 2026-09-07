@@ -30,8 +30,22 @@ for src_path in (
     if str(src_path) not in sys.path:
         sys.path.insert(0, str(src_path))
 
+import pytest  # noqa: E402
 from anytoolai_platform_api import bootstrap  # noqa: E402
+from anytoolai_platform_core.config.errors import RegistryLoadError  # noqa: E402
+from anytoolai_platform_sdk import ProductBundle  # noqa: E402
 from anytoolai_platform_worker import composition as worker_composition  # noqa: E402
+
+
+class _EmptyBundle(ProductBundle):
+    """Minimal test-only ProductBundle: no real product roots needed, since the duplicate-id
+    check runs before config_roots() is ever resolved."""
+
+    def __init__(self, bundle_id: str) -> None:
+        self.bundle_id = bundle_id
+
+    def config_roots(self) -> list[Path]:
+        return []
 
 
 def _load_validate_configs_module() -> Any:
@@ -91,3 +105,30 @@ def test_api_and_worker_compose_the_same_default_product_registry(monkeypatch: A
     assert len(worker_registries) == 1
     assert dict(api_registries[0].products) == dict(worker_registries[0].products)
     assert dict(api_registries[0].workflows) == dict(worker_registries[0].workflows)
+
+
+def test_duplicate_bundle_id_fails_consistently_across_all_three_composition_boundaries(
+    monkeypatch: Any,
+) -> None:
+    """ANY-32 code-review finding: only apps/platform-api/bootstrap.py rejected a duplicate
+    composed bundle_id -- apps/platform-worker/composition.py and
+    scripts/agent/validate_configs.py silently accepted one. All three now share platform-core's
+    check_ids_are_unique(); this proves all three actually reject the same duplicate."""
+    dup_bundles = [_EmptyBundle("dup"), _EmptyBundle("dup")]
+
+    with pytest.raises(RegistryLoadError) as api_excinfo:
+        bootstrap.build_runtime(config_root=CONFIG_ROOT, bundles=dup_bundles)
+    assert "config_duplicate_bundle_id" in [error.code for error in api_excinfo.value.errors]
+
+    engine = sa.create_engine("sqlite://")
+    with pytest.raises(RegistryLoadError) as worker_excinfo:
+        worker_composition.build_worker(
+            session_factory=sessionmaker(bind=engine),
+            config_root=CONFIG_ROOT,
+            bundles=dup_bundles,
+        )
+    assert "config_duplicate_bundle_id" in [error.code for error in worker_excinfo.value.errors]
+
+    validate_configs = _load_validate_configs_module()
+    monkeypatch.setattr(validate_configs, "DEFAULT_PRODUCT_BUNDLES", dup_bundles)
+    assert validate_configs.main() == 1

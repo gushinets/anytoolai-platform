@@ -1,6 +1,7 @@
 """Composition root for the platform runtime and its product bundles.
 
-This is the only module allowed to import a product-platforms package (see
+Alongside apps/platform-worker/composition.py and scripts/agent/validate_configs.py, this is one
+of the only modules allowed to import a product-platforms package (see
 docs/architecture/platform-boundaries.md and tests/architecture's freelancer-suite import-
 boundary proof). Platform Core and Platform Actions stay bundle-ignorant; this module explicitly
 resolves each bundle's config_roots() and passes them through platform-core's product-neutral
@@ -17,7 +18,7 @@ from typing import Any
 from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle
 from anytoolai_platform_actions.bundle import PlatformActionsBundle
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
-from anytoolai_platform_core.config.errors import ConfigError, RegistryLoadError
+from anytoolai_platform_core.config.errors import check_ids_are_unique
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.storage.db import build_postgres_url_from_env, create_sync_engine
 from anytoolai_platform_core.storage.transactions import build_session_factory
@@ -65,7 +66,12 @@ def build_runtime(
     literal. A caller that passes `bundles` explicitly (e.g. a test-only fixture bundle) fully
     replaces the production default; it is never combined with it."""
     resolved_bundles = list(bundles) if bundles is not None else list(DEFAULT_PRODUCT_BUNDLES)
-    _check_bundle_ids_are_unique(resolved_bundles)
+    check_ids_are_unique(
+        (bundle.bundle_id for bundle in resolved_bundles),
+        reserved=RESERVED_BUNDLE_IDS,
+        ref_type="bundle_id",
+        context="composed bundles",
+    )
     extra_product_roots = [
         root for bundle in resolved_bundles for root in bundle.config_roots()
     ]
@@ -79,37 +85,6 @@ def build_runtime(
         config_registry=config_registry,
         storage=_build_storage_dependencies(database_url),
     )
-
-
-def _check_bundle_ids_are_unique(resolved_bundles: Sequence[ProductBundle]) -> None:
-    """Fail startup/config validation before any config_roots() resolution or loader work if a
-    composed bundle's `bundle_id` repeats another composed bundle's `bundle_id`, or collides with
-    a reserved `loaded_bundles` label (`RESERVED_BUNDLE_IDS`). `loaded_bundles` must report what
-    was actually, uniquely composed -- silently accepting a collision would produce a misleading
-    report. `bundle_id` is a composition-root-only concept: this check lives in bootstrap.py, not
-    in platform-core's ConfigLoader, which stays ProductBundle-ignorant."""
-    seen = set(RESERVED_BUNDLE_IDS)
-    errors: list[ConfigError] = []
-    for bundle in resolved_bundles:
-        bundle_id = bundle.bundle_id
-        if bundle_id in seen:
-            errors.append(
-                ConfigError(
-                    code="config_duplicate_bundle_id",
-                    message=(
-                        f"Duplicate bundle_id '{bundle_id}': either two composed bundles share "
-                        "this bundle_id, or it collides with a reserved loaded_bundles label "
-                        f"({', '.join(RESERVED_BUNDLE_IDS)})"
-                    ),
-                    config_id=bundle_id,
-                    ref_type="bundle_id",
-                    ref_value=bundle_id,
-                )
-            )
-        else:
-            seen.add(bundle_id)
-    if errors:
-        raise RegistryLoadError("Duplicate bundle_id in composed bundles", errors=errors)
 
 
 def _build_storage_dependencies(database_url: str | None) -> RuntimeStorageDependencies:
