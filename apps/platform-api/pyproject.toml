@@ -10,9 +10,12 @@ dependencies = [
     "fastapi",
     "pydantic",
     "anytoolai-platform-core",
+    "anytoolai-platform-sdk",
+    "anytoolai-freelancer-suite",
     "uvicorn>=0.30",
     "alembic>=1.13",
     "psycopg[binary]>=3.2",
+    "anytoolai-platform-actions",
 ]
 
 [project.scripts]
@@ -34,3 +37,6 @@ anytoolai_platform_api = ["static/demo/*"]
 
 [tool.uv.sources]
 anytoolai-platform-core = { path = "../../packages/backend/platform-core", editable = true }
+anytoolai-freelancer-suite = { path = "../../packages/backend/product-platforms/freelancer-suite", editable = true }
+anytoolai-platform-sdk = { path = "../../packages/backend/platform-sdk", editable = true }
+anytoolai-platform-actions = { path = "../../packages/backend/platform-actions", editable = true }

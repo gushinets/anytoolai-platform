@@ -73,6 +73,17 @@ PRODUCT_PLATFORMS_FORBIDDEN_IMPORTS = {
     "anytoolai_platform_worker",
 }
 
+# ANY-32: the Freelancer Suite bundle is composed only at the application boundary. Everywhere
+# else (platform-core, platform-actions, every other platform-api module) must stay bundle-
+# ignorant -- only apps/platform-api's own composition root may import it.
+FREELANCER_SUITE_MODULE = "anytoolai_freelancer_suite"
+FREELANCER_SUITE_PACKAGE_DIR = (
+    ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite"
+)
+FREELANCER_SUITE_ALLOWED_IMPORTER = (
+    ROOT / "apps" / "platform-api" / "src" / "anytoolai_platform_api" / "bootstrap.py"
+)
+
 JS_MODULE_IMPORT_RE = re.compile(
     r"""
     (?:
@@ -249,6 +260,31 @@ def check_product_platforms_boundary(product_platforms: Path) -> list[str]:
     return errors
 
 
+def check_freelancer_suite_import_boundary(roots: list[Path]) -> list[str]:
+    """ATAI008: anytoolai_freelancer_suite is a product-platforms bundle package -- the
+    application composition root (apps/platform-api/bootstrap.py) is the only place allowed to
+    import it (ANY-32). Everything else under `roots` (platform-core, platform-actions, the
+    loader/registry extension points, every other platform-api module) must stay bundle-
+    ignorant. The package's own source/tests are excluded -- they legitimately import themselves."""
+    errors: list[str] = []
+    for root in roots:
+        for path in iter_code_files(root):
+            if path.suffix != ".py":
+                continue
+            if FREELANCER_SUITE_PACKAGE_DIR in path.parents:
+                continue
+            if path == FREELANCER_SUITE_ALLOWED_IMPORTER:
+                continue
+            imports = imported_python_modules(path)
+            if imports_module(imports, FREELANCER_SUITE_MODULE):
+                errors.append(
+                    "ATAI008 "
+                    f"{path}: anytoolai_freelancer_suite must be imported only from "
+                    "apps/platform-api/src/anytoolai_platform_api/bootstrap.py"
+                )
+    return errors
+
+
 def check_extensions_boundary(extensions: Path) -> list[str]:
     """ATAI005: extensions must not contain prompts or provider selection."""
     errors: list[str] = []
@@ -272,6 +308,7 @@ def main() -> int:
     errors += check_llm_provider_boundary([ROOT / "apps", ROOT / "packages", ROOT / "extensions"])
     errors += check_product_platforms_boundary(ROOT / "packages" / "backend" / "product-platforms")
     errors += check_extensions_boundary(ROOT / "extensions")
+    errors += check_freelancer_suite_import_boundary([ROOT / "apps", ROOT / "packages"])
 
     if errors:
         for error in errors:

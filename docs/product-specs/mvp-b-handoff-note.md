@@ -9,13 +9,20 @@ allowed and forbidden, and where to look before writing product code.
 - The platform kernel (workflow runner, action runner, provider gateway, scenario/event/quota/
   handoff modules) runs 11 generic atoms and composite workflows without any Freelancer-specific
   code, per the MVP-A1 release gate (`ANY-5`, `docs/exec-plans/active/mvp-a-mvp-b-linear-epics.md`).
-- `packages/backend/product-platforms/freelancer-suite/` already loads as a real
-  `ProductBundle` depending only on `anytoolai_platform_sdk` — see `bundle.py` and
-  `tests/test_bundle_loads.py`. This is a working, tested example of the shape your product bundle
-  should take, not a hypothetical.
+- `packages/backend/product-platforms/freelancer-suite/` already loads as a real `ProductBundle`
+  depending only on `anytoolai_platform_sdk`, composed through `apps/platform-api`'s real
+  composition root (`bootstrap.py`'s `build_runtime`) — see `bundle.py`, `tests/test_bundle_loads.py`,
+  and `apps/platform-api/tests/test_bundle_composition.py` (the loader's required-evidence suite,
+  proven against a test-only fixture bundle). As of `ANY-32` (`B01`) `FreelancerSuiteBundle.config_roots()`
+  returns `[]` — zero implemented product roots. ProposalAI (`ANY-227`) becomes the first real one;
+  see the package's own README for the full 6-product roadmap order. Use `self._package_dir()`
+  (inherited from `ProductBundle`, `packages/backend/platform-sdk/src/anytoolai_platform_sdk/bundle.py`)
+  to resolve your product directory relative to your bundle's own installed package, independent of
+  the caller's working directory — never a bare relative string.
 - Architecture boundaries are enforced twice: `python scripts/agent/runner.py
-  validate-architecture` (CI-gated) and `pytest tests/architecture` (10+ test files). Both are
-  green on `main` today.
+  validate-architecture` (CI-gated) and `pytest tests/architecture` (10+ test files, including
+  `test_freelancer_suite_import_boundary.py`'s proof that `anytoolai_freelancer_suite` is imported
+  only from `apps/platform-api/bootstrap.py`). Both are green on `main` today.
 
 ## What is allowed
 

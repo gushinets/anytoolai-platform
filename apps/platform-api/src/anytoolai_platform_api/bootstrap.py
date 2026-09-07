@@ -1,19 +1,38 @@
-"""Composition root for platform runtime and future product bundles."""
+"""Composition root for the platform runtime and its product bundles.
+
+This is the only module allowed to import a product-platforms package (see
+docs/architecture/platform-boundaries.md and tests/architecture's freelancer-suite import-
+boundary proof). Platform Core and Platform Actions stay bundle-ignorant; this module explicitly
+resolves each bundle's config_roots() and passes them through platform-core's product-neutral
+ConfigLoader extension point."""
 
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle
+from anytoolai_platform_actions.bundle import PlatformActionsBundle
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
+from anytoolai_platform_core.config.errors import ConfigError, RegistryLoadError
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.storage.db import build_postgres_url_from_env, create_sync_engine
 from anytoolai_platform_core.storage.transactions import build_session_factory
+from anytoolai_platform_sdk import ProductBundle
 
 PROJECT_DATABASE_URL_ENV = "ANYTOOLAI_DATABASE_URL"
 GENERIC_DATABASE_URL_ENV = "DATABASE_URL"
+
+# loaded_bundles always carries these two kernel-level labels ahead of any composed bundle's own
+# bundle_id (see build_runtime below) -- a composed bundle_id colliding with either would produce
+# a misleading, ambiguous loaded_bundles report. "platform_actions" is sourced from
+# PlatformActionsBundle.bundle_id (not re-hardcoded here) so the two never drift independently;
+# "kernel_demo" has no equivalent bundle class to source from -- it names a product directory
+# inside the kernel config root, not a composed ProductBundle.
+RESERVED_BUNDLE_IDS: tuple[str, ...] = (PlatformActionsBundle.bundle_id, "kernel_demo")
 
 
 @dataclass(frozen=True)
@@ -32,15 +51,60 @@ def build_runtime(
     config_root: Path | None = None,
     *,
     database_url: str | None = None,
+    bundles: Sequence[ProductBundle] | None = None,
 ) -> RuntimeBootstrapResult:
-    # MVP-A loads platform actions + kernel demo configs only.
-    # MVP-B may add FreelancerSuiteBundle here, never inside platform-core.
-    config_registry = build_config_registry(config_root)
+    """Compose the platform kernel with `bundles` (defaulting in production to
+    `[FreelancerSuiteBundle()]`, which currently contributes zero product roots -- ANY-227 adds
+    ProposalAI as its first one). `loaded_bundles` reports what was actually composed: the two
+    kernel-level labels plus each bundle's own `bundle_id`, in the order given -- not a fabricated
+    literal. A caller that passes `bundles` explicitly (e.g. a test-only fixture bundle) fully
+    replaces the production default; it is never combined with it."""
+    resolved_bundles = list(bundles) if bundles is not None else [FreelancerSuiteBundle()]
+    _check_bundle_ids_are_unique(resolved_bundles)
+    extra_product_roots = [
+        root for bundle in resolved_bundles for root in bundle.config_roots()
+    ]
+    config_registry = build_config_registry(config_root, extra_product_roots=extra_product_roots)
     return RuntimeBootstrapResult(
-        loaded_bundles=["platform_actions", "kernel_demo"],
+        loaded_bundles=[
+            PlatformActionsBundle.bundle_id,
+            "kernel_demo",
+            *(bundle.bundle_id for bundle in resolved_bundles),
+        ],
         config_registry=config_registry,
         storage=_build_storage_dependencies(database_url),
     )
+
+
+def _check_bundle_ids_are_unique(resolved_bundles: Sequence[ProductBundle]) -> None:
+    """Fail startup/config validation before any config_roots() resolution or loader work if a
+    composed bundle's `bundle_id` repeats another composed bundle's `bundle_id`, or collides with
+    a reserved `loaded_bundles` label (`RESERVED_BUNDLE_IDS`). `loaded_bundles` must report what
+    was actually, uniquely composed -- silently accepting a collision would produce a misleading
+    report. `bundle_id` is a composition-root-only concept: this check lives in bootstrap.py, not
+    in platform-core's ConfigLoader, which stays ProductBundle-ignorant."""
+    seen = set(RESERVED_BUNDLE_IDS)
+    errors: list[ConfigError] = []
+    for bundle in resolved_bundles:
+        bundle_id = bundle.bundle_id
+        if bundle_id in seen:
+            errors.append(
+                ConfigError(
+                    code="config_duplicate_bundle_id",
+                    message=(
+                        f"Duplicate bundle_id '{bundle_id}': either two composed bundles share "
+                        "this bundle_id, or it collides with a reserved loaded_bundles label "
+                        f"({', '.join(RESERVED_BUNDLE_IDS)})"
+                    ),
+                    config_id=bundle_id,
+                    ref_type="bundle_id",
+                    ref_value=bundle_id,
+                )
+            )
+        else:
+            seen.add(bundle_id)
+    if errors:
+        raise RegistryLoadError("Duplicate bundle_id in composed bundles", errors=errors)
 
 
 def _build_storage_dependencies(database_url: str | None) -> RuntimeStorageDependencies:

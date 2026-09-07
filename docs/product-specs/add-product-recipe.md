@@ -10,15 +10,26 @@ must stay inside, and `tests/architecture/` for the tests that enforce it.
 ## Steps
 
 1. **Bundle package.** Add a package under `packages/backend/product-platforms/<suite>/` that
-   depends only on `anytoolai_platform_sdk`. Implement `ProductBundle` with a `bundle_id` and
-   `config_roots()` listing the product's config directories. See
+   depends only on `anytoolai_platform_sdk`. Subclass `ProductBundle`
+   (`packages/backend/platform-sdk/src/anytoolai_platform_sdk/bundle.py`) with a `bundle_id` and a
+   `config_roots() -> list[Path]` that resolves each product directory relative to your bundle's
+   own installed package via the inherited `self._package_dir()` helper — never a bare relative
+   string, and never dependent on the caller's current working directory. See
    `packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/bundle.py`
-   for the working example — it is 17 lines and imports nothing from `platform-core`,
-   `platform-actions`, or `platform-api`.
+   for the class shape (it imports nothing from `platform-core`, `platform-actions`, or
+   `platform-api`); as of `ANY-32` it returns `[]` until a product issue (starting with
+   `ANY-227`/ProposalAI) adds a real product directory.
 2. **Config roots.** Under the bundle's `products/<product_name>/` config root, add the
-   product's workflow definition, action configs, and any product-scoped events/handoff maps —
-   the same YAML/Markdown-defines-behavior model platform-core already uses for its own atoms and
-   workflows.
+   product's `product.yaml`, `frontends.yaml`, `action_configs.yaml`, `workflows.yaml`,
+   `scenarios.yaml`, `prompts.yaml`, `schemas.yaml`, and any product-scoped
+   `quotas.yaml`/`handoffs.yaml`/`analytics.yaml` — the same YAML/Markdown-defines-behavior model
+   platform-core already uses for its own atoms and workflows. `apps/platform-api/bootstrap.py`
+   passes every composed bundle's `config_roots()` straight through to platform-core's
+   product-neutral `ConfigLoader` (its `extra_product_roots` parameter), which validates your
+   product against the same duplicate-id and cross-reference checks as `configs/kernel`'s own
+   products — see `apps/platform-api/tests/test_bundle_composition.py` for the loader's
+   required-evidence suite (happy path, missing-root, duplicate-id in both orderings, invalid
+   cross-reference) against a minimal test-only fixture bundle.
 3. **Prompts.** Add prompt files under the bundle (e.g. `shared/prompts/`), referenced from action
    configs by `prompt_ref`. Prompts never live in `platform-core`, `platform-actions`, or in any
    extension.
@@ -31,13 +42,16 @@ must stay inside, and `tests/architecture/` for the tests that enforce it.
    strings live only in `configs/kernel/provider_policies.yaml` and
    `configs/kernel/litellm_router.yaml` — never hardcoded in bundle or action code
    (`tests/architecture/test_litellm_model_strings_stay_in_provider_config.py`).
-6. **Register the bundle.** Wire the new bundle into `apps/platform-api` composition (the only
-   place allowed to know both platform runtime and product bundles). This does not add
-   product-specific routes: every platform-api endpoint stays parameterized on `{product_id}`
+6. **Register the bundle.** Wire the new bundle into `apps/platform-api/bootstrap.py`'s
+   `build_runtime` (the only module allowed to import a product-platforms package — see
+   `tests/architecture/test_freelancer_suite_import_boundary.py`), e.g. by adding it to the
+   production default bundle list. This does not add product-specific routes: every platform-api
+   endpoint stays parameterized on `{product_id}`
    (`tests/architecture/test_no_product_specific_endpoints.py`). That test's forbidden-term list
-   only names the 8 Freelancer Suite products that exist today — it is a backstop, not a general
-   proof. Add your new product's name to `FORBIDDEN_PRODUCT_PATH_TERMS` in that test file too, so
-   a future accidental hardcode of *this* product's path also fails the gate.
+   is a static backstop of known/candidate Freelancer product names, not a general proof and not
+   tied to what is actually implemented. Add your new product's name to
+   `FORBIDDEN_PRODUCT_PATH_TERMS` in that test file too, so a future accidental hardcode of *this*
+   product's path also fails the gate.
 7. **Chrome Extension.** Build a separate CE for the product using shared `packages/frontend/ce-kit`
    (transport, storage, identity, quota, start, polling, result, handoff helpers). The extension
    contains no prompts, no provider/model selection, and no workflow logic — it calls the platform

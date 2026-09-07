@@ -16,14 +16,8 @@ def test_freelancer_suite_declares_platform_sdk_dependency() -> None:
     assert "anytoolai-platform-sdk==0.1.0" in dependencies
 
 
-def test_freelancer_bundle_exposes_all_validation_products() -> None:
-    assert FreelancerSuiteBundle().config_roots() == [
-        "products/proposal_ai",
-        "products/acceptance_builder",
-        "products/case_study",
-        "products/scope_guard",
-        "products/task_finder",
-        "products/send_ready",
-        "products/brief_decoder",
-        "products/persuasion_lens",
-    ]
+def test_freelancer_bundle_has_no_implemented_product_roots() -> None:
+    """ANY-32 (B01): the bundle starts with zero product roots. ProposalAI becomes the first
+    real one in ANY-227 -- see this package's README for the full 6-product roadmap order."""
+    assert FreelancerSuiteBundle().bundle_id == "freelancer_suite"
+    assert FreelancerSuiteBundle().config_roots() == []
