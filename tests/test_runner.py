@@ -256,6 +256,89 @@ def test_pnpm_workspace_member_dirs_asks_pnpm_and_excludes_root(monkeypatch, tmp
     assert runner._pnpm_workspace_member_dirs() == [member]
 
 
+def test_pnpm_workspace_member_dirs_bounds_subprocess_with_timeout_and_closed_stdin(
+    monkeypatch, tmp_path
+) -> None:
+    runner = load_runner_module()
+    repo_root = tmp_path / "repo"
+    calls: list[tuple[list[str], dict]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append((list(command), kwargs))
+        return subprocess.CompletedProcess(command, 0, stdout="[]", stderr="")
+
+    monkeypatch.setattr(runner, "ROOT", repo_root)
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    runner._pnpm_workspace_member_dirs()
+
+    assert len(calls) == 1
+    command, kwargs = calls[0]
+    assert command == ["pnpm", "list", "-r", "--depth", "-1", "--json"]
+    assert kwargs["cwd"] == repo_root
+    assert kwargs["check"] is True
+    assert kwargs["stdin"] == subprocess.DEVNULL
+    assert kwargs["timeout"] == runner.PNPM_WORKSPACE_LIST_TIMEOUT_SECONDS
+
+
+def test_pnpm_workspace_member_dirs_returns_none_when_pnpm_is_missing(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+
+    def fake_run(command, **kwargs):
+        raise FileNotFoundError(2, "No such file or directory", "pnpm")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    assert runner._pnpm_workspace_member_dirs() is None
+    assert "pnpm" in capsys.readouterr().err
+
+
+def test_pnpm_workspace_member_dirs_returns_none_when_pnpm_fails(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+
+    def fake_run(command, **kwargs):
+        raise subprocess.CalledProcessError(returncode=1, cmd=command, stderr="boom")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    assert runner._pnpm_workspace_member_dirs() is None
+    err = capsys.readouterr().err
+    assert "exit 1" in err
+    assert "boom" in err
+
+
+def test_pnpm_workspace_member_dirs_returns_none_when_pnpm_times_out(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+
+    def fake_run(command, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=command, timeout=kwargs.get("timeout"))
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    assert runner._pnpm_workspace_member_dirs() is None
+    assert "timed out" in capsys.readouterr().err
+
+
+def test_frontend_check_fails_when_pnpm_workspace_discovery_fails(monkeypatch) -> None:
+    runner = load_runner_module()
+
+    def fake_run(command, **kwargs):
+        raise FileNotFoundError(2, "No such file or directory", "pnpm")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    commands: list[list[str]] = []
+    monkeypatch.setattr(runner, "run", lambda command: commands.append(list(command)) or 0)
+
+    assert runner.frontend_check() != 0
+    # Never even reaches `pnpm install` -- discovery failure is caught up front, not left to
+    # crash the whole check with an unhandled traceback.
+    assert commands == []
+
+
 def test_run_sequence_stops_and_propagates_on_first_failure(monkeypatch) -> None:
     runner = load_runner_module()
     commands: list[list[str]] = []
