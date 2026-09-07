@@ -43,6 +43,12 @@ DEV_DEFAULT_POSTGRES_DB = "anytoolai"
 # calls (dev_up/prod_up) -- those legitimately take minutes on a cold image build, and a short
 # timeout there would turn a slow-but-healthy build into a false failure.
 COMPOSE_QUERY_TIMEOUT_SECONDS = 60
+# `doctor`'s tool probes are a one-off diagnostic, not a hot path, so this is generous on purpose:
+# a cold `windows-latest` CI runner has been observed timing out a bare `npm --version` at 10s
+# (round 55's stdin=DEVNULL fix closed the Node/Windows stdin-hang case, nodejs/node#10836, but a
+# genuinely slow first invocation -- Windows PATHEXT resolution across npm.cmd's wrapper hops,
+# Defender scanning -- needs headroom, not a different fix).
+TOOL_PROBE_TIMEOUT_SECONDS = 30
 
 
 def resolve_postgres_db() -> str:
@@ -295,7 +301,7 @@ def probe_tool(tool: str) -> tuple[bool, str]:
             # `.exe`, launched without any of `npm`'s own Node-process-startup stdin touches —
             # resolved fine).
             stdin=subprocess.DEVNULL,
-            timeout=10,
+            timeout=TOOL_PROBE_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return False, f"unusable ({exc})"
