@@ -208,8 +208,12 @@ def test_frontend_check_fails_when_a_workspace_has_no_lint_script(
     (unlinted / "package.json").write_text(
         '{"name": "unlinted", "scripts": {"typecheck": "tsc --noEmit"}}', encoding="utf-8"
     )
+    # A comment and a blank line right after `packages:` -- valid YAML pnpm parses correctly, but
+    # a prior hand-rolled line-based parser here stopped at the first non-`-` line and silently
+    # produced an empty workspace list (a vacuously-passing preflight). This is why
+    # frontend_workspace_lint_preflight() now asks pnpm itself for workspace members instead.
     (repo_root / "pnpm-workspace.yaml").write_text(
-        'packages:\n  - "packages/frontend/*"\n', encoding="utf-8"
+        'packages:\n  # frontend workspaces\n\n  - "packages/frontend/*"\n', encoding="utf-8"
     )
     monkeypatch.setattr(runner, "ROOT", repo_root)
     commands: list[list[str]] = []

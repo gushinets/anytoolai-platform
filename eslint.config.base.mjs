@@ -64,7 +64,10 @@ export function baseConfig({ tsconfigRootDir, react = false, ignores = [] } = {}
     ...(react
       ? [
           {
-            files: ["**/*.tsx"],
+            // Custom hooks are legal in plain `.ts` files (no JSX required) -- scope to the same
+            // `tsFiles` set the type-checked rules use, not just `.tsx`, or a rules-of-hooks
+            // violation in a `.ts`-only hook passes silently.
+            files: tsFiles,
             plugins: { "react-hooks": reactHooks },
             // Deliberately not `reactHooks.configs.recommended`/`configs.flat.recommended`: as of
             // v7 both resolve to the same rule map, which now also bundles React Compiler

@@ -388,27 +388,28 @@ def postgresql_check() -> int:
     return run(postgresql_pytest_command())
 
 
-def _pnpm_workspace_package_patterns() -> list[str]:
-    """Minimal parser for pnpm-workspace.yaml's `packages:` list.
+def _pnpm_workspace_member_dirs() -> list[Path]:
+    """Ask pnpm itself which directories are workspace member packages.
 
-    Not full YAML: the `frontend` CI job runs this script with plain system Python (no installed
-    third-party packages, PyYAML included), so this reads the one list this repo's
-    pnpm-workspace.yaml actually has (a flat sequence of quoted glob strings) without adding a new
-    hard dependency just for it.
+    Not a hand-rolled pnpm-workspace.yaml parser: `pnpm list -r --depth -1 --json` uses pnpm's own
+    package discovery, so this can't drift out of sync with what `pnpm -r lint` itself considers a
+    member (a prior line-based parser silently produced an empty list -- and a vacuously-passing
+    preflight -- for a `packages:` list that had a comment or blank line in it, exactly the kind of
+    valid YAML pnpm itself parses correctly). Excludes the workspace root itself, which pnpm
+    includes in this listing but which isn't a "maintained frontend workspace".
     """
-    patterns: list[str] = []
-    in_packages_list = False
-    for line in (ROOT / "pnpm-workspace.yaml").read_text(encoding="utf-8").splitlines():
-        if line.startswith("packages:"):
-            in_packages_list = True
-            continue
-        if not in_packages_list:
-            continue
-        stripped = line.strip()
-        if not stripped.startswith("-"):
-            break
-        patterns.append(stripped.removeprefix("-").strip().strip("\"'"))
-    return patterns
+    completed = subprocess.run(
+        ["pnpm", "list", "-r", "--depth", "-1", "--json"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return [
+        path
+        for project in json.loads(completed.stdout)
+        if (path := Path(project["path"])) != ROOT
+    ]
 
 
 def frontend_workspace_lint_preflight() -> int:
@@ -418,16 +419,15 @@ def frontend_workspace_lint_preflight() -> int:
     that lacks the script is otherwise skipped silently and the recursive run still exits 0
     (verified directly against this repo's pinned pnpm version). That would let a newly added
     frontend workspace merge without ever being linted, contradicting ANY-341's "no silent
-    package skips" acceptance criterion. This walks pnpm-workspace.yaml's own glob patterns so it
-    stays correct as workspaces are added or removed.
+    package skips" acceptance criterion.
     """
-    patterns = _pnpm_workspace_package_patterns()
     missing: list[str] = []
-    for pattern in patterns:
-        for package_json in sorted(ROOT.glob(f"{pattern}/package.json")):
-            scripts = json.loads(package_json.read_text(encoding="utf-8")).get("scripts", {})
-            if "lint" not in scripts:
-                missing.append(package_json.parent.relative_to(ROOT).as_posix())
+    for workspace_dir in _pnpm_workspace_member_dirs():
+        scripts = json.loads((workspace_dir / "package.json").read_text(encoding="utf-8")).get(
+            "scripts", {}
+        )
+        if "lint" not in scripts:
+            missing.append(workspace_dir.relative_to(ROOT).as_posix())
     if missing:
         for workspace in missing:
             print(
