@@ -16,8 +16,6 @@ import time
 import tomllib
 import urllib.error
 import urllib.request
-
-import yaml
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -390,6 +388,29 @@ def postgresql_check() -> int:
     return run(postgresql_pytest_command())
 
 
+def _pnpm_workspace_package_patterns() -> list[str]:
+    """Minimal parser for pnpm-workspace.yaml's `packages:` list.
+
+    Not full YAML: the `frontend` CI job runs this script with plain system Python (no installed
+    third-party packages, PyYAML included), so this reads the one list this repo's
+    pnpm-workspace.yaml actually has (a flat sequence of quoted glob strings) without adding a new
+    hard dependency just for it.
+    """
+    patterns: list[str] = []
+    in_packages_list = False
+    for line in (ROOT / "pnpm-workspace.yaml").read_text(encoding="utf-8").splitlines():
+        if line.startswith("packages:"):
+            in_packages_list = True
+            continue
+        if not in_packages_list:
+            continue
+        stripped = line.strip()
+        if not stripped.startswith("-"):
+            break
+        patterns.append(stripped.removeprefix("-").strip().strip("\"'"))
+    return patterns
+
+
 def frontend_workspace_lint_preflight() -> int:
     """Fail loudly if any pnpm workspace package lacks a `lint` script.
 
@@ -400,8 +421,7 @@ def frontend_workspace_lint_preflight() -> int:
     package skips" acceptance criterion. This walks pnpm-workspace.yaml's own glob patterns so it
     stays correct as workspaces are added or removed.
     """
-    workspace_config = yaml.safe_load((ROOT / "pnpm-workspace.yaml").read_text(encoding="utf-8"))
-    patterns = workspace_config.get("packages", [])
+    patterns = _pnpm_workspace_package_patterns()
     missing: list[str] = []
     for pattern in patterns:
         for package_json in sorted(ROOT.glob(f"{pattern}/package.json")):
