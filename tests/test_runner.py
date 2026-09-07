@@ -193,6 +193,36 @@ def test_frontend_check_uses_frozen_install_and_real_checks(monkeypatch) -> None
     ]
 
 
+def test_frontend_check_fails_when_a_workspace_has_no_lint_script(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    runner = load_runner_module()
+    repo_root = tmp_path / "repo"
+    linted = repo_root / "packages" / "frontend" / "linted"
+    unlinted = repo_root / "packages" / "frontend" / "unlinted"
+    linted.mkdir(parents=True)
+    unlinted.mkdir(parents=True)
+    (linted / "package.json").write_text(
+        '{"name": "linted", "scripts": {"lint": "eslint ."}}', encoding="utf-8"
+    )
+    (unlinted / "package.json").write_text(
+        '{"name": "unlinted", "scripts": {"typecheck": "tsc --noEmit"}}', encoding="utf-8"
+    )
+    (repo_root / "pnpm-workspace.yaml").write_text(
+        'packages:\n  - "packages/frontend/*"\n', encoding="utf-8"
+    )
+    monkeypatch.setattr(runner, "ROOT", repo_root)
+    commands: list[list[str]] = []
+    monkeypatch.setattr(runner, "run", lambda command: commands.append(list(command)) or 0)
+
+    exit_code = runner.frontend_check()
+
+    assert exit_code != 0
+    # Never even reaches `pnpm install` -- the missing-lint workspace is caught up front.
+    assert commands == []
+    assert "packages/frontend/unlinted" in capsys.readouterr().err
+
+
 def test_run_sequence_stops_and_propagates_on_first_failure(monkeypatch) -> None:
     runner = load_runner_module()
     commands: list[list[str]] = []

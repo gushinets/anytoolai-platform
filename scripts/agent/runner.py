@@ -16,6 +16,8 @@ import time
 import tomllib
 import urllib.error
 import urllib.request
+
+import yaml
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -388,7 +390,39 @@ def postgresql_check() -> int:
     return run(postgresql_pytest_command())
 
 
+def frontend_workspace_lint_preflight() -> int:
+    """Fail loudly if any pnpm workspace package lacks a `lint` script.
+
+    `pnpm -r lint` only fails when *none* of the selected packages define `lint` -- a package
+    that lacks the script is otherwise skipped silently and the recursive run still exits 0
+    (verified directly against this repo's pinned pnpm version). That would let a newly added
+    frontend workspace merge without ever being linted, contradicting ANY-341's "no silent
+    package skips" acceptance criterion. This walks pnpm-workspace.yaml's own glob patterns so it
+    stays correct as workspaces are added or removed.
+    """
+    workspace_config = yaml.safe_load((ROOT / "pnpm-workspace.yaml").read_text(encoding="utf-8"))
+    patterns = workspace_config.get("packages", [])
+    missing: list[str] = []
+    for pattern in patterns:
+        for package_json in sorted(ROOT.glob(f"{pattern}/package.json")):
+            scripts = json.loads(package_json.read_text(encoding="utf-8")).get("scripts", {})
+            if "lint" not in scripts:
+                missing.append(str(package_json.parent.relative_to(ROOT)))
+    if missing:
+        for workspace in missing:
+            print(
+                f'FRONTENDLINT001: "{workspace}" is a pnpm workspace package with no "lint" '
+                'script -- `pnpm -r lint` would silently skip it instead of failing.',
+                file=sys.stderr,
+            )
+        return 1
+    return 0
+
+
 def frontend_check() -> int:
+    exit_code = frontend_workspace_lint_preflight()
+    if exit_code != 0:
+        return exit_code
     return run_sequence(
         [
             ["pnpm", "install", "--frozen-lockfile"],
