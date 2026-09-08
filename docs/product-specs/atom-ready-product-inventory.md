@@ -51,28 +51,33 @@ SP007 Phrase Check остаётся фичей SP002, а не 22-м продук
 ## Web-first validation set
 
 Таблица из 21 концепции выше — инвентарь возможностей текущего ядра, а не очередь из 21 релиза.
-Контролирующий порядок задан в `mvp-scope-source-of-truth.md`. Сначала проверяются шесть продуктов:
+Контролирующий порядок задан в `mvp-scope-source-of-truth.md`. Сначала выпускаются пять продуктов:
 
-| Очередь | Продукт | Реализация | Запусков | Что проверяет |
+| Очередь | Продукт | Реализация | Запусков | Основание приоритета |
 |---:|---|---|---:|---|
-| 1 | ProposalAI | `A06`; после проверки MVP возможен `A09 → A06` | 1 | Кратчайший полный web-путь и activation через успешное копирование результата. |
-| 2 | Client Update Writer | `A07`; PrepaidRequest и ReplyDraft — режимы с отдельными prompts/configs | 1 | Первое реальное переиспользование product-run поведения до извлечения общей абстракции. |
-| 3 | Brief Decoder | `A01 + A04 → A05`, результаты → `A10` | 1 | Первый составной документный workflow и источник первого handoff. |
-| 4 | Acceptance Builder | `A01 + A11` или `A02`, результаты → `A10` | 1 | `immediate` same-tab handoff из Brief Decoder и результат с вердиктом/критериями. |
-| 5 | Task Finder | `A11 + A02`; `A01` и `A09` опциональны | 1 | Ценность, выраженная fit-score, и будущий handoff в ProposalAI. |
-| 6 | Send-Ready | `A04 + A03`, затем выбранный gap → `A08` | 2 | Два запуска с пользовательским выбором gap без расширения mapping DSL. |
+| 1 | ProposalAI | `A06`; после проверки MVP возможен `A09 → A06` | 1 | Наиболее частая боль клиента. |
+| 2 | Client Message Decoder | `A01 → A07`; `A04` опционален | 1 | Частота возникновения и страх ошибиться. |
+| 3 | Scope Creep Guard | `A11 → A07`; результат сравнения и данные запроса → `A10` | 1 | Предварительно проверенный спрос. |
+| 4 | Send-Ready | `A04 + A03`, затем выбранный gap → `A08` | 2 | Предварительно проверенный спрос. |
+| 5 | Brief Decoder | `A01 + A04 → A05`, результаты → `A10` | 1 | Высокая ценность для всех проектов. |
 
-PrepaidRequest и ReplyDraft сохраняются среди 21 концепции, но поставляются режимами Client Update
-Writer, а не отдельными приложениями.
+Порядок и основания приоритета зафиксированы владельцем продукта 2026-09-08. Второй продукт,
+Client Message Decoder, проверяет повторное использование web runtime после ProposalAI.
+Handoff Brief Decoder → Acceptance Builder остаётся будущим сценарием: Acceptance Builder
+не входит в первую очередь.
+
+PrepaidRequest и ReplyDraft сохраняются среди 21 концепции как режимы Client Update Writer,
+который теперь находится в backlog, а не в первой очереди.
 
 ## Capability backlog после validation set
 
 Остальные atom-ready концепции не имеют зафиксированного порядка выпуска:
 
-- Scope Creep Guard;
+- Client Update Writer;
+- Acceptance Builder;
+- External Task Finder & Fit;
 - Case Study & Upsell;
 - Persuasion Lens;
-- Client Message Decoder;
 - Client Lens QA;
 - Client Content Map;
 - Client Content Studio;

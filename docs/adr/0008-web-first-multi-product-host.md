@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted.
+Accepted. Product release order updated on 2026-09-08 to match
+`docs/product-specs/mvp-scope-source-of-truth.md`.
 
 ## Context
 
@@ -43,7 +44,7 @@ product definitions or contain Freelancer product meaning. Product definitions m
 shared runtime and frontend-safe client contracts.
 
 Do not create a new frontend package or schema-driven application builder for the first product.
-Implement ProposalAI in the host, implement Client Update Writer on the same pattern, and extract
+Implement ProposalAI in the host, implement Client Message Decoder on the same pattern, and extract
 only repetition demonstrated by both. A shared package is justified only when a second application,
 outside `apps/web-mirror`, needs the same runtime.
 
@@ -83,13 +84,14 @@ Web-to-web handoff reuses the existing backend-owned bearer-token contract, incl
 expiry, replay protection, acceptance, and source/target session linkage. Web navigation uses the
 same tab; it does not introduce a second simplified handoff path.
 
-The initial web validation set uses only `immediate` target-start policies. Acceptance queues the
+The initial five-product order does not require a product-to-product handoff pair.
+Any delivered web handoff uses only `immediate` target-start policies. Acceptance queues the
 target workflow and returns the user to the target product state in the same tab. Deferred target
 continuation remains outside the first release because no frontend start path currently exists for
 an accepted deferred target session.
 
-For Brief Decoder to Acceptance Builder, the consent action means "create draft", not final approval
-of acceptance criteria. Editing after the target result appears is local editing or a new ordinary
+For the later Brief Decoder to Acceptance Builder candidate, the consent action means "create draft",
+not final approval of acceptance criteria. Editing after the target result appears is local editing or a new ordinary
 scenario run; it is not deferred continuation of the accepted handoff.
 
 ## Consequences
@@ -100,7 +102,7 @@ Positive:
 - products share one proven browser runtime without copying transport and state-management code;
 - product semantics stay outside the shared runtime and Platform Core;
 - Chrome Extensions can be added later without redefining backend contracts;
-- immediate handoff is validated without extending the handoff runtime.
+- shared MVP-A2 handoff proof remains valid without extending the handoff runtime.
 
 Negative / accepted tradeoffs:
 
@@ -111,7 +113,8 @@ Negative / accepted tradeoffs:
 
 ## Follow-up
 
-- Align the controlling MVP documents with the web-first six-product validation set.
+- Follow the web-first release order: ProposalAI, Client Message Decoder, Scope Creep Guard,
+  Send-Ready, Brief Decoder.
 - Implement ProposalAI as the first vertical web slice.
-- Use Client Update Writer to prove which frontend behavior is genuinely reusable.
+- Use Client Message Decoder to prove which frontend behavior is genuinely reusable.
 - Revisit package extraction only after another application needs the proven runtime.

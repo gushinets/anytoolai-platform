@@ -365,7 +365,7 @@ MVP-B adds product-level assets only:
 - handoff maps
 - product events
 
-The validation set contains six web products. Each product needs a product bundle/workflow and one
+The validation set contains five web products. Each product needs a product bundle/workflow and one
 complete web runtime E2E/QA vertical. A dedicated Chrome Extension is not part of the default product
 Definition of Done.
 
@@ -380,18 +380,25 @@ clients without introducing product-specific backend behavior.
 
 ## MVP-B Validation Set And Order
 
-1. ProposalAI: `A06` / `text.compose_persuasive_text`.
-2. Client Update Writer: `A07` / `text.compose_reply`, with PrepaidRequest and ReplyDraft as modes.
-3. Brief Decoder: `A01 + A04 -> A05`, results to `A10`.
-4. Acceptance Builder: `A01 + A11` or `A02`, results to `A10`.
-5. Task Finder: `A11 + A02`, with `A01` and `A09` optional.
-6. Send-Ready: `A04 + A03`, then a user-selected gap to `A08` in a second scenario run.
+1. ProposalAI: `A06` for v1; `A09 -> A06` remains a later option.
+2. Client Message Decoder: `A01 -> A07`, with `A04` optional.
+3. Scope Creep Guard: `A11 -> A07`; comparison results and request data to `A10`.
+4. Send-Ready: `A04 + A03`, then a user-selected gap to `A08` in a second scenario run.
+5. Brief Decoder: `A01 + A04 -> A05`, results to `A10`.
 
-ProposalAI is first because one scenario and one atom prove the complete web path quickly. Client
-Update Writer is second to prove reuse before a shared abstraction is extracted. Brief Decoder to
-Acceptance Builder is the first `immediate` same-tab handoff: the CTA creates an editable draft and
-does not represent final approval. Task Finder proves score-based activation. Send-Ready is the final
-validation product because it proves the two-run selected-gap flow without extending mapping DSL.
+The release order follows product demand priorities: ProposalAI addresses the most frequent
+customer pain; Client Message Decoder combines frequent need with fear of making a mistake;
+Scope Creep Guard and Send-Ready have preliminary demand validation; Brief Decoder has high value
+across projects. These priority reasons were supplied by the product owner on 2026-09-08.
+
+ProposalAI proves the shortest complete web path. Client Message Decoder is the second product
+and proves reuse before shared UI extraction. Scope Creep Guard proves scope comparison, reply,
+and document generation. Send-Ready proves the two-run selected-gap flow without extending the
+mapping DSL. Brief Decoder completes the initial set with brief analysis, questions, and a document.
+
+Client Update Writer, Acceptance Builder, and External Task Finder & Fit remain in the capability
+backlog without a committed release order. Brief Decoder to Acceptance Builder remains a later
+handoff candidate, not a dependency of the initial five-product release set.
 
 The 21 concepts in `atom-ready-product-inventory.md` are a capability inventory, not 21 committed
 releases and not an alternative delivery order.
