@@ -5,10 +5,12 @@ from pathlib import Path
 
 
 class ProductBundle:
-    """Product-neutral contract a product-platform package implements to be composed by
-    apps/platform-api's bootstrap.py. platform-sdk owns this contract (not platform-core) so
-    platform-core/platform-actions never need to import a product-platforms package -- only the
-    application composition root does."""
+    """Product-neutral contract a product-platform package implements to be composed by the
+    platform's composition boundaries (apps/platform-api/bootstrap.py,
+    apps/platform-worker/composition.py, scripts/agent/validate_configs.py -- all three compose
+    the identical default bundle set). platform-sdk owns this contract (not platform-core) so
+    platform-core/platform-actions never need to import a product-platforms package -- only those
+    composition boundaries do."""
 
     bundle_id: str = "base"
 

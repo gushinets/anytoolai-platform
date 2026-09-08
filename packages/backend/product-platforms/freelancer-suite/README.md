@@ -1,7 +1,10 @@
 # Freelancer Suite Bundle
 
-MVP-B `ProductBundle`. Composed only by `apps/platform-api`'s composition root
-(`bootstrap.py`); never imported by Platform Core or Platform Actions.
+MVP-B `ProductBundle`. Composed by the platform's three composition boundaries —
+`apps/platform-api/bootstrap.py`, `apps/platform-worker/composition.py`, and
+`scripts/agent/validate_configs.py` — with the identical default bundle set (enforced by
+`ATAI008` and `tests/architecture/test_bundle_composition_parity.py`); never imported by Platform
+Core or Platform Actions.
 
 When enabled, it registers configs through platform-sdk's `ProductBundle` contract and must not
 require changes to platform-core.
