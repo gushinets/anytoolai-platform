@@ -12,20 +12,21 @@ require changes to platform-core.
 ## Product config roots
 
 As of ANY-32 (B01), `FreelancerSuiteBundle.config_roots()` returns `[]`: this package owns no
-implemented product directories yet. The Freelancer Suite roadmap adds one product per
+implemented product directories yet. Per `docs/product-specs/mvp-scope-source-of-truth.md`'s
+five-product release order (`ANY-452`), the Freelancer Suite roadmap adds one product per
 bundle-and-workflow issue, in this order:
 
 1. ProposalAI (ANY-227)
-2. Client Update Writer (ANY-413)
-3. Brief Decoder (ANY-232)
-4. Acceptance Builder (ANY-228)
-5. Task Finder (ANY-231)
-6. Send-Ready (ANY-230)
+2. Client Message Decoder (ANY-423)
+3. Scope Creep Guard (ANY-229)
+4. Send-Ready (ANY-230)
+5. Brief Decoder (ANY-232)
 
 A product only appears in `config_roots()` once its own issue lands a real product directory
 (product config, scenarios, workflows, action configs, prompts, strict schemas, and any handoff
-map it needs) under `src/anytoolai_freelancer_suite/products/<name>/`. Additional atom-ready
-products (Case Study, Scope Guard, Persuasion Lens, and others) remain capability backlog until an
-issue schedules them -- they are not placeholder directories here.
+map it needs) under `src/anytoolai_freelancer_suite/products/<name>/`. Client Update Writer,
+Acceptance Builder, External Task Finder & Fit, Case Study & Upsell, and Persuasion Lens remain
+capability backlog without a committed release order -- they are not placeholder directories
+here.
 
 Product meaning stays in this package, not in Platform Core.
