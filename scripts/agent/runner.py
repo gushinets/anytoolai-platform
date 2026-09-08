@@ -49,6 +49,10 @@ COMPOSE_QUERY_TIMEOUT_SECONDS = 60
 # genuinely slow first invocation -- Windows PATHEXT resolution across npm.cmd's wrapper hops,
 # Defender scanning -- needs headroom, not a different fix).
 TOOL_PROBE_TIMEOUT_SECONDS = 30
+# `pnpm list` is a Node-based tool subject to the same stdin-inheritance hang as `npm`/`node`
+# (see TOOL_PROBE_TIMEOUT_SECONDS above, nodejs/node#10836) -- bounded and given closed stdin for
+# the same reason, generous since it's a one-off metadata query, not a hot path.
+PNPM_WORKSPACE_LIST_TIMEOUT_SECONDS = 30
 
 
 def resolve_postgres_db() -> str:
@@ -388,10 +392,92 @@ def postgresql_check() -> int:
     return run(postgresql_pytest_command())
 
 
+def _pnpm_workspace_member_dirs() -> list[Path] | None:
+    """Ask pnpm itself which directories are workspace member packages.
+
+    Not a hand-rolled pnpm-workspace.yaml parser: `pnpm list -r --depth -1 --json` uses pnpm's own
+    package discovery, so this can't drift out of sync with what `pnpm -r lint` itself considers a
+    member (a prior line-based parser silently produced an empty list -- and a vacuously-passing
+    preflight -- for a `packages:` list that had a comment or blank line in it, exactly the kind of
+    valid YAML pnpm itself parses correctly). Excludes the workspace root itself, which pnpm
+    includes in this listing but which isn't a "maintained frontend workspace".
+
+    Returns None (with a diagnostic already printed to stderr) if pnpm itself couldn't be queried
+    -- missing, failing, or hung -- instead of letting the exception crash `frontend_check()` with
+    an unhandled traceback; callers turn that into a clean nonzero exit code.
+    """
+    try:
+        completed = subprocess.run(
+            ["pnpm", "list", "-r", "--depth", "-1", "--json"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+            stdin=subprocess.DEVNULL,
+            timeout=PNPM_WORKSPACE_LIST_TIMEOUT_SECONDS,
+        )
+    except FileNotFoundError as exc:
+        print(f"Command not found: {exc.filename}", file=sys.stderr)
+        return None
+    except subprocess.CalledProcessError as exc:
+        print(
+            "pnpm list -r --depth -1 --json failed "
+            f"(exit {exc.returncode}): {exc.stderr.strip()}",
+            file=sys.stderr,
+        )
+        return None
+    except subprocess.TimeoutExpired:
+        print(
+            "pnpm list -r --depth -1 --json timed out after "
+            f"{PNPM_WORKSPACE_LIST_TIMEOUT_SECONDS:g}s",
+            file=sys.stderr,
+        )
+        return None
+    return [
+        path
+        for project in json.loads(completed.stdout)
+        if (path := Path(project["path"])) != ROOT
+    ]
+
+
+def frontend_workspace_lint_preflight() -> int:
+    """Fail loudly if any pnpm workspace package lacks a `lint` script.
+
+    `pnpm -r lint` only fails when *none* of the selected packages define `lint` -- a package
+    that lacks the script is otherwise skipped silently and the recursive run still exits 0
+    (verified directly against this repo's pinned pnpm version). That would let a newly added
+    frontend workspace merge without ever being linted, contradicting ANY-341's "no silent
+    package skips" acceptance criterion.
+    """
+    workspace_dirs = _pnpm_workspace_member_dirs()
+    if workspace_dirs is None:
+        return 1
+    missing: list[str] = []
+    for workspace_dir in workspace_dirs:
+        scripts = json.loads((workspace_dir / "package.json").read_text(encoding="utf-8")).get(
+            "scripts", {}
+        )
+        if "lint" not in scripts:
+            missing.append(workspace_dir.relative_to(ROOT).as_posix())
+    if missing:
+        for workspace in missing:
+            print(
+                f'FRONTENDLINT001: "{workspace}" is a pnpm workspace package with no "lint" '
+                'script -- `pnpm -r lint` would silently skip it instead of failing.',
+                file=sys.stderr,
+            )
+        return 1
+    return 0
+
+
 def frontend_check() -> int:
+    exit_code = frontend_workspace_lint_preflight()
+    if exit_code != 0:
+        return exit_code
     return run_sequence(
         [
             ["pnpm", "install", "--frozen-lockfile"],
+            ["pnpm", "-r", "lint"],
             ["pnpm", "-r", "typecheck"],
             ["pnpm", "-r", "test"],
             ["pnpm", "-r", "--if-present", "generate-api-types:check"],

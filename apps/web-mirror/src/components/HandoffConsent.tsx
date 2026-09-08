@@ -183,12 +183,15 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
     }
   }
 
-  function handleAccept() {
-    return runAction("accept", () => acceptHandoff(client, handoffToken, { guestId }));
+  function handleAccept(): void {
+    // runAction() already catches every rejection internally (see its own try/catch above), so
+    // there's nothing left for a caller to await -- explicitly discard so `onClick` (which expects
+    // a void-returning handler) doesn't see this as an unhandled floating promise.
+    void runAction("accept", () => acceptHandoff(client, handoffToken, { guestId }));
   }
 
-  function handleDecline() {
-    return runAction("decline", () => declineHandoff(client, handoffToken));
+  function handleDecline(): void {
+    void runAction("decline", () => declineHandoff(client, handoffToken));
   }
 
   function retryAfterSafeError() {

@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test demo-state.test.mjs"
+    "test": "node --test demo-state.test.mjs",
+    "lint": "eslint . --max-warnings=0"
   }
 }
