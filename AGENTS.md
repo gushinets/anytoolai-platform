@@ -28,7 +28,7 @@ MVP-B: Freelancer Validation Bundle v0.
 MVP-A is delivered in two milestones. MVP-A1 proves the platform execution kernel and all 11
 generic atoms without depending on web or Chrome UI. MVP-A2 delivers shared client contracts, the
 multi-product web host, handoff consent, paywall/onboarding, and kernel-demo client surfaces. MVP-B
-validates the kernel with six web-first product bundles; product Chrome Extensions are optional.
+validates the kernel with five web-first product bundles; product Chrome Extensions are optional.
 
 The controlling source for current MVP-A/MVP-B scope is
 `docs/product-specs/mvp-scope-source-of-truth.md`. Keep repo-local docs and scaffold aligned with

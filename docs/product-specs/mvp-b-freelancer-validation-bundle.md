@@ -28,21 +28,29 @@ capture or extension distribution is a validated product requirement.
 
 ## Validation Set
 
-MVP-B validates six products in this order:
+MVP-B validates five products in this order:
 
-1. ProposalAI: `A06` / `text.compose_persuasive_text`.
-2. Client Update Writer: `A07` / `text.compose_reply`, with PrepaidRequest and ReplyDraft as modes.
-3. Brief Decoder: `A01 + A04 -> A05`, results to `A10`.
-4. Acceptance Builder: `A01 + A11` or `A02`, results to `A10`.
-5. Task Finder: `A11 + A02`, with `A01` and `A09` optional.
-6. Send-Ready: `A04 + A03`, then a user-selected gap to `A08` in a second scenario run.
+1. ProposalAI: `A06` for v1; `A09 -> A06` remains a later option.
+2. Client Message Decoder: `A01 -> A07`, with `A04` optional.
+3. Scope Creep Guard: `A11 -> A07`; comparison results and request data to `A10`.
+4. Send-Ready: `A04 + A03`, then a user-selected gap to `A08` in a second scenario run.
+5. Brief Decoder: `A01 + A04 -> A05`, results to `A10`.
 
-ProposalAI proves the shortest complete web path. Client Update Writer proves real reuse before
-shared UI is extracted. Brief Decoder and Acceptance Builder prove one `immediate` same-tab handoff.
-Task Finder proves score-based value delivery. Send-Ready proves the two-run selected-gap flow
-without mapping DSL array indexing.
+The release order follows product demand priorities: ProposalAI addresses the most frequent
+customer pain; Client Message Decoder combines frequent need with fear of making a mistake;
+Scope Creep Guard and Send-Ready have preliminary demand validation; Brief Decoder has high value
+across projects. These priority reasons were supplied by the product owner on 2026-09-08.
 
-The 21 concepts in `atom-ready-product-inventory.md` remain a capability inventory. They are not an
+ProposalAI proves the shortest complete web path. Client Message Decoder is the second product
+and proves reuse before shared UI extraction. Scope Creep Guard proves scope comparison, reply,
+and document generation. Send-Ready proves the two-run selected-gap flow without extending the
+mapping DSL. Brief Decoder completes the initial set with brief analysis, questions, and a document.
+
+Client Update Writer, Acceptance Builder, and External Task Finder & Fit remain in the capability
+backlog without a committed release order. Brief Decoder to Acceptance Builder remains a later
+handoff candidate, not a dependency of the initial five-product release set.
+
+The 21 concepts in `atom-ready-product-inventory.md` remain a capability inventory, not an
 alternative MVP-B release train.
 
 ## Product Delivery Shape
@@ -62,27 +70,24 @@ required MVP-A2 client-event, result-rendering, product-host, and handoff slices
 
 ## Handoff Validation
 
-The first required handoff is:
+No product-to-product handoff pair is a mandatory dependency of the initial five-product release
+order. Shared handoff contracts and MVP-A2 browser proof remain required in their own scope.
+
+Later handoff candidates include:
 
 ```text
-Brief Decoder -> Acceptance Builder
-```
-
-It reuses the existing backend-owned bearer token, safe preview, acceptance, expiry, replay
-protection, and source/target session linkage. Navigation stays in the same tab and the target start
-policy is `immediate`.
-
-The CTA means "create draft". Acceptance queues Acceptance Builder immediately; editing the result
-is local editing or a new ordinary scenario run, not deferred continuation.
-
-Later supported handoff candidates include:
-
-```text
-Task Finder -> ProposalAI
 ProposalAI -> Send-Ready
+Brief Decoder -> Acceptance Builder
+External Task Finder & Fit -> ProposalAI
 ```
 
-Deferred handoff continuation is outside the first validation set.
+Any delivered handoff reuses the existing backend-owned bearer token, safe preview, acceptance,
+expiry, replay protection, and source/target session linkage. Navigation stays in the same tab and
+the target start policy is `immediate`. Deferred continuation remains outside the first validation set.
+
+For the later Brief Decoder to Acceptance Builder flow, the CTA means "create draft". Acceptance
+queues Acceptance Builder immediately; editing the result is local editing or a new ordinary
+scenario run, not deferred continuation.
 
 ## Platform Boundary
 
@@ -104,7 +109,7 @@ frontend behavior, extract only that proven repetition into the shared web runti
 
 ## Definition Of Done
 
-MVP-B validation is complete when all six products have:
+MVP-B validation is complete when all five products have:
 
 - a validated product bundle and workflow;
 - a working web page using frontend-safe Platform API contracts;
