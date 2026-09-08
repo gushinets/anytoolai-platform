@@ -1,0 +1,12 @@
+{
+  "response_json": {
+    "text": "Hi -- thanks for sharing what you need. Based on the brief you've given me so far, I'm confident I can help, and I'm happy to hop on a short call to pin down the exact scope and timeline before we start. In the meantime, here's how I typically work: a short discovery step, a draft for your review, then revisions until it's right."
+  },
+  "input_tokens": 40,
+  "output_tokens": 58,
+  "latency_ms": 8,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "proposal_ai.compose_persuasive_text_v1.weak_input"
+  }
+}

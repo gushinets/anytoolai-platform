@@ -1,0 +1,15 @@
+workflows:
+  - workflow_id: proposal_ai.generate_v1
+    version: 1
+    input_schema_ref: proposal_ai.generate_input_v1
+    output_schema_ref: kernel.schemas.compose_persuasive_text_output_v1
+    steps:
+      - step_id: compose_persuasive_text
+        action_config_id: proposal_ai.compose_persuasive_text_v1
+        input_mapping:
+          context: scenario.input
+          objective: 'literal:"Write a persuasive, truthful freelance proposal tailored to the task."'
+          constraints.tone: '?scenario.input.tone'
+          constraints.language: '?scenario.input.language'
+          constraints.format: 'literal:"plain_text"'
+          constraints.length: 'literal:4000'

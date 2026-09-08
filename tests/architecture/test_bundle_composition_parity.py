@@ -57,8 +57,9 @@ class _FixtureBundle(ProductBundle):
     """Reuses apps/platform-api/tests/test_bundle_composition.py's fixture_product directory
     (product_id: fixture_product) rather than checking in a second copy -- proves a *non-empty*
     ProductBundle actually reaches the loaded registry, not just that composition runs without
-    error (ANY-32 code review finding: DEFAULT_PRODUCT_BUNDLES currently contributes zero
-    config_roots, so a passing composition call alone doesn't prove roots are wired through)."""
+    error (ANY-32 code review finding, still true post-ANY-227: DEFAULT_PRODUCT_BUNDLES's real
+    ProposalAI root is a *known-good* fixture, so this test still needs its own throwaway
+    fixture bundle to prove the general wiring, independent of any one product's content)."""
 
     bundle_id = "fixture_bundle"
 
@@ -195,10 +196,11 @@ def test_reserved_bundle_id_collision_fails_consistently_across_all_three_compos
 def test_non_empty_bundle_actually_lands_in_worker_and_validate_configs_registries(
     monkeypatch: Any,
 ) -> None:
-    """ANY-32 code-review finding: DEFAULT_PRODUCT_BUNDLES currently contributes zero
-    config_roots for every bundle, so composition running without error doesn't prove a real
-    product actually reaches the loaded registry. Runs a non-empty fixture bundle through
-    build_worker() and validate_configs.load_registry() and asserts fixture_product is present."""
+    """ANY-32 code-review finding: composition running without error doesn't by itself prove a
+    real product actually reaches the loaded registry (still worth a dedicated, product-agnostic
+    proof post-ANY-227, since a bug here could hide behind any one product's own config being
+    valid). Runs a non-empty fixture bundle through build_worker() and
+    validate_configs.load_registry() and asserts fixture_product is present."""
     worker_registries = _capture_registry(monkeypatch, worker_composition)
     engine = sa.create_engine("sqlite://")
     worker_composition.build_worker(

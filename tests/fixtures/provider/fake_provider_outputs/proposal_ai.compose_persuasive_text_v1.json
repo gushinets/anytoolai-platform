@@ -1,0 +1,12 @@
+{
+  "response_json": {
+    "text": "Hi -- I'd love to help you build the marketing site you described, on the two-week timeline you mentioned. I've spent the last four years designing and shipping small-business marketing sites end to end, so I can move straight from your brief to a working draft without a long ramp-up. Let's start with a quick call to confirm scope and I can have a first draft ready within the first week."
+  },
+  "input_tokens": 96,
+  "output_tokens": 64,
+  "latency_ms": 8,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "proposal_ai.compose_persuasive_text_v1"
+  }
+}
