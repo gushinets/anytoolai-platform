@@ -5,9 +5,9 @@
 - State: active
 - Owner: product/engineering
 - Created: 2026-06-23
-- Last updated: 2026-09-03
-- Review date: 2026-09-03
-- Next action: audit the existing Freelancer Suite issues against the controlling six-product
+- Last updated: 2026-09-08
+- Review date: 2026-09-08
+- Next action: audit the existing Freelancer Suite issues against the controlling five-product
   web-first validation set before changing Linear.
 - Blocker: none
 
@@ -103,8 +103,8 @@ workflow definitions, quota authority, artifact state, or handoff state.
 B01 (ANY-32) defines the product template and bundle loader. B06 (ANY-26) owns declarative
 cross-product handoff maps. B11 (ANY-17) owns shared product events and deterministic fixtures.
 
-The current validation set is ProposalAI, Client Update Writer, Brief Decoder, Acceptance Builder,
-Task Finder, and Send-Ready. Each needs bundle/workflow plus web runtime E2E/QA outcomes; dedicated
+The current release order is ProposalAI, Client Message Decoder, Scope Creep Guard, Send-Ready,
+and Brief Decoder. Each needs bundle/workflow plus web runtime E2E/QA outcomes; dedicated
 Chrome Extensions are optional.
 
 The table records the legacy issue structure for audit only:

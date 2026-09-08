@@ -74,8 +74,8 @@ MVP-A has no real Freelancer product semantics. `kernel_demo` is an internal smo
 
 ## MVP-B scope
 
-MVP-B is the web-first Freelancer Validation Bundle v0. The validation set is ProposalAI, Client
-Update Writer, Brief Decoder, Acceptance Builder, Task Finder, and Send-Ready. Each product has a
+MVP-B is the web-first Freelancer Validation Bundle v0. The release order is ProposalAI, Client
+Message Decoder, Scope Creep Guard, Send-Ready, and Brief Decoder. Each product has a
 product-owned bundle/workflow, web definition/page, renderer, events, and runtime E2E slice hosted
 through `apps/web-mirror`. Dedicated Chrome Extensions are optional and remain product-owned when a
 product requires them. Product delivery must not add Freelancer semantics to Platform Core or change
