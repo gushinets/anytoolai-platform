@@ -48,6 +48,24 @@ class _EmptyBundle(ProductBundle):
         return []
 
 
+FIXTURE_PRODUCT_DIR = (
+    ROOT / "apps" / "platform-api" / "tests" / "fixtures" / "fixture_product"
+)
+
+
+class _FixtureBundle(ProductBundle):
+    """Reuses apps/platform-api/tests/test_bundle_composition.py's fixture_product directory
+    (product_id: fixture_product) rather than checking in a second copy -- proves a *non-empty*
+    ProductBundle actually reaches the loaded registry, not just that composition runs without
+    error (ANY-32 code review finding: DEFAULT_PRODUCT_BUNDLES currently contributes zero
+    config_roots, so a passing composition call alone doesn't prove roots are wired through)."""
+
+    bundle_id = "fixture_bundle"
+
+    def config_roots(self) -> list[Path]:
+        return [FIXTURE_PRODUCT_DIR]
+
+
 def _load_validate_configs_module() -> Any:
     path = ROOT / "scripts" / "agent" / "validate_configs.py"
     spec = importlib.util.spec_from_file_location("validate_configs_module", path)
@@ -75,6 +93,20 @@ def test_default_product_bundles_match_across_all_three_composition_boundaries()
 
     assert api_bundle_ids == worker_bundle_ids == validate_configs_bundle_ids
     assert api_bundle_ids, "expected at least the production FreelancerSuiteBundle default"
+
+
+def test_reserved_bundle_ids_match_across_all_three_composition_boundaries() -> None:
+    """Contract A (ANY-32 code review finding): platform_actions/kernel_demo are globally
+    reserved bundle IDs, not just an apps/platform-api `loaded_bundles`-reporting constraint --
+    all three composition boundaries must agree on the same reserved set."""
+    validate_configs = _load_validate_configs_module()
+
+    assert (
+        bootstrap.RESERVED_BUNDLE_IDS
+        == worker_composition.RESERVED_BUNDLE_IDS
+        == validate_configs.RESERVED_BUNDLE_IDS
+    )
+    assert bootstrap.RESERVED_BUNDLE_IDS == ("platform_actions", "kernel_demo")
 
 
 def _capture_registry(monkeypatch: Any, module: Any) -> list[Any]:
@@ -132,3 +164,51 @@ def test_duplicate_bundle_id_fails_consistently_across_all_three_composition_bou
     validate_configs = _load_validate_configs_module()
     monkeypatch.setattr(validate_configs, "DEFAULT_PRODUCT_BUNDLES", dup_bundles)
     assert validate_configs.main() == 1
+
+
+def test_reserved_bundle_id_collision_fails_consistently_across_all_three_composition_boundaries(
+    monkeypatch: Any,
+) -> None:
+    """Contract A (ANY-32 code review finding): a composed bundle_id colliding with a reserved
+    kernel-level label ("platform_actions"/"kernel_demo") was only rejected by
+    apps/platform-api/bootstrap.py. All three now share the same RESERVED_BUNDLE_IDS."""
+    colliding_bundles = [_EmptyBundle("platform_actions")]
+
+    with pytest.raises(RegistryLoadError) as api_excinfo:
+        bootstrap.build_runtime(config_root=CONFIG_ROOT, bundles=colliding_bundles)
+    assert "config_duplicate_bundle_id" in [error.code for error in api_excinfo.value.errors]
+
+    engine = sa.create_engine("sqlite://")
+    with pytest.raises(RegistryLoadError) as worker_excinfo:
+        worker_composition.build_worker(
+            session_factory=sessionmaker(bind=engine),
+            config_root=CONFIG_ROOT,
+            bundles=colliding_bundles,
+        )
+    assert "config_duplicate_bundle_id" in [error.code for error in worker_excinfo.value.errors]
+
+    validate_configs = _load_validate_configs_module()
+    monkeypatch.setattr(validate_configs, "DEFAULT_PRODUCT_BUNDLES", colliding_bundles)
+    assert validate_configs.main() == 1
+
+
+def test_non_empty_bundle_actually_lands_in_worker_and_validate_configs_registries(
+    monkeypatch: Any,
+) -> None:
+    """ANY-32 code-review finding: DEFAULT_PRODUCT_BUNDLES currently contributes zero
+    config_roots for every bundle, so composition running without error doesn't prove a real
+    product actually reaches the loaded registry. Runs a non-empty fixture bundle through
+    build_worker() and validate_configs.load_registry() and asserts fixture_product is present."""
+    worker_registries = _capture_registry(monkeypatch, worker_composition)
+    engine = sa.create_engine("sqlite://")
+    worker_composition.build_worker(
+        session_factory=sessionmaker(bind=engine),
+        config_root=CONFIG_ROOT,
+        bundles=[_FixtureBundle()],
+    )
+    assert len(worker_registries) == 1
+    assert "fixture_product" in worker_registries[0].products
+
+    validate_configs = _load_validate_configs_module()
+    registry = validate_configs.load_registry(bundles=[_FixtureBundle()])
+    assert "fixture_product" in registry.products
