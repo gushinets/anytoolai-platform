@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any
 
 from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle
-from anytoolai_platform_actions.bundle import PlatformActionsBundle
 from anytoolai_platform_actions.structured_llm.cross_validation import (
     build_input_validators,
     build_output_cross_validators,
@@ -26,7 +25,7 @@ from anytoolai_platform_core.actions.runner import ActionRunner, ActionRunServic
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
-from anytoolai_platform_core.config.errors import check_ids_are_unique
+from anytoolai_platform_core.config.errors import RESERVED_BUNDLE_IDS, check_ids_are_unique
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
@@ -59,14 +58,6 @@ from anytoolai_platform_worker.worker import Worker
 # named DEFAULT_PRODUCT_BUNDLES -- both must resolve to the same bundle set (ANY-32 code review
 # finding), or the API can accept a product workflow this worker's own registry never loaded.
 DEFAULT_PRODUCT_BUNDLES: tuple[ProductBundle, ...] = (FreelancerSuiteBundle(),)
-
-# Contract A (ANY-32 code review finding): platform_actions/kernel_demo are globally reserved
-# bundle IDs, not just an apps/platform-api `loaded_bundles`-reporting constraint -- a composed
-# bundle colliding with either must fail worker startup too, identically to the API. Mirrors
-# bootstrap.py's identically-named RESERVED_BUNDLE_IDS (see
-# tests/architecture/test_bundle_composition_parity.py for the parity proof); sourced from
-# PlatformActionsBundle.bundle_id so the two never drift independently.
-RESERVED_BUNDLE_IDS: tuple[str, ...] = (PlatformActionsBundle.bundle_id, "kernel_demo")
 
 
 def build_worker(

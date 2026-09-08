@@ -101,7 +101,8 @@ scaffold removed).
 
 ### Out of scope (per issue non-goals and plan)
 
-Real product behavior/content for any of the 6 named products (ANY-227 and siblings),
+Real product behavior/content for any of the 5 release-order products (ProposalAI/ANY-227 and
+siblings; see `docs/product-specs/mvp-scope-source-of-truth.md`),
 `apps/web-mirror` `WebProductDefinition`/page/renderer changes, a generic frontend/plugin
 framework, a product-event/metric registry (ANY-17), product-specific backend endpoints, runtime
 editing UI, dedicated Chrome Extensions.

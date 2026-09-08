@@ -31,6 +31,7 @@ for src_path in (
         sys.path.insert(0, str(src_path))
 
 import pytest  # noqa: E402
+from anytoolai_platform_actions.bundle import PlatformActionsBundle  # noqa: E402
 from anytoolai_platform_api import bootstrap  # noqa: E402
 from anytoolai_platform_core.config.errors import RegistryLoadError  # noqa: E402
 from anytoolai_platform_sdk import ProductBundle  # noqa: E402
@@ -95,18 +96,30 @@ def test_default_product_bundles_match_across_all_three_composition_boundaries()
     assert api_bundle_ids, "expected at least the production FreelancerSuiteBundle default"
 
 
-def test_reserved_bundle_ids_match_across_all_three_composition_boundaries() -> None:
-    """Contract A (ANY-32 code review finding): platform_actions/kernel_demo are globally
-    reserved bundle IDs, not just an apps/platform-api `loaded_bundles`-reporting constraint --
-    all three composition boundaries must agree on the same reserved set."""
+def test_reserved_bundle_ids_are_shared_not_duplicated_across_composition_boundaries() -> None:
+    """Contract A (ANY-32 code review finding): a first fix gave each composition boundary its
+    own independently-defined-but-tested-equal RESERVED_BUNDLE_IDS -- rejected as not actually
+    "shared/reused from a single product-neutral composition contract boundary". All three now
+    import the identical object from platform-core's config.errors, so this asserts identity
+    (`is`), not just equal value -- a real regression (e.g. one module re-defining its own copy)
+    would break `is` even if the value still matched by coincidence."""
     validate_configs = _load_validate_configs_module()
 
-    assert (
-        bootstrap.RESERVED_BUNDLE_IDS
-        == worker_composition.RESERVED_BUNDLE_IDS
-        == validate_configs.RESERVED_BUNDLE_IDS
-    )
+    assert bootstrap.RESERVED_BUNDLE_IDS is worker_composition.RESERVED_BUNDLE_IDS
+    # validate_configs.py is loaded via importlib as a separate module object (see
+    # _load_validate_configs_module), so its RESERVED_BUNDLE_IDS is a distinct import of the same
+    # underlying platform-core tuple -- equal by value, not necessarily by identity.
+    assert bootstrap.RESERVED_BUNDLE_IDS == validate_configs.RESERVED_BUNDLE_IDS
     assert bootstrap.RESERVED_BUNDLE_IDS == ("platform_actions", "kernel_demo")
+
+
+def test_reserved_bundle_ids_do_not_drift_from_platform_actions_bundle_id() -> None:
+    """platform-core's RESERVED_BUNDLE_IDS hardcodes "platform_actions" as a plain string literal
+    rather than importing PlatformActionsBundle (platform-actions depends on platform-core, so
+    the reverse import would be circular). This is the drift check that makes that safe: if
+    PlatformActionsBundle.bundle_id is ever renamed, this test (which can import both) catches
+    the mismatch immediately."""
+    assert PlatformActionsBundle.bundle_id in bootstrap.RESERVED_BUNDLE_IDS
 
 
 def _capture_registry(monkeypatch: Any, module: Any) -> list[Any]:
