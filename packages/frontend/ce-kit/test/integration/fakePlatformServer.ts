@@ -71,7 +71,9 @@ export function createFakePlatformServer(options: FakePlatformServerOptions = {}
   }
 
   const fetchImpl: typeof fetch = async (input, init) => {
-    const url = new URL(String(input));
+    const requestUrl =
+      typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const url = new URL(requestUrl);
     const method = (init?.method ?? "GET").toUpperCase();
     const path = url.pathname;
 
@@ -112,7 +114,13 @@ export function createFakePlatformServer(options: FakePlatformServerOptions = {}
       if (!idempotencyKey) {
         return errorResponse(422, "idempotency_key_invalid", "Idempotency-Key is required.");
       }
-      const body = JSON.parse(String(init?.body ?? "{}"));
+      if (typeof init?.body !== "string") {
+        // Every real caller (PlatformApiClient) always sends a JSON string body -- a non-string
+        // body means this fake is being driven in a way its routing below doesn't support, so
+        // fail loudly here rather than silently treating it as an empty body.
+        throw new Error("fakePlatformServer: expected a JSON string request body.");
+      }
+      const body = JSON.parse(init.body) as { guest_id?: string | null };
       const guestId: string | null = body.guest_id ?? null;
       const requestFingerprint = JSON.stringify({ path, body });
 

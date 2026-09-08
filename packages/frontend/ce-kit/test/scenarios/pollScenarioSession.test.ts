@@ -92,6 +92,7 @@ describe("pollScenarioSession", () => {
     expect(result.reason).toBe("error");
     expect(result.result).toEqual({
       ok: false,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- vitest/Chai types `expect.any()`'s asymmetric-matcher placeholder as `any` by design; standard `toEqual` usage.
       error: { type: "invalid_response", status: 200, message: expect.any(String) },
     });
   });

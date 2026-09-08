@@ -7,7 +7,7 @@
     "dev": "wxt",
     "build": "wxt build",
     "typecheck": "wxt prepare && tsc --noEmit",
-    "lint": "wxt prepare && tsc --noEmit"
+    "lint": "wxt prepare && eslint . --max-warnings=0"
   },
   "dependencies": {
     "@anytoolai/ce-kit": "workspace:*",

@@ -25,9 +25,15 @@ async function captureActiveTabInput(): Promise<CaptureInputResponse> {
   if (activeTab?.id === undefined) {
     throw new Error("No active tab to capture input from.");
   }
-  const response = (await chrome.tabs.sendMessage(activeTab.id, CAPTURE_INPUT_MESSAGE)) as
-    | CaptureInputResponse
-    | undefined;
+  // Typed via sendMessage's own generic parameters, not a post-hoc `as` cast -- `chrome.tabs
+  // .sendMessage` defaults both its message and response generics to `any`, and asserting a
+  // concrete type onto an `any` value is a no-op ESLint can't distinguish from a real narrowing
+  // (it flags the assertion as unnecessary either way), so a cast here would silently leave
+  // `response` typed `any` if this got "fixed" by deleting it.
+  const response = await chrome.tabs.sendMessage<
+    typeof CAPTURE_INPUT_MESSAGE,
+    CaptureInputResponse | undefined
+  >(activeTab.id, CAPTURE_INPUT_MESSAGE);
   if (!response) {
     throw new Error("Could not capture input from the active tab.");
   }
@@ -148,7 +154,10 @@ export function HandoffView() {
 
   return (
     <div>
-      <button type="button" onClick={runSmokeJourney} disabled={state.kind === "running"}>
+      {/* runSmokeJourney() already catches every rejection internally, so the promise is
+          intentionally discarded here rather than left for `onClick` (void-returning) to see as
+          an unhandled floating promise. */}
+      <button type="button" onClick={() => void runSmokeJourney()} disabled={state.kind === "running"}>
         Run handoff smoke journey
       </button>
       {state.kind === "running" ? <p role="status">{state.step}</p> : null}

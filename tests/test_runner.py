@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import subprocess
 import sys
 import urllib.parse
 from pathlib import Path
@@ -20,6 +22,22 @@ def load_runner_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def fake_pnpm_list_run(project_paths: list[Path]):
+    """Stubs `subprocess.run(["pnpm", "list", "-r", "--depth", "-1", "--json"], ...)`.
+
+    `baseline`'s CI job (where this test module's pytest run actually happens, via
+    `quick-check`) has no `pnpm` on PATH -- only `frontend`/`full-check`/`client-handoff-smoke` do
+    -- so `_pnpm_workspace_member_dirs()` must never shell out to a real `pnpm` from a test.
+    """
+
+    def run(command, **kwargs):
+        assert command == ["pnpm", "list", "-r", "--depth", "-1", "--json"]
+        payload = [{"name": path.name, "path": str(path)} for path in project_paths]
+        return subprocess.CompletedProcess(command, 0, stdout=json.dumps(payload), stderr="")
+
+    return run
 
 
 def test_full_check_uses_uv_for_freelancer_suite_install(monkeypatch) -> None:
@@ -182,14 +200,161 @@ def test_frontend_check_uses_frozen_install_and_real_checks(monkeypatch) -> None
         "run",
         lambda command: commands.append(list(command)) or 0,
     )
+    monkeypatch.setattr(runner.subprocess, "run", fake_pnpm_list_run([]))
 
     assert runner.frontend_check() == 0
     assert commands == [
         ["pnpm", "install", "--frozen-lockfile"],
+        ["pnpm", "-r", "lint"],
         ["pnpm", "-r", "typecheck"],
         ["pnpm", "-r", "test"],
         ["pnpm", "-r", "--if-present", "generate-api-types:check"],
         ["pnpm", "-r", "build"],
+    ]
+
+
+def test_frontend_check_fails_when_a_workspace_has_no_lint_script(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    runner = load_runner_module()
+    repo_root = tmp_path / "repo"
+    linted = repo_root / "packages" / "frontend" / "linted"
+    unlinted = repo_root / "packages" / "frontend" / "unlinted"
+    repo_root.mkdir(parents=True)
+    linted.mkdir(parents=True)
+    unlinted.mkdir(parents=True)
+    (repo_root / "package.json").write_text('{"name": "root"}', encoding="utf-8")
+    (linted / "package.json").write_text(
+        '{"name": "linted", "scripts": {"lint": "eslint ."}}', encoding="utf-8"
+    )
+    (unlinted / "package.json").write_text(
+        '{"name": "unlinted", "scripts": {"typecheck": "tsc --noEmit"}}', encoding="utf-8"
+    )
+    monkeypatch.setattr(runner, "ROOT", repo_root)
+    monkeypatch.setattr(
+        runner.subprocess, "run", fake_pnpm_list_run([repo_root, linted, unlinted])
+    )
+    commands: list[list[str]] = []
+    monkeypatch.setattr(runner, "run", lambda command: commands.append(list(command)) or 0)
+
+    exit_code = runner.frontend_check()
+
+    assert exit_code != 0
+    # Never even reaches `pnpm install` -- the missing-lint workspace is caught up front.
+    assert commands == []
+    # The workspace root itself (present in `pnpm list`'s own output) must not be treated as a
+    # maintained frontend workspace that needs `scripts.lint`.
+    assert "packages/frontend/unlinted" in capsys.readouterr().err
+
+
+def test_pnpm_workspace_member_dirs_asks_pnpm_and_excludes_root(monkeypatch, tmp_path) -> None:
+    runner = load_runner_module()
+    repo_root = tmp_path / "repo"
+    member = repo_root / "packages" / "frontend" / "ce-kit"
+    monkeypatch.setattr(runner, "ROOT", repo_root)
+    monkeypatch.setattr(runner.subprocess, "run", fake_pnpm_list_run([repo_root, member]))
+
+    assert runner._pnpm_workspace_member_dirs() == [member]
+
+
+def test_pnpm_workspace_member_dirs_bounds_subprocess_with_timeout_and_closed_stdin(
+    monkeypatch, tmp_path
+) -> None:
+    runner = load_runner_module()
+    repo_root = tmp_path / "repo"
+    calls: list[tuple[list[str], dict]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append((list(command), kwargs))
+        return subprocess.CompletedProcess(command, 0, stdout="[]", stderr="")
+
+    monkeypatch.setattr(runner, "ROOT", repo_root)
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    runner._pnpm_workspace_member_dirs()
+
+    assert len(calls) == 1
+    command, kwargs = calls[0]
+    assert command == ["pnpm", "list", "-r", "--depth", "-1", "--json"]
+    assert kwargs["cwd"] == repo_root
+    assert kwargs["check"] is True
+    assert kwargs["stdin"] == subprocess.DEVNULL
+    assert kwargs["timeout"] == runner.PNPM_WORKSPACE_LIST_TIMEOUT_SECONDS
+
+
+def test_pnpm_workspace_member_dirs_returns_none_when_pnpm_is_missing(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+
+    def fake_run(command, **kwargs):
+        raise FileNotFoundError(2, "No such file or directory", "pnpm")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    assert runner._pnpm_workspace_member_dirs() is None
+    assert "pnpm" in capsys.readouterr().err
+
+
+def test_pnpm_workspace_member_dirs_returns_none_when_pnpm_fails(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+
+    def fake_run(command, **kwargs):
+        raise subprocess.CalledProcessError(returncode=1, cmd=command, stderr="boom")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    assert runner._pnpm_workspace_member_dirs() is None
+    err = capsys.readouterr().err
+    assert "exit 1" in err
+    assert "boom" in err
+
+
+def test_pnpm_workspace_member_dirs_returns_none_when_pnpm_times_out(
+    monkeypatch, capsys
+) -> None:
+    runner = load_runner_module()
+
+    def fake_run(command, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=command, timeout=kwargs.get("timeout"))
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    assert runner._pnpm_workspace_member_dirs() is None
+    assert "timed out" in capsys.readouterr().err
+
+
+def test_frontend_check_fails_when_pnpm_workspace_discovery_fails(monkeypatch) -> None:
+    runner = load_runner_module()
+
+    def fake_run(command, **kwargs):
+        raise FileNotFoundError(2, "No such file or directory", "pnpm")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    commands: list[list[str]] = []
+    monkeypatch.setattr(runner, "run", lambda command: commands.append(list(command)) or 0)
+
+    assert runner.frontend_check() != 0
+    # Never even reaches `pnpm install` -- discovery failure is caught up front, not left to
+    # crash the whole check with an unhandled traceback.
+    assert commands == []
+
+
+def test_run_sequence_stops_and_propagates_on_first_failure(monkeypatch) -> None:
+    runner = load_runner_module()
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str]) -> int:
+        commands.append(list(command))
+        return 1 if command == ["pnpm", "-r", "lint"] else 0
+
+    monkeypatch.setattr(runner, "run", fake_run)
+    monkeypatch.setattr(runner.subprocess, "run", fake_pnpm_list_run([]))
+
+    assert runner.frontend_check() == 1
+    assert commands == [
+        ["pnpm", "install", "--frozen-lockfile"],
+        ["pnpm", "-r", "lint"],
     ]
 
 
