@@ -7,41 +7,50 @@ thin frontend composition.
 ## Validation Products
 
 1. ProposalAI.
-2. Client Update Writer, including PrepaidRequest and ReplyDraft modes.
-3. Brief Decoder.
-4. Acceptance Builder.
-5. Task Finder.
-6. Send-Ready.
+2. Client Message Decoder.
+3. Scope Creep Guard.
+4. Send-Ready.
+5. Brief Decoder.
 
-The 21 atom-ready concepts remain the wider capability inventory; they are not all committed Suite
-releases.
+The 21 atom-ready concepts remain the wider capability inventory. Client Update Writer,
+Acceptance Builder, and External Task Finder & Fit are outside the initial set and have no
+committed release order. PrepaidRequest and ReplyDraft remain modes of the later Client Update Writer.
 
 ## Recommended Build Order
 
-1. ProposalAI proves one-atom web execution and copy-button activation.
-2. Client Update Writer proves reuse before shared UI extraction.
-3. Brief Decoder proves the first composite document workflow.
-4. Acceptance Builder proves an `immediate` same-tab handoff from Brief Decoder.
-5. Task Finder proves score-based value delivery and can later hand off to ProposalAI.
-6. Send-Ready proves a user-selected gap and second workflow run without changing mapping DSL.
+1. ProposalAI: `A06` for v1; `A09 -> A06` remains a later option.
+2. Client Message Decoder: `A01 -> A07`, with `A04` optional.
+3. Scope Creep Guard: `A11 -> A07`; comparison results and request data to `A10`.
+4. Send-Ready: `A04 + A03`, then a user-selected gap to `A08` in a second scenario run.
+5. Brief Decoder: `A01 + A04 -> A05`, results to `A10`.
+
+The release order follows product demand priorities: ProposalAI addresses the most frequent
+customer pain; Client Message Decoder combines frequent need with fear of making a mistake;
+Scope Creep Guard and Send-Ready have preliminary demand validation; Brief Decoder has high value
+across projects. These priority reasons were supplied by the product owner on 2026-09-08.
+
+ProposalAI proves the shortest complete web path. Client Message Decoder is the second product
+and proves reuse before shared UI extraction. Scope Creep Guard proves scope comparison, reply,
+and document generation. Send-Ready proves the two-run selected-gap flow without extending the
+mapping DSL. Brief Decoder completes the initial set with brief analysis, questions, and a document.
+
+Client Update Writer, Acceptance Builder, and External Task Finder & Fit remain in the capability
+backlog without a committed release order. Brief Decoder to Acceptance Builder remains a later
+handoff candidate, not a dependency of the initial five-product release set.
 
 ## Handoff Chains
 
-The first required validation chain is:
+The initial five-product order does not require a product-to-product handoff pair. Shared MVP-A2
+handoff proof remains in scope. Later candidates are:
 
 ```text
-Brief Decoder -> Acceptance Builder
-```
-
-Later supported candidates are:
-
-```text
-Task Finder -> ProposalAI
 ProposalAI -> Send-Ready
+Brief Decoder -> Acceptance Builder
+External Task Finder & Fit -> ProposalAI
 ```
 
-The first release uses existing backend tokens, `immediate` target start, and same-tab navigation.
-Deferred continuation is outside this validation set.
+Any delivered web handoff uses existing backend tokens, `immediate` target start, and same-tab
+navigation. Deferred continuation is outside the initial validation set.
 
 ## Implementation Rule
 
