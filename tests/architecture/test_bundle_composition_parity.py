@@ -106,10 +106,13 @@ def test_reserved_bundle_ids_are_shared_not_duplicated_across_composition_bounda
     validate_configs = _load_validate_configs_module()
 
     assert bootstrap.RESERVED_BUNDLE_IDS is worker_composition.RESERVED_BUNDLE_IDS
-    # validate_configs.py is loaded via importlib as a separate module object (see
-    # _load_validate_configs_module), so its RESERVED_BUNDLE_IDS is a distinct import of the same
-    # underlying platform-core tuple -- equal by value, not necessarily by identity.
-    assert bootstrap.RESERVED_BUNDLE_IDS == validate_configs.RESERVED_BUNDLE_IDS
+    # validate_configs.py is loaded via importlib as a separate *module* object (see
+    # _load_validate_configs_module), but its own `from anytoolai_platform_core.config.errors
+    # import RESERVED_BUNDLE_IDS` still resolves through sys.modules -- Python caches the already-
+    # imported anytoolai_platform_core.config.errors module, so it gets the exact same tuple
+    # object, not a re-import. `is` here (not `==`) is what actually catches a regression where
+    # this boundary reintroduces its own independently-defined, equal-by-coincidence copy.
+    assert bootstrap.RESERVED_BUNDLE_IDS is validate_configs.RESERVED_BUNDLE_IDS
     assert bootstrap.RESERVED_BUNDLE_IDS == ("platform_actions", "kernel_demo")
 
 
@@ -179,13 +182,17 @@ def test_duplicate_bundle_id_fails_consistently_across_all_three_composition_bou
     assert validate_configs.main() == 1
 
 
+@pytest.mark.parametrize("reserved_id", bootstrap.RESERVED_BUNDLE_IDS)
 def test_reserved_bundle_id_collision_fails_consistently_across_all_three_composition_boundaries(
-    monkeypatch: Any,
+    monkeypatch: Any, reserved_id: str
 ) -> None:
     """Contract A (ANY-32 code review finding): a composed bundle_id colliding with a reserved
     kernel-level label ("platform_actions"/"kernel_demo") was only rejected by
-    apps/platform-api/bootstrap.py. All three now share the same RESERVED_BUNDLE_IDS."""
-    colliding_bundles = [_EmptyBundle("platform_actions")]
+    apps/platform-api/bootstrap.py. All three now share the same RESERVED_BUNDLE_IDS.
+    Parametrized over every reserved value (not just "platform_actions") -- a first version of
+    this test only exercised one, so a boundary that special-cased just that one value would
+    still have passed it."""
+    colliding_bundles = [_EmptyBundle(reserved_id)]
 
     with pytest.raises(RegistryLoadError) as api_excinfo:
         bootstrap.build_runtime(config_root=CONFIG_ROOT, bundles=colliding_bundles)
