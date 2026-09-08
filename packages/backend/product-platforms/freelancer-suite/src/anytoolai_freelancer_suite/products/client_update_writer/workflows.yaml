@@ -1,0 +1,53 @@
+workflows:
+  - workflow_id: client_update_writer.update_v1
+    version: 1
+    input_schema_ref: client_update_writer.update_input_v1
+    output_schema_ref: kernel.schemas.compose_reply_output_v1
+    steps:
+      - step_id: compose_reply
+        action_config_id: client_update_writer.update_compose_reply_v1
+        input_mapping:
+          situation: scenario.input.progress_notes
+          intent: 'literal:"Give the client a clear, concrete update on project progress and next steps."'
+          tone: scenario.input.tone
+          constraints: '?scenario.input.constraints'
+
+  - workflow_id: client_update_writer.reply_draft_v1
+    version: 1
+    input_schema_ref: client_update_writer.reply_draft_input_v1
+    output_schema_ref: kernel.schemas.compose_reply_output_v1
+    steps:
+      - step_id: compose_reply
+        action_config_id: client_update_writer.reply_draft_compose_reply_v1
+        input_mapping:
+          situation: scenario.input.client_message
+          intent: scenario.input.reply_goal
+          tone: scenario.input.tone
+          constraints: '?scenario.input.constraints'
+
+  - workflow_id: client_update_writer.prepaid_request_v1
+    version: 1
+    input_schema_ref: client_update_writer.prepaid_request_input_v1
+    output_schema_ref: kernel.schemas.compose_reply_output_v1
+    steps:
+      - step_id: compose_persuasive_text
+        action_config_id: client_update_writer.prepaid_request_compose_persuasive_text_v1
+        input_mapping:
+          context: scenario.input.billing_context
+          objective: 'literal:"Persuade the client to send the requested prepayment promptly, using only the stated context."'
+          constraints.tone: scenario.input.tone
+          # compose_persuasive_text_input.schema.json names these length/format, not
+          # compose_reply_input's max_length/output_format -- same scenario.input.constraints
+          # object as the compose_reply step below, renamed per-field to this step's own schema.
+          constraints.language: '?scenario.input.constraints.language'
+          constraints.length: '?scenario.input.constraints.max_length'
+          constraints.format: '?scenario.input.constraints.output_format'
+      - step_id: compose_reply
+        action_config_id: client_update_writer.prepaid_request_compose_reply_v1
+        input_mapping:
+          situation: steps.compose_persuasive_text.output.text
+          intent: 'literal:"Ask the client to complete the requested prepayment and confirm receipt once sent."'
+          tone: scenario.input.tone
+          constraints: '?scenario.input.constraints'
+        output_mapping:
+          context.workflow_output: steps.compose_reply.output

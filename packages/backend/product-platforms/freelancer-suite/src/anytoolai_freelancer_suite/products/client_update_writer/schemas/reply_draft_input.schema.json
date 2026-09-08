@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "properties": {
+    "client_message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reply_goal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tone": {
+      "type": "string",
+      "enum": ["neutral", "warm", "firm"]
+    },
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+        },
+        "max_length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "output_format": {
+          "type": "string",
+          "enum": ["plain_text", "markdown", "html"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["client_message", "reply_goal", "tone"],
+  "additionalProperties": false
+}

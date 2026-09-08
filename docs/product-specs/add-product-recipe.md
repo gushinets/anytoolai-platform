@@ -19,8 +19,8 @@ must stay inside, and `tests/architecture/` for the tests that enforce it.
    string, and never dependent on the caller's current working directory. See
    `packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/bundle.py`
    for the class shape (it imports nothing from `platform-core`, `platform-actions`, or
-   `platform-api`); as of `ANY-32` it returns `[]` until a product issue (starting with
-   `ANY-227`/ProposalAI) adds a real product directory.
+   `platform-api`); as of `ANY-413`/Client Update Writer it returns one product root, and each
+   further product issue (`ANY-227`/ProposalAI and onward) adds its own entry to the list.
 2. **Config roots.** Under the bundle's `products/<product_name>/` config root, add the
    product's `product.yaml`, `frontends.yaml`, `action_configs.yaml`, `workflows.yaml`,
    `scenarios.yaml`, `prompts.yaml`, `schemas.yaml`, and any product-scoped

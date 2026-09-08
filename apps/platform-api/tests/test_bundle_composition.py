@@ -84,7 +84,8 @@ def test_production_default_excludes_the_fixture_bundle() -> None:
 
     assert "fixture_bundle" not in result.loaded_bundles
     assert "fixture_product" not in result.config_registry.products
-    # ANY-32: production default is FreelancerSuiteBundle with zero product roots.
+    # ANY-32: production default is FreelancerSuiteBundle (ANY-413 gives it its first real
+    # product root, client_update_writer).
     assert "freelancer_suite" in result.loaded_bundles
 
 

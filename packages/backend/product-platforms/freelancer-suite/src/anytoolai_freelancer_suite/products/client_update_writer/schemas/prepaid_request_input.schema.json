@@ -1,0 +1,49 @@
+{
+  "type": "object",
+  "properties": {
+    "billing_context": {
+      "type": "object",
+      "properties": {
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        },
+        "amount": {
+          "type": "string",
+          "minLength": 1
+        },
+        "due_date": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["notes", "amount"],
+      "additionalProperties": false
+    },
+    "tone": {
+      "type": "string",
+      "enum": ["neutral", "warm", "firm"]
+    },
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+        },
+        "max_length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4000
+        },
+        "output_format": {
+          "type": "string",
+          "enum": ["plain_text", "markdown", "html"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["billing_context", "tone"],
+  "additionalProperties": false
+}

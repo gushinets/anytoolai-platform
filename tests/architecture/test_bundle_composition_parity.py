@@ -62,11 +62,12 @@ def _bundle_ids(bundles: Any) -> list[str]:
 
 
 def test_default_product_bundles_match_across_all_three_composition_boundaries() -> None:
-    """The regression this finding actually needs: DEFAULT_PRODUCT_BUNDLES is currently `()` of
-    contributed config roots for every bundle (no real product exists yet), so a registry-content
-    comparison alone would pass even if one composition root silently used a different or empty
-    bundle set. Comparing the bundle_id sequence directly catches that today, before ANY-227 gives
-    it any config-root content to diverge on."""
+    """The regression this finding actually needs: comparing the composed registry's *content*
+    alone would pass even if one composition root silently used a different or empty bundle set,
+    as long as the resulting product/workflow/scenario ids happened to coincide. Comparing the
+    bundle_id sequence directly catches that regardless of how much config-root content each
+    bundle contributes (zero, as when this test was written, or client_update_writer onward as of
+    ANY-413)."""
     validate_configs = _load_validate_configs_module()
 
     api_bundle_ids = _bundle_ids(bootstrap.DEFAULT_PRODUCT_BUNDLES)
@@ -131,4 +132,34 @@ def test_duplicate_bundle_id_fails_consistently_across_all_three_composition_bou
 
     validate_configs = _load_validate_configs_module()
     monkeypatch.setattr(validate_configs, "DEFAULT_PRODUCT_BUNDLES", dup_bundles)
+    assert validate_configs.main() == 1
+
+
+def test_reserved_bundle_id_fails_consistently_across_all_three_composition_boundaries(
+    monkeypatch: Any,
+) -> None:
+    """`/code-review xhigh` round 3 finding: apps/platform-worker/composition.py and
+    scripts/agent/validate_configs.py called check_ids_are_unique() without `reserved=`, unlike
+    apps/platform-api/bootstrap.py -- a bundle_id colliding with a reserved kernel-level label
+    (e.g. "kernel_demo") would fail API startup but pass worker startup and the required
+    `validate-configs` CI gate silently. Mirrors
+    test_duplicate_bundle_id_fails_consistently_across_all_three_composition_boundaries above,
+    for the reserved-id rejection path instead of the duplicate-id one."""
+    reserved_id_bundle = [_EmptyBundle("kernel_demo")]
+
+    with pytest.raises(RegistryLoadError) as api_excinfo:
+        bootstrap.build_runtime(config_root=CONFIG_ROOT, bundles=reserved_id_bundle)
+    assert "config_duplicate_bundle_id" in [error.code for error in api_excinfo.value.errors]
+
+    engine = sa.create_engine("sqlite://")
+    with pytest.raises(RegistryLoadError) as worker_excinfo:
+        worker_composition.build_worker(
+            session_factory=sessionmaker(bind=engine),
+            config_root=CONFIG_ROOT,
+            bundles=reserved_id_bundle,
+        )
+    assert "config_duplicate_bundle_id" in [error.code for error in worker_excinfo.value.errors]
+
+    validate_configs = _load_validate_configs_module()
+    monkeypatch.setattr(validate_configs, "DEFAULT_PRODUCT_BUNDLES", reserved_id_bundle)
     assert validate_configs.main() == 1

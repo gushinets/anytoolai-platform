@@ -1,0 +1,13 @@
+{
+  "response_json": {
+    "text": "Quick update: the homepage redesign is done and the checkout flow is in progress, on track for review by Friday. No blockers on my end right now.",
+    "call_to_action": "Let me know by Thursday if you'd like any changes to the homepage before I move on to checkout."
+  },
+  "input_tokens": 92,
+  "output_tokens": 34,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "client_update_writer.update_compose_reply_v1"
+  }
+}

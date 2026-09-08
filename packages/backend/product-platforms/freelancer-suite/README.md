@@ -11,12 +11,12 @@ require changes to platform-core.
 
 ## Product config roots
 
-As of ANY-32 (B01), `FreelancerSuiteBundle.config_roots()` returns `[]`: this package owns no
-implemented product directories yet. The Freelancer Suite roadmap adds one product per
-bundle-and-workflow issue, in this order:
+As of ANY-413, `FreelancerSuiteBundle.config_roots()` returns one implemented product root:
+`client_update_writer`. The Freelancer Suite roadmap adds one product per bundle-and-workflow
+issue, in this order:
 
 1. ProposalAI (ANY-227)
-2. Client Update Writer (ANY-413)
+2. Client Update Writer (ANY-413) -- implemented
 3. Brief Decoder (ANY-232)
 4. Acceptance Builder (ANY-228)
 5. Task Finder (ANY-231)

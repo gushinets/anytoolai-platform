@@ -1,0 +1,21 @@
+prompts:
+  - prompt_ref: client_update_writer.update_compose_reply.v1
+    version: 1
+    template_path: prompts/update_compose_reply.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.compose_reply_output_v1
+  - prompt_ref: client_update_writer.reply_draft_compose_reply.v1
+    version: 1
+    template_path: prompts/reply_draft_compose_reply.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.compose_reply_output_v1
+  - prompt_ref: client_update_writer.prepaid_request_compose_persuasive_text.v1
+    version: 1
+    template_path: prompts/prepaid_request_compose_persuasive_text.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.compose_persuasive_text_output_v1
+  - prompt_ref: client_update_writer.prepaid_request_compose_reply.v1
+    version: 1
+    template_path: prompts/prepaid_request_compose_reply.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.compose_reply_output_v1

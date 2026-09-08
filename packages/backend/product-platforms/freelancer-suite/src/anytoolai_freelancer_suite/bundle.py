@@ -6,12 +6,12 @@ from anytoolai_platform_sdk import ProductBundle
 
 
 class FreelancerSuiteBundle(ProductBundle):
-    """MVP-B Freelancer Suite. Zero implemented product roots as of ANY-32 (B01) -- ProposalAI
-    becomes the first one in ANY-227 (B02a). See this package's README for the 6-product roadmap
-    order; a product only appears in config_roots() once its own bundle-and-workflow issue lands
-    a real product directory here."""
+    """MVP-B Freelancer Suite. `client_update_writer` (ANY-413) is the first implemented product
+    root -- see this package's README for the full 6-product roadmap order; a product only
+    appears in config_roots() once its own bundle-and-workflow issue lands a real product
+    directory here."""
 
     bundle_id = "freelancer_suite"
 
     def config_roots(self) -> list[Path]:
-        return []
+        return [self._package_dir() / "products" / "client_update_writer"]

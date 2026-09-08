@@ -1,8 +1,8 @@
 """ANY-32 code-review finding: package-relative config_roots() resolution only helps if the
 product config files it points at actually ship inside the built wheel. setuptools does not
 include non-.py files by default, so this proves the package-data declaration in pyproject.toml
-actually works, using a throwaway fixture product file (this bundle has zero real product roots
-today -- ProposalAI, ANY-227, adds the first one)."""
+actually works, using a throwaway fixture product file (independent of client_update_writer,
+ANY-413's real product root, so this test stays a minimal packaging-only proof)."""
 
 from __future__ import annotations
 

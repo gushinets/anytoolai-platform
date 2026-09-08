@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle
+from anytoolai_platform_actions.bundle import PlatformActionsBundle
 from anytoolai_platform_actions.structured_llm.cross_validation import (
     build_input_validators,
     build_output_cross_validators,
@@ -59,6 +60,12 @@ from anytoolai_platform_worker.worker import Worker
 # finding), or the API can accept a product workflow this worker's own registry never loaded.
 DEFAULT_PRODUCT_BUNDLES: tuple[ProductBundle, ...] = (FreelancerSuiteBundle(),)
 
+# Mirrors apps/platform-api/bootstrap.py's identically-named RESERVED_BUNDLE_IDS -- both must
+# reject the same bundle_id collisions, or a bundle whose bundle_id shadows a reserved kernel
+# label can fail API startup while silently passing here (the same duplicate-check parity gap
+# check_ids_are_unique's own docstring names as its reason for existing).
+RESERVED_BUNDLE_IDS: tuple[str, ...] = (PlatformActionsBundle.bundle_id, "kernel_demo")
+
 
 def build_worker(
     *,
@@ -95,6 +102,7 @@ def build_worker(
         resolved_bundles = list(bundles) if bundles is not None else list(DEFAULT_PRODUCT_BUNDLES)
         check_ids_are_unique(
             (bundle.bundle_id for bundle in resolved_bundles),
+            reserved=RESERVED_BUNDLE_IDS,
             ref_type="bundle_id",
             context="composed bundles",
         )

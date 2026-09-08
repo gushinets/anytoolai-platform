@@ -13,9 +13,9 @@ allowed and forbidden, and where to look before writing product code.
   depending only on `anytoolai_platform_sdk`, composed through `apps/platform-api`'s real
   composition root (`bootstrap.py`'s `build_runtime`) — see `bundle.py`, `tests/test_bundle_loads.py`,
   and `apps/platform-api/tests/test_bundle_composition.py` (the loader's required-evidence suite,
-  proven against a test-only fixture bundle). As of `ANY-32` (`B01`) `FreelancerSuiteBundle.config_roots()`
-  returns `[]` — zero implemented product roots. ProposalAI (`ANY-227`) becomes the first real one;
-  see the package's own README for the full 6-product roadmap order. Use `self._package_dir()`
+  proven against a test-only fixture bundle). As of `ANY-413`, `FreelancerSuiteBundle.config_roots()`
+  returns one implemented product root (`client_update_writer`); see the package's own README for
+  the full 6-product roadmap order and status. Use `self._package_dir()`
   (inherited from `ProductBundle`, `packages/backend/platform-sdk/src/anytoolai_platform_sdk/bundle.py`)
   to resolve your product directory relative to your bundle's own installed package, independent of
   the caller's working directory — never a bare relative string.
