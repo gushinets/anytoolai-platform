@@ -52,8 +52,8 @@ def build_runtime(
     bundles: Sequence[ProductBundle] | None = None,
 ) -> RuntimeBootstrapResult:
     """Compose the platform kernel with `bundles` (defaulting in production to
-    `[FreelancerSuiteBundle()]`, which currently contributes zero product roots -- ANY-227 adds
-    ProposalAI as its first one). `loaded_bundles` reports what was actually composed: the two
+    `[FreelancerSuiteBundle()]`, which contributes ProposalAI (ANY-227) as its first product
+    root). `loaded_bundles` reports what was actually composed: the two
     kernel-level labels plus each bundle's own `bundle_id`, in the order given -- not a fabricated
     literal. A caller that passes `bundles` explicitly (e.g. a test-only fixture bundle) fully
     replaces the production default; it is never combined with it."""
