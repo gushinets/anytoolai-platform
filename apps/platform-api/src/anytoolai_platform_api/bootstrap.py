@@ -18,7 +18,7 @@ from typing import Any
 from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle
 from anytoolai_platform_actions.bundle import PlatformActionsBundle
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
-from anytoolai_platform_core.config.errors import check_ids_are_unique
+from anytoolai_platform_core.config.errors import RESERVED_BUNDLE_IDS, check_ids_are_unique
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.storage.db import build_postgres_url_from_env, create_sync_engine
 from anytoolai_platform_core.storage.transactions import build_session_factory
@@ -26,14 +26,6 @@ from anytoolai_platform_sdk import ProductBundle
 
 PROJECT_DATABASE_URL_ENV = "ANYTOOLAI_DATABASE_URL"
 GENERIC_DATABASE_URL_ENV = "DATABASE_URL"
-
-# loaded_bundles always carries these two kernel-level labels ahead of any composed bundle's own
-# bundle_id (see build_runtime below) -- a composed bundle_id colliding with either would produce
-# a misleading, ambiguous loaded_bundles report. "platform_actions" is sourced from
-# PlatformActionsBundle.bundle_id (not re-hardcoded here) so the two never drift independently;
-# "kernel_demo" has no equivalent bundle class to source from -- it names a product directory
-# inside the kernel config root, not a composed ProductBundle.
-RESERVED_BUNDLE_IDS: tuple[str, ...] = (PlatformActionsBundle.bundle_id, "kernel_demo")
 
 # Named (not inline) so apps/platform-worker/composition.py and scripts/agent/validate_configs.py
 # -- the only other modules allowed to import a product-platforms package (ANY-32 code review
@@ -60,8 +52,8 @@ def build_runtime(
     bundles: Sequence[ProductBundle] | None = None,
 ) -> RuntimeBootstrapResult:
     """Compose the platform kernel with `bundles` (defaulting in production to
-    `[FreelancerSuiteBundle()]`, which contributes ProposalAI (ANY-227) as its first product
-    root). `loaded_bundles` reports what was actually composed: the two
+    `[FreelancerSuiteBundle()]`, which currently contributes zero product roots -- ANY-227 adds
+    ProposalAI as its first one). `loaded_bundles` reports what was actually composed: the two
     kernel-level labels plus each bundle's own `bundle_id`, in the order given -- not a fabricated
     literal. A caller that passes `bundles` explicitly (e.g. a test-only fixture bundle) fully
     replaces the production default; it is never combined with it."""

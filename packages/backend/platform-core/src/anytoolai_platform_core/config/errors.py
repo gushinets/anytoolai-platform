@@ -182,6 +182,19 @@ class RegistryLoadError(ConfigError):
         return f"{base}\n\n{details}"
 
 
+# Kernel-level labels reserved across every product-bundle composition boundary
+# (apps/platform-api/bootstrap.py, apps/platform-worker/composition.py,
+# scripts/agent/validate_configs.py): "platform_actions" names the platform-actions kernel
+# bundle, "kernel_demo" names the kernel's own smoke-test product directory. A single shared
+# definition here (ANY-32 code review finding: three independently-defined-but-tested-equal
+# copies were rejected as not actually "shared/reused") -- plain string literals, not sourced
+# from PlatformActionsBundle.bundle_id, because platform-actions depends on platform-core (not
+# the reverse); importing it here would be circular. Drift against
+# PlatformActionsBundle.bundle_id is caught by
+# tests/architecture/test_bundle_composition_parity.py, which imports both.
+RESERVED_BUNDLE_IDS: tuple[str, ...] = ("platform_actions", "kernel_demo")
+
+
 def check_ids_are_unique(
     ids: Iterable[str],
     *,

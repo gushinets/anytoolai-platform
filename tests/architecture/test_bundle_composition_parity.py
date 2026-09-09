@@ -31,6 +31,7 @@ for src_path in (
         sys.path.insert(0, str(src_path))
 
 import pytest  # noqa: E402
+from anytoolai_platform_actions.bundle import PlatformActionsBundle  # noqa: E402
 from anytoolai_platform_api import bootstrap  # noqa: E402
 from anytoolai_platform_core.config.errors import RegistryLoadError  # noqa: E402
 from anytoolai_platform_sdk import ProductBundle  # noqa: E402
@@ -57,9 +58,8 @@ class _FixtureBundle(ProductBundle):
     """Reuses apps/platform-api/tests/test_bundle_composition.py's fixture_product directory
     (product_id: fixture_product) rather than checking in a second copy -- proves a *non-empty*
     ProductBundle actually reaches the loaded registry, not just that composition runs without
-    error (ANY-32 code review finding, still true post-ANY-227: DEFAULT_PRODUCT_BUNDLES's real
-    ProposalAI root is a *known-good* fixture, so this test still needs its own throwaway
-    fixture bundle to prove the general wiring, independent of any one product's content)."""
+    error (ANY-32 code review finding: DEFAULT_PRODUCT_BUNDLES currently contributes zero
+    config_roots, so a passing composition call alone doesn't prove roots are wired through)."""
 
     bundle_id = "fixture_bundle"
 
@@ -96,18 +96,33 @@ def test_default_product_bundles_match_across_all_three_composition_boundaries()
     assert api_bundle_ids, "expected at least the production FreelancerSuiteBundle default"
 
 
-def test_reserved_bundle_ids_match_across_all_three_composition_boundaries() -> None:
-    """Contract A (ANY-32 code review finding): platform_actions/kernel_demo are globally
-    reserved bundle IDs, not just an apps/platform-api `loaded_bundles`-reporting constraint --
-    all three composition boundaries must agree on the same reserved set."""
+def test_reserved_bundle_ids_are_shared_not_duplicated_across_composition_boundaries() -> None:
+    """Contract A (ANY-32 code review finding): a first fix gave each composition boundary its
+    own independently-defined-but-tested-equal RESERVED_BUNDLE_IDS -- rejected as not actually
+    "shared/reused from a single product-neutral composition contract boundary". All three now
+    import the identical object from platform-core's config.errors, so this asserts identity
+    (`is`), not just equal value -- a real regression (e.g. one module re-defining its own copy)
+    would break `is` even if the value still matched by coincidence."""
     validate_configs = _load_validate_configs_module()
 
-    assert (
-        bootstrap.RESERVED_BUNDLE_IDS
-        == worker_composition.RESERVED_BUNDLE_IDS
-        == validate_configs.RESERVED_BUNDLE_IDS
-    )
+    assert bootstrap.RESERVED_BUNDLE_IDS is worker_composition.RESERVED_BUNDLE_IDS
+    # validate_configs.py is loaded via importlib as a separate *module* object (see
+    # _load_validate_configs_module), but its own `from anytoolai_platform_core.config.errors
+    # import RESERVED_BUNDLE_IDS` still resolves through sys.modules -- Python caches the already-
+    # imported anytoolai_platform_core.config.errors module, so it gets the exact same tuple
+    # object, not a re-import. `is` here (not `==`) is what actually catches a regression where
+    # this boundary reintroduces its own independently-defined, equal-by-coincidence copy.
+    assert bootstrap.RESERVED_BUNDLE_IDS is validate_configs.RESERVED_BUNDLE_IDS
     assert bootstrap.RESERVED_BUNDLE_IDS == ("platform_actions", "kernel_demo")
+
+
+def test_reserved_bundle_ids_do_not_drift_from_platform_actions_bundle_id() -> None:
+    """platform-core's RESERVED_BUNDLE_IDS hardcodes "platform_actions" as a plain string literal
+    rather than importing PlatformActionsBundle (platform-actions depends on platform-core, so
+    the reverse import would be circular). This is the drift check that makes that safe: if
+    PlatformActionsBundle.bundle_id is ever renamed, this test (which can import both) catches
+    the mismatch immediately."""
+    assert PlatformActionsBundle.bundle_id in bootstrap.RESERVED_BUNDLE_IDS
 
 
 def _capture_registry(monkeypatch: Any, module: Any) -> list[Any]:
@@ -167,13 +182,17 @@ def test_duplicate_bundle_id_fails_consistently_across_all_three_composition_bou
     assert validate_configs.main() == 1
 
 
+@pytest.mark.parametrize("reserved_id", bootstrap.RESERVED_BUNDLE_IDS)
 def test_reserved_bundle_id_collision_fails_consistently_across_all_three_composition_boundaries(
-    monkeypatch: Any,
+    monkeypatch: Any, reserved_id: str
 ) -> None:
     """Contract A (ANY-32 code review finding): a composed bundle_id colliding with a reserved
     kernel-level label ("platform_actions"/"kernel_demo") was only rejected by
-    apps/platform-api/bootstrap.py. All three now share the same RESERVED_BUNDLE_IDS."""
-    colliding_bundles = [_EmptyBundle("platform_actions")]
+    apps/platform-api/bootstrap.py. All three now share the same RESERVED_BUNDLE_IDS.
+    Parametrized over every reserved value (not just "platform_actions") -- a first version of
+    this test only exercised one, so a boundary that special-cased just that one value would
+    still have passed it."""
+    colliding_bundles = [_EmptyBundle(reserved_id)]
 
     with pytest.raises(RegistryLoadError) as api_excinfo:
         bootstrap.build_runtime(config_root=CONFIG_ROOT, bundles=colliding_bundles)
@@ -196,11 +215,10 @@ def test_reserved_bundle_id_collision_fails_consistently_across_all_three_compos
 def test_non_empty_bundle_actually_lands_in_worker_and_validate_configs_registries(
     monkeypatch: Any,
 ) -> None:
-    """ANY-32 code-review finding: composition running without error doesn't by itself prove a
-    real product actually reaches the loaded registry (still worth a dedicated, product-agnostic
-    proof post-ANY-227, since a bug here could hide behind any one product's own config being
-    valid). Runs a non-empty fixture bundle through build_worker() and
-    validate_configs.load_registry() and asserts fixture_product is present."""
+    """ANY-32 code-review finding: DEFAULT_PRODUCT_BUNDLES currently contributes zero
+    config_roots for every bundle, so composition running without error doesn't prove a real
+    product actually reaches the loaded registry. Runs a non-empty fixture bundle through
+    build_worker() and validate_configs.load_registry() and asserts fixture_product is present."""
     worker_registries = _capture_registry(monkeypatch, worker_composition)
     engine = sa.create_engine("sqlite://")
     worker_composition.build_worker(
