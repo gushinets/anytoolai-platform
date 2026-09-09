@@ -33,7 +33,22 @@ from anytoolai_platform_worker.composition import build_worker
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
-FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
+# Product-owned per ANY-227's implementation contract (not the repo-global
+# tests/fixtures/provider/fake_provider_outputs/ used by kernel_demo and other suites) --
+# FakeProviderAdapter's fixture_root is a test-only composition parameter, so pointing it here is
+# a test-side wiring choice with no Platform Core or production runtime change.
+FIXTURE_ROOT = (
+    REPO_ROOT
+    / "packages"
+    / "backend"
+    / "product-platforms"
+    / "freelancer-suite"
+    / "src"
+    / "anytoolai_freelancer_suite"
+    / "products"
+    / "proposal_ai"
+    / "fixtures"
+)
 GUEST_ID = "guest_proposal_ai_test"
 
 # `session_factory` (SQLite-backed) comes from apps/platform-api/tests/conftest.py -- shared with

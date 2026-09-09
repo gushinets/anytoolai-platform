@@ -263,18 +263,22 @@ Three verified and fixed; one reviewed and declined with cited evidence:
   output field (`text`), the reused output schema, the `copy_result` next action, and the
   excluded fields (angle/rationale/model/provider), plus a test cross-checking it against
   `workflows.yaml`/`scenarios.yaml` so it can't silently drift from the real config.
-- **Declined: moving the fixtures under `products/proposal_ai/`.** The review read ANY-227's
-  "product-owned config, prompt, schema, fixture, and renderer contract" as requiring the
-  fake-provider JSON files to live under the product's own directory. Checked against the
-  repo's actual, established pattern: `kernel_demo` -- the platform's own reference product --
-  keeps its fixtures in the exact same repo-global
-  `tests/fixtures/provider/fake_provider_outputs/` directory this PR uses, not under
-  `configs/kernel/products/kernel_demo/`. No product anywhere in the repo nests fixtures under
-  its own product config root; the fake-provider/test-composition mechanism itself (its own
-  README, and every existing test) assumes one shared, `action_config_id`-keyed directory.
-  "Product-owned" here is expressed through the unique, product-prefixed filename inside that
-  shared mechanism, not directory nesting -- moving ProposalAI's fixtures alone would deviate
-  from the repo's own reference product's layout, not align with it.
+- **Fixture location, round 1: declined, then reversed on re-review.** Initially declined,
+  citing `kernel_demo`'s own fixtures living in the same repo-global
+  `tests/fixtures/provider/fake_provider_outputs/` directory as a general-pattern precedent. The
+  reviewer's follow-up round correctly rejected that precedent: `kernel_demo` is the platform's
+  own smoke product (AGENTS.md: "the only platform smoke product"), not a Freelancer Suite
+  product bound by ANY-227's issue-specific "product-owned config, prompt, schema, fixture, and
+  renderer contract live under `.../products/proposal_ai/`" contract -- a repo-wide convention
+  that happens to hold for a *different class* of product doesn't override an explicit,
+  issue-specific requirement for *this* one. Fixed: moved both fixtures to
+  `products/proposal_ai/fixtures/`; `FIXTURE_ROOT` in both test files now points there instead of
+  the repo-global directory. `FakeProviderAdapter(fixture_root=...)` is a test-only composition
+  parameter (`FakeProviderAdapter` is never constructed in production, which uses the real,
+  LiteLLM-backed Provider Gateway), so this is purely test-side wiring -- no Platform Core,
+  provider-gateway, or fake-provider-adapter code changed. Verified the fixtures actually ship in
+  a real built wheel (`uv build --wheel`), not just under the throwaway fixture
+  `test_packaging.py` already covered generically.
 
 ## Resolved follow-up
 

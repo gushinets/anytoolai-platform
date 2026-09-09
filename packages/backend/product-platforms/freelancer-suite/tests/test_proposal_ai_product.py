@@ -23,7 +23,9 @@ PRODUCT_DIR = (
     / "products"
     / "proposal_ai"
 )
-FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
+# Product-owned per ANY-227's implementation contract, not the repo-global
+# tests/fixtures/provider/fake_provider_outputs/ used by kernel_demo and other suites.
+FIXTURE_ROOT = PRODUCT_DIR / "fixtures"
 
 
 def _load_validate_architecture_module() -> Any:
