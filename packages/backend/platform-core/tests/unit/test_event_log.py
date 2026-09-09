@@ -539,6 +539,76 @@ def test_event_emitter_rejects_missing_region(
             )
 
 
+def test_event_emitter_client_event_id_is_idempotent(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        emitter = _build_emitter(session)
+        context = make_execution_context()
+
+        first = emitter.emit(
+            "web.product_viewed",
+            context,
+            properties={"mode": "default"},
+            event_id="client_event_demo_1",
+        )
+        duplicate = emitter.emit(
+            "web.product_viewed",
+            context,
+            properties={"mode": "other"},
+            event_id="client_event_demo_1",
+        )
+
+        rows = list(
+            session.execute(
+                sa.select(event_log_table).where(
+                    event_log_table.c.event_type == "web.product_viewed"
+                )
+            ).mappings()
+        )
+
+    assert first.event_id == "client_event_demo_1"
+    assert duplicate.event_id == "client_event_demo_1"
+    assert duplicate.properties["mode"] == "default"
+    assert len(rows) == 1
+
+
+def test_event_emitter_rejects_empty_client_event_id(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        emitter = _build_emitter(session)
+        with pytest.raises(EventValidationError, match="event_id must not be empty"):
+            emitter.emit("web.product_viewed", make_execution_context(), event_id="  ")
+
+
+def test_event_emitter_rejects_oversized_client_event_id(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        emitter = _build_emitter(session)
+        with pytest.raises(EventValidationError, match="at most 128 characters"):
+            emitter.emit(
+                "web.product_viewed",
+                make_execution_context(),
+                event_id="x" * 129,
+            )
+
+
+def test_event_emitter_rejects_client_event_id_with_replay(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        emitter = _build_emitter(session)
+        with pytest.raises(EventValidationError, match="mutually exclusive"):
+            emitter.emit(
+                "web.product_viewed",
+                make_execution_context(),
+                event_id="client_event_demo",
+                replay=True,
+            )
+
+
 def test_event_emitter_sanitizes_properties_and_keeps_persistence_safe(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

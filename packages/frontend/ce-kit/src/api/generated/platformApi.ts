@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/client-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record an allowlisted client analytics event */
+        post: operations["post_client_event_v1_client_events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/demo/runs": {
         parameters: {
             query?: never;
@@ -229,6 +246,35 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ClientEventRequest */
+        ClientEventRequest: {
+            /** Event Id */
+            event_id: string;
+            event_type: components["schemas"]["WebClientEventType"];
+            /** Frontend Id */
+            frontend_id: string;
+            /** Guest Id */
+            guest_id?: string | null;
+            /** Product Id */
+            product_id: string;
+            /** Properties */
+            properties?: {
+                [key: string]: unknown;
+            };
+            /** Scenario Session Id */
+            scenario_session_id?: string | null;
+            /** User Id */
+            user_id?: string | null;
+            /** Web Session Id */
+            web_session_id: string;
+        };
+        /** ClientEventResponse */
+        ClientEventResponse: {
+            /** Event Id */
+            event_id: string;
+            /** Event Type */
+            event_type: string;
+        };
         /** DemoRunRequest */
         DemoRunRequest: {
             /** Demo Id */
@@ -512,6 +558,16 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /**
+         * WebClientEventType
+         * @description ANY-17 v1 web-event allowlist -- the only event types POST /v1/client-events accepts.
+         *
+         *     A closed HTTP-facing enum per docs/agent/coding-conventions.md, not a plain `str`, so OpenAPI
+         *     emits a real enum and `ce-kit` can generate its client-side union from it instead of keeping an
+         *     independent hand-maintained copy.
+         * @enum {string}
+         */
+        WebClientEventType: "web.product_viewed" | "web.form_started" | "web.form_submitted" | "web.result_viewed" | "web.retry_clicked" | "web.mode_selected" | "web.gap_selected" | "web.feedback_submitted";
     };
     responses: never;
     parameters: never;
@@ -539,6 +595,90 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    post_client_event_v1_client_events_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientEventRequest"];
+            };
+        };
+        responses: {
+            /** @description Event was durably recorded (or already existed for this event_id -- duplicate delivery is idempotent). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "event_id": "web_evt_123",
+                     *       "event_type": "web.product_viewed"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ClientEventResponse"];
+                };
+            };
+            /** @description Safe response when the supplied guest identity or scenario session is unknown. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "guest_identity_not_found",
+                     *         "message": "Guest identity not found.",
+                     *         "request_id": "req_123"
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The supplied event_id was already used to record a client event with different content (event type, correlation, or properties). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "client_event_id_conflict",
+                     *         "message": "event_id was already used to record a different client event.",
+                     *         "request_id": "req_123"
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Safe response for an unknown event type, an invalid product/frontend combination, a disallowed property, or a missing/oversized identifier. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "client_event_type_not_allowed",
+                     *         "message": "Event type is not part of the v1 client-event allowlist.",
+                     *         "request_id": "req_123"
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

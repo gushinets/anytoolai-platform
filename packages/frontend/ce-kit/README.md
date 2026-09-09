@@ -6,14 +6,14 @@ This package covers **A15 — CE Kit MVP API Client** (ANY-8): **A15a — Founda
 **A15b — Scenario, Quota, and Polling Client** (ANY-171), and **A15c — Result Artifact Client**
 (ANY-226). The transport layer, the stable error union, injectable storage, guest identity, runtime
 config, quota, idempotent scenario start, session polling, next-action, and the frontend-safe
-result artifact read, the handoff creation/consent-navigation helpers (A18a / ANY-222), and the
-handoff preview/accept/decline helpers (A18b / ANY-223) are all real. `pollJob`, `getArtifact`,
-`captureEmail`, and `trackClientEvent` are intentionally not
-exported: their backend contracts don't exist yet (public job polling, raw artifact fetching,
-email capture, client-event ingestion, owned by ANY-36 / later tickets). Unsupported capabilities
-must not ship as fake-success helpers, so all of the above will be added for real once their
-owning tickets land. (The deferred `getArtifact` name above is unrelated to the real `getResult()`
-below.)
+result artifact read, the handoff creation/consent-navigation helpers (A18a / ANY-222), the
+handoff preview/accept/decline helpers (A18b / ANY-223), and the allowlisted client-event ingestion
+client (`trackClientEvent`, plus the device-local `getOrCreateWebSessionId` 30-minute-inactivity
+helper it's paired with -- ANY-17) are all real. `pollJob`, `getArtifact`, and `captureEmail` are
+intentionally not exported: their backend contracts don't exist yet (public job polling, raw
+artifact fetching, email capture -- owned by ANY-36 / later tickets). Unsupported capabilities must
+not ship as fake-success helpers, so all of the above will be added for real once their owning
+tickets land. (The deferred `getArtifact` name above is unrelated to the real `getResult()` below.)
 
 ## PlatformApiClient
 

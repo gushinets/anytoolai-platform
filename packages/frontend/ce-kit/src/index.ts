@@ -63,6 +63,22 @@ export type {
 export { isScenarioSessionStatus } from "./scenarios/scenarioSessionStatus";
 export type { ScenarioSessionStatus } from "./scenarios/scenarioSessionStatus";
 
+export { trackClientEvent } from "./events/trackClientEvent";
+export type {
+  ClientEventProperties,
+  TrackClientEventOptions,
+  TrackClientEventRequest,
+} from "./events/trackClientEvent";
+export type { ClientEventReceipt } from "./events/parseClientEventResponse";
+export { isWebClientEventType } from "./events/webClientEventType";
+export type { WebClientEventType } from "./events/webClientEventType";
+export {
+  DEFAULT_WEB_SESSION_STORAGE_KEY,
+  WEB_SESSION_INACTIVITY_TIMEOUT_MS,
+  getOrCreateWebSessionId,
+} from "./events/webSession";
+export type { WebSessionOptions } from "./events/webSession";
+
 export { getRuntimeConfig, isFrontendType } from "./runtime";
 export type {
   FrontendType,
