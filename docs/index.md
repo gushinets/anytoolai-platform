@@ -50,6 +50,8 @@ This directory is the system of record for agents. Keep it current. If a decisio
 - `product-specs/freelancer-suite-v0.md`
 - `product-specs/atom-ready-product-inventory.md`
 - `superpowers/specs/2026-09-03-web-first-product-framework-design.md`
+- `superpowers/specs/2026-09-09-atom-lab-design.md` — internal atom experimentation, presets, and run history; agreed requirements, not implemented.
+- `exec-plans/active/atom-lab-v1.md` — Atom Lab v1 implementation sequence, Linear tickets, dependencies, and acceptance checks.
 
 ## Agent operations
 
