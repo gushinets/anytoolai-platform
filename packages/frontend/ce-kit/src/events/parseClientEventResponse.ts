@@ -1,10 +1,12 @@
 import type { AssertExactSchemaShape } from "../api/driftAssertions";
 import type { components } from "../api/generated/platformApi";
 import { isRecord } from "../api/parsing";
+import { isWebClientEventType } from "./webClientEventType";
+import type { WebClientEventType } from "./webClientEventType";
 
 export type ClientEventReceipt = {
   eventId: string;
-  eventType: string;
+  eventType: WebClientEventType;
 };
 
 /** Validates the backend's `ClientEventResponse` payload, or null if malformed. */
@@ -14,7 +16,7 @@ export function parseClientEventResponse(payload: unknown): ClientEventReceipt |
   }
 
   const { event_id: eventId, event_type: eventType } = payload;
-  if (typeof eventId !== "string" || typeof eventType !== "string") {
+  if (typeof eventId !== "string" || typeof eventType !== "string" || !isWebClientEventType(eventType)) {
     return null;
   }
 
@@ -26,7 +28,7 @@ export function parseClientEventResponse(payload: unknown): ClientEventReceipt |
 // about.
 type _ClientEventResponseShapeCheck = AssertExactSchemaShape<
   components["schemas"]["ClientEventResponse"],
-  { event_id: string; event_type: string }
+  { event_id: string; event_type: WebClientEventType }
 >;
 const _assertClientEventResponseShapeMatchesGenerated: _ClientEventResponseShapeCheck = true;
 void _assertClientEventResponseShapeMatchesGenerated;

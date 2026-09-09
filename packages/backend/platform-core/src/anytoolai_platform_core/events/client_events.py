@@ -48,6 +48,15 @@ CLIENT_EVENT_PROPERTY_TYPES: dict[str, type] = {
     "gap_category": str,
 }
 MAX_WEB_SESSION_ID_LENGTH = 128
+# mode/gap_category are meant to be short categorical labels, not free text -- bounding them here
+# (rather than relying on EventEmitter's incidental 1024-char sanitizer truncation) keeps an
+# oversized value a clean 422 instead of silent truncation, and keeps a rejected property's own
+# value out of the error path entirely (only the key is ever echoed back, see
+# ClientEventPropertyInvalidError, and that is itself length-capped).
+MAX_PROPERTY_STRING_LENGTH = 128
+# Echoed back in a 422 message; capped so a caller can't reflect an arbitrarily large key through
+# the error response.
+MAX_PROPERTY_KEY_LENGTH_IN_ERROR = 64
 
 
 class ClientEventTypeNotAllowedError(PlatformError):
@@ -97,9 +106,15 @@ class ClientEventFrontendInvalidError(PlatformError):
 
 class ClientEventPropertyInvalidError(PlatformError):
     def __init__(self, key: str) -> None:
+        safe_key = (
+            key
+            if len(key) <= MAX_PROPERTY_KEY_LENGTH_IN_ERROR
+            else f"{key[:MAX_PROPERTY_KEY_LENGTH_IN_ERROR]}..."
+        )
         super().__init__(
             "client_event_property_invalid",
-            f"Property '{key}' is not an allowlisted client-event property of the expected type.",
+            f"Property '{safe_key}' is not an allowlisted client-event property of the expected "
+            "type and length.",
         )
 
 
@@ -141,9 +156,14 @@ class ClientEventService:
     ) -> EventEnvelope:
         if event_type not in CLIENT_EVENT_TYPES:
             raise ClientEventTypeNotAllowedError()
-        if not event_id.strip() or len(event_id) > MAX_CLIENT_EVENT_ID_LENGTH:
+        # Normalize before validating length, not after -- otherwise a value that's only over
+        # length before trimming (e.g. padding whitespace) is rejected even though the id that
+        # would actually be stored/looked-up fits.
+        event_id = event_id.strip()
+        if not event_id or len(event_id) > MAX_CLIENT_EVENT_ID_LENGTH:
             raise ClientEventIdInvalidError()
-        if not web_session_id.strip() or len(web_session_id) > MAX_WEB_SESSION_ID_LENGTH:
+        web_session_id = web_session_id.strip()
+        if not web_session_id or len(web_session_id) > MAX_WEB_SESSION_ID_LENGTH:
             raise ClientEventWebSessionIdInvalidError()
 
         product = self._config_registry.get_product(product_id)
@@ -168,11 +188,13 @@ class ClientEventService:
                 product_id=product_id,
                 frontend_id=frontend_id,
             )
-            # A session that exists but belongs to a different guest (or to no guest_id at all
-            # in this request) must be indistinguishable from a session that does not exist --
-            # checked against the session's own guest_id, not merely whether this request
-            # happened to include one, so omitting guest_id can't be used to bypass the check.
-            if session is None or (session.guest_id is not None and session.guest_id != guest_id):
+            # A session whose true owner (None for an anonymous session, or a specific guest_id)
+            # doesn't match this request's guest_id exactly must be indistinguishable from a
+            # session that does not exist -- a plain equality check, not a check that only
+            # applies when one side happens to be non-None, so neither omitting guest_id nor a
+            # session with no owner can be used to correlate to/from an identity that isn't
+            # actually attached to it.
+            if session is None or session.guest_id != guest_id:
                 raise ScenarioSessionNotFoundError()
 
         event_properties = self._validate_properties(properties or {})
@@ -234,6 +256,8 @@ class ClientEventService:
             # exclude it explicitly, but only for int-typed keys. A hypothetical future bool-typed
             # key must not be rejected by this same guard.
             if expected_type is int and isinstance(value, bool):
+                raise ClientEventPropertyInvalidError(key)
+            if expected_type is str and len(value) > MAX_PROPERTY_STRING_LENGTH:
                 raise ClientEventPropertyInvalidError(key)
             validated[key] = value
         return validated

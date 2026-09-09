@@ -127,7 +127,7 @@ class ClientEventResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     event_id: str
-    event_type: str
+    event_type: WebClientEventType
 
 
 class DemoRunRequest(BaseModel):

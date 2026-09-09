@@ -143,22 +143,22 @@ def test_client_event_is_recorded(session_factory: SessionFactory) -> None:
     assert rows[0]["properties"]["gap_category"] == "budget"
 
 
-def test_client_event_accepts_a_long_property_value_without_a_false_conflict(
+def test_client_event_accepts_a_property_value_at_the_length_boundary_without_a_false_conflict(
     session_factory: SessionFactory,
 ) -> None:
     app = _create_test_app(session_factory)
 
-    # Longer than the sanitizer's 1024-char truncation threshold. The very first, successful
-    # write of this event_id must not be mistaken for a content conflict against itself just
-    # because emit() truncates the stored copy.
-    long_mode = "m" * 1100
-    response = _post_client_event(app, properties={"mode": long_mode})
+    # Exactly MAX_PROPERTY_STRING_LENGTH (128) -- accepted, and well below the sanitizer's
+    # separate 1024-char truncation threshold, so it round-trips through emit() unchanged. The
+    # very first, successful write of this event_id must not be mistaken for a content conflict
+    # against itself.
+    boundary_mode = "m" * 128
+    response = _post_client_event(app, properties={"mode": boundary_mode})
 
     assert response.status_code == HTTPStatus.OK
     rows = _stored_events(session_factory, "web_evt_demo_1")
     assert len(rows) == 1
-    assert rows[0]["properties"]["mode"] != long_mode
-    assert rows[0]["properties"]["mode"].startswith("m" * 100)
+    assert rows[0]["properties"]["mode"] == boundary_mode
 
 
 def test_client_event_duplicate_delivery_is_idempotent(session_factory: SessionFactory) -> None:
@@ -388,3 +388,73 @@ def test_client_event_rejects_a_guest_owned_session_when_guest_id_is_omitted(
 
     assert response.status_code == HTTPStatus.NOT_FOUND
     assert response.json()["error"]["code"] == "scenario_session_not_found"
+
+
+def test_client_event_rejects_an_anonymous_session_claimed_by_a_real_guest(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    # Regression: an earlier version of the owner check only fired when the *session* had a
+    # guest_id, so an anonymous session (guest_id=None) could be silently claimed by any real
+    # guest_id the caller happened to supply.
+    response = _post_client_event(
+        app,
+        event_type="web.result_viewed",
+        guest_id="guest_other",
+        scenario_session_id="scenario_session_demo",
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "scenario_session_not_found"
+
+
+def test_client_event_accepts_an_event_id_that_only_fits_after_trimming_whitespace(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    # 129 raw characters (over the 128 limit), 127 after trimming (within it). An earlier version
+    # validated the length of the untrimmed value, rejecting this even though the id actually
+    # stored/looked-up fits.
+    padded_event_id = " " + ("x" * 127) + " "
+    response = _post_client_event(app, event_id=padded_event_id)
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json()["event_id"] == "x" * 127
+
+
+def test_client_event_trims_web_session_id_before_storing(session_factory: SessionFactory) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(app, web_session_id="  web_session_demo  ")
+
+    assert response.status_code == HTTPStatus.OK
+    rows = _stored_events(session_factory, "web_evt_demo_1")
+    assert rows[0]["properties"]["web_session_id"] == "web_session_demo"
+
+
+def test_client_event_rejects_property_value_over_the_length_cap(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(app, properties={"mode": "m" * 200})
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_property_invalid"
+
+
+def test_client_event_truncates_a_huge_property_key_in_the_error_message(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    huge_key = "x" * 5000
+    response = _post_client_event(app, properties={huge_key: "value"})
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    message = response.json()["error"]["message"]
+    # The full 5000-char key must never be reflected back into the response.
+    assert huge_key not in message
+    assert len(message) < 500

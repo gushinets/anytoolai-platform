@@ -606,6 +606,23 @@ def test_event_emitter_normalizes_client_event_id_whitespace_for_idempotency(
     assert len(rows) == 1
 
 
+def test_event_emitter_accepts_an_event_id_that_only_fits_after_trimming_whitespace(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    # 129 raw characters (over MAX_CLIENT_EVENT_ID_LENGTH), 127 after trimming. Length must be
+    # validated against the trimmed value, not the raw one.
+    padded_event_id = " " + ("x" * 127) + " "
+    with transaction_boundary(session_factory) as session:
+        emitter = _build_emitter(session)
+        created = emitter.emit(
+            "web.product_viewed",
+            make_execution_context(),
+            event_id=padded_event_id,
+        )
+
+    assert created.event_id == "x" * 127
+
+
 def test_event_emitter_rejects_empty_client_event_id(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

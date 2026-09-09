@@ -272,8 +272,7 @@ export interface components {
         ClientEventResponse: {
             /** Event Id */
             event_id: string;
-            /** Event Type */
-            event_type: string;
+            event_type: components["schemas"]["WebClientEventType"];
         };
         /** DemoRunRequest */
         DemoRunRequest: {

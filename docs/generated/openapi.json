@@ -80,8 +80,7 @@
             "type": "string"
           },
           "event_type": {
-            "title": "Event Type",
-            "type": "string"
+            "$ref": "#/components/schemas/WebClientEventType"
           }
         },
         "required": [

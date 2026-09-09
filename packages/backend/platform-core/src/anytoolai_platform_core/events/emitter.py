@@ -71,12 +71,13 @@ class EventEmitter:
         if event_id is not None:
             if replay:
                 raise EventValidationError("event_id and replay are mutually exclusive")
-            self._validate_client_event_id(event_id)
-            # Normalize before use, not just before validation -- otherwise "abc" and " abc "
-            # pass the same non-empty/length checks but store/look up as two different rows,
-            # defeating the idempotent-retry guarantee for a caller whose retries aren't
-            # byte-identical.
+            # Normalize before validating -- not just before use -- so a value that's only over
+            # length before trimming (e.g. padding whitespace) doesn't get rejected as too long
+            # when the id that would actually be stored/looked-up fits, and so "abc" and " abc "
+            # store/look up as the same row instead of two, preserving idempotent retries for a
+            # caller whose retries aren't byte-identical.
             event_id = event_id.strip()
+            self._validate_client_event_id(event_id)
 
         sanitized_properties = sanitize_event_properties(properties or {})
         error_code = _extract_error_code(sanitized_properties)
