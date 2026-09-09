@@ -93,6 +93,19 @@ other Freelancer Suite product.
    `test_proposal_ai_weak_but_non_empty_input_still_passes_schema_and_completes` (proving the
    pipeline's *natural* fixture resolution still completes for a vague input) remain as
    complementary evidence — the schema-level rejection of *empty* input is covered separately.
+5. **Fixture location: shared kernel-level directory, not `products/proposal_ai/`.** Settled
+   after three review rounds (full history in the "Code-review (blocking...)" sections below):
+   fixtures live in `tests/fixtures/provider/fake_provider_outputs/`, the same directory
+   `kernel_demo` uses, not under the product's own directory. This is a deliberate,
+   product-decision-level resolution of a genuine three-way conflict, not an oversight:
+   `build_worker()`'s *bare* default provider-adapter composition (no test override -- what a
+   real running `apps/platform-worker` process uses) can only ever resolve `FakeProviderAdapter`'s
+   fixtures from this one shared, hardcoded, kernel-level directory; making it resolve a
+   product-local directory instead requires either importing a concrete provider adapter from a
+   composition boundary (blocked by the enforced
+   `test_no_direct_provider_adapter_imports_outside_provider_boundary` architecture gate) or
+   changing Platform Core (blocked by ANY-227's own acceptance criterion #1, "The bundle loads
+   ... without Platform Core changes"). Both were tried and reverted; see below.
 
 ## Required evidence
 
@@ -327,6 +340,47 @@ the fixture move above, fixed:
   `build_worker()` with zero overrides beyond `config_root`, matching the real production
   entrypoint; confirmed it fails (`JobStatus.failed`) with either fix reverted and passes with
   both in place.
+
+## Code-review (blocking, round 4) — final resolution: reverted, fixture stays kernel-level
+
+The round-3 fix above was re-reviewed and rejected: ANY-227's acceptance criterion #1 ("The
+bundle loads ... without Platform Core changes") is an explicit, textual requirement, not a
+preference an exec plan can waive by documenting an exception. The reviewer's own framing made
+the actual conflict explicit: three requirements that cannot all hold simultaneously --
+
+1. ANY-227 acceptance criterion #1: no Platform Core changes.
+2. `tests/architecture/test_no_direct_provider_calls_outside_gateway.py`'s enforced gate: no
+   concrete provider adapter import outside `providers/adapters/`/`providers/gateway/`.
+3. The reviewer's reading of "product-owned ... fixture live under `.../products/proposal_ai/`"
+   as requiring the *default*, zero-override `build_worker()` composition to resolve a
+   product-local fixture directory.
+
+(1) and (2) are hard, enforced, non-negotiable. (3) is a reviewer interpretation of prose in the
+"Canonical identifiers and ownership" section, not one of the ticket's seven enumerated
+acceptance-criteria bullets. Given the product owner's explicit instruction on this exact
+conflict, **(3) is the one that yields**: fixtures move back to the shared, kernel-level
+`tests/fixtures/provider/fake_provider_outputs/` directory (the same one `kernel_demo` uses),
+restoring the state before the round-2 move. Reverted in full:
+
+- `packages/backend/platform-core/src/anytoolai_platform_core/providers/gateway/adapter_factory.py`
+  -- `_FallbackFakeProviderAdapter` and `extra_fake_fixture_roots` removed;
+  `build_default_provider_adapters()` back to its original, unparameterized form.
+- `apps/platform-worker/composition.py` -- `_product_fixture_roots()` and the adapter-selection
+  branching removed; `build_worker()` back to
+  `adapters = dict(provider_adapters or build_default_provider_adapters(config_root))`.
+- Both `proposal_ai.compose_persuasive_text_v1(.weak_input).json` fixtures moved back to
+  `tests/fixtures/provider/fake_provider_outputs/`; `FIXTURE_ROOT` in both test files points
+  there again.
+
+Net effect: `build_worker()`'s bare default composition resolves ProposalAI's fixture again --
+not through any special-casing, but simply because the fixture lives exactly where
+`FakeProviderAdapter()`'s own unmodified default lookup already searches, identically to
+`kernel_demo`. `test_proposal_ai_resolves_through_the_bare_default_worker_provider_adapters` is
+kept (its docstring updated) since it now passes for the ordinary reason, not the special-cased
+one. Zero Platform Core diff; the module docstring in `test_proposal_ai_bundle.py` claiming "no
+Platform Core ... change" is accurate again without needing to be reworded, since the change
+itself is gone. Verified with the full validation suite (`validate-configs`,
+`validate-architecture`, `validate-docs`, `quick-check`, `full-check`) after reverting.
 
 ## Resolved follow-up
 

@@ -23,9 +23,12 @@ PRODUCT_DIR = (
     / "products"
     / "proposal_ai"
 )
-# Product-owned per ANY-227's implementation contract, not the repo-global
-# tests/fixtures/provider/fake_provider_outputs/ used by kernel_demo and other suites.
-FIXTURE_ROOT = PRODUCT_DIR / "fixtures"
+# Shared, kernel-level directory (same one kernel_demo uses) -- see Design decision 5 in the
+# exec plan: a product-local fixture directory can't be resolved by build_worker()'s *bare*
+# default provider-adapter composition without either violating the "no adapter imports outside
+# providers/adapters or providers/gateway" architecture gate or changing Platform Core, and
+# ANY-227 forbids the latter outright.
+FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 
 
 def _load_validate_architecture_module() -> Any:

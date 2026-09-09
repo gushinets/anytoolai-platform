@@ -33,22 +33,7 @@ from anytoolai_platform_worker.composition import build_worker
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
-# Product-owned per ANY-227's implementation contract (not the repo-global
-# tests/fixtures/provider/fake_provider_outputs/ used by kernel_demo and other suites) --
-# FakeProviderAdapter's fixture_root is a test-only composition parameter, so pointing it here is
-# a test-side wiring choice with no Platform Core or production runtime change.
-FIXTURE_ROOT = (
-    REPO_ROOT
-    / "packages"
-    / "backend"
-    / "product-platforms"
-    / "freelancer-suite"
-    / "src"
-    / "anytoolai_freelancer_suite"
-    / "products"
-    / "proposal_ai"
-    / "fixtures"
-)
+FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 GUEST_ID = "guest_proposal_ai_test"
 
 # `session_factory` (SQLite-backed) comes from apps/platform-api/tests/conftest.py -- shared with
@@ -202,12 +187,16 @@ def test_proposal_ai_resolves_through_the_bare_default_worker_provider_adapters(
     which always injects an explicit `provider_adapters` override -- masking that
     `build_worker()`'s *bare* default (no override at all) is what a real running
     apps/platform-worker process actually uses. ProposalAI's action config resolves to provider
-    `fake` (`default_fake_provider_v1`), and moving its fixtures to `products/proposal_ai/
-    fixtures/` broke that default path: `build_default_provider_adapters()`'s own
-    `FakeProviderAdapter()` only ever searches the shared kernel-level fixture directory. This
-    proves the true default composition -- config_root and zero other overrides, exactly what
-    apps/platform-worker/composition.py's own production entrypoint uses -- still resolves it via
-    `_ProductFixtureFallbackAdapter`."""
+    `fake` (`default_fake_provider_v1`), and `build_default_provider_adapters()`'s own
+    `FakeProviderAdapter()` only ever searches the shared, kernel-level
+    `tests/fixtures/provider/fake_provider_outputs/` directory -- exactly where ProposalAI's
+    fixtures live (see Design decision 5 in the exec plan for why they stay there rather than
+    under `products/proposal_ai/`: making the *default*, zero-override composition resolve a
+    product-local fixture is not achievable without either violating
+    `test_no_direct_provider_adapter_imports_outside_provider_boundary` or changing Platform
+    Core, and ANY-227 forbids the latter outright). This proves the true default composition --
+    config_root and zero other overrides, exactly what apps/platform-worker/composition.py's own
+    production entrypoint uses -- resolves ProposalAI's fixture with no special-casing at all."""
     _start(
         app,
         input_payload={
