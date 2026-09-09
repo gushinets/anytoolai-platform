@@ -1,20 +1,32 @@
 # Freelancer Suite Bundle
 
-MVP-B placeholder. This package is intentionally not imported in MVP-A.
+MVP-B `ProductBundle`. Composed by the platform's three composition boundaries —
+`apps/platform-api/bootstrap.py`, `apps/platform-worker/composition.py`, and
+`scripts/agent/validate_configs.py` — with the identical default bundle set (enforced by
+`ATAI008` and `tests/architecture/test_bundle_composition_parity.py`); never imported by Platform
+Core or Platform Actions.
 
-When enabled, it must register configs through platform-sdk and must not require changes to platform-core.
+When enabled, it registers configs through platform-sdk's `ProductBundle` contract and must not
+require changes to platform-core.
 
 ## Product config roots
 
-MVP-B contains eight thin validation products:
+As of ANY-32 (B01), `FreelancerSuiteBundle.config_roots()` returns `[]`: this package owns no
+implemented product directories yet. Per `docs/product-specs/mvp-scope-source-of-truth.md`'s
+five-product release order (`ANY-452`), the Freelancer Suite roadmap adds one product per
+bundle-and-workflow issue, in this order:
 
-1. `proposal_ai`
-2. `acceptance_builder`
-3. `case_study`
-4. `scope_guard`
-5. `task_finder`
-6. `send_ready`
-7. `brief_decoder`
-8. `persuasion_lens`
+1. ProposalAI (ANY-227)
+2. Client Message Decoder (ANY-423)
+3. Scope Creep Guard (ANY-229)
+4. Send-Ready (ANY-230)
+5. Brief Decoder (ANY-232)
 
-Each product contributes product config, scenarios, workflows, action configs, prompts, schemas, result rendering, handoff maps, and product events. Product meaning stays here, not in Platform Core.
+A product only appears in `config_roots()` once its own issue lands a real product directory
+(product config, scenarios, workflows, action configs, prompts, strict schemas, and any handoff
+map it needs) under `src/anytoolai_freelancer_suite/products/<name>/`. Client Update Writer,
+Acceptance Builder, External Task Finder & Fit, Case Study & Upsell, and Persuasion Lens remain
+capability backlog without a committed release order -- they are not placeholder directories
+here.
+
+Product meaning stays in this package, not in Platform Core.

@@ -1,0 +1,12 @@
+workflows:
+  - workflow_id: fixture_product.single_action_v1
+    version: 1
+    input_schema_ref: kernel.schemas.extract_input_v1
+    output_schema_ref: kernel.schemas.extract_output_v1
+    steps:
+      - step_id: extract
+        action_config_id: fixture_product.extract_v1
+        input_mapping:
+          source_text: scenario.input.source_text
+          fields: scenario.input.fields
+          strict: '?scenario.input.strict'

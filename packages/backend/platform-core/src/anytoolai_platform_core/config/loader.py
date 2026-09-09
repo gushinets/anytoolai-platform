@@ -493,8 +493,19 @@ def _find_handoff_mapping_target_conflict(
 class ConfigLoader:
     """Build an immutable ``ConfigRegistry`` from the repo config tree."""
 
-    def __init__(self, config_root: Path) -> None:
+    def __init__(
+        self,
+        config_root: Path,
+        *,
+        extra_product_roots: Sequence[Path] = (),
+    ) -> None:
         self.config_root = config_root
+        # Fully-formed product directories contributed by the application composition root (e.g.
+        # a ProductBundle's config_roots()), loaded alongside config_root's own "products"
+        # subdirectory -- see _load_products. Deliberately Path-only and ProductBundle-ignorant:
+        # platform-core must never import a product bundle package (see
+        # docs/architecture/platform-boundaries.md).
+        self.extra_product_roots = tuple(extra_product_roots)
         self.tenants: dict[str, TenantDefinition] = {}
         self.regions: dict[str, RegionDefinition] = {}
         self.provider_policies: dict[str, ProviderPolicy] = {}
@@ -1329,6 +1340,10 @@ class ConfigLoader:
     def _load_products(self) -> None:
         products_dir = self.config_root / "products"
         if not products_dir.exists():
+            # The kernel's own products/ directory is a hard prerequisite: report it cleanly and
+            # stop, rather than also attempting to load bundle-contributed extra_product_roots.
+            # Falling through here would mix unrelated bundle errors (or a false-positive
+            # success) into RegistryLoadError.errors alongside the real root cause.
             self._append_error(
                 self._missing_required_file_error(
                     products_dir,
@@ -1343,6 +1358,15 @@ class ConfigLoader:
         for product_dir in sorted(products_dir.iterdir()):
             if product_dir.is_dir():
                 self._load_product(product_dir)
+
+        # Bundle-contributed roots load in the composition root's explicit order, after
+        # config_root's own products -- see ConfigLoader's own docstring/__init__. Each entry is
+        # already a fully-formed product directory (no further "products/" nesting), so it feeds
+        # the same _load_product pass as config_root's own products: duplicate/missing-root/
+        # invalid-cross-reference handling is the same single-pass validation either way,
+        # independent of which side (kernel or a bundle) contributed a given product_id.
+        for product_dir in self.extra_product_roots:
+            self._load_product(product_dir)
 
     def _load_product(self, product_dir: Path) -> None:
         product_file = product_dir / "product.yaml"

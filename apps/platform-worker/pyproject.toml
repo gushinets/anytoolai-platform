@@ -7,8 +7,10 @@ name = "anytoolai-platform-worker"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "anytoolai-freelancer-suite",
     "anytoolai-platform-actions",
     "anytoolai-platform-core",
+    "anytoolai-platform-sdk",
     "psycopg[binary]>=3.2",
     "sqlalchemy>=2.0",
 ]
@@ -25,3 +27,5 @@ where = ["src"]
 [tool.uv.sources]
 anytoolai-platform-core = { path = "../../packages/backend/platform-core", editable = true }
 anytoolai-platform-actions = { path = "../../packages/backend/platform-actions", editable = true }
+anytoolai-platform-sdk = { path = "../../packages/backend/platform-sdk", editable = true }
+anytoolai-freelancer-suite = { path = "../../packages/backend/product-platforms/freelancer-suite", editable = true }

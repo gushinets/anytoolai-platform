@@ -1,0 +1,4 @@
+scenarios:
+  - scenario_id: fixture_product.single_action_v1
+    version: 1
+    workflow_id: fixture_product.single_action_v1

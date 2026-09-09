@@ -47,7 +47,12 @@ def _src_roots() -> list[str]:
     """Mirror the repo root `conftest.py`'s sys.path setup for the subprocess below,
     which runs outside pytest and so never goes through that conftest itself."""
     roots: list[str] = []
-    for base in (REPO_ROOT / "apps", REPO_ROOT / "packages" / "backend"):
+    backend = REPO_ROOT / "packages" / "backend"
+    # product-platforms/* (e.g. freelancer-suite) nests one level deeper than every other
+    # backend package -- apps/platform-worker/composition.py imports it (ANY-32), so a
+    # subprocess missing this from PYTHONPATH fails with ModuleNotFoundError before it ever
+    # claims the seeded job (caught live in CI on the ANY-32 PR).
+    for base in (REPO_ROOT / "apps", backend, backend / "product-platforms"):
         for child in sorted(base.iterdir()):
             src_dir = child / "src"
             if src_dir.is_dir():
