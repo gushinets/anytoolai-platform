@@ -10,6 +10,8 @@ from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import (
     MAX_CLIENT_EVENT_ID_LENGTH,
     EventEmitter,
+    EventValidationError,
+    sanitize_event_properties,
 )
 from anytoolai_platform_core.events.envelope import EventEnvelope
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
@@ -166,11 +168,11 @@ class ClientEventService:
                 product_id=product_id,
                 frontend_id=frontend_id,
             )
-            # A session that exists but belongs to a different guest must be indistinguishable
-            # from a session that does not exist at all -- otherwise a caller could correlate
-            # (and misattribute analytics to) a session it does not own, by guessing a valid
-            # scenario_session_id and pairing it with its own unrelated guest_id.
-            if session is None or (guest_id is not None and session.guest_id != guest_id):
+            # A session that exists but belongs to a different guest (or to no guest_id at all
+            # in this request) must be indistinguishable from a session that does not exist --
+            # checked against the session's own guest_id, not merely whether this request
+            # happened to include one, so omitting guest_id can't be used to bypass the check.
+            if session is None or (session.guest_id is not None and session.guest_id != guest_id):
                 raise ScenarioSessionNotFoundError()
 
         event_properties = self._validate_properties(properties or {})
@@ -185,18 +187,30 @@ class ClientEventService:
             user_id=user_id,
             scenario_session_id=scenario_session_id,
         )
-        envelope = self._event_emitter.emit(
-            event_type,
-            context,
-            properties=event_properties,
-            event_id=event_id,
-        )
+        try:
+            envelope = self._event_emitter.emit(
+                event_type,
+                context,
+                properties=event_properties,
+                event_id=event_id,
+            )
+        except EventValidationError as exc:
+            # Defense in depth: every input that could plausibly cause EventEmitter's own
+            # validation to reject this call is already checked above (event_type against
+            # CLIENT_EVENT_TYPES, event_id shape), so this should be unreachable in practice.
+            # It only fires if those checks and the emitter's ever drift apart -- and if they
+            # do, a client must still get a safe 422 (this service's own error contract), not an
+            # uncaught ValueError surfacing as a raw 500.
+            raise ClientEventTypeNotAllowedError() from exc
         # `EventEmitter.emit(event_id=...)` treats a colliding event_id as an idempotent replay
         # and returns whatever is already stored under it, even if that stored row belongs to a
         # different logical event -- harmless for a genuine retry (same content), but a silent
         # misattribution for a colliding id used for different content. Compare what we asked to
         # record against what is actually stored and reject the mismatch instead of returning it
-        # as if it had succeeded.
+        # as if it had succeeded. Properties are compared post-sanitization (the same
+        # transformation `emit()` itself applies) so a value that `emit()` legitimately
+        # normalizes (e.g. a long string it truncates) isn't mistaken for a content conflict on
+        # its very first, successful write.
         if (
             envelope.event_type != event_type
             or envelope.product_id != product_id
@@ -204,7 +218,7 @@ class ClientEventService:
             or envelope.guest_id != guest_id
             or envelope.user_id != user_id
             or envelope.scenario_session_id != scenario_session_id
-            or envelope.properties != event_properties
+            or envelope.properties != sanitize_event_properties(event_properties)
         ):
             raise ClientEventIdConflictError()
         return envelope
@@ -214,7 +228,12 @@ class ClientEventService:
         validated: dict[str, Any] = {}
         for key, value in properties.items():
             expected_type = CLIENT_EVENT_PROPERTY_TYPES.get(key)
-            if expected_type is None or isinstance(value, bool) or not isinstance(value, expected_type):
+            if expected_type is None or not isinstance(value, expected_type):
+                raise ClientEventPropertyInvalidError(key)
+            # bool is a subclass of int in Python, so it passes `isinstance(value, int)` above --
+            # exclude it explicitly, but only for int-typed keys. A hypothetical future bool-typed
+            # key must not be rejected by this same guard.
+            if expected_type is int and isinstance(value, bool):
                 raise ClientEventPropertyInvalidError(key)
             validated[key] = value
         return validated

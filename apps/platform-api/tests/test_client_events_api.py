@@ -143,6 +143,24 @@ def test_client_event_is_recorded(session_factory: SessionFactory) -> None:
     assert rows[0]["properties"]["gap_category"] == "budget"
 
 
+def test_client_event_accepts_a_long_property_value_without_a_false_conflict(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    # Longer than the sanitizer's 1024-char truncation threshold. The very first, successful
+    # write of this event_id must not be mistaken for a content conflict against itself just
+    # because emit() truncates the stored copy.
+    long_mode = "m" * 1100
+    response = _post_client_event(app, properties={"mode": long_mode})
+
+    assert response.status_code == HTTPStatus.OK
+    rows = _stored_events(session_factory, "web_evt_demo_1")
+    assert len(rows) == 1
+    assert rows[0]["properties"]["mode"] != long_mode
+    assert rows[0]["properties"]["mode"].startswith("m" * 100)
+
+
 def test_client_event_duplicate_delivery_is_idempotent(session_factory: SessionFactory) -> None:
     app = _create_test_app(session_factory)
 
@@ -352,3 +370,21 @@ def test_client_event_accepts_scenario_session_owned_by_the_matching_guest(
     )
 
     assert response.status_code == HTTPStatus.OK
+
+
+def test_client_event_rejects_a_guest_owned_session_when_guest_id_is_omitted(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    # Regression: an earlier version of the owner check only compared guest_id against the
+    # session's owner *when guest_id was supplied* -- omitting guest_id entirely bypassed the
+    # check completely, letting anyone correlate an event to any known guest-owned session.
+    response = _post_client_event(
+        app,
+        event_type="web.result_viewed",
+        scenario_session_id="scenario_session_owned_by_guest_demo",
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "scenario_session_not_found"

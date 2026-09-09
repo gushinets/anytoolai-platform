@@ -573,6 +573,39 @@ def test_event_emitter_client_event_id_is_idempotent(
     assert len(rows) == 1
 
 
+def test_event_emitter_normalizes_client_event_id_whitespace_for_idempotency(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        emitter = _build_emitter(session)
+        context = make_execution_context()
+
+        first = emitter.emit(
+            "web.product_viewed",
+            context,
+            properties={"mode": "default"},
+            event_id="client_event_demo_2",
+        )
+        padded = emitter.emit(
+            "web.product_viewed",
+            context,
+            properties={"mode": "default"},
+            event_id="  client_event_demo_2  ",
+        )
+
+        rows = list(
+            session.execute(
+                sa.select(event_log_table).where(
+                    event_log_table.c.event_id == "client_event_demo_2"
+                )
+            ).mappings()
+        )
+
+    assert first.event_id == "client_event_demo_2"
+    assert padded.event_id == "client_event_demo_2"
+    assert len(rows) == 1
+
+
 def test_event_emitter_rejects_empty_client_event_id(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

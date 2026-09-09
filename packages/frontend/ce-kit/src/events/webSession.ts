@@ -21,6 +21,11 @@ type StoredWebSession = {
  * id, with the later `set()` silently winning and splitting that request's events across two
  * `web_session_id` values. Keyed by the storage instance itself (not a global), so unrelated
  * `AsyncStorage` instances never contend, and entries can be garbage-collected with their storage.
+ *
+ * This only coalesces calls that share the same `backingStorage` object -- the same requirement
+ * `PlatformApiClient.createGuestIdentity()`'s single-flight guard has for its client instance. A
+ * caller that constructs a fresh `AsyncStorage` adapter per call (instead of reusing one) gets no
+ * coalescing, since each call is then keyed by a distinct, never-again-seen WeakMap entry.
  */
 const inFlightCalls = new WeakMap<AsyncStorage, Map<string, Promise<string>>>();
 
