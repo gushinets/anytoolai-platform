@@ -11,6 +11,7 @@ mapping-DSL change.
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
@@ -24,6 +25,7 @@ from anytoolai_platform_api.main import create_app
 from anytoolai_platform_core.identity.models import GuestIdentityRecord
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
+from anytoolai_platform_core.providers.models import ProviderResponse, ResolvedProviderRequest
 from anytoolai_platform_core.storage.db import provider_calls_table
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.workflows.models import JobStatus
@@ -90,13 +92,29 @@ def _start(
     return response.json()
 
 
-def _build_worker(app: Any, session_factory: SessionFactory):
+class _FixedFixtureProviderAdapter(FakeProviderAdapter):
+    """Test-only: forces a specific fixture_key regardless of what action_config_id the real
+    pipeline would resolve. In production, FakeProviderAdapter._fixture_key_for() only ever falls
+    back to action_config_id -- a real workflow run has no way to pick a *second* fixture for the
+    same action config. This lets a test pin a worker run to a specific checked-in fixture file
+    (e.g. the weak-input variant) so the run's own output can be asserted against it, without any
+    change to product or platform runtime code."""
+
+    def __init__(self, fixture_root: Path, *, fixture_key: str) -> None:
+        super().__init__(fixture_root)
+        self._forced_fixture_key = fixture_key
+
+    async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
+        return await super().complete(replace(request, fixture_key=self._forced_fixture_key))
+
+
+def _build_worker(app: Any, session_factory: SessionFactory, *, provider_adapters=None):
     # Reuses the app's already-loaded config_registry instead of re-parsing configs/kernel from
     # scratch a second time per test.
     return build_worker(
         session_factory=session_factory,
         config_registry=app.state.runtime.config_registry,
-        provider_adapters={"fake": FakeProviderAdapter(FIXTURE_ROOT)},
+        provider_adapters=provider_adapters or {"fake": FakeProviderAdapter(FIXTURE_ROOT)},
     )
 
 
@@ -166,11 +184,10 @@ def test_proposal_ai_weak_but_non_empty_input_still_passes_schema_and_completes(
     session_factory: SessionFactory,
 ) -> None:
     """Proves the *schema* accepts a vague-but-non-empty task/positioning pair and the workflow
-    runs it to completion -- it does not exercise the `.weak_input.json` fixture itself.
-    `FakeProviderAdapter` always resolves by `action_config_id` in the real runtime path (it never
-    receives a `fixture_key`), so this and the happy-path test necessarily resolve the same
-    fixture; the weak-input fixture's own content is asserted separately, at the config level, in
-    test_proposal_ai_product.py (see exec-plan Design decision 4)."""
+    runs it to completion via the pipeline's natural fixture resolution (by `action_config_id`,
+    which is always the happy fixture here -- see
+    test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_artifact below for
+    a run that actually exercises `.weak_input.json`)."""
     started = _start(
         app,
         input_payload={
@@ -187,6 +204,56 @@ def test_proposal_ai_weak_but_non_empty_input_still_passes_schema_and_completes(
     assert processed is not None
     assert processed.status is JobStatus.succeeded
     assert _provider_call_count(session_factory, job_id=started["job_id"]) == 1
+
+
+def test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_artifact(
+    app: Any,
+    session_factory: SessionFactory,
+) -> None:
+    """Code review finding: the real pipeline can never select the weak-input fixture on its own
+    (FakeProviderAdapter only ever resolves fixture_key from action_config_id), so nothing proved
+    the checked-in `.weak_input.json` fixture is actually reachable end to end -- it could be
+    wrong (as it once was) while every other test still passed. `_FixedFixtureProviderAdapter`
+    pins this one worker run to that fixture (test-only, no product/platform runtime change), and
+    the result is asserted against the fixture file's own content -- not a hardcoded copy of it."""
+    weak_fixture_key = "proposal_ai.compose_persuasive_text_v1.weak_input"
+    expected_text = json.loads(
+        (FIXTURE_ROOT / f"{weak_fixture_key}.json").read_text(encoding="utf-8")
+    )["response_json"]["text"]
+
+    _start(
+        app,
+        input_payload={
+            "task_text": "Need some help with a website.",
+            "freelancer_positioning": "I build websites.",
+        },
+        request_id="req_start_weak_pinned",
+    )
+
+    worker = _build_worker(
+        app,
+        session_factory,
+        provider_adapters={
+            "fake": _FixedFixtureProviderAdapter(FIXTURE_ROOT, fixture_key=weak_fixture_key)
+        },
+    )
+    processed = asyncio.run(worker.process_next_job())
+    worker.dispose()
+
+    assert processed is not None
+    assert processed.status is JobStatus.succeeded
+    assert processed.result_artifact_id is not None
+
+    result_response = asyncio.run(
+        _request(
+            app,
+            "GET",
+            f"/v1/results/{processed.result_artifact_id}",
+            request_id="req_result_weak_pinned",
+        )
+    )
+    assert result_response.status_code == HTTPStatus.OK
+    assert result_response.json()["output"] == {"text": expected_text}
 
 
 @pytest.mark.parametrize(

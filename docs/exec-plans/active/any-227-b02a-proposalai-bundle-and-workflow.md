@@ -80,14 +80,19 @@ other Freelancer Suite product.
    different guest-quota budget for ProposalAI specifically.
 4. **Weak-input fixture selection.** The real runtime path (`ActionRunner` → provider gateway →
    `FakeProviderAdapter`) never sets `ResolvedProviderRequest.fixture_key`; the fake provider
-   always falls back to `action_config_id`, so a full HTTP scenario run cannot select a second
-   fixture for the same `action_config_id` without a runtime change (out of scope). The weak-input
-   fixture is instead asserted directly at the product-config level
-   (`test_proposal_ai_product.py`): it exists, matches the A06 output schema shape, and is a
-   distinct, bounded draft with no fabricated concrete claims. The full end-to-end worker test
-   (`test_proposal_ai_bundle.py`) additionally proves a weak-but-non-empty task/positioning pair
-   still completes successfully end to end (using the happy fixture, since that's what the real
-   pipeline resolves) — the schema-level rejection of *empty* input is covered separately.
+   always falls back to `action_config_id`, so an *unmodified* HTTP scenario run cannot select a
+   second fixture for the same `action_config_id`. Revised after code review: rather than leaving
+   the weak fixture disconnected from any real workflow run, `test_proposal_ai_bundle.py` now
+   has a test-only `_FixedFixtureProviderAdapter` (a `FakeProviderAdapter` subclass, confined to
+   the test file) that forces `fixture_key` on the resolved request before delegating to the real
+   adapter — no product or platform runtime change. That test
+   (`test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_artifact`) proves
+   the checked-in weak fixture is schema-valid *and* genuinely reachable end to end, asserting the
+   canonical result against the fixture file's own content. The pre-existing
+   `test_proposal_ai_product.py` fixture-shape assertions and the unmodified
+   `test_proposal_ai_weak_but_non_empty_input_still_passes_schema_and_completes` (proving the
+   pipeline's *natural* fixture resolution still completes for a vague input) remain as
+   complementary evidence — the schema-level rejection of *empty* input is covered separately.
 
 ## Required evidence
 
@@ -203,6 +208,34 @@ Reviewed and refuted (pass #3 finding #7, retracting pass #2 finding #3):
   `test_demo_api.py` -- pass #2 called this PR-specific duplication. Pass #3 re-checked and found
   the same helper shape repeated across 6+ files in `apps/platform-api/tests/`: a pre-existing,
   repo-wide convention, not something this PR introduced or should uniquely fix.
+
+## Code-review (blocking, from the PR author's own account) — disposition
+
+Full findings are in `plans/ANY-227.md` ("Code-review (me #1)"). All three verified against
+current code and fixed -- these were genuine truthfulness-contract violations, not style nits:
+
+- **Happy fixture invented an unsupported delivery commitment.** The response promised "a first
+  draft ready within the first week" and a no-ramp-up claim, neither grounded in the task's
+  two-week deadline or the positioning's "4 years" experience claim. Rewritten to restate only the
+  input's own facts (the two-week timeline, four years of experience) and end on a scope-setting
+  call, with no new commitment invented.
+- **Weak fixture invented a claim about the freelancer's usual process** ("here's how I typically
+  work: a discovery step, a draft, then revisions") that the extremely vague input ("I build
+  websites.") never stated. Rewritten to acknowledge only the stated fact and ask clarifying
+  questions instead of asserting an unstated process.
+- **The checked-in weak fixture was never actually reachable by any test through the real
+  pipeline** (`FakeProviderAdapter` only ever resolves `fixture_key` from `action_config_id`, so
+  every existing test necessarily got the happy fixture) -- it could be wrong, as it was, while
+  every test still passed. Added a test-only `_FixedFixtureProviderAdapter` in
+  `test_proposal_ai_bundle.py` (a `FakeProviderAdapter` subclass confined to the test file, no
+  product/platform runtime change) that forces `fixture_key` on the resolved request, plus a new
+  test asserting the real workflow's canonical result matches the weak fixture file's own content.
+- Also strengthened the regression coverage the review asked for: the existing weak-input
+  anti-invention check only caught fabricated *quantities* (a year/week/day regex), not a
+  fabricated commitment or process claim. Added
+  `test_fixtures_make_no_delivery_or_process_commitment_the_input_never_stated`, a denylist check
+  run against *both* fixtures (the happy one is just as capable of inventing an unsupported
+  commitment as the weak one).
 
 ## Resolved follow-up
 

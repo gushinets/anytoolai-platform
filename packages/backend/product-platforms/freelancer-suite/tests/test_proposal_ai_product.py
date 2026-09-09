@@ -141,6 +141,37 @@ def test_weak_input_fixture_is_a_distinct_bounded_draft_with_no_invented_specifi
     assert not re.search(rf"\b({number_words})[\s-]*(year|week|day)s?\b", weak, re.IGNORECASE)
 
 
+# Code review finding: a year/week/day regex only catches invented *quantities* -- it cannot
+# catch an invented concrete delivery commitment ("a first draft ready within the first week")
+# or an invented claim about the freelancer's usual process ("here's how I typically work: a
+# discovery step, a draft, then revisions"), neither of which is stated in either fixture's own
+# task_text/freelancer_positioning. Denylisted here, checked against both fixtures -- the happy
+# fixture is just as capable of inventing an unsupported commitment as the weak one.
+INVENTED_COMMITMENT_PHRASES = (
+    "first draft",
+    "draft ready",
+    "typically work",
+    "how i work",
+    "discovery step",
+    "no ramp-up",
+    "ramp up",
+)
+
+
+@pytest.mark.parametrize(
+    "fixture_name",
+    ["proposal_ai.compose_persuasive_text_v1", "proposal_ai.compose_persuasive_text_v1.weak_input"],
+)
+def test_fixtures_make_no_delivery_or_process_commitment_the_input_never_stated(
+    fixture_name: str,
+) -> None:
+    text = json.loads((FIXTURE_ROOT / f"{fixture_name}.json").read_text(encoding="utf-8"))[
+        "response_json"
+    ]["text"].lower()
+    for phrase in INVENTED_COMMITMENT_PHRASES:
+        assert phrase not in text, f"{fixture_name} invents an unsupported commitment: {phrase!r}"
+
+
 def test_language_pattern_rejects_a_trailing_newline() -> None:
     """Code review finding: Python's `re` (what jsonschema's `pattern` keyword actually runs)
     matches a trailing `$` just before a final `\\n`, so a naive `^...$` pattern silently accepts
