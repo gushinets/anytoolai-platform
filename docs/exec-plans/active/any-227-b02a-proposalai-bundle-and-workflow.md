@@ -273,12 +273,60 @@ Three verified and fixed; one reviewed and declined with cited evidence:
   that happens to hold for a *different class* of product doesn't override an explicit,
   issue-specific requirement for *this* one. Fixed: moved both fixtures to
   `products/proposal_ai/fixtures/`; `FIXTURE_ROOT` in both test files now points there instead of
-  the repo-global directory. `FakeProviderAdapter(fixture_root=...)` is a test-only composition
-  parameter (`FakeProviderAdapter` is never constructed in production, which uses the real,
-  LiteLLM-backed Provider Gateway), so this is purely test-side wiring -- no Platform Core,
-  provider-gateway, or fake-provider-adapter code changed. Verified the fixtures actually ship in
-  a real built wheel (`uv build --wheel`), not just under the throwaway fixture
-  `test_packaging.py` already covered generically.
+  the repo-global directory. Verified the fixtures actually ship in a real built wheel
+  (`uv build --wheel`), not just under the throwaway fixture `test_packaging.py` already covered
+  generically.
+
+## Code-review (blocking, round 3) — disposition
+
+Full findings are in `plans/ANY-227.md`, re-reviewing head `48b3365`. One real regression from
+the fixture move above, fixed:
+
+- **Correction to the previous entry:** it claimed `FakeProviderAdapter` is "never constructed in
+  production." That was wrong -- `build_default_provider_adapters()`
+  (`platform-core/.../providers/gateway/adapter_factory.py`) explicitly registers
+  `FakeProviderAdapter()` under the `"fake"` key as part of the *production* default adapter set,
+  used whenever `build_worker()` runs with no `provider_adapters` override (exactly what a real
+  running `apps/platform-worker` process does). ProposalAI's action config resolves to provider
+  `fake` (`default_fake_provider_v1`, and no live-provider variant exists per this exec plan's own
+  documented out-of-scope decision), so a real deployed instance processing a real ProposalAI job
+  goes through exactly this bare default path today.
+- **The regression this correction exposes:** `FakeProviderAdapter()`'s own default fixture
+  lookup only ever searches the shared kernel-level `tests/fixtures/provider/fake_provider_outputs/`
+  directory (a hardcoded walk-up-from-file search, unaware of any bundle or product). Moving
+  ProposalAI's fixtures out of that directory meant the *real* default worker composition could no
+  longer resolve them -- a genuine break, not merely a test-coverage gap, confirmed by reverting
+  the fix locally and watching the new regression test fail with `JobStatus.failed`.
+- **First fix attempt failed a real architecture gate.** Tried wrapping the default `"fake"`
+  adapter entirely inside `apps/platform-worker/composition.py` (a composition boundary already
+  permitted to import product-platforms), subclassing `FakeProviderAdapter` there. This directly
+  violates `tests/architecture/test_no_direct_provider_calls_outside_gateway.py`'s
+  `test_no_direct_provider_adapter_imports_outside_provider_boundary`: importing
+  `anytoolai_platform_core.providers.adapters.fake` (or `.providers.adapters` at all) is only
+  allowed from `providers/adapters/` and `providers/gateway/` themselves -- proven by actually
+  running the suite, not assumed. So "wrap the concrete adapter at the composition boundary
+  without touching Platform Core" is not just discouraged here, it is architecturally impossible
+  under this repo's own enforced rules.
+- **Actual fix: a narrow, generic, backward-compatible extension to the gateway factory.**
+  `build_default_provider_adapters()` (`platform-core/.../providers/gateway/adapter_factory.py`
+  -- inside the allowed gateway boundary) gains an additive `extra_fake_fixture_roots: Sequence[Path] = ()`
+  keyword parameter. When given, it wraps the `"fake"` adapter in `_FallbackFakeProviderAdapter`
+  (defined in that same file, subclassing `FakeProviderAdapter` unmodified), which tries each
+  extra root before `FakeProviderAdapter`'s own shared kernel-level default. The function knows
+  nothing about ProposalAI or any specific product -- it only accepts a list of directories --
+  and every existing caller that omits the parameter gets the exact same `FakeProviderAdapter()`
+  as before, so `kernel_demo` and everything else keeps resolving exactly as it did.
+  `apps/platform-worker/composition.py` only computes plain `Path`s (via `_product_fixture_roots()`,
+  derived from the existing `bundle.config_roots()` extension point -- not a new mechanism, and
+  it generalizes to any future product using this same ownership pattern) and passes them
+  through; it imports no provider adapter type at all, satisfying the architecture gate.
+  This is a real Platform Core diff, which the review asked to avoid -- documented here as a
+  deliberate, evidence-backed exception (the failing test above) to that preference, not a
+  silent one. New regression test
+  (`test_proposal_ai_resolves_through_the_bare_default_worker_provider_adapters`) calls
+  `build_worker()` with zero overrides beyond `config_root`, matching the real production
+  entrypoint; confirmed it fails (`JobStatus.failed`) with either fix reverted and passes with
+  both in place.
 
 ## Resolved follow-up
 

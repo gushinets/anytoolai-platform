@@ -194,6 +194,40 @@ def test_proposal_ai_happy_path_invokes_a06_once_and_produces_canonical_artifact
     assert 1 <= len(result_body["output"]["text"]) <= 4000
 
 
+def test_proposal_ai_resolves_through_the_bare_default_worker_provider_adapters(
+    app: Any,
+    session_factory: SessionFactory,
+) -> None:
+    """Code review finding: every other test here builds its worker through `_build_worker`,
+    which always injects an explicit `provider_adapters` override -- masking that
+    `build_worker()`'s *bare* default (no override at all) is what a real running
+    apps/platform-worker process actually uses. ProposalAI's action config resolves to provider
+    `fake` (`default_fake_provider_v1`), and moving its fixtures to `products/proposal_ai/
+    fixtures/` broke that default path: `build_default_provider_adapters()`'s own
+    `FakeProviderAdapter()` only ever searches the shared kernel-level fixture directory. This
+    proves the true default composition -- config_root and zero other overrides, exactly what
+    apps/platform-worker/composition.py's own production entrypoint uses -- still resolves it via
+    `_ProductFixtureFallbackAdapter`."""
+    _start(
+        app,
+        input_payload={
+            "task_text": "Build a 5-page marketing site for a local bakery within two weeks.",
+            "freelancer_positioning": (
+                "Freelance web designer with 4 years building small-business sites."
+            ),
+        },
+        request_id="req_start_default_adapters",
+    )
+
+    worker = build_worker(session_factory=session_factory, config_root=CONFIG_ROOT)
+    processed = asyncio.run(worker.process_next_job())
+    worker.dispose()
+
+    assert processed is not None
+    assert processed.status is JobStatus.succeeded
+    assert processed.result_artifact_id is not None
+
+
 def test_proposal_ai_weak_but_non_empty_input_still_passes_schema_and_completes(
     app: Any,
     session_factory: SessionFactory,

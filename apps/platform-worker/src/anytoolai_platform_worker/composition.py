@@ -60,6 +60,26 @@ from anytoolai_platform_worker.worker import Worker
 DEFAULT_PRODUCT_BUNDLES: tuple[ProductBundle, ...] = (FreelancerSuiteBundle(),)
 
 
+def _product_fixture_roots(bundles: Sequence[ProductBundle]) -> list[Path]:
+    """Every bundle-contributed product may keep its own deterministic fake-provider fixtures
+    under products/<name>/fixtures/ (ANY-227 product-ownership contract), rather than the shared
+    kernel-level tests/fixtures/provider/fake_provider_outputs/ FakeProviderAdapter falls back to
+    by default. Reuses the same `bundle.config_roots()` extension point already used one line
+    above to register config -- not a new mechanism. Only deals in plain Paths (no provider
+    adapter import here): this composition boundary is not allowed to import a concrete provider
+    adapter directly (tests/architecture/test_no_direct_provider_calls_outside_gateway.py), so the
+    actual fallback-adapter construction lives in platform-core's own
+    providers/gateway/adapter_factory.py, behind build_default_provider_adapters()'s
+    extra_fake_fixture_roots parameter."""
+    roots: list[Path] = []
+    for bundle in bundles:
+        for product_root in bundle.config_roots():
+            candidate = product_root / "fixtures"
+            if candidate.is_dir():
+                roots.append(candidate)
+    return roots
+
+
 def build_worker(
     *,
     database_url: str | None = None,
@@ -91,8 +111,8 @@ def build_worker(
             create_sync_engine(database_url, decode_database_name=decode_database_name)
         )
 
+    resolved_bundles = list(bundles) if bundles is not None else list(DEFAULT_PRODUCT_BUNDLES)
     if config_registry is None:
-        resolved_bundles = list(bundles) if bundles is not None else list(DEFAULT_PRODUCT_BUNDLES)
         check_ids_are_unique(
             (bundle.bundle_id for bundle in resolved_bundles),
             reserved=RESERVED_BUNDLE_IDS,
@@ -106,7 +126,15 @@ def build_worker(
             config_root, extra_product_roots=extra_product_roots
         )
     registry = config_registry
-    adapters = dict(provider_adapters or build_default_provider_adapters(config_root))
+    if provider_adapters is not None:
+        adapters = dict(provider_adapters)
+    else:
+        adapters = dict(
+            build_default_provider_adapters(
+                config_root,
+                extra_fake_fixture_roots=_product_fixture_roots(resolved_bundles),
+            )
+        )
     # Resolved eagerly here (not inside runner_factory) so a bad cross_validator_ref/
     # input_validator_ref raises ValidatorRefNotFoundError at worker startup, not on
     # the first job of the affected action_type.
