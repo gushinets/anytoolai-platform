@@ -382,6 +382,20 @@ Platform Core ... change" is accurate again without needing to be reworded, sinc
 itself is gone. Verified with the full validation suite (`validate-configs`,
 `validate-architecture`, `validate-docs`, `quick-check`, `full-check`) after reverting.
 
+## Code-review finding, reviewed and declined: "installed package" fixture lookup
+
+A follow-up finding claimed the ProposalAI fixture JSONs must also be included in the *worker
+package* and that `FakeProviderAdapter`'s default lookup must resolve an "installed package
+location" distinct from the source-tree `tests/` path. Checked against how this repo actually
+builds and ships its images: `infra/docker/platform-worker.Dockerfile` and
+`infra/docker/platform-api.Dockerfile` both `COPY . .` -- the entire monorepo, `tests/` included
+-- into the running container; there is no separate wheel-only/site-packages-only deployment
+mode anywhere in this repo's actual build story. `FakeProviderAdapter._default_fixture_root()`'s
+walk-up-from-file search finds `tests/fixtures/provider/fake_provider_outputs/` inside the
+container exactly as it does in dev/CI. The finding's premise (installed-package location
+diverges from the source-tree `tests/` path) does not hold here; no code or packaging change
+made.
+
 ## Resolved follow-up
 
 None outstanding for this ticket. Web page implementation is ANY-243; Chrome Extension is the
