@@ -54,9 +54,28 @@ MAX_WEB_SESSION_ID_LENGTH = 128
 # value out of the error path entirely (only the key is ever echoed back, see
 # ClientEventPropertyInvalidError, and that is itself length-capped).
 MAX_PROPERTY_STRING_LENGTH = 128
+# field_count is meant to be a small count (form fields on one page); an unbounded int would
+# still round-trip through JSONB, but has no privacy-reviewed meaning past a sane ceiling.
+MAX_PROPERTY_INT_VALUE = 10_000
 # Echoed back in a 422 message; capped so a caller can't reflect an arbitrarily large key through
 # the error response.
 MAX_PROPERTY_KEY_LENGTH_IN_ERROR = 64
+# Fields ClientEventIdConflictError's comparison reads off both `context` and the stored
+# `envelope` -- both ExecutionContext and EventEnvelope name these identically.
+_CONTEXT_CORRELATION_FIELDS = (
+    "product_id",
+    "frontend_id",
+    "guest_id",
+    "user_id",
+    "scenario_session_id",
+)
+# event_log.user_id is a bounded String(128) column. Unlike guest_id/scenario_session_id (which
+# are validated by requiring a matching existing row, indirectly bounding them), MVP-A has no
+# user-identity table to look user_id up against, so its length must be checked explicitly here
+# -- otherwise an oversized value reaches the INSERT unchecked and raises sa.exc.DataError, which
+# EventLogRepository.create() does not catch (only sa.exc.IntegrityError), surfacing as a raw 500
+# instead of this endpoint's normal 422 contract.
+MAX_USER_ID_LENGTH = 128
 
 
 class ClientEventTypeNotAllowedError(PlatformError):
@@ -101,6 +120,14 @@ class ClientEventFrontendInvalidError(PlatformError):
         super().__init__(
             "client_event_frontend_invalid",
             "Frontend is not enabled for this product.",
+        )
+
+
+class ClientEventUserIdInvalidError(PlatformError):
+    def __init__(self) -> None:
+        super().__init__(
+            "client_event_user_id_invalid",
+            f"user_id must be a non-empty string of at most {MAX_USER_ID_LENGTH} characters.",
         )
 
 
@@ -165,6 +192,10 @@ class ClientEventService:
         web_session_id = web_session_id.strip()
         if not web_session_id or len(web_session_id) > MAX_WEB_SESSION_ID_LENGTH:
             raise ClientEventWebSessionIdInvalidError()
+        if user_id is not None:
+            user_id = user_id.strip()
+            if not user_id or len(user_id) > MAX_USER_ID_LENGTH:
+                raise ClientEventUserIdInvalidError()
 
         product = self._config_registry.get_product(product_id)
         if product is None:
@@ -229,17 +260,19 @@ class ClientEventService:
         # different logical event -- harmless for a genuine retry (same content), but a silent
         # misattribution for a colliding id used for different content. Compare what we asked to
         # record against what is actually stored and reject the mismatch instead of returning it
-        # as if it had succeeded. Properties are compared post-sanitization (the same
-        # transformation `emit()` itself applies) so a value that `emit()` legitimately
-        # normalizes (e.g. a long string it truncates) isn't mistaken for a content conflict on
-        # its very first, successful write.
+        # as if it had succeeded. Correlation dimensions are read back off `context` itself (the
+        # same object already passed to `emit()`) rather than re-listed as separate identifiers,
+        # so a field can't silently drift out of sync between the two. Properties are compared
+        # post-sanitization (the same transformation `emit()` itself applies) so a value that
+        # `emit()` legitimately normalizes isn't mistaken for a content conflict on its very
+        # first, successful write.
+        correlation_mismatch = any(
+            getattr(envelope, field) != getattr(context, field)
+            for field in _CONTEXT_CORRELATION_FIELDS
+        )
         if (
             envelope.event_type != event_type
-            or envelope.product_id != product_id
-            or envelope.frontend_id != frontend_id
-            or envelope.guest_id != guest_id
-            or envelope.user_id != user_id
-            or envelope.scenario_session_id != scenario_session_id
+            or correlation_mismatch
             or envelope.properties != sanitize_event_properties(event_properties)
         ):
             raise ClientEventIdConflictError()
@@ -249,15 +282,20 @@ class ClientEventService:
     def _validate_properties(properties: Mapping[str, Any]) -> dict[str, Any]:
         validated: dict[str, Any] = {}
         for key, value in properties.items():
-            expected_type = CLIENT_EVENT_PROPERTY_TYPES.get(key)
-            if expected_type is None or not isinstance(value, expected_type):
-                raise ClientEventPropertyInvalidError(key)
-            # bool is a subclass of int in Python, so it passes `isinstance(value, int)` above --
-            # exclude it explicitly, but only for int-typed keys. A hypothetical future bool-typed
-            # key must not be rejected by this same guard.
-            if expected_type is int and isinstance(value, bool):
-                raise ClientEventPropertyInvalidError(key)
-            if expected_type is str and len(value) > MAX_PROPERTY_STRING_LENGTH:
+            if not _is_allowed_property_value(key, value):
                 raise ClientEventPropertyInvalidError(key)
             validated[key] = value
         return validated
+
+
+def _is_allowed_property_value(key: str, value: Any) -> bool:
+    expected_type = CLIENT_EVENT_PROPERTY_TYPES.get(key)
+    if expected_type is None or not isinstance(value, expected_type):
+        return False
+    if expected_type is int:
+        # bool is a subclass of int in Python -- exclude it explicitly, but only here, so a
+        # hypothetical future bool-typed key isn't rejected by this same guard.
+        return not isinstance(value, bool) and 0 <= value <= MAX_PROPERTY_INT_VALUE
+    if expected_type is str:
+        return len(value) <= MAX_PROPERTY_STRING_LENGTH
+    return True

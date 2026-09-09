@@ -74,7 +74,11 @@ function toWireProperties(
   if (properties.mode !== undefined) {
     wire.mode = properties.mode;
   }
-  if (properties.fieldCount !== undefined) {
+  // Number.isFinite() excludes NaN/Infinity, which JSON.stringify would otherwise silently turn
+  // into `null` on the wire -- the backend would then reject it with the generic
+  // client_event_property_invalid rather than a message pointing at the real problem. Dropping
+  // it here keeps the rest of the event recordable instead of failing the whole call.
+  if (properties.fieldCount !== undefined && Number.isFinite(properties.fieldCount)) {
     wire.field_count = properties.fieldCount;
   }
   if (properties.gapCategory !== undefined) {

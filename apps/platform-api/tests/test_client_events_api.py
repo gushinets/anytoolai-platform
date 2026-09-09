@@ -289,6 +289,60 @@ def test_client_event_rejects_bool_for_an_int_property(session_factory: SessionF
     assert response.json()["error"]["code"] == "client_event_property_invalid"
 
 
+def test_client_event_rejects_field_count_above_the_bound(session_factory: SessionFactory) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(app, properties={"field_count": 10**9})
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_property_invalid"
+
+
+def test_client_event_rejects_negative_field_count(session_factory: SessionFactory) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(app, properties={"field_count": -1})
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_property_invalid"
+
+
+def test_client_event_rejects_oversized_user_id_instead_of_500ing(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    # event_log.user_id is a bounded String(128) column. Before this was validated, a value this
+    # long reached the INSERT unchecked and raised an uncaught sa.exc.DataError (not a
+    # sa.exc.IntegrityError, so EventLogRepository.create()'s own except clause didn't catch it) --
+    # a raw 500 instead of this endpoint's normal 422 contract.
+    response = _post_client_event(app, user_id="u" * 129)
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_user_id_invalid"
+
+
+def test_client_event_rejects_empty_user_id(session_factory: SessionFactory) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(app, user_id="   ")
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_user_id_invalid"
+
+
+def test_client_event_accepts_a_user_id_at_the_length_boundary(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(app, user_id="u" * 128)
+
+    assert response.status_code == HTTPStatus.OK
+    rows = _stored_events(session_factory, "web_evt_demo_1")
+    assert rows[0]["user_id"] == "u" * 128
+
+
 def test_client_event_rejects_server_owned_dimensions_in_payload(
     session_factory: SessionFactory,
 ) -> None:

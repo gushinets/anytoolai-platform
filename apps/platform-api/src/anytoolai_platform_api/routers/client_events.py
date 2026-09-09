@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from http import HTTPStatus
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends
@@ -132,19 +133,20 @@ def _status_code_for_platform_error(error: PlatformError) -> int:
         "guest_identity_not_found",
         "scenario_session_not_found",
     }:
-        return 404
+        return HTTPStatus.NOT_FOUND
     if error.code == "client_event_id_conflict":
-        return 409
+        return HTTPStatus.CONFLICT
     if error.code in {
         "client_event_type_not_allowed",
         "client_event_id_invalid",
         "client_event_web_session_id_invalid",
+        "client_event_user_id_invalid",
         "client_event_product_invalid",
         "client_event_frontend_invalid",
         "client_event_property_invalid",
     }:
-        return 422
-    return 500
+        return HTTPStatus.UNPROCESSABLE_ENTITY
+    return HTTPStatus.INTERNAL_SERVER_ERROR
 
 
 def _to_api_error(error: PlatformError) -> ApiError:
