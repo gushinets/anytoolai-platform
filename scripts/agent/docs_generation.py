@@ -10,7 +10,19 @@ from typing import TYPE_CHECKING, Any
 ROOT = Path(__file__).resolve().parents[2]
 PLATFORM_CORE_SRC = ROOT / "packages" / "backend" / "platform-core" / "src"
 PLATFORM_API_SRC = ROOT / "apps" / "platform-api" / "src"
-for source_root in (PLATFORM_CORE_SRC, PLATFORM_API_SRC):
+# ANY-32: apps/platform-api/bootstrap.py's composition root now imports platform-sdk,
+# platform-actions, and freelancer-suite directly (ProductBundle contract + default bundle
+# wiring), so all three must be importable here too, not just platform-core/platform-api.
+PLATFORM_SDK_SRC = ROOT / "packages" / "backend" / "platform-sdk" / "src"
+PLATFORM_ACTIONS_SRC = ROOT / "packages" / "backend" / "platform-actions" / "src"
+FREELANCER_SUITE_SRC = ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite" / "src"
+for source_root in (
+    PLATFORM_CORE_SRC,
+    PLATFORM_API_SRC,
+    PLATFORM_SDK_SRC,
+    PLATFORM_ACTIONS_SRC,
+    FREELANCER_SUITE_SRC,
+):
     if str(source_root) not in sys.path:
         sys.path.insert(0, str(source_root))
 

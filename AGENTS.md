@@ -51,7 +51,10 @@ Deep rules live in `docs/architecture/llm-runtime.md`.
 
 - `packages/backend/platform-core` must not import `product-platforms`.
 - `packages/backend/platform-actions` must not import `product-platforms`.
-- `apps/platform-api` is the composition root that wires platform + bundles.
+- `apps/platform-api`, `apps/platform-worker`, and `scripts/agent/validate_configs.py` are the only
+  modules allowed to import a product-platforms package; they must compose the identical default
+  bundle set (`ANY-32`) so every runtime and validation entry point sees the same product
+  definitions.
 - Extensions must not contain system prompts.
 - Frontend must not choose provider/model.
 - Provider calls must go through `packages/backend/platform-core/src/anytoolai_platform_core/providers/gateway.py` and provider adapters.

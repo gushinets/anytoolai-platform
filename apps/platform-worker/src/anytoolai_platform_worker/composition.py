@@ -1,11 +1,20 @@
-"""Production composition root for the A11 DB-backed workflow worker."""
+"""Production composition root for the A11 DB-backed workflow worker.
+
+Alongside apps/platform-api/bootstrap.py and scripts/agent/validate_configs.py, this is one of
+the only modules allowed to import a product-platforms package (see
+docs/architecture/platform-boundaries.md and tests/architecture's freelancer-suite import-
+boundary proof). All three must compose the identical default bundle set (ANY-32 code review
+finding: the worker previously never composed any ProductBundle, so it could accept/execute a job
+referencing a product workflow that apps/platform-api had validated but the worker's own registry
+never loaded)."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle
 from anytoolai_platform_actions.structured_llm.cross_validation import (
     build_input_validators,
     build_output_cross_validators,
@@ -16,6 +25,7 @@ from anytoolai_platform_core.actions.runner import ActionRunner, ActionRunServic
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
+from anytoolai_platform_core.config.errors import RESERVED_BUNDLE_IDS, check_ids_are_unique
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
@@ -35,6 +45,7 @@ from anytoolai_platform_core.workflows.runner import (
     SequentialWorkflowRunner,
     WorkflowJobService,
 )
+from anytoolai_platform_sdk import ProductBundle
 from sqlalchemy.orm import Session, sessionmaker
 
 from anytoolai_platform_worker.handlers.run_workflow import RunWorkflowHandler
@@ -42,6 +53,11 @@ from anytoolai_platform_worker.lease import build_job_lease
 from anytoolai_platform_worker.queues import DatabaseJobQueue
 from anytoolai_platform_worker.reconciliation import build_job_lease_reconciler
 from anytoolai_platform_worker.worker import Worker
+
+# Named (not inline) so it can be tested against apps/platform-api/bootstrap.py's identically-
+# named DEFAULT_PRODUCT_BUNDLES -- both must resolve to the same bundle set (ANY-32 code review
+# finding), or the API can accept a product workflow this worker's own registry never loaded.
+DEFAULT_PRODUCT_BUNDLES: tuple[ProductBundle, ...] = (FreelancerSuiteBundle(),)
 
 
 def build_worker(
@@ -51,6 +67,7 @@ def build_worker(
     session_factory: sessionmaker[Session] | None = None,
     config_root: Path | None = None,
     config_registry: ConfigRegistry | None = None,
+    bundles: Sequence[ProductBundle] | None = None,
     provider_adapters: Mapping[str, Any] | None = None,
     poll_interval_seconds: float = 1.0,
 ) -> Worker:
@@ -59,6 +76,12 @@ def build_worker(
     decode_database_name is forwarded to create_sync_engine() verbatim -- see its own
     docstring; it must be True only when database_url came from
     anytoolai_platform_core.storage.db.build_postgres_url_from_env().
+
+    `bundles` defaults to DEFAULT_PRODUCT_BUNDLES, identical to
+    apps/platform-api/bootstrap.py's `build_runtime` default -- the worker must resolve the same
+    product config roots the API validated, or a job the API accepted can fail at execution time
+    on a workflow/action lookup the worker's registry never loaded. Ignored when `config_registry`
+    is passed explicitly (a test-only seam that fully replaces registry construction).
     """
 
     if session_factory is None:
@@ -68,7 +91,21 @@ def build_worker(
             create_sync_engine(database_url, decode_database_name=decode_database_name)
         )
 
-    registry = config_registry or build_config_registry(config_root)
+    if config_registry is None:
+        resolved_bundles = list(bundles) if bundles is not None else list(DEFAULT_PRODUCT_BUNDLES)
+        check_ids_are_unique(
+            (bundle.bundle_id for bundle in resolved_bundles),
+            reserved=RESERVED_BUNDLE_IDS,
+            ref_type="bundle_id",
+            context="composed bundles",
+        )
+        extra_product_roots = [
+            root for bundle in resolved_bundles for root in bundle.config_roots()
+        ]
+        config_registry = build_config_registry(
+            config_root, extra_product_roots=extra_product_roots
+        )
+    registry = config_registry
     adapters = dict(provider_adapters or build_default_provider_adapters(config_root))
     # Resolved eagerly here (not inside runner_factory) so a bad cross_validator_ref/
     # input_validator_ref raises ValidatorRefNotFoundError at worker startup, not on

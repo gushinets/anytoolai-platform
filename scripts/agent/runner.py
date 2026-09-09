@@ -200,6 +200,7 @@ QUICK_CHECK_DEPENDENCY_FINGERPRINT_INPUTS = [
     ROOT / "packages" / "backend" / "platform-sdk" / "pyproject.toml",
     ROOT / "packages" / "backend" / "platform-core" / "pyproject.toml",
     ROOT / "packages" / "backend" / "platform-actions" / "pyproject.toml",
+    ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite" / "pyproject.toml",
     ROOT / "apps" / "platform-api" / "pyproject.toml",
     ROOT / "apps" / "platform-worker" / "pyproject.toml",
 ]

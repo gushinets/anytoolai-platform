@@ -147,6 +147,17 @@ wheels = [
 ]
 
 [[package]]
+name = "anytoolai-freelancer-suite"
+version = "0.1.0"
+source = { editable = "../../packages/backend/product-platforms/freelancer-suite" }
+dependencies = [
+    { name = "anytoolai-platform-sdk" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "anytoolai-platform-sdk", specifier = "==0.1.0" }]
+
+[[package]]
 name = "anytoolai-platform-actions"
 version = "0.1.0"
 source = { editable = "../../packages/backend/platform-actions" }
@@ -187,20 +198,35 @@ requires-dist = [
 ]
 
 [[package]]
+name = "anytoolai-platform-sdk"
+version = "0.1.0"
+source = { editable = "../../packages/backend/platform-sdk" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = "==2.13.4" }]
+
+[[package]]
 name = "anytoolai-platform-worker"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "anytoolai-freelancer-suite" },
     { name = "anytoolai-platform-actions" },
     { name = "anytoolai-platform-core" },
+    { name = "anytoolai-platform-sdk" },
     { name = "psycopg", extra = ["binary"] },
     { name = "sqlalchemy" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "anytoolai-freelancer-suite", editable = "../../packages/backend/product-platforms/freelancer-suite" },
     { name = "anytoolai-platform-actions", editable = "../../packages/backend/platform-actions" },
     { name = "anytoolai-platform-core", editable = "../../packages/backend/platform-core" },
+    { name = "anytoolai-platform-sdk", editable = "../../packages/backend/platform-sdk" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "sqlalchemy", specifier = ">=2.0" },
 ]

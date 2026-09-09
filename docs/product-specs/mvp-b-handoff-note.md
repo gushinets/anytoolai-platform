@@ -9,13 +9,22 @@ allowed and forbidden, and where to look before writing product code.
 - The platform kernel (workflow runner, action runner, provider gateway, scenario/event/quota/
   handoff modules) runs 11 generic atoms and composite workflows without any Freelancer-specific
   code, per the MVP-A1 release gate (`ANY-5`, `docs/exec-plans/active/mvp-a-mvp-b-linear-epics.md`).
-- `packages/backend/product-platforms/freelancer-suite/` already loads as a real
-  `ProductBundle` depending only on `anytoolai_platform_sdk` — see `bundle.py` and
-  `tests/test_bundle_loads.py`. This is a working, tested example of the shape your product bundle
-  should take, not a hypothetical.
+- `packages/backend/product-platforms/freelancer-suite/` already loads as a real `ProductBundle`
+  depending only on `anytoolai_platform_sdk`, composed through all three of the platform's
+  composition boundaries (`apps/platform-api/bootstrap.py`'s `build_runtime`,
+  `apps/platform-worker/composition.py`'s `build_worker`, and `scripts/agent/validate_configs.py`)
+  — see `bundle.py`, `tests/test_bundle_loads.py`, and `apps/platform-api/tests/test_bundle_composition.py`
+  (the loader's required-evidence suite, proven against a test-only fixture bundle). As of `ANY-32` (`B01`)
+  `FreelancerSuiteBundle.config_roots()` returns `[]` — zero implemented product roots. ProposalAI
+  (`ANY-227`) becomes the first real one; see the package's own README for the full 5-product
+  release order (`ANY-452`). Use `self._package_dir()`
+  (inherited from `ProductBundle`, `packages/backend/platform-sdk/src/anytoolai_platform_sdk/bundle.py`)
+  to resolve your product directory relative to your bundle's own installed package, independent of
+  the caller's working directory — never a bare relative string.
 - Architecture boundaries are enforced twice: `python scripts/agent/runner.py
-  validate-architecture` (CI-gated) and `pytest tests/architecture` (10+ test files). Both are
-  green on `main` today.
+  validate-architecture` (CI-gated) and `pytest tests/architecture` (10+ test files, including
+  `test_freelancer_suite_import_boundary.py`'s proof that `anytoolai_freelancer_suite` is imported
+  only from `apps/platform-api/bootstrap.py`). Both are green on `main` today.
 
 ## What is allowed
 
@@ -23,8 +32,11 @@ allowed and forbidden, and where to look before writing product code.
   `products/<name>/` config roots.
 - A `provider_policy_ref` from `configs/kernel/provider_policies.yaml` (add a new one there if you
   need different model/temperature/retry settings — never hardcode a model string elsewhere).
-- A dedicated Chrome Extension per product, built on shared `packages/frontend/ce-kit`.
-- Registering your bundle in `apps/platform-api` composition.
+- A dedicated Chrome Extension per product, built on shared `packages/frontend/ce-kit` — optional
+  backlog, not required by the bundle contract (`ANY-32`). The shared web mirror
+  (`apps/web-mirror`) is the default client surface.
+- Registering your bundle in `apps/platform-api`, `apps/platform-worker`, and
+  `scripts/agent/validate_configs.py` composition (all three must compose the same bundle set).
 
 Follow the step-by-step in `docs/product-specs/add-product-recipe.md`.
 

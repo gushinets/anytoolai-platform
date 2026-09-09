@@ -11,6 +11,7 @@ import pytest
 import yaml
 
 from tests.test_atoms_proof import load_atoms_proof_module
+from tests.test_quick_check import load_quick_check_module
 
 
 def load_runner_module():
@@ -1333,6 +1334,23 @@ def test_quick_check_dependency_fingerprint_changes_when_an_input_file_changes(
     after = runner.quick_check_dependency_fingerprint()
 
     assert before != after
+
+
+def test_quick_check_dependency_fingerprint_inputs_match_quick_check_module() -> None:
+    """runner.py's QUICK_CHECK_DEPENDENCY_FINGERPRINT_INPUTS is a manually-kept-in-sync duplicate
+    of quick_check.py's DEPENDENCY_FINGERPRINT_INPUTS (documented at both definitions -- neither
+    script imports the other). A missed entry here means quick_check.py's bootstrap writes a
+    marker fingerprint that runner.py's quick_check_venv_ready() can never match, so atoms-proof/
+    live-canary fail with a spurious ENV001 even right after a successful bootstrap in the same
+    CI job (caught live on the ANY-32 PR: freelancer-suite's pyproject.toml was added to
+    quick_check.py's list but not here)."""
+    runner = load_runner_module()
+    quick_check = load_quick_check_module()
+
+    assert (
+        runner.QUICK_CHECK_DEPENDENCY_FINGERPRINT_INPUTS
+        == quick_check.DEPENDENCY_FINGERPRINT_INPUTS
+    )
 
 
 def test_quick_check_venv_ready_rejects_stale_marker(monkeypatch, tmp_path) -> None:

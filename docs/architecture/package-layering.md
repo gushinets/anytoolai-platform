@@ -6,6 +6,11 @@ apps/platform-api
   -> platform-actions
   -> product-platforms/*  (MVP-B)
 
+apps/platform-worker
+  -> platform-core
+  -> platform-actions
+  -> product-platforms/*  (MVP-B; must compose the same default bundle set as apps/platform-api)
+
 platform-core
   -> no product-platforms
   -> provider boundary may import litellm/provider SDKs only under providers/*

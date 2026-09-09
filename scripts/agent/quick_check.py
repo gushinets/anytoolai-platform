@@ -19,6 +19,11 @@ EDITABLE_PROJECTS = [
     ROOT / "packages" / "backend" / "platform-sdk",
     ROOT / "packages" / "backend" / "platform-core",
     ROOT / "packages" / "backend" / "platform-actions",
+    # apps/platform-api's composition root (bootstrap.py) imports FreelancerSuiteBundle as its
+    # production default (ANY-32) -- this must install before apps/platform-api's own editable
+    # install below, or importing anytoolai_platform_api.bootstrap during apps/platform-api/tests
+    # (part of PYTEST_TARGETS) fails with ModuleNotFoundError.
+    ROOT / "packages" / "backend" / "product-platforms" / "freelancer-suite",
     ROOT / "apps" / "platform-api",
     ROOT / "apps" / "platform-worker",
 ]

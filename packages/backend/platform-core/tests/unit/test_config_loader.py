@@ -12,6 +12,7 @@ from anytoolai_platform_core.config.errors import (
     BrokenReferenceError,
     DuplicateConfigIdError,
     InvalidConfigShapeError,
+    MissingConfigFileError,
     RegistryLoadError,
 )
 from anytoolai_platform_core.config.loader import ConfigLoader
@@ -1028,3 +1029,29 @@ def test_loader_rejects_duplicate_workflow_step_ids(tmp_path: Path) -> None:
         ref_value="extract",
         message_part="must be unique within a workflow",
     )
+
+
+def test_loader_reports_missing_kernel_products_dir_without_processing_extra_product_roots(
+    tmp_path: Path,
+) -> None:
+    """A missing config_root/products is a hard prerequisite failure reported on its own --
+    _load_products must return early instead of also attempting extra_product_roots. Regression
+    test for ANY-32 review cycle 1: the multi-root rewrite briefly dropped the early return and
+    fell through to the bundle-roots loop, which would have masked (or, with a valid-looking
+    extra root, silently ignored) the real missing-kernel-products-dir error."""
+    config_root = _copy_config_tree(tmp_path)
+    shutil.rmtree(config_root / "products")
+    extra_root = tmp_path / "does_not_exist_extra_root"
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root, extra_product_roots=[extra_root]).load()
+
+    errors = exc_info.value.errors
+    # Exactly one error: the missing products_dir. If extra_product_roots were still processed
+    # after the early return regressed, loading a non-existent extra_root would raise a second,
+    # unrelated "product_file"-missing error here.
+    assert len(errors) == 1
+    (error,) = errors
+    assert isinstance(error, MissingConfigFileError)
+    assert error.config_id == "kernel"
+    assert error.ref_type == "products_dir"

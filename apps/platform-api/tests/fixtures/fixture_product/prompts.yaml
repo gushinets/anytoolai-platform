@@ -1,0 +1,6 @@
+prompts:
+  - prompt_ref: fixture_product.extract.v1
+    version: 1
+    template_path: prompts/extract.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.extract_output_v1
