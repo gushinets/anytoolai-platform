@@ -99,7 +99,7 @@ other Freelancer Suite product.
   empty/whitespace-input cases each fail with `workflow_input_validation_failed` and zero
   `provider_calls` rows.
 - `packages/backend/product-platforms/freelancer-suite/tests/test_proposal_ai_product.py`
-  (7 tests) — action-type sequence, no forbidden provider/model tokens anywhere in the product
+  (9 tests) — action-type sequence, no forbidden provider/model tokens anywhere in the product
   directory, quota-policy-ref resolution, mapping-DSL-legality of every `input_mapping` entry,
   fixture/output-schema agreement (both fixtures), weak-input-fixture distinctness, input-schema
   field contract.
@@ -143,19 +143,63 @@ Deliberately not fixed (documented risk, not a regression from this ticket):
   the worker side) is pre-existing, cross-cutting platform behavior, not something ANY-227
   introduced. Fixing it means reordering platform-core's start/validate sequence for every
   product, which is out of this ticket's scope (Platform Core changes are explicitly not required
-  here) and needs its own ticket. Effect for ProposalAI specifically: three whitespace-only
-  submissions in a row exhaust the lifetime guest quota with zero successful results — worth
-  flagging to product/whoever owns the quota UX, not silently absorbing into this PR.
+  here) and needs its own ticket. Effect: three whitespace-only submissions in a row exhaust the
+  lifetime guest quota with zero successful results — worth flagging to product/whoever owns the
+  quota UX, not silently absorbing into this PR. Correction (round 3 review): `limit_count: 3,
+  period: lifetime` is not a ProposalAI-specific choice that makes this worse than elsewhere --
+  `configs/kernel/products/kernel_demo/quotas.yaml` uses the identical `limit_count: 3, period:
+  lifetime`. This is an existing repo pattern this PR followed (Design decision 3), not a new,
+  more-exposed configuration; the underlying mechanism risk is real but not unique to this PR.
 - **`context: scenario.input` mapping-DSL workaround** (Design decision 1) — review flagged this,
   together with the unmerged `feature/ANY-413` needing a different workaround for the same atom,
   as a signal the DSL's `context.*` restriction is worth fixing at the root. Out of scope here:
   the ticket explicitly forbids a mapping-DSL change for this issue.
 - Not treated as bugs: `constraints.length: 'literal:4000'` matching A06's own `maxLength: 4000`
   in two independent places is the ticket's own instruction (cap at 4000, matching the atom's max),
-  not an accidental duplication needing a shared constant; the product-level
-  `FORBIDDEN_PROVIDER_TERMS` text scan only covers this product's non-Python config/prompt content
-  (YAML/JSON/Markdown), which `ATAI007`'s Python-import check doesn't scan, so it isn't a true
-  duplicate; no `*_live_v1` action config is explicitly out of scope per this exec plan already.
+  not an accidental duplication needing a shared constant; no `*_live_v1` action config is
+  explicitly out of scope per this exec plan already.
+
+## `/code-review xhigh` passes #2 and #3 (2026-09-08 / 2026-09-09) — disposition
+
+Full findings are in `plans/ANY-227.md`. Pass #2 scoped to the ANY-227 commit itself; pass #3
+re-verified everything, refuted one pass-#2 finding, and refined two pass-#1 findings. Fixed:
+
+- **Anti-hallucination regex still had a gap** (pass #3): matched `"4 years"` and `"four years"`
+  but not the hyphenated compound-adjective form (`"4-year"`, `"three-week"`) — live repro
+  confirmed. Pattern now allows a hyphen (or no separator) between the number and the unit.
+- **`FORBIDDEN_PROVIDER_TERMS` duplication** (pass #1 finding #7, sharpened in pass #3 finding #5
+  with a concrete precedent: `test_bundle_composition_parity.py` already dynamic-loads
+  `scripts/agent/validate_configs.py` as a module for the same reason). The provider-name half of
+  the list now comes from `validate_architecture.py`'s own `LLM_PROVIDER_IMPORTS` via the same
+  dynamic-import pattern, instead of a second hand-maintained copy that could silently drift from
+  the one `ATAI006` actually enforces; the model-string prefixes (`gpt-`/`claude-`/`gemini-`) stay
+  local since they're raw text, not an import name, with no central list to reuse.
+- **Stale test count in this doc** (pass #2 finding #2): "(7 tests)" corrected to the real,
+  `--collect-only`-verified count above.
+
+Corrected framing (not a code change, a documentation correction):
+
+- **Quota risk severity** (pass #3 finding #1): pass #1 framed the lifetime `limit_count: 3` as
+  something that hits ProposalAI harder than `kernel_demo`. Reviewed and found inaccurate --
+  `kernel_demo.guest_quota_v1` uses the identical `limit_count: 3, period: lifetime`. See the
+  corrected note under "Deliberately not fixed" above.
+
+Deliberately not fixed (repo-wide pattern, not introduced by this ticket):
+
+- **`app` fixture rebuilds `create_app()`/`build_runtime()` from scratch per test** (pass #3
+  finding #6, new): all 5 tests in `test_proposal_ai_bundle.py` each pay a full config parse via
+  the `app` fixture, the same class of cost `_build_worker` already avoids for the worker side.
+  Not fixed here: `test_demo_api.py` has the identical per-test `app` fixture shape and predates
+  this PR -- this is an existing repo convention (function-scoped fixtures, not a shared
+  session-scoped registry), not something ANY-227 introduced. Changing fixture scope repo-wide is
+  a bigger, cross-cutting change than this ticket's evidence gate calls for.
+
+Reviewed and refuted (pass #3 finding #7, retracting pass #2 finding #3):
+
+- **Duplicated `_request` httpx helper** across `test_proposal_ai_bundle.py` and
+  `test_demo_api.py` -- pass #2 called this PR-specific duplication. Pass #3 re-checked and found
+  the same helper shape repeated across 6+ files in `apps/platform-api/tests/`: a pre-existing,
+  repo-wide convention, not something this PR introduced or should uniquely fix.
 
 ## Resolved follow-up
 

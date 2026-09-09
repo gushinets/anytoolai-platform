@@ -5,14 +5,17 @@ Everything here is plain YAML/JSON parsing over the checked-in product directory
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 import jsonschema
 import pytest
 import yaml
 
+REPO_ROOT = Path(__file__).resolve().parents[5]
 PRODUCT_DIR = (
     Path(__file__).resolve().parents[1]
     / "src"
@@ -20,18 +23,27 @@ PRODUCT_DIR = (
     / "products"
     / "proposal_ai"
 )
-FIXTURE_ROOT = (
-    Path(__file__).resolve().parents[5] / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
-)
+FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 
-FORBIDDEN_PROVIDER_TERMS = (
-    "litellm",
-    "pydantic_ai",
-    "openai",
-    "anthropic",
-    "google.genai",
-    "cohere",
-    "mistralai",
+
+def _load_validate_architecture_module() -> Any:
+    # Dynamic-load, same pattern as tests/architecture/test_bundle_composition_parity.py's
+    # _load_validate_configs_module -- validate_architecture.py is pure stdlib (no
+    # anytoolai_platform_core import chain), so this stays within ATAI007/ATAI008's ban on
+    # product-platforms code depending on platform-core internals.
+    path = REPO_ROOT / "scripts" / "agent" / "validate_architecture.py"
+    spec = importlib.util.spec_from_file_location("validate_architecture_module", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+# Provider-SDK names come from validate_architecture.py's own LLM_PROVIDER_IMPORTS -- the single
+# source of truth ATAI006 already enforces repo-wide -- rather than a second, hand-maintained copy
+# that could silently drift from it (code review finding, round 3). Model-string prefixes are a
+# distinct concern (raw text, not an import name) with no central list to reuse.
+FORBIDDEN_PROVIDER_TERMS = tuple(_load_validate_architecture_module().LLM_PROVIDER_IMPORTS) + (
     "gpt-",
     "claude-",
     "gemini-",
@@ -121,10 +133,12 @@ def test_weak_input_fixture_is_a_distinct_bounded_draft_with_no_invented_specifi
 
     assert weak != happy
     # No fabricated concrete numbers/dates that a vague brief could not have supplied -- digit
-    # form ("4 years") and spelled-out form ("four years") both count; the happy fixture itself
-    # uses the spelled-out form, so a digit-only pattern here would prove nothing.
+    # form ("4 years"), spelled-out form ("four years"), and hyphenated compound-adjective form
+    # ("4-year", "three-week") all count. The happy fixture itself uses the spelled-out form, so a
+    # digit-only pattern would prove nothing; a space-only separator would miss the hyphenated form
+    # (code review finding, round 3).
     number_words = r"one|two|three|four|five|six|seven|eight|nine|ten|\d+"
-    assert not re.search(rf"\b({number_words})\s*(year|week|day)s?\b", weak, re.IGNORECASE)
+    assert not re.search(rf"\b({number_words})[\s-]*(year|week|day)s?\b", weak, re.IGNORECASE)
 
 
 def test_language_pattern_rejects_a_trailing_newline() -> None:
