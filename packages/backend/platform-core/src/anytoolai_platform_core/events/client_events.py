@@ -76,6 +76,11 @@ _CONTEXT_CORRELATION_FIELDS = (
 # EventLogRepository.create() does not catch (only sa.exc.IntegrityError), surfacing as a raw 500
 # instead of this endpoint's normal 422 contract.
 MAX_USER_ID_LENGTH = 128
+# guest_id/scenario_session_id can never actually reach the INSERT oversized (they must exactly
+# match an already-bounded existing row first, see `record()`), so this cap isn't load-bearing for
+# safety the way MAX_USER_ID_LENGTH is -- it exists so an absurdly long value fails fast as a 422
+# instead of paying for a lookup that can only ever miss.
+MAX_LOOKUP_ID_LENGTH = 128
 
 
 class ClientEventTypeNotAllowedError(PlatformError):
@@ -131,6 +136,23 @@ class ClientEventUserIdInvalidError(PlatformError):
         )
 
 
+class ClientEventGuestIdInvalidError(PlatformError):
+    def __init__(self) -> None:
+        super().__init__(
+            "client_event_guest_id_invalid",
+            f"guest_id must be a non-empty string of at most {MAX_LOOKUP_ID_LENGTH} characters.",
+        )
+
+
+class ClientEventScenarioSessionIdInvalidError(PlatformError):
+    def __init__(self) -> None:
+        super().__init__(
+            "client_event_scenario_session_id_invalid",
+            f"scenario_session_id must be a non-empty string of at most {MAX_LOOKUP_ID_LENGTH} "
+            "characters.",
+        )
+
+
 class ClientEventPropertyInvalidError(PlatformError):
     def __init__(self, key: str) -> None:
         safe_key = (
@@ -172,7 +194,7 @@ class ClientEventService:
         tenant_id: str,
         region: str,
         event_id: str,
-        event_type: str,
+        event_type: WebClientEventType,
         product_id: str,
         frontend_id: str,
         web_session_id: str,
@@ -183,19 +205,22 @@ class ClientEventService:
     ) -> EventEnvelope:
         if event_type not in CLIENT_EVENT_TYPES:
             raise ClientEventTypeNotAllowedError()
-        # Normalize before validating length, not after -- otherwise a value that's only over
-        # length before trimming (e.g. padding whitespace) is rejected even though the id that
-        # would actually be stored/looked-up fits.
-        event_id = event_id.strip()
-        if not event_id or len(event_id) > MAX_CLIENT_EVENT_ID_LENGTH:
-            raise ClientEventIdInvalidError()
-        web_session_id = web_session_id.strip()
-        if not web_session_id or len(web_session_id) > MAX_WEB_SESSION_ID_LENGTH:
-            raise ClientEventWebSessionIdInvalidError()
+        event_id = _trim_or_raise(event_id, max_length=MAX_CLIENT_EVENT_ID_LENGTH, error=ClientEventIdInvalidError)
+        web_session_id = _trim_or_raise(
+            web_session_id, max_length=MAX_WEB_SESSION_ID_LENGTH, error=ClientEventWebSessionIdInvalidError
+        )
         if user_id is not None:
-            user_id = user_id.strip()
-            if not user_id or len(user_id) > MAX_USER_ID_LENGTH:
-                raise ClientEventUserIdInvalidError()
+            user_id = _trim_or_raise(user_id, max_length=MAX_USER_ID_LENGTH, error=ClientEventUserIdInvalidError)
+        if guest_id is not None:
+            guest_id = _trim_or_raise(
+                guest_id, max_length=MAX_LOOKUP_ID_LENGTH, error=ClientEventGuestIdInvalidError
+            )
+        if scenario_session_id is not None:
+            scenario_session_id = _trim_or_raise(
+                scenario_session_id,
+                max_length=MAX_LOOKUP_ID_LENGTH,
+                error=ClientEventScenarioSessionIdInvalidError,
+            )
 
         product = self._config_registry.get_product(product_id)
         if product is None:
@@ -219,13 +244,13 @@ class ClientEventService:
                 product_id=product_id,
                 frontend_id=frontend_id,
             )
-            # A session whose true owner (None for an anonymous session, or a specific guest_id)
-            # doesn't match this request's guest_id exactly must be indistinguishable from a
-            # session that does not exist -- a plain equality check, not a check that only
-            # applies when one side happens to be non-None, so neither omitting guest_id nor a
-            # session with no owner can be used to correlate to/from an identity that isn't
-            # actually attached to it.
-            if session is None or session.guest_id != guest_id:
+            # A session whose true owner (None for an anonymous/unauthenticated session, or a
+            # specific guest_id/user_id) doesn't match this request's identity exactly must be
+            # indistinguishable from a session that does not exist -- plain equality checks, not
+            # checks that only apply when one side happens to be non-None, so neither omitting an
+            # identity nor a session with no owner can be used to correlate to/from an identity
+            # that isn't actually attached to it.
+            if session is None or session.guest_id != guest_id or session.user_id != user_id:
                 raise ScenarioSessionNotFoundError()
 
         event_properties = self._validate_properties(properties or {})
@@ -286,6 +311,13 @@ class ClientEventService:
                 raise ClientEventPropertyInvalidError(key)
             validated[key] = value
         return validated
+
+
+def _trim_or_raise(value: str, *, max_length: int, error: type[PlatformError]) -> str:
+    normalized = value.strip()
+    if not normalized or len(normalized) > max_length:
+        raise error()
+    return normalized
 
 
 def _is_allowed_property_value(key: str, value: Any) -> bool:

@@ -111,6 +111,26 @@ describe("trackClientEvent", () => {
     expect(body.properties?.mode).toBe("one_run");
   });
 
+  it("omits a non-integer fieldCount instead of failing the whole event", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(200, { event_id: "web_evt_1", event_type: "web.product_viewed" }),
+    );
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    await trackClientEvent(client, {
+      eventType: "web.product_viewed",
+      productId: "kernel_demo",
+      frontendId: "web_mirror",
+      webSessionId: "web_session_123",
+      properties: { mode: "one_run", fieldCount: 2.5 },
+    });
+
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    const body = parseBody(init);
+    expect(body.properties?.field_count).toBeUndefined();
+    expect(body.properties?.mode).toBe("one_run");
+  });
+
   it("omits unset optional fields instead of sending them as undefined-turned-null", async () => {
     const fetchImpl = vi.fn(async () =>
       jsonResponse(200, { event_id: "web_evt_1", event_type: "web.product_viewed" }),

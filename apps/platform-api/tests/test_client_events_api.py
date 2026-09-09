@@ -69,6 +69,18 @@ def _create_test_app(session_factory: SessionFactory):
                 guest_id="guest_demo",
             )
         )
+        ScenarioSessionRepository(session).create(
+            ScenarioSessionRecord(
+                id="scenario_session_owned_by_user_demo",
+                tenant_id="anytoolai",
+                region="default",
+                product_id="kernel_demo",
+                frontend_id="web_mirror",
+                scenario_id="kernel_demo.single_action_smoke_v1",
+                scenario_version=1,
+                user_id="user_demo",
+            )
+        )
     app = create_app(config_root=CONFIG_ROOT)
     app.state.runtime = replace(
         app.state.runtime,
@@ -461,6 +473,84 @@ def test_client_event_rejects_an_anonymous_session_claimed_by_a_real_guest(
 
     assert response.status_code == HTTPStatus.NOT_FOUND
     assert response.json()["error"]["code"] == "scenario_session_not_found"
+
+
+def test_client_event_rejects_a_user_owned_session_claimed_by_omitting_guest_id(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    # Regression: the owner check compared session.guest_id but never session.user_id, so a
+    # session owned by user_demo (guest_id=None) could be claimed by any request that simply
+    # omitted guest_id (None == None) and supplied an arbitrary, unchecked user_id.
+    response = _post_client_event(
+        app,
+        event_type="web.result_viewed",
+        user_id="someone_else",
+        scenario_session_id="scenario_session_owned_by_user_demo",
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "scenario_session_not_found"
+
+
+def test_client_event_accepts_scenario_session_owned_by_the_matching_user(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(
+        app,
+        event_type="web.result_viewed",
+        user_id="user_demo",
+        scenario_session_id="scenario_session_owned_by_user_demo",
+    )
+
+    assert response.status_code == HTTPStatus.OK
+
+
+def test_client_event_trims_guest_id_before_lookup(session_factory: SessionFactory) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(app, guest_id="  guest_demo  ")
+
+    assert response.status_code == HTTPStatus.OK
+
+
+def test_client_event_trims_scenario_session_id_before_lookup(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(
+        app,
+        event_type="web.result_viewed",
+        scenario_session_id="  scenario_session_demo  ",
+    )
+
+    assert response.status_code == HTTPStatus.OK
+
+
+def test_client_event_rejects_empty_guest_id_as_invalid_not_not_found(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(app, guest_id="   ")
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_guest_id_invalid"
+
+
+def test_client_event_rejects_empty_scenario_session_id_as_invalid_not_not_found(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(app, scenario_session_id="")
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_scenario_session_id_invalid"
 
 
 def test_client_event_accepts_an_event_id_that_only_fits_after_trimming_whitespace(

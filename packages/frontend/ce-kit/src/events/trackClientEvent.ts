@@ -74,11 +74,11 @@ function toWireProperties(
   if (properties.mode !== undefined) {
     wire.mode = properties.mode;
   }
-  // Number.isFinite() excludes NaN/Infinity, which JSON.stringify would otherwise silently turn
-  // into `null` on the wire -- the backend would then reject it with the generic
-  // client_event_property_invalid rather than a message pointing at the real problem. Dropping
-  // it here keeps the rest of the event recordable instead of failing the whole call.
-  if (properties.fieldCount !== undefined && Number.isFinite(properties.fieldCount)) {
+  // Number.isInteger() (not just isFinite()) -- the backend's field_count is a Python `int`, so a
+  // finite non-integer like 2.5 would fail isinstance(value, int) there and fail the whole event
+  // with the generic client_event_property_invalid, same as NaN/Infinity would. isInteger()
+  // already excludes NaN/Infinity too, so this is the one check that covers both.
+  if (properties.fieldCount !== undefined && Number.isInteger(properties.fieldCount)) {
     wire.field_count = properties.fieldCount;
   }
   if (properties.gapCategory !== undefined) {
