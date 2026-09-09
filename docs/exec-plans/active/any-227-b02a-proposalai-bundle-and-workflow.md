@@ -110,8 +110,11 @@ other Freelancer Suite product.
 Full findings are in `plans/ANY-227.md`. Fixed:
 
 - **Regex bug** (`language` pattern used `$`, which Python `re` matches just before a trailing
-  `\n`, so `"en\n"` passed validation) — `generate_input.schema.json` now uses `\Z`. Regression
-  test: `test_language_pattern_rejects_a_trailing_newline`.
+  `\n`, so `"en\n"` passed validation) — `generate_input.schema.json` now uses `(?!\n)$`.
+  (An initial fix used `\Z`, but that isn't valid ECMA-262 syntax — the dialect JSON Schema's
+  `pattern` keyword is defined against — so a later review round replaced it with `(?!\n)$`,
+  which closes the same gap under Python's `jsonschema` while staying portable.) Regression test:
+  `test_language_pattern_rejects_a_trailing_newline`.
 - **Misleading test name/docstring** on the weak-input worker test — renamed to
   `test_proposal_ai_weak_but_non_empty_input_still_passes_schema_and_completes` with a docstring
   stating exactly what it does and doesn't prove (it can't exercise the `.weak_input.json` fixture

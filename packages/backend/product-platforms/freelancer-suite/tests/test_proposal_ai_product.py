@@ -144,8 +144,12 @@ def test_weak_input_fixture_is_a_distinct_bounded_draft_with_no_invented_specifi
 def test_language_pattern_rejects_a_trailing_newline() -> None:
     """Code review finding: Python's `re` (what jsonschema's `pattern` keyword actually runs)
     matches a trailing `$` just before a final `\\n`, so a naive `^...$` pattern silently accepts
-    `"en\\n"` -- verified live against this repo's jsonschema. `\\Z` closes that gap; this pins
-    the fix against a regression back to `$`."""
+    `"en\\n"` -- verified live against this repo's jsonschema. A bare `\\Z` anchor would close that
+    gap too, but `\\Z` isn't part of ECMA-262 (the regex dialect JSON Schema's `pattern` keyword is
+    defined against) and reads as a literal `Z` character under an ECMA-262 engine -- a portability
+    regression the first fix introduced. `(?!\\n)$` closes the same gap with syntax that is valid,
+    and means the same thing, under both engines: this pins the fix against a regression to either
+    a bare `$` or back to `\\Z`."""
     schema = json.loads(
         (PRODUCT_DIR / "schemas" / "generate_input.schema.json").read_text(encoding="utf-8")
     )
@@ -164,4 +168,4 @@ def test_generate_input_schema_matches_the_ticket_field_contract() -> None:
     assert schema["additionalProperties"] is False
     assert set(schema["required"]) == {"task_text", "freelancer_positioning"}
     assert schema["properties"]["tone"]["enum"] == ["neutral", "warm", "firm"]
-    assert schema["properties"]["language"]["pattern"] == "^[a-z]{2}(-[A-Z]{2})?\\Z"
+    assert schema["properties"]["language"]["pattern"] == "^[a-z]{2}(-[A-Z]{2})?(?!\\n)$"

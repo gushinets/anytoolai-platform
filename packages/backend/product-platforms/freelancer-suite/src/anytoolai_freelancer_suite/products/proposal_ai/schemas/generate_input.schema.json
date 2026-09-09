@@ -19,7 +19,7 @@
     },
     "language": {
       "type": "string",
-      "pattern": "^[a-z]{2}(-[A-Z]{2})?\\Z"
+      "pattern": "^[a-z]{2}(-[A-Z]{2})?(?!\\n)$"
     }
   },
   "required": ["task_text", "freelancer_positioning"],

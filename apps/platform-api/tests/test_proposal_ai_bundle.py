@@ -70,8 +70,10 @@ async def _request(
         )
 
 
-def _start(app: Any, *, input_payload: dict[str, Any], request_id: str = "req_start") -> httpx.Response:
-    return asyncio.run(
+def _start(
+    app: Any, *, input_payload: dict[str, Any], request_id: str = "req_start"
+) -> dict[str, Any]:
+    response = asyncio.run(
         _request(
             app,
             "POST",
@@ -84,6 +86,8 @@ def _start(app: Any, *, input_payload: dict[str, Any], request_id: str = "req_st
             request_id=request_id,
         )
     )
+    assert response.status_code == HTTPStatus.OK, response.text
+    return response.json()
 
 
 def _build_worker(app: Any, session_factory: SessionFactory):
@@ -113,9 +117,11 @@ def test_proposal_ai_happy_path_invokes_a06_once_and_produces_canonical_artifact
         app,
         input_payload={
             "task_text": "Build a 5-page marketing site for a local bakery within two weeks.",
-            "freelancer_positioning": "Freelance web designer with 4 years building small-business sites.",
+            "freelancer_positioning": (
+                "Freelance web designer with 4 years building small-business sites."
+            ),
         },
-    ).json()
+    )
 
     worker = _build_worker(app, session_factory)
     processed = asyncio.run(worker.process_next_job())
@@ -172,7 +178,7 @@ def test_proposal_ai_weak_but_non_empty_input_still_passes_schema_and_completes(
             "freelancer_positioning": "I build websites.",
         },
         request_id="req_start_weak",
-    ).json()
+    )
 
     worker = _build_worker(app, session_factory)
     processed = asyncio.run(worker.process_next_job())
@@ -196,7 +202,7 @@ def test_proposal_ai_rejects_empty_or_whitespace_required_fields_before_provider
     session_factory: SessionFactory,
     invalid_input: dict[str, Any],
 ) -> None:
-    started = _start(app, input_payload=invalid_input, request_id="req_start_invalid").json()
+    started = _start(app, input_payload=invalid_input, request_id="req_start_invalid")
 
     worker = _build_worker(app, session_factory)
     processed = asyncio.run(worker.process_next_job())

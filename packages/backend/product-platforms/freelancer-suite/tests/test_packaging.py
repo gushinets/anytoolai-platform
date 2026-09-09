@@ -40,7 +40,9 @@ def test_non_python_product_config_files_are_included_in_the_built_wheel(
     # Real products (e.g. proposal_ai) nest config two levels deep under products/<name>/ --
     # prompts/*.md, schemas/*.json -- not just top-level *.yaml. Prove that depth ships too.
     (fixture_product_dir / "prompts").mkdir()
-    (fixture_product_dir / "prompts" / "fixture.v1.md").write_text("fixture prompt\n", encoding="utf-8")
+    (fixture_product_dir / "prompts" / "fixture.v1.md").write_text(
+        "fixture prompt\n", encoding="utf-8"
+    )
     (fixture_product_dir / "schemas").mkdir()
     (fixture_product_dir / "schemas" / "fixture.schema.json").write_text("{}\n", encoding="utf-8")
 
