@@ -262,9 +262,13 @@ def test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_
         {"task_text": "", "freelancer_positioning": "I build websites."},
         {"task_text": "   ", "freelancer_positioning": "I build websites."},
         {"task_text": "Build a site.", "freelancer_positioning": ""},
+        # Code review finding: `task_text`/`freelancer_positioning` are a `required trimmed
+        # string` per ANY-227 -- non-blank but padded values must not reach A06 untrimmed either.
+        {"task_text": "  Build a site.  ", "freelancer_positioning": "I build websites."},
+        {"task_text": "Build a site.", "freelancer_positioning": "I build websites.\n"},
     ],
 )
-def test_proposal_ai_rejects_empty_or_whitespace_required_fields_before_provider_execution(
+def test_proposal_ai_rejects_invalid_required_field_values_before_provider_execution(
     app: Any,
     session_factory: SessionFactory,
     invalid_input: dict[str, Any],

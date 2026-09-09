@@ -92,6 +92,25 @@ def test_quota_policy_ref_resolves_to_the_declared_lifetime_product_quota() -> N
     assert isinstance(policy["limit_count"], int) and policy["limit_count"] > 0
 
 
+def test_renderer_contract_pins_the_canonical_copy_ready_field_to_a06_text() -> None:
+    """Code review finding: ANY-227 lists a renderer contract as a Bundle-And-Workflow scope item
+    (also required at the MVP-B spec level,
+    docs/product-specs/mvp-b-freelancer-validation-bundle.md), distinct from ANY-243's later
+    `apps/web-mirror` renderer *implementation*. Nothing under
+    `products/proposal_ai/` pinned it before this file. Cross-checked against workflows.yaml and
+    scenarios.yaml so it can't silently drift from the actual output schema / next action."""
+    contract = _load_yaml("renderer_contract.yaml")["renderer_contract"]
+    workflow = _load_yaml("workflows.yaml")["workflows"][0]
+    scenario = _load_yaml("scenarios.yaml")["scenarios"][0]
+
+    assert contract["scenario_id"] == scenario["scenario_id"]
+    assert contract["output_schema_ref"] == workflow["output_schema_ref"]
+    assert contract["output_schema_ref"] == "kernel.schemas.compose_persuasive_text_output_v1"
+    assert contract["canonical_field"] == "text"
+    assert contract["next_action"] in scenario["allowed_next_actions"]
+    assert set(contract["excluded_fields"]) >= {"angle", "rationale", "model", "provider"}
+
+
 def test_workflow_input_mapping_uses_only_generic_mapping_dsl_syntax() -> None:
     """No mapping-DSL change was needed: the whole `context` maps in one entry (`scenario.input`,
     single-segment target -- the DSL only rejects a *dotted* `context.*` target key), and
@@ -192,6 +211,35 @@ def test_language_pattern_rejects_a_trailing_newline() -> None:
         jsonschema.validate("en\n", language_schema)
 
 
+@pytest.mark.parametrize("field_name", ["task_text", "freelancer_positioning"])
+def test_required_text_fields_reject_untrimmed_values(field_name: str) -> None:
+    """Code review finding: ANY-227 specifies both fields as a `required trimmed string`, but
+    `pattern: "\\S"` only rejects an all-whitespace value -- `"  Build a site  "` passed, and
+    nothing downstream (`normalize_mapping`) strips the padding before it reaches A06. Verified
+    live against this repo's jsonschema. The fixed pattern requires the first and last character
+    to be non-whitespace (an internal newline, e.g. a multi-line task description, stays legal --
+    only leading/trailing whitespace is rejected), with the same `(?!\\n)` guard against Python
+    `re`'s trailing-newline-tolerant `$` used for `language` above."""
+    schema = json.loads(
+        (PRODUCT_DIR / "schemas" / "generate_input.schema.json").read_text(encoding="utf-8")
+    )
+    field_schema = schema["properties"][field_name]
+
+    jsonschema.validate("Build a site", field_schema)
+    jsonschema.validate("a", field_schema)
+    jsonschema.validate("Build a site\nwith two pages.", field_schema)
+    untrimmed_values = (
+        "  Build a site",
+        "Build a site  ",
+        "  Build a site  ",
+        " ",
+        "Build a site\n",
+    )
+    for untrimmed in untrimmed_values:
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(untrimmed, field_schema)
+
+
 def test_generate_input_schema_matches_the_ticket_field_contract() -> None:
     schema = json.loads(
         (PRODUCT_DIR / "schemas" / "generate_input.schema.json").read_text(encoding="utf-8")
@@ -200,3 +248,6 @@ def test_generate_input_schema_matches_the_ticket_field_contract() -> None:
     assert set(schema["required"]) == {"task_text", "freelancer_positioning"}
     assert schema["properties"]["tone"]["enum"] == ["neutral", "warm", "firm"]
     assert schema["properties"]["language"]["pattern"] == "^[a-z]{2}(-[A-Z]{2})?(?!\\n)$"
+    trimmed_pattern = "^\\S([\\s\\S]*\\S)?(?!\\n)$"
+    assert schema["properties"]["task_text"]["pattern"] == trimmed_pattern
+    assert schema["properties"]["freelancer_positioning"]["pattern"] == trimmed_pattern

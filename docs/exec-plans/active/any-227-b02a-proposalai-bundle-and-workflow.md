@@ -237,6 +237,45 @@ current code and fixed -- these were genuine truthfulness-contract violations, n
   run against *both* fixtures (the happy one is just as capable of inventing an unsupported
   commitment as the weak one).
 
+## Code-review (blocking, from the PR author's own account, round 2) — disposition
+
+Full findings are in `plans/ANY-227.md` ("Code-review (me #2)"), re-reviewing head `7ae7738`.
+Three verified and fixed; one reviewed and declined with cited evidence:
+
+- **Happy fixture still overstated experience.** The positioning input says "small-business
+  sites" (general); the fixture said "small-business *marketing* sites" -- a narrower experience
+  claim the input never made, even though the current task happens to be a marketing site.
+  Rewritten to keep the experience claim exactly at "small-business sites" and relate it to the
+  marketing-site task as fit ("exactly the kind of project I take on"), not as claimed history.
+- **Required fields were non-blank but not actually trimmed.** `pattern: "\S"` only rejects an
+  all-whitespace value; `"  Build a site  "` validated, and `normalize_mapping()` does not strip
+  whitespace, so padding reached A06 unchanged -- confirmed live against this repo's jsonschema.
+  ANY-227 specifies both fields as a `required trimmed string`. Fixed the pattern to
+  `^\S([\s\S]*\S)?(?!\n)$` (rejects leading/trailing whitespace including a lone trailing `\n`,
+  via the same `(?!\n)` guard as the `language` fix, but still allows a legal *internal* newline
+  in a multi-line task description). New schema-level regression test
+  (`test_required_text_fields_reject_untrimmed_values`) and two new end-to-end rejection cases in
+  `test_proposal_ai_bundle.py` proving a padded value fails before reaching the provider.
+- **No renderer contract existed under `products/proposal_ai/`.** ANY-227's own scope list and
+  `docs/product-specs/mvp-b-freelancer-validation-bundle.md`'s Bundle-And-Workflow outcome both
+  name a renderer contract as this ticket's deliverable, distinct from ANY-243's later
+  `apps/web-mirror` renderer *implementation*. Added `renderer_contract.yaml`: pins the canonical
+  output field (`text`), the reused output schema, the `copy_result` next action, and the
+  excluded fields (angle/rationale/model/provider), plus a test cross-checking it against
+  `workflows.yaml`/`scenarios.yaml` so it can't silently drift from the real config.
+- **Declined: moving the fixtures under `products/proposal_ai/`.** The review read ANY-227's
+  "product-owned config, prompt, schema, fixture, and renderer contract" as requiring the
+  fake-provider JSON files to live under the product's own directory. Checked against the
+  repo's actual, established pattern: `kernel_demo` -- the platform's own reference product --
+  keeps its fixtures in the exact same repo-global
+  `tests/fixtures/provider/fake_provider_outputs/` directory this PR uses, not under
+  `configs/kernel/products/kernel_demo/`. No product anywhere in the repo nests fixtures under
+  its own product config root; the fake-provider/test-composition mechanism itself (its own
+  README, and every existing test) assumes one shared, `action_config_id`-keyed directory.
+  "Product-owned" here is expressed through the unique, product-prefixed filename inside that
+  shared mechanism, not directory nesting -- moving ProposalAI's fixtures alone would deviate
+  from the repo's own reference product's layout, not align with it.
+
 ## Resolved follow-up
 
 None outstanding for this ticket. Web page implementation is ANY-243; Chrome Extension is the

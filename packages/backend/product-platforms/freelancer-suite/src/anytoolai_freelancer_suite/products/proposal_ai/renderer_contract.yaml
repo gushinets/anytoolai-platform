@@ -1,0 +1,13 @@
+renderer_contract:
+  scenario_id: proposal_ai.generate_v1
+  output_schema_ref: kernel.schemas.compose_persuasive_text_output_v1
+  canonical_field: text
+  next_action: copy_result
+  excluded_fields: [angle, rationale, model, provider]
+  description: >-
+    The copy-ready proposal body is exactly the A06 output field `text` -- verbatim, no wrapping
+    or reformatting. ProposalAI v1 has no angle/rationale distinction (angle-driven persuasion is
+    out of scope for v1) and never exposes model, provider, or other hidden product fields in the
+    rendered result. apps/web-mirror (ANY-243) renders this field as-is and records a successful
+    copy as the `copy_result` next action; this file pins the contract ANY-243's renderer
+    implementation is built against, not the renderer implementation itself.
