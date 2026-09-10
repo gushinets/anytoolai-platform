@@ -300,6 +300,15 @@ class ClientEventService:
             guest_id = session.guest_id
             user_id = session.user_id
             scenario_chain_id = session.scenario_chain_id
+            # A session itself can be anonymous: a product with no quota_policy_ref never
+            # requires guest_id/user_id at scenario-start time (`QuotaService
+            # .validate_accepted_start()` only enforces `guest_id` when a policy is
+            # configured), so `session.guest_id`/`session.user_id` can both genuinely be None
+            # here. Re-check the same identity requirement post-derivation -- the pre-resolution
+            # guard above only proves a `scenario_session_id` was supplied, not that resolving it
+            # actually produced a real identity.
+            if guest_id is None and user_id is None:
+                raise ClientEventIdentityRequiredError()
         elif user_id is not None:
             # No session to derive/verify user_id against, and MVP-A has no authenticated-user
             # lookup at all -- unlike guest_id (itself unauthenticated, but at least checked

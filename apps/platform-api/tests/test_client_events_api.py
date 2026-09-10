@@ -522,21 +522,27 @@ def test_client_event_rejects_a_fully_anonymous_payload(session_factory: Session
     assert response.json()["error"]["code"] == "client_event_identity_required"
 
 
-def test_client_event_accepts_a_session_only_payload_with_no_separate_guest_id(
+def test_client_event_rejects_a_session_only_payload_when_the_session_itself_is_anonymous(
     session_factory: SessionFactory,
 ) -> None:
     app = _create_test_app(session_factory)
 
-    # A resolved scenario_session_id is sufficient identity on its own -- the caller doesn't have
-    # to also (and, per the owner-check tests elsewhere in this file, generally must not)
-    # separately assert guest_id/user_id once a session already carries that information.
+    # ANY-17 code-review (me #4): a resolved scenario_session_id is only sufficient identity when
+    # the session itself actually carries one. `scenario_session_demo` has no guest_id/user_id of
+    # its own (a product with no quota_policy_ref never requires either at scenario-start time),
+    # so deriving identity from it yields guest_id=None, user_id=None -- a fully anonymous event,
+    # which this authenticated-or-guest endpoint must still reject even though a real,
+    # verified scenario_session_id was supplied. See
+    # `test_client_event_accepts_a_guest_owned_session_when_guest_id_is_omitted` for the
+    # session-carries-real-identity counterpart of this test.
     response = _post_client_event(
         app,
         event_type="web.result_viewed",
         scenario_session_id="scenario_session_demo",
     )
 
-    assert response.status_code == HTTPStatus.OK
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_identity_required"
 
 
 def test_client_event_rejects_server_owned_dimensions_in_payload(
@@ -571,7 +577,7 @@ def test_client_event_accepts_known_scenario_session_and_rejects_unknown(
     known = _post_client_event(
         app,
         event_type="web.result_viewed",
-        scenario_session_id="scenario_session_demo",
+        scenario_session_id="scenario_session_owned_by_guest_demo",
     )
     assert known.status_code == HTTPStatus.OK
 
@@ -729,7 +735,7 @@ def test_client_event_trims_scenario_session_id_before_lookup(
     response = _post_client_event(
         app,
         event_type="web.result_viewed",
-        scenario_session_id="  scenario_session_demo  ",
+        scenario_session_id="  scenario_session_owned_by_guest_demo  ",
     )
 
     assert response.status_code == HTTPStatus.OK
