@@ -421,4 +421,9 @@ def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:
     assert contract["output_schema_ref"] == "kernel.schemas.compose_reply_output_v1"
     assert contract["canonical_field"] == "text"
     assert contract["call_to_action_field"] == "call_to_action"
+    assert contract["call_to_action_composition"] == "append_after_blank_line"
     assert contract["excluded_fields"] == []
+
+    output_schema_properties = _load_schema(contract["output_schema_ref"])["properties"]
+    assert contract["canonical_field"] in output_schema_properties
+    assert contract["call_to_action_field"] in output_schema_properties
