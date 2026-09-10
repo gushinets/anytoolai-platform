@@ -1,0 +1,6 @@
+scenarios:
+  - scenario_id: proposal_ai.generate_v1
+    version: 1
+    workflow_id: proposal_ai.generate_v1
+    allowed_next_actions:
+      - copy_result
