@@ -239,3 +239,22 @@ def test_weak_input_fixture_is_distinct_and_invents_no_specific_day(action_confi
 
     assert weak_text != happy_text
     assert not any(day in weak_text for day in _DAY_WORDS), action_config_id
+
+
+# Code review finding: the day-word check above only catches invented *dates* -- it cannot catch
+# an invented *absence-of-information* claim ("I don't have a firm milestone to share yet") or an
+# invented future commitment neither the weak scenario input's progress_notes/reply_goal actually
+# states. Denylisted here and checked against every weak fixture -- a well-grounded response to a
+# vague-but-non-empty input restates the input plainly, it does not assert what information is or
+# isn't available.
+_UNGROUNDED_HEDGE_PHRASES = ("don't have", "no update", "nothing to report", "no firm")
+
+
+@pytest.mark.parametrize("action_config_id", [pair[0] for pair in _ACTION_CONFIG_OUTPUT_SCHEMAS])
+def test_weak_input_fixture_invents_no_absence_of_information_claim(action_config_id: str) -> None:
+    weak_text = json.loads(
+        (FIXTURE_ROOT / f"{action_config_id}.weak_input.json").read_text(encoding="utf-8")
+    )["response_json"]["text"].lower()
+
+    for phrase in _UNGROUNDED_HEDGE_PHRASES:
+        assert phrase not in weak_text, (action_config_id, phrase)
