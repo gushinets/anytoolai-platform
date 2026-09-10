@@ -14,6 +14,8 @@ Rules:
 - State the payment amount and, when `context` includes a due date, the due date explicitly — this
   is the only step in the workflow that sees `context`, so omitting either here means it never
   reaches the client at all. Do not state or imply a payment amount or due date beyond exactly what
-  `context` provides, and do not state a payment method (that is a later step's concern).
+  `context` provides — in particular, do not tighten a due date to an earlier one (for example
+  writing "before Friday" when `context` says the due date is "Friday"; use "by Friday" or "due
+  Friday" instead) — and do not state a payment method (that is a later step's concern).
 - Match `constraints.tone` (`neutral`, `warm`, or `firm`) when provided.
 - Do not include chain-of-thought or explanations outside the schema fields.

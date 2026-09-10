@@ -10,8 +10,10 @@ Rules:
 - State the request plainly: what the payment is for, building on the persuasive framing in
   `situation` without repeating it verbatim. Do not assert a causal or gating claim (for example
   that work will stall or continue on schedule) beyond what `situation` itself states. Preserve
-  every concrete fact `situation` states (amount, due date) — `situation` is the only place those
-  facts appear, so `text` is the client's only chance to see them.
+  every concrete fact `situation` states (amount, due date) exactly as stated — do not tighten a
+  due date to an earlier one (for example writing "before Friday" when `situation` says "by
+  Friday") — `situation` is the only place those facts appear, so `text` is the client's only
+  chance to see them.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
   to the language `situation` is written in otherwise.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.

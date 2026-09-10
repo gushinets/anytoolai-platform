@@ -341,3 +341,25 @@ def test_prepaid_request_fixtures_invent_no_causal_or_gating_claim(
 
     for phrase in _UNGROUNDED_CAUSALITY_PHRASES:
         assert phrase not in text, (action_config_id, fixture_suffix, phrase)
+
+
+# Code review finding: the happy-path fixture wrote "before Friday" for a `due_date: "Friday"`
+# input -- "before Friday" is a strictly earlier deadline than "by Friday"/"due Friday", tightening
+# a fact the prompt explicitly says must not go beyond what `context`/`situation` provides.
+_DUE_DATE_TIGHTENING_PATTERN = re.compile(
+    r"\bbefore (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b", re.IGNORECASE
+)
+
+
+@pytest.mark.parametrize(
+    "action_config_id",
+    [
+        "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "client_update_writer.prepaid_request_compose_reply_v1",
+    ],
+)
+def test_prepaid_request_happy_fixture_does_not_tighten_the_due_date(action_config_id: str) -> None:
+    text = json.loads((FIXTURE_ROOT / f"{action_config_id}.json").read_text(encoding="utf-8"))[
+        "response_json"
+    ]["text"]
+    assert _DUE_DATE_TIGHTENING_PATTERN.search(text) is None, action_config_id
