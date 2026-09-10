@@ -48,6 +48,8 @@ Required `ce-kit` capabilities:
 - `startScenario()`
 - `getScenarioSession()`
 - `nextAction()`
+- `copyResultAndRecordActivation()` (clipboard write first, then exactly one `copy_result`
+  next-action -- the shared copy-button activation contract every product's result page uses)
 - `pollScenarioSession()`
 - `getResult()`
 - `createHandoff()`

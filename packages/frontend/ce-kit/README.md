@@ -396,6 +396,31 @@ const result = await nextAction(client, {
 });
 ```
 
+## Copy activation
+
+`copyResultAndRecordActivation(client, { text, scenarioSessionId, checkpointId, writeToClipboard })`
+is the shared copy-button contract (ANY-17): it completes the clipboard write **first**, and only
+then records exactly one `copy_result` next-action for that call (producing
+`client.next_action_clicked(copy_result)` on the backend). A failed clipboard write records nothing;
+a failed activation request never revokes a copy that already succeeded, so a product page keeps
+showing "Copied" from `copied: true` regardless of `activation.ok`. The clipboard write is injected
+(`writeToClipboard`) rather than called directly, so a host can use `navigator.clipboard.writeText`,
+an `execCommand` fallback, or a native bridge without CE-kit knowing about it.
+
+```ts
+import { copyResultAndRecordActivation } from "@anytoolai/ce-kit";
+
+const outcome = await copyResultAndRecordActivation(client, {
+  text: resultText,
+  scenarioSessionId,
+  checkpointId: currentCheckpointId,
+  writeToClipboard: (text) => navigator.clipboard.writeText(text),
+});
+if (outcome.copied) {
+  showCopied(); // even if outcome.activation.ok is false -- analytics may undercount, never block
+}
+```
+
 ## Handoff
 
 `createHandoff(client, { handoffDefinitionId, sourceScenarioSessionId, sourceArtifactId })` is a

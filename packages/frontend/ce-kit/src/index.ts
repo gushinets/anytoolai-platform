@@ -56,6 +56,14 @@ export type {
 } from "./scenarios/pollScenarioSession";
 export { nextAction } from "./scenarios/nextAction";
 export type { NextActionOptions, NextActionRequest } from "./scenarios/nextAction";
+export {
+  COPY_RESULT_NEXT_ACTION_ID,
+  copyResultAndRecordActivation,
+} from "./scenarios/copyResultAndRecordActivation";
+export type {
+  CopyResultAndRecordActivationRequest,
+  CopyResultAndRecordActivationResult,
+} from "./scenarios/copyResultAndRecordActivation";
 export type {
   ScenarioSession,
   ScenarioSessionSnapshot,
