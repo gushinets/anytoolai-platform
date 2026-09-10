@@ -27,14 +27,6 @@ from anytoolai_platform_sdk import ProductBundle
 PROJECT_DATABASE_URL_ENV = "ANYTOOLAI_DATABASE_URL"
 GENERIC_DATABASE_URL_ENV = "DATABASE_URL"
 
-# loaded_bundles always carries these two kernel-level labels ahead of any composed bundle's own
-# bundle_id (see build_runtime below) -- a composed bundle_id colliding with either would produce
-# a misleading, ambiguous loaded_bundles report. "platform_actions" is sourced from
-# PlatformActionsBundle.bundle_id (not re-hardcoded here) so the two never drift independently;
-# "kernel_demo" has no equivalent bundle class to source from -- it names a product directory
-# inside the kernel config root, not a composed ProductBundle.
-RESERVED_BUNDLE_IDS: tuple[str, ...] = (PlatformActionsBundle.bundle_id, "kernel_demo")
-
 # Named (not inline) so apps/platform-worker/composition.py and scripts/agent/validate_configs.py
 # -- the only other modules allowed to import a product-platforms package (ANY-32 code review
 # finding) -- can be tested against the exact same default bundle set this composition root uses.

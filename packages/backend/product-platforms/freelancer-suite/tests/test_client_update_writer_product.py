@@ -27,7 +27,11 @@ from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle
 REPO_ROOT = Path(__file__).resolve().parents[5]
 KERNEL_SCHEMAS_DIR = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
-PRODUCT_DIR = FreelancerSuiteBundle().config_roots()[0]
+# ANY-227 added a second product root (proposal_ai) ahead of this one in config_roots(), so pick
+# this file's own root by name rather than assuming index 0.
+(PRODUCT_DIR,) = (
+    root for root in FreelancerSuiteBundle().config_roots() if root.name == "client_update_writer"
+)
 
 FORBIDDEN_TOKENS = (
     "pydantic_ai",
