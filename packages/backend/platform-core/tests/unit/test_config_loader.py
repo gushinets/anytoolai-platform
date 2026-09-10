@@ -15,6 +15,7 @@ from anytoolai_platform_core.config.errors import (
     MissingConfigFileError,
     RegistryLoadError,
 )
+from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.config.loader import ConfigLoader
 from anytoolai_platform_core.workflows.mappings import resolve_step_input
 
@@ -1060,8 +1061,6 @@ def test_loader_reports_missing_kernel_products_dir_without_processing_extra_pro
 def test_loader_loads_client_event_properties_vocabulary() -> None:
     """kernel_demo's analytics.yaml declares a closed client_event_properties vocabulary (ANY-17
     human review #2) -- proves it round-trips into ProductDefinition.analytics unchanged."""
-    from anytoolai_platform_core.bootstrap.registry import build_config_registry
-
     registry = build_config_registry(CONFIG_ROOT)
     product = registry.get_product("kernel_demo")
 

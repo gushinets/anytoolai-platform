@@ -102,6 +102,12 @@ function isWithinInactivityWindow(
   return elapsed >= 0 && elapsed <= WEB_SESSION_INACTIVITY_TIMEOUT_MS;
 }
 
+// The same canonical (lowercase, hyphenated) shape `generateIdempotencyKey()` always produces and
+// the backend's own `_is_canonical_uuid()` requires -- a stored id that doesn't match this can
+// never be a valid web_session_id, so treating it as absent (rather than replaying a value the
+// backend will keep rejecting for the rest of the inactivity window) is strictly better.
+const CANONICAL_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 function parseStoredWebSession(raw: string): StoredWebSession | null {
   let parsed: unknown;
   try {
@@ -109,7 +115,12 @@ function parseStoredWebSession(raw: string): StoredWebSession | null {
   } catch {
     return null;
   }
-  if (!isRecord(parsed) || typeof parsed.id !== "string" || typeof parsed.lastActivityAt !== "number") {
+  if (
+    !isRecord(parsed) ||
+    typeof parsed.id !== "string" ||
+    !CANONICAL_UUID_PATTERN.test(parsed.id) ||
+    typeof parsed.lastActivityAt !== "number"
+  ) {
     return null;
   }
   return { id: parsed.id, lastActivityAt: parsed.lastActivityAt };

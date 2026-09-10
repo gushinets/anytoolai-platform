@@ -76,6 +76,18 @@ describe("getOrCreateWebSessionId", () => {
     expect(id.length).toBeGreaterThan(0);
   });
 
+  it("treats a stored id that isn't a canonical UUID as absent and mints a fresh id", async () => {
+    const storage = createInMemoryAsyncStorage({
+      [DEFAULT_WEB_SESSION_STORAGE_KEY]: JSON.stringify({ id: "not-a-uuid", lastActivityAt: Date.now() }),
+    });
+
+    const id = await getOrCreateWebSessionId(storage);
+
+    expect(id).not.toBe("not-a-uuid");
+    expect(typeof id).toBe("string");
+    expect(id.length).toBeGreaterThan(0);
+  });
+
   it("falls back to a fresh unpersisted id when storage.get() rejects", async () => {
     const storage = createInMemoryAsyncStorage();
     storage.get = vi.fn().mockRejectedValue(new Error("storage unavailable"));

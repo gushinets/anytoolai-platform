@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import uuid as uuid_module
+from collections.abc import Iterator
 from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import httpx
 import pytest
