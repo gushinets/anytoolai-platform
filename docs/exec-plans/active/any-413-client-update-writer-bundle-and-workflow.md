@@ -76,9 +76,12 @@ this ticket).
    input schema.
 4. **Output schema is `kernel.schemas.compose_reply_output_v1` for all three modes**, reused
    directly (not redefined) — the atom's own `{text, call_to_action}` shape *is* the copy-ready
-   client message. This is the "renderer contract" for this ticket: a copy-ready message is
-   `text` (required, ready to send as-is) plus optional `call_to_action`; `apps/web-mirror`
-   (ANY-412/414, out of scope here) renders `text` as the primary copy target.
+   client message. The renderer contract this ticket's scope requires is pinned as a concrete
+   product-owned artifact, `renderer_contract.yaml` (mirroring ProposalAI's own file and
+   regression test): `text` is the canonical copy-ready field; when `call_to_action` is present it
+   is appended after `text` separated by one blank line, otherwise the payload is `text` alone.
+   `apps/web-mirror` (ANY-412/414, out of scope here) is the renderer *implementation* this
+   contract is built against, not part of this ticket.
 5. **`frontends.yaml` declares one `web_mirror` (type: web) entry, not an empty list.**
    `ConfigLoader._load_frontends` requires the file to exist, but the harder constraint is
    runtime, not load-time: `ScenarioRuntimeService.start_session`'s `_require_enabled_frontend`

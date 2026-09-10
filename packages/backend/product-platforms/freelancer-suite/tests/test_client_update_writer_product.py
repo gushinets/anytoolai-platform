@@ -396,3 +396,29 @@ def test_prepaid_request_weak_fixture_preserves_urgency_across_both_steps() -> N
     assert any(word in persuasive_text for word in urgency_words), persuasive_text
     assert any(word in reply_text for word in urgency_words), reply_text
     assert "when you get a chance" not in reply_text
+
+
+def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:
+    """Code review finding: ANY-413 lists "Renderer contract for a copy-ready client message" as
+    a Bundle-And-Workflow scope item, distinct from ANY-412/ANY-414's later apps/web-mirror
+    renderer *implementation* -- nothing under products/client_update_writer/ pinned it before
+    this file. Mirrors ProposalAI's own renderer_contract.yaml + regression test. Cross-checked
+    against workflows.yaml/scenarios.yaml for all three modes so it can't silently drift from the
+    actual output schema / next action."""
+    contract = _load_yaml("renderer_contract.yaml")["renderer_contract"]
+    workflows_by_id = _workflow_by_id()
+    scenarios_by_id = {
+        entry["scenario_id"]: entry for entry in _load_yaml("scenarios.yaml")["scenarios"]
+    }
+
+    assert set(contract["scenarios"]) == set(scenarios_by_id)
+    for scenario_id in contract["scenarios"]:
+        scenario = scenarios_by_id[scenario_id]
+        workflow = workflows_by_id[scenario["workflow_id"]]
+        assert workflow["output_schema_ref"] == contract["output_schema_ref"]
+        assert contract["next_action"] in scenario["allowed_next_actions"]
+
+    assert contract["output_schema_ref"] == "kernel.schemas.compose_reply_output_v1"
+    assert contract["canonical_field"] == "text"
+    assert contract["call_to_action_field"] == "call_to_action"
+    assert contract["excluded_fields"] == []
