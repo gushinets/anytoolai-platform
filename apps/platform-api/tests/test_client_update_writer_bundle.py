@@ -270,7 +270,7 @@ _MODE_HAPPY_PATH_CASES = {
     "prepaid_request": (
         {
             "billing_context": {
-                "notes": "Phase 2 kickoff.",
+                "notes": "The approved design phase wraps up this week; phase 2 (development) starts next.",
                 "amount": "$500",
                 "due_date": "Friday",
             },
