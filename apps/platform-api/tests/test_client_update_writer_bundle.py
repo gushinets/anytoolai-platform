@@ -21,10 +21,11 @@ apps/platform-api/tests/test_demo_api.py for the same SQLite pattern):
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import httpx
 import jsonschema
@@ -34,18 +35,12 @@ from anytoolai_platform_api.main import create_app
 from anytoolai_platform_core.identity.models import GuestIdentityRecord
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
+from anytoolai_platform_core.providers.models import ProviderResponse, ResolvedProviderRequest
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
-from anytoolai_platform_core.storage.db import runtime_metadata
-from anytoolai_platform_core.storage.transactions import (
-    SessionFactory,
-    build_session_factory,
-    transaction_boundary,
-)
+from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_worker.composition import build_worker
-
-from tests.support.sqlite_harness import build_sqlite_runtime_engine
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
@@ -186,17 +181,8 @@ def test_compose_reply_output_schema_rejects_malformed_output() -> None:
         )
 
 
-@pytest.fixture
-def session_factory(tmp_path: Path) -> Iterator[SessionFactory]:
-    engine = build_sqlite_runtime_engine(
-        tmp_path / "main.sqlite3",
-        tmp_path / "platform.sqlite3",
-    )
-    runtime_metadata.create_all(engine)
-    try:
-        yield build_session_factory(engine)
-    finally:
-        engine.dispose()
+# `session_factory` (SQLite-backed) comes from apps/platform-api/tests/conftest.py, shared with
+# test_demo_api.py and test_proposal_ai_bundle.py.
 
 
 @pytest.fixture
@@ -249,7 +235,7 @@ _MODE_HAPPY_PATH_CASES = {
                 "Quick update: the homepage redesign is done and ready for review by Friday. "
                 "Checkout flow work is in progress, no blockers so far."
             ),
-            "call_to_action": "Let me know by Friday if you'd like any changes to the homepage.",
+            "call_to_action": "Let me know if you'd like any changes to the homepage.",
         },
     ),
     "reply_draft": (
@@ -350,6 +336,103 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     assert session_body["current_checkpoint_id"] == RESULT_READY_CHECKPOINT_ID
     assert session_body["allowed_next_actions"] == ["copy_result"]
     assert session_body["result_artifact_id"] == processed.result_artifact_id
+
+    result_response = asyncio.run(
+        _request(
+            app,
+            "GET",
+            f"/v1/results/{processed.result_artifact_id}",
+        )
+    )
+    assert result_response.status_code == HTTPStatus.OK
+    result_body = result_response.json()
+    assert result_body["schema_ref"] == "kernel.schemas.compose_reply_output_v1"
+    assert result_body["output"] == expected_output
+
+
+class _WeakInputProviderAdapter(FakeProviderAdapter):
+    """Forces every provider call in a worker run to resolve `<action_config_id>.weak_input`
+    instead of the happy-path `<action_config_id>` fixture. FakeProviderAdapter only ever falls
+    back to a call's own action_config_id, so nothing else proves a checked-in `.weak_input.json`
+    fixture is actually reachable through the real pipeline (it could be schema-valid but
+    unreachable, or simply wrong, while every other test still passed). Test-only -- no
+    product/platform runtime change; generalizes apps/platform-api/tests/test_proposal_ai_bundle.py's
+    single-fixed-key `_FixedFixtureProviderAdapter` to a multi-step workflow, where each step needs
+    its own weak fixture rather than one shared key."""
+
+    async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
+        return await super().complete(
+            replace(request, fixture_key=f"{request.action_config_id}.weak_input")
+        )
+
+
+_MODE_WEAK_INPUT_CASES = {
+    "update": (
+        {"progress_notes": "Still working on it.", "tone": "neutral"},
+        "client_update_writer.update_compose_reply_v1",
+    ),
+    "reply_draft": (
+        {
+            "client_message": "Any update?",
+            "reply_goal": "Acknowledge and say more soon.",
+            "tone": "neutral",
+        },
+        "client_update_writer.reply_draft_compose_reply_v1",
+    ),
+    "prepaid_request": (
+        {
+            "billing_context": {"notes": "Work is ongoing.", "amount": "the agreed amount"},
+            "tone": "neutral",
+        },
+        "client_update_writer.prepaid_request_compose_reply_v1",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("mode", "start_input", "final_action_config_id"),
+    [(mode, *case) for mode, case in _MODE_WEAK_INPUT_CASES.items()],
+    ids=_MODE_WEAK_INPUT_CASES.keys(),
+)
+def test_weak_input_fixture_is_reachable_end_to_end(
+    app: Any,
+    session_factory: SessionFactory,
+    mode: str,
+    start_input: dict[str, Any],
+    final_action_config_id: str,
+) -> None:
+    scenario_id = _MODE_WORKFLOWS[mode][0]
+    expected_output = json.loads(
+        (FIXTURE_ROOT / f"{final_action_config_id}.weak_input.json").read_text(encoding="utf-8")
+    )["response_json"]
+
+    started = asyncio.run(
+        _request(
+            app,
+            "POST",
+            f"/v1/products/client_update_writer/scenarios/{scenario_id}/start",
+            json={
+                "frontend_id": "web_mirror",
+                "guest_id": "guest_client_update_writer",
+                "input": start_input,
+            },
+        )
+    ).json()
+
+    worker = build_worker(
+        session_factory=session_factory,
+        config_root=CONFIG_ROOT,
+        provider_adapters={"fake": _WeakInputProviderAdapter(FIXTURE_ROOT)},
+    )
+    processed = asyncio.run(worker.process_next_job())
+    worker.dispose()
+
+    assert processed is not None
+    assert processed.status is JobStatus.succeeded, (
+        processed.error_code,
+        processed.error_message_safe,
+    )
+    assert processed.result_artifact_id is not None
 
     result_response = asyncio.run(
         _request(

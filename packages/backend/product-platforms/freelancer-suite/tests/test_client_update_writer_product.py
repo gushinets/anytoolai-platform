@@ -177,35 +177,65 @@ def test_weak_inputs_are_rejected_per_mode(
             jsonschema.validate(weak_input, schema)
 
 
+_ACTION_CONFIG_OUTPUT_SCHEMAS = (
+    (
+        "client_update_writer.update_compose_reply_v1",
+        "kernel.schemas.compose_reply_output_v1",
+    ),
+    (
+        "client_update_writer.reply_draft_compose_reply_v1",
+        "kernel.schemas.compose_reply_output_v1",
+    ),
+    (
+        "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "kernel.schemas.compose_persuasive_text_output_v1",
+    ),
+    (
+        "client_update_writer.prepaid_request_compose_reply_v1",
+        "kernel.schemas.compose_reply_output_v1",
+    ),
+)
+
+
 @pytest.mark.parametrize(
-    ("action_config_id", "output_schema_ref"),
+    ("action_config_id", "output_schema_ref", "fixture_suffix"),
     [
-        (
-            "client_update_writer.update_compose_reply_v1",
-            "kernel.schemas.compose_reply_output_v1",
-        ),
-        (
-            "client_update_writer.reply_draft_compose_reply_v1",
-            "kernel.schemas.compose_reply_output_v1",
-        ),
-        (
-            "client_update_writer.prepaid_request_compose_persuasive_text_v1",
-            "kernel.schemas.compose_persuasive_text_output_v1",
-        ),
-        (
-            "client_update_writer.prepaid_request_compose_reply_v1",
-            "kernel.schemas.compose_reply_output_v1",
-        ),
+        (action_config_id, output_schema_ref, suffix)
+        for action_config_id, output_schema_ref in _ACTION_CONFIG_OUTPUT_SCHEMAS
+        for suffix in ("", ".weak_input")
     ],
 )
-def test_happy_path_fixture_matches_its_output_schema(
+def test_fixture_matches_its_output_schema(
     action_config_id: str,
     output_schema_ref: str,
+    fixture_suffix: str,
 ) -> None:
     schema = _load_schema(output_schema_ref)
 
-    fixture_path = FIXTURE_ROOT / f"{action_config_id}.json"
+    fixture_path = FIXTURE_ROOT / f"{action_config_id}{fixture_suffix}.json"
     assert fixture_path.is_file(), fixture_path
     fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
 
     jsonschema.validate(fixture["response_json"], schema)
+
+
+# ANY-413's own ticket scope requires "Deterministic happy-path and weak-input fake-provider
+# fixtures" -- distinct from schema validity (test_fixture_matches_its_output_schema above), this
+# proves the weak fixture is actually a different, appropriately hedged draft rather than an
+# accidental copy of the happy-path one, and doesn't invent a specific day the weak/vague input
+# never supplied (mirrors test_proposal_ai_product.py's weak-fixture content checks, scaled down
+# to this product's shorter, deliberately fact-free weak inputs).
+_DAY_WORDS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+
+@pytest.mark.parametrize("action_config_id", [pair[0] for pair in _ACTION_CONFIG_OUTPUT_SCHEMAS])
+def test_weak_input_fixture_is_distinct_and_invents_no_specific_day(action_config_id: str) -> None:
+    happy_text = json.loads(
+        (FIXTURE_ROOT / f"{action_config_id}.json").read_text(encoding="utf-8")
+    )["response_json"]["text"]
+    weak_text = json.loads(
+        (FIXTURE_ROOT / f"{action_config_id}.weak_input.json").read_text(encoding="utf-8")
+    )["response_json"]["text"]
+
+    assert weak_text != happy_text
+    assert not any(day in weak_text for day in _DAY_WORDS), action_config_id

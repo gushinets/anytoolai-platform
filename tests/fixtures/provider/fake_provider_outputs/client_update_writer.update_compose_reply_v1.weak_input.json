@@ -1,0 +1,12 @@
+{
+  "response_json": {
+    "text": "Quick update: work is still underway. I don't have a firm milestone to share yet, but I'll follow up as soon as there's something concrete to report."
+  },
+  "input_tokens": 28,
+  "output_tokens": 26,
+  "latency_ms": 7,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "client_update_writer.update_compose_reply_v1.weak_input"
+  }
+}

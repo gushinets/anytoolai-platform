@@ -1,0 +1,12 @@
+{
+  "response_json": {
+    "text": "Work on the project is ongoing, and sending the agreed amount now helps keep things moving forward smoothly."
+  },
+  "input_tokens": 22,
+  "output_tokens": 20,
+  "latency_ms": 6,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1.weak_input"
+  }
+}
