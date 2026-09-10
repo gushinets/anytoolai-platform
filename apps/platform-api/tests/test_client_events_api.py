@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid as uuid_module
 from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
@@ -26,6 +27,15 @@ from tests.db_support import provision_database
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
+
+# event_id/web_session_id must be canonical-form UUIDs (ANY-17 human review #1, finding 1) -- ce-kit
+# always generates one via generateIdempotencyKey(), so these fixed values stand in for that.
+DEFAULT_EVENT_ID = "11111111-1111-4111-8111-111111111111"
+DEFAULT_WEB_SESSION_ID = "22222222-2222-4222-8222-222222222222"
+
+
+def _new_uuid() -> str:
+    return str(uuid_module.uuid4())
 
 
 @pytest.fixture
@@ -67,6 +77,7 @@ def _create_test_app(session_factory: SessionFactory):
                 scenario_id="kernel_demo.single_action_smoke_v1",
                 scenario_version=1,
                 guest_id="guest_demo",
+                scenario_chain_id="scenario_chain_demo",
             )
         )
         ScenarioSessionRepository(session).create(
@@ -109,11 +120,11 @@ async def _request(
 
 def _payload(**overrides: Any) -> dict[str, Any]:
     payload = {
-        "event_id": "web_evt_demo_1",
+        "event_id": DEFAULT_EVENT_ID,
         "event_type": "web.product_viewed",
         "product_id": "kernel_demo",
         "frontend_id": "web_mirror",
-        "web_session_id": "web_session_demo",
+        "web_session_id": DEFAULT_WEB_SESSION_ID,
     }
     payload.update(overrides)
     return payload
@@ -141,18 +152,99 @@ def test_client_event_is_recorded(session_factory: SessionFactory) -> None:
 
     assert response.status_code == HTTPStatus.OK
     body = response.json()
-    assert body == {"event_id": "web_evt_demo_1", "event_type": "web.product_viewed"}
+    assert body == {"event_id": DEFAULT_EVENT_ID, "event_type": "web.product_viewed"}
 
-    rows = _stored_events(session_factory, "web_evt_demo_1")
+    rows = _stored_events(session_factory, DEFAULT_EVENT_ID)
     assert len(rows) == 1
     assert rows[0]["product_id"] == "kernel_demo"
     assert rows[0]["frontend_id"] == "web_mirror"
     assert rows[0]["tenant_id"] == "anytoolai"
     assert rows[0]["region"] == "default"
-    assert rows[0]["properties"]["web_session_id"] == "web_session_demo"
+    assert rows[0]["properties"]["web_session_id"] == DEFAULT_WEB_SESSION_ID
     assert rows[0]["properties"]["mode"] == "one_run"
     assert rows[0]["properties"]["field_count"] == 3
     assert rows[0]["properties"]["gap_category"] == "budget"
+
+
+def test_client_event_rejects_a_non_uuid_event_id(session_factory: SessionFactory) -> None:
+    app = _create_test_app(session_factory)
+
+    # event_id/web_session_id are opaque client-minted ids, not arbitrary text (ANY-17 human
+    # review #1, finding 1) -- ce-kit always generates a UUID for both.
+    response = _post_client_event(app, event_id="web_evt_demo_1")
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_id_invalid"
+
+
+def test_client_event_rejects_a_non_canonical_uuid_event_id(session_factory: SessionFactory) -> None:
+    app = _create_test_app(session_factory)
+
+    # A valid UUID under a loose parse, but uppercase -- not the canonical lowercase form ce-kit
+    # actually produces; two differently-cased strings for "the same" UUID must not be treated as
+    # interchangeable for storage/lookup. (DEFAULT_EVENT_ID has no hex letters in it, so its own
+    # .upper() would be a no-op -- this uses a UUID with real a-f digits instead.)
+    response = _post_client_event(app, event_id="a1b2c3d4-1234-4abc-8def-1234567890ab".upper())
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_id_invalid"
+
+
+def test_client_event_rejects_an_event_id_in_the_backend_replay_namespace(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    # A client must never be able to impersonate the backend's own reserved id namespace (see
+    # events/replay.py's is_replay_owned_event_id()) -- requiring UUID shape rejects this
+    # structurally, not via an explicit prefix blocklist.
+    response = _post_client_event(app, event_id="event_replay_010_deadbeef")
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_id_invalid"
+
+
+def test_client_event_rejects_a_non_uuid_web_session_id(session_factory: SessionFactory) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(app, web_session_id="web_session_demo")
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_web_session_id_invalid"
+
+
+def test_client_event_accepts_a_uuid_event_id_with_surrounding_whitespace_trimmed(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(app, event_id=f"  {DEFAULT_EVENT_ID}  ")
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json()["event_id"] == DEFAULT_EVENT_ID
+
+
+def test_client_event_rejects_free_text_gap_category(session_factory: SessionFactory) -> None:
+    app = _create_test_app(session_factory)
+
+    # gap_category (and mode) are short categorical labels, not free text -- a length cap alone
+    # doesn't stop prompt/result fragments from being smuggled in under an allowlisted key (ANY-17
+    # human review #1, finding 3). Free-form prose structurally can't match the categorical shape.
+    response = _post_client_event(
+        app, properties={"gap_category": "Please rewrite this for a $50k budget by next week"}
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_property_invalid"
+
+
+def test_client_event_rejects_uppercase_mode_value(session_factory: SessionFactory) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(app, properties={"mode": "One_Run"})
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_property_invalid"
 
 
 def test_client_event_accepts_a_property_value_at_the_length_boundary_without_a_false_conflict(
@@ -160,17 +252,28 @@ def test_client_event_accepts_a_property_value_at_the_length_boundary_without_a_
 ) -> None:
     app = _create_test_app(session_factory)
 
-    # Exactly MAX_PROPERTY_STRING_LENGTH (128) -- accepted, and well below the sanitizer's
+    # Exactly the categorical-value length cap (64) -- accepted, and well below the sanitizer's
     # separate 1024-char truncation threshold, so it round-trips through emit() unchanged. The
     # very first, successful write of this event_id must not be mistaken for a content conflict
     # against itself.
-    boundary_mode = "m" * 128
+    boundary_mode = "m" * 64
     response = _post_client_event(app, properties={"mode": boundary_mode})
 
     assert response.status_code == HTTPStatus.OK
-    rows = _stored_events(session_factory, "web_evt_demo_1")
+    rows = _stored_events(session_factory, DEFAULT_EVENT_ID)
     assert len(rows) == 1
     assert rows[0]["properties"]["mode"] == boundary_mode
+
+
+def test_client_event_rejects_property_value_over_the_length_cap(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    response = _post_client_event(app, properties={"mode": "m" * 65})
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_property_invalid"
 
 
 def test_client_event_duplicate_delivery_is_idempotent(session_factory: SessionFactory) -> None:
@@ -183,7 +286,7 @@ def test_client_event_duplicate_delivery_is_idempotent(session_factory: SessionF
     assert duplicate.status_code == HTTPStatus.OK
     assert duplicate.json() == first.json()
 
-    rows = _stored_events(session_factory, "web_evt_demo_1")
+    rows = _stored_events(session_factory, DEFAULT_EVENT_ID)
     assert len(rows) == 1
     assert rows[0]["properties"]["mode"] == "one_run"
 
@@ -201,7 +304,7 @@ def test_client_event_rejects_colliding_event_id_used_for_different_content(
     assert conflicting.json()["error"]["code"] == "client_event_id_conflict"
 
     # The original event is untouched by the rejected conflicting attempt.
-    rows = _stored_events(session_factory, "web_evt_demo_1")
+    rows = _stored_events(session_factory, DEFAULT_EVENT_ID)
     assert len(rows) == 1
     assert rows[0]["properties"]["mode"] == "one_run"
 
@@ -327,8 +430,14 @@ def test_client_event_rejects_oversized_user_id_instead_of_500ing(
     # event_log.user_id is a bounded String(128) column. Before this was validated, a value this
     # long reached the INSERT unchecked and raised an uncaught sa.exc.DataError (not a
     # sa.exc.IntegrityError, so EventLogRepository.create()'s own except clause didn't catch it) --
-    # a raw 500 instead of this endpoint's normal 422 contract.
-    response = _post_client_event(app, user_id="u" * 129)
+    # a raw 500 instead of this endpoint's normal 422 contract. Correlated with a real session so
+    # this specifically exercises the length check, not the (separate) standalone-user_id rule.
+    response = _post_client_event(
+        app,
+        event_type="web.result_viewed",
+        user_id="u" * 129,
+        scenario_session_id="scenario_session_owned_by_user_demo",
+    )
 
     assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
     assert response.json()["error"]["code"] == "client_event_user_id_invalid"
@@ -337,22 +446,29 @@ def test_client_event_rejects_oversized_user_id_instead_of_500ing(
 def test_client_event_rejects_empty_user_id(session_factory: SessionFactory) -> None:
     app = _create_test_app(session_factory)
 
-    response = _post_client_event(app, user_id="   ")
+    response = _post_client_event(
+        app,
+        event_type="web.result_viewed",
+        user_id="   ",
+        scenario_session_id="scenario_session_owned_by_user_demo",
+    )
 
     assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
     assert response.json()["error"]["code"] == "client_event_user_id_invalid"
 
 
-def test_client_event_accepts_a_user_id_at_the_length_boundary(
+def test_client_event_rejects_standalone_user_id_without_a_scenario_session(
     session_factory: SessionFactory,
 ) -> None:
     app = _create_test_app(session_factory)
 
-    response = _post_client_event(app, user_id="u" * 128)
+    # MVP-A has no authenticated-user lookup, so a bare user_id claim with nothing to verify it
+    # against must not be trusted at all (ANY-17 human review #1, finding 2) -- unlike guest_id,
+    # which is at least checked for existence against a real minted identity.
+    response = _post_client_event(app, user_id="real_user_123")
 
-    assert response.status_code == HTTPStatus.OK
-    rows = _stored_events(session_factory, "web_evt_demo_1")
-    assert rows[0]["user_id"] == "u" * 128
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_user_id_requires_scenario_session"
 
 
 def test_client_event_rejects_server_owned_dimensions_in_payload(
@@ -374,9 +490,7 @@ def test_client_event_accepts_known_guest_and_rejects_unknown_guest(
     known = _post_client_event(app, guest_id="guest_demo")
     assert known.status_code == HTTPStatus.OK
 
-    unknown = _post_client_event(
-        app, event_id="web_evt_demo_2", guest_id="guest_unknown"
-    )
+    unknown = _post_client_event(app, event_id=_new_uuid(), guest_id="guest_unknown")
     assert unknown.status_code == HTTPStatus.NOT_FOUND
     assert unknown.json()["error"]["code"] == "guest_identity_not_found"
 
@@ -395,7 +509,7 @@ def test_client_event_accepts_known_scenario_session_and_rejects_unknown(
 
     unknown = _post_client_event(
         app,
-        event_id="web_evt_demo_2",
+        event_id=_new_uuid(),
         event_type="web.result_viewed",
         scenario_session_id="scenario_session_unknown",
     )
@@ -438,22 +552,25 @@ def test_client_event_accepts_scenario_session_owned_by_the_matching_guest(
     assert response.status_code == HTTPStatus.OK
 
 
-def test_client_event_rejects_a_guest_owned_session_when_guest_id_is_omitted(
+def test_client_event_derives_identity_and_scenario_chain_id_from_the_resolved_session(
     session_factory: SessionFactory,
 ) -> None:
     app = _create_test_app(session_factory)
 
-    # Regression: an earlier version of the owner check only compared guest_id against the
-    # session's owner *when guest_id was supplied* -- omitting guest_id entirely bypassed the
-    # check completely, letting anyone correlate an event to any known guest-owned session.
+    # ANY-17 human review #1, finding 2: once a session resolves, it becomes the source of truth
+    # for identity/correlation -- the client doesn't need to (and, per the tests above, need not
+    # even be able to) re-assert guest_id, and scenario_chain_id (which a standalone client
+    # request has no way to know) is populated from the session instead of dropped.
     response = _post_client_event(
         app,
         event_type="web.result_viewed",
         scenario_session_id="scenario_session_owned_by_guest_demo",
     )
 
-    assert response.status_code == HTTPStatus.NOT_FOUND
-    assert response.json()["error"]["code"] == "scenario_session_not_found"
+    assert response.status_code == HTTPStatus.OK
+    rows = _stored_events(session_factory, DEFAULT_EVENT_ID)
+    assert rows[0]["guest_id"] == "guest_demo"
+    assert rows[0]["scenario_chain_id"] == "scenario_chain_demo"
 
 
 def test_client_event_rejects_an_anonymous_session_claimed_by_a_real_guest(
@@ -475,14 +592,14 @@ def test_client_event_rejects_an_anonymous_session_claimed_by_a_real_guest(
     assert response.json()["error"]["code"] == "scenario_session_not_found"
 
 
-def test_client_event_rejects_a_user_owned_session_claimed_by_omitting_guest_id(
+def test_client_event_rejects_a_user_owned_session_claimed_by_a_different_user(
     session_factory: SessionFactory,
 ) -> None:
     app = _create_test_app(session_factory)
 
-    # Regression: the owner check compared session.guest_id but never session.user_id, so a
-    # session owned by user_demo (guest_id=None) could be claimed by any request that simply
-    # omitted guest_id (None == None) and supplied an arbitrary, unchecked user_id.
+    # An explicitly contradictory user_id claim against a user-owned session is still rejected --
+    # unlike simply omitting it, which the session's own identity now resolves (see the
+    # derives_identity test above).
     response = _post_client_event(
         app,
         event_type="web.result_viewed",
@@ -507,6 +624,25 @@ def test_client_event_accepts_scenario_session_owned_by_the_matching_user(
     )
 
     assert response.status_code == HTTPStatus.OK
+
+
+def test_client_event_accepts_a_guest_owned_session_when_guest_id_is_omitted(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    # The session is authoritative for identity once resolved: a caller correlating to a
+    # guest-owned session doesn't need to redundantly resend its guest_id, and the event is
+    # correctly attributed to that guest rather than being rejected or recorded unattributed.
+    response = _post_client_event(
+        app,
+        event_type="web.result_viewed",
+        scenario_session_id="scenario_session_owned_by_guest_demo",
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    rows = _stored_events(session_factory, DEFAULT_EVENT_ID)
+    assert rows[0]["guest_id"] == "guest_demo"
 
 
 def test_client_event_trims_guest_id_before_lookup(session_factory: SessionFactory) -> None:
@@ -553,40 +689,14 @@ def test_client_event_rejects_empty_scenario_session_id_as_invalid_not_not_found
     assert response.json()["error"]["code"] == "client_event_scenario_session_id_invalid"
 
 
-def test_client_event_accepts_an_event_id_that_only_fits_after_trimming_whitespace(
-    session_factory: SessionFactory,
-) -> None:
-    app = _create_test_app(session_factory)
-
-    # 129 raw characters (over the 128 limit), 127 after trimming (within it). An earlier version
-    # validated the length of the untrimmed value, rejecting this even though the id actually
-    # stored/looked-up fits.
-    padded_event_id = " " + ("x" * 127) + " "
-    response = _post_client_event(app, event_id=padded_event_id)
-
-    assert response.status_code == HTTPStatus.OK
-    assert response.json()["event_id"] == "x" * 127
-
-
 def test_client_event_trims_web_session_id_before_storing(session_factory: SessionFactory) -> None:
     app = _create_test_app(session_factory)
 
-    response = _post_client_event(app, web_session_id="  web_session_demo  ")
+    response = _post_client_event(app, web_session_id=f"  {DEFAULT_WEB_SESSION_ID}  ")
 
     assert response.status_code == HTTPStatus.OK
-    rows = _stored_events(session_factory, "web_evt_demo_1")
-    assert rows[0]["properties"]["web_session_id"] == "web_session_demo"
-
-
-def test_client_event_rejects_property_value_over_the_length_cap(
-    session_factory: SessionFactory,
-) -> None:
-    app = _create_test_app(session_factory)
-
-    response = _post_client_event(app, properties={"mode": "m" * 200})
-
-    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
-    assert response.json()["error"]["code"] == "client_event_property_invalid"
+    rows = _stored_events(session_factory, DEFAULT_EVENT_ID)
+    assert rows[0]["properties"]["web_session_id"] == DEFAULT_WEB_SESSION_ID
 
 
 def test_client_event_truncates_a_huge_property_key_in_the_error_message(

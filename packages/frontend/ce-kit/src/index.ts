@@ -39,6 +39,7 @@ export { getQuota } from "./quota/getQuota";
 export type { QuotaRequest, QuotaState } from "./quota/types";
 export { isQuotaDimension, isQuotaPeriod, isQuotaUnit } from "./quota/quotaEnums";
 export type { QuotaDimension, QuotaPeriod, QuotaUnit } from "./quota/quotaEnums";
+export { generateIdempotencyKey } from "./scenarios/idempotencyKey";
 export { startScenario } from "./scenarios/startScenario";
 export { prepareScenarioStart } from "./scenarios/prepareScenarioStart";
 export type {

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import uuid
 from collections.abc import Mapping
 from enum import StrEnum
 from typing import Any
@@ -48,12 +50,15 @@ CLIENT_EVENT_PROPERTY_TYPES: dict[str, type] = {
     "gap_category": str,
 }
 MAX_WEB_SESSION_ID_LENGTH = 128
-# mode/gap_category are meant to be short categorical labels, not free text -- bounding them here
-# (rather than relying on EventEmitter's incidental 1024-char sanitizer truncation) keeps an
-# oversized value a clean 422 instead of silent truncation, and keeps a rejected property's own
-# value out of the error path entirely (only the key is ever echoed back, see
-# ClientEventPropertyInvalidError, and that is itself length-capped).
-MAX_PROPERTY_STRING_LENGTH = 128
+# mode/gap_category are short categorical labels (e.g. "one_run", "budget_gap"), never free text --
+# a length cap alone doesn't stop prompt/result fragments from being smuggled in under an
+# allowlisted key (EventEmitter's generic sanitizer only redacts by *key name*, not by content), so
+# these are validated against a slug shape instead: lowercase, starts with a letter, only
+# alphanumerics/underscore after that. Real category values look like this; free-form text (spaces,
+# punctuation, mixed case, newlines) structurally cannot match. The concrete set of valid category
+# *values* is product-owned (each product defines its own modes/gap categories) and must not be
+# hardcoded in platform-core -- this is a content-shape guard, not a per-product vocabulary.
+_CATEGORICAL_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 # field_count is meant to be a small count (form fields on one page); an unbounded int would
 # still round-trip through JSONB, but has no privacy-reviewed meaning past a sane ceiling.
 MAX_PROPERTY_INT_VALUE = 10_000
@@ -68,6 +73,7 @@ _CONTEXT_CORRELATION_FIELDS = (
     "guest_id",
     "user_id",
     "scenario_session_id",
+    "scenario_chain_id",
 )
 # event_log.user_id is a bounded String(128) column. Unlike guest_id/scenario_session_id (which
 # are validated by requiring a matching existing row, indirectly bounding them), MVP-A has no
@@ -95,7 +101,8 @@ class ClientEventIdInvalidError(PlatformError):
     def __init__(self) -> None:
         super().__init__(
             "client_event_id_invalid",
-            f"event_id must be a non-empty string of at most {MAX_CLIENT_EVENT_ID_LENGTH} characters.",
+            "event_id must be a canonical lowercase UUID string (the same shape ce-kit's "
+            "generateIdempotencyKey() already produces).",
         )
 
 
@@ -111,7 +118,8 @@ class ClientEventWebSessionIdInvalidError(PlatformError):
     def __init__(self) -> None:
         super().__init__(
             "client_event_web_session_id_invalid",
-            f"web_session_id must be a non-empty string of at most {MAX_WEB_SESSION_ID_LENGTH} characters.",
+            "web_session_id must be a canonical lowercase UUID string (the same shape ce-kit's "
+            "getOrCreateWebSessionId() already produces).",
         )
 
 
@@ -133,6 +141,15 @@ class ClientEventUserIdInvalidError(PlatformError):
         super().__init__(
             "client_event_user_id_invalid",
             f"user_id must be a non-empty string of at most {MAX_USER_ID_LENGTH} characters.",
+        )
+
+
+class ClientEventUserIdRequiresSessionError(PlatformError):
+    def __init__(self) -> None:
+        super().__init__(
+            "client_event_user_id_requires_scenario_session",
+            "user_id is only accepted correlated with a known scenario_session_id; MVP-A has no "
+            "authenticated-user lookup to verify a standalone user_id claim against.",
         )
 
 
@@ -163,7 +180,7 @@ class ClientEventPropertyInvalidError(PlatformError):
         super().__init__(
             "client_event_property_invalid",
             f"Property '{safe_key}' is not an allowlisted client-event property of the expected "
-            "type and length.",
+            "type and shape.",
         )
 
 
@@ -205,10 +222,20 @@ class ClientEventService:
     ) -> EventEnvelope:
         if event_type not in CLIENT_EVENT_TYPES:
             raise ClientEventTypeNotAllowedError()
+        # event_id/web_session_id are opaque client-minted identifiers, not arbitrary text: ce-kit
+        # always generates a UUID for both, so requiring that shape (a) keeps the content-free
+        # analytics guarantee for web_session_id, which is stored verbatim in event properties,
+        # and (b) makes it structurally impossible for a client id to collide with the backend's
+        # own reserved "event_<...>" / "event_replay_<...>" id namespaces (see common/ids.py,
+        # events/replay.py), which a client must never be able to impersonate.
         event_id = _trim_or_raise(event_id, max_length=MAX_CLIENT_EVENT_ID_LENGTH, error=ClientEventIdInvalidError)
+        if not _is_canonical_uuid(event_id):
+            raise ClientEventIdInvalidError()
         web_session_id = _trim_or_raise(
             web_session_id, max_length=MAX_WEB_SESSION_ID_LENGTH, error=ClientEventWebSessionIdInvalidError
         )
+        if not _is_canonical_uuid(web_session_id):
+            raise ClientEventWebSessionIdInvalidError()
         if user_id is not None:
             user_id = _trim_or_raise(user_id, max_length=MAX_USER_ID_LENGTH, error=ClientEventUserIdInvalidError)
         if guest_id is not None:
@@ -231,11 +258,7 @@ class ClientEventService:
         ):
             raise ClientEventFrontendInvalidError()
 
-        if guest_id is not None:
-            guest = self._guest_repository.get(guest_id, tenant_id=tenant_id, region=region)
-            if guest is None:
-                raise GuestIdentityNotFoundError()
-
+        scenario_chain_id: str | None = None
         if scenario_session_id is not None:
             session = self._scenario_session_repository.get(
                 scenario_session_id,
@@ -244,14 +267,33 @@ class ClientEventService:
                 product_id=product_id,
                 frontend_id=frontend_id,
             )
-            # A session whose true owner (None for an anonymous/unauthenticated session, or a
-            # specific guest_id/user_id) doesn't match this request's identity exactly must be
-            # indistinguishable from a session that does not exist -- plain equality checks, not
-            # checks that only apply when one side happens to be non-None, so neither omitting an
-            # identity nor a session with no owner can be used to correlate to/from an identity
-            # that isn't actually attached to it.
-            if session is None or session.guest_id != guest_id or session.user_id != user_id:
+            # An explicitly supplied guest_id/user_id that contradicts the session's real owner is
+            # rejected outright (a confused or spoofing caller); one that's simply omitted is not
+            # treated as a mismatch, since the session itself is about to become the source of
+            # truth for identity below.
+            if session is None or (
+                (guest_id is not None and session.guest_id != guest_id)
+                or (user_id is not None and session.user_id != user_id)
+            ):
                 raise ScenarioSessionNotFoundError()
+            # The resolved session is authoritative for identity from here on -- derived, not
+            # merely validated, so a caller never has to (and cannot incorrectly) re-assert
+            # guest_id/user_id once scenario_session_id already carries that information, and so
+            # scenario_chain_id (which a standalone client request has no way to know or claim on
+            # its own) is populated instead of silently dropped.
+            guest_id = session.guest_id
+            user_id = session.user_id
+            scenario_chain_id = session.scenario_chain_id
+        elif user_id is not None:
+            # No session to derive/verify user_id against, and MVP-A has no authenticated-user
+            # lookup at all -- unlike guest_id (itself unauthenticated, but at least checked
+            # against a real minted identity below), a standalone user_id claim is entirely
+            # unverifiable and must not be trusted.
+            raise ClientEventUserIdRequiresSessionError()
+        elif guest_id is not None:
+            guest = self._guest_repository.get(guest_id, tenant_id=tenant_id, region=region)
+            if guest is None:
+                raise GuestIdentityNotFoundError()
 
         event_properties = self._validate_properties(properties or {})
         event_properties["web_session_id"] = web_session_id
@@ -264,6 +306,7 @@ class ClientEventService:
             guest_id=guest_id,
             user_id=user_id,
             scenario_session_id=scenario_session_id,
+            scenario_chain_id=scenario_chain_id,
         )
         try:
             envelope = self._event_emitter.emit(
@@ -320,6 +363,14 @@ def _trim_or_raise(value: str, *, max_length: int, error: type[PlatformError]) -
     return normalized
 
 
+def _is_canonical_uuid(value: str) -> bool:
+    try:
+        parsed = uuid.UUID(value)
+    except (ValueError, AttributeError, TypeError):
+        return False
+    return str(parsed) == value
+
+
 def _is_allowed_property_value(key: str, value: Any) -> bool:
     expected_type = CLIENT_EVENT_PROPERTY_TYPES.get(key)
     if expected_type is None or not isinstance(value, expected_type):
@@ -329,5 +380,5 @@ def _is_allowed_property_value(key: str, value: Any) -> bool:
         # hypothetical future bool-typed key isn't rejected by this same guard.
         return not isinstance(value, bool) and 0 <= value <= MAX_PROPERTY_INT_VALUE
     if expected_type is str:
-        return len(value) <= MAX_PROPERTY_STRING_LENGTH
+        return bool(_CATEGORICAL_VALUE_PATTERN.fullmatch(value))
     return True

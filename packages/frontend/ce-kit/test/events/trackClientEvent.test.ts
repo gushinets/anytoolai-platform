@@ -91,6 +91,24 @@ describe("trackClientEvent", () => {
     expect(firstBody.event_id).not.toBe(secondBody.event_id);
   });
 
+  it("reuses a caller-supplied eventId across retries instead of minting a new one", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(200, { event_id: "web_evt_1", event_type: "web.product_viewed" }),
+    );
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+    const preparedEventId = "11111111-1111-4111-8111-111111111111";
+
+    await trackClientEvent(client, { ...REQUEST, eventId: preparedEventId });
+    await trackClientEvent(client, { ...REQUEST, eventId: preparedEventId });
+
+    const [firstCall, secondCall] = fetchImpl.mock.calls as unknown as [
+      [string, RequestInit],
+      [string, RequestInit],
+    ];
+    expect(parseBody(firstCall[1]).event_id).toBe(preparedEventId);
+    expect(parseBody(secondCall[1]).event_id).toBe(preparedEventId);
+  });
+
   it("omits a non-finite fieldCount instead of letting it become null on the wire", async () => {
     const fetchImpl = vi.fn(async () =>
       jsonResponse(200, { event_id: "web_evt_1", event_type: "web.product_viewed" }),

@@ -21,15 +21,24 @@ export type TrackClientEventRequest = {
   userId?: string;
   scenarioSessionId?: string;
   properties?: ClientEventProperties;
+  /**
+   * Reuse the same id across retries of one logical event, so duplicate delivery dedupes
+   * server-side instead of creating a second row -- generate it once with
+   * `generateIdempotencyKey()` (exported from this package) and pass the same value to every
+   * retry of that call. Omit to mint a fresh one for this call only, which is safe as long as
+   * the caller never itself retries with a "new" id for what is really the same logical event.
+   */
+  eventId?: string;
 };
 
 export type TrackClientEventOptions = Pick<PlatformApiRequestOptions, "signal" | "timeoutMs">;
 
 /**
- * Records one allowlisted `web.*` client event (ANY-17). Generates its own idempotent `event_id`
- * per call, so a caller must not retry a failed call with the same properties expecting a fresh
- * attempt -- retrying is safe (duplicate delivery is idempotent) but a genuinely new event needs a
- * new call.
+ * Records one allowlisted `web.*` client event (ANY-17). Mints a fresh idempotent `event_id` per
+ * call unless the caller supplies one via `request.eventId` -- a caller that itself retries (e.g.
+ * after a timeout where the first attempt may have actually committed) must pass the same
+ * `eventId` on every retry of one logical event, or duplicate delivery will create a second row
+ * instead of deduping.
  *
  * Never throws: like every other CE-kit helper, failure comes back as `{ ok: false, error }`, so a
  * caller can fire this without blocking or risking the product result on analytics delivery (the
@@ -46,7 +55,7 @@ export async function trackClientEvent(
       method: "POST",
       path: "/v1/client-events",
       body: {
-        event_id: generateIdempotencyKey(),
+        event_id: request.eventId ?? generateIdempotencyKey(),
         event_type: request.eventType,
         product_id: request.productId,
         frontend_id: request.frontendId,

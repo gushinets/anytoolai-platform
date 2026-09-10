@@ -44,9 +44,9 @@ def test_client_event_service_maps_unexpected_event_validation_error_to_safe_pla
         service.record(
             tenant_id="anytoolai",
             region="default",
-            event_id="web_evt_demo",
+            event_id="11111111-1111-4111-8111-111111111111",
             event_type="web.product_viewed",
             product_id="kernel_demo",
             frontend_id="web_mirror",
-            web_session_id="web_session_demo",
+            web_session_id="22222222-2222-4222-8222-222222222222",
         )
