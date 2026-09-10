@@ -130,7 +130,19 @@ def _payload(**overrides: Any) -> dict[str, Any]:
     return payload
 
 
+_IDENTITY_KEYS = ("guest_id", "user_id", "scenario_session_id")
+
+
 def _post_client_event(app, **overrides: Any) -> httpx.Response:
+    # This endpoint requires at least one of guest_id/user_id/scenario_session_id (ANY-17
+    # team-lead review). Most tests here aren't testing identity at all, so default to a known
+    # real guest unless the caller already supplies one of the three itself -- a caller that
+    # does (e.g. to correlate to a specific scenario_session_id) must not have guest_id silently
+    # injected alongside it, since that can turn a same-session request into a spoofed-identity
+    # mismatch. The one test that needs a genuinely identity-free payload bypasses this helper
+    # and posts via `_payload()` directly.
+    if not any(key in overrides for key in _IDENTITY_KEYS):
+        overrides = {**overrides, "guest_id": "guest_demo"}
     return asyncio.run(_request(app, "POST", "/v1/client-events", json=_payload(**overrides)))
 
 
@@ -494,6 +506,36 @@ def test_client_event_rejects_standalone_user_id_without_a_scenario_session(
 
     assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
     assert response.json()["error"]["code"] == "client_event_user_id_requires_scenario_session"
+
+
+def test_client_event_rejects_a_fully_anonymous_payload(session_factory: SessionFactory) -> None:
+    app = _create_test_app(session_factory)
+
+    # ANY-17 team-lead review: this endpoint is authenticated-or-guest, not anonymous --
+    # retention/activation metrics rely on a real active identity. Posted via _payload() directly
+    # (bypassing _post_client_event's default-identity injection) to prove the payload really has
+    # none of guest_id/user_id/scenario_session_id.
+    response = asyncio.run(_request(app, "POST", "/v1/client-events", json=_payload()))
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_identity_required"
+
+
+def test_client_event_accepts_a_session_only_payload_with_no_separate_guest_id(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    # A resolved scenario_session_id is sufficient identity on its own -- the caller doesn't have
+    # to also (and, per the owner-check tests elsewhere in this file, generally must not)
+    # separately assert guest_id/user_id once a session already carries that information.
+    response = _post_client_event(
+        app,
+        event_type="web.result_viewed",
+        scenario_session_id="scenario_session_demo",
+    )
+
+    assert response.status_code == HTTPStatus.OK
 
 
 def test_client_event_rejects_server_owned_dimensions_in_payload(

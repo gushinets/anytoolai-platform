@@ -1547,8 +1547,16 @@ class ConfigLoader:
         # pattern) cannot tell privacy-reviewed categorical values apart from arbitrary content
         # merely re-encoded as a slug. A product that declares nothing here simply cannot use
         # that property at all (the closed set defaults to empty, never to "anything goes").
-        client_event_properties = data.get("client_event_properties")
-        if client_event_properties is not None:
+        if "client_event_properties" in data:
+            client_event_properties = data["client_event_properties"]
+            # An explicit `client_event_properties: null` (as opposed to omitting the key
+            # entirely) is not a mapping either, so this is already covered by the isinstance
+            # check below -- deliberately not special-cased as "same as absent", since `.get(key,
+            # {})` at the ClientEventService call site only substitutes its default for a
+            # genuinely *absent* key, not one present with value None. Treating null as "no
+            # vocabulary declared" here would leave that None sitting in product.analytics and
+            # crash `_is_allowed_property_value()`'s `.get()` call on it at request time instead
+            # of failing here, at config-load time, with a clear error.
             if not isinstance(client_event_properties, Mapping):
                 raise InvalidConfigShapeError(
                     path,

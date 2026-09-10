@@ -137,6 +137,15 @@ class ClientEventFrontendInvalidError(PlatformError):
         )
 
 
+class ClientEventIdentityRequiredError(PlatformError):
+    def __init__(self) -> None:
+        super().__init__(
+            "client_event_identity_required",
+            "At least one of guest_id, user_id, or scenario_session_id is required; this "
+            "endpoint is authenticated-or-guest, not anonymous.",
+        )
+
+
 class ClientEventUserIdInvalidError(PlatformError):
     def __init__(self) -> None:
         super().__init__(
@@ -249,6 +258,12 @@ class ClientEventService:
                 max_length=MAX_LOOKUP_ID_LENGTH,
                 error=ClientEventScenarioSessionIdInvalidError,
             )
+        # This endpoint is authenticated-or-guest, not anonymous: retention/activation metrics
+        # rely on a real active identity. A resolved scenario_session_id counts (its own
+        # guest_id/user_id become authoritative below, even if both are omitted here) -- only a
+        # request with none of the three is rejected.
+        if guest_id is None and user_id is None and scenario_session_id is None:
+            raise ClientEventIdentityRequiredError()
 
         product = self._config_registry.get_product(product_id)
         if product is None:

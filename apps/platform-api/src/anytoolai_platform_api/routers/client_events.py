@@ -144,6 +144,7 @@ def _status_code_for_platform_error(error: PlatformError) -> int:
         "client_event_user_id_requires_scenario_session",
         "client_event_guest_id_invalid",
         "client_event_scenario_session_id_invalid",
+        "client_event_identity_required",
         "client_event_product_invalid",
         "client_event_frontend_invalid",
         "client_event_property_invalid",

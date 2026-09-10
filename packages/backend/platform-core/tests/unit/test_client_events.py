@@ -28,10 +28,21 @@ class _RaisingEmitter:
         raise EventValidationError("unknown platform event type: web.product_viewed")
 
 
+class _KnownGuestRepository:
+    """Stands in for a real `GuestIdentityRepository` -- always reports the guest as known, so
+    this test can reach `EventEmitter.emit()` (what it's actually exercising) without a real
+    database. `record()` now requires an identity (ANY-17 team-lead review), and a guest_id is
+    the one that doesn't also require a fake `ScenarioSessionRecord`."""
+
+    def get(self, guest_id: str, *, tenant_id: str, region: str) -> object:
+        del guest_id, tenant_id, region
+        return object()
+
+
 def _service(*, event_emitter: Any) -> ClientEventService:
     return ClientEventService(
         config_registry=build_config_registry(CONFIG_ROOT),
-        guest_repository=None,  # type: ignore[arg-type]
+        guest_repository=_KnownGuestRepository(),  # type: ignore[arg-type]
         scenario_session_repository=None,  # type: ignore[arg-type]
         event_emitter=event_emitter,
     )
@@ -49,4 +60,5 @@ def test_client_event_service_maps_unexpected_event_validation_error_to_safe_pla
             product_id="kernel_demo",
             frontend_id="web_mirror",
             web_session_id="22222222-2222-4222-8222-222222222222",
+            guest_id="guest_demo",
         )

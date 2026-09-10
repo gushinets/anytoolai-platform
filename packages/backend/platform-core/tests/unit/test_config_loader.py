@@ -1154,3 +1154,28 @@ def test_loader_fails_on_field_count_as_a_client_event_properties_key(tmp_path: 
         ref_value="field_count",
         message_part="is not a categorical client-event property",
     )
+
+
+def test_loader_fails_on_null_client_event_properties(tmp_path: Path) -> None:
+    """ANY-17 team-lead review: an explicit `client_event_properties: null` isn't a mapping
+    either, but `data.get(...)` returning None used to skip validation entirely, leaving that
+    None sitting in product.analytics -- ClientEventService's `.get(key, {})` only substitutes
+    its default for a genuinely *absent* key, not a present key whose value is None, so the next
+    mode/gap_category event would have called `.get()` on None and raised an uncaught 500."""
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "analytics.yaml"
+    data = _load_yaml(path)
+    data["client_event_properties"] = None
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="client_event_properties",
+        ref_value=None,
+        message_part="must be a mapping",
+    )
