@@ -5,9 +5,10 @@
 - State: active
 - Owner: agent
 - Created: 2026-09-10
-- Last updated: 2026-09-10
-- Review date: 2026-09-10
-- Next action: none — happy-path vertical implemented and verified; awaiting code review.
+- Last updated: 2026-09-11
+- Review date: 2026-09-11
+- Next action: none — happy-path vertical plus the generic event integration point implemented
+  and verified; awaiting code review.
 - Blocker: none
 
 ## Goal
@@ -67,27 +68,39 @@ plan covers the shared-runtime-proving happy path only.
 5. **`packages/frontend/web-result-kit`** — `GeneratedTextRenderer` implemented (verbatim
    `white-space: pre-wrap` text), exported from `src/index.tsx` (was `export {}`). Package.json
    gained `main`/`types` (missing entirely before — nothing had ever imported this package) and a
-   `react` peer/dev dependency (needed once the file contains real JSX). `ArtifactRenderer`,
+   `react` runtime dependency (needed once the file contains real JSX). `ArtifactRenderer`,
    `StructuredJsonRenderer`, `ErrorBoundary`, `HandoffPreview`, `EmailCapture` left as stubs —
    ProposalAI needs none of them (single plain-text canonical field, no handoff, no email capture).
 6. **`packages/frontend/ce-kit/src/ui/*`** — left untouched. Not exported from ce-kit's own
    `index.ts`, nothing imports them; building them out now would be speculative ahead of a second
    product's actual need.
-7. **Tests** — `apps/web-mirror/test/ProposalAIProduct.test.tsx` (8 cases: mount/load, client
+7. **`onEvent` prop on `ProposalAIProduct`** — the "generic event ... integration points" half of
+   ANY-453's scope doc that isn't the next-action call: an injectable
+   `(event: ProposalAIProductEvent) => void` covering the funnel ANY-243 names (`product_viewed` →
+   `form_started` → `form_submitted` → `scenario_completed` → `copy_activated`), payloads carrying
+   only ids/status, never form or result text. No real dispatch is wired anywhere yet (ANY-17 owns
+   that); the prop exists and is tested with an injected fake handler, matching ANY-453's own
+   "exposes callbacks/integration points and tests them with injected handlers" wording. A thrown
+   handler is caught and otherwise ignored so a broken caller-supplied handler can't break the page.
+8. **Tests** — `apps/web-mirror/test/ProposalAIProduct.test.tsx` (11 cases: mount/load, client
    validation blocking submit, full happy path including the copy→next-action call, advisory and
    reactive quota-exhausted, preserved form values + same-Idempotency-Key retry, non-blocking
-   next-action failure) and `test/registry.test.tsx`. Both use ce-kit's existing
+   next-action failure, the full `onEvent` funnel sequence with a text-leak check, no-handler and
+   throwing-handler safety) and `test/registry.test.tsx`. Both use ce-kit's existing
    `makeRoutedFetchClient` test util, matching `HandoffConsent.test.tsx`'s conventions.
 
 ### Out of scope (left for other tickets)
 
-- The generic `ProductRunPage`/product-definition contract, product-owned renderer *slot*
-  abstraction, and shared event/next-action hook interface ANY-453's original scope doc describes
-  — deferred until a second product exists to prove the actual shared shape (team-lead guidance).
+- The generic `ProductRunPage`/product-definition contract and product-owned renderer *slot*
+  abstraction ANY-453's original scope doc describes — deferred until a second product exists to
+  prove the actual shared shape (team-lead guidance). The event/next-action *callback* half of that
+  scope item is implemented (see #7 above); only the generic component contract is deferred.
 - ProposalAI's Playwright E2E, funnel/event correlation assertions, and full weak-input coverage —
-  `plans/ANY-243.md`.
-- Real client-event ingestion (`ANY-17`) — `nextAction()`'s call today only fires the backend's
-  next-action endpoint itself; no separate analytics/event dispatch exists yet to wire.
+  `plans/ANY-243.md`. This plan's `onEvent` tests prove the callback contract with an injected
+  handler, not a real analytics backend.
+- Real client-event ingestion (`ANY-17`) — nothing calls `onEvent` in production composition yet
+  (the `/products/[productId]` route doesn't pass one); wiring a real implementation in is ANY-17's
+  job plus whichever ticket composes it into the route.
 - `apps/web-mirror/src/lib/runtimeConfig.ts` (a different, unrelated build/deploy-environment stub)
   — not touched, not used by this vertical.
 - Any other product (Client Message Decoder, Scope Creep Guard, Send-Ready, Brief Decoder) — none
@@ -116,10 +129,24 @@ plan covers the shared-runtime-proving happy path only.
    straight into the `quota-exhausted` state rather than showing a form whose submit button is
    merely disabled — matches ANY-243's "no fake progress ... for the rejected attempt" language in
    spirit even before any submit is attempted.
+5. **`react` as a plain `dependency` of `web-result-kit`, not a `peerDependency`.** First tried as
+   a peer dependency (matching the usual library convention of not pinning a consumer's React).
+   That resolved fine under a plain `pnpm install` but the symlink pnpm creates for it into
+   `web-result-kit/node_modules` did not survive a subsequent `pnpm install --frozen-lockfile` (the
+   install `frontend-check` itself runs first), breaking `react/jsx-dev-runtime` resolution for
+   Vitest. Moved to a regular `dependency` — resolves identically (pinned to the same `19.2.7` in
+   `pnpm-lock.yaml` either way) but the symlink is then guaranteed by ordinary dependency
+   installation, not peer-resolution heuristics. `web-result-kit` isn't a published, externally
+   consumed package with a real "don't double-install React" concern to protect against here.
+6. **`onEvent` behind a ref, not a `useEffect` dependency.** `ProposalAIProduct` keeps the latest
+   `onEvent` in a ref (refreshed every render via a deps-less effect) rather than listing it in
+   each effect's dependency array. Avoids re-running the mount-only `product_viewed` effect (or
+   any other effect) whenever a caller passes a new inline arrow function each render, which is the
+   normal shape for an event handler prop.
 
 ## Required evidence
 
-- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (35 passed) / `build` — all
+- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (38 passed) / `build` — all
   passed.
 - `pnpm --filter @anytoolai/web-result-kit typecheck` / `lint` — passed.
 - `pnpm --filter @anytoolai/ce-kit test` (289 passed, unaffected by this change) — passed, confirms

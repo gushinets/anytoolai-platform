@@ -1,7 +1,7 @@
 import { makeRoutedFetchClient } from "@anytoolai/ce-kit/test/testUtils/routedFetchClient";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ProposalAIProduct } from "../src/products/proposalAi/ProposalAIProduct";
+import { ProposalAIProduct, type ProposalAIProductEvent } from "../src/products/proposalAi/ProposalAIProduct";
 
 afterEach(() => {
   cleanup();
@@ -278,5 +278,79 @@ describe("ProposalAIProduct", () => {
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
     expect(screen.getByText("Dear client, here is my proposal.")).toBeTruthy();
+  });
+
+  it("reports the full funnel to an injected onEvent handler, with no form/result text in any payload", async () => {
+    const events: ProposalAIProductEvent[] = [];
+    const { client } = makeClient({
+      [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse()],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      [QUOTA_ROUTE]: [quotaResponse()],
+      [START_ROUTE]: [startResponse()],
+      [SESSION_ROUTE]: [sessionResponse()],
+      [RESULT_ROUTE]: [resultResponse()],
+      [NEXT_ACTION_ROUTE]: [sessionResponse({ status: "completed" })],
+    });
+
+    render(<ProposalAIProduct client={client} onEvent={(event) => events.push(event)} />);
+    await waitFor(() => expect(events).toEqual([{ type: "product_viewed" }]));
+
+    fillValidForm();
+    expect(events).toEqual([{ type: "product_viewed" }, { type: "form_started" }]);
+
+    // A second field edit must not emit a second "form_started".
+    fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Updated positioning." } });
+    expect(events.filter((event) => event.type === "form_started")).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await waitFor(() => expect(screen.getByText("Dear client, here is my proposal.")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+
+    expect(events).toEqual([
+      { type: "product_viewed" },
+      { type: "form_started" },
+      { type: "form_submitted" },
+      { type: "scenario_completed", scenarioSessionId: "session_1" },
+      { type: "copy_activated", scenarioSessionId: "session_1" },
+    ]);
+    const serialized = JSON.stringify(events);
+    expect(serialized).not.toContain("bakery");
+    expect(serialized).not.toContain("Dear client");
+  });
+
+  it("keeps working with no onEvent handler at all", async () => {
+    const { client } = makeClient({
+      [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse()],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      [QUOTA_ROUTE]: [quotaResponse()],
+    });
+
+    render(<ProposalAIProduct client={client} />);
+
+    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
+    fillValidForm();
+    expect(screen.getByLabelText("Describe the task")).toBeTruthy();
+  });
+
+  it("does not let a throwing onEvent handler break the page", async () => {
+    const { client } = makeClient({
+      [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse()],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      [QUOTA_ROUTE]: [quotaResponse()],
+    });
+
+    render(
+      <ProposalAIProduct
+        client={client}
+        onEvent={() => {
+          throw new Error("handler boom");
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
+    fillValidForm();
+    expect(screen.getByLabelText("Describe the task")).toBeTruthy();
   });
 });

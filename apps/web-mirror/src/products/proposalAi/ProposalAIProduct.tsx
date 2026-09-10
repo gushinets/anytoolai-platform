@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type RefObject } from "react";
 import {
   createInMemoryAsyncStorage,
   createWindowLocalStorageAdapter,
@@ -21,9 +21,38 @@ import {
 import { ErrorState } from "../../components/ErrorState";
 import { ResultView } from "../../components/ResultView";
 
+/**
+ * Funnel events ANY-243 names (product viewed -> form started -> form submitted -> scenario
+ * completed/result viewed -> copy activation). Never carries prompt text, result text, or
+ * clipboard contents -- only ids/status, matching ANY-453's "keep ... user text out of event
+ * payloads" requirement.
+ */
+export type ProposalAIProductEvent =
+  | { type: "product_viewed" }
+  | { type: "form_started" }
+  | { type: "form_submitted" }
+  | { type: "scenario_completed"; scenarioSessionId: string }
+  | { type: "copy_activated"; scenarioSessionId: string };
+
 export type ProposalAIProductProps = {
   client: PlatformApiClient;
+  /**
+   * Generic event integration point (ANY-453's "The foundation exposes callbacks/integration
+   * points and tests them with injected handlers; product integration verifies the real event
+   * path after both prerequisites are ready" -- ANY-17 owns that real event path). No real
+   * dispatch is wired here; this only exposes and tests the callback contract.
+   */
+  onEvent?: (event: ProposalAIProductEvent) => void;
 };
+
+function emitEvent(ref: RefObject<((event: ProposalAIProductEvent) => void) | undefined>, event: ProposalAIProductEvent): void {
+  try {
+    ref.current?.(event);
+  } catch {
+    // A caller's own handler failing must never break the product page (ANY-453: "keep analytics
+    // failure non-blocking").
+  }
+}
 
 const PRODUCT_ID = "proposal_ai";
 const COPY_NEXT_ACTION_ID = "copy_result";
@@ -119,7 +148,18 @@ type Phase =
  * first real product, extract a shared abstraction only once a second product needs the same
  * shape. Nothing here should be assumed reusable yet.
  */
-export function ProposalAIProduct({ client }: ProposalAIProductProps) {
+export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
+  // Latest onEvent behind a ref, refreshed after every render (not a dependency-array capture) so
+  // call sites below never hold a stale handler without needing to be listed in any effect's deps.
+  const onEventRef = useRef<ProposalAIProductProps["onEvent"]>(onEvent);
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  });
+  useEffect(() => {
+    emitEvent(onEventRef, { type: "product_viewed" });
+  }, []);
+  const formStartedRef = useRef(false);
+
   const [boot, setBoot] = useState<BootState>({ kind: "loading" });
   const [quota, setQuota] = useState<QuotaState | null>(null);
   const [guestId, setGuestId] = useState<string | undefined>(undefined);
@@ -252,6 +292,7 @@ export function ProposalAIProduct({ client }: ProposalAIProductProps) {
       return;
     }
     setPhase({ kind: "result", scenarioSessionId, checkpointId: session.currentCheckpointId, text });
+    emitEvent(onEventRef, { type: "scenario_completed", scenarioSessionId });
   }
 
   function handleSubmit(event: FormEvent) {
@@ -278,6 +319,7 @@ export function ProposalAIProduct({ client }: ProposalAIProductProps) {
       setPendingStart({ prepared, input: values });
     }
     setPhase({ kind: "submitting" });
+    emitEvent(onEventRef, { type: "form_submitted" });
     void runStart(prepared);
   }
 
@@ -293,6 +335,9 @@ export function ProposalAIProduct({ client }: ProposalAIProductProps) {
     if (phase.kind !== "result" || !phase.checkpointId) {
       return;
     }
+    // Emitted on a successful clipboard write regardless of the next-action HTTP outcome below --
+    // the funnel event reflects the user's copy, not the backend's acknowledgement of it.
+    emitEvent(onEventRef, { type: "copy_activated", scenarioSessionId: phase.scenarioSessionId });
     // Fire-and-forget: a failed activation event must never make an already-copied,
     // already-displayed result look broken (ANY-243).
     nextAction(
@@ -303,6 +348,10 @@ export function ProposalAIProduct({ client }: ProposalAIProductProps) {
   }
 
   function updateField<K extends keyof FormValues>(field: K, value: FormValues[K]) {
+    if (!formStartedRef.current) {
+      formStartedRef.current = true;
+      emitEvent(onEventRef, { type: "form_started" });
+    }
     setValues((prev) => ({ ...prev, [field]: value }));
   }
 
