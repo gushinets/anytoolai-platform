@@ -1,0 +1,12 @@
+{
+  "response_json": {
+    "text": "Hi -- I'd love to help you build the marketing site you described, within the two-week timeline you mentioned. I've spent the last four years building small-business sites, and a marketing site like this is exactly the kind of project I take on. Let's set up a quick call to confirm scope and get started."
+  },
+  "input_tokens": 96,
+  "output_tokens": 64,
+  "latency_ms": 8,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "proposal_ai.compose_persuasive_text_v1"
+  }
+}

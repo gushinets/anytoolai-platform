@@ -61,7 +61,7 @@ smoke commands will be added only when feature issues deliver real vertical slic
 
 - MVP-A1: Atom Runtime Proof — backend proof of all 11 typed atoms individually and in composite workflows, with deterministic and live-provider evidence.
 - MVP-A2: Client Surfaces — shared CE-kit, web mirror, consent/paywall/onboarding surfaces, kernel-demo CE, and browser evidence.
-- MVP-B: Freelancer Validation Bundle v0 — six thin, web-first Freelancer products (ProposalAI, Client Update Writer, Brief Decoder, Acceptance Builder, Task Finder, Send-Ready) added through configs, prompts, schemas, workflows, web product definitions/pages, result renderers, handoff maps, and product events; a dedicated Chrome Extension per product is optional backlog, not part of the default product Definition of Done.
+- MVP-B: Freelancer Validation Bundle v0 — eight thin Freelancer CE-first products added through configs, prompts, schemas, workflows, result renderers, handoff maps, product events, and separate Chrome Extension wrappers.
 
 ## First places to read
 

@@ -18,7 +18,7 @@ from typing import Any
 from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle
 from anytoolai_platform_actions.bundle import PlatformActionsBundle
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
-from anytoolai_platform_core.config.errors import check_ids_are_unique
+from anytoolai_platform_core.config.errors import RESERVED_BUNDLE_IDS, check_ids_are_unique
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.storage.db import build_postgres_url_from_env, create_sync_engine
 from anytoolai_platform_core.storage.transactions import build_session_factory
@@ -60,9 +60,8 @@ def build_runtime(
     bundles: Sequence[ProductBundle] | None = None,
 ) -> RuntimeBootstrapResult:
     """Compose the platform kernel with `bundles` (defaulting in production to
-    `[FreelancerSuiteBundle()]`, which contributes one product root as of ANY-413
-    (`client_update_writer`); each further product issue adds its own). `loaded_bundles` reports
-    what was actually composed: the two
+    `[FreelancerSuiteBundle()]`, which contributes ProposalAI (ANY-227) as its first product
+    root). `loaded_bundles` reports what was actually composed: the two
     kernel-level labels plus each bundle's own `bundle_id`, in the order given -- not a fabricated
     literal. A caller that passes `bundles` explicitly (e.g. a test-only fixture bundle) fully
     replaces the production default; it is never combined with it."""

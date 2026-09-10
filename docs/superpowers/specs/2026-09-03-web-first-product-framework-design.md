@@ -1,7 +1,7 @@
 # Web-First Product Framework And Analytics Design
 
 Date: 2026-09-03  
-Status: approved design boundary
+Status: approved design boundary; product release order updated 2026-09-08
 
 ## Decision
 
@@ -17,7 +17,7 @@ Analytics is events-first: the framework records truthful raw events with stable
 - Keep each product responsible only for its fields, validation, scenario identity, modes, and result presentation.
 - Collect a consistent product funnel without storing user text, prompts, or generated content in analytics.
 - Support one-run and user-approved two-run workflows without changing atoms or the mapping DSL.
-- Prove the framework with ProposalAI, then reuse it for Client Update Writer.
+- Prove the framework with ProposalAI, then reuse it for Client Message Decoder.
 
 ## Non-Goals
 
@@ -78,7 +78,7 @@ The first `ProductRunPage` is implemented together with ProposalAI and owns:
 6. rendering, copying, retrying, and invoking allowed next actions;
 7. emitting allowlisted client events.
 
-Client Update Writer then reuses this behavior. Only repetition demonstrated by those two products
+Client Message Decoder then reuses this behavior. Only repetition demonstrated by those two products
 is extracted into shared internal components; no generic framework is built ahead of them.
 
 The page state is deliberately small:
@@ -116,10 +116,11 @@ Web-to-web handoff reuses the existing backend-owned bearer token, safe preview,
 protection, acceptance, and source/target session linkage. Consent and target navigation stay in the
 same tab; the web host does not introduce a simplified handoff contract.
 
-The initial validation set supports only `immediate` target start. Brief Decoder to Acceptance
-Builder is the first required pair. Its CTA is "create draft": acceptance queues Acceptance Builder
-immediately. Editing after the result appears is local editing or a new ordinary scenario run, not
-deferred continuation. Deferred handoff remains outside v1 because an accepted deferred target has
+The initial five-product order has no mandatory product-to-product handoff pair; shared MVP-A2
+handoff proof remains required. Any delivered web handoff supports only `immediate` target start.
+Brief Decoder to Acceptance Builder is a later candidate. Its CTA is "create draft": acceptance
+queues Acceptance Builder immediately. Editing after the result appears is local editing or a new
+ordinary scenario run, not deferred continuation. Deferred handoff remains outside v1 because an accepted deferred target has
 no frontend start path.
 
 ## Client Event Contract
@@ -217,7 +218,12 @@ The shared operational metrics are:
 | `value_take_rate` | Activated scenario sessions divided by `value_produced` scenario sessions for the same product, cohort, and time window. | Derived from the two metrics above | `derived` | Inherits identity, delivery, and producer blind spots; denominator zero yields no value rather than zero percent. |
 | `activation_gap` | `value_produced` scenario sessions minus activated scenario sessions for the same product, cohort, and time window. | Derived from the two metrics above | `derived` | It signals produced-but-not-taken value but does not explain why the user stopped. |
 
-The validation products use these activation definitions:
+The existing product activation definitions below remain valid independently of release order.
+ProposalAI, Send-Ready, and Brief Decoder retain their definitions for the initial set. Client Update
+Writer, Acceptance Builder, and External Task Finder & Fit are backlog products. Client Message
+Decoder and Scope Creep Guard must define activation, producer, trust class, and blind spots in their
+product bundle specifications before implementation; changing release priority does not assign them
+another product's metric.
 
 | Product | Activation definition | Producer | Trust class | Blind spots |
 |---|---|---|---|---|
@@ -225,7 +231,7 @@ The validation products use these activation definitions:
 | Client Update Writer | First successful copy-button action for a completed update, including PrepaidRequest and ReplyDraft modes. | `client.next_action_clicked(copy_result)` after clipboard success | `backend_recorded_client_action` | Same copy-button boundary as ProposalAI. |
 | Brief Decoder | First successful rendering of a non-empty clarifying-question result. | `web.result_viewed` correlated with the completed scenario | `client_observed` | Browser delivery can fail; rendering does not prove a question was used. |
 | Acceptance Builder | First successful rendering of its acceptance verdict and criteria. | `web.result_viewed` correlated with the completed scenario | `client_observed` | Rendering does not prove the criteria were accepted or applied. |
-| Task Finder | First successful rendering of its fit score. | `web.result_viewed` correlated with the completed scenario | `client_observed` | Rendering does not prove that the user acted on the score. |
+| External Task Finder & Fit | First successful rendering of its fit score. | `web.result_viewed` correlated with the completed scenario | `client_observed` | Rendering does not prove that the user acted on the score. |
 | Send-Ready | First successful copy-button action on the rewrite result from the second run. | `client.next_action_clicked(copy_result)` after clipboard success | `backend_recorded_client_action` | Excludes users who use the diagnosis without generating or copying a rewrite. |
 
 These are operational metrics, not two competing north-stars. A portfolio north-star is selected
@@ -302,10 +308,15 @@ The framework preserves join keys for future enrichment but does not fabricate u
 3. Complete the real `/r/{artifact_id}` result renderer.
 4. Implement ProposalAI and the minimum product-run behavior together in `apps/web-mirror`.
 5. Add the complete ProposalAI funnel and copy-button activation path with persisted correlation.
-6. Build Client Update Writer on the same route/runtime pattern.
+6. Build Client Message Decoder on the same route/runtime pattern.
 7. Extract only the repetition proven by both products into shared internal components.
-8. Build Brief Decoder, Acceptance Builder and their immediate same-tab handoff.
-9. Build Task Finder, then Send-Ready as the two-run validation product.
+8. Build Scope Creep Guard.
+9. Build Send-Ready as the two-run validation product.
+10. Build Brief Decoder.
+
+This follows the controlling five-product release order. Client Update Writer, Acceptance Builder,
+and External Task Finder & Fit remain in the backlog; Brief Decoder to Acceptance Builder is a
+later handoff candidate, not a first-release dependency.
 
 ## Verification
 

@@ -26,7 +26,7 @@ from anytoolai_platform_core.actions.runner import ActionRunner, ActionRunServic
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
-from anytoolai_platform_core.config.errors import check_ids_are_unique
+from anytoolai_platform_core.config.errors import RESERVED_BUNDLE_IDS, check_ids_are_unique
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository

@@ -1,5 +1,11 @@
 # Execution Plan: Web-First Product Plan Alignment
 
+> Release-order update (2026-09-08): the current order is ProposalAI → Client Message Decoder →
+> Scope Creep Guard → Send-Ready → Brief Decoder, as defined in
+> `docs/product-specs/mvp-scope-source-of-truth.md`. The six-product order, reuse-product choice,
+> and mandatory Brief Decoder → Acceptance Builder pair below record the completed 2026-09-03
+> plan and are superseded for future delivery.
+
 ## Status
 
 - State: completed

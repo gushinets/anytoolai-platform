@@ -46,9 +46,13 @@ scaffold removed).
 4. **`FreelancerSuiteBundle` cleanup**
    (`packages/backend/product-platforms/freelancer-suite/`): `config_roots()` returns `[]`; the
    eight placeholder `products/<name>/` directories (each only a `README.md`, no real config) are
-   deleted. `tests/test_bundle_loads.py` and `README.md` rewritten to describe the 6-product
-   roadmap (ProposalAI, Client Update Writer, Brief Decoder, Acceptance Builder, Task Finder,
-   Send-Ready), zero implemented today.
+   deleted. `tests/test_bundle_loads.py` and `README.md` rewritten to describe a roadmap, zero
+   implemented today. At the time this landed that roadmap was six products (ProposalAI, Client
+   Update Writer, Brief Decoder, Acceptance Builder, Task Finder, Send-Ready); `ANY-452` (a
+   separate, later docs-only realignment) replaced it repo-wide with the five-product release
+   order this package's README now describes: ProposalAI, Client Message Decoder, Scope Creep
+   Guard, Send-Ready, Brief Decoder -- Client Update Writer/Acceptance Builder/External Task
+   Finder & Fit moved to capability backlog.
 5. **Test-only fixture bundle and loader evidence**
    (`apps/platform-api/tests/fixtures/fixture_product/` and `fixture_product_duplicate/` — a
    byte-identical copy, used only for the duplicate-id case; `apps/platform-api/tests/test_bundle_composition.py`):
@@ -97,7 +101,8 @@ scaffold removed).
 
 ### Out of scope (per issue non-goals and plan)
 
-Real product behavior/content for any of the 6 named products (ANY-227 and siblings),
+Real product behavior/content for any of the 6 release-order products (ProposalAI/ANY-227 and
+siblings; see `docs/product-specs/mvp-scope-source-of-truth.md`),
 `apps/web-mirror` `WebProductDefinition`/page/renderer changes, a generic frontend/plugin
 framework, a product-event/metric registry (ANY-17), product-specific backend endpoints, runtime
 editing UI, dedicated Chrome Extensions.
