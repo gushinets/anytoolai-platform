@@ -363,3 +363,36 @@ def test_prepaid_request_happy_fixture_does_not_tighten_the_due_date(action_conf
         "response_json"
     ]["text"]
     assert _DUE_DATE_TIGHTENING_PATTERN.search(text) is None, action_config_id
+
+
+# Code review finding: prepaid_request_v1's second step (compose_reply) dropped step 1's
+# "promptly" urgency and phrased its CTA as the client confirming *receipt* -- the client is the
+# one sending the payment, not receiving one, so "confirm receipt" addresses the wrong party.
+def test_prepaid_request_reply_step_intent_preserves_urgency_and_correct_confirmation_party() -> (
+    None
+):
+    workflow = _workflow_by_id()["client_update_writer.prepaid_request_v1"]
+    reply_step = next(step for step in workflow["steps"] if step["step_id"] == "compose_reply")
+    intent = reply_step["input_mapping"]["intent"].lower()
+
+    assert "confirm receipt" not in intent
+    assert "promptly" in intent
+
+
+def test_prepaid_request_weak_fixture_preserves_urgency_across_both_steps() -> None:
+    persuasive_text = json.loads(
+        (
+            FIXTURE_ROOT
+            / "client_update_writer.prepaid_request_compose_persuasive_text_v1.weak_input.json"
+        ).read_text(encoding="utf-8")
+    )["response_json"]["text"].lower()
+    reply_text = json.loads(
+        (
+            FIXTURE_ROOT / "client_update_writer.prepaid_request_compose_reply_v1.weak_input.json"
+        ).read_text(encoding="utf-8")
+    )["response_json"]["text"].lower()
+
+    urgency_words = ("now", "promptly", "today")
+    assert any(word in persuasive_text for word in urgency_words), persuasive_text
+    assert any(word in reply_text for word in urgency_words), reply_text
+    assert "when you get a chance" not in reply_text

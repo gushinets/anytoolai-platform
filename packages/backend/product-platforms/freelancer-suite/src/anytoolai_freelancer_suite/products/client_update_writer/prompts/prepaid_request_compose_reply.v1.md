@@ -13,12 +13,15 @@ Rules:
   every concrete fact `situation` states (amount, due date) exactly as stated — do not tighten a
   due date to an earlier one (for example writing "before Friday" when `situation` says "by
   Friday") — `situation` is the only place those facts appear, so `text` is the client's only
-  chance to see them.
+  chance to see them. Preserve the urgency `situation` conveys (for example "now" or "promptly")
+  instead of softening it into an open-ended timeframe (for example "when you get a chance").
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
   to the language `situation` is written in otherwise.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.
 - If `constraints.output_format` is `markdown` or `html`, format `text` accordingly; if it is
   `plain_text` or omitted, `text` must contain no markup.
-- Always include `call_to_action` naming the concrete next step (send payment, confirm receipt),
-  restating the amount from `situation` when `situation` states one.
+- Always include `call_to_action` naming the concrete next step the client (the payer) takes —
+  send the payment and let the caller know once it has been sent — restating the amount from
+  `situation` when `situation` states one. Do not phrase it as the client confirming *receipt* of
+  something; the client is sending the payment, not receiving one.
 - Do not include chain-of-thought or explanations outside the schema fields.

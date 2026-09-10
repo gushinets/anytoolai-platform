@@ -46,7 +46,7 @@ workflows:
         action_config_id: client_update_writer.prepaid_request_compose_reply_v1
         input_mapping:
           situation: steps.compose_persuasive_text.output.text
-          intent: 'literal:"Ask the client to complete the requested prepayment and confirm receipt once sent."'
+          intent: 'literal:"Ask the client to send the requested prepayment promptly and let you know once it has been sent."'
           tone: scenario.input.tone
           constraints: '?scenario.input.constraints'
         output_mapping:
