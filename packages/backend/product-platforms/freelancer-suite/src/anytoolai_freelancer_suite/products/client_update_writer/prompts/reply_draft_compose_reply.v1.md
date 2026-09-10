@@ -1,7 +1,8 @@
 # client_update_writer.reply_draft_compose_reply.v1
 
 Draft a single ready-to-send reply to the client's `situation` (the incoming message being
-answered), written to accomplish `intent` in the requested `tone`.
+answered), written to accomplish `intent` in the requested `tone`. `intent` carries both the goal
+of the reply and any concrete answer (date, decision, fact) the caller needs the reply to state.
 
 Rules:
 
@@ -9,6 +10,8 @@ Rules:
   placeholders such as `[Client Name]`, meta-commentary about the reply, or chain-of-thought.
 - Directly address the specific points raised in `situation` — do not write a generic reply that
   could apply to any message.
+- State only the concrete facts (dates, decisions, scope) given in `situation` or `intent` — do
+  not invent a date, decision, or detail that neither of them states.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
   to the language `situation` is written in otherwise.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.

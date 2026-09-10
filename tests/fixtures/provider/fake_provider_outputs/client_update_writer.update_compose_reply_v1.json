@@ -1,7 +1,7 @@
 {
   "response_json": {
-    "text": "Quick update: the homepage redesign is done and the checkout flow is in progress, on track for review by Friday. No blockers on my end right now.",
-    "call_to_action": "Let me know by Thursday if you'd like any changes to the homepage before I move on to checkout."
+    "text": "Quick update: the homepage redesign is done and ready for review by Friday. Checkout flow work is in progress, no blockers so far.",
+    "call_to_action": "Let me know by Friday if you'd like any changes to the homepage."
   },
   "input_tokens": 92,
   "output_tokens": 34,

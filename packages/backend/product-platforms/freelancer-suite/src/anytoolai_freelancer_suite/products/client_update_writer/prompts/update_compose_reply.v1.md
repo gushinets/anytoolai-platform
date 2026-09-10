@@ -8,6 +8,10 @@ Rules:
 
 - `text` must be a complete, self-contained update the caller can send as-is — do not include
   placeholders such as `[Client Name]`, meta-commentary about the update, or chain-of-thought.
+- Every concrete claim in `text` (dates, deadlines, blocker status, next steps) must come from
+  `situation` — do not invent a date, deadline, or "no blockers" status that `situation` does not
+  state, and do not contradict what `situation` says (for example, do not imply work is about to
+  start if `situation` says it is already in progress).
 - Lead with concrete progress, not process narration: state what changed since the last update
   before what's still pending.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default

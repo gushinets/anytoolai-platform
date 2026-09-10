@@ -238,24 +238,27 @@ async def _request(
 _MODE_HAPPY_PATH_CASES = {
     "update": (
         {
-            "progress_notes": "Homepage redesign is done; checkout flow is in progress.",
+            "progress_notes": (
+                "Homepage redesign is done and ready for review by Friday. Checkout flow work "
+                "is in progress, no blockers so far."
+            ),
             "tone": "warm",
         },
         {
             "text": (
-                "Quick update: the homepage redesign is done and the checkout flow is in "
-                "progress, on track for review by Friday. No blockers on my end right now."
+                "Quick update: the homepage redesign is done and ready for review by Friday. "
+                "Checkout flow work is in progress, no blockers so far."
             ),
-            "call_to_action": (
-                "Let me know by Thursday if you'd like any changes to the homepage before I "
-                "move on to checkout."
-            ),
+            "call_to_action": "Let me know by Friday if you'd like any changes to the homepage.",
         },
     ),
     "reply_draft": (
         {
             "client_message": "When will this ship?",
-            "reply_goal": "Give a concrete date.",
+            "reply_goal": (
+                "State that the revised delivery date is next Wednesday, which covers both the "
+                "copy edits and the final review pass."
+            ),
             "tone": "neutral",
         },
         {
