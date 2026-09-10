@@ -1433,7 +1433,7 @@ class ConfigLoader:
             self._load_handoffs(product_dir / "handoffs.yaml")
 
             frontends = self._load_frontends(product_dir / "frontends.yaml", product_id)
-            analytics = self._load_analytics(product_dir / "analytics.yaml")
+            analytics = self._load_analytics(product_dir / "analytics.yaml", product_id)
 
             quota_policy_ref = product_data.get("quota_policy_ref")
             if not quota_policy_ref and quota_refs:
@@ -1525,10 +1525,39 @@ class ConfigLoader:
             )
         return frontends
 
-    def _load_analytics(self, path: Path) -> dict[str, Any]:
-        if path.exists():
-            return load_yaml_file(path)
-        return {}
+    def _load_analytics(self, path: Path, product_id: str) -> dict[str, Any]:
+        if not path.exists():
+            return {}
+        data = load_yaml_file(path)
+        # `client_event_properties` is this product's closed vocabulary for the ANY-17 web.*
+        # client-event `mode`/`gap_category` scalar properties -- ClientEventService validates
+        # against it instead of a generic shape check, since a shape check alone (e.g. a slug
+        # pattern) cannot tell privacy-reviewed categorical values apart from arbitrary content
+        # merely re-encoded as a slug. A product that declares nothing here simply cannot use
+        # that property at all (the closed set defaults to empty, never to "anything goes").
+        client_event_properties = data.get("client_event_properties")
+        if client_event_properties is not None:
+            if not isinstance(client_event_properties, Mapping):
+                raise InvalidConfigShapeError(
+                    path,
+                    "client_event_properties must be a mapping of property name to a list of "
+                    "allowed values",
+                    config_id=product_id,
+                    ref_type="client_event_properties",
+                )
+            for property_name, allowed_values in client_event_properties.items():
+                if not isinstance(allowed_values, list) or not all(
+                    isinstance(value, str) and value for value in allowed_values
+                ):
+                    raise InvalidConfigShapeError(
+                        path,
+                        f"client_event_properties.{property_name} must be a list of non-empty "
+                        "strings",
+                        config_id=product_id,
+                        ref_type="client_event_properties",
+                        ref_value=str(property_name),
+                    )
+        return data
 
     def _load_action_configs(self, path: Path, product_id: str) -> None:
         try:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import uuid
 from collections.abc import Mapping
 from enum import StrEnum
@@ -18,6 +17,7 @@ from anytoolai_platform_core.events.emitter import (
 from anytoolai_platform_core.events.envelope import EventEnvelope
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.identity.service import GuestIdentityNotFoundError
+from anytoolai_platform_core.products.models import ProductDefinition
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.scenarios.service import ScenarioSessionNotFoundError
 
@@ -50,15 +50,16 @@ CLIENT_EVENT_PROPERTY_TYPES: dict[str, type] = {
     "gap_category": str,
 }
 MAX_WEB_SESSION_ID_LENGTH = 128
-# mode/gap_category are short categorical labels (e.g. "one_run", "budget_gap"), never free text --
-# a length cap alone doesn't stop prompt/result fragments from being smuggled in under an
-# allowlisted key (EventEmitter's generic sanitizer only redacts by *key name*, not by content), so
-# these are validated against a slug shape instead: lowercase, starts with a letter, only
-# alphanumerics/underscore after that. Real category values look like this; free-form text (spaces,
-# punctuation, mixed case, newlines) structurally cannot match. The concrete set of valid category
-# *values* is product-owned (each product defines its own modes/gap categories) and must not be
-# hardcoded in platform-core -- this is a content-shape guard, not a per-product vocabulary.
-_CATEGORICAL_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+# mode/gap_category are short categorical labels, never free text. A content-*shape* check (e.g. a
+# slug pattern) is not enough on its own -- "please_rewrite_this_before_friday" is a valid slug and
+# still arbitrary user content re-encoded under an allowlisted key. The actual closed set of valid
+# values is product-owned (each product defines its own modes/gap categories) and must not be
+# hardcoded in platform-core, so it's read per-request from
+# `ProductDefinition.analytics["client_event_properties"]` (config/loader.py's `_load_analytics()`
+# validates that shape at load time) -- see `_is_allowed_property_value()`. A product that hasn't
+# declared a vocabulary for a key at all cannot use that key: the default is an empty closed set,
+# never "anything goes".
+CLIENT_EVENT_PROPERTIES_CONFIG_KEY = "client_event_properties"
 # field_count is meant to be a small count (form fields on one page); an unbounded int would
 # still round-trip through JSONB, but has no privacy-reviewed meaning past a sane ceiling.
 MAX_PROPERTY_INT_VALUE = 10_000
@@ -295,7 +296,7 @@ class ClientEventService:
             if guest is None:
                 raise GuestIdentityNotFoundError()
 
-        event_properties = self._validate_properties(properties or {})
+        event_properties = self._validate_properties(properties or {}, product=product)
         event_properties["web_session_id"] = web_session_id
 
         context = ExecutionContext(
@@ -347,10 +348,13 @@ class ClientEventService:
         return envelope
 
     @staticmethod
-    def _validate_properties(properties: Mapping[str, Any]) -> dict[str, Any]:
+    def _validate_properties(
+        properties: Mapping[str, Any], *, product: ProductDefinition
+    ) -> dict[str, Any]:
+        allowed_categorical_values = product.analytics.get(CLIENT_EVENT_PROPERTIES_CONFIG_KEY, {})
         validated: dict[str, Any] = {}
         for key, value in properties.items():
-            if not _is_allowed_property_value(key, value):
+            if not _is_allowed_property_value(key, value, allowed_categorical_values):
                 raise ClientEventPropertyInvalidError(key)
             validated[key] = value
         return validated
@@ -371,7 +375,9 @@ def _is_canonical_uuid(value: str) -> bool:
     return str(parsed) == value
 
 
-def _is_allowed_property_value(key: str, value: Any) -> bool:
+def _is_allowed_property_value(
+    key: str, value: Any, allowed_categorical_values: Mapping[str, Any]
+) -> bool:
     expected_type = CLIENT_EVENT_PROPERTY_TYPES.get(key)
     if expected_type is None or not isinstance(value, expected_type):
         return False
@@ -380,5 +386,9 @@ def _is_allowed_property_value(key: str, value: Any) -> bool:
         # hypothetical future bool-typed key isn't rejected by this same guard.
         return not isinstance(value, bool) and 0 <= value <= MAX_PROPERTY_INT_VALUE
     if expected_type is str:
-        return bool(_CATEGORICAL_VALUE_PATTERN.fullmatch(value))
+        # ConfigRegistry freezes loaded config into immutable structures, so a YAML list here
+        # comes through as a tuple, not a list -- accept either rather than assuming the loader's
+        # exact container type.
+        allowed_values = allowed_categorical_values.get(key)
+        return isinstance(allowed_values, (list, tuple)) and value in allowed_values
     return True

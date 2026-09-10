@@ -227,11 +227,29 @@ def test_client_event_accepts_a_uuid_event_id_with_surrounding_whitespace_trimme
 def test_client_event_rejects_free_text_gap_category(session_factory: SessionFactory) -> None:
     app = _create_test_app(session_factory)
 
-    # gap_category (and mode) are short categorical labels, not free text -- a length cap alone
-    # doesn't stop prompt/result fragments from being smuggled in under an allowlisted key (ANY-17
-    # human review #1, finding 3). Free-form prose structurally can't match the categorical shape.
+    # gap_category/mode are validated against the product's own declared closed vocabulary, not a
+    # shape check -- free-form prose obviously isn't a member of kernel_demo's declared list
+    # (ANY-17 human review #1, finding 3; sharpened in review #2 to require a real closed set
+    # rather than a slug-shape check, since a slug like "please_rewrite_this_before_friday" would
+    # otherwise still smuggle arbitrary content through).
     response = _post_client_event(
         app, properties={"gap_category": "Please rewrite this for a $50k budget by next week"}
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_property_invalid"
+
+
+def test_client_event_rejects_a_slug_shaped_value_not_in_the_declared_vocabulary(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    # ANY-17 human review #2: a value can look exactly like a legitimate category (lowercase,
+    # underscore-separated, no punctuation) and still not be one -- membership in the product's
+    # declared list is what matters, not shape.
+    response = _post_client_event(
+        app, properties={"mode": "please_rewrite_this_proposal_before_friday"}
     )
 
     assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
@@ -241,36 +259,43 @@ def test_client_event_rejects_free_text_gap_category(session_factory: SessionFac
 def test_client_event_rejects_uppercase_mode_value(session_factory: SessionFactory) -> None:
     app = _create_test_app(session_factory)
 
+    # "One_Run" is not a declared value even though "one_run" is -- membership is exact/
+    # case-sensitive, not case-insensitive.
     response = _post_client_event(app, properties={"mode": "One_Run"})
 
     assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
     assert response.json()["error"]["code"] == "client_event_property_invalid"
 
 
-def test_client_event_accepts_a_property_value_at_the_length_boundary_without_a_false_conflict(
+def test_client_event_accepts_every_declared_categorical_value(
     session_factory: SessionFactory,
 ) -> None:
     app = _create_test_app(session_factory)
 
-    # Exactly the categorical-value length cap (64) -- accepted, and well below the sanitizer's
-    # separate 1024-char truncation threshold, so it round-trips through emit() unchanged. The
-    # very first, successful write of this event_id must not be mistaken for a content conflict
-    # against itself.
-    boundary_mode = "m" * 64
-    response = _post_client_event(app, properties={"mode": boundary_mode})
+    response = _post_client_event(
+        app, properties={"mode": "two_run", "gap_category": "timeline"}
+    )
 
     assert response.status_code == HTTPStatus.OK
     rows = _stored_events(session_factory, DEFAULT_EVENT_ID)
-    assert len(rows) == 1
-    assert rows[0]["properties"]["mode"] == boundary_mode
+    assert rows[0]["properties"]["mode"] == "two_run"
+    assert rows[0]["properties"]["gap_category"] == "timeline"
 
 
-def test_client_event_rejects_property_value_over_the_length_cap(
+def test_client_event_rejects_categorical_property_for_a_product_with_no_declared_vocabulary(
     session_factory: SessionFactory,
 ) -> None:
     app = _create_test_app(session_factory)
 
-    response = _post_client_event(app, properties={"mode": "m" * 65})
+    # proposal_ai has no analytics.yaml at all yet (it has no mode/gap-selection concept
+    # implemented), so its client_event_properties vocabulary is empty -- the default is "this
+    # key cannot be used at all" for this product, never "anything goes" just because no explicit
+    # rejection list was configured.
+    response = _post_client_event(
+        app,
+        product_id="proposal_ai",
+        properties={"mode": "one_run"},
+    )
 
     assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
     assert response.json()["error"]["code"] == "client_event_property_invalid"
@@ -297,7 +322,7 @@ def test_client_event_rejects_colliding_event_id_used_for_different_content(
     app = _create_test_app(session_factory)
 
     first = _post_client_event(app, properties={"mode": "one_run"})
-    conflicting = _post_client_event(app, properties={"mode": "different_on_retry"})
+    conflicting = _post_client_event(app, properties={"mode": "two_run"})
 
     assert first.status_code == HTTPStatus.OK
     assert conflicting.status_code == HTTPStatus.CONFLICT

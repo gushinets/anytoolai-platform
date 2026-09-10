@@ -1055,3 +1055,57 @@ def test_loader_reports_missing_kernel_products_dir_without_processing_extra_pro
     assert isinstance(error, MissingConfigFileError)
     assert error.config_id == "kernel"
     assert error.ref_type == "products_dir"
+
+
+def test_loader_loads_client_event_properties_vocabulary() -> None:
+    """kernel_demo's analytics.yaml declares a closed client_event_properties vocabulary (ANY-17
+    human review #2) -- proves it round-trips into ProductDefinition.analytics unchanged."""
+    from anytoolai_platform_core.bootstrap.registry import build_config_registry
+
+    registry = build_config_registry(CONFIG_ROOT)
+    product = registry.get_product("kernel_demo")
+
+    assert product is not None
+    allowed = product.analytics["client_event_properties"]
+    assert set(allowed["mode"]) == {"one_run", "two_run"}
+    assert set(allowed["gap_category"]) == {"budget", "timeline", "scope"}
+
+
+def test_loader_fails_on_non_mapping_client_event_properties(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "analytics.yaml"
+    data = _load_yaml(path)
+    data["client_event_properties"] = ["mode", "gap_category"]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="client_event_properties",
+        ref_value=None,
+        message_part="must be a mapping",
+    )
+
+
+def test_loader_fails_on_non_list_client_event_property_values(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "analytics.yaml"
+    data = _load_yaml(path)
+    data["client_event_properties"]["mode"] = "one_run"
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="client_event_properties",
+        ref_value="mode",
+        message_part="must be a list of non-empty strings",
+    )
