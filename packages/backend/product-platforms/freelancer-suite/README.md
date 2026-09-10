@@ -11,12 +11,12 @@ require changes to platform-core.
 
 ## Product config roots
 
-As of ANY-32 (B01), `FreelancerSuiteBundle.config_roots()` returns `[]`: this package owns no
-implemented product directories yet. Per `docs/product-specs/mvp-scope-source-of-truth.md`'s
-five-product release order (`ANY-452`), the Freelancer Suite roadmap adds one product per
-bundle-and-workflow issue, in this order:
+As of ANY-227 (B02a), `FreelancerSuiteBundle.config_roots()` returns
+`[.../products/proposal_ai]`: ProposalAI is the first implemented product directory. Per
+`docs/product-specs/mvp-scope-source-of-truth.md`'s five-product release order (`ANY-452`), the
+Freelancer Suite roadmap adds one product per bundle-and-workflow issue, in this order:
 
-1. ProposalAI (ANY-227)
+1. ProposalAI (ANY-227) -- implemented
 2. Client Message Decoder (ANY-423)
 3. Scope Creep Guard (ANY-229)
 4. Send-Ready (ANY-230)

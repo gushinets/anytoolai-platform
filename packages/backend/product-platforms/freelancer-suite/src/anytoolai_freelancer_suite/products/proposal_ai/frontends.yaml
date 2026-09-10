@@ -1,0 +1,4 @@
+frontends:
+  - frontend_id: web_mirror
+    type: web
+    enabled: true

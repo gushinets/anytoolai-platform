@@ -1,0 +1,4 @@
+schemas:
+  - schema_ref: proposal_ai.generate_input_v1
+    version: 1
+    file_path: schemas/generate_input.schema.json

@@ -84,7 +84,9 @@ def test_production_default_excludes_the_fixture_bundle() -> None:
 
     assert "fixture_bundle" not in result.loaded_bundles
     assert "fixture_product" not in result.config_registry.products
-    # ANY-32: production default is FreelancerSuiteBundle with zero product roots.
+    # ANY-227: production default is FreelancerSuiteBundle, now with ProposalAI as its first
+    # real product root -- this test only checks the fixture bundle stays excluded from
+    # production, not FreelancerSuiteBundle's own contents (see test_proposal_ai_bundle.py).
     assert "freelancer_suite" in result.loaded_bundles
 
 

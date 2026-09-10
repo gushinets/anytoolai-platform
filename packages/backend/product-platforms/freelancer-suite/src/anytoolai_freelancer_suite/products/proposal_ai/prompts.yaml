@@ -1,0 +1,6 @@
+prompts:
+  - prompt_ref: proposal_ai.compose_persuasive_text.v1
+    version: 1
+    template_path: prompts/compose_persuasive_text.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.compose_persuasive_text_output_v1

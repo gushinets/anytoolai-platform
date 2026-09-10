@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime
 from http import HTTPStatus
@@ -19,18 +18,11 @@ from anytoolai_platform_core.scenarios.repository import ScenarioSessionReposito
 from anytoolai_platform_core.storage.db import (
     guest_identities_table,
     jobs_table,
-    runtime_metadata,
     scenario_sessions_table,
 )
-from anytoolai_platform_core.storage.transactions import (
-    SessionFactory,
-    build_session_factory,
-    transaction_boundary,
-)
+from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.workflows.models import JobRecord
 from anytoolai_platform_core.workflows.repository import JobRepository
-
-from tests.support.sqlite_harness import build_sqlite_runtime_engine
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
@@ -72,19 +64,6 @@ EXPECTED_DEMOS = {
         {"source_text": "Проверяем реальную цепочку"},
     ),
 }
-
-
-@pytest.fixture
-def session_factory(tmp_path: Path) -> Iterator[SessionFactory]:
-    engine = build_sqlite_runtime_engine(
-        tmp_path / "main.sqlite3",
-        tmp_path / "platform.sqlite3",
-    )
-    runtime_metadata.create_all(engine)
-    try:
-        yield build_session_factory(engine)
-    finally:
-        engine.dispose()
 
 
 @pytest.fixture
