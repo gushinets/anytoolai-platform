@@ -16,6 +16,22 @@ class ApiError(Exception):
         self.message = message
 
 
+class AtomLabApiError(Exception):
+    def __init__(
+        self,
+        *,
+        status_code: int,
+        code: str,
+        message: str,
+        field_errors: list[dict[str, str]] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.code = code
+        self.message = message
+        self.field_errors = list(field_errors or [])
+
+
 def platform_error_to_api_error(error: PlatformError, *, status_code: int) -> ApiError:
     """Builds the ApiError shape shared by every router's PlatformError -> HTTP mapping.
 
@@ -35,6 +51,23 @@ async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
     )
 
 
+async def atom_lab_api_error_handler(request: Request, exc: AtomLabApiError) -> JSONResponse:
+    request_id = request_id_from(request)
+    response = JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "code": exc.code,
+                "message": exc.message,
+                "field_errors": exc.field_errors,
+            },
+            "request_id": request_id,
+        },
+    )
+    response.headers[REQUEST_ID_HEADER] = request_id
+    return response
+
+
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     return _error_response(
         request,
@@ -48,6 +81,28 @@ async def request_validation_error_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
+    if request.url.path.startswith("/v1/atom-lab/"):
+        field_errors = []
+        for error in exc.errors():
+            location = error.get("loc", ())
+            path_parts = [
+                str(part) for part in location if part not in {"body", "query", "path", "header"}
+            ]
+            field_errors.append(
+                {
+                    "path": ".".join(path_parts),
+                    "message": "Недопустимое значение.",
+                }
+            )
+        return await atom_lab_api_error_handler(
+            request,
+            AtomLabApiError(
+                status_code=422,
+                code="request_validation_failed",
+                message="Проверка запроса не пройдена.",
+                field_errors=field_errors,
+            ),
+        )
     del exc
     return _error_response(
         request,

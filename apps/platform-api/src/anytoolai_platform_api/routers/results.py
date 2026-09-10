@@ -14,6 +14,8 @@ from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.results.service import ResultArtifactView, ResultService
+from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
+from anytoolai_platform_core.scenarios.runtime_scope import is_public_runtime_session
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 from anytoolai_platform_core.workflows.repository import JobRepository
 from fastapi import APIRouter, Depends
@@ -92,10 +94,28 @@ def get_result_artifact(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ResultArtifactResponse:
     with transaction_boundary(session_factory) as session:
+        artifact_repository = ArtifactRepository(session)
+        artifact = artifact_repository.get_in_scope(
+            result_artifact_id,
+            tenant_id=settings.default_tenant_id,
+            region=settings.default_region,
+        )
+        if artifact is not None:
+            source_session = ScenarioSessionRepository(session).get_in_scope(
+                artifact.scenario_session_id,
+                tenant_id=settings.default_tenant_id,
+                region=settings.default_region,
+            )
+            if source_session is not None and not is_public_runtime_session(source_session):
+                raise ApiError(
+                    status_code=404,
+                    code="result_artifact_not_found",
+                    message="Result artifact not found.",
+                )
         try:
             view = ResultService(
                 config_registry=registry,
-                artifact_repository=ArtifactRepository(session),
+                artifact_repository=artifact_repository,
                 job_repository=JobRepository(session),
             ).get_result(
                 result_artifact_id,
@@ -123,8 +143,6 @@ def _result_response_payload(view: ResultArtifactView) -> dict[str, object]:
 
 def _to_api_error(error: PlatformError) -> ApiError:
     status_code = (
-        404
-        if error.code in {"result_artifact_not_found", "result_artifact_unavailable"}
-        else 500
+        404 if error.code in {"result_artifact_not_found", "result_artifact_unavailable"} else 500
     )
     return platform_error_to_api_error(error, status_code=status_code)

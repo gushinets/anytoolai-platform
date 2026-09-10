@@ -1,0 +1,49 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  margin: 0 auto;
+  max-width: 72rem;
+  padding: 2rem;
+}
+
+form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+label {
+  width: 100%;
+}
+
+input,
+button {
+  font: inherit;
+  padding: 0.65rem 0.8rem;
+}
+
+#catalog {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  margin-top: 2rem;
+}
+
+article {
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+:focus-visible {
+  outline: 3px solid #4c8dff;
+  outline-offset: 3px;
+}

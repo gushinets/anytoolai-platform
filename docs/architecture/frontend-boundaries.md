@@ -28,6 +28,24 @@ They must not:
 - call LLM providers directly;
 - own authoritative scenario state.
 
+## Internal Atom Lab exception
+
+`/atom-lab` is an internal static shell hosted by `platform-api`, outside `apps/web-mirror`, CE-kit,
+and product extensions. The shell contains no prompts, schemas, examples, catalog rows, provider
+settings, or access code. After a user enters the separate code, JavaScript keeps it only in the
+current module's memory and sends it in `X-Atom-Lab-Access-Code`; it must not use a URL, cookie,
+`localStorage`, `sessionStorage`, analytics, or console logging for the code.
+
+Only `/v1/atom-lab/*` may return registry prompts and schemas or later accept laboratory
+prompt/model choices. The server remains authoritative for fixed contracts and runtime scope.
+Ordinary product routes, web-mirror, shared frontend packages, and extensions do not import Atom
+Lab authority and continue to follow the prohibitions above.
+
+The public scenario/session/result/artifact/handoff surface treats a server-classified lab session
+and every resource linked to it as not found. Unknown non-public runtime-scope values also fail
+closed. The public scenario-start DTO forbids metadata and runtime-scope fields, so a browser cannot
+turn a normal request into a laboratory request.
+
 MVP-A2 Client Surfaces owns shared `ce-kit`, the `apps/web-mirror` multi-product host, and shared
 browser journeys. Freelancer Suite owns each product's web definition/page and any optional
 product-specific Chrome Extension. Product surfaces consume shared clients rather than copy

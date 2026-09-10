@@ -3,12 +3,12 @@
 ## Status
 
 - State: active
-- Phase: audit corrections approved; implementation not started
+- Phase: AL01 implemented and verified; dependent delivery remains active
 - Owner: mixed
 - Created: 2026-09-09
-- Last updated: 2026-09-09
+- Last updated: 2026-09-10
 - Review date: 2026-09-16
-- Next action: Begin ANY-459 by publishing the spec/plan and internal contracts before dependent development.
+- Next action: Begin ANY-460 snapshot and worker execution plumbing on top of the AL01 boundary.
 - Blocker: none for development; operator configuration required before rollout.
 - Linear project: [Atom Lab](https://linear.app/paveldik/project/atom-lab-e1efc95ce888)
 - Milestone: Atom Lab v1
@@ -149,7 +149,7 @@ Do not postpone all testing to final QA.
 
 ### AL01 — [ANY-459](https://linear.app/paveldik/issue/ANY-459/atom-lab-zakrytaya-poverhnost-i-katalog-11-atomov): Atom Lab: закрытая поверхность и каталог 11 атомов
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 - Depends on: none.
 - Files/areas: `apps/platform-api/src/anytoolai_platform_api/routers/demo.py (reference), routers/atom_lab.py (new), main.py, schemas.py`; `configs/kernel/products/kernel_demo`; `docs/core-beliefs.md`; `docs/product-specs/mvp-scope-source-of-truth.md`; `docs/architecture/frontend-boundaries.md`.
 
@@ -159,11 +159,11 @@ Acceptance: Без кода невозможно прочитать катало
 
 ### Уточнения после аудита
 
-- [ ] Первым изменением ANY-459 опубликовать спецификацию и этот план в репозитории до зависимой разработки. Одновременно описать узкое исключение внутреннего Lab в controlling docs и guards, не ослабляя публичные frontend boundaries.
-- [ ] Сервер создаёт доверенную маркировку lab scope; пользовательский input/metadata не может её включить. Определить проверку принадлежности session/job/action/artifact к lab через серверную связь с сессией, пригодную для хранилища ANY-460. До появления run API проверить guards на seeded fixtures. Отрицательные проверки охватывают чтение и действия публичных session/result/artifact/handoff маршрутов.
-- [ ] Добавить раннюю Compose/env-настройку отдельного lab access code на API, сохранить server live token и OpenAI key только у worker. Документировать закрытый локальный запуск и fail-closed режим; без production rollout и без секретов в git. Статический shell не содержит защищённых данных; запросы используют `X-Atom-Lab-Access-Code`.
-- [ ] Каталог атомов возвращает `atom_id, action_type, base_action_config_id, prompt, prompt_ref, input_schema, output_schema, schema_refs, description, example_input`. Схемы и промпт берутся из registry; описания подготовлены без LLM. `atom_id` — стабильный код A01–A11, а не произвольный scenario ID.
-- [ ] Приёмка: доступ к каталогу и seeded lab IDs закрыт без кода; обычные demo/results работают; все 11 примеров валидны. Добавить `apps/platform-api/tests/test_atom_lab_access.py` и `test_atom_lab_catalog.py`. Точная сериализация каталога и safe error envelope фиксируется API-моделями в этом PR.
+- [x] Первым изменением ANY-459 опубликовать спецификацию и этот план в репозитории до зависимой разработки. Одновременно описать узкое исключение внутреннего Lab в controlling docs и guards, не ослабляя публичные frontend boundaries.
+- [x] Сервер создаёт доверенную маркировку lab scope; пользовательский input/metadata не может её включить. Определить проверку принадлежности session/job/action/artifact к lab через серверную связь с сессией, пригодную для хранилища ANY-460. До появления run API проверить guards на seeded fixtures. Отрицательные проверки охватывают чтение и действия публичных session/result/artifact/handoff маршрутов.
+- [x] Добавить раннюю Compose/env-настройку отдельного lab access code на API, сохранить server live token и OpenAI key только у worker. Документировать закрытый локальный запуск и fail-closed режим; без production rollout и без секретов в git. Статический shell не содержит защищённых данных; запросы используют `X-Atom-Lab-Access-Code`.
+- [x] Каталог атомов возвращает `atom_id, action_type, base_action_config_id, prompt, prompt_ref, input_schema, output_schema, schema_refs, description, example_input`. Схемы и промпт берутся из registry; описания подготовлены без LLM. `atom_id` — стабильный код A01–A11, а не произвольный scenario ID.
+- [x] Приёмка: доступ к каталогу и seeded lab IDs закрыт без кода; обычные demo/results работают; все 11 примеров валидны. Добавить `apps/platform-api/tests/test_atom_lab_access.py` и `test_atom_lab_catalog.py`. Точная сериализация каталога и safe error envelope фиксируется API-моделями в этом PR.
 
 
 ### AL02 — [ANY-460](https://linear.app/paveldik/issue/ANY-460/atom-lab-neizmenyaemyj-snimok-nastroek-cherez-postgres-i-worker): Atom Lab: неизменяемый снимок настроек через Postgres и worker

@@ -3,12 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
-
 from anytoolai_platform_core.handoffs.models import HandoffStatus
 from anytoolai_platform_core.products.models import FrontendType
 from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaPeriod, QuotaUnit
 from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RuntimeRendererHintResponse(BaseModel):
@@ -115,6 +114,35 @@ class DemoRunRequest(BaseModel):
     source_text: str
 
 
+class AtomLabVersionedSchemaRefResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_ref: str
+    version: int
+
+
+class AtomLabSchemaRefsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    input: AtomLabVersionedSchemaRefResponse
+    output: AtomLabVersionedSchemaRefResponse
+
+
+class AtomLabAtomResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    atom_id: str
+    action_type: str
+    base_action_config_id: str
+    prompt: str
+    prompt_ref: str
+    input_schema: dict[str, Any]
+    output_schema: dict[str, Any]
+    schema_refs: AtomLabSchemaRefsResponse
+    description: str
+    example_input: dict[str, Any]
+
+
 class ScenarioSessionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -152,6 +180,28 @@ class ErrorResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     error: ErrorDetailResponse
+
+
+class AtomLabFieldErrorResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str
+    message: str
+
+
+class AtomLabErrorDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    message: str
+    field_errors: list[AtomLabFieldErrorResponse] = Field(default_factory=list)
+
+
+class AtomLabErrorResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    error: AtomLabErrorDetailResponse
+    request_id: str
 
 
 class HandoffCreateRequest(BaseModel):

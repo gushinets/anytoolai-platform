@@ -12,6 +12,8 @@ Version: 0.1.0
 | Method | Path | Operation ID | Responses |
 |---|---|---|---|
 | GET | /health | health_health_get | 200 |
+| GET | /v1/atom-lab/atoms | list_atoms_v1_atom_lab_atoms_get | 200, 401, 422, 503 |
+| GET | /v1/atom-lab/atoms/{atom_id} | get_atom_v1_atom_lab_atoms__atom_id__get | 200, 401, 404, 422, 503 |
 | POST | /v1/demo/runs | start_demo_run_v1_demo_runs_post | 200, 401, 409, 422, 429, 503 |
 | POST | /v1/handoffs | create_handoff_v1_handoffs_post | 200, 404, 409, 422 |
 | GET | /v1/handoffs/{handoff_token} | get_handoff_v1_handoffs__handoff_token__get | 200, 404, 422 |
@@ -27,6 +29,12 @@ Version: 0.1.0
 
 ## Component schemas
 
+- AtomLabAtomResponse
+- AtomLabErrorDetailResponse
+- AtomLabErrorResponse
+- AtomLabFieldErrorResponse
+- AtomLabSchemaRefsResponse
+- AtomLabVersionedSchemaRefResponse
 - DemoRunRequest
 - ErrorDetailResponse
 - ErrorResponse
