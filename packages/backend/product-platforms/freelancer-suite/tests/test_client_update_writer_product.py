@@ -258,3 +258,86 @@ def test_weak_input_fixture_invents_no_absence_of_information_claim(action_confi
 
     for phrase in _UNGROUNDED_HEDGE_PHRASES:
         assert phrase not in weak_text, (action_config_id, phrase)
+
+
+# Code review finding: content fields only had `minLength: 1`, which accepts a whitespace-only
+# value (`" "`), and `constraints.language` used a bare `^...$` pattern, which Python's `re` (what
+# jsonschema's `pattern` keyword runs) treats as matching just before a trailing `"\n"` too --
+# mirrors test_proposal_ai_product.py's own regression tests for the same two gaps, already fixed
+# there.
+_TRIMMED_CONTENT_FIELDS = (
+    ("client_update_writer.update_input_v1", "progress_notes"),
+    ("client_update_writer.reply_draft_input_v1", "client_message"),
+    ("client_update_writer.reply_draft_input_v1", "reply_goal"),
+    ("client_update_writer.prepaid_request_input_v1", "billing_context.notes"),
+    ("client_update_writer.prepaid_request_input_v1", "billing_context.amount"),
+    ("client_update_writer.prepaid_request_input_v1", "billing_context.due_date"),
+)
+
+
+def _nested_field_schema(schema: dict[str, Any], dotted_path: str) -> dict[str, Any]:
+    node = schema
+    for part in dotted_path.split("."):
+        node = node["properties"][part]
+    return node
+
+
+@pytest.mark.parametrize(("schema_ref", "field_path"), _TRIMMED_CONTENT_FIELDS)
+def test_content_fields_reject_whitespace_only_and_trailing_newline(
+    schema_ref: str,
+    field_path: str,
+) -> None:
+    field_schema = _nested_field_schema(_load_schema(schema_ref), field_path)
+
+    jsonschema.validate("Some text", field_schema)
+    jsonschema.validate("a", field_schema)
+    jsonschema.validate("Some text\nwith an internal newline.", field_schema)
+    for untrimmed in (" ", "  Some text", "Some text  ", "  Some text  ", "Some text\n"):
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(untrimmed, field_schema)
+
+
+@pytest.mark.parametrize(
+    "schema_ref",
+    [
+        "client_update_writer.update_input_v1",
+        "client_update_writer.reply_draft_input_v1",
+        "client_update_writer.prepaid_request_input_v1",
+    ],
+)
+def test_constraints_language_pattern_rejects_a_trailing_newline(schema_ref: str) -> None:
+    language_schema = _load_schema(schema_ref)["properties"]["constraints"]["properties"][
+        "language"
+    ]
+
+    jsonschema.validate("en", language_schema)
+    jsonschema.validate("en-US", language_schema)
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate("en\n", language_schema)
+
+
+# Code review finding: PrepaidRequest's prompts forced a causal/gating claim ("is needed before
+# work continues", "keeps ... on schedule") regardless of whether billing_context actually
+# supports one -- both weak fixtures proved it invented the claim from vague input. Denylisted
+# here across both prepaid_request action configs' fixtures (happy and weak).
+_UNGROUNDED_CAUSALITY_PHRASES = ("before work continues", "on schedule", "keeps things moving")
+
+
+@pytest.mark.parametrize(
+    "action_config_id",
+    [
+        "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        "client_update_writer.prepaid_request_compose_reply_v1",
+    ],
+)
+@pytest.mark.parametrize("fixture_suffix", ["", ".weak_input"])
+def test_prepaid_request_fixtures_invent_no_causal_or_gating_claim(
+    action_config_id: str,
+    fixture_suffix: str,
+) -> None:
+    text = json.loads(
+        (FIXTURE_ROOT / f"{action_config_id}{fixture_suffix}.json").read_text(encoding="utf-8")
+    )["response_json"]["text"].lower()
+
+    for phrase in _UNGROUNDED_CAUSALITY_PHRASES:
+        assert phrase not in text, (action_config_id, fixture_suffix, phrase)

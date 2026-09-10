@@ -8,8 +8,9 @@ Rules:
 
 - `text` must be ready-to-use persuasive framing the caller can fold into a payment request — do
   not include placeholders, meta-commentary about the text, or chain-of-thought.
-- Ground the persuasive angle in the concrete project context given (what the payment covers, why
-  it is needed now) rather than generic urgency language.
+- Ground the persuasive angle in exactly what `context.notes` states (what the payment covers) —
+  do not invent a reason the payment is urgent, gating, or blocking (for example that other work
+  will stall without it) beyond what `notes` itself says.
 - State the payment amount and, when `context` includes a due date, the due date explicitly — this
   is the only step in the workflow that sees `context`, so omitting either here means it never
   reaches the client at all. Do not state or imply a payment amount or due date beyond exactly what

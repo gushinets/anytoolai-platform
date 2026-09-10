@@ -7,10 +7,11 @@ Rules:
 
 - `text` must be a complete, self-contained message the caller can send as-is — do not include
   placeholders such as `[Client Name]`, meta-commentary about the message, or chain-of-thought.
-- State the request plainly: what the payment is for and that it is needed before work continues,
-  building on the persuasive framing in `situation` without repeating it verbatim. Preserve every
-  concrete fact `situation` states (amount, due date) — `situation` is the only place those facts
-  appear, so `text` is the client's only chance to see them.
+- State the request plainly: what the payment is for, building on the persuasive framing in
+  `situation` without repeating it verbatim. Do not assert a causal or gating claim (for example
+  that work will stall or continue on schedule) beyond what `situation` itself states. Preserve
+  every concrete fact `situation` states (amount, due date) — `situation` is the only place those
+  facts appear, so `text` is the client's only chance to see them.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
   to the language `situation` is written in otherwise.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.

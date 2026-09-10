@@ -6,15 +6,21 @@
       "properties": {
         "notes": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 4000,
+          "pattern": "^\\S([\\s\\S]*\\S)?(?!\\n)$"
         },
         "amount": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^\\S([\\s\\S]*\\S)?(?!\\n)$"
         },
         "due_date": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^\\S([\\s\\S]*\\S)?(?!\\n)$"
         }
       },
       "required": ["notes", "amount"],
@@ -29,7 +35,7 @@
       "properties": {
         "language": {
           "type": "string",
-          "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+          "pattern": "^[a-z]{2}(-[A-Z]{2})?(?!\\n)$"
         },
         "max_length": {
           "type": "integer",

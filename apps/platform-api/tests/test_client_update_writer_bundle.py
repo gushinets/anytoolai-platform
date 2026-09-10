@@ -250,8 +250,7 @@ _MODE_HAPPY_PATH_CASES = {
         {
             "text": (
                 "Thanks for the question about the timeline. The revised delivery date is next "
-                "Wednesday, and that covers both the copy edits and the final review pass you "
-                "asked about."
+                "Wednesday, which covers both the copy edits and the final review pass."
             ),
             "call_to_action": "Let me know if Wednesday works, or if you need it sooner.",
         },
@@ -268,9 +267,8 @@ _MODE_HAPPY_PATH_CASES = {
         },
         {
             "text": (
-                "The design phase you approved wraps up this week, and getting the prepayment "
-                "in now keeps development starting on schedule right after. Could you send the "
-                "$500 prepayment for phase 2 before Friday?"
+                "The design phase you approved wraps up this week, with phase 2 (development) "
+                "starting next. Could you send the $500 prepayment for phase 2 before Friday?"
             ),
             "call_to_action": "Please send the $500 prepayment and reply once it's on its way.",
         },
