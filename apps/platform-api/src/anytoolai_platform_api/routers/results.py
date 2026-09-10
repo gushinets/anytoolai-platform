@@ -106,7 +106,7 @@ def get_result_artifact(
                 tenant_id=settings.default_tenant_id,
                 region=settings.default_region,
             )
-            if source_session is not None and not is_public_runtime_session(source_session):
+            if source_session is None or not is_public_runtime_session(source_session):
                 raise ApiError(
                     status_code=404,
                     code="result_artifact_not_found",

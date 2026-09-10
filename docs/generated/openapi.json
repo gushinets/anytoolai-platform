@@ -83,7 +83,8 @@
         },
         "required": [
           "code",
-          "message"
+          "message",
+          "field_errors"
         ],
         "title": "AtomLabErrorDetailResponse",
         "type": "object"
@@ -1058,11 +1059,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Atom Lab request validation failed."
           },
           "503": {
             "content": {
@@ -1147,11 +1148,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Atom Lab request validation failed."
           },
           "503": {
             "content": {

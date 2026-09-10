@@ -27,6 +27,7 @@ protected_router = APIRouter(
 _ASSET_ROOT = Path(__file__).resolve().parents[1] / "static" / "atom_lab"
 _ERROR_RESPONSES = {
     401: {"model": AtomLabErrorResponse, "description": "Atom Lab access denied."},
+    422: {"model": AtomLabErrorResponse, "description": "Atom Lab request validation failed."},
     503: {"model": AtomLabErrorResponse, "description": "Atom Lab is not configured."},
 }
 

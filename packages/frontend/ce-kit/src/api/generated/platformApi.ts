@@ -296,7 +296,7 @@ export interface components {
             /** Code */
             code: string;
             /** Field Errors */
-            field_errors?: components["schemas"]["AtomLabFieldErrorResponse"][];
+            field_errors: components["schemas"]["AtomLabFieldErrorResponse"][];
             /** Message */
             message: string;
         };
@@ -668,13 +668,13 @@ export interface operations {
                     "application/json": components["schemas"]["AtomLabErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Atom Lab request validation failed. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
                 };
             };
             /** @description Atom Lab is not configured. */
@@ -728,13 +728,13 @@ export interface operations {
                     "application/json": components["schemas"]["AtomLabErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Atom Lab request validation failed. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
                 };
             };
             /** @description Atom Lab is not configured. */

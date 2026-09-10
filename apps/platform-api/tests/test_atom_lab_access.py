@@ -218,6 +218,24 @@ def test_atom_lab_routes_do_not_remove_the_existing_demo(app) -> None:
     assert "/v1/atom-lab/atoms/{atom_id}" in app.openapi()["paths"]
 
 
+def test_atom_lab_error_schema_requires_field_errors(app) -> None:
+    schema = app.openapi()["components"]["schemas"]["AtomLabErrorDetailResponse"]
+
+    assert "field_errors" in schema["required"]
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/v1/atom-lab/atoms", "/v1/atom-lab/atoms/{atom_id}"],
+)
+def test_atom_lab_catalog_routes_document_the_safe_422_envelope(app, path: str) -> None:
+    response_schema = app.openapi()["paths"][path]["get"]["responses"]["422"]["content"][
+        "application/json"
+    ]["schema"]
+
+    assert response_schema == {"$ref": "#/components/schemas/AtomLabErrorResponse"}
+
+
 def _seed_result(session_factory: SessionFactory, *, runtime_scope: str | None) -> tuple[str, str]:
     metadata = {} if runtime_scope is None else {"runtime_scope": runtime_scope}
     with transaction_boundary(session_factory) as session:
@@ -335,6 +353,22 @@ def test_public_routes_keep_ordinary_results_available_and_fail_closed_on_unknow
     assert public_result.json()["output"]["values"]["deadline"] == "2026-09-30"
     assert unknown_session.status_code == HTTPStatus.NOT_FOUND
     assert unknown_result.status_code == HTTPStatus.NOT_FOUND
+
+
+def test_public_result_route_hides_artifact_when_source_session_is_missing(
+    stored_app, session_factory: SessionFactory
+) -> None:
+    scenario_id, artifact_id = _seed_result(session_factory, runtime_scope=None)
+    with transaction_boundary(session_factory) as session:
+        session.execute(
+            sa.delete(scenario_sessions_table).where(scenario_sessions_table.c.id == scenario_id)
+        )
+
+    response = _public_request(stored_app, "GET", f"/v1/results/{artifact_id}")
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "result_artifact_not_found"
+    assert "2026-09-30" not in response.text
 
 
 def test_public_start_cannot_forge_atom_lab_runtime_scope(

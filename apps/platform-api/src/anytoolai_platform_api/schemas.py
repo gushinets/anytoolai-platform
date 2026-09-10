@@ -194,7 +194,7 @@ class AtomLabErrorDetailResponse(BaseModel):
 
     code: str
     message: str
-    field_errors: list[AtomLabFieldErrorResponse] = Field(default_factory=list)
+    field_errors: list[AtomLabFieldErrorResponse]
 
 
 class AtomLabErrorResponse(BaseModel):
