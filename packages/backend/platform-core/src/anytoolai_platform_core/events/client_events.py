@@ -292,28 +292,32 @@ class ClientEventService:
                 or (user_id is not None and session.user_id != user_id)
             ):
                 raise ScenarioSessionNotFoundError()
-            # The resolved session is authoritative for identity from here on -- derived, not
+            # The resolved session is authoritative for correlation from here on -- derived, not
             # merely validated, so a caller never has to (and cannot incorrectly) re-assert
-            # guest_id/user_id once scenario_session_id already carries that information, and so
+            # guest_id once scenario_session_id already carries that information, and
             # scenario_chain_id (which a standalone client request has no way to know or claim on
-            # its own) is populated instead of silently dropped. `session.user_id` itself traces
-            # back to an unverified client-supplied field on scenario-start (no authenticated-user
-            # system exists yet in MVP-A) -- every other event already emitted for this session
-            # (`scenario.started`, `scenario.completed`, `client.next_action_clicked`) trusts it at
-            # the same level, so this is consistent with the rest of the platform, not a new gap
-            # introduced here. Tracked platform-wide as TD-013 (`docs/tech-debt-tracker.md`).
-            guest_id = session.guest_id
-            user_id = session.user_id
+            # its own) is populated instead of silently dropped.
+            #
+            # `session.user_id` traces back to an unverified client-supplied field on
+            # scenario-start -- no authenticated-user system exists yet in MVP-A (TD-013,
+            # `docs/tech-debt-tracker.md`). Every other event already emitted for this session
+            # trusts it at that same level, but this endpoint's own contract is
+            # "authenticated-or-guest" with server-*derived*, trusted identity, so unlike the rest
+            # of the platform it must not elevate an unverified user_id to that trust level. Only
+            # `session.guest_id`, re-verified here against a real minted `GuestIdentityRecord`
+            # (the same check the standalone guest_id path below already does), counts as identity
+            # for a client event -- `session.user_id` is read for the owner-check above but never
+            # propagated. A session with no verified guest (anonymous, or user-only because a
+            # product with no quota_policy_ref never required guest_id at scenario-start) has no
+            # identity this endpoint can trust, and is rejected the same as a fully anonymous one.
             scenario_chain_id = session.scenario_chain_id
-            # A session itself can be anonymous: a product with no quota_policy_ref never
-            # requires guest_id/user_id at scenario-start time (`QuotaService
-            # .validate_accepted_start()` only enforces `guest_id` when a policy is
-            # configured), so `session.guest_id`/`session.user_id` can both genuinely be None
-            # here. Re-check the same identity requirement post-derivation -- the pre-resolution
-            # guard above only proves a `scenario_session_id` was supplied, not that resolving it
-            # actually produced a real identity.
-            if guest_id is None and user_id is None:
+            guest_id = session.guest_id
+            user_id = None
+            if guest_id is None:
                 raise ClientEventIdentityRequiredError()
+            guest = self._guest_repository.get(guest_id, tenant_id=tenant_id, region=region)
+            if guest is None:
+                raise GuestIdentityNotFoundError()
         elif user_id is not None:
             # No session to derive/verify user_id against, and MVP-A has no authenticated-user
             # lookup at all -- unlike guest_id (itself unauthenticated, but at least checked

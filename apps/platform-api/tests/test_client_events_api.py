@@ -93,6 +93,19 @@ def _create_test_app(session_factory: SessionFactory):
                 user_id="user_demo",
             )
         )
+        ScenarioSessionRepository(session).create(
+            ScenarioSessionRecord(
+                id="scenario_session_owned_by_guest_demo_with_a_user_id",
+                tenant_id="anytoolai",
+                region="default",
+                product_id="kernel_demo",
+                frontend_id="web_mirror",
+                scenario_id="kernel_demo.single_action_smoke_v1",
+                scenario_version=1,
+                guest_id="guest_demo",
+                user_id="unverified_user_claim",
+            )
+        )
     app = create_app(config_root=CONFIG_ROOT)
     app.state.runtime = replace(
         app.state.runtime,
@@ -671,9 +684,8 @@ def test_client_event_rejects_a_user_owned_session_claimed_by_a_different_user(
 ) -> None:
     app = _create_test_app(session_factory)
 
-    # An explicitly contradictory user_id claim against a user-owned session is still rejected --
-    # unlike simply omitting it, which the session's own identity now resolves (see the
-    # derives_identity test above).
+    # An explicitly contradictory user_id claim against a user-owned session is still rejected as
+    # a spoofing attempt at the owner-check stage, before identity derivation is even reached.
     response = _post_client_event(
         app,
         event_type="web.result_viewed",
@@ -685,11 +697,16 @@ def test_client_event_rejects_a_user_owned_session_claimed_by_a_different_user(
     assert response.json()["error"]["code"] == "scenario_session_not_found"
 
 
-def test_client_event_accepts_scenario_session_owned_by_the_matching_user(
+def test_client_event_rejects_a_user_only_session_even_with_a_matching_user_id(
     session_factory: SessionFactory,
 ) -> None:
     app = _create_test_app(session_factory)
 
+    # ANY-17 code-review (me #6): session.user_id traces back to an unverified client-supplied
+    # field on scenario-start (no authenticated-user system exists in MVP-A -- TD-013), so it must
+    # never count as identity for this endpoint's own authenticated-or-guest contract, even when
+    # it matches exactly what the caller separately claims. Only a verified guest_id does. A
+    # session with no guest_id at all therefore has no identity this endpoint can trust.
     response = _post_client_event(
         app,
         event_type="web.result_viewed",
@@ -697,7 +714,29 @@ def test_client_event_accepts_scenario_session_owned_by_the_matching_user(
         scenario_session_id="scenario_session_owned_by_user_demo",
     )
 
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "client_event_identity_required"
+
+
+def test_client_event_ignores_an_unverified_session_user_id_alongside_a_verified_guest(
+    session_factory: SessionFactory,
+) -> None:
+    app = _create_test_app(session_factory)
+
+    # ANY-17 code-review (me #6): a session can carry both a verified guest_id and an unverified
+    # client-supplied user_id (the same scenario-start field that isn't checked against any real
+    # authenticated-user record). The event is accepted via the verified guest, but the unverified
+    # user_id must not be propagated as if it were trusted identity.
+    response = _post_client_event(
+        app,
+        event_type="web.result_viewed",
+        scenario_session_id="scenario_session_owned_by_guest_demo_with_a_user_id",
+    )
+
     assert response.status_code == HTTPStatus.OK
+    rows = _stored_events(session_factory, DEFAULT_EVENT_ID)
+    assert rows[0]["guest_id"] == "guest_demo"
+    assert rows[0]["user_id"] is None
 
 
 def test_client_event_accepts_a_guest_owned_session_when_guest_id_is_omitted(
