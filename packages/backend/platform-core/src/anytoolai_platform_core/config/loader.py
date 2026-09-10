@@ -33,6 +33,7 @@ from anytoolai_platform_core.config.registry import (
     SchemaDefinition,
     TenantDefinition,
 )
+from anytoolai_platform_core.events.client_events import CLIENT_EVENT_PROPERTY_TYPES
 from anytoolai_platform_core.handoffs.models import (
     HandoffDefinition,
     HandoffStartPolicy,
@@ -488,6 +489,17 @@ def _find_handoff_mapping_target_conflict(
             ):
                 return parent_path, nested_path
     return None
+
+
+# The categorical (string-valued) ANY-17 client-event properties a product's analytics.yaml may
+# declare a closed vocabulary for -- field_count is int-typed and has no vocabulary concept, so
+# it's deliberately excluded. Restricting to this set at load time means a typo like "mod" or
+# "gap_categry" fails validate-configs immediately, instead of silently declaring a vocabulary
+# entry ClientEventService never consults (it only ever looks up "mode"/"gap_category" by exact
+# name), which would otherwise leave the real key's vocabulary empty with no diagnostic.
+CLIENT_EVENT_CATEGORICAL_PROPERTY_KEYS = frozenset(
+    key for key, value_type in CLIENT_EVENT_PROPERTY_TYPES.items() if value_type is str
+)
 
 
 class ConfigLoader:
@@ -1546,6 +1558,16 @@ class ConfigLoader:
                     ref_type="client_event_properties",
                 )
             for property_name, allowed_values in client_event_properties.items():
+                if property_name not in CLIENT_EVENT_CATEGORICAL_PROPERTY_KEYS:
+                    raise InvalidConfigShapeError(
+                        path,
+                        f"client_event_properties.{property_name} is not a categorical "
+                        "client-event property (expected one of "
+                        f"{sorted(CLIENT_EVENT_CATEGORICAL_PROPERTY_KEYS)})",
+                        config_id=product_id,
+                        ref_type="client_event_properties",
+                        ref_value=str(property_name),
+                    )
                 if not isinstance(allowed_values, list) or not all(
                     isinstance(value, str) and value for value in allowed_values
                 ):

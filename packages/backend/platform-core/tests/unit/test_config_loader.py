@@ -1109,3 +1109,48 @@ def test_loader_fails_on_non_list_client_event_property_values(tmp_path: Path) -
         ref_value="mode",
         message_part="must be a list of non-empty strings",
     )
+
+
+def test_loader_fails_on_unsupported_client_event_property_key(tmp_path: Path) -> None:
+    """ANY-17 human review #3: a typo'd key (e.g. "gap_categry" for "gap_category") must fail
+    validate-configs immediately, not silently declare a vocabulary ClientEventService never
+    consults -- which would otherwise leave the real key's vocabulary empty with no diagnostic."""
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "analytics.yaml"
+    data = _load_yaml(path)
+    data["client_event_properties"]["gap_categry"] = ["budget"]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="client_event_properties",
+        ref_value="gap_categry",
+        message_part="is not a categorical client-event property",
+    )
+
+
+def test_loader_fails_on_field_count_as_a_client_event_properties_key(tmp_path: Path) -> None:
+    """field_count is int-typed and has no vocabulary concept -- declaring it here is as invalid
+    as any other unsupported key, not silently accepted because it's a real property name."""
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "analytics.yaml"
+    data = _load_yaml(path)
+    data["client_event_properties"]["field_count"] = ["3"]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="client_event_properties",
+        ref_value="field_count",
+        message_part="is not a categorical client-event property",
+    )
