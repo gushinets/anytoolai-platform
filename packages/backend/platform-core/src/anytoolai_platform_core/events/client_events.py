@@ -296,7 +296,12 @@ class ClientEventService:
             # merely validated, so a caller never has to (and cannot incorrectly) re-assert
             # guest_id/user_id once scenario_session_id already carries that information, and so
             # scenario_chain_id (which a standalone client request has no way to know or claim on
-            # its own) is populated instead of silently dropped.
+            # its own) is populated instead of silently dropped. `session.user_id` itself traces
+            # back to an unverified client-supplied field on scenario-start (no authenticated-user
+            # system exists yet in MVP-A) -- every other event already emitted for this session
+            # (`scenario.started`, `scenario.completed`, `client.next_action_clicked`) trusts it at
+            # the same level, so this is consistent with the rest of the platform, not a new gap
+            # introduced here. Tracked platform-wide as TD-013 (`docs/tech-debt-tracker.md`).
             guest_id = session.guest_id
             user_id = session.user_id
             scenario_chain_id = session.scenario_chain_id
