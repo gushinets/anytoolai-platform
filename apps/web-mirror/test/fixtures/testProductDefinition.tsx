@@ -30,6 +30,7 @@ function TestProductFields({ values, errors, disabled, onChange }: ProductFields
  */
 export const testProductDefinition: ProductDefinition<TestProductValues, string> = {
   productId: TEST_PRODUCT_IDS.productId,
+  scenarioId: TEST_PRODUCT_IDS.scenarioId,
   title: "Test Product",
   emptyValues: { text: "" },
   validate: (values) => (values.text.trim().length === 0 ? { text: "Text is required." } : {}),

@@ -521,9 +521,70 @@ the pre-fix code (temporarily reverted, tested, restored) before being left in p
   fixture helper, resolving the later-started call first, then the earlier one, with a failure) —
   confirmed to fail against the pre-fix code (the result was clobbered by the stale failure).
 
+## Code review round 6 (team lead #2) — disposition
+
+Three findings, verified by direct code reading plus the actual Linear ticket text (ANY-12,
+ANY-246, ANY-452) rather than trusting the review's claims about them: one real doc-alignment gap
+(fixed, and found to be broader than the finding itself described), one real code-level fragility
+(fixed, independent of the Send-Ready specifics the finding argued from), one declined as
+contradicted by the very tickets it cited as justification.
+
+- **Declined: a generic product-continuation/second-run hook in `ProductResultProps`.** The
+  finding argues this is "not speculative" because ANY-12/ANY-246 (Send-Ready's own tickets)
+  already require a two-run flow. That two-run requirement is real (ANY-12: "Workflow: First run:
+  `A04 + A03`. Second run: the user-selected gap → A08.") — but both ANY-12 and ANY-246 also carry
+  their own explicit standing rule for exactly this situation: *"When the same UI/runtime behavior
+  is required by a second product, it must be moved to the shared runtime in the same change and
+  covered by shared tests; one-off product behavior must not be generalized prematurely."* That
+  assigns the two-run generalization to Send-Ready's own implementation ticket, when it is
+  actually built, not to ANY-453 ahead of it — the same incremental-extraction principle the
+  team lead's own original ANY-453 guidance already established (derive the contract from a real
+  product, don't design it ahead of one), and the same reasoning round 3's disposition already
+  applied once to this identical question. The finding's claimed dilemma ("either change the
+  foundation later... or duplicate scenario/client logic, which the tickets forbid") isn't a real
+  dilemma: changing the foundation later, in the same change as the product that needs it, is
+  exactly what the tickets prescribe, not what they forbid. No code change; `ProductDefinition`'s
+  and `ProductRunPage`'s existing docstrings already document this as a deliberate deferral.
+- **Real bug: scenario selection depended on runtime config's array order.** Confirmed against the
+  platform's own generated OpenAPI example (`docs/generated/openapi.json`'s `kernel_demo`
+  response), which lists *six* scenarios today, not hypothetically for a future product —
+  `scenarios[0]` was never a safe stand-in for "the scenario this product means to run," even
+  before Send-Ready exists. Added `ProductDefinition.scenarioId` (the product's own known scenario
+  id, e.g. `proposal_ai.generate_v1` from its `scenarios.yaml`); `ProductRunPage`'s boot effect now
+  resolves the scenario by matching this id against runtime config's `scenarios` array instead of
+  taking the first entry, and fails safely to `boot-error` (not a silent wrong-scenario start) if
+  it's absent. `proposalAiDefinition` and the shared test-only `testProductDefinition` both set
+  their existing scenario id explicitly. Two regression tests: "selects the scenario named by the
+  product definition, not just the first one runtime config lists" and "treats a runtime config
+  missing the product's own scenario id as unavailable, never falling back to another one" — both
+  confirmed to fail against the pre-fix code (wrong scenario submitted to a route the mock never
+  queued; missing scenario silently accepted) before being left in place.
+- **Real doc-alignment gap, broader than the finding described.** The finding named only
+  `docs/product-specs/mvp-scope-source-of-truth.md`'s "Client Message Decoder is the second
+  product and proves reuse before shared UI extraction" sentence, which is indeed now false: ANY-
+  453's own ticket text records "Ownership split approved 2026-09-08. This issue takes the shared
+  foundation out of ANY-243... No other product depends on completion of ProposalAI" — the same
+  day `mvp-scope-source-of-truth.md` was itself last touched (ANY-452) with the *old* sequencing.
+  The identical sentence was also duplicated verbatim in `docs/product-specs/
+  mvp-b-freelancer-validation-bundle.md` and `docs/product-specs/freelancer-suite-v0.md` (fixed in
+  all three, for the same reason AGENTS.md requires keeping repo-local docs aligned with the
+  controlling one). More significantly, `docs/adr/0008-web-first-multi-product-host.md` — an
+  *Accepted* architecture decision, not just a product spec — states the old sequencing formally
+  and more strongly: "Extracting a generic frontend framework before two products prove the same
+  need would create an unvalidated abstraction," and its own Decision/Follow-up prescribe
+  "implement Client Message Decoder on the same pattern, and extract only repetition demonstrated
+  by both." Directly contradicted by the foundation-first split. Rather than rewriting that
+  historical Context/Decision/Follow-up prose in place (the ANY-452 precedent: "mark the previous
+  ... plan as superseded rather than rewriting its historical log"), added a dated amendment note
+  to the ADR's own Status section, matching the pattern of its existing 2026-09-08 amendment note,
+  that names exactly which of its original sequencing statements the foundation-first split
+  corrects, while leaving its internal-module-vs-standalone-package boundary (still accurate)
+  untouched. `python3 scripts/agent/runner.py validate-docs` / `generate-docs --check` — both
+  passed after the edits.
+
 ## Required evidence
 
-- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (62 passed: 25 shared-runtime
+- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (64 passed: 27 shared-runtime
   cases against the test-only definition, 5 ProposalAI-meaning cases, 4 registry/boundary cases,
   2 `ResultView` cases, plus the 26 pre-existing `HandoffConsent` cases) / `build` — all
   passed.
@@ -538,8 +599,9 @@ the pre-fix code (temporarily reverted, tested, restored) before being left in p
 - `python3 scripts/agent/runner.py frontend-check` — passed (exit 0): `pnpm -r lint`, `typecheck`,
   `test`, `generate-api-types:check`, `build` across all 7 frontend workspaces, including the
   `next build` of `apps/web-mirror`.
-- `python3 scripts/agent/runner.py quick-check` — passed: config/architecture/docs validation,
-  1232 passed / 399 deselected (backend baseline unaffected by this frontend-only change).
+- `python3 scripts/agent/runner.py quick-check` — passed: config/architecture/docs validation
+  (including `validate-docs` and `generate-docs --check` against round 6's doc-alignment edits),
+  1241 passed / 451 deselected (backend baseline unaffected by this frontend/docs-only change).
 
 ## Resolved follow-up
 

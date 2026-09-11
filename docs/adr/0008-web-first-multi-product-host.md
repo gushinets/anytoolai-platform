@@ -5,6 +5,18 @@
 Accepted. Product release order updated on 2026-09-08 to match
 `docs/product-specs/mvp-scope-source-of-truth.md`.
 
+Amended 2026-09-08: the product owner approved a foundation-first ownership split. The shared
+`product-runtime` module inside `apps/web-mirror` (the "generic frontend framework" this ADR's
+Context/Decision/Follow-up describe below) is extracted directly from ProposalAI alone, as its own
+deliverable, before a second product exists -- not after Client Message Decoder independently
+re-implements the same pattern. This corrects this ADR's original sequencing below (Context's
+"before two products prove the same need", Decision's "implement Client Message Decoder on the
+same pattern, and extract only repetition demonstrated by both", and Follow-up's "Use Client
+Message Decoder to prove which frontend behavior is genuinely reusable"), so that no product in
+the release order waits on another product's completion to start its own web implementation. The
+internal-module-vs-standalone-package boundary this ADR draws is unaffected: the foundation stays
+inside `apps/web-mirror`, not a new frontend package, exactly as Decision already describes.
+
 ## Context
 
 ADR-0005 requires a separate Chrome Extension for each MVP-B product. That decision keeps extension

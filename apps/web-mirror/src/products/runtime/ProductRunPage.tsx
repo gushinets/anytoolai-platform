@@ -155,6 +155,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const [pendingStart, setPendingStart] = useState<{ prepared: PreparedScenarioStart; input: V } | null>(null);
 
   const productId = definition.productId;
+  const scenarioId = definition.scenarioId;
   useEffect(() => {
     // Snapshotted once per effect invocation (including StrictMode's replay), not re-read from
     // controllerRef inside the .then() continuations below: by the time those run, the ref could
@@ -172,7 +173,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           setBoot({ kind: "boot-error" });
           return;
         }
-        const scenario = runtimeResult.value.scenarios[0];
+        // Resolved by id, not position: runtime config's `scenarios` array isn't guaranteed to be
+        // a singleton (see `ProductDefinition.scenarioId`'s own docstring) or ordered to match
+        // this product's meaning.
+        const scenario = runtimeResult.value.scenarios.find((candidate) => candidate.scenarioId === scenarioId);
         // No fallback to frontends[0]: that could silently select a disabled frontend or a
         // non-web one, letting a disabled/wrong-type frontend still expose the form/start flow.
         // No enabled web frontend means this product isn't actually available here.
@@ -213,7 +217,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         }
       },
     );
-  }, [client, guestStorage, productId]);
+  }, [client, guestStorage, productId, scenarioId]);
 
   async function runStart(prepared: PreparedScenarioStart) {
     // Snapshotted once: this call's own controller, checked consistently across every await below

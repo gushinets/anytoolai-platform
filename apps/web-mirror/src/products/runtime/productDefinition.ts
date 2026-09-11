@@ -44,6 +44,15 @@ export type ProductResultProps<R> = {
  */
 export type ProductDefinition<V extends Record<string, unknown>, R> = {
   productId: string;
+  /**
+   * The product's own known scenario id (its `scenarios.yaml`, e.g. `proposal_ai.generate_v1`).
+   * `ProductRunPage` resolves this by id out of runtime config's `scenarios` array, never by
+   * position -- that array already carries more than one scenario for some products (e.g.
+   * `kernel_demo`'s own runtime-config response lists six), so picking `scenarios[0]` would
+   * silently run whichever scenario the backend happens to list first instead of the one this
+   * product actually means to run.
+   */
+  scenarioId: string;
   title: string;
   emptyValues: V;
   /** Client-side, for immediate feedback only -- the backend's schema stays authoritative. */

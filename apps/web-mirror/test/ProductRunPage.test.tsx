@@ -135,6 +135,69 @@ describe("ProductRunPage", () => {
     expect(screen.queryByLabelText("Text")).toBeNull();
   });
 
+  it("selects the scenario named by the product definition, not just the first one runtime config lists", async () => {
+    const otherScenario = {
+      scenario_id: "test_product.other_v1",
+      version: 1,
+      allowed_next_actions: ["copy_result"],
+      input_renderer_hint: { renderer: "json_schema", schema_ref: "test_product.other_input_v1", schema_version: 1 },
+      output_renderer_hint: { renderer: "json_schema", schema_ref: "test_product.other_output_v1", schema_version: 1 },
+    };
+    const { client, calls } = makeClient({
+      ...bootRoutes(),
+      [ROUTES.RUNTIME_CONFIG]: [
+        runtimeConfigResponse(TEST_PRODUCT_IDS, {
+          // The product's own scenario is listed *second* -- selection must not depend on order.
+          scenario_ids: [otherScenario.scenario_id, TEST_PRODUCT_IDS.scenarioId],
+          scenarios: [
+            otherScenario,
+            {
+              scenario_id: TEST_PRODUCT_IDS.scenarioId,
+              version: 1,
+              allowed_next_actions: ["copy_result"],
+              input_renderer_hint: { renderer: "json_schema", schema_ref: "test_product.input_v1", schema_version: 1 },
+              output_renderer_hint: { renderer: "json_schema", schema_ref: "test_product.output_v1", schema_version: 1 },
+            },
+          ],
+        }),
+      ],
+      [ROUTES.START]: [startResponse()],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitFor(() => expect(calls.some((call) => call.key === ROUTES.START)).toBe(true));
+  });
+
+  it("treats a runtime config missing the product's own scenario id as unavailable, never falling back to another one", async () => {
+    const otherScenario = {
+      scenario_id: "test_product.other_v1",
+      version: 1,
+      allowed_next_actions: ["copy_result"],
+      input_renderer_hint: { renderer: "json_schema", schema_ref: "test_product.other_input_v1", schema_version: 1 },
+      output_renderer_hint: { renderer: "json_schema", schema_ref: "test_product.other_output_v1", schema_version: 1 },
+    };
+    const { client } = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [
+        runtimeConfigResponse(TEST_PRODUCT_IDS, {
+          scenario_ids: [otherScenario.scenario_id],
+          scenarios: [otherScenario],
+        }),
+      ],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+    });
+
+    renderPage({ client });
+
+    await waitFor(() =>
+      expect(screen.getByText("Test Product is unavailable right now. Please reload the page.")).toBeTruthy(),
+    );
+    expect(screen.queryByLabelText("Text")).toBeNull();
+  });
+
   it("fires product_viewed exactly once even under React StrictMode's dev-only double-invoke of effects", async () => {
     const events: ProductRunEvent[] = [];
     // StrictMode's mount -> cleanup -> remount genuinely re-runs the boot effect's body (the

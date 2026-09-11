@@ -101,6 +101,7 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
  */
 export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> = {
   productId: "proposal_ai",
+  scenarioId: "proposal_ai.generate_v1",
   title: "ProposalAI",
   emptyValues: { taskText: "", freelancerPositioning: "", tone: "", language: "" },
   validate,
