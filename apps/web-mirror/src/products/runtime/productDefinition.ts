@@ -1,0 +1,55 @@
+import type { ComponentType } from "react";
+
+/**
+ * Funnel events the shared runtime emits (product viewed -> form started -> form submitted ->
+ * scenario completed/result viewed -> copy activation). Never carries prompt text, result text,
+ * or clipboard contents -- only ids/status, matching ANY-453's "keep ... user text out of event
+ * payloads" requirement. Real dispatch is ANY-17's; this is the injectable callback contract.
+ */
+export type ProductRunEvent =
+  | { type: "product_viewed" }
+  | { type: "form_started" }
+  | { type: "form_submitted" }
+  | { type: "scenario_completed"; scenarioSessionId: string }
+  | { type: "copy_activated"; scenarioSessionId: string };
+
+export type ProductFieldsProps<V> = {
+  values: V;
+  errors: Partial<Record<keyof V, string>>;
+  /** True while a run is active; the product disables its own inputs. */
+  disabled: boolean;
+  onChange: <K extends keyof V>(field: K, value: V[K]) => void;
+};
+
+export type ProductResultProps<R> = {
+  result: R;
+  /** Call after a successful clipboard write; the runtime fires `copyNextActionId` from it. */
+  onCopied: () => void;
+};
+
+/**
+ * What a product owns, and nothing more (ANY-453: "Product modules own only their definition,
+ * fields, renderer, and meaning"). `V` is the product's form values; `R` its canonical result.
+ * Fields are a product-owned React component, deliberately not a declarative field schema.
+ */
+export type ProductDefinition<V extends Record<string, unknown>, R> = {
+  productId: string;
+  title: string;
+  emptyValues: V;
+  /** Client-side, for immediate feedback only -- the backend's schema stays authoritative. */
+  validate: (values: V) => Partial<Record<keyof V, string>>;
+  /** Form values -> the scenario-start `input` payload (the product's own input schema shape). */
+  toInput: (values: V) => Record<string, unknown>;
+  /** Frontend-safe canonical output -> the product's result; null means unusable. */
+  extractResult: (output: Record<string, unknown>) => R | null;
+  /** The next action fired after a successful copy (the product's `renderer_contract.yaml`). */
+  copyNextActionId: string;
+  Fields: ComponentType<ProductFieldsProps<V>>;
+  Result: ComponentType<ProductResultProps<R>>;
+  copy: {
+    submit: string;
+    running: string;
+    runFailed: string;
+    quotaRemaining: (remaining: number, limit: number) => string;
+  };
+};

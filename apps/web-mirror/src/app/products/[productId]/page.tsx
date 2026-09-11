@@ -3,7 +3,7 @@
 import { notFound } from "next/navigation";
 import { use, useMemo } from "react";
 import { createPlatformApiClient } from "../../../lib/apiClient";
-import { getProductDefinition } from "../../../products/registry";
+import { getRegisteredProduct } from "../../../products/registry";
 
 type ProductPageProps = {
   params: Promise<{ productId: string }>;
@@ -11,15 +11,15 @@ type ProductPageProps = {
 
 export default function ProductPage({ params }: ProductPageProps) {
   const { productId } = use(params);
-  const definition = getProductDefinition(productId);
+  const product = getRegisteredProduct(productId);
   // Memoized so a re-render that isn't a real navigation doesn't hand the product a new client
   // instance and re-trigger its mount-time identity/runtime-config fetch.
   const client = useMemo(() => createPlatformApiClient(), []);
 
-  if (!definition) {
+  if (!product) {
     notFound();
   }
 
-  const { Component } = definition;
+  const { Component } = product;
   return <Component key={productId} client={client} />;
 }

@@ -7,9 +7,10 @@
 - Created: 2026-09-10
 - Last updated: 2026-09-11
 - Review date: 2026-09-11
-- Next action: none — happy-path vertical, the generic event integration point, and two code
-  review passes' fixes (including a StrictMode-fragility bug found while fixing pass #2) are all
-  implemented and verified.
+- Next action: none — happy-path vertical, the generic event integration point, the fixes from
+  every review round, and the Phase 2 extraction of the shared `ProductRunPage` + product-
+  definition contract (with the test-only definition ANY-453's acceptance criteria require) are
+  all implemented and verified.
 - Blocker: none
 
 ## Goal
@@ -27,14 +28,16 @@ proving its shape.
 > и выносишь это в shared kit. Второй продукт — видишь общую часть хотя бы для двух продуктов —
 > выносишь в web-kit.
 
-Concretely: no generic `ProductRunPage(definition)`
-abstraction, no product-definition contract, no schema-driven form builder yet — those are
-explicit ANY-453 scope-doc asks this plan deliberately does not build. Instead: build ProposalAI's
-page as a concrete, product-owned component; only the pieces that were already named,
-already-scaffolded shared integration points (ce-kit's data-layer primitives, web-mirror's
+How this was applied, in two phases: Phase 1 built ProposalAI's page as one concrete,
+product-owned component (no contract designed up front), filling in only the already-named
+shared integration points (ce-kit's data-layer primitives, web-mirror's
 `apiClient`/`ErrorState`/`ResultView` placeholders, web-result-kit's `GeneratedTextRenderer`
-placeholder) get filled in for real. A second product's needs, not a guess, decide what else moves
-to a shared kit.
+placeholder). Phase 2 (see "Phase 2" below) then extracted the shared `ProductRunPage` and the
+product-definition contract *from* that proven code -- the "understand what is definitely not
+product-specific, and extract it" step of the guidance -- rather than waiting for a second product.
+What stays deliberately unbuilt is the "whole framework" the guidance warned against: no
+schema-driven form builder (fields remain a product-owned React component) and no renderer
+registry.
 
 This also means this plan's scope overlaps what ANY-243 owns as ProposalAI's own ticket (product
 definition, fields, renderer, activation). That overlap is intentional per the
@@ -94,10 +97,9 @@ plan covers the shared-runtime-proving happy path only.
 
 ### Out of scope (left for other tickets)
 
-- The generic `ProductRunPage`/product-definition contract and product-owned renderer *slot*
-  abstraction ANY-453's original scope doc describes — deferred until a second product exists to
-  prove the actual shared shape (team-lead guidance). The event/next-action *callback* half of that
-  scope item is implemented (see #7 above); only the generic component contract is deferred.
+- A schema-driven form builder or a renderer registry — explicit ANY-453 non-goals. The shared
+  `ProductRunPage` and product-definition contract themselves are implemented (Phase 2 below);
+  products supply fields as their own React component, not as a field schema.
 - ProposalAI's Playwright E2E, funnel/event correlation assertions, and full weak-input coverage —
   ANY-243's own scope. This plan's `onEvent` tests prove the callback contract with an injected
   handler, not a real analytics backend.
@@ -340,9 +342,51 @@ on the PR pointing at the commits that already fixed them, no further changes ne
   replaying the dead session" — confirmed to fail against the pre-fix code (asserted the same key
   twice) before being left in place with the correct assertion.
 
+## Phase 2: shared `ProductRunPage` extracted from the proven ProposalAI code (2026-09-11)
+
+Resolves the round-2 review's open finding #1 (the PR contradicting ANY-453's literal acceptance
+criteria) in code rather than by editing Linear. Re-reading the team-lead guidance against the
+Linear AC and `docs/architecture/frontend-boundaries.md`: they agree on the *destination*
+(product-neutral common runtime; product modules own only definition/fields/renderer/meaning;
+"Product surfaces consume shared clients rather than copy transport, storage, identity, quota,
+polling, result, next-action, event, or handoff code") and differ only on the *order* — derive
+the contract from a real product instead of designing it up front. The earlier phase over-weighted
+the "at least two products" heuristic and under-weighted "extract what is definitely not
+product-specific"; with the first product built, that extraction is now mechanical and
+evidence-based, not speculative: of `ProposalAIProduct.tsx`'s ~550 lines, the product-specific
+surface was six things (product id, the four fields + validation, the input mapping, the canonical
+field name `text`, the `copy_result` next-action id, and the UI copy). Everything else referenced
+no ProposalAI concept. Leaving it fused would also mean the five product tickets this issue blocks
+each copying ~500 lines — exactly what the architecture doc forbids.
+
+Design, derived from the real code (not a schema-driven builder — fields stay a product-owned
+React component; no renderer registry):
+
+- `src/products/runtime/productDefinition.ts` — the published contract: `ProductDefinition<V, R>`
+  (`productId`, `title`, `emptyValues`, `validate`, `toInput`, `extractResult`,
+  `copyNextActionId`, `Fields`, `Result`, `copy`), `ProductFieldsProps<V>`,
+  `ProductResultProps<R>`, `ProductRunEvent`.
+- `src/products/runtime/ProductRunPage.tsx` — the shared runtime: everything that was
+  product-neutral in the old component, unchanged in behavior (all round-1/round-2 fixes carried
+  over verbatim). Imports no product module.
+- `src/products/proposalAi/ProposalAIProduct.tsx` — now `proposalAiDefinition` plus a thin
+  `ProposalAIProduct` wrapper. The registry keeps its `Component` shape (composition layer, allowed
+  to import products per `frontend-boundaries.md`); its entry type is renamed `RegisteredProduct`
+  to avoid clashing with the runtime's `ProductDefinition`.
+- `test/fixtures/testProductDefinition.tsx` — the test-only definition (`test_product`), not in
+  the registry; `test/fixtures/platformResponses.ts` — response/route builders parameterized by
+  product/scenario id, shared by both suites.
+- `test/ProductRunPage.test.tsx` — the shared suite, moved from the ProposalAI suite and pointed
+  at the fixture; `test/ProposalAIProduct.test.tsx` — reduced to ProposalAI meaning only (fields
+  and validation copy, input mapping, canonical `text` rendering + `copy_result`);
+  `test/registry.test.tsx` — additionally proves the fixture is not registered and that the shared
+  runtime source imports no product module.
+
 ## Required evidence
 
-- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (47 passed) / `build` — all
+- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (55 passed: 18 shared-runtime
+  cases against the test-only definition, 5 ProposalAI-meaning cases, 4 registry/boundary cases,
+  2 `ResultView` cases, plus the 26 pre-existing `HandoffConsent` cases) / `build` — all
   passed.
 - `pnpm --filter @anytoolai/web-result-kit typecheck` / `lint` — passed.
 - `pnpm --filter @anytoolai/ce-kit test` (289 passed, unaffected by this change) — passed, confirms
@@ -360,6 +404,8 @@ on the PR pointing at the commits that already fixed them, no further changes ne
 
 ## Resolved follow-up
 
-None outstanding for the happy-path vertical implemented here. The generic shared contract
-(product-definition type, `ProductRunPage`) stays deferred to whichever second product's
-implementation first needs the same shape, per the team-lead guidance recorded above.
+None outstanding. The shared `ProductRunPage` and product-definition contract are implemented
+(Phase 2) and proven against the test-only definition; the five product tickets this issue blocks
+consume `src/products/runtime/productDefinition.ts` and register a definition in `registry.ts`.
+The round-2 open question about editing the Linear issue is moot: the PR now satisfies ANY-453's
+acceptance criteria as written.
