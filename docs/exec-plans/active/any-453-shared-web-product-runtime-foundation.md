@@ -7,8 +7,9 @@
 - Created: 2026-09-10
 - Last updated: 2026-09-11
 - Review date: 2026-09-11
-- Next action: none — happy-path vertical, the generic event integration point, and a code review
-  pass's fixes are all implemented and verified.
+- Next action: none — happy-path vertical, the generic event integration point, and two code
+  review passes' fixes (including a StrictMode-fragility bug found while fixing pass #2) are all
+  implemented and verified.
 - Blocker: none
 
 ## Goal
@@ -140,15 +141,28 @@ plan covers the shared-runtime-proving happy path only.
    `pnpm-lock.yaml` either way) but the symlink is then guaranteed by ordinary dependency
    installation, not peer-resolution heuristics. `web-result-kit` isn't a published, externally
    consumed package with a real "don't double-install React" concern to protect against here.
-6. **`onEvent` behind a ref only where an effect needs it.** Only the mount-only `product_viewed`
-   effect reads `onEvent` through a ref (captured once at first render) — using the prop directly
-   there would need `onEvent` in that effect's dependency array (a real prop, not ref-exempt from
-   `exhaustive-deps`), re-firing "product_viewed" on every render where a caller passes a new
-   inline handler, the normal shape for an event-handler prop. Every other `emitEvent()` call site
-   (`handleSubmit`, `handleRetry`, `runPoll`, `handleCopied`, `updateField`) is a plain closure in
-   an event handler, not inside an effect, so those use `onEvent` directly — an earlier version
-   routed all five through the ref uniformly, which was unnecessary indirection for four of them
-   (a code review pass, finding #7).
+6. **`onEvent` behind a ref uniformly, at every `emitEvent()` call site.** `handleSubmit`,
+   `handleRetry`, and `updateField` are genuinely synchronous DOM-event-handler closures, where
+   using the `onEvent` prop directly would already be safe. `runPoll` (a multi-second async
+   continuation) and `handleCopied` (invoked from `ResultView`'s own clipboard-write promise,
+   itself async) are not: either can still be running after a re-render has handed the parent a
+   new `onEvent` identity, and a closure captured before that await would fire the stale one. A
+   prior version tried classifying each call site as "safe" or not and routed only the mount
+   effect through the ref — that classification was wrong for `runPoll` (a second code review pass
+   caught it as a real, reintroduced bug). Using the ref uniformly for every site removes the need
+   to keep re-deriving that classification correctly as the component changes.
+7. **`AbortController` created inside its mount effect, not held in `useState`.** A `useState`
+   singleton is the same instance across React StrictMode's double-invoke of effects (mount →
+   cleanup → remount); that cleanup's `abort()` would permanently kill the one shared controller
+   before the remount's own effects — or any later user action — ever got to use it, leaving every
+   later request short-circuited by `signal.aborted` forever. Recreating the controller inside the
+   effect (stored in a ref, read by `runStart`/`runPoll`/`handleCopied`) gives each invocation,
+   including a StrictMode replay, its own independent controller. Verified live that neither this
+   app's default `next dev` config nor an explicit `reactStrictMode: true` currently reproduces
+   the double-invoke for this route (no duplicate network calls observed either way) — so this
+   isn't a presently user-facing bug in this app today, but the fix is correct hardening against a
+   real class of fragility regardless (this app opting into strict mode later, or a future Next.js
+   default change).
 
 ## Code review pass #1 (2026-09-11) — disposition
 
@@ -193,9 +207,62 @@ Reviewed and left as documented, not a code change:
   `pnpm install --frozen-lockfile`) and the accepted risk (single current consumer,
   `apps/web-mirror`, so the risk this protects against is currently inactive).
 
+## Code review pass #2 (2026-09-11) — disposition
+
+All 9 findings re-verified by direct code reading before fixing; none refuted. Fixed:
+
+- **Finding #1 (critical, reintroduced by pass #1's own fix): `runPoll`'s `emitEvent` closed over
+  a stale `onEvent`.** Pass #1's finding #7 fix classified `runPoll` as a "safe" direct-`onEvent`
+  call site; it isn't, since it's an async continuation spanning at least two `await`s — see design
+  decision #6 above. Restored the uniform ref for every `emitEvent()` call site, including
+  `runPoll`.
+- **Finding #2: the exec plan itself asserted the wrong reasoning.** Design decision #6 above
+  rewritten to state the actual rule (why `runPoll`/`handleCopied` need the ref and the other
+  three don't) instead of the "all five call sites are safe" claim finding #1 disproved.
+- **Finding #3: `handleSubmit`/`handleRetry` duplicated the same 3-line "begin a start" sequence**
+  (`setPhase(submitting)` + `emitEvent(form_submitted)` + `runStart(...)`) — the exact sequence
+  whose missing `emitEvent` in one of the two copies was pass #1's own finding #2. Extracted a
+  shared `beginStart(prepared)`.
+- **Finding #4: no test proved the `productViewedFiredRef` StrictMode guard actually works.**
+  Added "fires product_viewed exactly once even under React StrictMode's dev-only double-invoke of
+  effects", wrapping `render()` in `<StrictMode>`. This test is also what surfaced the unrelated,
+  more severe `AbortController` bug below — it initially failed by getting the whole component
+  stuck on "Loading ProposalAI...", not just on a `product_viewed` double-count.
+- **Findings #5 and #6: `emitEvent()`'s discard logic didn't reuse the file's own `_noop`, and its
+  manual `.then`-sniffing could collapse to an unconditional wrap.** Simplified to
+  `Promise.resolve(handler?.(event)).catch(_noop)` inside the same `try/catch` — behaviorally
+  identical (a plain sync return value just wraps into an already-resolved, harmless promise) but
+  removes the manual thenable check and reuses `_noop`, which also resolves finding #8 (duck-typing
+  on `.then` could theoretically misfire on a non-Promise value with its own `.then` property;
+  `Promise.resolve()` handles a genuine thenable correctly per spec and needs no manual check).
+- **Finding #7: the three near-identical safety tests differed only in the `onEvent` prop.**
+  Consolidated into one `it.each` over `{label, onEvent}` cases (no handler, a throwing handler, an
+  async-rejecting handler), each still exercising the full submit → poll → result → copy flow.
+
+Found while re-verifying finding #1, not one of the review's own 9 numbered findings, but real and
+more severe — fixed the same way (see design decision #7 above):
+
+- **The shared `AbortController` was a `useState` singleton, fragile to the exact same StrictMode
+  double-invoke class of bug `runPoll`'s `onEvent` had, but worse.** Once finding #4's StrictMode
+  test made the double-invoke actually happen in a test, the pre-fix component got permanently
+  stuck on "Loading ProposalAI..." (the mount fetch's own controller, shared for the whole
+  component's lifetime via `useState`, got aborted by the first invocation's cleanup before the
+  second invocation — or any later user action — could ever use it). Fixed by creating the
+  controller inside its own mount effect (ref-held) instead of `useState`, so each invocation gets
+  an independent, un-aborted controller. Verified live via both this app's default `next dev` and
+  an explicit `reactStrictMode: true` that neither currently reproduces the double-invoke for this
+  route (no duplicate network calls either way) — not a presently user-facing bug in this app, but
+  a real fragility now closed regardless.
+
+Reviewed and left as is, not a code change:
+
+- **Finding #9: `productViewedFiredRef` defends against a StrictMode double-invoke no real
+  consumer currently reaches.** Correct as stated, but it's a pass #1 fix already made and now has
+  direct test coverage (finding #4 above) proving it does what it claims; not worth reverting.
+
 ## Required evidence
 
-- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (41 passed) / `build` — all
+- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (42 passed) / `build` — all
   passed.
 - `pnpm --filter @anytoolai/web-result-kit typecheck` / `lint` — passed.
 - `pnpm --filter @anytoolai/ce-kit test` (289 passed, unaffected by this change) — passed, confirms

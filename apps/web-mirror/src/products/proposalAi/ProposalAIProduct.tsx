@@ -49,19 +49,17 @@ export type ProposalAIProductProps = {
  * Invokes a caller-supplied event handler defensively: neither a synchronous throw nor an async
  * handler's later rejection (TS's `() => void` return type structurally accepts `() => Promise<void>`,
  * so an `async` handler is a legal `onEvent`) may break the product page (ANY-453: "keep analytics
- * failure non-blocking").
+ * failure non-blocking"). `Promise.resolve(...)` correctly adopts a genuine thenable and just
+ * wraps a plain sync return value otherwise, so no manual `.then`-sniffing is needed.
  */
 function emitEvent(
   handler: ((event: ProposalAIProductEvent) => void) | undefined,
   event: ProposalAIProductEvent,
 ): void {
   try {
-    const result: unknown = handler?.(event);
-    if (result && typeof (result as PromiseLike<unknown>).then === "function") {
-      Promise.resolve(result).catch(() => {});
-    }
+    Promise.resolve(handler?.(event)).catch(_noop);
   } catch {
-    // Non-blocking; see docstring above.
+    // handler threw synchronously -- nothing to attach a rejection handler to.
   }
 }
 
@@ -161,13 +159,19 @@ type Phase =
  * assumed reusable yet.
  */
 export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
-  // Captured once at first render, for the mount-only effect below only: a plain closure over
-  // `onEvent` inside that effect would need `onEvent` in its dependency array (a real prop, not
-  // exempt from exhaustive-deps the way a ref is), which would refire "product_viewed" on every
-  // render where a caller passes a new inline handler -- the normal shape for an event-handler
-  // prop. Every other emitEvent() call site below is a plain closure in an event handler (not
-  // inside an effect), so it just uses `onEvent` directly with no ref needed.
-  const productViewedHandlerRef = useRef(onEvent);
+  // Always-current `onEvent` behind a ref, refreshed after every render. Used by every
+  // emitEvent() call site below, not just the mount effect: `handleSubmit`/`handleRetry`/
+  // `updateField` are genuinely synchronous DOM-event-handler closures where using the `onEvent`
+  // prop directly would already be safe, but `runPoll` (a multi-second async continuation) and
+  // `handleCopied` (invoked from `ResultView`'s own clipboard-write promise, itself async) are
+  // not -- either can run after a re-render has already handed the parent a new `onEvent`
+  // identity, and a closure captured before that await would fire the stale one. Using the ref
+  // uniformly, rather than trying to classify each call site as "safe," avoids re-introducing
+  // this exact bug: an earlier version used `onEvent` directly in `runPoll`, which was wrong.
+  const onEventRef = useRef(onEvent);
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  });
   // Guards against React StrictMode's dev-only double-invoke of effects (mount -> cleanup ->
   // remount) double-counting this top-of-funnel event; the ref survives that synthetic cycle
   // since it's the same component instance throughout.
@@ -177,7 +181,7 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
       return;
     }
     productViewedFiredRef.current = true;
-    emitEvent(productViewedHandlerRef.current, { type: "product_viewed" });
+    emitEvent(onEventRef.current, { type: "product_viewed" });
   }, []);
   const formStartedRef = useRef(false);
 
@@ -186,11 +190,29 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
   const [guestId, setGuestId] = useState<string | undefined>(undefined);
   const [ephemeralGuestStorage] = useState<AsyncStorage>(() => createInMemoryAsyncStorage());
   const [guestStorage] = useState<AsyncStorage>(() => createWindowLocalStorageAdapter() ?? ephemeralGuestStorage);
-  // Single controller for this component instance's whole lifetime: aborts every in-flight read
-  // (identity/runtime-config/quota on mount, poll/result while a run is active) on unmount so
-  // none of them can call setState after this component is gone.
-  const [controller] = useState(() => new AbortController());
-  useEffect(() => () => controller.abort(), [controller]);
+  // Fresh AbortController created inside the effect itself, not a `useState` singleton: aborts
+  // every in-flight read (identity/runtime-config/quota on mount, poll/result while a run is
+  // active) on unmount so none of them can call setState after this component is gone. A
+  // `useState`-held controller would be the SAME instance across React StrictMode's double-invoke
+  // of effects (mount -> cleanup -> remount) -- confirmed live: neither this app's default `next
+  // dev` config nor an explicit `reactStrictMode: true` actually reproduces that double-invoke
+  // for this route today (no duplicate network calls observed either way), so this isn't a
+  // currently-reproducing bug in this app -- but a `useState` controller is still objectively
+  // fragile to it: that cleanup's abort() would permanently kill the single shared instance
+  // before the remount's own effects (or any later user action) ever got to use it, leaving every
+  // subsequent request short-circuited by `signal.aborted` forever (stuck on "Loading
+  // ProposalAI..." with no submit ever able to succeed) the moment StrictMode *does* apply --
+  // whether from this app opting in later or a future Next.js version defaulting it on.
+  // Recreating the controller inside the effect gives each invocation, including a StrictMode
+  // replay, its own independent, un-aborted controller, which is correct either way.
+  const controllerRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    return () => {
+      controller.abort();
+    };
+  }, []);
 
   const [values, setValues] = useState<FormValues>(EMPTY_VALUES);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -204,9 +226,14 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
   );
 
   useEffect(() => {
+    // Snapshotted once per effect invocation (including StrictMode's replay), not re-read from
+    // controllerRef inside the .then() continuations below: by the time those run, the ref could
+    // already point at a newer controller from a later invocation, which would wrongly report
+    // "not aborted" for a continuation that belongs to an already-superseded one.
+    const controller = controllerRef.current;
     Promise.all([getRuntimeConfig(client, PRODUCT_ID), client.createGuestIdentity({ storage: guestStorage })]).then(
       ([runtimeResult, guestResult]) => {
-        if (controller.signal.aborted) {
+        if (controller?.signal.aborted) {
           return;
         }
         const resolvedGuestId = guestResult.ok ? guestResult.value.guestId : undefined;
@@ -228,7 +255,7 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
         if (resolvedGuestId) {
           // Advisory only: shown if it loads in time, never blocks the form from becoming usable.
           getQuota(client, { productId: PRODUCT_ID, guestId: resolvedGuestId }).then((quotaResult) => {
-            if (controller.signal.aborted || !quotaResult.ok) {
+            if (controller?.signal.aborted || !quotaResult.ok) {
               return;
             }
             setQuota(quotaResult.value);
@@ -239,16 +266,19 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
         }
       },
       () => {
-        if (!controller.signal.aborted) {
+        if (!controller?.signal.aborted) {
           setBoot({ kind: "boot-error" });
         }
       },
     );
-  }, [client, guestStorage, controller]);
+  }, [client, guestStorage]);
 
   async function runStart(prepared: PreparedScenarioStart) {
-    const result = await prepared.execute(client, { signal: controller.signal });
-    if (controller.signal.aborted) {
+    // Snapshotted once: this call's own controller, checked consistently across every await below
+    // regardless of which controller (if any) controllerRef points to by the time each resolves.
+    const controller = controllerRef.current;
+    const result = await prepared.execute(client, { signal: controller?.signal });
+    if (controller?.signal.aborted) {
       return;
     }
     if (!result.ok) {
@@ -261,7 +291,7 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
         // (not a special "retry" action) can succeed. The stale handle's request body carries the
         // old guest_id, so it can't be reused: clearing it forces a fresh prepareScenarioStart().
         const fresh = await refreshGuestIdentity(client, guestStorage, { fallbackStorage: ephemeralGuestStorage });
-        if (controller.signal.aborted) {
+        if (controller?.signal.aborted) {
           return;
         }
         setGuestId(fresh.ok ? fresh.value.guestId : undefined);
@@ -277,8 +307,9 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
   }
 
   async function runPoll(scenarioSessionId: string) {
-    const polled = await pollScenarioSession(client, scenarioSessionId, { signal: controller.signal });
-    if (controller.signal.aborted) {
+    const controller = controllerRef.current;
+    const polled = await pollScenarioSession(client, scenarioSessionId, { signal: controller?.signal });
+    if (controller?.signal.aborted) {
       return;
     }
     if (!polled.result.ok) {
@@ -303,8 +334,8 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
       setPhase({ kind: "unknown-error" });
       return;
     }
-    const resultResult = await getResult(client, session.resultArtifactId, { signal: controller.signal });
-    if (controller.signal.aborted) {
+    const resultResult = await getResult(client, session.resultArtifactId, { signal: controller?.signal });
+    if (controller?.signal.aborted) {
       return;
     }
     const text = resultResult.ok ? extractProposalText(resultResult.value.output) : null;
@@ -313,7 +344,14 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
       return;
     }
     setPhase({ kind: "result", scenarioSessionId, checkpointId: session.currentCheckpointId, text });
-    emitEvent(onEvent, { type: "scenario_completed", scenarioSessionId });
+    emitEvent(onEventRef.current, { type: "scenario_completed", scenarioSessionId });
+  }
+
+  // Shared by handleSubmit/handleRetry: both begin a (new or reused) prepared start the same way.
+  function beginStart(prepared: PreparedScenarioStart) {
+    setPhase({ kind: "submitting" });
+    emitEvent(onEventRef.current, { type: "form_submitted" });
+    void runStart(prepared);
   }
 
   function handleSubmit(event: FormEvent) {
@@ -339,18 +377,14 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
     if (!reuseExisting) {
       setPendingStart({ prepared, input: values });
     }
-    setPhase({ kind: "submitting" });
-    emitEvent(onEvent, { type: "form_submitted" });
-    void runStart(prepared);
+    beginStart(prepared);
   }
 
   function handleRetry() {
     if (phase.kind !== "retryable-error" || !pendingStart) {
       return;
     }
-    setPhase({ kind: "submitting" });
-    emitEvent(onEvent, { type: "form_submitted" });
-    void runStart(pendingStart.prepared);
+    beginStart(pendingStart.prepared);
   }
 
   function handleCopied() {
@@ -361,7 +395,7 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
     // and regardless of whether this session even has a checkpoint id (`currentCheckpointId` is
     // legitimately nullable on a completed session) -- the funnel event reflects the user's copy,
     // not the backend's acknowledgement of it.
-    emitEvent(onEvent, { type: "copy_activated", scenarioSessionId: phase.scenarioSessionId });
+    emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId: phase.scenarioSessionId });
     if (!phase.checkpointId) {
       return;
     }
@@ -370,14 +404,14 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
     nextAction(
       client,
       { scenarioSessionId: phase.scenarioSessionId, nextActionId: COPY_NEXT_ACTION_ID, checkpointId: phase.checkpointId },
-      { signal: controller.signal },
+      { signal: controllerRef.current?.signal },
     ).then(_noop, _noop);
   }
 
   function updateField<K extends keyof FormValues>(field: K, value: FormValues[K]) {
     if (!formStartedRef.current) {
       formStartedRef.current = true;
-      emitEvent(onEvent, { type: "form_started" });
+      emitEvent(onEventRef.current, { type: "form_started" });
     }
     setValues((prev) => ({ ...prev, [field]: value }));
   }

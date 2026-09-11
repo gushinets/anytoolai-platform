@@ -1,7 +1,12 @@
 import { makeRoutedFetchClient } from "@anytoolai/ce-kit/test/testUtils/routedFetchClient";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ProposalAIProduct, type ProposalAIProductEvent } from "../src/products/proposalAi/ProposalAIProduct";
+import {
+  ProposalAIProduct,
+  type ProposalAIProductEvent,
+  type ProposalAIProductProps,
+} from "../src/products/proposalAi/ProposalAIProduct";
 
 afterEach(() => {
   cleanup();
@@ -146,6 +151,28 @@ describe("ProposalAIProduct", () => {
     expect(screen.getByRole("status").textContent).toMatch(/loading/i);
     await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
     await waitFor(() => expect(screen.getByText("3 of 3 proposals remaining.")).toBeTruthy());
+  });
+
+  it("fires product_viewed exactly once even under React StrictMode's dev-only double-invoke of effects", async () => {
+    const events: ProposalAIProductEvent[] = [];
+    // StrictMode's mount -> cleanup -> remount genuinely re-runs the boot effect's body (the
+    // abort only stops the first invocation's own continuation from acting on its response, it
+    // doesn't stop the fake fetch mock from "completing" the request) -- two responses queued per
+    // route, matching how HandoffConsent.test.tsx's own remount test does this.
+    const { client } = makeClient({
+      [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse(), runtimeConfigResponse()],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse(), guestIdentityResponse()],
+      [QUOTA_ROUTE]: [quotaResponse(), quotaResponse()],
+    });
+
+    render(
+      <StrictMode>
+        <ProposalAIProduct client={client} onEvent={(event) => events.push(event)} />
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
+    expect(events.filter((event) => event.type === "product_viewed")).toHaveLength(1);
   });
 
   it("blocks submission and shows field errors for empty required fields, without starting a scenario", async () => {
@@ -367,7 +394,22 @@ describe("ProposalAIProduct", () => {
     expect(events.filter((event) => event.type === "form_submitted")).toHaveLength(2);
   });
 
-  it("keeps working with no onEvent handler at all", async () => {
+  it.each<{ label: string; onEvent: ProposalAIProductProps["onEvent"] }>([
+    { label: "no handler at all", onEvent: undefined },
+    {
+      label: "a throwing handler",
+      onEvent: () => {
+        throw new Error("handler boom");
+      },
+    },
+    {
+      label: "an async handler that rejects",
+      // Deliberately a Promise-returning handler -- exactly the shape emitEvent() must survive
+      // (TS's `() => void` accepts an `async` handler structurally; see emitEvent()'s docstring).
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
+      onEvent: () => Promise.reject(new Error("async handler boom")),
+    },
+  ])("keeps working through the full flow with $label", async ({ onEvent }) => {
     const { client } = makeClient({
       [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse()],
       [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
@@ -377,62 +419,7 @@ describe("ProposalAIProduct", () => {
       [RESULT_ROUTE]: [resultResponse()],
     });
 
-    render(<ProposalAIProduct client={client} />);
-
-    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
-    fillValidForm();
-    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
-    await waitFor(() => expect(screen.getByText("Dear client, here is my proposal.")).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
-  });
-
-  it("does not let a throwing onEvent handler break the page through the full flow", async () => {
-    const { client } = makeClient({
-      [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse()],
-      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
-      [QUOTA_ROUTE]: [quotaResponse()],
-      [START_ROUTE]: [startResponse()],
-      [SESSION_ROUTE]: [sessionResponse()],
-      [RESULT_ROUTE]: [resultResponse()],
-    });
-
-    render(
-      <ProposalAIProduct
-        client={client}
-        onEvent={() => {
-          throw new Error("handler boom");
-        }}
-      />,
-    );
-
-    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
-    fillValidForm();
-    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
-    await waitFor(() => expect(screen.getByText("Dear client, here is my proposal.")).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
-  });
-
-  it("does not let an async onEvent handler's rejection break the page", async () => {
-    const { client } = makeClient({
-      [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse()],
-      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
-      [QUOTA_ROUTE]: [quotaResponse()],
-      [START_ROUTE]: [startResponse()],
-      [SESSION_ROUTE]: [sessionResponse()],
-      [RESULT_ROUTE]: [resultResponse()],
-    });
-
-    render(
-      <ProposalAIProduct
-        client={client}
-        // Deliberately a Promise-returning handler -- exactly the shape emitEvent() must survive
-        // (TS's `() => void` accepts an `async` handler structurally; see emitEvent()'s docstring).
-        // eslint-disable-next-line @typescript-eslint/no-misused-promises
-        onEvent={() => Promise.reject(new Error("async handler boom"))}
-      />,
-    );
+    render(<ProposalAIProduct client={client} onEvent={onEvent} />);
 
     await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
     fillValidForm();
