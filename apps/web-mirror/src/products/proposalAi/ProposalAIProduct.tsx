@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type RefObject } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   createInMemoryAsyncStorage,
   createWindowLocalStorageAdapter,
@@ -45,12 +45,23 @@ export type ProposalAIProductProps = {
   onEvent?: (event: ProposalAIProductEvent) => void;
 };
 
-function emitEvent(ref: RefObject<((event: ProposalAIProductEvent) => void) | undefined>, event: ProposalAIProductEvent): void {
+/**
+ * Invokes a caller-supplied event handler defensively: neither a synchronous throw nor an async
+ * handler's later rejection (TS's `() => void` return type structurally accepts `() => Promise<void>`,
+ * so an `async` handler is a legal `onEvent`) may break the product page (ANY-453: "keep analytics
+ * failure non-blocking").
+ */
+function emitEvent(
+  handler: ((event: ProposalAIProductEvent) => void) | undefined,
+  event: ProposalAIProductEvent,
+): void {
   try {
-    ref.current?.(event);
+    const result: unknown = handler?.(event);
+    if (result && typeof (result as PromiseLike<unknown>).then === "function") {
+      Promise.resolve(result).catch(() => {});
+    }
   } catch {
-    // A caller's own handler failing must never break the product page (ANY-453: "keep analytics
-    // failure non-blocking").
+    // Non-blocking; see docstring above.
   }
 }
 
@@ -144,19 +155,29 @@ type Phase =
  * polling, and the canonical text result with copy-to-clipboard activation.
  *
  * This is deliberately a concrete, product-owned component rather than a generic
- * `ProductRunPage(definition)` -- see plans/ANY-453.md's "Team lead guidance" note: build the
- * first real product, extract a shared abstraction only once a second product needs the same
- * shape. Nothing here should be assumed reusable yet.
+ * `ProductRunPage(definition)` -- per ANY-453's team-lead guidance (docs/exec-plans/active/
+ * any-453-shared-web-product-runtime-foundation.md): build the first real product, extract a
+ * shared abstraction only once a second product needs the same shape. Nothing here should be
+ * assumed reusable yet.
  */
 export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
-  // Latest onEvent behind a ref, refreshed after every render (not a dependency-array capture) so
-  // call sites below never hold a stale handler without needing to be listed in any effect's deps.
-  const onEventRef = useRef<ProposalAIProductProps["onEvent"]>(onEvent);
+  // Captured once at first render, for the mount-only effect below only: a plain closure over
+  // `onEvent` inside that effect would need `onEvent` in its dependency array (a real prop, not
+  // exempt from exhaustive-deps the way a ref is), which would refire "product_viewed" on every
+  // render where a caller passes a new inline handler -- the normal shape for an event-handler
+  // prop. Every other emitEvent() call site below is a plain closure in an event handler (not
+  // inside an effect), so it just uses `onEvent` directly with no ref needed.
+  const productViewedHandlerRef = useRef(onEvent);
+  // Guards against React StrictMode's dev-only double-invoke of effects (mount -> cleanup ->
+  // remount) double-counting this top-of-funnel event; the ref survives that synthetic cycle
+  // since it's the same component instance throughout.
+  const productViewedFiredRef = useRef(false);
   useEffect(() => {
-    onEventRef.current = onEvent;
-  });
-  useEffect(() => {
-    emitEvent(onEventRef, { type: "product_viewed" });
+    if (productViewedFiredRef.current) {
+      return;
+    }
+    productViewedFiredRef.current = true;
+    emitEvent(productViewedHandlerRef.current, { type: "product_viewed" });
   }, []);
   const formStartedRef = useRef(false);
 
@@ -292,7 +313,7 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
       return;
     }
     setPhase({ kind: "result", scenarioSessionId, checkpointId: session.currentCheckpointId, text });
-    emitEvent(onEventRef, { type: "scenario_completed", scenarioSessionId });
+    emitEvent(onEvent, { type: "scenario_completed", scenarioSessionId });
   }
 
   function handleSubmit(event: FormEvent) {
@@ -319,7 +340,7 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
       setPendingStart({ prepared, input: values });
     }
     setPhase({ kind: "submitting" });
-    emitEvent(onEventRef, { type: "form_submitted" });
+    emitEvent(onEvent, { type: "form_submitted" });
     void runStart(prepared);
   }
 
@@ -328,16 +349,22 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
       return;
     }
     setPhase({ kind: "submitting" });
+    emitEvent(onEvent, { type: "form_submitted" });
     void runStart(pendingStart.prepared);
   }
 
   function handleCopied() {
-    if (phase.kind !== "result" || !phase.checkpointId) {
+    if (phase.kind !== "result") {
       return;
     }
-    // Emitted on a successful clipboard write regardless of the next-action HTTP outcome below --
-    // the funnel event reflects the user's copy, not the backend's acknowledgement of it.
-    emitEvent(onEventRef, { type: "copy_activated", scenarioSessionId: phase.scenarioSessionId });
+    // Emitted on a successful clipboard write regardless of the next-action HTTP outcome below,
+    // and regardless of whether this session even has a checkpoint id (`currentCheckpointId` is
+    // legitimately nullable on a completed session) -- the funnel event reflects the user's copy,
+    // not the backend's acknowledgement of it.
+    emitEvent(onEvent, { type: "copy_activated", scenarioSessionId: phase.scenarioSessionId });
+    if (!phase.checkpointId) {
+      return;
+    }
     // Fire-and-forget: a failed activation event must never make an already-copied,
     // already-displayed result look broken (ANY-243).
     nextAction(
@@ -350,7 +377,7 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
   function updateField<K extends keyof FormValues>(field: K, value: FormValues[K]) {
     if (!formStartedRef.current) {
       formStartedRef.current = true;
-      emitEvent(onEventRef, { type: "form_started" });
+      emitEvent(onEvent, { type: "form_started" });
     }
     setValues((prev) => ({ ...prev, [field]: value }));
   }

@@ -7,8 +7,8 @@
 - Created: 2026-09-10
 - Last updated: 2026-09-11
 - Review date: 2026-09-11
-- Next action: none — happy-path vertical plus the generic event integration point implemented
-  and verified; awaiting code review.
+- Next action: none — happy-path vertical, the generic event integration point, and a code review
+  pass's fixes are all implemented and verified.
 - Blocker: none
 
 ## Goal
@@ -26,7 +26,7 @@ proving its shape.
 > и выносишь это в shared kit. Второй продукт — видишь общую часть хотя бы для двух продуктов —
 > выносишь в web-kit.
 
-Recorded verbatim in `plans/ANY-453.md`. Concretely: no generic `ProductRunPage(definition)`
+Concretely: no generic `ProductRunPage(definition)`
 abstraction, no product-definition contract, no schema-driven form builder yet — those are
 explicit ANY-453 scope-doc asks this plan deliberately does not build. Instead: build ProposalAI's
 page as a concrete, product-owned component; only the pieces that were already named,
@@ -35,8 +35,8 @@ already-scaffolded shared integration points (ce-kit's data-layer primitives, we
 placeholder) get filled in for real. A second product's needs, not a guess, decide what else moves
 to a shared kit.
 
-This also means this plan's scope overlaps what `plans/ANY-243.md` describes as ProposalAI's own
-ticket (product definition, fields, renderer, activation). That overlap is intentional per the
+This also means this plan's scope overlaps what ANY-243 owns as ProposalAI's own ticket (product
+definition, fields, renderer, activation). That overlap is intentional per the
 team-lead guidance above, not scope creep: ANY-453 cannot be usefully "proven against a real
 product" without that product's page actually existing. ANY-243 remains the ticket that owns
 ProposalAI's full E2E/QA evidence (Playwright, funnel/event assertions, weak-input path); this
@@ -82,12 +82,14 @@ plan covers the shared-runtime-proving happy path only.
    that); the prop exists and is tested with an injected fake handler, matching ANY-453's own
    "exposes callbacks/integration points and tests them with injected handlers" wording. A thrown
    handler is caught and otherwise ignored so a broken caller-supplied handler can't break the page.
-8. **Tests** — `apps/web-mirror/test/ProposalAIProduct.test.tsx` (11 cases: mount/load, client
+8. **Tests** — `apps/web-mirror/test/ProposalAIProduct.test.tsx` (13 cases: mount/load, client
    validation blocking submit, full happy path including the copy→next-action call, advisory and
    reactive quota-exhausted, preserved form values + same-Idempotency-Key retry, non-blocking
-   next-action failure, the full `onEvent` funnel sequence with a text-leak check, no-handler and
-   throwing-handler safety) and `test/registry.test.tsx`. Both use ce-kit's existing
-   `makeRoutedFetchClient` test util, matching `HandoffConsent.test.tsx`'s conventions.
+   next-action failure, the full `onEvent` funnel sequence with a text-leak check,
+   `copy_activated`-without-checkpoint, a retry emitting a second `form_submitted`, no-handler
+   safety, and throwing/async-rejecting-handler safety, each through the full happy path) and
+   `test/registry.test.tsx`. Both use ce-kit's existing `makeRoutedFetchClient` test util, matching
+   `HandoffConsent.test.tsx`'s conventions.
 
 ### Out of scope (left for other tickets)
 
@@ -96,7 +98,7 @@ plan covers the shared-runtime-proving happy path only.
   prove the actual shared shape (team-lead guidance). The event/next-action *callback* half of that
   scope item is implemented (see #7 above); only the generic component contract is deferred.
 - ProposalAI's Playwright E2E, funnel/event correlation assertions, and full weak-input coverage —
-  `plans/ANY-243.md`. This plan's `onEvent` tests prove the callback contract with an injected
+  ANY-243's own scope. This plan's `onEvent` tests prove the callback contract with an injected
   handler, not a real analytics backend.
 - Real client-event ingestion (`ANY-17`) — nothing calls `onEvent` in production composition yet
   (the `/products/[productId]` route doesn't pass one); wiring a real implementation in is ANY-17's
@@ -138,15 +140,62 @@ plan covers the shared-runtime-proving happy path only.
    `pnpm-lock.yaml` either way) but the symlink is then guaranteed by ordinary dependency
    installation, not peer-resolution heuristics. `web-result-kit` isn't a published, externally
    consumed package with a real "don't double-install React" concern to protect against here.
-6. **`onEvent` behind a ref, not a `useEffect` dependency.** `ProposalAIProduct` keeps the latest
-   `onEvent` in a ref (refreshed every render via a deps-less effect) rather than listing it in
-   each effect's dependency array. Avoids re-running the mount-only `product_viewed` effect (or
-   any other effect) whenever a caller passes a new inline arrow function each render, which is the
-   normal shape for an event handler prop.
+6. **`onEvent` behind a ref only where an effect needs it.** Only the mount-only `product_viewed`
+   effect reads `onEvent` through a ref (captured once at first render) — using the prop directly
+   there would need `onEvent` in that effect's dependency array (a real prop, not ref-exempt from
+   `exhaustive-deps`), re-firing "product_viewed" on every render where a caller passes a new
+   inline handler, the normal shape for an event-handler prop. Every other `emitEvent()` call site
+   (`handleSubmit`, `handleRetry`, `runPoll`, `handleCopied`, `updateField`) is a plain closure in
+   an event handler, not inside an effect, so those use `onEvent` directly — an earlier version
+   routed all five through the ref uniformly, which was unnecessary indirection for four of them
+   (a code review pass, finding #7).
+
+## Code review pass #1 (2026-09-11) — disposition
+
+All 8 findings re-verified by direct code reading before fixing; none refuted. Fixed:
+
+- **Finding #1 (real bug): `handleCopied()` dropped `copy_activated` for a completed session with
+  no checkpoint id.** `currentCheckpointId` is legitimately `string | null` on a completed session;
+  the old guard (`if (phase.kind !== "result" || !phase.checkpointId) return;`) skipped both the
+  event *and* the next-action call together, even though the clipboard write had already succeeded
+  (`ResultView` only calls `onCopied` after a successful write). Split into two checks: emit
+  `copy_activated` whenever `phase.kind === "result"`, regardless of checkpoint; only skip the
+  `nextAction()` HTTP call (which requires a checkpoint id) when there isn't one. Regression test:
+  "emits copy_activated even when the completed session has no checkpoint id ...".
+- **Finding #2 (real bug): `handleRetry()` emitted no `form_submitted`.** Added the same
+  `emitEvent(onEvent, { type: "form_submitted" })` call `handleSubmit()` already had. Regression
+  test: "retrying after a failed submission emits a second form_submitted".
+- **Finding #3 (real bug): `emitEvent()`'s `try/catch` didn't cover an async handler's rejection.**
+  `onEvent?: (event) => void` structurally accepts an `async` handler (TS's `void` return type
+  is satisfied by any return value, including a `Promise`); a later rejection wouldn't be seen by
+  a synchronous `catch`. `emitEvent()` now also checks the call's return value for a `.then` and
+  attaches a swallowing `.catch()`. Regression test: "does not let an async onEvent handler's
+  rejection break the page" (needs one inline `eslint-disable-next-line
+  @typescript-eslint/no-misused-promises` — deliberately passing a Promise-returning handler is
+  exactly the shape being tested).
+- **Finding #4 (moderate): the `product_viewed` mount effect had no StrictMode guard.** Dev-only
+  `next dev` StrictMode double-invokes effects (mount → cleanup → remount); with no cleanup here,
+  that double-fired `product_viewed`. Added a `productViewedFiredRef` guard that survives the
+  synthetic cycle (same component instance throughout).
+- **Finding #6 (minor): stale test count.** "11 cases" corrected to the current, `grep -c`-verified
+  count (13, after this pass's own regression tests).
+- **Finding #7 (minor, not a bug): unnecessary `onEventRef` indirection.** Simplified per design
+  decision #6 above — only the mount effect still needs a ref.
+- **Finding #8 (minor): the no-handler/throwing-handler tests didn't exercise the real `emitEvent()`
+  call sites.** Both now run the full happy path (submit → poll → result → copy) instead of just
+  `fillValidForm()`, and a third test covers the async-rejecting-handler case finding #3 fixed.
+
+Reviewed and left as documented, not a code change:
+
+- **Finding #5: `web-result-kit`'s `react` dependency-type change loses the "single React
+  instance" tooling guarantee a `peerDependency` gives a published library.** Already captured as
+  design decision #5 above with the concrete reason (the peer symlink didn't survive
+  `pnpm install --frozen-lockfile`) and the accepted risk (single current consumer,
+  `apps/web-mirror`, so the risk this protects against is currently inactive).
 
 ## Required evidence
 
-- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (38 passed) / `build` — all
+- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (41 passed) / `build` — all
   passed.
 - `pnpm --filter @anytoolai/web-result-kit typecheck` / `lint` — passed.
 - `pnpm --filter @anytoolai/ce-kit test` (289 passed, unaffected by this change) — passed, confirms

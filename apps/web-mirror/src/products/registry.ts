@@ -9,8 +9,9 @@ export type ProductDefinition = {
 };
 
 /** Static product registry for `/products/{productId}`. One entry per product owns only its own
- * component -- see plans/ANY-453.md's "Team lead guidance" note: no shared product-definition
- * contract until a second product needs the same shape. */
+ * component -- per ANY-453's team-lead guidance (docs/exec-plans/active/
+ * any-453-shared-web-product-runtime-foundation.md): no shared product-definition contract until
+ * a second product needs the same shape. */
 const PRODUCTS: readonly ProductDefinition[] = [{ productId: "proposal_ai", enabled: true, Component: ProposalAIProduct }];
 
 export function getProductDefinition(productId: string): ProductDefinition | null {

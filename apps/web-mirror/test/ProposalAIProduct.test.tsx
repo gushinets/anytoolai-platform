@@ -319,25 +319,82 @@ describe("ProposalAIProduct", () => {
     expect(serialized).not.toContain("Dear client");
   });
 
+  it("emits copy_activated even when the completed session has no checkpoint id, only skipping the next-action call", async () => {
+    const events: ProposalAIProductEvent[] = [];
+    const { client, calls } = makeClient({
+      [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse()],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      [QUOTA_ROUTE]: [quotaResponse()],
+      [START_ROUTE]: [startResponse()],
+      [SESSION_ROUTE]: [sessionResponse({ current_checkpoint_id: null })],
+      [RESULT_ROUTE]: [resultResponse()],
+    });
+
+    render(<ProposalAIProduct client={client} onEvent={(event) => events.push(event)} />);
+    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
+    fillValidForm();
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await waitFor(() => expect(screen.getByText("Dear client, here is my proposal.")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+
+    await waitFor(() =>
+      expect(events.some((event) => event.type === "copy_activated")).toBe(true),
+    );
+    expect(calls.some((call) => call.key === NEXT_ACTION_ROUTE)).toBe(false);
+  });
+
+  it("retrying after a failed submission emits a second form_submitted", async () => {
+    const events: ProposalAIProductEvent[] = [];
+    const { client } = makeClient({
+      [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse()],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      [QUOTA_ROUTE]: [quotaResponse()],
+      [START_ROUTE]: [errorResponse(500, "internal_error"), startResponse()],
+      [SESSION_ROUTE]: [sessionResponse()],
+      [RESULT_ROUTE]: [resultResponse()],
+    });
+
+    render(<ProposalAIProduct client={client} onEvent={(event) => events.push(event)} />);
+    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
+    fillValidForm();
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start proposalai/i));
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByText("Dear client, here is my proposal.")).toBeTruthy());
+
+    expect(events.filter((event) => event.type === "form_submitted")).toHaveLength(2);
+  });
+
   it("keeps working with no onEvent handler at all", async () => {
     const { client } = makeClient({
       [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse()],
       [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
       [QUOTA_ROUTE]: [quotaResponse()],
+      [START_ROUTE]: [startResponse()],
+      [SESSION_ROUTE]: [sessionResponse()],
+      [RESULT_ROUTE]: [resultResponse()],
     });
 
     render(<ProposalAIProduct client={client} />);
 
     await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
     fillValidForm();
-    expect(screen.getByLabelText("Describe the task")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await waitFor(() => expect(screen.getByText("Dear client, here is my proposal.")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
   });
 
-  it("does not let a throwing onEvent handler break the page", async () => {
+  it("does not let a throwing onEvent handler break the page through the full flow", async () => {
     const { client } = makeClient({
       [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse()],
       [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
       [QUOTA_ROUTE]: [quotaResponse()],
+      [START_ROUTE]: [startResponse()],
+      [SESSION_ROUTE]: [sessionResponse()],
+      [RESULT_ROUTE]: [resultResponse()],
     });
 
     render(
@@ -351,6 +408,37 @@ describe("ProposalAIProduct", () => {
 
     await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
     fillValidForm();
-    expect(screen.getByLabelText("Describe the task")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await waitFor(() => expect(screen.getByText("Dear client, here is my proposal.")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+  });
+
+  it("does not let an async onEvent handler's rejection break the page", async () => {
+    const { client } = makeClient({
+      [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse()],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      [QUOTA_ROUTE]: [quotaResponse()],
+      [START_ROUTE]: [startResponse()],
+      [SESSION_ROUTE]: [sessionResponse()],
+      [RESULT_ROUTE]: [resultResponse()],
+    });
+
+    render(
+      <ProposalAIProduct
+        client={client}
+        // Deliberately a Promise-returning handler -- exactly the shape emitEvent() must survive
+        // (TS's `() => void` accepts an `async` handler structurally; see emitEvent()'s docstring).
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        onEvent={() => Promise.reject(new Error("async handler boom"))}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
+    fillValidForm();
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await waitFor(() => expect(screen.getByText("Dear client, here is my proposal.")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
   });
 });
