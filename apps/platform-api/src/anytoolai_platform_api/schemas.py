@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import StrEnum
 from typing import Any, Literal
 
 from anytoolai_platform_core.handoffs.models import HandoffStatus
@@ -128,10 +129,24 @@ class AtomLabSchemaRefsResponse(BaseModel):
     output: AtomLabVersionedSchemaRefResponse
 
 
+class AtomLabAtomId(StrEnum):
+    A01 = "A01"
+    A02 = "A02"
+    A03 = "A03"
+    A04 = "A04"
+    A05 = "A05"
+    A06 = "A06"
+    A07 = "A07"
+    A08 = "A08"
+    A09 = "A09"
+    A10 = "A10"
+    A11 = "A11"
+
+
 class AtomLabAtomResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    atom_id: str
+    atom_id: AtomLabAtomId
     action_type: str
     base_action_config_id: str
     prompt: str

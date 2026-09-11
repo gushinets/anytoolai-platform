@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from anytoolai_platform_api.schemas import (
+    AtomLabAtomId,
     AtomLabAtomResponse,
     AtomLabSchemaRefsResponse,
     AtomLabVersionedSchemaRefResponse,
@@ -11,7 +12,7 @@ from anytoolai_platform_api.schemas import (
 from anytoolai_platform_core.config.registry import ConfigRegistry
 
 ATOM_LAB_METADATA_KEY = "atom_lab"
-EXPECTED_ATOM_IDS = tuple(f"A{index:02d}" for index in range(1, 12))
+EXPECTED_ATOM_IDS = tuple(atom_id.value for atom_id in AtomLabAtomId)
 LIVE_PROVIDER_POLICY_REF = "default_text_generation_v1"
 
 
@@ -63,7 +64,7 @@ def build_atom_catalog(registry: ConfigRegistry) -> tuple[AtomLabAtomResponse, .
             )
 
         entries[atom_id] = AtomLabAtomResponse(
-            atom_id=atom_id,
+            atom_id=AtomLabAtomId(atom_id),
             action_type=configuration.action_type,
             base_action_config_id=configuration.action_config_id,
             prompt=prompt.content,

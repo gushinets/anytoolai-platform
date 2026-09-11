@@ -41,6 +41,7 @@ from starlette.responses import Response
 
 CORS_ORIGINS_ENV = "ANYTOOLAI_API_CORS_ORIGINS"
 CHROME_EXTENSION_ORIGIN_REGEX = r"^chrome-extension://[a-p]{32}$"
+ATOM_LAB_API_PATH_PREFIX = "/v1/atom-lab"
 logger = logging.getLogger(__name__)
 
 
@@ -103,6 +104,10 @@ def _install_request_context(app: FastAPI) -> None:
         try:
             response = await call_next(request)
             response.headers[REQUEST_ID_HEADER] = request_id
+            if request.url.path == ATOM_LAB_API_PATH_PREFIX or request.url.path.startswith(
+                f"{ATOM_LAB_API_PATH_PREFIX}/"
+            ):
+                response.headers["Cache-Control"] = "no-store"
             log_event(
                 logger,
                 "http.request_completed",

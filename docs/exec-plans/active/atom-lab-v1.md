@@ -13,10 +13,6 @@
 - Linear project: [Atom Lab](https://linear.app/paveldik/project/atom-lab-e1efc95ce888)
 - Milestone: Atom Lab v1
 
-Publication update: these documents are submitted for review under ANY-399. Once that PR is merged,
-the document-publication prerequisite mentioned under AL01 is satisfied; its implementation,
-controlling-doc/guard changes and all runtime acceptance criteria remain outstanding.
-
 ## Goal
 
 Внутренний инструмент для ручного тестирования всех 11 существующих атомов: полный вход,

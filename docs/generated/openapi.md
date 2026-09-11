@@ -29,6 +29,7 @@ Version: 0.1.0
 
 ## Component schemas
 
+- AtomLabAtomId
 - AtomLabAtomResponse
 - AtomLabErrorDetailResponse
 - AtomLabErrorResponse

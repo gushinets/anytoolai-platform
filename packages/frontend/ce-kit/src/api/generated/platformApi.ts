@@ -263,12 +263,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AtomLabAtomId
+         * @enum {string}
+         */
+        AtomLabAtomId: "A01" | "A02" | "A03" | "A04" | "A05" | "A06" | "A07" | "A08" | "A09" | "A10" | "A11";
         /** AtomLabAtomResponse */
         AtomLabAtomResponse: {
             /** Action Type */
             action_type: string;
-            /** Atom Id */
-            atom_id: string;
+            atom_id: components["schemas"]["AtomLabAtomId"];
             /** Base Action Config Id */
             base_action_config_id: string;
             /** Description */

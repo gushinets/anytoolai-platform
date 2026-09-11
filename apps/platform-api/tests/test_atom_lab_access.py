@@ -135,6 +135,23 @@ def test_atom_lab_catalog_returns_protected_registry_data(app) -> None:
     assert detail.json()["atom_id"] == "A10"
 
 
+@pytest.mark.parametrize(
+    ("access_code", "expected_status"),
+    [(ACCESS_CODE, HTTPStatus.OK), (None, HTTPStatus.UNAUTHORIZED)],
+)
+def test_atom_lab_protected_responses_are_not_stored_by_caches(
+    app,
+    access_code: str | None,
+    expected_status: HTTPStatus,
+) -> None:
+    response = asyncio.run(
+        _request(app, "/v1/atom-lab/atoms", access_code=access_code)
+    )
+
+    assert response.status_code == expected_status
+    assert response.headers["Cache-Control"] == "no-store"
+
+
 def test_atom_lab_unknown_atom_uses_safe_error_envelope(app) -> None:
     response = asyncio.run(
         _request(
@@ -222,6 +239,28 @@ def test_atom_lab_error_schema_requires_field_errors(app) -> None:
     schema = app.openapi()["components"]["schemas"]["AtomLabErrorDetailResponse"]
 
     assert "field_errors" in schema["required"]
+
+
+def test_atom_lab_openapi_preserves_the_finite_atom_id_contract(app) -> None:
+    openapi = app.openapi()
+    atom_id_schema = openapi["components"]["schemas"]["AtomLabAtomResponse"]["properties"][
+        "atom_id"
+    ]
+
+    assert atom_id_schema == {"$ref": "#/components/schemas/AtomLabAtomId"}
+    assert openapi["components"]["schemas"]["AtomLabAtomId"]["enum"] == [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A06",
+        "A07",
+        "A08",
+        "A09",
+        "A10",
+        "A11",
+    ]
 
 
 @pytest.mark.parametrize(

@@ -1,6 +1,23 @@
 {
   "components": {
     "schemas": {
+      "AtomLabAtomId": {
+        "enum": [
+          "A01",
+          "A02",
+          "A03",
+          "A04",
+          "A05",
+          "A06",
+          "A07",
+          "A08",
+          "A09",
+          "A10",
+          "A11"
+        ],
+        "title": "AtomLabAtomId",
+        "type": "string"
+      },
       "AtomLabAtomResponse": {
         "additionalProperties": false,
         "properties": {
@@ -9,8 +26,7 @@
             "type": "string"
           },
           "atom_id": {
-            "title": "Atom Id",
-            "type": "string"
+            "$ref": "#/components/schemas/AtomLabAtomId"
           },
           "base_action_config_id": {
             "title": "Base Action Config Id",
