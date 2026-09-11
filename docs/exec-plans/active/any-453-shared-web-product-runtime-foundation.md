@@ -8,8 +8,8 @@
 - Last updated: 2026-09-11
 - Review date: 2026-09-11
 - Next action: none — happy-path vertical, the generic event integration point, the fixes from
-  every review round (including round 3's result-fetch-vs-terminal-failure and scenario-dimension
-  quota bugs), and the Phase 2 extraction of the shared `ProductRunPage` + product-definition
+  every review round (including round 4's root-caused fix for the terminal-failure retry's form-
+  submit bypass), and the Phase 2 extraction of the shared `ProductRunPage` + product-definition
   contract (with the test-only definition ANY-453's acceptance criteria require) are all
   implemented and verified.
 - Blocker: none
@@ -429,9 +429,43 @@ declined as premature/speculative for the current single product:
   now say explicitly that generalizing this waits for whichever product first needs a
   non-single-checkpoint flow, rather than silently under-scoping "generic" as before.
 
+## Code review round 4 (PR author's own account) — disposition
+
+One real bug, confirmed by direct code reading and fixed; one unrelated CI failure, confirmed
+unrelated and not touched:
+
+- **Real bug: round 3's terminal-execution-failure fix was bypassable.** `"unknown-error"` is
+  grouped with the form-showing `Phase` variants in the render switch, so the form and its own
+  enabled Submit button stay visible and reachable while that phase shows — `pendingStart` was
+  only cleared inside the separate `ErrorState`'s dedicated "Try again" `onRetry` handler. A user
+  who reached `unknown-error` and simply clicked the form's own Submit button (unchanged values,
+  the natural thing to do) bypassed that handler entirely: `handleSubmit` still saw the stale
+  `pendingStart`, reused the same `PreparedScenarioStart`/Idempotency-Key, and the backend replayed
+  the same dead terminal session — exactly the bug round 3 believed it had closed, reachable via a
+  second path round 3's own regression test (which only clicked "Try again" first) never exercised.
+  Root-caused rather than patched at the call site: added `enterUnknownError()`, the single place
+  this phase is ever entered (3 call sites in `runPoll`/`fetchResult`), which clears `pendingStart`
+  the moment the phase transitions rather than relying on one specific retry button's handler to do
+  it later — so it's invalidated no matter *how* the user gets back to a submit. The `ErrorState`'s
+  own "Try again" handler simplified accordingly (nothing left for it to clear). Regression test:
+  "also uses a new Idempotency-Key when the user bypasses \"Try again\" and clicks the form's own
+  Submit button directly after a terminal execution failure" — confirmed to fail against the
+  pre-fix code (same key reused) before being left in place, alongside the original round-3 test
+  (also re-confirmed to still fail the same way against the same revert, proving both paths shared
+  the one root cause).
+- **`baseline (windows-latest)` CI failure: confirmed unrelated to this PR, not touched.**
+  `test_runtime_identity_is_stable_and_worktree_specific` failed on a port collision between two
+  different worktree paths' derived ports — `scripts/agent/runner.py`'s `runtime_identity()` hashes
+  a normalized path to a `sha256`-derived offset into the port range; two arbitrary temp paths
+  landing on the same offset is a rare (~1-in-1000), pre-existing hash-collision flake in code this
+  PR never touches (`git diff main...feature/ANY-453 --stat -- 'scripts/*' 'tests/*'` is empty).
+  Not fixed here — out of this ticket's scope, and coding-conventions.md's own "Applicability" rule
+  against drive-by fixes to unrelated pre-existing issues while touching a different area of the
+  repo. A re-run (this round's own push already triggers one) should very likely pass.
+
 ## Required evidence
 
-- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (57 passed: 20 shared-runtime
+- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (58 passed: 21 shared-runtime
   cases against the test-only definition, 5 ProposalAI-meaning cases, 4 registry/boundary cases,
   2 `ResultView` cases, plus the 26 pre-existing `HandoffConsent` cases) / `build` — all
   passed.

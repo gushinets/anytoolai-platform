@@ -301,6 +301,38 @@ describe("ProductRunPage", () => {
     expect(idempotencyKeyOf(startCalls[0]!)).not.toBe(idempotencyKeyOf(startCalls[1]!));
   });
 
+  it("also uses a new Idempotency-Key when the user bypasses \"Try again\" and clicks the form's own Submit button directly after a terminal execution failure", async () => {
+    // unknown-error is grouped with the form-showing phases, so the ordinary submit button stays
+    // enabled and reachable -- the fix must not rely on the user going through the dedicated
+    // "Try again" control.
+    const SECOND_SESSION_ROUTE = "GET /v1/scenario-sessions/session_2";
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [startResponse(), startResponse({ scenario_session_id: "session_2" })],
+      [ROUTES.SESSION]: [sessionResponse({ status: "failed" })],
+      [SECOND_SESSION_ROUTE]: [
+        sessionResponse({ scenario_session_id: "session_2", status: "completed", result_artifact_id: "result_1" }),
+      ],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitFor(() => expect(screen.getByText(RUN_FAILED)).toBeTruthy());
+
+    // Same, unchanged form values -- directly hitting the form's own submit button, not "Try
+    // again".
+    submit();
+
+    await waitForResult();
+    const startCalls = calls.filter((call) => call.key === ROUTES.START);
+    expect(startCalls).toHaveLength(2);
+    expect(idempotencyKeyOf(startCalls[0]!)).toBeTruthy();
+    expect(idempotencyKeyOf(startCalls[1]!)).toBeTruthy();
+    expect(idempotencyKeyOf(startCalls[0]!)).not.toBe(idempotencyKeyOf(startCalls[1]!));
+  });
+
   it("retries just the result fetch, without starting a new (quota-consuming) run, after a transient failure to fetch an already-completed session's result", async () => {
     const { client, calls } = makeClient({
       ...happyPathRoutes(),

@@ -267,14 +267,28 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       // post-completion activation" shape (see `ProductDefinition`'s docstring) -- a mid-flow
       // checkpoint needing a product-chosen next action isn't handled yet, deliberately, until a
       // real product needs it.
-      setPhase({ kind: "unknown-error" });
+      enterUnknownError();
       return;
     }
     if (!session.resultArtifactId) {
-      setPhase({ kind: "unknown-error" });
+      enterUnknownError();
       return;
     }
     await fetchResult(scenarioSessionId, session.resultArtifactId, session.currentCheckpointId);
+  }
+
+  // Any transition into "unknown-error" means the backend already reached a definitive terminal
+  // outcome for that specific session -- reusing the old PreparedScenarioStart/Idempotency-Key
+  // would just replay that same dead session forever (the backend collapses a repeated key into
+  // the existing session's snapshot, it never starts a new run). Clearing pendingStart right here,
+  // at the single place this phase is ever entered, is what guarantees that invariant regardless
+  // of *how* the user gets back to a fresh submit: "unknown-error" is grouped with the
+  // form-showing phases below (its retry isn't the only path back to the submit button), so
+  // invalidating the stale start only inside one specific "Try again" handler previously left the
+  // ordinary form Submit button able to silently replay it too.
+  function enterUnknownError() {
+    setPendingStart(null);
+    setPhase({ kind: "unknown-error" });
   }
 
   // Shared by runPoll and handleRetryResult: the session already completed server-side (we have
@@ -298,7 +312,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     if (extracted === null) {
       // The backend returned a genuinely unusable/malformed result -- an unexpected terminal
       // state, not a fetch problem, so this one *does* mean starting over.
-      setPhase({ kind: "unknown-error" });
+      enterUnknownError();
       return;
     }
     setPhase({ kind: "result", scenarioSessionId, checkpointId, result: extracted });
@@ -453,15 +467,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         <ErrorState
           message={definition.copy.runFailed}
           onRetry={() => {
-            // Unlike "retryable-error" (an ambiguous transport-level failure, where reusing the
-            // same PreparedScenarioStart/Idempotency-Key is correct -- see beginStart()),
-            // "unknown-error" means the backend already reached a definitive terminal outcome
-            // for that specific session (failed/expired, or an unexpected completed-but-
-            // unusable result). Reusing the same key here would just replay that same dead
-            // session forever (the backend collapses a repeated key into the existing session's
-            // snapshot, it does not start a new run) -- clear it so the next submit is a
-            // genuinely new logical start with a fresh key.
-            setPendingStart(null);
+            // pendingStart was already cleared the moment this phase was entered (see
+            // enterUnknownError()) -- this button (like the form's own Submit button, which stays
+            // reachable while this phase is showing) is guaranteed a fresh Idempotency-Key either
+            // way; it only needs to get the phase back to a submittable state.
             setPhase({ kind: "idle" });
           }}
         />
