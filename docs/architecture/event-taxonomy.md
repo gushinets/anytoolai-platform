@@ -85,6 +85,15 @@ Current MVP-A runtime-owned emission points:
   - `handoff.expired`
   - `handoff.failed`
   - `handoff.consumed`
+- client-events ingestion endpoint (`POST /v1/client-events`, ANY-17):
+  - `web.product_viewed`
+  - `web.form_started`
+  - `web.form_submitted`
+  - `web.result_viewed`
+  - `web.retry_clicked`
+  - `web.mode_selected`
+  - `web.gap_selected`
+  - `web.feedback_submitted`
 
 Other taxonomy groups remain part of the platform contract even when their concrete runtime service
 slice lands later.
@@ -214,6 +223,23 @@ debug/provider payloads are forbidden event properties.
 
 - `client.result_copied`
 - `client.next_action_clicked`
+
+### `web`
+
+- `web.product_viewed`
+- `web.form_started`
+- `web.form_submitted`
+- `web.result_viewed`
+- `web.retry_clicked`
+- `web.mode_selected`
+- `web.gap_selected`
+- `web.feedback_submitted`
+
+`web.*` events are the v1 client-event allowlist (ANY-17): the only event types
+`POST /v1/client-events` accepts. They are emitted by the client-events ingestion endpoint, not by a
+domain runtime service, and carry a client-generated `web_session_id` (30-minute inactivity
+rotation) in `properties`. Allowed scalar `properties` keys are `mode`, `field_count`, and
+`gap_category`; no other key, and no non-scalar value, is accepted.
 
 ### `access_lite`
 

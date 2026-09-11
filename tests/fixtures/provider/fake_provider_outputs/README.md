@@ -1,5 +1,8 @@
 # Fake provider outputs
 
+See `docs/product-specs/add-product-recipe.md` step 7 ("Deterministic fixtures") for the naming
+convention and how to make a weak-input fixture reachable end to end.
+
 The fake provider selects fixtures by request metadata, never by prompt text.
 
 Lookup order:

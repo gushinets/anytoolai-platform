@@ -56,13 +56,36 @@ must stay inside, and `tests/architecture/` for the tests that enforce it.
    names, not a general proof and not tied to what is actually implemented. Add your new product's
    name to `FORBIDDEN_PRODUCT_PATH_TERMS` in that test file too, so a future accidental hardcode of
    *this* product's path also fails the gate.
-7. **Chrome Extension (optional).** The bundle contract does not require a dedicated CE
+7. **Deterministic fixtures.** Every structured LLM action needs a happy-path fixture and a
+   weak-input fixture, both checked in and schema-valid, so tests are deterministic and don't call
+   a real provider.
+   - **Naming and location.** Add `<product>.<action_config_id>_v1.json` (happy path) and
+     `<product>.<action_config_id>_v1.weak_input.json` (weak input) to the single shared
+     `tests/fixtures/provider/fake_provider_outputs/` directory (see its `README.md` for the file
+     shape) — not a product-local directory. `FakeProviderAdapter` resolves fixtures by
+     `fixture_key`/`action_config_id` from this one hardcoded, kernel-level directory; every
+     runtime composition boundary (including `build_worker()`'s bare default, what a real running
+     `apps/platform-worker` uses) can only ever resolve fixtures from here. Making it resolve a
+     product-local directory instead would require either a provider-adapter import from outside
+     the provider boundary (blocked by
+     `test_no_direct_provider_adapter_imports_outside_provider_boundary`) or a Platform Core
+     change — both go against this recipe's own "what never changes" list.
+   - **Reaching the weak-input fixture end to end.** The real runtime path (`ActionRunner` →
+     provider gateway → `FakeProviderAdapter`) never sets `ResolvedProviderRequest.fixture_key`;
+     it always falls back to `action_config_id`, so an unmodified run can only ever select the
+     happy-path fixture for a given `action_config_id`. To prove the weak-input fixture is
+     genuinely reachable (not just schema-valid in isolation), add a test-only
+     `FakeProviderAdapter` subclass that forces `fixture_key` on the resolved request before
+     delegating to the real adapter, confined to the product's own test file — see
+     `_FixedFixtureProviderAdapter` in
+     `apps/platform-api/tests/test_proposal_ai_bundle.py` for the worked example.
+8. **Chrome Extension (optional).** The bundle contract does not require a dedicated CE
    (`ANY-32`); the shared web mirror (`apps/web-mirror`) is the default client surface for a new
    product's web pages and result renderers. If the product still needs a standalone CE, build it
    on shared `packages/frontend/ce-kit` (transport, storage, identity, quota, start, polling,
    result, handoff helpers) with no prompts, no provider/model selection, and no workflow logic —
    it only calls the platform API and renders results.
-8. **Verify the boundary, not just the feature.** Run `python scripts/agent/runner.py
+9. **Verify the boundary, not just the feature.** Run `python scripts/agent/runner.py
    validate-architecture` and `pytest tests/architecture` before calling the product done. A green
    architecture gate is part of the product's definition of done, not a one-time audit.
 
