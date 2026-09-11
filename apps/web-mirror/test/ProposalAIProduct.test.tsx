@@ -371,6 +371,43 @@ describe("ProposalAIProduct", () => {
     expect(firstKey).toBe(secondKey);
   });
 
+  it("starts a genuinely new logical submission (new Idempotency-Key) after a terminal execution failure, instead of replaying the dead session", async () => {
+    const SECOND_SESSION_ROUTE = "GET /v1/scenario-sessions/session_2";
+    const { client, calls } = makeClient({
+      [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse()],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+      [QUOTA_ROUTE]: [quotaResponse()],
+      [START_ROUTE]: [startResponse(), startResponse({ scenario_session_id: "session_2" })],
+      [SESSION_ROUTE]: [sessionResponse({ status: "failed" })],
+      [SECOND_SESSION_ROUTE]: [
+        sessionResponse({ scenario_session_id: "session_2", status: "completed", result_artifact_id: "result_1" }),
+      ],
+      [RESULT_ROUTE]: [resultResponse()],
+    });
+
+    render(<ProposalAIProduct client={client} />);
+    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
+    fillValidForm();
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Something went wrong generating your proposal. Please try again.")).toBeTruthy(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    // Same, unchanged form values -- the natural case a user retries without editing anything.
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+
+    await waitFor(() => expect(screen.getByText("Dear client, here is my proposal.")).toBeTruthy());
+    const startCalls = calls.filter((call) => call.key === START_ROUTE);
+    expect(startCalls).toHaveLength(2);
+    const firstKey = (startCalls[0]?.init.headers as Headers).get("Idempotency-Key");
+    const secondKey = (startCalls[1]?.init.headers as Headers).get("Idempotency-Key");
+    expect(firstKey).toBeTruthy();
+    expect(secondKey).toBeTruthy();
+    expect(firstKey).not.toBe(secondKey);
+  });
+
   it("keeps the copied result readable when the copy_result next-action call fails", async () => {
     const { client } = makeClient({
       [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse()],

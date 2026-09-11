@@ -528,7 +528,18 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
       {phase.kind === "unknown-error" ? (
         <ErrorState
           message="Something went wrong generating your proposal. Please try again."
-          onRetry={() => setPhase({ kind: "idle" })}
+          onRetry={() => {
+            // Unlike "retryable-error" (an ambiguous transport-level failure, where reusing the
+            // same PreparedScenarioStart/Idempotency-Key is correct -- see beginStart()),
+            // "unknown-error" means the backend already reached a definitive terminal outcome
+            // for that specific session (failed/expired, or an unexpected completed-but-
+            // unusable result). Reusing the same key here would just replay that same dead
+            // session forever (the backend collapses a repeated key into the existing session's
+            // snapshot, it does not start a new run) -- clear it so the next submit is a
+            // genuinely new logical start with a fresh key.
+            setPendingStart(null);
+            setPhase({ kind: "idle" });
+          }}
         />
       ) : null}
     </main>
