@@ -13,9 +13,11 @@ from anytoolai_platform_api.bootstrap import RuntimeStorageDependencies
 from anytoolai_platform_api.main import create_app
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
+from anytoolai_platform_core.identity.models import GuestIdentityRecord
+from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord, ScenarioSessionStatus
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
-from anytoolai_platform_core.storage.db import scenario_sessions_table
+from anytoolai_platform_core.storage.db import event_log_table, scenario_sessions_table
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
@@ -367,6 +369,53 @@ def _public_request(
     return asyncio.run(_request(app, path, method=method, json=json))
 
 
+def _seed_client_event_session(
+    session_factory: SessionFactory, *, runtime_scope: str | None
+) -> str:
+    metadata = {} if runtime_scope is None else {"runtime_scope": runtime_scope}
+    with transaction_boundary(session_factory) as session:
+        guest = GuestIdentityRepository(session).create(
+            GuestIdentityRecord(
+                id="guest_client_event_scope",
+                tenant_id="anytoolai",
+                region="default",
+            )
+        )
+        scenario = ScenarioSessionRepository(session).create(
+            ScenarioSessionRecord(
+                tenant_id="anytoolai",
+                region="default",
+                product_id="kernel_demo",
+                frontend_id="web_mirror",
+                scenario_id="kernel_demo.single_action_smoke_v1",
+                scenario_version=1,
+                guest_id=guest.id,
+                metadata=metadata,
+            )
+        )
+        return scenario.id
+
+
+def _client_event_count(session_factory: SessionFactory, scenario_session_id: str) -> int:
+    with transaction_boundary(session_factory) as session:
+        return session.execute(
+            sa.select(sa.func.count())
+            .select_from(event_log_table)
+            .where(event_log_table.c.scenario_session_id == scenario_session_id)
+        ).scalar_one()
+
+
+def _client_event_payload(scenario_session_id: str) -> dict[str, object]:
+    return {
+        "event_id": "11111111-1111-4111-8111-111111111111",
+        "event_type": "web.result_viewed",
+        "product_id": "kernel_demo",
+        "frontend_id": "web_mirror",
+        "web_session_id": "22222222-2222-4222-8222-222222222222",
+        "scenario_session_id": scenario_session_id,
+    }
+
+
 def test_public_session_and_result_routes_hide_seeded_lab_resources(
     stored_app, session_factory: SessionFactory
 ) -> None:
@@ -412,6 +461,42 @@ def test_public_routes_keep_ordinary_results_available_and_fail_closed_on_unknow
     assert public_result.json()["output"]["values"]["deadline"] == "2026-09-30"
     assert unknown_session.status_code == HTTPStatus.NOT_FOUND
     assert unknown_result.status_code == HTTPStatus.NOT_FOUND
+
+
+@pytest.mark.parametrize("runtime_scope", ["atom_lab", "unrecognized_internal_scope"])
+def test_public_client_events_hide_non_public_sessions_without_recording(
+    stored_app,
+    session_factory: SessionFactory,
+    runtime_scope: str,
+) -> None:
+    scenario_id = _seed_client_event_session(session_factory, runtime_scope=runtime_scope)
+
+    response = _public_request(
+        stored_app,
+        "POST",
+        "/v1/client-events",
+        _client_event_payload(scenario_id),
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json()["error"]["code"] == "scenario_session_not_found"
+    assert _client_event_count(session_factory, scenario_id) == 0
+
+
+def test_public_client_events_keep_ordinary_sessions_available(
+    stored_app, session_factory: SessionFactory
+) -> None:
+    scenario_id = _seed_client_event_session(session_factory, runtime_scope=None)
+
+    response = _public_request(
+        stored_app,
+        "POST",
+        "/v1/client-events",
+        _client_event_payload(scenario_id),
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert _client_event_count(session_factory, scenario_id) == 1
 
 
 def test_public_result_route_hides_artifact_when_source_session_is_missing(

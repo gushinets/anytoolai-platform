@@ -19,6 +19,7 @@ from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.identity.service import GuestIdentityNotFoundError
 from anytoolai_platform_core.products.models import ProductDefinition
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
+from anytoolai_platform_core.scenarios.runtime_scope import is_public_runtime_session
 from anytoolai_platform_core.scenarios.service import ScenarioSessionNotFoundError
 
 
@@ -283,11 +284,11 @@ class ClientEventService:
                 product_id=product_id,
                 frontend_id=frontend_id,
             )
-            # An explicitly supplied guest_id/user_id that contradicts the session's real owner is
-            # rejected outright (a confused or spoofing caller); one that's simply omitted is not
-            # treated as a mismatch, since the session itself is about to become the source of
-            # truth for identity below.
-            if session is None or (
+            # A non-public runtime scope is indistinguishable from a missing session at this
+            # public boundary. An explicitly supplied guest_id/user_id that contradicts a public
+            # session's real owner is rejected the same way; one that's simply omitted is not a
+            # mismatch, since the session becomes the source of truth for identity below.
+            if session is None or not is_public_runtime_session(session) or (
                 (guest_id is not None and session.guest_id != guest_id)
                 or (user_id is not None and session.user_id != user_id)
             ):
