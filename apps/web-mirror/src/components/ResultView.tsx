@@ -17,6 +17,10 @@ export function ResultView({ text, onCopied }: ResultViewProps) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
 
   function handleCopy() {
+    if (!navigator.clipboard?.writeText) {
+      setCopyState("error");
+      return;
+    }
     navigator.clipboard.writeText(text).then(
       () => {
         setCopyState("copied");
