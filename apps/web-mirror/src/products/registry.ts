@@ -1,11 +1,12 @@
 import type { ComponentType } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import { ProposalAIProduct } from "./proposalAi/ProposalAIProduct";
+import type { ProductRunEvent } from "./runtime/productDefinition";
 
 export type RegisteredProduct = {
   productId: string;
   enabled: boolean;
-  Component: ComponentType<{ client: PlatformApiClient }>;
+  Component: ComponentType<{ client: PlatformApiClient; onEvent?: (event: ProductRunEvent) => void }>;
 };
 
 /** Static product registry for `/products/{productId}`. This is the composition layer

@@ -97,7 +97,8 @@ describe("ProposalAI product definition", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
 
     await waitFor(() => expect(calls.some((call) => call.key === ROUTES.NEXT_ACTION)).toBe(true));
-    expect(ROUTES.NEXT_ACTION.endsWith("/next-actions/copy_result")).toBe(true);
+    const nextActionCall = calls.find((call) => call.key === ROUTES.NEXT_ACTION);
+    expect(JSON.parse(nextActionCall?.init.body as string)).toEqual({ checkpoint_id: "checkpoint_1" });
   });
 
   it("treats a result without a string `text` field as unusable rather than rendering something else", () => {

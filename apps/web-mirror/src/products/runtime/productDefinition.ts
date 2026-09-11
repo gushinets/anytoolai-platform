@@ -5,13 +5,25 @@ import type { ComponentType } from "react";
  * scenario completed/result viewed -> copy activation). Never carries prompt text, result text,
  * or clipboard contents -- only ids/status, matching ANY-453's "keep ... user text out of event
  * payloads" requirement. Real dispatch is ANY-17's; this is the injectable callback contract.
+ *
+ * Every variant but `product_viewed` carries the `guestId` `ProductRunPage` itself already
+ * resolved (its own `guestId` state), rather than leaving a consumer to re-resolve it
+ * independently: two independent resolutions can diverge whenever `createWindowLocalStorageAdapter()`
+ * is unavailable (e.g. some private-browsing modes) and each caller falls back to its own,
+ * separate in-memory storage instance -- there is then no shared cache for a second resolution to
+ * land on, so it mints a second, different guest id instead of reusing the first. `product_viewed`
+ * fires synchronously at mount, before this resolution has necessarily completed, so it has no
+ * settled value to forward; a consumer that still wants to attribute it resolves guest identity
+ * itself for that one event only (its window to do so racing, and in practice usually coalescing
+ * with, `ProductRunPage`'s own concurrent mount-time call via `PlatformApiClient`'s own
+ * per-client-instance single-flight guard).
  */
 export type ProductRunEvent =
   | { type: "product_viewed" }
-  | { type: "form_started" }
-  | { type: "form_submitted" }
-  | { type: "scenario_completed"; scenarioSessionId: string }
-  | { type: "copy_activated"; scenarioSessionId: string };
+  | { type: "form_started"; guestId: string | undefined }
+  | { type: "form_submitted"; guestId: string | undefined }
+  | { type: "scenario_completed"; scenarioSessionId: string; guestId: string | undefined }
+  | { type: "copy_activated"; scenarioSessionId: string; guestId: string | undefined };
 
 export type ProductFieldsProps<V> = {
   values: V;

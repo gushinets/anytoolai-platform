@@ -16,7 +16,7 @@ import time
 import tomllib
 import urllib.error
 import urllib.request
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -884,9 +884,19 @@ CLIENT_HANDOFF_SMOKE_REPORT_PATH = (
     ROOT / "tests" / "e2e" / "client-handoff-smoke" / "playwright-report.json"
 )
 
+PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV = "ANYTOOLAI_PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT"
+PROPOSAL_AI_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "proposal-ai-smoke"
+PROPOSAL_AI_SMOKE_REPORT_PATH = (
+    ROOT / "tests" / "e2e" / "proposal-ai-smoke" / "playwright-report.json"
+)
+
 
 def _client_handoff_smoke_web_mirror_port() -> int:
     return _port_override(CLIENT_HANDOFF_SMOKE_WEB_MIRROR_PORT_ENV, 3000)
+
+
+def _proposal_ai_smoke_web_mirror_port() -> int:
+    return _port_override(PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV, 3100)
 
 
 def _terminate_process_group(process: subprocess.Popen) -> None:
@@ -931,6 +941,59 @@ def _write_client_handoff_smoke_evidence(exit_code: int) -> Path:
         "playwright_report": report,
     }
     return write_timestamped_json_bundle(CLIENT_HANDOFF_SMOKE_EVIDENCE_ROOT, "evidence", payload)
+
+
+def _serve_web_mirror_and_run_smoke(
+    *,
+    web_mirror_port: int,
+    env: dict[str, str],
+    readiness_error_code: str,
+    smoke_extra_env: dict[str, str],
+    smoke_pnpm_filter: str,
+    report_path: Path,
+    write_evidence: Callable[[int], Path],
+) -> int:
+    """Shared tail for client_handoff_smoke()/proposal_ai_smoke(), once each has built its own
+    web-mirror (and any product-specific extra artifact, e.g. the extension): serve the already-
+    built web-mirror, wait for it to become ready, run the given Playwright smoke package, write
+    its evidence, and always tear the server down -- whichever of the two calls this, one fix here
+    now covers both instead of needing to be re-applied to a second copy (as the TMPDIR handling
+    below originally wasn't).
+    """
+    web_mirror_url = f"http://localhost:{web_mirror_port}"
+    # start_new_session=True so this lands in its own process group -- `pnpm exec next start`
+    # spawns `next-server` as a child that does NOT receive a plain terminate() sent to just the
+    # pnpm wrapper pid (pnpm doesn't forward signals to its child), which otherwise leaks a live
+    # next-server bound to web_mirror_port past this command's exit (found by running this live).
+    web_mirror_process = subprocess.Popen(
+        ["pnpm", "--filter", "@anytoolai/web-mirror", "exec", "next", "start", "-p", str(web_mirror_port)],
+        cwd=ROOT,
+        env=env,
+        start_new_session=True,
+    )
+    try:
+        if not _wait_for_http_ok(web_mirror_url, 30.0):
+            print(f"{readiness_error_code}: web-mirror did not become ready in time.", file=sys.stderr)
+            return 1
+
+        smoke_env = dict(env)
+        smoke_env.update(smoke_extra_env)
+        # runner_env()'s workspace-local TMPDIR is wrong for this subprocess: Playwright's own
+        # browser-profile temp dir (a persistent-context spec's explicit mkdtemp(), or its default
+        # context's own launch profile either way) feeds straight into Chromium's user-data-dir,
+        # and on a long checkout path (e.g. GitHub Actions' /home/runner/work/<repo>/<repo>) the
+        # resulting profile-relative singleton-socket path exceeds Linux's ~108-byte AF_UNIX limit
+        # -- Chrome then FATALs in process_singleton_posix.cc before the browser ever opens a page.
+        # Falling back to the real system temp dir (always short, e.g. /tmp) keeps the profile path
+        # short regardless of checkout location.
+        for key in ("TMPDIR", "TMP", "TEMP"):
+            smoke_env.pop(key, None)
+        report_path.unlink(missing_ok=True)
+        exit_code = run_with_env(["pnpm", "--filter", smoke_pnpm_filter, "run", "smoke"], smoke_env)
+        write_evidence(exit_code)
+        return exit_code
+    finally:
+        _terminate_process_group(web_mirror_process)
 
 
 def client_handoff_smoke() -> int:
@@ -994,41 +1057,85 @@ def client_handoff_smoke() -> int:
     if extension_build_exit != 0:
         return extension_build_exit
 
-    # start_new_session=True so this lands in its own process group -- `pnpm exec next start`
-    # spawns `next-server` as a child that does NOT receive a plain terminate() sent to just the
-    # pnpm wrapper pid (pnpm doesn't forward signals to its child), which otherwise leaks a live
-    # next-server bound to web_mirror_port past this command's exit (found by running this live).
-    web_mirror_process = subprocess.Popen(
-        ["pnpm", "--filter", "@anytoolai/web-mirror", "exec", "next", "start", "-p", str(web_mirror_port)],
-        cwd=ROOT,
+    return _serve_web_mirror_and_run_smoke(
+        web_mirror_port=web_mirror_port,
         env=env,
-        start_new_session=True,
+        readiness_error_code="CHS002",
+        smoke_extra_env={"WEB_CONSENT_BASE_URL": web_mirror_url},
+        smoke_pnpm_filter="@anytoolai/client-handoff-smoke",
+        report_path=CLIENT_HANDOFF_SMOKE_REPORT_PATH,
+        write_evidence=_write_client_handoff_smoke_evidence,
     )
-    try:
-        if not _wait_for_http_ok(web_mirror_url, 30.0):
-            print("CHS002: web-mirror did not become ready in time.", file=sys.stderr)
-            return 1
 
-        smoke_env = dict(env)
-        smoke_env["WEB_CONSENT_BASE_URL"] = web_mirror_url
-        # runner_env()'s workspace-local TMPDIR is wrong for this one subprocess: the spec's
-        # mkdtemp(join(tmpdir(), ...)) feeds that path straight into Chromium's
-        # launchPersistentContext user-data-dir, and on a long checkout path (e.g. GitHub Actions'
-        # /home/runner/work/<repo>/<repo>) the resulting profile-relative singleton-socket path
-        # exceeds Linux's ~108-byte AF_UNIX limit -- Chrome then FATALs in
-        # process_singleton_posix.cc before the browser ever opens a page. Falling back to the
-        # real system temp dir (always short, e.g. /tmp) keeps the profile path short regardless
-        # of checkout location.
-        for key in ("TMPDIR", "TMP", "TEMP"):
-            smoke_env.pop(key, None)
-        CLIENT_HANDOFF_SMOKE_REPORT_PATH.unlink(missing_ok=True)
-        exit_code = run_with_env(
-            ["pnpm", "--filter", "@anytoolai/client-handoff-smoke", "run", "smoke"], smoke_env
-        )
-        _write_client_handoff_smoke_evidence(exit_code)
-        return exit_code
-    finally:
-        _terminate_process_group(web_mirror_process)
+
+def _write_proposal_ai_smoke_evidence(exit_code: int) -> Path:
+    """Mirrors _write_client_handoff_smoke_evidence()'s shape."""
+    from collect_context import write_timestamped_json_bundle
+
+    report = None
+    if PROPOSAL_AI_SMOKE_REPORT_PATH.is_file():
+        try:
+            report = json.loads(PROPOSAL_AI_SMOKE_REPORT_PATH.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            report = None
+    payload = {
+        "generated_at": datetime.now(tz=UTC).isoformat(),
+        "all_passed": exit_code == 0,
+        "playwright_report": report,
+    }
+    return write_timestamped_json_bundle(PROPOSAL_AI_SMOKE_EVIDENCE_ROOT, "evidence", payload)
+
+
+def proposal_ai_smoke() -> int:
+    """ANY-243: builds and serves web-mirror against the running dev-up platform-api, then runs
+    the Playwright browser-evidence smoke (tests/e2e/proposal-ai-smoke) that proves the ProposalAI
+    web vertical end to end in a real (headless, no extension involved) Chromium -- product page ->
+    shared client -> scenario session -> job/worker -> deterministic fake-provider workflow (ANY-227)
+    -> canonical result -> copy activation, plus weak-input, guest-identity-reuse, and
+    quota-exhaustion coverage.
+
+    Requires `dev-up` already running first (same precedent as atoms-proof/client-handoff-smoke:
+    this command only resolves runtime_identity() for the API URL, it never starts Docker itself)
+    and Playwright's Chromium already installed (`pnpm --filter @anytoolai/proposal-ai-smoke exec
+    playwright install chromium`). Unlike client-handoff-smoke, this needs no extension and no
+    visible display -- ordinary web pages run fine in Playwright's default headless Chromium.
+
+    web-mirror's next.config.ts rewrites() destination is baked in at `next build` time (see
+    client_handoff_smoke()'s own docstring), so PLATFORM_API_BASE_URL must be set for that build
+    step too, not just for the later `next start`.
+    """
+    try:
+        identity = runtime_identity()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
+
+    web_mirror_port = _proposal_ai_smoke_web_mirror_port()
+    if not _check_ports_available(
+        "PAS001",
+        [("web-mirror", web_mirror_port, PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV, None)],
+    ):
+        return 1
+    web_mirror_url = f"http://localhost:{web_mirror_port}"
+
+    env = runner_env()
+    env["PLATFORM_API_BASE_URL"] = identity.api_url
+
+    build_command = ["pnpm", "--filter", "@anytoolai/web-mirror", "build"]
+    print_command(build_command)
+    build_exit = run_with_env(build_command, env)
+    if build_exit != 0:
+        return build_exit
+
+    return _serve_web_mirror_and_run_smoke(
+        web_mirror_port=web_mirror_port,
+        env=env,
+        readiness_error_code="PAS002",
+        smoke_extra_env={"WEB_MIRROR_BASE_URL": web_mirror_url},
+        smoke_pnpm_filter="@anytoolai/proposal-ai-smoke",
+        report_path=PROPOSAL_AI_SMOKE_REPORT_PATH,
+        write_evidence=_write_proposal_ai_smoke_evidence,
+    )
 
 
 def _prod_compose_command(*args: str) -> list[str]:
@@ -1156,6 +1263,7 @@ COMMANDS = {
     "atoms-proof": atoms_proof,
     "live-canary": live_canary,
     "client-handoff-smoke": client_handoff_smoke,
+    "proposal-ai-smoke": proposal_ai_smoke,
     "prod-up": prod_up,
     "prod-ready": prod_ready,
     "prod-status": prod_status,

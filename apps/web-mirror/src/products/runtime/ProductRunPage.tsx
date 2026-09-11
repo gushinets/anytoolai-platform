@@ -395,13 +395,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     resultFetchSettledRef.current = true;
     setPhase({ kind: "result", scenarioSessionId, checkpointId, result: extracted });
-    emitEvent(onEventRef.current, { type: "scenario_completed", scenarioSessionId });
+    emitEvent(onEventRef.current, { type: "scenario_completed", scenarioSessionId, guestId });
   }
 
   // Shared by handleSubmit/handleRetry: both begin a (new or reused) prepared start the same way.
   function beginStart(prepared: PreparedScenarioStart) {
     setPhase({ kind: "submitting" });
-    emitEvent(onEventRef.current, { type: "form_submitted" });
+    emitEvent(onEventRef.current, { type: "form_submitted", guestId });
     void runStart(prepared);
   }
 
@@ -469,7 +469,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // and regardless of whether this session even has a checkpoint id (`currentCheckpointId` is
     // legitimately nullable on a completed session) -- the funnel event reflects the user's copy,
     // not the backend's acknowledgement of it.
-    emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId: phase.scenarioSessionId });
+    emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId: phase.scenarioSessionId, guestId });
     if (!phase.checkpointId) {
       return;
     }
@@ -489,7 +489,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   function updateField<K extends keyof V>(field: K, value: V[K]) {
     if (!formStartedRef.current) {
       formStartedRef.current = true;
-      emitEvent(onEventRef.current, { type: "form_started" });
+      emitEvent(onEventRef.current, { type: "form_started", guestId });
     }
     setValues((prev) => {
       const next = { ...prev };
