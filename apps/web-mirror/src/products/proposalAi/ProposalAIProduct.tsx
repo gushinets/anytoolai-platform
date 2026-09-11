@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import {
   createInMemoryAsyncStorage,
   createWindowLocalStorageAdapter,
@@ -426,20 +426,22 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
   const busy = phase.kind === "submitting" || phase.kind === "running";
   const identityUnavailable = guestId === undefined;
 
-  return (
-    <main>
-      <h1>ProposalAI</h1>
-      {quota ? (
-        <p aria-live="polite">
-          {quota.remainingCount} of {quota.limitCount} proposals remaining.
-        </p>
-      ) : null}
-
-      {phase.kind === "result" ? (
-        <ResultView text={phase.text} onCopied={handleCopied} />
-      ) : phase.kind === "quota-exhausted" ? (
-        <ErrorState message="You've used all your ProposalAI runs for now." />
-      ) : (
+  // Exhaustive over Phase["kind"] (docs/agent/coding-conventions.md's "Exhaustiveness" rule): a
+  // future new Phase variant fails typecheck here instead of silently falling through to the form.
+  let mainContent: ReactNode;
+  switch (phase.kind) {
+    case "result":
+      mainContent = <ResultView text={phase.text} onCopied={handleCopied} />;
+      break;
+    case "quota-exhausted":
+      mainContent = <ErrorState message="You've used all your ProposalAI runs for now." />;
+      break;
+    case "idle":
+    case "submitting":
+    case "running":
+    case "retryable-error":
+    case "unknown-error":
+      mainContent = (
         <form onSubmit={handleSubmit}>
           <label htmlFor="proposal-ai-task-text">Describe the task</label>
           <textarea
@@ -496,7 +498,22 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
             <p role="alert">We couldn&apos;t verify your identity. Please reload the page and try again.</p>
           ) : null}
         </form>
-      )}
+      );
+      break;
+    default:
+      return assertNever(phase);
+  }
+
+  return (
+    <main>
+      <h1>ProposalAI</h1>
+      {quota ? (
+        <p aria-live="polite">
+          {quota.remainingCount} of {quota.limitCount} proposals remaining.
+        </p>
+      ) : null}
+
+      {mainContent}
 
       {phase.kind === "retryable-error" ? (
         <ErrorState message={phase.message} onRetry={pendingStart ? handleRetry : undefined} />
@@ -509,6 +526,10 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
       ) : null}
     </main>
   );
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled Phase: ${JSON.stringify(value)}`);
 }
 
 function _noop(): void {

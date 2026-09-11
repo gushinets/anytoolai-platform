@@ -260,6 +260,20 @@ Reviewed and left as is, not a code change:
   consumer currently reaches.** Correct as stated, but it's a pass #1 fix already made and now has
   direct test coverage (finding #4 above) proving it does what it claims; not worth reverting.
 
+## Coding-conventions compliance pass (2026-09-11)
+
+Checked the render's `Phase` handling against `docs/agent/coding-conventions.md`'s
+"Exhaustiveness" rule ("For discriminated unions and UI state machines, handle every variant. Use
+a `never` helper so a new union member fails typecheck") ahead of marking that PR checklist item
+compliant. The main-content ternary (`result` / `quota-exhausted` / implicit-else-form) didn't
+satisfy it: a future `Phase` variant would have silently rendered the form by default instead of
+failing typecheck. Replaced with a `switch (phase.kind)` over every variant (grouping the five that
+render the form under one case-fallthrough) ending in `default: return assertNever(phase);`.
+`BootState` didn't need the same treatment: its two early returns (`loading`/`boot-error`) already
+force TypeScript to narrow `boot` to `{ kind: "ready" }` for every later `boot.scenarioId`/
+`boot.frontendId` access, so a new `BootState` variant lacking those fields already fails
+typecheck without an explicit helper.
+
 ## Required evidence
 
 - `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (42 passed) / `build` — all
