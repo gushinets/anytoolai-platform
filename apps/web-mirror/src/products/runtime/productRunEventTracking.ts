@@ -9,12 +9,33 @@ import type { ProductRunEvent } from "./productDefinition";
 
 const FRONTEND_ID = "web_mirror";
 
-const WEB_EVENT_TYPE_BY_RUN_EVENT: Partial<Record<ProductRunEvent["type"], WebClientEventType>> = {
-  product_viewed: "web.product_viewed",
-  form_started: "web.form_started",
-  form_submitted: "web.form_submitted",
-  scenario_completed: "web.result_viewed",
-};
+/**
+ * Exhaustive over `ProductRunEvent["type"]` (docs/agent/coding-conventions.md's "Exhaustiveness"
+ * rule, mirrored by `ProductRunPage.tsx`'s own `assertNever()` switch over `Phase["kind"]`): a
+ * future new `ProductRunEvent` variant fails typecheck here instead of silently never reaching the
+ * backend.
+ */
+function webEventTypeForRunEvent(eventType: ProductRunEvent["type"]): WebClientEventType | undefined {
+  switch (eventType) {
+    case "product_viewed":
+      return "web.product_viewed";
+    case "form_started":
+      return "web.form_started";
+    case "form_submitted":
+      return "web.form_submitted";
+    case "scenario_completed":
+      return "web.result_viewed";
+    case "copy_activated":
+      // No web.* counterpart on purpose -- see this function's caller docstring below.
+      return undefined;
+    default:
+      return assertNever(eventType);
+  }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled ProductRunEvent type: ${JSON.stringify(value)}`);
+}
 
 /**
  * Wires the shared runtime's injectable `ProductRunEvent` callback (ANY-453) to ANY-17's real
@@ -44,7 +65,7 @@ export function createProductRunEventTracker(
   storage: AsyncStorage,
 ): (event: ProductRunEvent) => void {
   return (event) => {
-    const eventType = WEB_EVENT_TYPE_BY_RUN_EVENT[event.type];
+    const eventType = webEventTypeForRunEvent(event.type);
     if (eventType === undefined) {
       return;
     }

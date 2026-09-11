@@ -487,7 +487,15 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   function updateField<K extends keyof V>(field: K, value: V[K]) {
-    if (!formStartedRef.current) {
+    // Gated on a resolved guestId too, the same way submitCurrentValues() already gates
+    // form_submitted: a boot-time createGuestIdentity() failure (not just the guest-identity-
+    // not-found self-heal path) otherwise leaves the form fully interactive with guestId
+    // undefined, and this event only ever fires once per page lifetime (formStartedRef) -- firing
+    // it here with no guestId/scenarioSessionId would be permanently dropped by the backend's
+    // identity-required check with no chance to recover it later. Leaving formStartedRef unset
+    // while guestId is undefined lets a still-unresolved identity emit on a later keystroke
+    // instead of losing the event outright.
+    if (!formStartedRef.current && guestId !== undefined) {
       formStartedRef.current = true;
       emitEvent(onEventRef.current, { type: "form_started", guestId });
     }

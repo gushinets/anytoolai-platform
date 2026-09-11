@@ -5,10 +5,10 @@
 - State: active
 - Owner: agent
 - Created: 2026-09-11
-- Last updated: 2026-09-11
-- Review date: 2026-09-11
-- Next action: none — implementation landed, verified live against a real `dev-up` backend, and
-  code review round 1 (13 findings) addressed.
+- Last updated: 2026-09-12
+- Review date: 2026-09-12
+- Next action: none — implementation landed, verified live against a real `dev-up` backend, code
+  review round 1 (13 findings) addressed, and code review round 2 (3 findings) addressed.
 - Blocker: none
 
 ## Goal
@@ -133,7 +133,9 @@ end to end (also 4/4 passing, clean process teardown, evidence written).
 ## Validation run this session
 
 - `pnpm --filter @anytoolai/web-mirror test` — 75/75 passing after code review round 1's fixes
-  (includes the new `productRunEventTracking.test.tsx`).
+  (includes the new `productRunEventTracking.test.tsx`). Now 76/76 after code review round 2's
+  fixes added one further regression test to `ProductRunPage.test.tsx` — see "Code review round 2"
+  below.
 - `pnpm --filter @anytoolai/web-mirror lint` / `typecheck` / `build` — clean.
 - `python scripts/agent/runner.py frontend-check` — clean across the whole pnpm workspace
   (includes the new `tests/e2e/proposal-ai-smoke` package's lint/typecheck/build).
@@ -229,3 +231,62 @@ passing), `python scripts/agent/runner.py frontend-check` (clean across the whol
 `python scripts/agent/runner.py proposal-ai-smoke` (4/4 passing) against a freshly rebuilt `dev-up`
 stack, plus a direct `POST /v1/client-events` curl check confirming the redesigned event shapes
 are still accepted.
+
+## Code review round 2 (2026-09-12) — disposition
+
+A second review pass over the cumulative diff (the same files as round 1, plus round 1's own
+fixes) found 3 more real findings, all confirmed by direct code reading and all fixed:
+
+- **Real bug: `productRunEventTracking.ts`'s `WEB_EVENT_TYPE_BY_RUN_EVENT` lookup had no
+  exhaustiveness guard.** It was a plain `Partial<Record<ProductRunEvent["type"],
+  WebClientEventType>>` object literal; `createProductRunEventTracker()`'s handler silently
+  `return`ed when a lookup missed, so a future new `ProductRunEvent` variant would compile cleanly
+  and its events would be silently dropped forever with no test or typecheck signal — the same
+  "event silently never reaches the backend" bug class this ticket's own live-testing session had
+  to hunt down for the `client_event_identity_required` case, and a violation of
+  `docs/agent/coding-conventions.md`'s "Exhaustiveness" convention that this diff's own sibling
+  `ProductRunPage.tsx`'s `mainContent` switch already follows. Fixed by replacing the object
+  literal with `webEventTypeForRunEvent()`, an exhaustive `switch (eventType) { ... default: return
+  assertNever(eventType); }` (new local `assertNever` helper, matching `ProductRunPage.tsx`'s
+  pattern). `copy_activated` still explicitly returns `undefined` with its existing explanatory
+  comment; a new variant now fails typecheck instead of silently vanishing.
+- **Real bug: `ProductRunPage.tsx`'s `updateField()` emitted `form_started` with `guestId:
+  undefined` when boot-time `createGuestIdentity()` fails**, not only after a self-heal retry.
+  `guestId` and `boot` are set together, synchronously, in the same `Promise.all(...).then()`
+  callback, so a boot-time identity failure alone leaves `identityUnavailable === true` while the
+  form is still fully interactive (`<Fields>` is gated only on `busy`, not on
+  `identityUnavailable`, unlike the Submit button one line below it). A user typing into that
+  still-enabled form then fired `form_started` with no `guestId` and no `scenarioSessionId` — the
+  exact shape the backend's `client_event_identity_required` guard rejects — permanently, since
+  the emit is guarded by a once-per-page-lifetime ref and can never be re-emitted even if identity
+  later self-heals. Fixed by gating the `form_started` emit itself in `updateField()` on `guestId
+  !== undefined`, rather than disabling `<Fields>`: `fireEvent.change` in `@testing-library/react`
+  still invokes `onChange` on a `disabled` input under jsdom, so only gating the emit is provably
+  testable, and it also means a later successful self-heal can still emit the event on a
+  subsequent keystroke instead of losing it forever. Added a regression test to
+  `apps/web-mirror/test/ProductRunPage.test.tsx` ("does not emit form_started with no guest id
+  when identity fails at boot, not just after a self-heal retry") that boots with a failing
+  `GUEST_IDENTITY` route (no self-heal involved) and asserts no `form_started` event fires after
+  typing; verified this test fails on the pre-fix code (`expected true to be false`) and passes
+  after the fix.
+- **Duplication: `scripts/agent/runner.py`'s `_write_client_handoff_smoke_evidence()` and
+  `_write_proposal_ai_smoke_evidence()` remained fully duplicated** even after round 1's
+  `_serve_web_mirror_and_run_smoke()` extraction — that extraction only unified the serve/wait/
+  run/teardown tail and takes an already-built `write_evidence: Callable[[int], Path]` as an
+  injected parameter; it never touched the two evidence-writer functions themselves, which stayed
+  identical aside from which `*_REPORT_PATH`/`*_EVIDENCE_ROOT` constants each closed over. Fixed by
+  extracting a single `_write_smoke_evidence(exit_code, *, report_path, evidence_root)` used by
+  both `client_handoff_smoke()` and `proposal_ai_smoke()` via `functools.partial(...)`, removing
+  both original functions entirely.
+
+**Verification commands run:** `cd apps/web-mirror && pnpm run typecheck` (clean), `pnpm run lint
+--max-warnings=0` (clean), `pnpm test` (`Test Files 6 passed (6)`, `Tests 76 passed (76)` — up from
+75/75 because of the new `ProductRunPage.test.tsx` regression test above), a stash-based
+regression proof (reverting only `ProductRunPage.tsx` and re-running the new test alone fails as
+expected, `git stash pop` restores it, full suite still 76/76 after), `python3 -m py_compile
+scripts/agent/runner.py` (clean), and `python3 scripts/agent/runner.py quick-check` (passed,
+including the DB-free pytest subset: 1241 passed, 451 deselected).
+
+**Files changed:** `apps/web-mirror/src/products/runtime/productRunEventTracking.ts`,
+`apps/web-mirror/src/products/runtime/ProductRunPage.tsx`,
+`apps/web-mirror/test/ProductRunPage.test.tsx`, `scripts/agent/runner.py`.

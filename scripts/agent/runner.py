@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import hashlib
 import importlib.util
 import json
@@ -923,16 +924,17 @@ def _terminate_process_group(process: subprocess.Popen) -> None:
         process.wait()
 
 
-def _write_client_handoff_smoke_evidence(exit_code: int) -> Path:
-    """Mirrors atoms_proof.py's write_evidence_report() shape (generated_at/all_passed plus the
-    raw detail) -- the raw detail here is Playwright's own JSON reporter output, not a hand-rolled
-    case list, since the smoke's actual pass/fail granularity already lives in that report."""
+def _write_smoke_evidence(exit_code: int, *, report_path: Path, evidence_root: Path) -> Path:
+    """Shared by client_handoff_smoke()/proposal_ai_smoke(): mirrors atoms_proof.py's
+    write_evidence_report() shape (generated_at/all_passed plus the raw detail) -- the raw detail
+    here is Playwright's own JSON reporter output, not a hand-rolled case list, since the smoke's
+    actual pass/fail granularity already lives in that report."""
     from collect_context import write_timestamped_json_bundle
 
     report = None
-    if CLIENT_HANDOFF_SMOKE_REPORT_PATH.is_file():
+    if report_path.is_file():
         try:
-            report = json.loads(CLIENT_HANDOFF_SMOKE_REPORT_PATH.read_text(encoding="utf-8"))
+            report = json.loads(report_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             report = None
     payload = {
@@ -940,7 +942,7 @@ def _write_client_handoff_smoke_evidence(exit_code: int) -> Path:
         "all_passed": exit_code == 0,
         "playwright_report": report,
     }
-    return write_timestamped_json_bundle(CLIENT_HANDOFF_SMOKE_EVIDENCE_ROOT, "evidence", payload)
+    return write_timestamped_json_bundle(evidence_root, "evidence", payload)
 
 
 def _serve_web_mirror_and_run_smoke(
@@ -1064,26 +1066,12 @@ def client_handoff_smoke() -> int:
         smoke_extra_env={"WEB_CONSENT_BASE_URL": web_mirror_url},
         smoke_pnpm_filter="@anytoolai/client-handoff-smoke",
         report_path=CLIENT_HANDOFF_SMOKE_REPORT_PATH,
-        write_evidence=_write_client_handoff_smoke_evidence,
+        write_evidence=functools.partial(
+            _write_smoke_evidence,
+            report_path=CLIENT_HANDOFF_SMOKE_REPORT_PATH,
+            evidence_root=CLIENT_HANDOFF_SMOKE_EVIDENCE_ROOT,
+        ),
     )
-
-
-def _write_proposal_ai_smoke_evidence(exit_code: int) -> Path:
-    """Mirrors _write_client_handoff_smoke_evidence()'s shape."""
-    from collect_context import write_timestamped_json_bundle
-
-    report = None
-    if PROPOSAL_AI_SMOKE_REPORT_PATH.is_file():
-        try:
-            report = json.loads(PROPOSAL_AI_SMOKE_REPORT_PATH.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            report = None
-    payload = {
-        "generated_at": datetime.now(tz=UTC).isoformat(),
-        "all_passed": exit_code == 0,
-        "playwright_report": report,
-    }
-    return write_timestamped_json_bundle(PROPOSAL_AI_SMOKE_EVIDENCE_ROOT, "evidence", payload)
 
 
 def proposal_ai_smoke() -> int:
@@ -1134,7 +1122,11 @@ def proposal_ai_smoke() -> int:
         smoke_extra_env={"WEB_MIRROR_BASE_URL": web_mirror_url},
         smoke_pnpm_filter="@anytoolai/proposal-ai-smoke",
         report_path=PROPOSAL_AI_SMOKE_REPORT_PATH,
-        write_evidence=_write_proposal_ai_smoke_evidence,
+        write_evidence=functools.partial(
+            _write_smoke_evidence,
+            report_path=PROPOSAL_AI_SMOKE_REPORT_PATH,
+            evidence_root=PROPOSAL_AI_SMOKE_EVIDENCE_ROOT,
+        ),
     )
 
 
