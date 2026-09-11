@@ -1,6 +1,95 @@
 {
   "components": {
     "schemas": {
+      "ClientEventRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_type": {
+            "$ref": "#/components/schemas/WebClientEventType"
+          },
+          "frontend_id": {
+            "title": "Frontend Id",
+            "type": "string"
+          },
+          "guest_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guest Id"
+          },
+          "product_id": {
+            "title": "Product Id",
+            "type": "string"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "title": "Properties",
+            "type": "object"
+          },
+          "scenario_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Session Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "web_session_id": {
+            "title": "Web Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id",
+          "event_type",
+          "product_id",
+          "frontend_id",
+          "web_session_id"
+        ],
+        "title": "ClientEventRequest",
+        "type": "object"
+      },
+      "ClientEventResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_type": {
+            "$ref": "#/components/schemas/WebClientEventType"
+          }
+        },
+        "required": [
+          "event_id",
+          "event_type"
+        ],
+        "title": "ClientEventResponse",
+        "type": "object"
+      },
       "DemoRunRequest": {
         "additionalProperties": false,
         "properties": {
@@ -814,6 +903,21 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "WebClientEventType": {
+        "description": "ANY-17 v1 web-event allowlist -- the only event types POST /v1/client-events accepts.\n\nA closed HTTP-facing enum per docs/agent/coding-conventions.md, not a plain `str`, so OpenAPI\nemits a real enum and `ce-kit` can generate its client-side union from it instead of keeping an\nindependent hand-maintained copy.",
+        "enum": [
+          "web.product_viewed",
+          "web.form_started",
+          "web.form_submitted",
+          "web.result_viewed",
+          "web.retry_clicked",
+          "web.mode_selected",
+          "web.gap_selected",
+          "web.feedback_submitted"
+        ],
+        "title": "WebClientEventType",
+        "type": "string"
       }
     }
   },
@@ -845,6 +949,92 @@
         "summary": "Health",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/v1/client-events": {
+      "post": {
+        "operationId": "post_client_event_v1_client_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "event_id": "web_evt_123",
+                  "event_type": "web.product_viewed"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ClientEventResponse"
+                }
+              }
+            },
+            "description": "Event was durably recorded (or already existed for this event_id -- duplicate delivery is idempotent)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "guest_identity_not_found",
+                    "message": "Guest identity not found.",
+                    "request_id": "req_123"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Safe response when the supplied guest identity or scenario session is unknown."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "client_event_id_conflict",
+                    "message": "event_id was already used to record a different client event.",
+                    "request_id": "req_123"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The supplied event_id was already used to record a client event with different content (event type, correlation, or properties)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "client_event_type_not_allowed",
+                    "message": "Event type is not part of the v1 client-event allowlist.",
+                    "request_id": "req_123"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Safe response for an unknown event type, an invalid product/frontend combination, a disallowed property, or a missing/oversized identifier."
+          }
+        },
+        "summary": "Record an allowlisted client analytics event",
+        "tags": [
+          "client-events"
         ]
       }
     },

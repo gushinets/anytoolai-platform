@@ -15,6 +15,7 @@ from anytoolai_platform_core.config.errors import (
     MissingConfigFileError,
     RegistryLoadError,
 )
+from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.config.loader import ConfigLoader
 from anytoolai_platform_core.workflows.mappings import resolve_step_input
 
@@ -1055,3 +1056,125 @@ def test_loader_reports_missing_kernel_products_dir_without_processing_extra_pro
     assert isinstance(error, MissingConfigFileError)
     assert error.config_id == "kernel"
     assert error.ref_type == "products_dir"
+
+
+def test_loader_loads_client_event_properties_vocabulary() -> None:
+    """kernel_demo's analytics.yaml declares a closed client_event_properties vocabulary (ANY-17
+    human review #2) -- proves it round-trips into ProductDefinition.analytics unchanged."""
+    registry = build_config_registry(CONFIG_ROOT)
+    product = registry.get_product("kernel_demo")
+
+    assert product is not None
+    allowed = product.analytics["client_event_properties"]
+    assert set(allowed["mode"]) == {"one_run", "two_run"}
+    assert set(allowed["gap_category"]) == {"budget", "timeline", "scope"}
+
+
+def test_loader_fails_on_non_mapping_client_event_properties(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "analytics.yaml"
+    data = _load_yaml(path)
+    data["client_event_properties"] = ["mode", "gap_category"]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="client_event_properties",
+        ref_value=None,
+        message_part="must be a mapping",
+    )
+
+
+def test_loader_fails_on_non_list_client_event_property_values(tmp_path: Path) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "analytics.yaml"
+    data = _load_yaml(path)
+    data["client_event_properties"]["mode"] = "one_run"
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="client_event_properties",
+        ref_value="mode",
+        message_part="must be a list of non-empty strings",
+    )
+
+
+def test_loader_fails_on_unsupported_client_event_property_key(tmp_path: Path) -> None:
+    """ANY-17 human review #3: a typo'd key (e.g. "gap_categry" for "gap_category") must fail
+    validate-configs immediately, not silently declare a vocabulary ClientEventService never
+    consults -- which would otherwise leave the real key's vocabulary empty with no diagnostic."""
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "analytics.yaml"
+    data = _load_yaml(path)
+    data["client_event_properties"]["gap_categry"] = ["budget"]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="client_event_properties",
+        ref_value="gap_categry",
+        message_part="is not a categorical client-event property",
+    )
+
+
+def test_loader_fails_on_field_count_as_a_client_event_properties_key(tmp_path: Path) -> None:
+    """field_count is int-typed and has no vocabulary concept -- declaring it here is as invalid
+    as any other unsupported key, not silently accepted because it's a real property name."""
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "analytics.yaml"
+    data = _load_yaml(path)
+    data["client_event_properties"]["field_count"] = ["3"]
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="client_event_properties",
+        ref_value="field_count",
+        message_part="is not a categorical client-event property",
+    )
+
+
+def test_loader_fails_on_null_client_event_properties(tmp_path: Path) -> None:
+    """ANY-17 team-lead review: an explicit `client_event_properties: null` isn't a mapping
+    either, but `data.get(...)` returning None used to skip validation entirely, leaving that
+    None sitting in product.analytics -- ClientEventService's `.get(key, {})` only substitutes
+    its default for a genuinely *absent* key, not a present key whose value is None, so the next
+    mode/gap_category event would have called `.get()` on None and raised an uncaught 500."""
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "analytics.yaml"
+    data = _load_yaml(path)
+    data["client_event_properties"] = None
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    _assert_invalid_shape(
+        exc_info.value.errors,
+        file_path=path,
+        config_id="kernel_demo",
+        ref_type="client_event_properties",
+        ref_value=None,
+        message_part="must be a mapping",
+    )

@@ -39,6 +39,7 @@ export { getQuota } from "./quota/getQuota";
 export type { QuotaRequest, QuotaState } from "./quota/types";
 export { isQuotaDimension, isQuotaPeriod, isQuotaUnit } from "./quota/quotaEnums";
 export type { QuotaDimension, QuotaPeriod, QuotaUnit } from "./quota/quotaEnums";
+export { generateIdempotencyKey } from "./scenarios/idempotencyKey";
 export { startScenario } from "./scenarios/startScenario";
 export { prepareScenarioStart } from "./scenarios/prepareScenarioStart";
 export type {
@@ -55,6 +56,14 @@ export type {
 } from "./scenarios/pollScenarioSession";
 export { nextAction } from "./scenarios/nextAction";
 export type { NextActionOptions, NextActionRequest } from "./scenarios/nextAction";
+export {
+  COPY_RESULT_NEXT_ACTION_ID,
+  copyResultAndRecordActivation,
+} from "./scenarios/copyResultAndRecordActivation";
+export type {
+  CopyResultAndRecordActivationRequest,
+  CopyResultAndRecordActivationResult,
+} from "./scenarios/copyResultAndRecordActivation";
 export type {
   ScenarioSession,
   ScenarioSessionSnapshot,
@@ -62,6 +71,22 @@ export type {
 } from "./scenarios/types";
 export { isScenarioSessionStatus } from "./scenarios/scenarioSessionStatus";
 export type { ScenarioSessionStatus } from "./scenarios/scenarioSessionStatus";
+
+export { trackClientEvent } from "./events/trackClientEvent";
+export type {
+  ClientEventProperties,
+  TrackClientEventOptions,
+  TrackClientEventRequest,
+} from "./events/trackClientEvent";
+export type { ClientEventReceipt } from "./events/parseClientEventResponse";
+export { isWebClientEventType } from "./events/webClientEventType";
+export type { WebClientEventType } from "./events/webClientEventType";
+export {
+  DEFAULT_WEB_SESSION_STORAGE_KEY,
+  WEB_SESSION_INACTIVITY_TIMEOUT_MS,
+  getOrCreateWebSessionId,
+} from "./events/webSession";
+export type { WebSessionOptions } from "./events/webSession";
 
 export { getRuntimeConfig, isFrontendType } from "./runtime";
 export type {
