@@ -614,9 +614,39 @@ array position) found no new blockers, and the round 6 "generic two-run support"
 non-blocking status was reconfirmed against the same ANY-12/ANY-246 ticket text round 6's
 disposition already cited.
 
+## Code review round 8 (PR author's own account, me #6) — disposition
+
+One real bug, confirmed by direct code reading and fixed, with a regression test confirmed to fail
+against the pre-fix code before being left in place:
+
+- **Real bug: round 5's overlapping-result-fetch-retry fix had its own gap in the reverse
+  resolution order.** `resultFetchGenerationRef` implemented "only the most-recently-*started*
+  call's completion is ever applied" — correct for the case round 5's own regression test covers
+  (a newer retry succeeds first, an older retry's failure arrives after and must not clobber it),
+  but generation order (who started last) and resolution order (who finishes last) are
+  independent: if an *older* retry's success resolves *after* a *newer* retry has already started
+  (but before that newer one itself resolves), the plain "last-started wins" rule discards the
+  older call's success outright — its generation no longer matches. If the newer retry then fails,
+  that failure becomes the only thing ever shown, even though a valid result was already, in fact,
+  obtained by the call that resolved first. Every concurrent `fetchResult()` call reads the exact
+  same immutable artifact, though, so this doesn't need to be adjudicated by generation at all: a
+  success (or a permanently-unavailable rejection, or a malformed result) is a deterministic fact
+  about the artifact, not a property of which specific network call happened to observe it, so it
+  should be applied and then protected the moment it's seen, from *any* generation, first-arrived-
+  wins. Added `resultFetchSettledRef` (reset per session at the top of `runPoll()`): a definitive,
+  artifact-deterministic outcome sets it and is applied unconditionally; once set, every other
+  completion (any generation, either order) becomes a no-op. `resultFetchGenerationRef` is now
+  used only to suppress a *stale, genuinely transient* failure (a property of that one network
+  call, e.g. a blip) from replacing a more recent one — the one case that's actually
+  generation-ordered rather than artifact-deterministic. Regression test: "keeps an
+  already-successful result-fetch retry even when an even-newer overlapping retry later fails" —
+  confirmed to fail against the pre-fix (round 5) code (the older call's success was silently
+  discarded, then the newer call's failure was shown) before being left in place, alongside the
+  existing round-5 regression test (re-confirmed still passing, covering the original order).
+
 ## Required evidence
 
-- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (65 passed: 28 shared-runtime
+- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (66 passed: 29 shared-runtime
   cases against the test-only definition, 5 ProposalAI-meaning cases, 4 registry/boundary cases,
   2 `ResultView` cases, plus the 26 pre-existing `HandoffConsent` cases) / `build` — all
   passed.

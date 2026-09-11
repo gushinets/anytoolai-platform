@@ -121,6 +121,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const formStartedRef = useRef(false);
   // Bumped by every fetchResult() call; see that function's own comment for why.
   const resultFetchGenerationRef = useRef(0);
+  // True once any concurrent fetchResult() call for the current session has reached a definitive,
+  // artifact-deterministic outcome (a usable result, a malformed one, or a permanently-unavailable
+  // rejection); reset per session at the top of runPoll(). See fetchResult()'s own comment.
+  const resultFetchSettledRef = useRef(false);
 
   const [boot, setBoot] = useState<BootState>({ kind: "loading" });
   const [quota, setQuota] = useState<QuotaState | null>(null);
@@ -253,6 +257,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   async function runPoll(scenarioSessionId: string) {
+    // Fresh per logical run: this session's result-fetch lifecycle (this call plus any later
+    // handleRetryResult() retries against the same artifact) hasn't settled yet.
+    resultFetchSettledRef.current = false;
     const controller = controllerRef.current;
     const polled = await pollScenarioSession(client, scenarioSessionId, { signal: controller?.signal });
     if (controller?.signal.aborted) {
@@ -314,17 +321,26 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // its resultArtifactId); this only fetches the canonical result for it, and never starts a new
   // scenario run -- see the "result-fetch-error" Phase variant's docstring.
   async function fetchResult(scenarioSessionId: string, resultArtifactId: string, checkpointId: string | null) {
-    // A fresh generation per call, checked before every setPhase() below: handleRetryResult()'s
-    // button isn't disabled while a fetch is in flight, so a double-click (or click-during-the-
-    // initial-poll-driven-call, in principle) can start a second, overlapping fetchResult() for
-    // the same artifact. Without this guard, whichever call happens to resolve *last* wins
-    // unconditionally -- an earlier success already showing the result could be clobbered by a
-    // later, slower call's failure, silently discarding an already-correct, already-displayed
-    // result.
+    // handleRetryResult()'s button isn't disabled while a fetch is in flight, so a double-click
+    // (or click-during-the-initial-poll-driven-call, in principle) can start a second, overlapping
+    // fetchResult() for the same artifact. A per-call generation, checked after the await, stops a
+    // *stale* completion from re-showing a superseded transient error -- but generation order
+    // (who started last) and resolution order (who finishes last) aren't the same thing, and every
+    // concurrent call reads the exact same immutable artifact. So a plain "last-started wins" rule
+    // has its own bug: an *older* call's success, resolving after a *newer* call already started,
+    // would be discarded outright by that rule, and a subsequent transient failure from the newer
+    // call would then be the only thing shown -- clobbering a result that was, in fact, already
+    // successfully fetched. `resultFetchSettledRef` fixes this: any definitive, artifact-
+    // deterministic outcome (success, permanently-unavailable, or malformed) is applied the moment
+    // it arrives, from whichever call got there first, and marks the fetch settled so every other
+    // concurrent completion -- of any generation, resolving before or after -- becomes a no-op.
+    // Only a genuinely transient/ambiguous failure (a property of that one network call, not of
+    // the artifact) still needs the generation check, to avoid a stale duplicate error replacing a
+    // more recent one.
     const generation = ++resultFetchGenerationRef.current;
     const controller = controllerRef.current;
     const resultResult = await getResult(client, resultArtifactId, { signal: controller?.signal });
-    if (controller?.signal.aborted || generation !== resultFetchGenerationRef.current) {
+    if (controller?.signal.aborted || resultFetchSettledRef.current) {
       return;
     }
     if (!resultResult.ok) {
@@ -336,13 +352,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         // retry, which would strand the user in a permanent dead end while still claiming "Your
         // result is ready". This session's own start is as dead as its result: only a fresh run
         // (a new Idempotency-Key) has any chance of a usable result.
+        resultFetchSettledRef.current = true;
         enterUnknownError();
         return;
       }
       // Transient/ambiguous: the scenario itself already completed, only this GET failed (network
       // blip, transient 5xx). Landing on "unknown-error" here would let its retry clear
       // pendingStart and mint a fresh Idempotency-Key, starting a whole new (quota-consuming) run
-      // for a result that already exists -- so this gets its own retry path instead.
+      // for a result that already exists -- so this gets its own retry path instead. Only shown if
+      // no newer retry has since started, so a stale failure can't replace a more recent outcome.
+      if (generation !== resultFetchGenerationRef.current) {
+        return;
+      }
       setPhase({ kind: "result-fetch-error", scenarioSessionId, resultArtifactId, checkpointId });
       return;
     }
@@ -350,9 +371,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     if (extracted === null) {
       // The backend returned a genuinely unusable/malformed result -- an unexpected terminal
       // state, not a fetch problem, so this one *does* mean starting over.
+      resultFetchSettledRef.current = true;
       enterUnknownError();
       return;
     }
+    resultFetchSettledRef.current = true;
     setPhase({ kind: "result", scenarioSessionId, checkpointId, result: extracted });
     emitEvent(onEventRef.current, { type: "scenario_completed", scenarioSessionId });
   }

@@ -675,6 +675,49 @@ describe("ProductRunPage", () => {
     expect(screen.queryByText("Your result is ready, but we couldn't load it. Please try again.")).toBeNull();
   });
 
+  it("keeps an already-successful result-fetch retry even when an even-newer overlapping retry later fails", async () => {
+    const { client, calls, resolveCall } = makeClientWithDeferredCalls(
+      {
+        ...bootRoutes(),
+        [ROUTES.START]: [startResponse()],
+        [ROUTES.SESSION]: [sessionResponse()],
+      },
+      ROUTES.RESULT,
+      3,
+    );
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitFor(() => expect(calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(1));
+    resolveCall(0, errorResponse(500, "internal_error"));
+    await waitFor(() =>
+      expect(screen.getByText("Your result is ready, but we couldn't load it. Please try again.")).toBeTruthy(),
+    );
+
+    // Two overlapping retries -- the retry button isn't disabled while a fetch is in flight.
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(3));
+
+    // The earlier (older-generation) retry settles first, with the real result -- this is the
+    // reverse of the resolution order the sibling test above covers, and generation order alone
+    // (call 1 started before call 2) must not be what decides the outcome here.
+    resolveCall(1, resultResponse(TEST_PRODUCT_IDS));
+    await waitForResult();
+
+    // The later (newer-generation) retry settles after, with a failure -- it's just a transient
+    // problem with *that* network call, not a fact about the artifact itself, so it must not
+    // clobber the result the older call already, correctly, obtained.
+    resolveCall(2, errorResponse(500, "internal_error"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+    expect(screen.queryByText("Your result is ready, but we couldn't load it. Please try again.")).toBeNull();
+  });
+
   it("does not offer a retry that would submit with no guest identity after a failed guest-identity self-heal", async () => {
     const { client, calls } = makeClient({
       [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(TEST_PRODUCT_IDS)],
