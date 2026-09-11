@@ -674,4 +674,30 @@ describe("ProductRunPage", () => {
     expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
     expect(screen.queryByText("Your result is ready, but we couldn't load it. Please try again.")).toBeNull();
   });
+
+  it("does not offer a retry that would submit with no guest identity after a failed guest-identity self-heal", async () => {
+    const { client, calls } = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(TEST_PRODUCT_IDS)],
+      // First call succeeds (boot); the second is the self-heal refresh triggered below, and it
+      // fails, so no valid guest id survives it.
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse(), errorResponse(500, "internal_error")],
+      [ROUTES.QUOTA]: [quotaResponse(TEST_PRODUCT_IDS)],
+      [ROUTES.START]: [errorResponse(404, "guest_identity_not_found")],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitFor(() =>
+      expect(screen.getByText("We couldn't verify your identity. Please reload the page and try again.")).toBeTruthy(),
+    );
+    expect(screen.getByText("Please try again.")).toBeTruthy();
+
+    // No "Try again" action offered for this dead end -- clicking one would only submit with
+    // guest_id: null.
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+  });
 });

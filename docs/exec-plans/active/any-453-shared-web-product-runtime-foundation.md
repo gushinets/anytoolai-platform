@@ -582,9 +582,41 @@ contradicted by the very tickets it cited as justification.
   untouched. `python3 scripts/agent/runner.py validate-docs` / `generate-docs --check` — both
   passed after the edits.
 
+## Code review round 7 (PR author's own account, me #5) — disposition
+
+One real bug, confirmed by direct code reading and fixed, with a regression test confirmed to fail
+against the pre-fix code before being left in place:
+
+- **Real bug: the guest-identity self-heal's own "Try again" could submit with no guest identity
+  at all.** `runStart()`'s `isGuestIdentityNotFound` branch calls `refreshGuestIdentity()` to
+  self-heal a stale guest id; if that refresh call itself fails, it sets `guestId` to `undefined`,
+  clears `pendingStart`, and still lands on `retryable-error`. The ordinary form Submit button is
+  correctly disabled in that state (`disabled={busy || identityUnavailable}`), and the form already
+  shows "We couldn't verify your identity. Please reload the page and try again." — but the
+  separate `ErrorState` "Try again" button for `retryable-error` was rendered unconditionally, and
+  neither it nor the `submitCurrentValues()` it calls checked `guestId` at all. Clicking it built a
+  brand new `PreparedScenarioStart` with `guestId: undefined` (serialized as `guest_id: null` on
+  the wire) and submitted it — a request the backend has no way to accept, and after that first
+  doomed retry fails too, its `pendingStart` would be reused by any further "Try again" click
+  (unchanged values), looping the user on the same broken request rather than ever prompting a
+  reload. Fixed at both the render site and the shared function: the "Try again" button is now
+  omitted (`onRetry={identityUnavailable ? undefined : handleRetry}`) whenever
+  `identityUnavailable`, leaving the existing reload message as the only path back; and
+  `submitCurrentValues()` itself now also bails out when `guestId === undefined`, so the same guard
+  holds even if something else ever calls it. Regression test: "does not offer a retry that would
+  submit with no guest identity after a failed guest-identity self-heal" — confirmed to fail
+  against the pre-fix code (button was rendered) before being left in place.
+
+The rest of the review's re-check of rounds 5/6's changes (poll-timeout no longer starting a new
+quota-consuming run, edit-before-retry using current values and a new key, permanent vs. transient
+result errors, concurrent result-fetch retry protection, scenario selection by `scenarioId` not
+array position) found no new blockers, and the round 6 "generic two-run support" thread's
+non-blocking status was reconfirmed against the same ANY-12/ANY-246 ticket text round 6's
+disposition already cited.
+
 ## Required evidence
 
-- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (64 passed: 27 shared-runtime
+- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (65 passed: 28 shared-runtime
   cases against the test-only definition, 5 ProposalAI-meaning cases, 4 registry/boundary cases,
   2 `ResultView` cases, plus the 26 pre-existing `HandoffConsent` cases) / `build` — all
   passed.

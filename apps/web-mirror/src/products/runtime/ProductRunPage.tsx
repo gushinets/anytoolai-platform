@@ -371,7 +371,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // that reused the stale prepared request; only truly unchanged values reuse the same
   // PreparedScenarioStart/Idempotency-Key (see prepareScenarioStart()'s own ANY-150 contract).
   function submitCurrentValues() {
-    if (boot.kind !== "ready" || phase.kind === "submitting" || phase.kind === "running") {
+    // guestId undefined here means either the initial identity fetch never succeeded, or (after a
+    // guest_identity_not_found self-heal) the refresh itself failed -- prepareScenarioStart() would
+    // still build a request, just with a null guest_id, which the backend has no way to accept.
+    // Matches the ordinary Submit button's own `identityUnavailable` guard below, so "Try again"
+    // can't bypass it and mint a doomed prepared start/Idempotency-Key that only loops the user on
+    // the same failure.
+    if (boot.kind !== "ready" || phase.kind === "submitting" || phase.kind === "running" || guestId === undefined) {
       return;
     }
     const errors = definition.validate(values);
@@ -509,11 +515,15 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       {mainContent}
 
       {phase.kind === "retryable-error" ? (
-        // Always available, not gated on `pendingStart`: submitCurrentValues() (called by both
-        // this and the form's own Submit button) builds a fresh prepared start when there's none
-        // to reuse -- e.g. after the guest-identity self-heal path in runStart(), which clears
-        // pendingStart while still landing on retryable-error.
-        <ErrorState message={phase.message} onRetry={handleRetry} />
+        // Not gated on `pendingStart`: submitCurrentValues() (called by both this and the form's
+        // own Submit button) builds a fresh prepared start when there's none to reuse -- e.g.
+        // after the guest-identity self-heal path in runStart(), which clears pendingStart while
+        // still landing on retryable-error. It IS gated on `identityUnavailable`: when the
+        // self-heal's own refresh failed too, there's no valid guest id to submit with, and the
+        // form's own "We couldn't verify your identity. Please reload the page and try again."
+        // message (rendered above, inside the form) is the only path back -- offering a "Try
+        // again" here would only loop the user on a doomed retry.
+        <ErrorState message={phase.message} onRetry={identityUnavailable ? undefined : handleRetry} />
       ) : null}
       {phase.kind === "unknown-error" ? (
         <ErrorState
