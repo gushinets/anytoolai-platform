@@ -314,10 +314,35 @@ see the open question below:
 Not resolved in this pass — needs the user's call, not a unilateral edit to a shared team-visible
 Linear issue. Options: (a) update ANY-453's Linear description with the approved scope change, (b)
 leave Linear as-is and rely on this exec plan / PR description as the record, (c) something else.
+Still open as of the round-2 re-review below — the reviewer left that thread unresolved for the
+same reason.
+
+## Code review round 2 (PR author's own account, and CodeRabbit) — disposition
+
+A second review pass (both the PR author's own re-review and CodeRabbit, an automated reviewer)
+found one real bug in common, plus re-confirmed the three items already fixed above (frontend
+fallback, quota race, and CodeRabbit's own clipboard-availability finding, which matches the fix
+already landed in the coding-conventions/self-review pass before this round — all three replied to
+on the PR pointing at the commits that already fixed them, no further changes needed).
+
+- **Real bug, confirmed: retry after a terminal execution failure replayed the dead session
+  instead of starting a fresh one.** `unknown-error` (a `failed`/`expired` polling result, or an
+  unexpected completed-but-unusable result) is a *definitive* terminal outcome for that specific
+  backend session — different from `retryable-error` (an *ambiguous* transport-level failure
+  during start/poll, where reusing the same `PreparedScenarioStart`/Idempotency-Key is correct;
+  see `beginStart()`). The `unknown-error` retry button only reset `phase` to `"idle"`, leaving
+  `pendingStart` untouched. Retrying without editing the form (the common case) reused the same
+  key; per the scenario-session idempotency contract, a repeated key is replayed as the *existing*
+  session's snapshot rather than starting a new run — so a failed/expired session came back as the
+  same dead session indefinitely, not a fresh attempt. Fixed by clearing `pendingStart` on that
+  retry, forcing the next submit to mint a genuinely new key. Regression test: "starts a genuinely
+  new logical submission (new Idempotency-Key) after a terminal execution failure, instead of
+  replaying the dead session" — confirmed to fail against the pre-fix code (asserted the same key
+  twice) before being left in place with the correct assertion.
 
 ## Required evidence
 
-- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (44 passed) / `build` — all
+- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (47 passed) / `build` — all
   passed.
 - `pnpm --filter @anytoolai/web-result-kit typecheck` / `lint` — passed.
 - `pnpm --filter @anytoolai/ce-kit test` (289 passed, unaffected by this change) — passed, confirms
