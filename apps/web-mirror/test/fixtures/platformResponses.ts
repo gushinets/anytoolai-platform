@@ -116,23 +116,23 @@ export function makeClient(routes: RouteQueues) {
   return makeRoutedFetchClient("https://api.example.com", routes);
 }
 
-/**
- * Like makeClient(), but `deferredRouteKey`'s response is a promise this function returns control
- * of via `resolveDeferred`, instead of being queued up front -- for tests that need one specific
- * request to settle *after* other, later requests/UI interactions have already happened.
- */
-export function makeClientWithDeferredRoute(routes: RouteQueues, deferredRouteKey: string) {
+export type CapturedCall = { key: string; url: string; init: RequestInit };
+
+/** Shared by makeClientWithDeferredRoute()/makeClientCapturingRequests(): dispatches by (method,
+ * path) from `routes`' FIFO queues, recording every call (including its full URL, e.g. for
+ * asserting on query-string parameters) as it goes. */
+function fetchImplFor(
+  routes: RouteQueues,
+  calls: CapturedCall[],
+  onCall?: (key: string) => Response | Promise<Response> | undefined,
+) {
   const queues = new Map(Object.entries(routes).map(([key, responses]) => [key, [...responses]]));
-  const calls: Array<{ key: string; init: RequestInit }> = [];
-  let resolveDeferred!: (response: Response) => void;
-  const deferredResponse = new Promise<Response>((resolve) => {
-    resolveDeferred = resolve;
-  });
-  const fetchImpl = vi.fn(async (url: string, init: RequestInit) => {
+  return vi.fn(async (url: string, init: RequestInit) => {
     const key = `${init.method ?? "GET"} ${new URL(url).pathname}`;
-    calls.push({ key, init });
-    if (key === deferredRouteKey) {
-      return deferredResponse;
+    calls.push({ key, url, init });
+    const overridden = onCall?.(key);
+    if (overridden !== undefined) {
+      return overridden;
     }
     const queue = queues.get(key);
     if (!queue || queue.length === 0) {
@@ -141,11 +141,37 @@ export function makeClientWithDeferredRoute(routes: RouteQueues, deferredRouteKe
     const next = queue.shift();
     return typeof next === "function" ? next() : (next as Response);
   });
+}
+
+/**
+ * Like makeClient(), but `deferredRouteKey`'s response is a promise this function returns control
+ * of via `resolveDeferred`, instead of being queued up front -- for tests that need one specific
+ * request to settle *after* other, later requests/UI interactions have already happened.
+ */
+export function makeClientWithDeferredRoute(routes: RouteQueues, deferredRouteKey: string) {
+  const calls: CapturedCall[] = [];
+  let resolveDeferred!: (response: Response) => void;
+  const deferredResponse = new Promise<Response>((resolve) => {
+    resolveDeferred = resolve;
+  });
+  const fetchImpl = fetchImplFor(routes, calls, (key) => (key === deferredRouteKey ? deferredResponse : undefined));
   const client = new PlatformApiClient({
     baseUrl: "https://api.example.com",
     fetchImpl: fetchImpl as unknown as typeof fetch,
   });
   return { client, calls, resolveDeferred };
+}
+
+/** Like makeClient(), but each call is recorded with its full URL -- for asserting on
+ * query-string parameters (e.g. that a request includes `scenario_id`). */
+export function makeClientCapturingRequests(routes: RouteQueues) {
+  const calls: CapturedCall[] = [];
+  const fetchImpl = fetchImplFor(routes, calls);
+  const client = new PlatformApiClient({
+    baseUrl: "https://api.example.com",
+    fetchImpl: fetchImpl as unknown as typeof fetch,
+  });
+  return { client, calls };
 }
 
 export function idempotencyKeyOf(call: { init: RequestInit }): string | null {

@@ -8,9 +8,10 @@
 - Last updated: 2026-09-11
 - Review date: 2026-09-11
 - Next action: none — happy-path vertical, the generic event integration point, the fixes from
-  every review round, and the Phase 2 extraction of the shared `ProductRunPage` + product-
-  definition contract (with the test-only definition ANY-453's acceptance criteria require) are
-  all implemented and verified.
+  every review round (including round 3's result-fetch-vs-terminal-failure and scenario-dimension
+  quota bugs), and the Phase 2 extraction of the shared `ProductRunPage` + product-definition
+  contract (with the test-only definition ANY-453's acceptance criteria require) are all
+  implemented and verified.
 - Blocker: none
 
 ## Goal
@@ -382,9 +383,55 @@ React component; no renderer registry):
   `test/registry.test.tsx` — additionally proves the fixture is not registered and that the shared
   runtime source imports no product module.
 
+## Code review round 3 (PR author's own account) — disposition
+
+A third review pass on the Phase 2 extraction (`018d049`) found the previous two blockers fixed
+and raised 3 new findings. All verified by direct code reading; 2 real bugs fixed, 1 reviewed and
+declined as premature/speculative for the current single product:
+
+- **Real bug: a transient `getResult()` failure was indistinguishable from a genuinely terminal
+  unusable result, and its retry started a whole new (quota-consuming) scenario run for a session
+  that had already completed successfully.** `runPoll` landed both cases in `unknown-error`, whose
+  retry clears `pendingStart` to mint a fresh Idempotency-Key — correct for a session that never
+  produced a usable result, wrong for one that already has a `resultArtifactId` sitting on the
+  backend and just failed to fetch (a network blip, a transient 5xx on `GET /v1/results/{id}`).
+  Added a `"result-fetch-error"` `Phase` variant (`scenarioSessionId`, `resultArtifactId`,
+  `checkpointId` retained) and a `fetchResult()` helper shared by `runPoll` and its own
+  `handleRetryResult`, which only re-calls `getResult()` — no scenario start, no new key, no form
+  shown (resubmitting would just create a second, wasteful run on top of the one that already
+  succeeded). `extractResult()` returning `null` (a genuinely unusable/malformed canonical result)
+  still lands on `unknown-error`, since that *is* a terminal, unexpected outcome. Regression test:
+  "retries just the result fetch, without starting a new (quota-consuming) run, after a transient
+  failure to fetch an already-completed session's result" — confirmed to fail against the pre-fix
+  code (landed on the generic form-showing `unknown-error` instead) before being left in place.
+- **Real bug: the advisory quota request never passed `scenario_id`.** `docs/architecture/
+  frontend-boundaries.md`: "When a product's quota policy uses `dimension: scenario`, quota state
+  checks also provide `scenario_id`; product-wide policies do not require it" (optional, not
+  rejected, for a product-wide policy). `ProductRunPage` always omitted it, which is correct for
+  ProposalAI's `dimension: product` policy but would silently lose advisory quota state entirely
+  for a future `dimension: scenario` product (the failed quota GET is swallowed as advisory-only).
+  The resolved `scenario.scenarioId` is already in scope at the call site, so passing it
+  unconditionally is free and correct for either quota-dimension shape. Regression test: "includes
+  scenario_id in the advisory quota request, so a scenario-dimension quota policy is also
+  supported" — confirmed to fail (missing query param) against the pre-fix code.
+- **Reviewed and declined (for now): the shared runtime's next-action/checkpoint contract is
+  copy-only, not a general typed multi-checkpoint/next-action system, and `waiting_for_user`
+  always lands on the safe-error state.** Confirmed as accurately described — `ProductDefinition`
+  only has `copyNextActionId`/`ProductResultProps.onCopied`, sized to exactly the single-checkpoint
+  "run to completion, then one post-completion activation" shape ProposalAI proved. Building a
+  general typed next-action/checkpoint system now, with no real multi-checkpoint product (e.g.
+  Send-Ready's user-selected-angle flow) built yet to prove its actual shape, is exactly the
+  "speculative abstraction" ANY-453's own non-goals forbid, and the same premature-genericity
+  mistake round 2's finding #1 disposition already reasoned through once for the runtime
+  extraction as a whole (team-lead guidance: derive the contract from a real product, don't design
+  it ahead of one). Left as a documented, deliberately deferred extension point instead of a code
+  change: `ProductDefinition`'s docstring and `ProductRunPage`'s `waiting_for_user` handling both
+  now say explicitly that generalizing this waits for whichever product first needs a
+  non-single-checkpoint flow, rather than silently under-scoping "generic" as before.
+
 ## Required evidence
 
-- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (55 passed: 18 shared-runtime
+- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (57 passed: 20 shared-runtime
   cases against the test-only definition, 5 ProposalAI-meaning cases, 4 registry/boundary cases,
   2 `ResultView` cases, plus the 26 pre-existing `HandoffConsent` cases) / `build` — all
   passed.

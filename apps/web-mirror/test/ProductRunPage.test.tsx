@@ -13,6 +13,7 @@ import {
   guestIdentityResponse,
   idempotencyKeyOf,
   makeClient,
+  makeClientCapturingRequests,
   makeClientWithDeferredRoute,
   quotaResponse,
   resultResponse,
@@ -90,6 +91,17 @@ describe("ProductRunPage", () => {
     await waitForForm();
     await waitFor(() => expect(screen.getByText("3 of 3 runs remaining.")).toBeTruthy());
     expect(screen.getByRole("heading", { name: "Test Product" })).toBeTruthy();
+  });
+
+  it("includes scenario_id in the advisory quota request, so a scenario-dimension quota policy is also supported", async () => {
+    const { client, calls } = makeClientCapturingRequests(bootRoutes());
+
+    renderPage({ client });
+    await waitForForm();
+
+    const quotaCall = calls.find((call) => call.key === ROUTES.QUOTA);
+    expect(quotaCall).toBeTruthy();
+    expect(new URL(quotaCall!.url).searchParams.get("scenario_id")).toBe(TEST_PRODUCT_IDS.scenarioId);
   });
 
   it("treats a runtime config with no enabled web frontend as unavailable, never falling back to an arbitrary frontend", async () => {
@@ -287,6 +299,30 @@ describe("ProductRunPage", () => {
     expect(idempotencyKeyOf(startCalls[0]!)).toBeTruthy();
     expect(idempotencyKeyOf(startCalls[1]!)).toBeTruthy();
     expect(idempotencyKeyOf(startCalls[0]!)).not.toBe(idempotencyKeyOf(startCalls[1]!));
+  });
+
+  it("retries just the result fetch, without starting a new (quota-consuming) run, after a transient failure to fetch an already-completed session's result", async () => {
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.RESULT]: [errorResponse(500, "internal_error"), resultResponse(TEST_PRODUCT_IDS)],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitFor(() =>
+      expect(screen.getByText("Your result is ready, but we couldn't load it. Please try again.")).toBeTruthy(),
+    );
+    // The run already succeeded -- no form to resubmit, so no risk of a second, wasteful run.
+    expect(screen.queryByLabelText("Text")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await waitForResult();
+    expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+    expect(calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(2);
   });
 
   it("lands on the safe error state when the completed result is unusable by the product", async () => {

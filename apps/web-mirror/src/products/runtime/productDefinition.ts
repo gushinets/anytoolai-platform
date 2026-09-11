@@ -31,6 +31,16 @@ export type ProductResultProps<R> = {
  * What a product owns, and nothing more (ANY-453: "Product modules own only their definition,
  * fields, renderer, and meaning"). `V` is the product's form values; `R` its canonical result.
  * Fields are a product-owned React component, deliberately not a declarative field schema.
+ *
+ * `copyNextActionId`/`onCopied` cover exactly the single-checkpoint "run to completion, then one
+ * post-completion activation" shape ProposalAI proved (`copy_result` after `completed`) -- not a
+ * general `waiting_for_user`/multi-checkpoint/multiple-next-action contract. `ProductRunPage`
+ * currently treats any non-`copy_result`-shaped scenario (a mid-flow `waiting_for_user` needing a
+ * product-chosen next action, e.g. Send-Ready's user-selected-angle checkpoint) as `unknown-error`.
+ * Generalizing this is deliberately deferred, the same way the runtime itself was: to whichever
+ * product first needs a non-single-checkpoint flow, so the generalization is derived from a real
+ * multi-checkpoint product instead of guessed at now with none built (ANY-453's own
+ * "speculative abstractions" non-goal).
  */
 export type ProductDefinition<V extends Record<string, unknown>, R> = {
   productId: string;

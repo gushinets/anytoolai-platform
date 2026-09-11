@@ -65,6 +65,13 @@ type Phase<R> =
   | { kind: "result"; scenarioSessionId: string; checkpointId: string | null; result: R }
   | { kind: "quota-exhausted" }
   | { kind: "retryable-error"; message: string }
+  /**
+   * The scenario session itself completed successfully (we have a `resultArtifactId`) but the
+   * `GET /v1/results/{id}` call failed -- a transient/ambiguous fetch problem, not a backend
+   * conclusion about the run. Distinct from "unknown-error": retrying here only re-fetches the
+   * same artifact, it never starts a new scenario run (see `fetchResult`/`handleRetryResult`).
+   */
+  | { kind: "result-fetch-error"; scenarioSessionId: string; resultArtifactId: string; checkpointId: string | null }
   | { kind: "unknown-error" };
 
 /**
@@ -176,7 +183,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
         if (resolvedGuestId) {
           // Advisory only: shown if it loads in time, never blocks the form from becoming usable.
-          getQuota(client, { productId, guestId: resolvedGuestId }).then((quotaResult) => {
+          // scenarioId is always passed, not just for scenario-dimension policies: per
+          // frontend-boundaries.md, a scenario-dimension quota policy *requires* it while a
+          // product-wide policy simply "does not require it" (optional, not rejected) -- passing
+          // it unconditionally keeps this shared runtime correct for either policy shape without
+          // needing to know which one a given product uses.
+          getQuota(client, { productId, guestId: resolvedGuestId, scenarioId: scenario.scenarioId }).then((quotaResult) => {
             if (controller?.signal.aborted || !quotaResult.ok) {
               return;
             }
@@ -250,9 +262,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     const session = polled.result.value;
     if (session.status !== "completed") {
-      // `failed`/`expired`/`waiting_for_user` (the latter never legitimately happens for a
-      // single-step workflow) all land on the generic safe-error state rather than guessing at
-      // product copy for a status the scenario isn't expected to reach.
+      // `failed`/`expired` land here as genuinely terminal. `waiting_for_user` does too, since
+      // this runtime only supports the single-checkpoint "run to completion, then one
+      // post-completion activation" shape (see `ProductDefinition`'s docstring) -- a mid-flow
+      // checkpoint needing a product-chosen next action isn't handled yet, deliberately, until a
+      // real product needs it.
       setPhase({ kind: "unknown-error" });
       return;
     }
@@ -260,16 +274,34 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       setPhase({ kind: "unknown-error" });
       return;
     }
-    const resultResult = await getResult(client, session.resultArtifactId, { signal: controller?.signal });
+    await fetchResult(scenarioSessionId, session.resultArtifactId, session.currentCheckpointId);
+  }
+
+  // Shared by runPoll and handleRetryResult: the session already completed server-side (we have
+  // its resultArtifactId); this only fetches the canonical result for it, and never starts a new
+  // scenario run -- see the "result-fetch-error" Phase variant's docstring.
+  async function fetchResult(scenarioSessionId: string, resultArtifactId: string, checkpointId: string | null) {
+    const controller = controllerRef.current;
+    const resultResult = await getResult(client, resultArtifactId, { signal: controller?.signal });
     if (controller?.signal.aborted) {
       return;
     }
-    const extracted = resultResult.ok ? definition.extractResult(resultResult.value.output) : null;
+    if (!resultResult.ok) {
+      // Transient/ambiguous: the scenario itself already completed, only this GET failed (network
+      // blip, transient 5xx). Landing on "unknown-error" here would let its retry clear
+      // pendingStart and mint a fresh Idempotency-Key, starting a whole new (quota-consuming) run
+      // for a result that already exists -- so this gets its own retry path instead.
+      setPhase({ kind: "result-fetch-error", scenarioSessionId, resultArtifactId, checkpointId });
+      return;
+    }
+    const extracted = definition.extractResult(resultResult.value.output);
     if (extracted === null) {
+      // The backend returned a genuinely unusable/malformed result -- an unexpected terminal
+      // state, not a fetch problem, so this one *does* mean starting over.
       setPhase({ kind: "unknown-error" });
       return;
     }
-    setPhase({ kind: "result", scenarioSessionId, checkpointId: session.currentCheckpointId, result: extracted });
+    setPhase({ kind: "result", scenarioSessionId, checkpointId, result: extracted });
     emitEvent(onEventRef.current, { type: "scenario_completed", scenarioSessionId });
   }
 
@@ -311,6 +343,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     beginStart(pendingStart.prepared);
+  }
+
+  function handleRetryResult() {
+    if (phase.kind !== "result-fetch-error") {
+      return;
+    }
+    void fetchResult(phase.scenarioSessionId, phase.resultArtifactId, phase.checkpointId);
   }
 
   function handleCopied() {
@@ -369,6 +408,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       break;
     case "quota-exhausted":
       mainContent = <ErrorState message={`You've used all your ${definition.title} runs for now.`} />;
+      break;
+    case "result-fetch-error":
+      // No form here: the scenario run already succeeded and consumed its quota unit -- showing
+      // the form again would invite a second, wasteful run instead of just re-fetching the result
+      // that already exists.
+      mainContent = (
+        <ErrorState message="Your result is ready, but we couldn't load it. Please try again." onRetry={handleRetryResult} />
+      );
       break;
     case "idle":
     case "submitting":
