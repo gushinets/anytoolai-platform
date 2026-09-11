@@ -274,9 +274,50 @@ force TypeScript to narrow `boot` to `{ kind: "ready" }` for every later `boot.s
 `boot.frontendId` access, so a new `BootState` variant lacking those fields already fails
 typecheck without an explicit helper.
 
+## Code review (blocking, PR author's own account) — disposition
+
+Posted as blocking inline PR comments (GitHub does not allow the PR author to submit
+`REQUEST_CHANGES` on their own PR). Two real bugs, fixed:
+
+- **`registry.ts`'s frontend-selection fallback in `ProposalAIProduct.tsx` could pick a disabled or
+  wrong-type frontend.** `frontends.find(web && enabled) ?? frontends[0]` — if no frontend was both
+  `type: "web"` and `enabled`, this silently fell back to whatever `frontends[0]` happened to be
+  (a disabled web frontend, or even a `chrome_extension` entry), still exposing the form/start flow
+  under that id. Removed the `?? frontends[0]` fallback entirely: no enabled web frontend now
+  correctly lands on the `boot-error` safe state. Regression test: "treats a runtime config with no
+  enabled web frontend as unavailable, never falling back to an arbitrary frontend".
+- **The advisory quota GET could resolve after the phase had already moved on and clobber it.** The
+  quota fetch is fire-and-forget alongside the rest of boot; if it resolved `exhausted: true` after
+  the user had already submitted (or even completed) a run, the unconditional
+  `setPhase({ kind: "quota-exhausted" })` would overwrite `submitting`/`running`/`result` and hide
+  an active or already-successful run behind a quota-exhausted screen. Changed to a functional
+  update gated on the phase still being `"idle"`. Regression test: "does not let a late advisory
+  quota response clobber an in-progress or completed run" (uses a custom deferred-response
+  `PlatformApiClient` fetch mock, not the routed-queue test util, since the queue's response shape
+  can't model "resolves after other requests/UI interactions have already happened"). Both new
+  tests confirmed to fail against the pre-fix code before being left in place.
+
+One finding raised a scope/process question rather than a code bug, not resolved in this pass —
+see the open question below:
+
+- **`registry.ts` registers `ProposalAIProduct` as ANY-453's production implementation, while the
+  Linear issue's own literal acceptance criteria describe a shared `ProductRunPage`/typed
+  product-definition contract plus a *test-only* minimal definition, with product-specific modules
+  excluded from the common runtime.** This is exactly the team-lead guidance already recorded at
+  the top of this doc and in the PR description (superseding the original scope) — but the actual
+  Linear issue ANY-453 itself is not updated to reflect it. A reviewer (or future reader) who
+  checks the Linear ticket directly, rather than this exec plan or the PR description, has no way
+  to see the guidance that justifies the deviation from its literal acceptance criteria.
+
+### Open question: should the Linear issue ANY-453 itself be updated to reflect the team-lead's guidance?
+
+Not resolved in this pass — needs the user's call, not a unilateral edit to a shared team-visible
+Linear issue. Options: (a) update ANY-453's Linear description with the approved scope change, (b)
+leave Linear as-is and rely on this exec plan / PR description as the record, (c) something else.
+
 ## Required evidence
 
-- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (42 passed) / `build` — all
+- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (44 passed) / `build` — all
   passed.
 - `pnpm --filter @anytoolai/web-result-kit typecheck` / `lint` — passed.
 - `pnpm --filter @anytoolai/ce-kit test` (289 passed, unaffected by this change) — passed, confirms

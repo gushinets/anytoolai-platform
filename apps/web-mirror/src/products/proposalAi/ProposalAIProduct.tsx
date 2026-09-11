@@ -243,9 +243,12 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
           return;
         }
         const scenario = runtimeResult.value.scenarios[0];
-        const frontend =
-          runtimeResult.value.frontends.find((candidate) => candidate.type === "web" && candidate.enabled) ??
-          runtimeResult.value.frontends[0];
+        // No fallback to frontends[0]: that could silently select a disabled frontend or a
+        // non-web one, letting a disabled/wrong-type frontend still expose the form/start flow.
+        // No enabled web frontend means this product isn't actually available here.
+        const frontend = runtimeResult.value.frontends.find(
+          (candidate) => candidate.type === "web" && candidate.enabled,
+        );
         if (!scenario || !frontend) {
           setBoot({ kind: "boot-error" });
           return;
@@ -260,7 +263,11 @@ export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
             }
             setQuota(quotaResult.value);
             if (quotaResult.value.exhausted) {
-              setPhase({ kind: "quota-exhausted" });
+              // Functional update, gated on the phase still being "idle": this advisory GET can
+              // resolve after the user has already submitted (or even completed) a run -- an
+              // unconditional setPhase() here would clobber "submitting"/"running"/"result" with
+              // a stale "quota-exhausted", hiding an active or already-successful run behind it.
+              setPhase((prev) => (prev.kind === "idle" ? { kind: "quota-exhausted" } : prev));
             }
           }, _noop);
         }

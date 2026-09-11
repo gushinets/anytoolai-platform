@@ -1,3 +1,4 @@
+import { PlatformApiClient } from "@anytoolai/ce-kit";
 import { makeRoutedFetchClient } from "@anytoolai/ce-kit/test/testUtils/routedFetchClient";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
@@ -122,6 +123,41 @@ function makeClient(routes: Record<string, Array<Response | (() => Response)>>) 
   return makeRoutedFetchClient("https://api.example.com", routes);
 }
 
+/**
+ * Like makeClient(), but `deferredRouteKey`'s response is a promise this function returns control
+ * of via `resolveDeferred`, instead of being queued up front -- for tests that need one specific
+ * request to settle *after* other, later requests/UI interactions have already happened.
+ */
+function makeClientWithDeferredRoute(
+  routes: Record<string, Array<Response | (() => Response)>>,
+  deferredRouteKey: string,
+) {
+  const queues = new Map(Object.entries(routes).map(([key, responses]) => [key, [...responses]]));
+  const calls: Array<{ key: string; init: RequestInit }> = [];
+  let resolveDeferred!: (response: Response) => void;
+  const deferredResponse = new Promise<Response>((resolve) => {
+    resolveDeferred = resolve;
+  });
+  const fetchImpl = vi.fn(async (url: string, init: RequestInit) => {
+    const key = `${init.method ?? "GET"} ${new URL(url).pathname}`;
+    calls.push({ key, init });
+    if (key === deferredRouteKey) {
+      return deferredResponse;
+    }
+    const queue = queues.get(key);
+    if (!queue || queue.length === 0) {
+      throw new Error(`No mock response queued for ${key}`);
+    }
+    const next = queue.shift();
+    return typeof next === "function" ? next() : (next as Response);
+  });
+  const client = new PlatformApiClient({
+    baseUrl: "https://api.example.com",
+    fetchImpl: fetchImpl as unknown as typeof fetch,
+  });
+  return { client, calls, resolveDeferred };
+}
+
 function fillValidForm() {
   fireEvent.change(screen.getByLabelText("Describe the task"), {
     target: { value: "Build a landing page for a bakery." },
@@ -151,6 +187,28 @@ describe("ProposalAIProduct", () => {
     expect(screen.getByRole("status").textContent).toMatch(/loading/i);
     await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
     await waitFor(() => expect(screen.getByText("3 of 3 proposals remaining.")).toBeTruthy());
+  });
+
+  it("treats a runtime config with no enabled web frontend as unavailable, never falling back to an arbitrary frontend", async () => {
+    const { client } = makeClient({
+      [RUNTIME_CONFIG_ROUTE]: [
+        runtimeConfigResponse({
+          frontend_ids: ["web_mirror", "kernel_demo_ce"],
+          frontends: [
+            { frontend_id: "web_mirror", type: "web", enabled: false },
+            { frontend_id: "kernel_demo_ce", type: "chrome_extension", enabled: true },
+          ],
+        }),
+      ],
+      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+    });
+
+    render(<ProposalAIProduct client={client} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("ProposalAI is unavailable right now. Please reload the page.")).toBeTruthy(),
+    );
+    expect(screen.queryByLabelText("Describe the task")).toBeNull();
   });
 
   it("fires product_viewed exactly once even under React StrictMode's dev-only double-invoke of effects", async () => {
@@ -249,6 +307,35 @@ describe("ProposalAIProduct", () => {
 
     await waitFor(() => expect(screen.getByText("You've used all your ProposalAI runs for now.")).toBeTruthy());
     expect(screen.queryByRole("status", { name: /generating/i })).toBeNull();
+  });
+
+  it("does not let a late advisory quota response clobber an in-progress or completed run", async () => {
+    const { client, resolveDeferred } = makeClientWithDeferredRoute(
+      {
+        [RUNTIME_CONFIG_ROUTE]: [runtimeConfigResponse()],
+        [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
+        [START_ROUTE]: [startResponse()],
+        [SESSION_ROUTE]: [sessionResponse()],
+        [RESULT_ROUTE]: [resultResponse()],
+      },
+      QUOTA_ROUTE,
+    );
+
+    render(<ProposalAIProduct client={client} />);
+    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
+    fillValidForm();
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+    await waitFor(() => expect(screen.getByText("Dear client, here is my proposal.")).toBeTruthy());
+
+    // The advisory quota GET only settles now, well after the run already completed -- exhausted,
+    // as it would genuinely be after consuming the run this session just made.
+    resolveDeferred(quotaResponse({ used_count: 3, remaining_count: 0, exhausted: true }));
+
+    // Confirms the response was actually processed (the advisory banner updates)...
+    await waitFor(() => expect(screen.getByText("0 of 3 proposals remaining.")).toBeTruthy());
+    // ...without clobbering the already-completed run underneath it.
+    expect(screen.getByText("Dear client, here is my proposal.")).toBeTruthy();
+    expect(screen.queryByText("You've used all your ProposalAI runs for now.")).toBeNull();
   });
 
   it("preserves entered form values and retries with the same Idempotency-Key after a retryable start failure", async () => {
