@@ -2,3 +2,15 @@ product_events:
   - kernel_demo.result_viewed
   - kernel_demo.result_copied
   - kernel_demo.handoff_clicked
+
+# ANY-17: this product's closed vocabulary for the web.* client-event `mode`/`gap_category`
+# scalar properties. A value that isn't in the declared list for its key is rejected -- these are
+# smoke-test values for kernel_demo's own generic proof, not a real product's category set.
+client_event_properties:
+  mode:
+    - one_run
+    - two_run
+  gap_category:
+    - budget
+    - timeline
+    - scope
