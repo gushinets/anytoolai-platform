@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from anytoolai_platform_api.atom_lab.cache import apply_atom_lab_cache_policy
 from anytoolai_platform_core.common.errors import PlatformError
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
@@ -69,12 +70,14 @@ async def atom_lab_api_error_handler(request: Request, exc: AtomLabApiError) -> 
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    return _error_response(
+    response = _error_response(
         request,
         status_code=500,
         code="internal_server_error",
         message="Internal server error",
     )
+    apply_atom_lab_cache_policy(request, response)
+    return response
 
 
 async def request_validation_error_handler(

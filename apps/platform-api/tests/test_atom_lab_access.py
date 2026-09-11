@@ -40,12 +40,14 @@ async def _request(
     json: dict[str, object] | None = None,
     access_code: str | None = None,
     request_id: str = "req_atom_lab",
+    raise_app_exceptions: bool = True,
 ) -> httpx.Response:
     headers = {"X-Request-ID": request_id}
     if access_code is not None:
         headers["X-Atom-Lab-Access-Code"] = access_code
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        transport=httpx.ASGITransport(app=app, raise_app_exceptions=raise_app_exceptions),
+        base_url="http://testserver",
     ) as client:
         return await client.request(method, path, headers=headers, json=json)
 
@@ -149,6 +151,24 @@ def test_atom_lab_protected_responses_are_not_stored_by_caches(
     )
 
     assert response.status_code == expected_status
+    assert response.headers["Cache-Control"] == "no-store"
+
+
+def test_atom_lab_unhandled_error_response_is_not_stored_by_caches(app) -> None:
+    @app.get("/v1/atom-lab/failure-probe")
+    def failure_probe() -> None:
+        raise RuntimeError("probe failure")
+
+    response = asyncio.run(
+        _request(
+            app,
+            "/v1/atom-lab/failure-probe",
+            access_code=ACCESS_CODE,
+            raise_app_exceptions=False,
+        )
+    )
+
+    assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
     assert response.headers["Cache-Control"] == "no-store"
 
 
