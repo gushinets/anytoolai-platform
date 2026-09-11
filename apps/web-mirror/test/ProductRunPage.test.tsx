@@ -2,7 +2,7 @@
 // "One test-only definition proves registration, form submission, scenario polling, canonical
 // result rendering, next-action callback, retry, and quota/error behavior") -- no real product's
 // meaning is in the loop here. ProposalAI's own meaning is covered in ProposalAIProduct.test.tsx.
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProductRunPage, type ProductRunPageProps } from "../src/products/runtime/ProductRunPage";
@@ -14,6 +14,7 @@ import {
   idempotencyKeyOf,
   makeClient,
   makeClientCapturingRequests,
+  makeClientWithDeferredCalls,
   makeClientWithDeferredRoute,
   quotaResponse,
   resultResponse,
@@ -79,6 +80,14 @@ function submit() {
 
 async function waitForResult() {
   await waitFor(() => expect(screen.getByText(RESULT_TEXT)).toBeTruthy());
+}
+
+/** Advances fake timers in small ticks so pending microtasks (fetch/promise chains) settle in
+ * between -- same pattern ce-kit's own pollScenarioSession.test.ts uses. */
+async function advance(ms: number, step = 50): Promise<void> {
+  for (let elapsed = 0; elapsed < ms; elapsed += step) {
+    await vi.advanceTimersByTimeAsync(Math.min(step, ms - elapsed));
+  }
 }
 
 describe("ProductRunPage", () => {
@@ -488,5 +497,118 @@ describe("ProductRunPage", () => {
     await waitForResult();
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+  });
+
+  it("treats a poll that gives up while the session is still non-terminal as retryable, not a dead run", async () => {
+    const { client } = makeClient({
+      ...bootRoutes(),
+      [ROUTES.START]: [startResponse()],
+      // pollScenarioSession's default budget (60s / 2s interval) needs ~30 GETs before it gives
+      // up; queued generously above that so the poll -- not the mock -- is what runs out first.
+      [ROUTES.SESSION]: Array.from({ length: 40 }, () => () => sessionResponse({ status: "running" })),
+    });
+
+    renderPage({ client });
+    // Real timers for boot/form (testing-library's own waitFor polling relies on them); fake
+    // timers are only switched on once the poll's 60s wait is the sole thing left to get through.
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        await advance(61_000);
+      });
+
+      expect(screen.getByText("This is taking longer than expected. Please try again.")).toBeTruthy();
+      // Still recoverable, not a dead run: retry stays available and reuses the same submission.
+      expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("submits freshly edited values, with a new Idempotency-Key, instead of silently replaying stale ones after a retryable failure", async () => {
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [errorResponse(500, "internal_error"), startResponse()],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start test product/i));
+
+    // The form stays editable in this phase -- an edit made here must actually reach the backend.
+    fireEvent.change(screen.getByLabelText("Text"), { target: { value: "Edited input text." } });
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await waitForResult();
+    const startCalls = calls.filter((call) => call.key === ROUTES.START);
+    expect(startCalls).toHaveLength(2);
+    expect(JSON.parse(startCalls[1]!.init.body as string)).toMatchObject({ input: { text: "Edited input text." } });
+    // A genuinely different submission must mint a fresh key, not reuse the pre-edit one.
+    expect(idempotencyKeyOf(startCalls[1]!)).not.toBe(idempotencyKeyOf(startCalls[0]!));
+  });
+
+  it("treats a permanently unavailable result as a dead run, not a same-artifact retry", async () => {
+    const { client } = makeClient({
+      ...bootRoutes(),
+      [ROUTES.START]: [startResponse()],
+      [ROUTES.SESSION]: [sessionResponse()],
+      [ROUTES.RESULT]: [errorResponse(404, "result_artifact_not_found")],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitFor(() => expect(screen.getByText(RUN_FAILED)).toBeTruthy());
+    // Not the same-artifact "couldn't load it" retry -- that would strand the user on an artifact
+    // the backend has definitively rejected, forever.
+    expect(screen.queryByText("Your result is ready, but we couldn't load it. Please try again.")).toBeNull();
+  });
+
+  it("ignores a stale, slower result-fetch retry so it can't clobber an already-applied newer success", async () => {
+    const { client, calls, resolveCall } = makeClientWithDeferredCalls(
+      {
+        ...bootRoutes(),
+        [ROUTES.START]: [startResponse()],
+        [ROUTES.SESSION]: [sessionResponse()],
+      },
+      ROUTES.RESULT,
+      3,
+    );
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    await waitFor(() => expect(calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(1));
+    resolveCall(0, errorResponse(500, "internal_error"));
+    await waitFor(() =>
+      expect(screen.getByText("Your result is ready, but we couldn't load it. Please try again.")).toBeTruthy(),
+    );
+
+    // Two overlapping retries -- the retry button isn't disabled while a fetch is in flight.
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(3));
+
+    // The later (newer-generation) call settles first, with the real result.
+    resolveCall(2, resultResponse(TEST_PRODUCT_IDS));
+    await waitForResult();
+
+    // The earlier (now-stale) call settles after, with a failure -- must not clobber the result
+    // already showing.
+    resolveCall(1, errorResponse(500, "internal_error"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+    expect(screen.queryByText("Your result is ready, but we couldn't load it. Please try again.")).toBeNull();
   });
 });

@@ -9,6 +9,8 @@ import {
   getRuntimeConfig,
   isGuestIdentityNotFound,
   isQuotaExhausted,
+  isResultNotFound,
+  isResultUnavailable,
   nextAction,
   pollScenarioSession,
   prepareScenarioStart,
@@ -117,6 +119,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     emitEvent(onEventRef.current, { type: "product_viewed" });
   }, []);
   const formStartedRef = useRef(false);
+  // Bumped by every fetchResult() call; see that function's own comment for why.
+  const resultFetchGenerationRef = useRef(0);
 
   const [boot, setBoot] = useState<BootState>({ kind: "loading" });
   const [quota, setQuota] = useState<QuotaState | null>(null);
@@ -260,6 +264,17 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       });
       return;
     }
+    if (polled.reason === "timeout") {
+      // pollScenarioSession() returning `result.ok: true` together with `reason: "timeout"` means
+      // the *last* snapshot it saw was still non-terminal (started/running) when the bounded
+      // polling budget ran out -- not a backend conclusion about the run, just this poll giving
+      // up early. Treating that as enterUnknownError() (like a genuinely terminal status below)
+      // would clear pendingStart and abandon a job that may still be actively running server-side.
+      // Ambiguous, so this is retryable-error: its retry reuses the same Idempotency-Key, and the
+      // backend collapses that back onto this same session rather than starting a new one.
+      setPhase({ kind: "retryable-error", message: "This is taking longer than expected. Please try again." });
+      return;
+    }
     const session = polled.result.value;
     if (session.status !== "completed") {
       // `failed`/`expired` land here as genuinely terminal. `waiting_for_user` does too, since
@@ -295,12 +310,31 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // its resultArtifactId); this only fetches the canonical result for it, and never starts a new
   // scenario run -- see the "result-fetch-error" Phase variant's docstring.
   async function fetchResult(scenarioSessionId: string, resultArtifactId: string, checkpointId: string | null) {
+    // A fresh generation per call, checked before every setPhase() below: handleRetryResult()'s
+    // button isn't disabled while a fetch is in flight, so a double-click (or click-during-the-
+    // initial-poll-driven-call, in principle) can start a second, overlapping fetchResult() for
+    // the same artifact. Without this guard, whichever call happens to resolve *last* wins
+    // unconditionally -- an earlier success already showing the result could be clobbered by a
+    // later, slower call's failure, silently discarding an already-correct, already-displayed
+    // result.
+    const generation = ++resultFetchGenerationRef.current;
     const controller = controllerRef.current;
     const resultResult = await getResult(client, resultArtifactId, { signal: controller?.signal });
-    if (controller?.signal.aborted) {
+    if (controller?.signal.aborted || generation !== resultFetchGenerationRef.current) {
       return;
     }
     if (!resultResult.ok) {
+      if (isResultNotFound(resultResult.error) || isResultUnavailable(resultResult.error)) {
+        // Permanently unavailable, not transient: the backend has definitively rejected this
+        // artifact id (e.g. it failed canonical/schema validation) or doesn't recognize it at
+        // all. Repeating the same GET can never succeed, so this must not land on
+        // "result-fetch-error" -- that state hides the form and offers only a same-artifact
+        // retry, which would strand the user in a permanent dead end while still claiming "Your
+        // result is ready". This session's own start is as dead as its result: only a fresh run
+        // (a new Idempotency-Key) has any chance of a usable result.
+        enterUnknownError();
+        return;
+      }
       // Transient/ambiguous: the scenario itself already completed, only this GET failed (network
       // blip, transient 5xx). Landing on "unknown-error" here would let its retry clear
       // pendingStart and mint a fresh Idempotency-Key, starting a whole new (quota-consuming) run
@@ -326,8 +360,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     void runStart(prepared);
   }
 
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault();
+  // Shared by handleSubmit and handleRetry (the "Try again" button on retryable-error): always
+  // validates and reuses-or-rebuilds against the *current* values, never blindly replays whatever
+  // was captured at the original submit. A field edited after a retryable failure (the form stays
+  // editable in that phase) must actually reach the backend, not be silently discarded by a retry
+  // that reused the stale prepared request; only truly unchanged values reuse the same
+  // PreparedScenarioStart/Idempotency-Key (see prepareScenarioStart()'s own ANY-150 contract).
+  function submitCurrentValues() {
     if (boot.kind !== "ready" || phase.kind === "submitting" || phase.kind === "running") {
       return;
     }
@@ -352,11 +391,16 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     beginStart(prepared);
   }
 
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    submitCurrentValues();
+  }
+
   function handleRetry() {
-    if (phase.kind !== "retryable-error" || !pendingStart) {
+    if (phase.kind !== "retryable-error") {
       return;
     }
-    beginStart(pendingStart.prepared);
+    submitCurrentValues();
   }
 
   function handleRetryResult() {
@@ -461,7 +505,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       {mainContent}
 
       {phase.kind === "retryable-error" ? (
-        <ErrorState message={phase.message} onRetry={pendingStart ? handleRetry : undefined} />
+        // Always available, not gated on `pendingStart`: submitCurrentValues() (called by both
+        // this and the form's own Submit button) builds a fresh prepared start when there's none
+        // to reuse -- e.g. after the guest-identity self-heal path in runStart(), which clears
+        // pendingStart while still landing on retryable-error.
+        <ErrorState message={phase.message} onRetry={handleRetry} />
       ) : null}
       {phase.kind === "unknown-error" ? (
         <ErrorState

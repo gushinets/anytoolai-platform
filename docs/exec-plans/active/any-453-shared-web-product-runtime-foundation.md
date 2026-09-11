@@ -463,9 +463,67 @@ unrelated and not touched:
   against drive-by fixes to unrelated pre-existing issues while touching a different area of the
   repo. A re-run (this round's own push already triggers one) should very likely pass.
 
+## Code review round 5 (team lead #1) — disposition
+
+Four real bugs in `ProductRunPage`, all confirmed by direct code reading against the current
+polling/result-fetch/retry logic and fixed; each has a regression test confirmed to fail against
+the pre-fix code (temporarily reverted, tested, restored) before being left in place:
+
+- **P1: a poll that gave up while the session was still non-terminal was treated as a dead run.**
+  `pollScenarioSession()` can return `reason: "timeout"` together with `result.ok: true` — its last
+  observed snapshot was still `started`/`running` when the bounded ~60s polling budget simply ran
+  out, not a backend conclusion about the run. `runPoll` fell through to the `session.status !==
+  "completed"` branch in that case, calling `enterUnknownError()` exactly as it does for a
+  genuinely terminal `failed`/`expired` status — clearing `pendingStart` and abandoning a job that
+  may still be actively running server-side, with no way back to it except starting an entirely
+  new (quota-consuming) run. Added an explicit `polled.reason === "timeout"` check before the
+  status branch, landing on `retryable-error` instead: its retry reuses the same
+  `PreparedScenarioStart`/Idempotency-Key, so the backend collapses it back onto this same session
+  rather than starting a new one. Regression test: "treats a poll that gives up while the session
+  is still non-terminal as retryable, not a dead run" (fake-timers-driven, following ce-kit's own
+  `pollScenarioSession.test.ts` `advance()` pattern) — confirmed to fail against the pre-fix code
+  (landed on the generic `unknown-error` message instead).
+- **P2: editing the form after a retryable failure and clicking "Try again" silently replayed the
+  stale pre-edit values.** `handleRetry` called `beginStart(pendingStart.prepared)` directly
+  whenever `pendingStart` existed, ignoring whatever the user had since typed — the form stays
+  editable in `retryable-error`, so this discarded a real edit without any indication to the user.
+  Extracted the shared `submitCurrentValues()` (used by both `handleSubmit` and `handleRetry`),
+  which always validates and reuses-or-rebuilds against the *current* `values`: only inputs that
+  are still shallow-equal to the pending attempt's reuse the existing prepared
+  start/Idempotency-Key, a genuine edit builds a fresh one. Also removed the `pendingStart`-gated
+  visibility of the retry button (`submitCurrentValues()` already handles a null `pendingStart` by
+  building a fresh start, so gating was never necessary and only obscured the retry path after the
+  guest-identity self-heal branch, which clears `pendingStart` while still landing on
+  `retryable-error`). Regression test: "submits freshly edited values, with a new Idempotency-Key,
+  instead of silently replaying stale ones after a retryable failure" — confirmed to fail against
+  the pre-fix code (start request carried the pre-edit text).
+- **P2: a permanently unavailable result was treated as a transient fetch problem.** `fetchResult`
+  landed every `getResult()` failure on `"result-fetch-error"`, whose only recovery is re-fetching
+  the *same* artifact id — correct for a network blip or transient 5xx, wrong for
+  `result_artifact_not_found`/`result_artifact_unavailable` (ce-kit's `isResultNotFound()` /
+  `isResultUnavailable()`), which the backend has definitively and permanently rejected. That
+  stranded the user on "Your result is ready, but we couldn't load it" with a retry that could
+  never succeed. Added the classifier check ahead of the generic transient branch, routing to
+  `enterUnknownError()` instead (this session's own start is as dead as its result — only a fresh
+  run has any chance of a usable one). Regression test: "treats a permanently unavailable result as
+  a dead run, not a same-artifact retry" — confirmed to fail against the pre-fix code (landed on
+  the same-artifact retry message).
+- **P2: an overlapping, slower result-fetch retry could clobber an already-applied newer
+  success.** `handleRetryResult`'s "Try again" button isn't disabled while a fetch is already in
+  flight, so two rapid clicks can start two overlapping `fetchResult()` calls for the same
+  artifact; whichever happened to *resolve* last won unconditionally, regardless of which was
+  started last — a slower, stale call's failure could overwrite an already-displayed, already-
+  correct result from a call started after it. Added `resultFetchGenerationRef`, incremented once
+  per `fetchResult()` invocation and checked immediately after the `getResult()` await returns:
+  any call whose generation no longer matches the ref's current value (a newer call has since
+  started) is a no-op. Regression test: "ignores a stale, slower result-fetch retry so it can't
+  clobber an already-applied newer success" (using a new `makeClientWithDeferredCalls()` test
+  fixture helper, resolving the later-started call first, then the earlier one, with a failure) —
+  confirmed to fail against the pre-fix code (the result was clobbered by the stale failure).
+
 ## Required evidence
 
-- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (58 passed: 21 shared-runtime
+- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (62 passed: 25 shared-runtime
   cases against the test-only definition, 5 ProposalAI-meaning cases, 4 registry/boundary cases,
   2 `ResultView` cases, plus the 26 pre-existing `HandoffConsent` cases) / `build` — all
   passed.

@@ -162,6 +162,44 @@ export function makeClientWithDeferredRoute(routes: RouteQueues, deferredRouteKe
   return { client, calls, resolveDeferred };
 }
 
+/**
+ * Like makeClientWithDeferredRoute(), but `deferredRouteKey` gets its own independent, separately
+ * resolvable promise for each of its first `callCount` calls -- for tests proving an out-of-order
+ * response race (e.g. a second, slower call's later failure must not clobber a first call's
+ * already-applied earlier success). `resolveCall(0, ...)` resolves the first call to that route,
+ * `resolveCall(1, ...)` the second, and so on.
+ */
+export function makeClientWithDeferredCalls(routes: RouteQueues, deferredRouteKey: string, callCount: number) {
+  const calls: CapturedCall[] = [];
+  const resolvers: Array<(response: Response) => void> = [];
+  const deferredResponses: Promise<Response>[] = [];
+  for (let index = 0; index < callCount; index += 1) {
+    let resolve!: (response: Response) => void;
+    deferredResponses.push(new Promise<Response>((res) => (resolve = res)));
+    resolvers.push(resolve);
+  }
+  let callIndex = 0;
+  const fetchImpl = fetchImplFor(routes, calls, (key) => {
+    if (key !== deferredRouteKey) {
+      return undefined;
+    }
+    const promise = deferredResponses[callIndex];
+    callIndex += 1;
+    return promise;
+  });
+  const client = new PlatformApiClient({
+    baseUrl: "https://api.example.com",
+    fetchImpl: fetchImpl as unknown as typeof fetch,
+  });
+  return {
+    client,
+    calls,
+    resolveCall: (index: number, response: Response) => {
+      resolvers[index]!(response);
+    },
+  };
+}
+
 /** Like makeClient(), but each call is recorded with its full URL -- for asserting on
  * query-string parameters (e.g. that a request includes `scenario_id`). */
 export function makeClientCapturingRequests(routes: RouteQueues) {
