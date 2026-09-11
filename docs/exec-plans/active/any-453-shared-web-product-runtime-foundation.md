@@ -644,9 +644,40 @@ against the pre-fix code before being left in place:
   discarded, then the newer call's failure was shown) before being left in place, alongside the
   existing round-5 regression test (re-confirmed still passing, covering the original order).
 
+## Code review round 9 (PR author's own account, me #7) — disposition
+
+One real bug, confirmed by direct code reading and fixed, with a regression test confirmed to fail
+against the pre-fix code before being left in place:
+
+- **Real bug: round 8's `resultFetchSettledRef` was scoped to the whole component, not to one
+  session, so a stale result-fetch retry from a superseded session could corrupt a brand new
+  session's own state.** `runPoll()` resets `resultFetchSettledRef` to `false` at the start of
+  every new logical run, but `controllerRef`'s `AbortController` lives for the whole component
+  (not per run), so an old session's still-in-flight `fetchResult()` retries are never cancelled
+  when a new session starts. Concretely: session 1 fails transiently, the user fires two
+  overlapping retries, one comes back permanently rejected (correctly landing session 1 on
+  `unknown-error`, since that verdict really is deterministic for session 1's own artifact) while
+  the other is left pending; the user starts a brand new session 2, whose `runPoll()` resets the
+  shared flag to `false` again; the still-pending session-1 retry then resolves (with the same
+  permanent rejection) and, because the flag it checks is shared and was just reset, passes the
+  same "deterministic, no generation check" fast path round 8 added -- calling
+  `enterUnknownError()` and clearing `pendingStart` for session 2, even though session 2 might
+  still be actively running or about to show its own, entirely different, correct result. Added
+  `activeScenarioSessionIdRef`, set alongside the settled-flag reset at the top of `runPoll()`:
+  `fetchResult()` now discards any call whose own `scenarioSessionId` no longer matches the
+  currently active one, before any other check -- a call belonging to a superseded session is
+  stale by definition, regardless of how "deterministic" its outcome would otherwise be treated
+  within its own (no-longer-relevant) session. Generalized the `makeClientWithDeferredCalls()` test
+  fixture (single-route-only before) to defer calls across multiple independent routes at once, so
+  the regression test could hold session 2's own result fetch pending while resolving session 1's
+  stale retry in exactly the window the finding describes. Regression test: "does not let a stale
+  result-fetch retry from a superseded session corrupt the new session's own state" — confirmed to
+  fail against the pre-fix (round 8) code (session 2 was shown session 1's "Something went wrong"
+  message instead of its own running/result state) before being left in place.
+
 ## Required evidence
 
-- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (66 passed: 29 shared-runtime
+- `pnpm --filter @anytoolai/web-mirror typecheck` / `lint` / `test` (67 passed: 30 shared-runtime
   cases against the test-only definition, 5 ProposalAI-meaning cases, 4 registry/boundary cases,
   2 `ResultView` cases, plus the 26 pre-existing `HandoffConsent` cases) / `build` — all
   passed.

@@ -642,8 +642,7 @@ describe("ProductRunPage", () => {
         [ROUTES.START]: [startResponse()],
         [ROUTES.SESSION]: [sessionResponse()],
       },
-      ROUTES.RESULT,
-      3,
+      { [ROUTES.RESULT]: 3 },
     );
 
     renderPage({ client });
@@ -652,7 +651,7 @@ describe("ProductRunPage", () => {
     submit();
 
     await waitFor(() => expect(calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(1));
-    resolveCall(0, errorResponse(500, "internal_error"));
+    resolveCall(ROUTES.RESULT, 0, errorResponse(500, "internal_error"));
     await waitFor(() =>
       expect(screen.getByText("Your result is ready, but we couldn't load it. Please try again.")).toBeTruthy(),
     );
@@ -663,16 +662,72 @@ describe("ProductRunPage", () => {
     await waitFor(() => expect(calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(3));
 
     // The later (newer-generation) call settles first, with the real result.
-    resolveCall(2, resultResponse(TEST_PRODUCT_IDS));
+    resolveCall(ROUTES.RESULT, 2, resultResponse(TEST_PRODUCT_IDS));
     await waitForResult();
 
     // The earlier (now-stale) call settles after, with a failure -- must not clobber the result
     // already showing.
-    resolveCall(1, errorResponse(500, "internal_error"));
+    resolveCall(ROUTES.RESULT, 1, errorResponse(500, "internal_error"));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
     expect(screen.queryByText("Your result is ready, but we couldn't load it. Please try again.")).toBeNull();
+  });
+
+  it("does not let a stale result-fetch retry from a superseded session corrupt the new session's own state", async () => {
+    const SECOND_SESSION_ROUTE = "GET /v1/scenario-sessions/session_2";
+    const SECOND_RESULT_ROUTE = "GET /v1/results/result_2";
+    const { client, calls, resolveCall } = makeClientWithDeferredCalls(
+      {
+        ...bootRoutes(),
+        [ROUTES.START]: [startResponse(), startResponse({ scenario_session_id: "session_2" })],
+        [ROUTES.SESSION]: [sessionResponse()],
+        [SECOND_SESSION_ROUTE]: [
+          sessionResponse({ scenario_session_id: "session_2", status: "completed", result_artifact_id: "result_2" }),
+        ],
+      },
+      { [ROUTES.RESULT]: 3, [SECOND_RESULT_ROUTE]: 1 },
+    );
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+
+    // Session 1's initial result fetch fails transiently.
+    await waitFor(() => expect(calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(1));
+    resolveCall(ROUTES.RESULT, 0, errorResponse(500, "internal_error"));
+    await waitFor(() =>
+      expect(screen.getByText("Your result is ready, but we couldn't load it. Please try again.")).toBeTruthy(),
+    );
+
+    // Two overlapping retries, both still for session 1's own artifact.
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(3));
+
+    // The first retry comes back permanently rejected -- session 1 is a dead end, so the form for
+    // a fresh run reappears. The second retry is deliberately left pending here.
+    resolveCall(ROUTES.RESULT, 1, errorResponse(404, "result_artifact_unavailable"));
+    await waitFor(() => expect(screen.getByText(RUN_FAILED)).toBeTruthy());
+
+    // Start a brand new, unrelated session 2 -- its own result fetch is deliberately left pending
+    // too, so the next step lands squarely in the window the original bug report describes.
+    submit();
+    await waitFor(() => expect(calls.filter((call) => call.key === SECOND_RESULT_ROUTE)).toHaveLength(1));
+
+    // Session 1's still-pending second retry resolves now, *while session 2's own result fetch is
+    // still in flight*. It belongs to an already-superseded session, so it must not be allowed to
+    // act on session 2's state at all -- not even via the same "permanently unavailable" outcome
+    // that was a correct, deterministic verdict for session 1's own artifact.
+    resolveCall(ROUTES.RESULT, 2, errorResponse(404, "result_artifact_unavailable"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByText(RUN_FAILED)).toBeNull();
+
+    // Session 2's own result then arrives and must be shown, undisturbed.
+    resolveCall(SECOND_RESULT_ROUTE, 0, resultResponse(TEST_PRODUCT_IDS, { result_artifact_id: "result_2" }));
+    await waitForResult();
+    expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
   });
 
   it("keeps an already-successful result-fetch retry even when an even-newer overlapping retry later fails", async () => {
@@ -682,8 +737,7 @@ describe("ProductRunPage", () => {
         [ROUTES.START]: [startResponse()],
         [ROUTES.SESSION]: [sessionResponse()],
       },
-      ROUTES.RESULT,
-      3,
+      { [ROUTES.RESULT]: 3 },
     );
 
     renderPage({ client });
@@ -692,7 +746,7 @@ describe("ProductRunPage", () => {
     submit();
 
     await waitFor(() => expect(calls.filter((call) => call.key === ROUTES.RESULT)).toHaveLength(1));
-    resolveCall(0, errorResponse(500, "internal_error"));
+    resolveCall(ROUTES.RESULT, 0, errorResponse(500, "internal_error"));
     await waitFor(() =>
       expect(screen.getByText("Your result is ready, but we couldn't load it. Please try again.")).toBeTruthy(),
     );
@@ -705,13 +759,13 @@ describe("ProductRunPage", () => {
     // The earlier (older-generation) retry settles first, with the real result -- this is the
     // reverse of the resolution order the sibling test above covers, and generation order alone
     // (call 1 started before call 2) must not be what decides the outcome here.
-    resolveCall(1, resultResponse(TEST_PRODUCT_IDS));
+    resolveCall(ROUTES.RESULT, 1, resultResponse(TEST_PRODUCT_IDS));
     await waitForResult();
 
     // The later (newer-generation) retry settles after, with a failure -- it's just a transient
     // problem with *that* network call, not a fact about the artifact itself, so it must not
     // clobber the result the older call already, correctly, obtained.
-    resolveCall(2, errorResponse(500, "internal_error"));
+    resolveCall(ROUTES.RESULT, 2, errorResponse(500, "internal_error"));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(screen.getByText(RESULT_TEXT)).toBeTruthy();

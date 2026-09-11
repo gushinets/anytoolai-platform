@@ -125,6 +125,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // artifact-deterministic outcome (a usable result, a malformed one, or a permanently-unavailable
   // rejection); reset per session at the top of runPoll(). See fetchResult()'s own comment.
   const resultFetchSettledRef = useRef(false);
+  // The scenarioSessionId runPoll() is currently polling/fetching a result for -- set at the top
+  // of runPoll(), alongside resultFetchSettledRef's own reset. `controllerRef`'s AbortController
+  // lives for the whole component, not per logical run, so a fetchResult() call from an *older*
+  // session (still in flight when the user starts a brand new one) never gets aborted on its own;
+  // this is what fetchResult() checks to recognize and discard such a call, however it resolves.
+  const activeScenarioSessionIdRef = useRef<string | null>(null);
 
   const [boot, setBoot] = useState<BootState>({ kind: "loading" });
   const [quota, setQuota] = useState<QuotaState | null>(null);
@@ -258,8 +264,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   async function runPoll(scenarioSessionId: string) {
     // Fresh per logical run: this session's result-fetch lifecycle (this call plus any later
-    // handleRetryResult() retries against the same artifact) hasn't settled yet.
+    // handleRetryResult() retries against the same artifact) hasn't settled yet, and it's now the
+    // one fetchResult() calls are allowed to act for.
     resultFetchSettledRef.current = false;
+    activeScenarioSessionIdRef.current = scenarioSessionId;
     const controller = controllerRef.current;
     const polled = await pollScenarioSession(client, scenarioSessionId, { signal: controller?.signal });
     if (controller?.signal.aborted) {
@@ -340,7 +348,17 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     const generation = ++resultFetchGenerationRef.current;
     const controller = controllerRef.current;
     const resultResult = await getResult(client, resultArtifactId, { signal: controller?.signal });
-    if (controller?.signal.aborted || resultFetchSettledRef.current) {
+    if (
+      controller?.signal.aborted ||
+      // `controllerRef`'s controller lives for the whole component, not per logical run, so it
+      // never aborts a call like this one on its own just because a *newer* session has since
+      // started -- a call belonging to any session other than the currently active one is stale
+      // by definition, whatever it resolved with (including a "deterministic" outcome below: that
+      // determinism only holds within one session's own artifact, not across a completely
+      // different, superseding one).
+      scenarioSessionId !== activeScenarioSessionIdRef.current ||
+      resultFetchSettledRef.current
+    ) {
       return;
     }
     if (!resultResult.ok) {

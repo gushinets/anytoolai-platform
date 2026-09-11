@@ -163,29 +163,39 @@ export function makeClientWithDeferredRoute(routes: RouteQueues, deferredRouteKe
 }
 
 /**
- * Like makeClientWithDeferredRoute(), but `deferredRouteKey` gets its own independent, separately
- * resolvable promise for each of its first `callCount` calls -- for tests proving an out-of-order
- * response race (e.g. a second, slower call's later failure must not clobber a first call's
- * already-applied earlier success). `resolveCall(0, ...)` resolves the first call to that route,
- * `resolveCall(1, ...)` the second, and so on.
+ * Like makeClientWithDeferredRoute(), but each route named in `deferred` (route key -> how many of
+ * its calls to defer) gets its own independent, separately resolvable promise per call -- for
+ * tests proving an out-of-order response race (e.g. a second, slower call's later failure must not
+ * clobber a first call's already-applied earlier success), including races that span two different
+ * routes (e.g. a stale retry against one session's result racing a fresh session's own result).
+ * `resolveCall(key, 0, ...)` resolves the first call to that route, `resolveCall(key, 1, ...)` the
+ * second, and so on, independently per route key.
  */
-export function makeClientWithDeferredCalls(routes: RouteQueues, deferredRouteKey: string, callCount: number) {
+export function makeClientWithDeferredCalls(routes: RouteQueues, deferred: Record<string, number>) {
   const calls: CapturedCall[] = [];
-  const resolvers: Array<(response: Response) => void> = [];
-  const deferredResponses: Promise<Response>[] = [];
-  for (let index = 0; index < callCount; index += 1) {
-    let resolve!: (response: Response) => void;
-    deferredResponses.push(new Promise<Response>((res) => (resolve = res)));
-    resolvers.push(resolve);
+  const resolvers = new Map<string, Array<(response: Response) => void>>();
+  const deferredResponses = new Map<string, Promise<Response>[]>();
+  const nextCallIndex = new Map<string, number>();
+  for (const [key, callCount] of Object.entries(deferred)) {
+    const keyResolvers: Array<(response: Response) => void> = [];
+    const keyResponses: Promise<Response>[] = [];
+    for (let index = 0; index < callCount; index += 1) {
+      let resolve!: (response: Response) => void;
+      keyResponses.push(new Promise<Response>((res) => (resolve = res)));
+      keyResolvers.push(resolve);
+    }
+    resolvers.set(key, keyResolvers);
+    deferredResponses.set(key, keyResponses);
+    nextCallIndex.set(key, 0);
   }
-  let callIndex = 0;
   const fetchImpl = fetchImplFor(routes, calls, (key) => {
-    if (key !== deferredRouteKey) {
+    const responses = deferredResponses.get(key);
+    if (!responses) {
       return undefined;
     }
-    const promise = deferredResponses[callIndex];
-    callIndex += 1;
-    return promise;
+    const callIndex = nextCallIndex.get(key)!;
+    nextCallIndex.set(key, callIndex + 1);
+    return responses[callIndex];
   });
   const client = new PlatformApiClient({
     baseUrl: "https://api.example.com",
@@ -194,8 +204,8 @@ export function makeClientWithDeferredCalls(routes: RouteQueues, deferredRouteKe
   return {
     client,
     calls,
-    resolveCall: (index: number, response: Response) => {
-      resolvers[index]!(response);
+    resolveCall: (routeKey: string, index: number, response: Response) => {
+      resolvers.get(routeKey)![index]!(response);
     },
   };
 }
