@@ -1,0 +1,10 @@
+schemas:
+  - schema_ref: client_update_writer.update_input_v1
+    version: 1
+    file_path: schemas/update_input.schema.json
+  - schema_ref: client_update_writer.reply_draft_input_v1
+    version: 1
+    file_path: schemas/reply_draft_input.schema.json
+  - schema_ref: client_update_writer.prepaid_request_input_v1
+    version: 1
+    file_path: schemas/prepaid_request_input.schema.json

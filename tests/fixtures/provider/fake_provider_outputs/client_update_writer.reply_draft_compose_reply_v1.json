@@ -1,0 +1,13 @@
+{
+  "response_json": {
+    "text": "Thanks for the question about the timeline. The revised delivery date is next Wednesday, which covers both the copy edits and the final review pass.",
+    "call_to_action": "Let me know if Wednesday works, or if you need it sooner."
+  },
+  "input_tokens": 88,
+  "output_tokens": 31,
+  "latency_ms": 9,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "client_update_writer.reply_draft_compose_reply_v1"
+  }
+}
