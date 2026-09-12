@@ -8,14 +8,18 @@ from pathlib import Path
 from time import perf_counter
 from uuid import uuid4
 
+from anytoolai_platform_api.atom_lab.cache import apply_atom_lab_cache_policy
 from anytoolai_platform_api.bootstrap import build_runtime
 from anytoolai_platform_api.errors import (
     REQUEST_ID_HEADER,
     ApiError,
+    AtomLabApiError,
     api_error_handler,
+    atom_lab_api_error_handler,
     request_validation_error_handler,
     unhandled_exception_handler,
 )
+from anytoolai_platform_api.routers.atom_lab import router as atom_lab_router
 from anytoolai_platform_api.routers.client_events import router as client_events_router
 from anytoolai_platform_api.routers.demo import router as demo_router
 from anytoolai_platform_api.routers.handoffs import router as handoffs_router
@@ -57,6 +61,7 @@ def create_app(
     _install_error_handlers(app)
 
     app.include_router(health_router)
+    app.include_router(atom_lab_router)
     app.include_router(demo_router)
     app.include_router(identity_quota_router)
     app.include_router(handoffs_router)
@@ -73,7 +78,12 @@ def _install_cors(app: FastAPI) -> None:
         allow_origins=_configured_cors_origins(),
         allow_origin_regex=CHROME_EXTENSION_ORIGIN_REGEX,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", REQUEST_ID_HEADER, "X-Demo-Access-Code"],
+        allow_headers=[
+            "Content-Type",
+            REQUEST_ID_HEADER,
+            "X-Demo-Access-Code",
+            "X-Atom-Lab-Access-Code",
+        ],
         expose_headers=[REQUEST_ID_HEADER],
     )
 
@@ -96,6 +106,7 @@ def _install_request_context(app: FastAPI) -> None:
         try:
             response = await call_next(request)
             response.headers[REQUEST_ID_HEADER] = request_id
+            apply_atom_lab_cache_policy(request, response)
             log_event(
                 logger,
                 "http.request_completed",
@@ -124,6 +135,7 @@ def _install_request_context(app: FastAPI) -> None:
 
 def _install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(ApiError, api_error_handler)
+    app.add_exception_handler(AtomLabApiError, atom_lab_api_error_handler)
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
 

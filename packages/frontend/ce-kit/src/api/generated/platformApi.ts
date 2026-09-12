@@ -21,6 +21,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/atom-lab/atoms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Atoms */
+        get: operations["list_atoms_v1_atom_lab_atoms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/atom-lab/atoms/{atom_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Atom */
+        get: operations["get_atom_v1_atom_lab_atoms__atom_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/client-events": {
         parameters: {
             query?: never;
@@ -246,6 +280,72 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AtomLabAtomId
+         * @enum {string}
+         */
+        AtomLabAtomId: "A01" | "A02" | "A03" | "A04" | "A05" | "A06" | "A07" | "A08" | "A09" | "A10" | "A11";
+        /** AtomLabAtomResponse */
+        AtomLabAtomResponse: {
+            /** Action Type */
+            action_type: string;
+            atom_id: components["schemas"]["AtomLabAtomId"];
+            /** Base Action Config Id */
+            base_action_config_id: string;
+            /** Description */
+            description: string;
+            /** Example Input */
+            example_input: {
+                [key: string]: unknown;
+            };
+            /** Input Schema */
+            input_schema: {
+                [key: string]: unknown;
+            };
+            /** Output Schema */
+            output_schema: {
+                [key: string]: unknown;
+            };
+            /** Prompt */
+            prompt: string;
+            /** Prompt Ref */
+            prompt_ref: string;
+            schema_refs: components["schemas"]["AtomLabSchemaRefsResponse"];
+        };
+        /** AtomLabErrorDetailResponse */
+        AtomLabErrorDetailResponse: {
+            /** Code */
+            code: string;
+            /** Field Errors */
+            field_errors: components["schemas"]["AtomLabFieldErrorResponse"][];
+            /** Message */
+            message: string;
+        };
+        /** AtomLabErrorResponse */
+        AtomLabErrorResponse: {
+            error: components["schemas"]["AtomLabErrorDetailResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** AtomLabFieldErrorResponse */
+        AtomLabFieldErrorResponse: {
+            /** Message */
+            message: string;
+            /** Path */
+            path: string;
+        };
+        /** AtomLabSchemaRefsResponse */
+        AtomLabSchemaRefsResponse: {
+            input: components["schemas"]["AtomLabVersionedSchemaRefResponse"];
+            output: components["schemas"]["AtomLabVersionedSchemaRefResponse"];
+        };
+        /** AtomLabVersionedSchemaRefResponse */
+        AtomLabVersionedSchemaRefResponse: {
+            /** Schema Ref */
+            schema_ref: string;
+            /** Version */
+            version: number;
+        };
         /** ClientEventRequest */
         ClientEventRequest: {
             /** Event Id */
@@ -594,6 +694,115 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    list_atoms_v1_atom_lab_atoms_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Atom-Lab-Access-Code"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabAtomResponse"][];
+                };
+            };
+            /** @description Atom Lab access denied. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab request validation failed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab is not configured. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+        };
+    };
+    get_atom_v1_atom_lab_atoms__atom_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Atom-Lab-Access-Code"?: string | null;
+            };
+            path: {
+                atom_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabAtomResponse"];
+                };
+            };
+            /** @description Atom Lab access denied. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab request validation failed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab is not configured. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
                 };
             };
         };

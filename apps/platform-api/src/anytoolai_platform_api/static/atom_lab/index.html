@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AnytoolAI Atom Lab</title>
+    <link rel="stylesheet" href="/atom-lab/atom_lab.css">
+    <script src="/atom-lab/atom_lab.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <h1>Atom Lab</h1>
+      <p>Закрытая лаборатория атомов AnytoolAI.</p>
+      <form id="access-form">
+        <label for="access-code">Код доступа</label>
+        <input id="access-code" type="password" autocomplete="off" required>
+        <button type="submit">Открыть каталог</button>
+      </form>
+      <p id="status" role="status" aria-live="polite"></p>
+      <section id="catalog" aria-label="Каталог атомов"></section>
+    </main>
+  </body>
+</html>
