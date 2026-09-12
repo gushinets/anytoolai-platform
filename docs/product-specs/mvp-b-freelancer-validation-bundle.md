@@ -41,10 +41,14 @@ customer pain; Client Message Decoder combines frequent need with fear of making
 Scope Creep Guard and Send-Ready have preliminary demand validation; Brief Decoder has high value
 across projects. These priority reasons were supplied by the product owner on 2026-09-08.
 
-ProposalAI proves the shortest complete web path. Client Message Decoder is the second product
-and proves reuse before shared UI extraction. Scope Creep Guard proves scope comparison, reply,
-and document generation. Send-Ready proves the two-run selected-gap flow without extending the
-mapping DSL. Brief Decoder completes the initial set with brief analysis, questions, and a document.
+ProposalAI proves the shortest complete web path; the shared web product runtime foundation is
+extracted directly from that single implementation once it proves which parts are product-neutral,
+under a foundation-first ownership split approved by the product owner on 2026-09-08 so no product
+in this order waits on another product's completion to start its own web implementation. Client
+Message Decoder proves the published foundation contract holds unchanged for an independently
+built second product. Scope Creep Guard proves scope comparison, reply, and document generation.
+Send-Ready proves the two-run selected-gap flow without extending the mapping DSL. Brief Decoder
+completes the initial set with brief analysis, questions, and a document.
 
 Client Update Writer, Acceptance Builder, and External Task Finder & Fit remain in the capability
 backlog without a committed release order. Brief Decoder to Acceptance Builder remains a later
