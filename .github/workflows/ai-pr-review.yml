@@ -1,0 +1,38 @@
+name: AI PR Review
+
+on:
+  workflow_run:
+    workflows:
+      - baseline-backend
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number to review
+        required: true
+        type: number
+
+permissions:
+  actions: read
+  contents: read
+  statuses: read
+  pull-requests: write
+  checks: write
+
+concurrency:
+  group: ai-pr-review-${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  ai-pr-review:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request'
+    uses: gushinets/ai-pr-review/.github/workflows/reusable-ai-pr-review.yml@660525298b8785158fc8339add65f0e5cd87e749
+    with:
+      mode: ${{ github.event_name == 'workflow_dispatch' && 'manual' || 'automatic' }}
+      triggering_run_id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+      pr_number: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_number || 0 }}
+    secrets:
+      QWEN_TOKEN_PLAN_API_KEY: ${{ secrets.QWEN_TOKEN_PLAN_API_KEY }}
+      LINEAR_CLIENT_ID: ${{ secrets.LINEAR_CLIENT_ID }}
+      LINEAR_CLIENT_SECRET: ${{ secrets.LINEAR_CLIENT_SECRET }}
