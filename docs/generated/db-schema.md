@@ -49,6 +49,54 @@ Definitions remain in repository configuration; these tables store runtime state
 | metadata | JSON | no |
 | created_at | DATETIME | no |
 
+## platform.atom_lab_runs
+
+| Column | Type | Nullable |
+|---|---|---|
+| id | VARCHAR(128) | no |
+| tenant_id | VARCHAR(128) | no |
+| region | VARCHAR(64) | no |
+| product_id | VARCHAR(128) | no |
+| frontend_id | VARCHAR(128) | no |
+| scenario_session_id | VARCHAR(128) | no |
+| job_id | VARCHAR(128) | no |
+| atom_id | VARCHAR(16) | no |
+| scenario_id | VARCHAR(128) | no |
+| scenario_version | INTEGER | no |
+| workflow_id | VARCHAR(128) | no |
+| workflow_version | INTEGER | no |
+| step_id | VARCHAR(128) | no |
+| action_type | VARCHAR(128) | no |
+| action_definition_version | INTEGER | no |
+| action_config_id | VARCHAR(128) | no |
+| action_config_schema_version | INTEGER | no |
+| prompt_ref | VARCHAR(128) | no |
+| prompt_version | INTEGER | no |
+| base_prompt | TEXT | no |
+| prompt | TEXT | no |
+| input_schema_ref | VARCHAR(128) | no |
+| input_schema_version | INTEGER | no |
+| input_schema | JSON | no |
+| output_schema_ref | VARCHAR(128) | no |
+| output_schema_version | INTEGER | no |
+| output_schema | JSON | no |
+| input_payload | JSON | no |
+| provider_policy_ref | VARCHAR(128) | no |
+| provider_policy | JSON | no |
+| model_id | VARCHAR(256) | no |
+| reasoning_effort | VARCHAR(32) | yes |
+| capability_snapshot_id | VARCHAR(128) | no |
+| capability_provenance | JSON | no |
+| workflow_definition | JSON | no |
+| action_definition | JSON | no |
+| action_config_definition | JSON | no |
+| execution_definition_hash | VARCHAR(64) | no |
+| preset_id | VARCHAR(128) | yes |
+| preset_version | INTEGER | yes |
+| action_run_id | VARCHAR(128) | yes |
+| artifact_id | VARCHAR(128) | yes |
+| created_at | DATETIME | no |
+
 ## platform.event_log
 
 | Column | Type | Nullable |

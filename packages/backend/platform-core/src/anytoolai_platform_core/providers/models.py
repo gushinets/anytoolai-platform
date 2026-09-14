@@ -13,6 +13,20 @@ class StructuredOutputMode(StrEnum):
     json_schema = "json_schema"
 
 
+class ProviderModelAddressing(StrEnum):
+    policy_alias = "policy_alias"
+    direct = "direct"
+
+
+class ReasoningEffort(StrEnum):
+    none = "none"
+    minimal = "minimal"
+    low = "low"
+    medium = "medium"
+    high = "high"
+    xhigh = "xhigh"
+
+
 class ProviderCallStatus(StrEnum):
     created = "created"
     running = "running"
@@ -41,15 +55,9 @@ class ProviderRetryHardLimits:
 
 @dataclass(frozen=True)
 class ProviderRetryPolicy:
-    transport: ProviderTransportRetryPolicy = field(
-        default_factory=ProviderTransportRetryPolicy
-    )
-    validation: ProviderValidationRetryPolicy = field(
-        default_factory=ProviderValidationRetryPolicy
-    )
-    hard_limits: ProviderRetryHardLimits = field(
-        default_factory=ProviderRetryHardLimits
-    )
+    transport: ProviderTransportRetryPolicy = field(default_factory=ProviderTransportRetryPolicy)
+    validation: ProviderValidationRetryPolicy = field(default_factory=ProviderValidationRetryPolicy)
+    hard_limits: ProviderRetryHardLimits = field(default_factory=ProviderRetryHardLimits)
 
 
 @dataclass(frozen=True)
@@ -93,6 +101,9 @@ class ProviderRequest:
     correlation_id: str | None = None
     semantic_attempt_index: int = 1
     pydantic_run_id: str | None = None
+    model_addressing: ProviderModelAddressing = ProviderModelAddressing.policy_alias
+    reasoning_effort: ReasoningEffort | None = None
+    policy_override: ProviderPolicy | None = None
 
 
 @dataclass(frozen=True)
@@ -129,6 +140,8 @@ class ResolvedProviderRequest:
     physical_call_index: int = 1
     pydantic_run_id: str | None = None
     fallback_from_policy_ref: str | None = None
+    model_addressing: ProviderModelAddressing = ProviderModelAddressing.policy_alias
+    reasoning_effort: ReasoningEffort | None = None
 
 
 @dataclass(frozen=True)

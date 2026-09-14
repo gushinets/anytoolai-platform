@@ -18,17 +18,18 @@ from anytoolai_platform_core.actions.models import ActionResult, ActionRunRecord
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.artifacts.service import _emit_recovered_artifact_created_event
+from anytoolai_platform_core.atom_lab.repository import AtomLabRunRepository
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
-from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.events.replay import (
     ReplayTimestampSequencer,
     sequence_existing_replay_event,
 )
+from anytoolai_platform_core.events.repository import EventLogRepository
 from anytoolai_platform_core.providers.gateway import ProviderGatewayExecutionError
 from anytoolai_platform_core.providers.gateway.recovery import emit_recovered_provider_events
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
@@ -38,7 +39,10 @@ from anytoolai_platform_core.storage.transactions import (
     transaction_boundary,
 )
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
-from anytoolai_platform_core.structured_output.schemas import normalize_mapping, normalize_schema_mapping
+from anytoolai_platform_core.structured_output.schemas import (
+    normalize_mapping,
+    normalize_schema_mapping,
+)
 
 _OUTPUT_ARTIFACT_ID_UNSET = object()
 
@@ -74,13 +78,25 @@ class ActionRunner:
         context: ExecutionContext,
     ) -> ActionResult:
         action_config = self._require_action_config(action_config_id)
+        run_local_settings = context.run_local_action_settings
+        if run_local_settings is not None and (
+            run_local_settings.action_type != action_type
+            or run_local_settings.action_config_id != action_config_id
+        ):
+            raise ValueError("run-local action settings do not match the workflow action")
         if action_config.action_type != action_type:
             raise LookupError(
                 "action config type mismatch: "
                 f"{action_config_id} -> {action_config.action_type} != {action_type}"
             )
         action_definition = self._require_action_definition(action_type)
-        provider_policy = self._require_provider_policy(action_config.provider_policy_ref)
+        provider_policy = (
+            self._require_provider_policy(action_config.provider_policy_ref)
+            if run_local_settings is None
+            else run_local_settings.provider_policy
+        )
+        if provider_policy.provider_policy_ref != action_config.provider_policy_ref:
+            raise ValueError("run-local provider policy does not match the action configuration")
         prompt = self._require_prompt(action_config.prompt_ref)
         input_schema = self._require_schema(action_definition.input_schema_ref)
         output_schema = self._require_schema(action_definition.output_schema_ref)
@@ -93,7 +109,9 @@ class ActionRunner:
                 region=context.region,
                 product_id=context.product_id,
                 frontend_id=context.frontend_id,
-                scenario_session_id=self._require_context(context.scenario_session_id, "scenario_session_id"),
+                scenario_session_id=self._require_context(
+                    context.scenario_session_id, "scenario_session_id"
+                ),
                 job_id=self._require_context(context.job_id, "job_id"),
                 workflow_id=self._require_context(context.workflow_id, "workflow_id"),
                 step_id=self._require_context(context.step_id, "step_id"),
@@ -112,11 +130,21 @@ class ActionRunner:
                     "prompt_ref": prompt.prompt_ref,
                     "input_schema_ref": input_schema.schema_ref,
                     "output_schema_ref": output_schema.schema_ref,
+                    **(
+                        {}
+                        if run_local_settings is None
+                        else {"atom_lab_run_id": run_local_settings.run_id}
+                    ),
                 },
             )
         )
 
         try:
+            if run_local_settings is not None:
+                AtomLabRunRepository(self._session).bind_runtime_ids(
+                    run_local_settings.run_id,
+                    action_run_id=action_run.id,
+                )
             self._validate_input_payload(
                 input_payload,
                 schema=input_schema.schema,
@@ -149,8 +177,13 @@ class ActionRunner:
                 },
                 guest_id=context.guest_id,
                 user_id=context.user_id,
+                run_local_settings=run_local_settings,
             )
             response = await executor.execute(request, session=self._session)
+            output_artifact_id = self._validated_structured_output_artifact_id(
+                response,
+                action_run_id=action_run.id,
+            )
         except asyncio.CancelledError as exc:
             self._persist_failed_action_run_for_exception(
                 action_run,
@@ -166,10 +199,6 @@ class ActionRunner:
             )
             raise
 
-        output_artifact_id = self._validated_structured_output_artifact_id(
-            response,
-            action_run_id=action_run.id,
-        )
         provider_call = response.provider_call
         succeeded = self._action_run_service.mark_succeeded(
             replace(
@@ -370,6 +399,7 @@ class ActionRunner:
             ),
             phase=RollbackRecoveryPhase.action_rows,
         )
+        self._register_atom_lab_link_recovery(action_run)
         register_rollback_recovery_callback(
             self._session,
             lambda recovery_session_factory: _recover_action_events_after_rollback(
@@ -388,6 +418,7 @@ class ActionRunner:
             ),
             phase=RollbackRecoveryPhase.action_rows,
         )
+        self._register_atom_lab_link_recovery(action_run)
         register_rollback_recovery_callback(
             self._session,
             lambda recovery_session_factory: _recover_action_events_after_rollback(
@@ -395,6 +426,20 @@ class ActionRunner:
                 action_run.id,
             ),
             phase=RollbackRecoveryPhase.action_events,
+        )
+
+    def _register_atom_lab_link_recovery(self, action_run: ActionRunRecord) -> None:
+        run_id = metadata_str(action_run.metadata, "atom_lab_run_id")
+        if run_id is None:
+            return
+        register_rollback_recovery_callback(
+            self._session,
+            lambda recovery_session_factory: _recover_atom_lab_action_link_after_rollback(
+                recovery_session_factory,
+                run_id=run_id,
+                action_run_id=action_run.id,
+            ),
+            phase=RollbackRecoveryPhase.atom_lab_links,
         )
 
 
@@ -507,7 +552,10 @@ def _recover_failed_action_run_row_after_rollback(
         artifact_repository = ArtifactRepository(recovery_session)
 
         persisted_artifact_id = output_artifact_id
-        if persisted_artifact_id is not None and artifact_repository.get(persisted_artifact_id) is None:
+        if (
+            persisted_artifact_id is not None
+            and artifact_repository.get(persisted_artifact_id) is None
+        ):
             persisted_artifact_id = None
 
         existing = action_run_repository.get(record.id)
@@ -569,6 +617,19 @@ def _recover_action_events_after_rollback(
             action_run_repository=ActionRunRepository(recovery_session),
             provider_call_repository=ProviderCallRepository(recovery_session),
             artifact_repository=ArtifactRepository(recovery_session),
+        )
+
+
+def _recover_atom_lab_action_link_after_rollback(
+    recovery_session_factory: Any,
+    *,
+    run_id: str,
+    action_run_id: str,
+) -> None:
+    with transaction_boundary(recovery_session_factory) as recovery_session:
+        AtomLabRunRepository(recovery_session).bind_runtime_ids(
+            run_id,
+            action_run_id=action_run_id,
         )
 
 
