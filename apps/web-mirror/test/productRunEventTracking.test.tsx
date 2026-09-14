@@ -1,10 +1,9 @@
 import { createInMemoryAsyncStorage } from "@anytoolai/ce-kit";
 import { describe, expect, it, vi } from "vitest";
 import { createProductRunEventTracker } from "../src/products/runtime/productRunEventTracking";
-import { errorResponse, guestIdentityResponse, jsonResponse, makeClientCapturingRequests } from "./fixtures/platformResponses";
+import { errorResponse, jsonResponse, makeClientCapturingRequests } from "./fixtures/platformResponses";
 
 const CLIENT_EVENTS_ROUTE = "POST /v1/client-events";
-const GUEST_IDENTITY_ROUTE = "POST /v1/identity/guest";
 
 function clientEventReceiptResponse() {
   return jsonResponse(200, { event_id: "event_1", accepted: true });
@@ -29,40 +28,26 @@ function clientEventCalls<C extends { key: string }>(calls: C[]): C[] {
 }
 
 describe("createProductRunEventTracker", () => {
-  it("tracks product_viewed as web.product_viewed, resolving its own guest id", async () => {
+  it("tracks product_viewed/form_started/form_submitted as their web.* counterparts, forwarding the guest id ProductRunPage already resolved", async () => {
     const { client, calls } = makeClientCapturingRequests({
-      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
-      [CLIENT_EVENTS_ROUTE]: [clientEventReceiptResponse()],
+      [CLIENT_EVENTS_ROUTE]: [clientEventReceiptResponse(), clientEventReceiptResponse(), clientEventReceiptResponse()],
     });
     const onEvent = createProductRunEventTracker(client, "proposal_ai", createInMemoryAsyncStorage());
 
-    onEvent({ type: "product_viewed" });
-    await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(1));
-
-    const body = parseBody(clientEventCalls(calls)[0]!);
-    expect(body.event_type).toBe("web.product_viewed");
-    expect(body.product_id).toBe("proposal_ai");
-    expect(body.frontend_id).toBe("web_mirror");
-    expect(typeof body.web_session_id).toBe("string");
-    expect(body.guest_id).toBe("guest_1");
-  });
-
-  it("tracks form_started/form_submitted as their web.* counterparts, forwarding the guest id ProductRunPage already resolved", async () => {
-    const { client, calls } = makeClientCapturingRequests({
-      [CLIENT_EVENTS_ROUTE]: [clientEventReceiptResponse(), clientEventReceiptResponse()],
-    });
-    const onEvent = createProductRunEventTracker(client, "proposal_ai", createInMemoryAsyncStorage());
-
+    onEvent({ type: "product_viewed", guestId: "guest_from_product_run_page" });
     onEvent({ type: "form_started", guestId: "guest_from_product_run_page" });
     onEvent({ type: "form_submitted", guestId: "guest_from_product_run_page" });
-    await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(2));
+    await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(3));
 
-    // No independent guest-identity resolution for these -- only the carried value is used.
-    expect(calls.some((call) => call.key === GUEST_IDENTITY_ROUTE)).toBe(false);
+    // No identity resolution of its own anywhere in this module -- only the client-events POSTs.
+    expect(calls.some((call) => call.key !== CLIENT_EVENTS_ROUTE)).toBe(false);
 
     const bodies = clientEventCalls(calls).map(parseBody);
-    expect(bodies.map((body) => body.event_type)).toEqual(["web.form_started", "web.form_submitted"]);
+    expect(bodies.map((body) => body.event_type)).toEqual(["web.product_viewed", "web.form_started", "web.form_submitted"]);
     for (const body of bodies) {
+      expect(body.product_id).toBe("proposal_ai");
+      expect(body.frontend_id).toBe("web_mirror");
+      expect(typeof body.web_session_id).toBe("string");
       expect(body.guest_id).toBe("guest_from_product_run_page");
     }
   });
@@ -82,12 +67,11 @@ describe("createProductRunEventTracker", () => {
 
   it("reuses the same web_session_id across calls", async () => {
     const { client, calls } = makeClientCapturingRequests({
-      [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
       [CLIENT_EVENTS_ROUTE]: [clientEventReceiptResponse(), clientEventReceiptResponse()],
     });
     const onEvent = createProductRunEventTracker(client, "proposal_ai", createInMemoryAsyncStorage());
 
-    onEvent({ type: "product_viewed" });
+    onEvent({ type: "product_viewed", guestId: "guest_1" });
     onEvent({ type: "form_started", guestId: "guest_1" });
     await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(2));
 
@@ -103,7 +87,6 @@ describe("createProductRunEventTracker", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(clientEventCalls(calls)).toHaveLength(0);
-    expect(calls.some((call) => call.key === GUEST_IDENTITY_ROUTE)).toBe(false);
   });
 
   it("never throws or carries prompt/result text when the backend rejects the event", async () => {
@@ -119,29 +102,14 @@ describe("createProductRunEventTracker", () => {
     expect(Object.keys(body)).not.toContain("properties");
   });
 
-  it("still tracks product_viewed (without a guest id) when its own guest-identity resolution fails", async () => {
-    const { client, calls } = makeClientCapturingRequests({
-      [GUEST_IDENTITY_ROUTE]: [errorResponse(500, "internal_error")],
-      [CLIENT_EVENTS_ROUTE]: [clientEventReceiptResponse()],
-    });
-    const onEvent = createProductRunEventTracker(client, "proposal_ai", createInMemoryAsyncStorage());
-
-    onEvent({ type: "product_viewed" });
-    await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(1));
-
-    const body = parseBody(clientEventCalls(calls)[0]!);
-    expect(body.guest_id).toBeUndefined();
-  });
-
-  it("passes through an undefined guest id for later events exactly as ProductRunPage resolved it", async () => {
+  it("passes through an undefined guest id exactly as ProductRunPage resolved it, for product_viewed included", async () => {
     const { client, calls } = makeClientCapturingRequests({ [CLIENT_EVENTS_ROUTE]: [clientEventReceiptResponse()] });
     const onEvent = createProductRunEventTracker(client, "proposal_ai", createInMemoryAsyncStorage());
 
-    onEvent({ type: "scenario_completed", scenarioSessionId: "session_1", guestId: undefined });
+    onEvent({ type: "product_viewed", guestId: undefined });
     await vi.waitFor(() => expect(clientEventCalls(calls)).toHaveLength(1));
 
     const body = parseBody(clientEventCalls(calls)[0]!);
     expect(body.guest_id).toBeUndefined();
-    expect(body.scenario_session_id).toBe("session_1");
   });
 });

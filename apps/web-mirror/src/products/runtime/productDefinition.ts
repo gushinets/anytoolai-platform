@@ -1,25 +1,37 @@
 import type { ComponentType } from "react";
 
+/** Shared by every exhaustive `switch` over a discriminated union in this runtime (`Phase["kind"]`
+ * in `ProductRunPage.tsx`, `ProductRunEvent["type"]` in `productRunEventTracking.ts`) --
+ * `docs/agent/coding-conventions.md`'s "Exhaustiveness" rule: a `default: return assertNever(x)`
+ * arm makes a new union member fail typecheck instead of silently falling through. */
+export function assertNever(value: never): never {
+  throw new Error(`Unhandled variant: ${JSON.stringify(value)}`);
+}
+
 /**
  * Funnel events the shared runtime emits (product viewed -> form started -> form submitted ->
  * scenario completed/result viewed -> copy activation). Never carries prompt text, result text,
  * or clipboard contents -- only ids/status, matching ANY-453's "keep ... user text out of event
  * payloads" requirement. Real dispatch is ANY-17's; this is the injectable callback contract.
  *
- * Every variant but `product_viewed` carries the `guestId` `ProductRunPage` itself already
- * resolved (its own `guestId` state), rather than leaving a consumer to re-resolve it
- * independently: two independent resolutions can diverge whenever `createWindowLocalStorageAdapter()`
- * is unavailable (e.g. some private-browsing modes) and each caller falls back to its own,
- * separate in-memory storage instance -- there is then no shared cache for a second resolution to
- * land on, so it mints a second, different guest id instead of reusing the first. `product_viewed`
- * fires synchronously at mount, before this resolution has necessarily completed, so it has no
- * settled value to forward; a consumer that still wants to attribute it resolves guest identity
- * itself for that one event only (its window to do so racing, and in practice usually coalescing
- * with, `ProductRunPage`'s own concurrent mount-time call via `PlatformApiClient`'s own
- * per-client-instance single-flight guard).
+ * Every variant carries the `guestId` `ProductRunPage` itself already resolved (its own `guestId`
+ * state, from the single boot-time `client.createGuestIdentity()` call), rather than leaving a
+ * consumer to re-resolve it independently: two independent resolutions can diverge whenever
+ * `createWindowLocalStorageAdapter()` is unavailable (e.g. some private-browsing modes) and each
+ * caller falls back to its own, separate in-memory storage instance -- there is then no shared
+ * cache for a second resolution to land on, so it mints a second, different guest id instead of
+ * reusing the first. This is why `product_viewed` fires from inside the boot-resolution effect's
+ * own callback (once `Promise.all([getRuntimeConfig, createGuestIdentity])` settles) rather than
+ * from a separate mount-time effect: it can then carry the exact same resolved (or, on failure,
+ * `undefined`) guest id as every other event, with no second identity resolution anywhere in this
+ * module. A `guestId` of `undefined` here means identity resolution hadn't succeeded by boot time;
+ * that event -- like `product_viewed`/`form_started`/`form_submitted` whenever neither `guestId`
+ * nor a `scenarioSessionId` is available -- may be dropped by the backend's identity-required
+ * check, matching `trackClientEvent`'s own documented "client analytics may legitimately
+ * undercount" contract.
  */
 export type ProductRunEvent =
-  | { type: "product_viewed" }
+  | { type: "product_viewed"; guestId: string | undefined }
   | { type: "form_started"; guestId: string | undefined }
   | { type: "form_submitted"; guestId: string | undefined }
   | { type: "scenario_completed"; scenarioSessionId: string; guestId: string | undefined }

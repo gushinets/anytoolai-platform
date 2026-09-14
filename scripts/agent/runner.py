@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import functools
 import hashlib
 import importlib.util
 import json
@@ -17,7 +16,7 @@ import time
 import tomllib
 import urllib.error
 import urllib.request
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
@@ -953,7 +952,7 @@ def _serve_web_mirror_and_run_smoke(
     smoke_extra_env: dict[str, str],
     smoke_pnpm_filter: str,
     report_path: Path,
-    write_evidence: Callable[[int], Path],
+    evidence_root: Path,
 ) -> int:
     """Shared tail for client_handoff_smoke()/proposal_ai_smoke(), once each has built its own
     web-mirror (and any product-specific extra artifact, e.g. the extension): serve the already-
@@ -992,7 +991,7 @@ def _serve_web_mirror_and_run_smoke(
             smoke_env.pop(key, None)
         report_path.unlink(missing_ok=True)
         exit_code = run_with_env(["pnpm", "--filter", smoke_pnpm_filter, "run", "smoke"], smoke_env)
-        write_evidence(exit_code)
+        _write_smoke_evidence(exit_code, report_path=report_path, evidence_root=evidence_root)
         return exit_code
     finally:
         _terminate_process_group(web_mirror_process)
@@ -1066,11 +1065,7 @@ def client_handoff_smoke() -> int:
         smoke_extra_env={"WEB_CONSENT_BASE_URL": web_mirror_url},
         smoke_pnpm_filter="@anytoolai/client-handoff-smoke",
         report_path=CLIENT_HANDOFF_SMOKE_REPORT_PATH,
-        write_evidence=functools.partial(
-            _write_smoke_evidence,
-            report_path=CLIENT_HANDOFF_SMOKE_REPORT_PATH,
-            evidence_root=CLIENT_HANDOFF_SMOKE_EVIDENCE_ROOT,
-        ),
+        evidence_root=CLIENT_HANDOFF_SMOKE_EVIDENCE_ROOT,
     )
 
 
@@ -1110,7 +1105,6 @@ def proposal_ai_smoke() -> int:
     env["PLATFORM_API_BASE_URL"] = identity.api_url
 
     build_command = ["pnpm", "--filter", "@anytoolai/web-mirror", "build"]
-    print_command(build_command)
     build_exit = run_with_env(build_command, env)
     if build_exit != 0:
         return build_exit
@@ -1122,11 +1116,7 @@ def proposal_ai_smoke() -> int:
         smoke_extra_env={"WEB_MIRROR_BASE_URL": web_mirror_url},
         smoke_pnpm_filter="@anytoolai/proposal-ai-smoke",
         report_path=PROPOSAL_AI_SMOKE_REPORT_PATH,
-        write_evidence=functools.partial(
-            _write_smoke_evidence,
-            report_path=PROPOSAL_AI_SMOKE_REPORT_PATH,
-            evidence_root=PROPOSAL_AI_SMOKE_EVIDENCE_ROOT,
-        ),
+        evidence_root=PROPOSAL_AI_SMOKE_EVIDENCE_ROOT,
     )
 
 

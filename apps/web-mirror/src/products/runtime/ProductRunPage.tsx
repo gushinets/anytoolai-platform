@@ -21,7 +21,7 @@ import {
   type QuotaState,
 } from "@anytoolai/ce-kit";
 import { ErrorState } from "../../components/ErrorState";
-import type { ProductDefinition, ProductRunEvent } from "./productDefinition";
+import { assertNever, type ProductDefinition, type ProductRunEvent } from "./productDefinition";
 
 export type ProductRunPageProps<V extends Record<string, unknown>, R> = {
   definition: ProductDefinition<V, R>;
@@ -109,15 +109,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   });
   // Guards against React StrictMode's dev-only double-invoke of effects (mount -> cleanup ->
   // remount) double-counting this top-of-funnel event; the ref survives that synthetic cycle
-  // since it's the same component instance throughout.
+  // since it's the same component instance throughout. Fired from inside the boot-resolution
+  // effect below (not a separate mount-time effect) so it can carry the same resolved `guestId`
+  // every other event does -- see `ProductRunEvent`'s own docstring for why a second, independent
+  // identity resolution here would risk diverging from it.
   const productViewedFiredRef = useRef(false);
-  useEffect(() => {
+  function emitProductViewed(resolvedGuestId: string | undefined) {
     if (productViewedFiredRef.current) {
       return;
     }
     productViewedFiredRef.current = true;
-    emitEvent(onEventRef.current, { type: "product_viewed" });
-  }, []);
+    emitEvent(onEventRef.current, { type: "product_viewed", guestId: resolvedGuestId });
+  }
   const formStartedRef = useRef(false);
   // Bumped by every fetchResult() call; see that function's own comment for why.
   const resultFetchGenerationRef = useRef(0);
@@ -179,6 +182,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         }
         const resolvedGuestId = guestResult.ok ? guestResult.value.guestId : undefined;
         setGuestId(resolvedGuestId);
+        emitProductViewed(resolvedGuestId);
         if (!runtimeResult.ok) {
           setBoot({ kind: "boot-error" });
           return;
@@ -224,6 +228,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       () => {
         if (!controller?.signal.aborted) {
           setBoot({ kind: "boot-error" });
+          emitProductViewed(undefined);
         }
       },
     );
@@ -541,7 +546,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     case "unknown-error":
       mainContent = (
         <form onSubmit={handleSubmit}>
-          <Fields values={values} errors={fieldErrors} disabled={busy} onChange={updateField} />
+          <Fields values={values} errors={fieldErrors} disabled={busy || identityUnavailable} onChange={updateField} />
           <button type="submit" disabled={busy || identityUnavailable}>
             {phase.kind === "submitting" ? "Starting…" : phase.kind === "running" ? "Generating…" : definition.copy.submit}
           </button>
@@ -588,10 +593,6 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       ) : null}
     </main>
   );
-}
-
-function assertNever(value: never): never {
-  throw new Error(`Unhandled Phase: ${JSON.stringify(value)}`);
 }
 
 function _noop(): void {

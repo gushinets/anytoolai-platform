@@ -470,10 +470,13 @@ describe("ProductRunPage", () => {
     });
 
     renderPage({ client, onEvent: (event) => events.push(event) });
-    await waitFor(() => expect(events).toEqual([{ type: "product_viewed" }]));
+    await waitFor(() => expect(events).toEqual([{ type: "product_viewed", guestId: "guest_1" }]));
 
     fillValidForm();
-    expect(events).toEqual([{ type: "product_viewed" }, { type: "form_started", guestId: "guest_1" }]);
+    expect(events).toEqual([
+      { type: "product_viewed", guestId: "guest_1" },
+      { type: "form_started", guestId: "guest_1" },
+    ]);
 
     // A second field edit must not emit a second "form_started".
     fireEvent.change(screen.getByLabelText("Text"), { target: { value: "Edited input text." } });
@@ -485,7 +488,7 @@ describe("ProductRunPage", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
 
     expect(events).toEqual([
-      { type: "product_viewed" },
+      { type: "product_viewed", guestId: "guest_1" },
       { type: "form_started", guestId: "guest_1" },
       { type: "form_submitted", guestId: "guest_1" },
       { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1" },

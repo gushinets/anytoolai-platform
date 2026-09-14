@@ -6,10 +6,15 @@ on:
   pull_request:
     paths:
       - "apps/web-mirror/**"
+      - "apps/platform-api/**"
+      - "apps/platform-worker/**"
       - "packages/frontend/ce-kit/**"
       - "packages/frontend/web-result-kit/**"
       - "packages/backend/platform-core/**"
+      - "packages/backend/platform-actions/**"
       - "packages/backend/product-platforms/freelancer-suite/**"
+      - "infra/compose/**"
+      - "infra/docker/**"
       - "tests/e2e/proposal-ai-smoke/**"
       - "scripts/agent/runner.py"
       - ".github/workflows/proposal-ai-smoke.yml"
@@ -22,7 +27,7 @@ permissions:
 jobs:
   proposal-ai-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:

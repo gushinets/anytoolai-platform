@@ -5,10 +5,10 @@
 - State: active
 - Owner: agent
 - Created: 2026-09-11
-- Last updated: 2026-09-12
-- Review date: 2026-09-12
-- Next action: none — implementation landed, verified live against a real `dev-up` backend, code
-  review round 1 (13 findings) addressed, and code review round 2 (3 findings) addressed.
+- Last updated: 2026-09-14
+- Review date: 2026-09-14
+- Next action: none — implementation landed, verified live against a real `dev-up` backend, and
+  code review rounds 1 (13 findings), 2 (3 findings), and 3 (14 findings) all addressed.
 - Blocker: none
 
 ## Goal
@@ -133,9 +133,11 @@ end to end (also 4/4 passing, clean process teardown, evidence written).
 ## Validation run this session
 
 - `pnpm --filter @anytoolai/web-mirror test` — 75/75 passing after code review round 1's fixes
-  (includes the new `productRunEventTracking.test.tsx`). Now 76/76 after code review round 2's
-  fixes added one further regression test to `ProductRunPage.test.tsx` — see "Code review round 2"
-  below.
+  (includes the new `productRunEventTracking.test.tsx`). 76/76 after round 2's fixes added one
+  further regression test to `ProductRunPage.test.tsx`. 74/74 after round 3 — see "Code review
+  round 3" below for why the count went down (two tests were removed as obsolete, not skipped:
+  they tested an independent-guest-identity-resolution code path that round 3's fix deleted
+  entirely, not a coverage gap).
 - `pnpm --filter @anytoolai/web-mirror lint` / `typecheck` / `build` — clean.
 - `python scripts/agent/runner.py frontend-check` — clean across the whole pnpm workspace
   (includes the new `tests/e2e/proposal-ai-smoke` package's lint/typecheck/build).
@@ -290,3 +292,130 @@ including the DB-free pytest subset: 1241 passed, 451 deselected).
 **Files changed:** `apps/web-mirror/src/products/runtime/productRunEventTracking.ts`,
 `apps/web-mirror/src/products/runtime/ProductRunPage.tsx`,
 `apps/web-mirror/test/ProductRunPage.test.tsx`, `scripts/agent/runner.py`.
+
+## Code review round 3 (2026-09-14) — disposition
+
+14 findings re-verified by direct code reading. 4 real issues fixed with one root-cause change
+(closing 2 findings at once), 3 significant findings fixed, 2 minor duplication findings fixed, 1
+finding explicitly deferred as out of this ticket's own defined funnel scope, and 3 minor findings
+deferred with reasoning.
+
+**Fixed, root-cause:**
+
+- **`product_viewed` could still hit the backend's identity-required rejection, and remained the
+  one event with its own independent guest-identity resolution (a private-browsing/storage-
+  unavailable divergence risk round 2 narrowed to this one event but didn't close).** Round 2 made
+  every event but `product_viewed` carry the exact `guestId` `ProductRunPage` itself resolved;
+  `product_viewed` was left resolving its own via `client.createGuestIdentity()` because it fires
+  synchronously at mount, before that resolution necessarily completes. Root-caused instead of
+  patched: moved the `product_viewed` emission from its own mount-time `useEffect(() => {...}, [])`
+  into the boot-resolution effect's own `.then()` callback (right after `setGuestId(resolvedGuestId)`,
+  covering both the `runtimeResult.ok`/`!runtimeResult.ok` paths, plus the effectively-unreachable-
+  in-practice outer rejection handler for completeness), so it now carries the identical resolved
+  `guestId` every other event does. `ProductRunEvent`'s `product_viewed` variant now requires
+  `guestId: string | undefined` like the rest. This removes the tracker's `client.createGuestIdentity()`
+  call and the `"guestId" in event ? ... : ...` branching in `productRunEventTracking.ts` entirely —
+  there is now exactly one guest-identity resolution anywhere in this event path, closing the
+  divergence risk completely rather than narrowing it further, and reducing `product_viewed`'s
+  identity-loss failure mode to the same single, already-accepted "client analytics may
+  legitimately undercount" contract every other event already has. Traded off: `product_viewed`'s
+  timestamp now reflects "boot resolved" rather than "component mounted" (typically tens to a few
+  hundred ms later) — judged an acceptable, arguably more meaningful shift (the event now reflects
+  whether the product was actually determined viewable, not just mounted) for what it buys in
+  correctness and simplicity. `productViewedFiredRef`'s StrictMode double-invoke guard moved with
+  it into a small `emitProductViewed()` helper; the existing "fires product_viewed exactly once
+  even under React StrictMode's dev-only double-invoke of effects" test in `ProductRunPage.test.tsx`
+  still passes unchanged, confirming the guard still holds from its new call site.
+
+**Fixed:**
+
+- **`<Fields disabled={busy}>` was still gated only on `busy`, not `identityUnavailable`, unlike
+  the Submit button one line below it.** No longer causes analytics loss (round 2 already gated the
+  `form_started` emit itself on a resolved `guestId`), but the inconsistency was real and cheap to
+  close: changed to `disabled={busy || identityUnavailable}`, matching the Submit button.
+- **The tracker's `void Promise.all([...]).then(...)` chain had no `.catch()`, and `emitEvent()`'s
+  own defensive wrapper doesn't cover it** (the `onEvent` handler itself returns `void`, not the
+  promise chain, so a synchronous-throw/rejection guard on the handler's return value never sees
+  this detached chain). Harmless today since every promise in the chain is documented as never
+  rejecting, but a silent regression of any of those three guarantees would surface as an unhandled
+  promise rejection instead of being absorbed like everywhere else in this event path. Added a
+  trailing `.catch(() => {})` as a backstop.
+- **`.github/workflows/proposal-ai-smoke.yml`'s path filter omitted `apps/platform-api/**`,
+  `apps/platform-worker/**`, `packages/backend/platform-actions/**`, and `infra/compose|docker/**`**
+  — all of which `dev-up` actually builds and runs for this smoke. Added all four (the sibling
+  `client-handoff-smoke.yml` has the same gap; not fixed here since it's pre-existing and outside
+  this ticket's own new file).
+- **`timeout-minutes: 15` vs. the sibling workflow's `20`, for a job that does a cold Next.js build,
+  a cold Docker Compose stack boot, and 4 real Playwright E2E runs including one with 3 full
+  submit-and-wait cycles.** No confirmed timeout, but the margin was thin for no real cost to
+  widening it; bumped to `20` to match.
+
+**Fixed, minor duplication:**
+
+- **`_serve_web_mirror_and_run_smoke()` took both `report_path` directly and an injected
+  `write_evidence: Callable[[int], Path]` that separately closed over the same `report_path` (plus
+  `evidence_root`) via `functools.partial(...)` — the same path constant threaded through twice for
+  one path.** The callable injection was also never actually polymorphic: both callers always
+  passed the same `_write_smoke_evidence` function, only the bound constants differed. Simplified
+  by having `_serve_web_mirror_and_run_smoke()` take `evidence_root` directly and call
+  `_write_smoke_evidence()` itself, removing the `write_evidence` parameter, both
+  `functools.partial(...)` call sites, the now-unused `functools` import, and the now-unused
+  `Callable` import.
+- **`proposal_ai_smoke()` printed its build command twice** — its own explicit `print_command(build_command)`
+  plus `run_with_env()`'s own internal `print_command(command)` call. Removed the redundant explicit
+  call (matches how every other `run_with_env()` call site in this file already relies on its own
+  printing).
+- **`webEventTypeForRunEvent()`'s local `assertNever()` in `productRunEventTracking.ts` duplicated
+  `ProductRunPage.tsx`'s own, structurally identical, helper.** Extracted one `assertNever()` into
+  `productDefinition.ts` (the module both already import from for shared contracts) and removed
+  both local copies.
+
+**Deferred, out of this ticket's defined scope:**
+
+- **`handleRetry()`/`handleRetryResult()` don't emit a `web.retry_clicked` event, even though that
+  event type already exists end-to-end** (ce-kit's `WebClientEventType`, the backend allowlist,
+  `docs/architecture/event-taxonomy.md`). Real and correctly identified, but this ticket's own
+  "Funnel and release tests" section defines the required funnel exhaustively as "product viewed →
+  form started → form submitted → scenario completed/result viewed → copy activation" — five
+  stages, matching the five `ProductRunEvent` variants that already exist. Retry-click tracking is
+  a real, separate future addition (it would need a new `ProductRunEvent` variant, an emit call
+  site, and its own test coverage) that no product currently requires; adding it here would be
+  scope creep beyond what this ticket specifies, not a gap in what it specifies.
+
+**Deferred, low value:**
+
+- **`client_handoff_smoke()`/`proposal_ai_smoke()` still duplicate their preambles** (identity
+  resolution, port-availability check, env setup, build invocation) after two rounds of tail
+  extraction — only the port env-var names/build filters/etc. differ. Real, but the two preambles
+  also genuinely differ (client-handoff-smoke's concurrent extension build has no proposal-ai-smoke
+  equivalent); unifying further would need a config-object parameter list approaching the size of
+  the functions it replaces, for two call sites. Left as is.
+- **`playwright.config.ts`/`tsconfig.json` under `tests/e2e/proposal-ai-smoke` are still byte-copies
+  of `client-handoff-smoke`'s, with no shared base config.** Same disposition as round 1: matches
+  this repo's existing per-package-boilerplate precedent (`stakeholder-demo-browser` too); not
+  extracted for two instances of intentionally minimal, rarely-changing tooling config.
+- **`registry.test.tsx`'s import-boundary check uses a double-regex pass as its own self-check
+  (round 1's own fix) rather than a real AST parser**, which would make the self-check unnecessary
+  in principle. True, but a full AST parser is disproportionate machinery for one boundary
+  assertion in one test file; the self-check already closes the specific blind spot round 1 found.
+- **A few inline numeric timeouts in `proposal-ai-smoke.spec.ts` (`30_000`, `10_000`, `5_000`)
+  aren't named constants.** Flagged by the reviewer itself as low-confidence; the values already
+  read as self-explanatory in context (a full scenario run, a UI-state settle, a network-call
+  settle) and there are only four occurrences of two distinct values. Not changed.
+
+**Verification commands run:** `cd apps/web-mirror && pnpm run typecheck` (clean), `pnpm run lint
+--max-warnings=0` (clean), `pnpm test` (`Test Files 6 passed (6)`, `Tests 74 passed (74)` — down
+from 76/76 because two `productRunEventTracking.test.tsx` tests exercising the now-deleted
+independent-guest-identity-resolution path were removed as obsolete, not because coverage
+shrank), `pnpm run build` (clean), `python3 -m py_compile scripts/agent/runner.py` (clean),
+`python3 scripts/agent/runner.py frontend-check` (clean across the whole workspace), and
+`python3 scripts/agent/runner.py quick-check` (1241 passed, 451 deselected). Also re-verified live
+against a freshly rebuilt `dev-up` stack: `python3 scripts/agent/runner.py proposal-ai-smoke`
+(4/4 Playwright tests passing) and a direct `POST /v1/client-events` curl check confirming a
+`web.product_viewed` event with a real `guest_id` still returns `200`.
+
+**Files changed:** `apps/web-mirror/src/products/runtime/productDefinition.ts`,
+`apps/web-mirror/src/products/runtime/ProductRunPage.tsx`,
+`apps/web-mirror/src/products/runtime/productRunEventTracking.ts`,
+`apps/web-mirror/test/ProductRunPage.test.tsx`, `apps/web-mirror/test/productRunEventTracking.test.tsx`,
+`scripts/agent/runner.py`, `.github/workflows/proposal-ai-smoke.yml`.
