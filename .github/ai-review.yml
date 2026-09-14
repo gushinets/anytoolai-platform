@@ -1,0 +1,8 @@
+version: 1
+primary_ci_workflow: baseline-backend
+policy:
+  always:
+    - AGENTS.md
+    - docs/agent/coding-conventions.md
+    - docs/agent/review-checklist.md
+  scoped: []
