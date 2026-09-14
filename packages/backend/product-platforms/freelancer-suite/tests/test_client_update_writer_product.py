@@ -85,6 +85,13 @@ def _workflow_by_id() -> dict[str, dict[str, Any]]:
     return {entry["workflow_id"]: entry for entry in _load_yaml("workflows.yaml")["workflows"]}
 
 
+def _load_prompt_template(prompt_ref: str) -> str:
+    (entry,) = (
+        item for item in _load_yaml("prompts.yaml")["prompts"] if item["prompt_ref"] == prompt_ref
+    )
+    return (PRODUCT_DIR / entry["template_path"]).read_text(encoding="utf-8")
+
+
 def _load_schema(schema_ref: str) -> dict[str, Any]:
     """Resolves a schema_ref against whichever schemas.yaml manifest owns it: the product's own
     (relative to PRODUCT_DIR) for `client_update_writer.*` refs, or the kernel's (relative to
@@ -441,3 +448,17 @@ def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:
     output_schema_properties = _load_schema(contract["output_schema_ref"])["properties"]
     assert contract["canonical_field"] in output_schema_properties
     assert contract["call_to_action_field"] in output_schema_properties
+
+
+# Code review finding (team lead #1 fix, "me #10"): the deterministic e2e tests run against fixed
+# fake-provider fixtures, so they can't prove a real model honors this prompt's constraints.language/
+# length/format instructions -- only the prompt text itself can regress here undetected. Pins that
+# A06's canonical language/length/format rules (including the html-format case) actually made it
+# into the product-owned prompt, not just the workflow mapping that feeds those fields in.
+def test_prepaid_request_persuasive_text_prompt_documents_language_length_and_format() -> None:
+    prompt = _load_prompt_template("client_update_writer.prepaid_request_compose_persuasive_text.v1")
+
+    assert "constraints.language" in prompt
+    assert "constraints.length" in prompt
+    assert "constraints.format" in prompt
+    assert "html" in prompt.lower()
