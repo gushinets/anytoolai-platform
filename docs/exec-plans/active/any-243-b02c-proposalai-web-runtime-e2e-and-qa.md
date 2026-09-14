@@ -7,8 +7,10 @@
 - Created: 2026-09-11
 - Last updated: 2026-09-14
 - Review date: 2026-09-14
-- Next action: none — implementation landed, verified live against a real `dev-up` backend, and
-  code review rounds 1 (13 findings), 2 (3 findings), and 3 (14 findings) all addressed.
+- Next action: none — implementation landed, verified live against a real `dev-up` backend, code
+  review rounds 1 (13 findings), 2 (3 findings), and 3 (14 findings) all addressed, and a
+  self-review's 5 acceptance-criteria gaps (round 4) closed with real E2E coverage and a full
+  `full-check` run.
 - Blocker: none
 
 ## Goal
@@ -419,3 +421,79 @@ against a freshly rebuilt `dev-up` stack: `python3 scripts/agent/runner.py propo
 `apps/web-mirror/src/products/runtime/productRunEventTracking.ts`,
 `apps/web-mirror/test/ProductRunPage.test.tsx`, `apps/web-mirror/test/productRunEventTracking.test.tsx`,
 `scripts/agent/runner.py`, `.github/workflows/proposal-ai-smoke.yml`.
+
+## Code review round 4 (2026-09-14) — self-review acceptance-criteria gaps, disposition
+
+A self-review pass (author's own account; GitHub rejects `REQUEST_CHANGES` from a PR's own author,
+so this landed as blocking notes rather than a formal review) found 5 real gaps against ANY-243's
+own literal acceptance criteria, distinct from rounds 1-3's code-quality findings: the E2E suite's
+earlier "weak input" test was actually the validation path, not a genuine weak-input path; the
+quota test never exercised idempotent-retry-consumes-no-extra-quota; there was no backend-recorded
+(not just browser-sent) verification of `client.next_action_clicked`; there was no safe-error/
+terminal-failure path at all; and `full-check` had never actually been run for this ticket (only
+`quick-check`/`frontend-check` separately). All 5 confirmed real and closed.
+
+**Architectural finding, verified by direct code reading before designing any fix:** the real
+`FakeProviderAdapter` (`packages/backend/platform-core/.../providers/adapters/fake.py`,
+`_fixture_key_for()`) resolves its fixture strictly from the action config id (or an explicit
+`fixture_key` no real HTTP-triggered request ever sets) -- never from request content -- and
+`proposal_ai.generate_v1` has exactly one action config. The real running `dev-up` stack therefore
+has **no way to select the `weak_input` fixture via genuine input text**; only Python-level tests
+that construct a fixed-fixture adapter subclass can reach it (confirmed against ANY-227's own exec
+plan, which documents this same constraint). Making input content select a fixture would require a
+Provider Gateway/mapping-DSL change, which ANY-243's own constraints explicitly forbid introducing.
+This bounded how the weak-input and safe-error fixes below could honestly be built: real backend
+calls wherever the real stack can produce the needed behavior, Playwright network interception only
+at the one point each genuinely can't (documented inline in the spec, not left implicit).
+
+**Fixed:**
+
+- **Backend-recorded `client.next_action_clicked` verification.** The happy-path test previously
+  only asserted the browser sent one `copy_result` HTTP request; ANY-17's own backend tests prove
+  the endpoint works in isolation, not that this specific vertical's E2E run persisted it. Added
+  `pg`/`@types/pg` as devDependencies of `tests/e2e/proposal-ai-smoke` (a test-tooling boundary, not
+  product/runtime code) and a `countBackendEvents()` helper that queries the real `event_log` table
+  directly (`platform.event_log` -- confirmed its actual schema via `information_schema.tables`,
+  not assumed) for the specific `scenario_session_id` this run produced (extracted from the
+  `copy_result` request's own URL), asserting exactly 1. `scripts/agent/runner.py`'s
+  `proposal_ai_smoke()` now passes `DATABASE_URL` (`identity.database_url`, already computed and
+  host-reachable since the compose Postgres port is published) into the Playwright process env.
+- **Genuine weak-input path.** Renamed the old "weak input" test to "validation" (it always tested
+  only client-side field-required validation). Added a real "weak input" test: a vague-but-schema-
+  valid task (passes both client and backend validation) starts and polls against the real backend/
+  worker for real, and only the final canonical-result fetch is intercepted to substitute the real,
+  documented `weak_input` fixture's exact `text` (read from the repo's own fixture file at test
+  time, never hand-copied, so the test can't silently drift from the actual documented output) --
+  proving the frontend correctly renders the documented safe weak-input result, which is the
+  furthest this can honestly be pushed given the architectural constraint above.
+- **Idempotent-retry-consumes-no-extra-quota.** New dedicated test: intercepts the first `start`
+  call with a transient `500` (not `quota_exhausted`/`guest_identity_not_found`, so the frontend
+  takes its generic retryable-error path, which reuses the same prepared start/Idempotency-Key on
+  retry per `submitCurrentValues()`'s own ANY-150 contract), asserts both attempts carried the
+  identical `Idempotency-Key` header, retries via "Try again" through to a real completion, and
+  confirms quota dropped by exactly one unit (`3 of 3` -> `2 of 3`) despite two HTTP `start` calls.
+- **Safe-error/terminal-failure path.** New dedicated test: since the real fake provider has no
+  failure mode to trigger on demand, intercepts the scenario-session poll response and forces
+  `status: "failed"` on the first poll (deterministic, no need to wait out a real failure this
+  stack can't produce) -- asserts the safe `unknown-error` message appears, the originally-typed
+  form values are still present (`values` state is never cleared on this transition; confirmed by
+  reading `ProductRunPage.tsx` before writing the assertion, not assumed), and no fake
+  progress/result (`status` role, `Copy` button) remains for the failed attempt.
+- **`full-check` never actually run.** Ran `python scripts/agent/runner.py full-check` for real on
+  the current head: exit code 0 -- `quick-check` (1241 passed, 451 deselected), `frontend-check`
+  (`ce-kit` 315 passed, `web-mirror` 74 passed, all builds/lints/typechecks clean), and the
+  freelancer-suite backend pytest tail (17 passed). Evidence is this log; not re-pasted verbatim
+  here.
+
+**Verification commands run:** `cd tests/e2e/proposal-ai-smoke && pnpm run typecheck` (clean),
+`pnpm run lint --max-warnings=0` (clean), `python3 -m py_compile scripts/agent/runner.py` (clean),
+`python scripts/agent/runner.py dev-up` + `python scripts/agent/runner.py proposal-ai-smoke` (7/7
+Playwright tests passing, including all 4 new ones, against a freshly rebuilt live stack -- one
+genuine bug caught live in the process: the first `countBackendEvents()` attempt failed with
+`relation "event_log" does not exist` because the table lives in the `platform` schema, not
+`public`; fixed by schema-qualifying the query after confirming the actual schema via
+`information_schema.tables`, not guessing), and `python scripts/agent/runner.py full-check` (exit
+0, see above).
+
+**Files changed:** `scripts/agent/runner.py`, `tests/e2e/proposal-ai-smoke/package.json`,
+`tests/e2e/proposal-ai-smoke/tests/proposal-ai-smoke.spec.ts`, `pnpm-lock.yaml`.

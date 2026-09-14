@@ -973,8 +973,18 @@ def _serve_web_mirror_and_run_smoke(
         start_new_session=True,
     )
     try:
+        # Cleared up front, not just before the smoke run below: a stale report from a previous
+        # successful invocation must not survive into this run's evidence, including the readiness-
+        # failure branch immediately below, which never gets as far as that later unlink().
+        report_path.unlink(missing_ok=True)
         if not _wait_for_http_ok(web_mirror_url, 30.0):
             print(f"{readiness_error_code}: web-mirror did not become ready in time.", file=sys.stderr)
+            # Still write an evidence bundle for this failure -- otherwise a readiness timeout
+            # leaves no artifact at all for CI's "Upload evidence report" step to pick up, unlike
+            # every other way this command can fail. `report_path` was just cleared above, so
+            # `_write_smoke_evidence()` correctly records `playwright_report: None` here (no
+            # Playwright run ever started) rather than a stale prior report.
+            _write_smoke_evidence(1, report_path=report_path, evidence_root=evidence_root)
             return 1
 
         smoke_env = dict(env)
@@ -989,7 +999,6 @@ def _serve_web_mirror_and_run_smoke(
         # short regardless of checkout location.
         for key in ("TMPDIR", "TMP", "TEMP"):
             smoke_env.pop(key, None)
-        report_path.unlink(missing_ok=True)
         exit_code = run_with_env(["pnpm", "--filter", smoke_pnpm_filter, "run", "smoke"], smoke_env)
         _write_smoke_evidence(exit_code, report_path=report_path, evidence_root=evidence_root)
         return exit_code
@@ -1113,7 +1122,11 @@ def proposal_ai_smoke() -> int:
         web_mirror_port=web_mirror_port,
         env=env,
         readiness_error_code="PAS002",
-        smoke_extra_env={"WEB_MIRROR_BASE_URL": web_mirror_url},
+        # DATABASE_URL: the happy-path spec asserts the backend actually persisted
+        # `client.next_action_clicked` for its own run (not just that the browser sent the
+        # request) -- host-reachable since postgres's compose port is published, per the same
+        # precedent as identity.api_url above.
+        smoke_extra_env={"WEB_MIRROR_BASE_URL": web_mirror_url, "DATABASE_URL": identity.database_url},
         smoke_pnpm_filter="@anytoolai/proposal-ai-smoke",
         report_path=PROPOSAL_AI_SMOKE_REPORT_PATH,
         evidence_root=PROPOSAL_AI_SMOKE_EVIDENCE_ROOT,
