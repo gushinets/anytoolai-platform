@@ -8,9 +8,9 @@
 - Last updated: 2026-09-14
 - Review date: 2026-09-14
 - Next action: none — implementation landed, verified live against a real `dev-up` backend, code
-  review rounds 1 (13 findings), 2 (3 findings), and 3 (14 findings) all addressed, and a
-  self-review's 5 acceptance-criteria gaps (round 4) closed with real E2E coverage and a full
-  `full-check` run.
+  review rounds 1 (13 findings), 2 (3 findings), and 3 (14 findings) all addressed, a self-review's
+  5 acceptance-criteria gaps (round 4) closed with real E2E coverage and a full `full-check` run,
+  and a follow-up re-review's 2 remaining gaps (round 5) closed.
 - Blocker: none
 
 ## Goal
@@ -497,3 +497,53 @@ genuine bug caught live in the process: the first `countBackendEvents()` attempt
 
 **Files changed:** `scripts/agent/runner.py`, `tests/e2e/proposal-ai-smoke/package.json`,
 `tests/e2e/proposal-ai-smoke/tests/proposal-ai-smoke.spec.ts`, `pnpm-lock.yaml`.
+
+## Code review round 5 (2026-09-14) — re-review, disposition
+
+A follow-up self-re-review on the head commit after round 4 found the backend-recorded-event and
+safe-error additions correct, but flagged 2 real remaining gaps in round 4's own new tests. Both
+verified by direct reading before fixing.
+
+**Fixed:**
+
+- **The idempotent-retry test didn't actually test backend idempotency.** Its first `start`
+  attempt was fulfilled from a canned `500` response without ever calling `route.fetch()` -- the
+  real backend never saw that request at all, so it could not have consumed a quota unit. The
+  observed `3 of 3 -> 2 of 3` transition therefore only proved that *one* real start (the retry)
+  consumed one unit -- it would have passed identically even with completely broken backend
+  idempotency, since there was only ever one real attempt in the first place. Fixed by calling
+  `route.fetch()` first (so the first attempt is a genuine backend call that really starts the
+  scenario and really consumes a unit) and only then discarding that response and fulfilling a
+  synthetic `500` to the browser, simulating a dropped connection *after* the server already
+  committed the write -- the exact ambiguous-outcome class idempotency keys exist for. The retry
+  now sends the same key to the real backend a second time; the assertion that quota only ever
+  drops by one unit is now a genuine test of the backend's own replay semantics, not an artifact of
+  the mock. Re-verified live: passes, including against a session that had already reached
+  `completed` server-side by the time the retry's replay reached it (the fake provider processes
+  fast enough that this is the common case, not an edge case this fix happens to dodge).
+- **The weak-input test's own scope needed to be made explicit, not built into new infrastructure.**
+  Re-confirmed the architectural constraint from round 4 (the real fake-provider adapter resolves
+  its fixture strictly by `action_config_id`, never by request content) and, additionally,
+  confirmed that the worker/workflow -> canonical-artifact half of this path is *already* proven
+  for real, end to end, by an existing, already-passing test:
+  `apps/platform-api/tests/test_proposal_ai_bundle.py::test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_artifact`
+  (a real ASGI app, a real `worker.process_next_job()` call with a test-only
+  `_FixedFixtureProviderAdapter` injected, asserting the persisted result matches the checked-in
+  fixture file exactly) -- confirmed this file is part of `apps/platform-api/tests`, one of
+  `quick-check`'s own DB-free pytest targets, so it runs (and has been passing) on every
+  `quick-check`/`full-check` in this session, not as a one-off. Standing up a second, Docker-based
+  worker composition just to reach that same fixture from a browser -- racing or pausing the live
+  `dev-up` worker mid-suite -- would add real CI fragility for coverage that already exists and
+  already passes; that tradeoff didn't seem worth it, and I want to flag that judgment call rather
+  than have it look like an oversight. Made this explicit rather than only implicit: expanded the
+  spec's own comment to name the existing test directly and state plainly that this Playwright test
+  and that backend test *together* -- not either one alone -- constitute the full required
+  "workflow -> canonical result -> renderer" journey for weak input, each proving the half the
+  other cannot reach.
+
+**Verification commands run:** `cd tests/e2e/proposal-ai-smoke && pnpm run typecheck` (clean),
+`pnpm run lint --max-warnings=0` (clean), and `python scripts/agent/runner.py dev-up` +
+`python scripts/agent/runner.py proposal-ai-smoke` (7/7 Playwright tests passing against a freshly
+rebuilt live stack, including the corrected idempotent-retry test).
+
+**Files changed:** `tests/e2e/proposal-ai-smoke/tests/proposal-ai-smoke.spec.ts` only.

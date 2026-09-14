@@ -23,11 +23,23 @@ const COPY_NEXT_ACTION_PATTERN = /\/scenario-sessions\/([^/]+)\/next-actions\/co
 // The real fake-provider adapter (packages/backend/platform-core/.../providers/adapters/fake.py,
 // FakeProviderAdapter._fixture_key_for()) resolves its fixture strictly from the action config id
 // -- never from request content -- and ProposalAI's workflow has exactly one action config. So the
-// real running dev-up stack has no way to select this fixture via genuine input text; only
-// Python-level tests construct a fixed-fixture adapter subclass to reach it directly (see ANY-227's
-// own exec plan). Selecting it via input content would need a Provider Gateway/mapping-DSL change,
-// which ANY-243 explicitly forbids introducing. Read here (not hand-copied) so this test can never
-// silently drift from the actual documented fixture content.
+// real running dev-up stack (this Playwright suite's own backend) has no way to select this
+// fixture via genuine input text; only a test-only _FixedFixtureProviderAdapter can pin a worker
+// run to it. Selecting it via input content in the real system would need a Provider Gateway/
+// mapping-DSL change, which ANY-243 explicitly forbids introducing.
+//
+// The worker/workflow -> canonical-artifact half of this path is therefore already proven for
+// real, end to end, by
+// apps/platform-api/tests/test_proposal_ai_bundle.py::test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_artifact
+// (a real ASGI app + a real worker.process_next_job() call with that adapter injected, asserting
+// the persisted result matches this exact fixture file) -- runs on every quick-check/full-check,
+// not a one-off. Duplicating that as a second, Docker-based worker composition just to reach it
+// from a browser would add real orchestration fragility (racing or pausing the live dev-up
+// worker) for coverage that already exists and already passes. What this Playwright test proves
+// instead, complementing that backend test rather than re-deriving it: a real start against the
+// real backend/worker, and that the frontend correctly renders whatever canonical artifact the
+// backend legitimately returns for this documented case -- verified against the same fixture file
+// read here (not hand-copied), never a fabricated one.
 const WEAK_INPUT_FIXTURE_PATH = join(
   import.meta.dirname,
   "../../../../tests/fixtures/provider/fake_provider_outputs/proposal_ai.compose_persuasive_text_v1.weak_input.json",
@@ -167,9 +179,16 @@ test.describe("ProposalAI web product", () => {
       idempotencyKeys.push(route.request().headers()["idempotency-key"] ?? null);
       startAttempts += 1;
       if (startAttempts === 1) {
-        // A transient/ambiguous failure -- not quota_exhausted or guest_identity_not_found -- so
-        // the frontend lands on its generic retryable-error path, which reuses the same prepared
-        // start (and thus the same Idempotency-Key) on retry rather than minting a new one.
+        // Let the request reach the real backend for real -- it genuinely starts the scenario and
+        // consumes a quota unit server-side -- then simulate the client never durably seeing that
+        // response (e.g. a dropped connection after the server already committed the write). This
+        // is exactly the ambiguous-outcome class the backend's idempotency-key contract exists
+        // for: fulfilling this from a canned response without ever calling route.fetch() would
+        // mean the "first" attempt never reached the backend at all, so the retry below would be
+        // the *only* real start -- proving nothing about idempotency (a prior version of this test
+        // had exactly that bug: the 3->2 transition it asserted would have passed even with
+        // completely broken backend idempotency).
+        await route.fetch();
         await route.fulfill({
           status: 500,
           contentType: "application/json",
@@ -190,8 +209,9 @@ test.describe("ProposalAI web product", () => {
     expect(idempotencyKeys[0]).toBeTruthy();
     expect(idempotencyKeys[1]).toBe(idempotencyKeys[0]);
 
-    // The failed first attempt never reached the real backend (fulfilled locally above), so only
-    // the second, real attempt could have consumed a unit -- confirms exactly one, not two.
+    // Both attempts reached the real backend with the identical Idempotency-Key; the backend's own
+    // replay semantics must return the first attempt's already-accepted session on the second
+    // call rather than starting (and charging) a new one -- confirmed by exactly one unit gone.
     await page.unroute(START_ROUTE_PATTERN);
     await page.goto(PRODUCT_URL);
     await expect(page.getByText("2 of 3 proposals remaining.")).toBeVisible();
