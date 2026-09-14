@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import math
 import os
+from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Mapping
+from typing import Any
 
 import litellm
 import yaml

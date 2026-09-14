@@ -240,13 +240,17 @@ Each runtime entity has a small repository class:
 - `GuestIdentityRepository`
 - `QuotaUsageRepository`
 - `HandoffRepository`
-- `AtomLabRunRepository`
 
 Repository responsibilities:
 
 - `create(record)`
 - `get(id)`
 - `update(record)`
+
+`AtomLabRunRepository` is the immutable, fill-once exception. It provides `create(record)`, lookup
+methods, and `bind_runtime_ids(...)`; the latter fills nullable execution links exactly once instead
+of exposing `update(record)`. It also validates that those links remain within the snapshot's
+laboratory-owned scenario and job.
 
 Repository non-responsibilities:
 
@@ -269,6 +273,7 @@ These records live next to the rest of the domain models:
 - `artifacts/models.py` -> `ArtifactRecord`
 - `identity/models.py` -> `GuestIdentityRecord`
 - `handoffs/models.py` -> `HandoffRecord`
+- `atom_lab/models.py` -> `AtomLabRunRecord`
 
 This keeps the runtime storage surface aligned with the repo's existing model style.
 
