@@ -33,7 +33,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-anytoolai_platform_api = ["static/demo/*"]
+anytoolai_platform_api = ["static/demo/*", "static/atom_lab/*"]
 
 [tool.uv.sources]
 anytoolai-platform-core = { path = "../../packages/backend/platform-core", editable = true }

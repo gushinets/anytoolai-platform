@@ -1602,6 +1602,7 @@ class ConfigLoader:
                 action_type = config_data.get("action_type")
                 prompt_ref = config_data.get("prompt_ref")
                 provider_policy_ref = config_data.get("provider_policy_ref")
+                metadata = config_data.get("metadata", {})
 
                 self._require_fields(
                     config_data,
@@ -1631,12 +1632,21 @@ class ConfigLoader:
                     recursive=True,
                 )
 
+                if not isinstance(metadata, dict):
+                    raise InvalidConfigShapeError(
+                        path,
+                        "Action config metadata must be a dictionary object",
+                        config_id=config_id,
+                        ref_type="metadata",
+                        ref_value=str(metadata),
+                    )
+
                 self.action_configurations[config_id] = ActionConfiguration(
                     action_config_id=config_id,
                     action_type=action_type,
                     prompt_ref=prompt_ref,
                     provider_policy_ref=provider_policy_ref,
-                    metadata={"_file_path": str(path)},
+                    metadata={**metadata, "_file_path": str(path)},
                 )
                 self._remember_source("action_config", config_id, path)
         except ConfigError as error:
