@@ -5,6 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from anytoolai_platform_core.events.client_events import WebClientEventType
 from anytoolai_platform_core.handoffs.models import HandoffStatus
 from anytoolai_platform_core.products.models import FrontendType
 from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaPeriod, QuotaUnit
@@ -106,6 +107,27 @@ class ScenarioStartResponse(BaseModel):
     status: ScenarioSessionStatus
     allowed_next_actions: list[str] = Field(default_factory=list)
     result_artifact_id: str | None = None
+
+
+class ClientEventRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event_id: str
+    event_type: WebClientEventType
+    product_id: str
+    frontend_id: str
+    web_session_id: str
+    guest_id: str | None = None
+    user_id: str | None = None
+    scenario_session_id: str | None = None
+    properties: dict[str, Any] = Field(default_factory=dict)
+
+
+class ClientEventResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event_id: str
+    event_type: WebClientEventType
 
 
 class DemoRunRequest(BaseModel):

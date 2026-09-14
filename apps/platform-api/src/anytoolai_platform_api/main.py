@@ -16,6 +16,7 @@ from anytoolai_platform_api.errors import (
     request_validation_error_handler,
     unhandled_exception_handler,
 )
+from anytoolai_platform_api.routers.client_events import router as client_events_router
 from anytoolai_platform_api.routers.demo import router as demo_router
 from anytoolai_platform_api.routers.handoffs import router as handoffs_router
 from anytoolai_platform_api.routers.health import router as health_router
@@ -62,6 +63,7 @@ def create_app(
     app.include_router(runtime_config_router)
     app.include_router(scenario_runtime_router)
     app.include_router(results_router)
+    app.include_router(client_events_router)
     return app
 
 

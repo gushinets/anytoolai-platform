@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from anytoolai_platform_api.schemas import (
+    ClientEventResponse,
     HandoffCreateResponse,
     HandoffPreviewResponse,
     QuotaStateResponse,
@@ -55,6 +56,11 @@ def test_quota_state_response_rejects_off_enum_unit_period_dimension() -> None:
         QuotaStateResponse(**base, quota_dimension="product", unit="monthly_run", period="lifetime")
     with pytest.raises(ValidationError):
         QuotaStateResponse(**base, quota_dimension="product", unit="scenario_run", period="monthly")
+
+
+def test_client_event_response_rejects_an_off_enum_event_type() -> None:
+    with pytest.raises(ValidationError):
+        ClientEventResponse(event_id="web_evt_1", event_type="client.result_copied")
 
 
 def test_scenario_start_response_rejects_an_off_enum_status() -> None:

@@ -66,6 +66,17 @@ Generated-doc mirror of the MVP-A platform event taxonomy from `configs/kernel/p
 - `client.result_copied`
 - `client.next_action_clicked`
 
+### web
+
+- `web.product_viewed`
+- `web.form_started`
+- `web.form_submitted`
+- `web.result_viewed`
+- `web.retry_clicked`
+- `web.mode_selected`
+- `web.gap_selected`
+- `web.feedback_submitted`
+
 ### access_lite
 
 - `email_capture.submitted`

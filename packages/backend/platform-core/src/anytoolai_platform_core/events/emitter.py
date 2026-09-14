@@ -43,6 +43,7 @@ SAFE_NUMERIC_USAGE_COUNTER_KEYS = frozenset(
         "total_tokens",
     }
 )
+MAX_CLIENT_EVENT_ID_LENGTH = 128
 
 
 class EventValidationError(ValueError):
@@ -62,14 +63,25 @@ class EventEmitter:
         *,
         timestamp: datetime | None = None,
         replay: bool = False,
+        event_id: str | None = None,
     ) -> EventEnvelope:
         self._validate_event_type(event_type)
         self._require_dimension(context.tenant_id, "tenant_id")
         self._require_dimension(context.region, "region")
+        if event_id is not None:
+            if replay:
+                raise EventValidationError("event_id and replay are mutually exclusive")
+            # Normalize before validating -- not just before use -- so a value that's only over
+            # length before trimming (e.g. padding whitespace) doesn't get rejected as too long
+            # when the id that would actually be stored/looked-up fits, and so "abc" and " abc "
+            # store/look up as the same row instead of two, preserving idempotent retries for a
+            # caller whose retries aren't byte-identical.
+            event_id = event_id.strip()
+            self._validate_client_event_id(event_id)
 
         sanitized_properties = sanitize_event_properties(properties or {})
         error_code = _extract_error_code(sanitized_properties)
-        event_id = (
+        resolved_event_id = event_id or (
             build_replay_event_id(
                 event_type=event_type,
                 tenant_id=context.tenant_id,
@@ -100,7 +112,7 @@ class EventEmitter:
             else new_ordered_id("event")
         )
         envelope = EventEnvelope(
-            event_id=event_id,
+            event_id=resolved_event_id,
             event_type=event_type,
             timestamp=timestamp or utc_now(),
             tenant_id=context.tenant_id,
@@ -131,7 +143,7 @@ class EventEmitter:
             acquisition_source=context.acquisition_source,
             properties=sanitized_properties,
         )
-        if replay:
+        if replay or event_id is not None:
             return self._repository.create(
                 envelope,
                 allow_existing_event_id=True,
@@ -147,6 +159,15 @@ class EventEmitter:
     def _validate_event_type(event_type: str) -> None:
         if event_type not in PLATFORM_EVENTS:
             raise EventValidationError(f"unknown platform event type: {event_type}")
+
+    @staticmethod
+    def _validate_client_event_id(event_id: str) -> None:
+        if not event_id.strip():
+            raise EventValidationError("event_id must not be empty")
+        if len(event_id) > MAX_CLIENT_EVENT_ID_LENGTH:
+            raise EventValidationError(
+                f"event_id must be at most {MAX_CLIENT_EVENT_ID_LENGTH} characters"
+            )
 
 
 def enrich_event_context(
