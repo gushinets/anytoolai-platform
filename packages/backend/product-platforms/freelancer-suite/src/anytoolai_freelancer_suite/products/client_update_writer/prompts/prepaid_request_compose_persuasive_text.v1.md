@@ -16,6 +16,12 @@ Rules:
   reaches the client at all. Do not state or imply a payment amount or due date beyond exactly what
   `context` provides — in particular, do not tighten a due date to an earlier one (for example
   writing "before Friday" when `context` says the due date is "Friday"; use "by Friday" or "due
-  Friday" instead) — and do not state a payment method (that is a later step's concern).
+  Friday" instead) — and do not state a payment method, link, reference, or account details (none
+  are available at this step; do not invent any).
 - Match `constraints.tone` (`neutral`, `warm`, or `firm`) when provided.
+- Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
+  to the language `context` is written in otherwise.
+- If `constraints.length` is set, `text` must not exceed that many characters.
+- If `constraints.format` is `markdown` or `html`, format `text` accordingly; if it is
+  `plain_text` or omitted, `text` must contain no markup.
 - Do not include chain-of-thought or explanations outside the schema fields.

@@ -252,7 +252,6 @@ _MODE_HAPPY_PATH_CASES = {
                 "Thanks for the question about the timeline. The revised delivery date is next "
                 "Wednesday, which covers both the copy edits and the final review pass."
             ),
-            "call_to_action": "Let me know if Wednesday works, or if you need it sooner.",
         },
     ),
     "prepaid_request": (

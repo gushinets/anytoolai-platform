@@ -14,6 +14,7 @@ instead of duplicating that proof.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 from pathlib import Path
@@ -33,15 +34,28 @@ FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_ou
     root for root in FreelancerSuiteBundle().config_roots() if root.name == "client_update_writer"
 )
 
-FORBIDDEN_TOKENS = (
-    "pydantic_ai",
-    "litellm",
-    "openai",
-    "anthropic",
-    "google.genai",
-    "@google/genai",
-    "cohere",
-    "mistralai",
+
+def _load_validate_architecture_module() -> Any:
+    # Dynamic-load, same pattern test_proposal_ai_product.py already uses --
+    # validate_architecture.py is pure stdlib (no anytoolai_platform_core import chain), so this
+    # stays within ATAI007/ATAI008's ban on product-platforms code depending on platform-core
+    # internals.
+    path = REPO_ROOT / "scripts" / "agent" / "validate_architecture.py"
+    spec = importlib.util.spec_from_file_location("validate_architecture_module", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+# Provider-SDK names come from validate_architecture.py's own LLM_PROVIDER_IMPORTS -- the single
+# source of truth ATAI006 already enforces repo-wide -- rather than a second, hand-maintained copy
+# that could silently drift from it (code review finding: team lead #1). Model-string prefixes are
+# a distinct concern (raw text, not an import name) with no central list to reuse.
+FORBIDDEN_TOKENS = tuple(_load_validate_architecture_module().LLM_PROVIDER_IMPORTS) + (
+    "gpt-",
+    "claude-",
+    "gemini-",
 )
 
 

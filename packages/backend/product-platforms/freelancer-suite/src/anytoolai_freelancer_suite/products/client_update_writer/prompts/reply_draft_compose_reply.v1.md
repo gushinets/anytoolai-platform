@@ -17,7 +17,9 @@ Rules:
 - If `constraints.max_length` is set, `text` must not exceed that many characters.
 - If `constraints.output_format` is `markdown` or `html`, format `text` accordingly; if it is
   `plain_text` or omitted, `text` must contain no markup.
-- Only include `call_to_action` when the reply benefits from a short, explicit next step beyond
-  what is already stated in `text`. Omit it when `text` already makes the requested action clear
-  on its own.
+- Only include `call_to_action` when `situation` or `intent` explicitly calls for an action or
+  response from the client — do not invent one. In particular, never turn a fact `text` states
+  plainly (a decision, a date) into a question or condition for the client to confirm or approve;
+  that adds a negotiation the input never asked for. Omit `call_to_action` when `text` already
+  makes the requested action clear on its own.
 - Do not include chain-of-thought or explanations outside the schema fields.

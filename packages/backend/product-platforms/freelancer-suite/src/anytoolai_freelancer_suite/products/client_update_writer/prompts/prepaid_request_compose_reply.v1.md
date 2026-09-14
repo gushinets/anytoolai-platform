@@ -24,4 +24,7 @@ Rules:
   send the payment and let the caller know once it has been sent — restating the amount from
   `situation` when `situation` states one. Do not phrase it as the client confirming *receipt* of
   something; the client is sending the payment, not receiving one.
+- Neither `text` nor `call_to_action` may state a payment method, link, reference, or account
+  details (for example a bank name, PayPal address, invoice number, or "the account on file") —
+  `situation` never contains any, so any such detail would be invented.
 - Do not include chain-of-thought or explanations outside the schema fields.
