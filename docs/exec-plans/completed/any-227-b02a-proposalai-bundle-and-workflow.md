@@ -2,10 +2,10 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-09-08
-- Last updated: 2026-09-08
+- Last updated: 2026-09-15
 - Review date: 2026-09-08
 - Next action: none — implementation landed, `/code-review xhigh` pass #1 findings addressed;
   awaiting further code review.
