@@ -27,7 +27,7 @@ concurrency:
 jobs:
   ai-pr-review:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request'
-    uses: gushinets/ai-pr-review/.github/workflows/reusable-ai-pr-review.yml@e7623290c35638500f14035a1c55a4e169b77eb6
+    uses: gushinets/ai-pr-review/.github/workflows/reusable-ai-pr-review.yml@c3bc681841256f2b12eed940bd3c2f0c3f3acba7
     with:
       mode: ${{ github.event_name == 'workflow_dispatch' && 'manual' || 'automatic' }}
       triggering_run_id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
