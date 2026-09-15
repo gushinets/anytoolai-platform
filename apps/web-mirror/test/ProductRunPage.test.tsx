@@ -289,9 +289,75 @@ describe("ProductRunPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+    // "Copied" no longer waits on the activation record settling (see the dedicated test below),
+    // so this waits for the record explicitly before asserting ordering.
+    await waitFor(() => expect(calls.some((call) => call.key === ROUTES.NEXT_ACTION)).toBe(true));
 
     expect(order).toEqual(["clipboard_write", "next_action_recorded"]);
     expect(calls.filter((call) => call.key === ROUTES.NEXT_ACTION)).toHaveLength(1);
+  });
+
+  it("shows Copied as soon as the clipboard write succeeds, without waiting for the copy_result activation record", async () => {
+    // Code review finding: handleCopy used to await the whole copy-and-record call before
+    // resolving, so "Copied" only appeared once the (network-bound) activation record had also
+    // settled -- a regression from the previous fire-and-forget UX. The activation record is left
+    // deliberately pending here to prove the UI no longer waits on it.
+    const { client, calls, resolveDeferred } = makeClientWithDeferredRoute(happyPathRoutes(), ROUTES.NEXT_ACTION);
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+    // The record request has been sent, but hasn't resolved yet -- "Copied" already showed anyway.
+    expect(calls.some((call) => call.key === ROUTES.NEXT_ACTION)).toBe(true);
+
+    resolveDeferred(sessionResponse({ status: "completed" }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
+  });
+
+  it("disables the Copy button for the duration of a copy, so a fast double-click can't fire two activations", async () => {
+    // Code review finding: handleCopy had no debounce/in-flight guard.
+    const { client, calls, resolveDeferred } = makeClientWithDeferredRoute(happyPathRoutes(), ROUTES.NEXT_ACTION);
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+
+    const copyButton = screen.getByRole("button", { name: "Copy" });
+    fireEvent.click(copyButton);
+    // The button disables itself (and relabels to "Copying…") the instant the first click's
+    // handler runs -- this second click must be a no-op, not a second activation.
+    fireEvent.click(copyButton);
+
+    resolveDeferred(sessionResponse({ status: "completed" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+    expect(calls.filter((call) => call.key === ROUTES.NEXT_ACTION)).toHaveLength(1);
+  });
+
+  it("treats an unavailable clipboard API as a failed copy, recording no activation", async () => {
+    // Code review finding: this exact rejection path (writeToClipboard's own "Clipboard API
+    // unavailable" branch) had lost all test coverage when ResultView stopped implementing the
+    // clipboard write itself.
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+    const { client, calls } = makeClient(happyPathRoutes());
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not copy to clipboard/i));
+    expect(calls.some((call) => call.key === ROUTES.NEXT_ACTION)).toBe(false);
   });
 
   it("enters a quota-exhausted state from the advisory quota check, with no form and no scenario started", async () => {
@@ -853,5 +919,55 @@ describe("ProductRunPage", () => {
     // guest_id: null.
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
     expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+  });
+
+  it("retries runtime config on a later mount sharing the same client, instead of caching a failed fetch forever", async () => {
+    // Code review finding: the runtime-config cache used to store the raw pending promise
+    // unconditionally; since getRuntimeConfig() resolves {ok: false} rather than rejecting on a
+    // network failure, that failure got remembered forever, permanently boot-erroring every later
+    // mount for the same (client, productId) -- e.g. every mode in Client Update Writer's mode
+    // switcher, which remounts ProductRunPage on switch while reusing the same client.
+    const { client } = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [errorResponse(500, "internal_error"), runtimeConfigResponse(TEST_PRODUCT_IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(TEST_PRODUCT_IDS)],
+    });
+
+    const first = renderPage({ client });
+    await waitFor(() =>
+      expect(screen.getByText("Test Product is unavailable right now. Please reload the page.")).toBeTruthy(),
+    );
+    first.unmount();
+
+    renderPage({ client });
+    await waitForForm();
+  });
+
+  it("dedupes product_viewed/form_started across remounts sharing the same client and productId", async () => {
+    // Code review finding: productViewedFiredRef/formStartedRef were per-component-instance refs,
+    // so a remount (e.g. Client Update Writer's key={modeId} mode switch) reset them and could
+    // refire these top-of-funnel events once per mode instead of once per real visit.
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(TEST_PRODUCT_IDS), runtimeConfigResponse(TEST_PRODUCT_IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(TEST_PRODUCT_IDS), quotaResponse(TEST_PRODUCT_IDS)],
+    });
+
+    const first = render(
+      <ProductRunPage definition={testProductDefinition} client={client} onEvent={(event) => events.push(event)} />,
+    );
+    await waitForForm();
+    fillValidForm();
+    first.unmount();
+
+    render(
+      <ProductRunPage definition={testProductDefinition} client={client} onEvent={(event) => events.push(event)} />,
+    );
+    await waitForForm();
+    fillValidForm();
+
+    expect(events.filter((event) => event.type === "product_viewed")).toHaveLength(1);
+    expect(events.filter((event) => event.type === "form_started")).toHaveLength(1);
   });
 });

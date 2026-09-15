@@ -51,7 +51,7 @@ describe("copyResultAndRecordActivation", () => {
     const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(JSON.parse(init.body as string)).toEqual({ checkpoint_id: "result_ready" });
     expect(result.copied).toBe(true);
-    expect(result.copied && result.activation.ok).toBe(true);
+    expect(result.copied && result.activation?.ok).toBe(true);
     expect(COPY_RESULT_NEXT_ACTION_ID).toBe("copy_result");
   });
 
@@ -106,9 +106,9 @@ describe("copyResultAndRecordActivation", () => {
     const result = await copyResultAndRecordActivation(client, request(async () => undefined));
 
     expect(result.copied).toBe(true);
-    expect(result.copied && result.activation.ok).toBe(false);
+    expect(result.copied && result.activation?.ok).toBe(false);
     expect(
-      result.copied && !result.activation.ok && result.activation.error.type === "backend_error"
+      result.copied && result.activation && !result.activation.ok && result.activation.error.type === "backend_error"
         ? result.activation.error.code
         : undefined,
     ).toBe("scenario_checkpoint_conflict");
@@ -123,6 +123,65 @@ describe("copyResultAndRecordActivation", () => {
     const result = await copyResultAndRecordActivation(client, request(async () => undefined));
 
     expect(result.copied).toBe(true);
-    expect(result.copied && result.activation.ok).toBe(false);
+    expect(result.copied && result.activation?.ok).toBe(false);
+  });
+
+  it("records the caller-supplied nextActionId instead of the default when one is given", async () => {
+    // Code review finding: the next-action id was unconditionally hardcoded to
+    // COPY_RESULT_NEXT_ACTION_ID, with no way for a future product whose own renderer_contract.yaml
+    // names a different next_action to override it.
+    const fetchImpl = vi.fn(async () => jsonResponse(200, SESSION_PAYLOAD));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    await copyResultAndRecordActivation(client, {
+      ...request(async () => undefined),
+      nextActionId: "custom_next_action",
+    });
+
+    const [calledUrl] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(calledUrl).toBe(
+      "https://api.example.com/v1/scenario-sessions/scenario_session_123/next-actions/custom_next_action",
+    );
+  });
+
+  it("skips the activation request entirely when checkpointId is null, but still fires onCopied", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(200, SESSION_PAYLOAD));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+    const onCopied = vi.fn();
+
+    const result = await copyResultAndRecordActivation(client, {
+      ...request(async () => undefined),
+      checkpointId: null,
+      onCopied,
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(onCopied).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ copied: true, activation: null });
+  });
+
+  it("fires onCopied as soon as the clipboard write succeeds, before the activation request settles", async () => {
+    let resolveFetch: (value: Response) => void = () => undefined;
+    const fetchImpl = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+    const onCopied = vi.fn();
+
+    const inFlight = copyResultAndRecordActivation(client, { ...request(async () => undefined), onCopied });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // onCopied has already fired, and the activation request is in flight, while its response is
+    // still deliberately unresolved -- proves onCopied doesn't wait for it.
+    expect(onCopied).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+    resolveFetch(jsonResponse(200, SESSION_PAYLOAD));
+    const result = await inFlight;
+    expect(result.copied).toBe(true);
   });
 });

@@ -107,6 +107,26 @@ def _load_schema(schema_ref: str) -> dict[str, Any]:
     return json.loads((manifest_dir / entry["file_path"]).read_text(encoding="utf-8"))
 
 
+def test_quota_policy_ref_resolves_to_the_declared_lifetime_product_quota() -> None:
+    """Code review finding: this product had no `quota_policy_ref` and no `quotas.yaml` at all --
+    `quotas/service.py`'s `validate_accepted_start()` skips enforcement entirely when
+    `product.quota_policy_ref` is absent, so guest usage of this LLM product was completely
+    unmetered. Mirrors test_proposal_ai_product.py's own regression test for the same shape."""
+    product = _load_yaml("product.yaml")
+    quotas = _load_yaml("quotas.yaml")["quota_policies"]
+
+    assert product["quota_policy_ref"] == "client_update_writer.guest_quota_v1"
+    (policy,) = [
+        policy
+        for policy in quotas
+        if policy["quota_policy_id"] == "client_update_writer.guest_quota_v1"
+    ]
+    assert policy["unit"] == "scenario_run"
+    assert policy["period"] == "lifetime"
+    assert policy["dimension"] == "product"
+    assert isinstance(policy["limit_count"], int) and policy["limit_count"] > 0
+
+
 def test_product_directory_contains_no_python_or_forbidden_provider_references() -> None:
     all_files = [path for path in PRODUCT_DIR.rglob("*") if path.is_file()]
     assert all_files, "expected the product directory to contain config files"
@@ -172,6 +192,13 @@ def test_each_mode_workflow_uses_only_generic_atom_action_types(
                     "reply_goal": "Answer.",
                     "tone": "calm",  # invalid enum
                 },
+                {
+                    "client_message": "Hi",
+                    "reply_goal": "Answer.",
+                    "tone": "neutral",
+                    "extra_field": "nope",
+                },  # additionalProperties: false -- code review finding: only update_input_v1 had
+                # this case before.
             ],
         ),
         (
@@ -183,6 +210,20 @@ def test_each_mode_workflow_uses_only_generic_atom_action_types(
                     "billing_context": {"notes": "Phase 2", "amount": "$500"},
                     "tone": "urgent",  # invalid enum
                 },
+                {
+                    "billing_context": {"notes": "Phase 2", "amount": "$500"},
+                    "tone": "firm",
+                    "extra_field": "nope",
+                },  # additionalProperties: false at the top level -- code review finding.
+                {
+                    "billing_context": {
+                        "notes": "Phase 2",
+                        "amount": "$500",
+                        "extra_field": "nope",
+                    },
+                    "tone": "firm",
+                },  # additionalProperties: false on the nested billing_context object -- code
+                # review finding: this nesting level was entirely untested before.
             ],
         ),
     ],

@@ -50,6 +50,118 @@ function emitEvent(handler: ((event: ProductRunEvent) => void) | undefined, even
   }
 }
 
+/**
+ * A per-(client, key) cache that only remembers a *successful* (`ok: true`) resolution --
+ * code review finding: an earlier version cached the raw pending promise unconditionally, so a
+ * single transient network failure got remembered forever (`getRuntimeConfig`/`getQuota` resolve
+ * `{ok: false}` on failure rather than rejecting, so nothing ever naturally evicted it). A
+ * `{ok: false}` result is left uncached, so the next caller retries instead of replaying the same
+ * dead failure until a full page reload.
+ */
+function cacheSuccessOnly<T extends { ok: boolean }>(
+  cache: WeakMap<PlatformApiClient, Map<string, Promise<T>>>,
+  client: PlatformApiClient,
+  key: string,
+  fetch: () => Promise<T>,
+): Promise<T> {
+  let byKey = cache.get(client);
+  if (!byKey) {
+    byKey = new Map();
+    cache.set(client, byKey);
+  }
+  const cached = byKey.get(key);
+  if (cached) {
+    return cached;
+  }
+  const pending = fetch();
+  byKey.set(key, pending);
+  const settledByKey = byKey;
+  void pending.then((result) => {
+    if (!result.ok && settledByKey.get(key) === pending) {
+      settledByKey.delete(key);
+    }
+  });
+  return pending;
+}
+
+// Runtime config is immutable per (client, productId) for the lifetime of a page load -- caching
+// it here means a product that mounts several ProductRunPage instances for the same productId in
+// sequence (e.g. Client Update Writer's mode switcher, which remounts on every mode change since
+// each mode's form values have an incompatible shape) doesn't re-fetch identical data on every
+// switch. Keyed by the client instance (not a bare module-level cache) so distinct clients --
+// different tests, or a real app with more than one client -- never share entries. Guest identity
+// is deliberately NOT cached here: it already caches itself via guestStorage.
+const runtimeConfigCache = new WeakMap<PlatformApiClient, Map<string, ReturnType<typeof getRuntimeConfig>>>();
+
+function getCachedRuntimeConfig(client: PlatformApiClient, productId: string) {
+  return cacheSuccessOnly(runtimeConfigCache, client, productId, () => getRuntimeConfig(client, productId));
+}
+
+/**
+ * Tracks which top-of-funnel events have already fired for a given (client, productId) -- not a
+ * per-component-instance `useRef`, because a product whose page remounts `ProductRunPage` for the
+ * same product (Client Update Writer's mode switcher, via `key={modeId}`) would otherwise refire
+ * `product_viewed`/`form_started` once per mode visited instead of once per real visit to that
+ * product (code review finding). Survives across those remounts the same way `getCachedRuntimeConfig`
+ * does, by living outside the component instance; StrictMode's mount -> cleanup -> remount replay
+ * still only fires each event once, same as before. Trade-off: `apps/web-mirror/src/app/products/
+ * [productId]/page.tsx` already keeps one `client` instance across a client-side navigation
+ * between two *different* products (its own `useMemo(..., [])`), so a return visit to a product
+ * already seen this tab session also won't refire -- same category of behavior as that existing
+ * per-client memoization, not a new one, and not something any current product/test relies on.
+ */
+const firedEventTypesCache = new WeakMap<PlatformApiClient, Map<string, Set<string>>>();
+
+function hasEventFired(client: PlatformApiClient, productId: string, eventType: string): boolean {
+  return firedEventTypesCache.get(client)?.get(productId)?.has(eventType) ?? false;
+}
+
+function markEventFired(client: PlatformApiClient, productId: string, eventType: string): void {
+  let byProductId = firedEventTypesCache.get(client);
+  if (!byProductId) {
+    byProductId = new Map();
+    firedEventTypesCache.set(client, byProductId);
+  }
+  let fired = byProductId.get(productId);
+  if (!fired) {
+    fired = new Set();
+    byProductId.set(productId, fired);
+  }
+  fired.add(eventType);
+}
+
+/**
+ * Advisory quota is only cached once a response has revealed its policy is product-dimensioned
+ * (`quotaDimension === "product"`) -- only then is the value actually identical across every
+ * scenario/mode of that product, so only then is reusing it across a Client Update Writer-style
+ * mode switch correct. A scenario-dimensioned policy's value can legitimately differ per
+ * scenario, so it's deliberately never cached here, and re-fetches per mode exactly as before.
+ */
+const productLevelQuotaCache = new WeakMap<PlatformApiClient, Map<string, ReturnType<typeof getQuota>>>();
+
+function getCachedOrFreshQuota(
+  client: PlatformApiClient,
+  request: { productId: string; guestId: string; scenarioId: string },
+) {
+  const byProductId = productLevelQuotaCache.get(client);
+  const cached = byProductId?.get(request.productId);
+  if (cached) {
+    return cached;
+  }
+  const pending = getQuota(client, request).then((result) => {
+    if (result.ok && result.value.quotaDimension === "product") {
+      let map = productLevelQuotaCache.get(client);
+      if (!map) {
+        map = new Map();
+        productLevelQuotaCache.set(client, map);
+      }
+      map.set(request.productId, Promise.resolve(result));
+    }
+    return result;
+  });
+  return pending;
+}
+
 function shallowEqualValues<V extends Record<string, unknown>>(a: V, b: V): boolean {
   const keys = Object.keys(a);
   return keys.length === Object.keys(b).length && keys.every((key) => Object.is(a[key], b[key]));
@@ -107,21 +219,6 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   useEffect(() => {
     onEventRef.current = onEvent;
   });
-  // Guards against React StrictMode's dev-only double-invoke of effects (mount -> cleanup ->
-  // remount) double-counting this top-of-funnel event; the ref survives that synthetic cycle
-  // since it's the same component instance throughout. Fired from inside the boot-resolution
-  // effect below (not a separate mount-time effect) so it can carry the same resolved `guestId`
-  // every other event does -- see `ProductRunEvent`'s own docstring for why a second, independent
-  // identity resolution here would risk diverging from it.
-  const productViewedFiredRef = useRef(false);
-  function emitProductViewed(resolvedGuestId: string | undefined) {
-    if (productViewedFiredRef.current) {
-      return;
-    }
-    productViewedFiredRef.current = true;
-    emitEvent(onEventRef.current, { type: "product_viewed", guestId: resolvedGuestId });
-  }
-  const formStartedRef = useRef(false);
   // Bumped by every fetchResult() call; see that function's own comment for why.
   const resultFetchGenerationRef = useRef(0);
   // True once any concurrent fetchResult() call for the current session has reached a definitive,
@@ -175,7 +272,19 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // already point at a newer controller from a later invocation, which would wrongly report
     // "not aborted" for a continuation that belongs to an already-superseded one.
     const controller = controllerRef.current;
-    Promise.all([getRuntimeConfig(client, productId), client.createGuestIdentity({ storage: guestStorage })]).then(
+    // Deduped via the shared (client, productId) cache above, not a per-instance ref -- guards
+    // both React StrictMode's dev-only double-invoke of effects (mount -> cleanup -> remount) and
+    // a Client Update Writer-style mode-switch remount from double-counting this top-of-funnel
+    // event. Declared inside this effect (its only caller) rather than at component scope so it
+    // doesn't need its own identity in the dependency array below.
+    function emitProductViewed(resolvedGuestId: string | undefined) {
+      if (hasEventFired(client, productId, "product_viewed")) {
+        return;
+      }
+      markEventFired(client, productId, "product_viewed");
+      emitEvent(onEventRef.current, { type: "product_viewed", guestId: resolvedGuestId });
+    }
+    Promise.all([getCachedRuntimeConfig(client, productId), client.createGuestIdentity({ storage: guestStorage })]).then(
       ([runtimeResult, guestResult]) => {
         if (controller?.signal.aborted) {
           return;
@@ -210,7 +319,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           // product-wide policy simply "does not require it" (optional, not rejected) -- passing
           // it unconditionally keeps this shared runtime correct for either policy shape without
           // needing to know which one a given product uses.
-          getQuota(client, { productId, guestId: resolvedGuestId, scenarioId: scenario.scenarioId }).then((quotaResult) => {
+          getCachedOrFreshQuota(client, {
+            productId,
+            guestId: resolvedGuestId,
+            scenarioId: scenario.scenarioId,
+          }).then((quotaResult) => {
             if (controller?.signal.aborted || !quotaResult.ok) {
               return;
             }
@@ -472,9 +585,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // Either way, a failed activation-record must never make an already-copied, already-displayed
   // result look broken (ANY-243): `copied` reflects only the clipboard write, never the
   // activation's own HTTP outcome (see `copyResultAndRecordActivation`'s own contract).
-  async function handleCopy(text: string): Promise<boolean> {
+  // Resolves as soon as the clipboard write itself succeeds (via `onCopied`), not once the
+  // `copy_result` activation record also completes -- code review finding: awaiting the whole
+  // helper before resolving made "Copied" wait on a network round-trip it never used to wait on.
+  // The activation record still proceeds to completion in the background either way.
+  function handleCopy(text: string): Promise<boolean> {
     if (phase.kind !== "result") {
-      return false;
+      return Promise.resolve(false);
     }
     const { scenarioSessionId, checkpointId } = phase;
     const controller = controllerRef.current;
@@ -482,43 +599,47 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       navigator.clipboard?.writeText
         ? navigator.clipboard.writeText(value)
         : Promise.reject(new Error("Clipboard API unavailable."));
-    if (!checkpointId) {
-      try {
-        await writeToClipboard(text);
-      } catch {
-        return false;
-      }
-      emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId, guestId });
-      return true;
-    }
-    const outcome = await copyResultAndRecordActivation(
-      client,
-      {
-        text,
-        scenarioSessionId,
-        checkpointId,
-        writeToClipboard,
-      },
-      { signal: controller?.signal },
-    );
-    if (!outcome.copied) {
-      return false;
-    }
-    emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId, guestId });
-    return true;
+
+    return new Promise<boolean>((resolve) => {
+      void copyResultAndRecordActivation(
+        client,
+        {
+          text,
+          scenarioSessionId,
+          checkpointId,
+          writeToClipboard,
+          nextActionId: definition.copyNextActionId,
+          onCopied: () => {
+            emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId, guestId });
+            resolve(true);
+          },
+        },
+        { signal: controller?.signal },
+      ).then(
+        (outcome) => {
+          if (!outcome.copied) {
+            resolve(false);
+          }
+        },
+        // Code review finding: with no rejection handler here, a throwing `onCopied` (or anything
+        // else in that chain) would leave this promise -- and the Copy button -- hanging forever
+        // with no feedback. `resolve(false)` is a no-op if `onCopied` already resolved `true`.
+        () => resolve(false),
+      );
+    });
   }
 
   function updateField<K extends keyof V>(field: K, value: V[K]) {
     // Gated on a resolved guestId too, the same way submitCurrentValues() already gates
     // form_submitted: a boot-time createGuestIdentity() failure (not just the guest-identity-
     // not-found self-heal path) otherwise leaves the form fully interactive with guestId
-    // undefined, and this event only ever fires once per page lifetime (formStartedRef) -- firing
-    // it here with no guestId/scenarioSessionId would be permanently dropped by the backend's
-    // identity-required check with no chance to recover it later. Leaving formStartedRef unset
-    // while guestId is undefined lets a still-unresolved identity emit on a later keystroke
-    // instead of losing the event outright.
-    if (!formStartedRef.current && guestId !== undefined) {
-      formStartedRef.current = true;
+    // undefined, and this event only ever fires once per (client, productId) -- firing it here
+    // with no guestId/scenarioSessionId would be permanently dropped by the backend's
+    // identity-required check with no chance to recover it later. Leaving it unmarked-fired while
+    // guestId is undefined lets a still-unresolved identity emit on a later keystroke instead of
+    // losing the event outright.
+    if (!hasEventFired(client, productId, "form_started") && guestId !== undefined) {
+      markEventFired(client, productId, "form_started");
       emitEvent(onEventRef.current, { type: "form_started", guestId });
     }
     setValues((prev) => {

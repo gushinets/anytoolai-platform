@@ -5,32 +5,18 @@ import { useState } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import { ResultView } from "../../components/ResultView";
 import { ProductRunPage } from "../runtime/ProductRunPage";
+import { collectFieldErrors, optionalTrimmedFieldError, requiredTrimmedFieldError } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductResultProps, ProductRunEvent } from "../runtime/productDefinition";
+import { TONE_OPTIONS, type Tone } from "../runtime/tone";
 
 const PRODUCT_ID = "client_update_writer";
 
-const TONE_OPTIONS = ["neutral", "warm", "firm"] as const;
-type Tone = (typeof TONE_OPTIONS)[number];
-
-// Mirrors every mode's own `^\S([\s\S]*\S)?(?!\n)$` schema pattern (no leading/trailing
-// whitespace) structurally, the same way ProposalAIProduct's own validate() does, instead of
-// transcribing the regex itself. Backend validation stays authoritative either way.
-function requiredTrimmedFieldError(value: string, label: string, maxLength: number): string | undefined {
-  if (value.trim().length === 0) {
-    return `${label} is required.`;
-  }
-  if (value !== value.trim()) {
-    return `${label} must not start or end with whitespace.`;
-  }
-  if (value.length > maxLength) {
-    return `${label} must be ${maxLength} characters or fewer.`;
-  }
-  return undefined;
-}
-
-function optionalTrimmedFieldError(value: string, label: string, maxLength: number): string | undefined {
-  return value.length === 0 ? undefined : requiredTrimmedFieldError(value, label, maxLength);
-}
+// `quotas.yaml` declares `dimension: product` -- one 3-run pool shared by all three modes, not a
+// separate pool per mode -- so every mode's `quotaRemaining` copy uses this same, mode-agnostic
+// wording (code review finding: per-mode wording like "X of Y updates remaining" implied separate
+// pools that don't exist).
+const quotaRemainingCopy = (remaining: number, limit: number) =>
+  `${remaining} of ${limit} Client Update Writer runs remaining.`;
 
 function toneError(tone: Tone | ""): string | undefined {
   return tone ? undefined : "Tone is required.";
@@ -101,12 +87,10 @@ function ClientUpdateWriterResultView({ result, onCopy }: ProductResultProps<Cli
 type UpdateValues = { progressNotes: string; tone: Tone | "" };
 
 function validateUpdate(values: UpdateValues): Partial<Record<keyof UpdateValues, string>> {
-  const errors: Partial<Record<keyof UpdateValues, string>> = {};
-  const progressNotesError = requiredTrimmedFieldError(values.progressNotes, "Progress notes", 4000);
-  if (progressNotesError) errors.progressNotes = progressNotesError;
-  const tone = toneError(values.tone);
-  if (tone) errors.tone = tone;
-  return errors;
+  return collectFieldErrors<UpdateValues>([
+    ["progressNotes", requiredTrimmedFieldError(values.progressNotes, "Progress notes", 4000)],
+    ["tone", toneError(values.tone)],
+  ]);
 }
 
 function UpdateFields({ values, errors, disabled, onChange }: ProductFieldsProps<UpdateValues>) {
@@ -140,7 +124,7 @@ export const updateDefinition: ProductDefinition<UpdateValues, ClientUpdateWrite
     submit: "Write update",
     running: "Writing your update…",
     runFailed: "Something went wrong writing your update. Please try again.",
-    quotaRemaining: (remaining, limit) => `${remaining} of ${limit} updates remaining.`,
+    quotaRemaining: quotaRemainingCopy,
   },
 };
 
@@ -149,14 +133,11 @@ export const updateDefinition: ProductDefinition<UpdateValues, ClientUpdateWrite
 type ReplyDraftValues = { clientMessage: string; replyGoal: string; tone: Tone | "" };
 
 function validateReplyDraft(values: ReplyDraftValues): Partial<Record<keyof ReplyDraftValues, string>> {
-  const errors: Partial<Record<keyof ReplyDraftValues, string>> = {};
-  const clientMessageError = requiredTrimmedFieldError(values.clientMessage, "Client message", 4000);
-  if (clientMessageError) errors.clientMessage = clientMessageError;
-  const replyGoalError = requiredTrimmedFieldError(values.replyGoal, "Reply goal", 4000);
-  if (replyGoalError) errors.replyGoal = replyGoalError;
-  const tone = toneError(values.tone);
-  if (tone) errors.tone = tone;
-  return errors;
+  return collectFieldErrors<ReplyDraftValues>([
+    ["clientMessage", requiredTrimmedFieldError(values.clientMessage, "Client message", 4000)],
+    ["replyGoal", requiredTrimmedFieldError(values.replyGoal, "Reply goal", 4000)],
+    ["tone", toneError(values.tone)],
+  ]);
 }
 
 function ReplyDraftFields({ values, errors, disabled, onChange }: ProductFieldsProps<ReplyDraftValues>) {
@@ -200,7 +181,7 @@ export const replyDraftDefinition: ProductDefinition<ReplyDraftValues, ClientUpd
     submit: "Write reply",
     running: "Writing your reply…",
     runFailed: "Something went wrong writing your reply. Please try again.",
-    quotaRemaining: (remaining, limit) => `${remaining} of ${limit} reply drafts remaining.`,
+    quotaRemaining: quotaRemainingCopy,
   },
 };
 
@@ -209,16 +190,12 @@ export const replyDraftDefinition: ProductDefinition<ReplyDraftValues, ClientUpd
 type PrepaidRequestValues = { billingNotes: string; billingAmount: string; billingDueDate: string; tone: Tone | "" };
 
 function validatePrepaidRequest(values: PrepaidRequestValues): Partial<Record<keyof PrepaidRequestValues, string>> {
-  const errors: Partial<Record<keyof PrepaidRequestValues, string>> = {};
-  const notesError = requiredTrimmedFieldError(values.billingNotes, "Billing notes", 4000);
-  if (notesError) errors.billingNotes = notesError;
-  const amountError = requiredTrimmedFieldError(values.billingAmount, "Amount", 200);
-  if (amountError) errors.billingAmount = amountError;
-  const dueDateError = optionalTrimmedFieldError(values.billingDueDate, "Due date", 200);
-  if (dueDateError) errors.billingDueDate = dueDateError;
-  const tone = toneError(values.tone);
-  if (tone) errors.tone = tone;
-  return errors;
+  return collectFieldErrors<PrepaidRequestValues>([
+    ["billingNotes", requiredTrimmedFieldError(values.billingNotes, "Billing notes", 4000)],
+    ["billingAmount", requiredTrimmedFieldError(values.billingAmount, "Amount", 200)],
+    ["billingDueDate", optionalTrimmedFieldError(values.billingDueDate, "Due date", 200)],
+    ["tone", toneError(values.tone)],
+  ]);
 }
 
 function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFieldsProps<PrepaidRequestValues>) {
@@ -279,7 +256,7 @@ export const prepaidRequestDefinition: ProductDefinition<PrepaidRequestValues, C
     submit: "Write request",
     running: "Writing your request…",
     runFailed: "Something went wrong writing your request. Please try again.",
-    quotaRemaining: (remaining, limit) => `${remaining} of ${limit} prepaid requests remaining.`,
+    quotaRemaining: quotaRemainingCopy,
   },
 };
 
@@ -288,15 +265,27 @@ export const prepaidRequestDefinition: ProductDefinition<PrepaidRequestValues, C
 // single mount; each mode here is its own complete ProductDefinition, and switching between them
 // is just which one this component currently renders). `key={modeId}` forces a full ProductRunPage
 // remount on switch, so a mode change always starts from a clean form/run state, exactly like
-// navigating to a different product would. ----
+// navigating to a different product would -- each mode's form values have an incompatible shape
+// (UpdateValues/ReplyDraftValues/PrepaidRequestValues), so the remount is load-bearing, not just
+// defensive: without it, ProductRunPage's own `values` state would keep the previous mode's shape. ----
 
 type ModeId = "update" | "reply_draft" | "prepaid_request";
 
-const MODES: ReadonlyArray<{ id: ModeId; label: string }> = [
-  { id: "update", label: "Update" },
-  { id: "reply_draft", label: "Reply Draft" },
-  { id: "prepaid_request", label: "Prepaid Request" },
-];
+// One map, not a separate label list plus a separate mode -> definition ternary (code review
+// finding: the two used to list the same three modes independently) -- `Record<ModeId, ...>`
+// also makes a missing mode a compile error instead of needing a runtime exhaustiveness check.
+// Each mode's own V is a distinct, incompatible values shape (see the docstring above); `any`
+// here is the map's value type only, not a loosening of any individual mode's own
+// ProductDefinition<V, R> declaration above.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyModeDefinition = ProductDefinition<any, ClientUpdateWriterResult>;
+
+const MODE_CONFIG: Record<ModeId, { label: string; definition: AnyModeDefinition }> = {
+  update: { label: "Update", definition: updateDefinition },
+  reply_draft: { label: "Reply Draft", definition: replyDraftDefinition },
+  prepaid_request: { label: "Prepaid Request", definition: prepaidRequestDefinition },
+};
+const MODE_IDS = Object.keys(MODE_CONFIG) as ModeId[];
 
 export type ClientUpdateWriterProductProps = {
   client: PlatformApiClient;
@@ -310,7 +299,7 @@ export function ClientUpdateWriterProduct({ client, onEvent }: ClientUpdateWrite
     <>
       <fieldset>
         <legend>Mode</legend>
-        {MODES.map(({ id, label }) => (
+        {MODE_IDS.map((id) => (
           <label key={id}>
             <input
               type="radio"
@@ -319,17 +308,11 @@ export function ClientUpdateWriterProduct({ client, onEvent }: ClientUpdateWrite
               checked={id === modeId}
               onChange={() => setModeId(id)}
             />
-            {label}
+            {MODE_CONFIG[id].label}
           </label>
         ))}
       </fieldset>
-      {modeId === "update" ? (
-        <ProductRunPage key="update" definition={updateDefinition} client={client} onEvent={onEvent} />
-      ) : modeId === "reply_draft" ? (
-        <ProductRunPage key="reply_draft" definition={replyDraftDefinition} client={client} onEvent={onEvent} />
-      ) : (
-        <ProductRunPage key="prepaid_request" definition={prepaidRequestDefinition} client={client} onEvent={onEvent} />
-      )}
+      <ProductRunPage key={modeId} definition={MODE_CONFIG[modeId].definition} client={client} onEvent={onEvent} />
     </>
   );
 }

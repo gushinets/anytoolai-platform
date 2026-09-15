@@ -4,10 +4,9 @@ import type { ChangeEvent } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import { ResultView } from "../../components/ResultView";
 import { ProductRunPage } from "../runtime/ProductRunPage";
+import { collectFieldErrors, requiredTrimmedFieldError } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductRunEvent } from "../runtime/productDefinition";
-
-const TONE_OPTIONS = ["neutral", "warm", "firm"] as const;
-type Tone = (typeof TONE_OPTIONS)[number];
+import { TONE_OPTIONS, type Tone } from "../runtime/tone";
 
 export type ProposalAIValues = {
   taskText: string;
@@ -16,30 +15,22 @@ export type ProposalAIValues = {
   language: string;
 };
 
-// Mirrors generate_input.schema.json's `language` pattern; task_text/freelancer_positioning are
-// checked structurally below instead of transcribing that schema's equivalent (but harder to
-// read) regex. Backend validation stays authoritative either way.
+// Mirrors generate_input.schema.json's `language` pattern -- checked structurally below instead
+// of transcribing that schema's equivalent (but harder to read) regex. Backend validation stays
+// authoritative either way.
 const LANGUAGE_PATTERN = /^[a-z]{2}(-[A-Z]{2})?$/;
 
 function validate(values: ProposalAIValues): Partial<Record<keyof ProposalAIValues, string>> {
-  const errors: Partial<Record<keyof ProposalAIValues, string>> = {};
-  for (const [field, label] of [
-    ["taskText", "Task description"],
-    ["freelancerPositioning", "Your positioning"],
-  ] as const) {
-    const value = values[field];
-    if (value.trim().length === 0) {
-      errors[field] = `${label} is required.`;
-    } else if (value !== value.trim()) {
-      errors[field] = `${label} must not start or end with whitespace.`;
-    } else if (value.length > 4000) {
-      errors[field] = `${label} must be 4000 characters or fewer.`;
-    }
-  }
-  if (values.language && !LANGUAGE_PATTERN.test(values.language)) {
-    errors.language = 'Language must look like "en" or "en-US".';
-  }
-  return errors;
+  return collectFieldErrors<ProposalAIValues>([
+    ["taskText", requiredTrimmedFieldError(values.taskText, "Task description", 4000)],
+    ["freelancerPositioning", requiredTrimmedFieldError(values.freelancerPositioning, "Your positioning", 4000)],
+    [
+      "language",
+      values.language && !LANGUAGE_PATTERN.test(values.language)
+        ? 'Language must look like "en" or "en-US".'
+        : undefined,
+    ],
+  ]);
 }
 
 function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsProps<ProposalAIValues>) {

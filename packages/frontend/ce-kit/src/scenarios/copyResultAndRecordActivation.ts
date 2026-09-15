@@ -10,8 +10,20 @@ export type CopyResultAndRecordActivationRequest = {
   /** The result text to place on the clipboard. */
   text: string;
   scenarioSessionId: string;
-  /** The checkpoint the copy button is shown against; the backend is authoritative on staleness. */
-  checkpointId: string;
+  /**
+   * The checkpoint the copy button is shown against; the backend is authoritative on staleness.
+   * `null` when the completed session has no active checkpoint to record an activation against
+   * (legitimately nullable -- see `ProductRunPageProps`'s own `Phase["result"]` docstring) -- the
+   * clipboard write still happens, only the next-action recording is skipped, so callers no longer
+   * need their own separate no-checkpoint branch.
+   */
+  checkpointId: string | null;
+  /**
+   * The next-action id to record. Defaults to `COPY_RESULT_NEXT_ACTION_ID` (`"copy_result"`) when
+   * omitted -- every product built so far uses that default; a future product whose own
+   * `renderer_contract.yaml` names a different `next_action` can pass it here instead.
+   */
+  nextActionId?: string;
   /**
    * Performs the actual clipboard write (typically `(text) => navigator.clipboard.writeText(text)`).
    * Injected rather than called directly so the ordering contract below is testable without a
@@ -19,17 +31,26 @@ export type CopyResultAndRecordActivationRequest = {
    * knowing about it. A rejection means the copy did not happen.
    */
   writeToClipboard: (text: string) => Promise<void>;
+  /**
+   * Fired the instant the clipboard write succeeds, before the (network-bound) activation record
+   * is even started. Lets a caller show "Copied" immediately instead of waiting on the record's
+   * round-trip -- code review finding: awaiting this whole function before flipping the UI to
+   * "Copied" regressed the previous fire-and-forget UX. Never awaited by this function itself; a
+   * throwing handler is the caller's own bug, not something this function should protect against.
+   */
+  onCopied?: () => void;
 };
 
 export type CopyResultAndRecordActivationResult =
   /** The clipboard write failed; no activation was recorded, because nothing was copied. */
   | { copied: false; reason: unknown }
   /**
-   * The clipboard write succeeded. `activation` is the outcome of recording it; a failed
-   * activation request does not revoke the copy -- the text is already on the clipboard, and the
-   * platform contract explicitly allows this metric to undercount.
+   * The clipboard write succeeded. `activation` is the outcome of recording it, or `null` when
+   * `checkpointId` was `null` and no recording was attempted. A failed activation request does not
+   * revoke the copy -- the text is already on the clipboard, and the platform contract explicitly
+   * allows this metric to undercount.
    */
-  | { copied: true; activation: PlatformApiResult<ScenarioSession> };
+  | { copied: true; activation: PlatformApiResult<ScenarioSession> | null };
 
 /**
  * The shared copy-button activation contract (ANY-17, design spec "ProposalAI activation"): the
@@ -59,11 +80,15 @@ export async function copyResultAndRecordActivation(
   } catch (reason: unknown) {
     return { copied: false, reason };
   }
+  request.onCopied?.();
+  if (!request.checkpointId) {
+    return { copied: true, activation: null };
+  }
   const activation = await nextAction(
     client,
     {
       scenarioSessionId: request.scenarioSessionId,
-      nextActionId: COPY_RESULT_NEXT_ACTION_ID,
+      nextActionId: request.nextActionId ?? COPY_RESULT_NEXT_ACTION_ID,
       checkpointId: request.checkpointId,
     },
     options,
