@@ -68,9 +68,7 @@ class ModelCatalogRepository:
         )
         return self._from_row(row)
 
-    def refresh_is_due(
-        self, account_scope: str, *, now: datetime, cooldown: timedelta
-    ) -> bool:
+    def refresh_is_due(self, account_scope: str, *, cooldown: timedelta) -> bool:
         row = (
             self._session.execute(
                 sa.select(
@@ -93,7 +91,10 @@ class ModelCatalogRepository:
         )
         return not active_lease and (
             not cooling_down
-            and (row["refresh_requested_at"] is not None or row["due_at"] <= now)
+            and (
+                row["refresh_requested_at"] is not None
+                or row["due_at"] <= row["database_now"]
+            )
         )
 
     def request_refresh(self, account_scope: str, *, now: datetime) -> ModelCatalogState:
@@ -129,7 +130,7 @@ class ModelCatalogRepository:
             and row["last_attempt_at"] + cooldown > database_now
         ):
             return None
-        if row["refresh_requested_at"] is None and row["due_at"] > now:
+        if row["refresh_requested_at"] is None and row["due_at"] > database_now:
             return None
         lease_id = new_id("model_catalog_lease")
         self._session.execute(
@@ -165,7 +166,7 @@ class ModelCatalogRepository:
                 snapshot={
                     "items": [serialize_catalog_item(item) for item in items],
                 },
-                due_at=now + ttl,
+                due_at=sa.func.clock_timestamp() + ttl,
                 refresh_requested_at=None,
                 lease_id=None,
                 lease_until=None,
@@ -193,7 +194,7 @@ class ModelCatalogRepository:
                 model_catalog_state_table.c.lease_until > sa.func.clock_timestamp(),
             )
             .values(
-                due_at=now + retry_after,
+                due_at=sa.func.clock_timestamp() + retry_after,
                 refresh_requested_at=None,
                 lease_id=None,
                 lease_until=None,
@@ -211,7 +212,7 @@ class ModelCatalogRepository:
             postgresql_insert(model_catalog_state_table)
             .values(
                 account_scope=account_scope,
-                due_at=now,
+                due_at=sa.func.clock_timestamp(),
                 created_at=now,
                 updated_at=now,
             )

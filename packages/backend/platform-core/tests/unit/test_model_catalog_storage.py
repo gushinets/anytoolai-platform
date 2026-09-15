@@ -62,6 +62,20 @@ def _expire_refresh_cooldown(
         )
 
 
+def _make_refresh_due(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session], account_scope: str
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        session.execute(
+            sa.update(model_catalog_state_table)
+            .where(model_catalog_state_table.c.account_scope == account_scope)
+            .values(
+                due_at=sa.func.clock_timestamp() - sa.text("interval '1 second'"),
+                last_attempt_at=sa.func.clock_timestamp() - sa.text("interval '61 seconds'"),
+            )
+        )
+
+
 def test_manual_refresh_queues_during_cooldown_and_runs_when_eligible(
     session_factory: sa.orm.sessionmaker[sa.orm.Session], now: datetime
 ) -> None:
@@ -275,7 +289,7 @@ def test_refresh_service_loads_initial_snapshot_and_refreshes_after_ttl(
 
     asyncio.run(service.refresh_if_due())
     current_time[0] = now + timedelta(hours=24, seconds=1)
-    _expire_refresh_cooldown(session_factory, "account-a")
+    _make_refresh_due(session_factory, "account-a")
     asyncio.run(service.refresh_if_due())
 
     statements: list[str] = []
@@ -350,7 +364,7 @@ def test_refresh_service_failure_keeps_last_good_snapshot_and_reports_pending(
     asyncio.run(service.refresh_if_due())
     current_time[0] = now + timedelta(hours=24, seconds=1)
     source.fail = True
-    _expire_refresh_cooldown(session_factory, "account-failure")
+    _make_refresh_due(session_factory, "account-failure")
     asyncio.run(service.refresh_if_due())
 
     with transaction_boundary(session_factory) as session:
@@ -416,3 +430,84 @@ def test_refresh_cooldown_is_derived_from_database_clock(
         )
 
     assert lease is None
+
+
+def test_due_refresh_is_claimed_using_database_clock_despite_worker_skew(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    skewed_worker_time = datetime.now(UTC) - timedelta(days=1)
+    with transaction_boundary(session_factory) as session:
+        repository = ModelCatalogRepository(session)
+        lease = repository.claim_refresh(
+            "account-skewed-due",
+            now=skewed_worker_time,
+            lease_duration=timedelta(seconds=30),
+        )
+        assert lease is not None
+        repository.complete_refresh(
+            lease,
+            snapshot_id="snapshot-skewed-due",
+            items=(),
+            now=skewed_worker_time,
+            ttl=timedelta(hours=24),
+        )
+        session.execute(
+            sa.update(model_catalog_state_table)
+            .where(model_catalog_state_table.c.account_scope == "account-skewed-due")
+            .values(
+                due_at=sa.func.clock_timestamp() - sa.text("interval '1 second'"),
+                last_attempt_at=sa.func.clock_timestamp() - sa.text("interval '61 seconds'"),
+            )
+        )
+
+    with transaction_boundary(session_factory) as session:
+        repository = ModelCatalogRepository(session)
+        assert repository.refresh_is_due(
+            "account-skewed-due",
+            cooldown=timedelta(seconds=60),
+        )
+        lease = repository.claim_refresh(
+            "account-skewed-due",
+            now=skewed_worker_time,
+            lease_duration=timedelta(seconds=30),
+            cooldown=timedelta(seconds=60),
+        )
+
+    assert lease is not None
+
+
+@pytest.mark.parametrize("finalizer", ["complete", "fail"])
+def test_refresh_finalizers_schedule_due_at_from_database_clock(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session], finalizer: str
+) -> None:
+    skewed_worker_time = datetime.now(UTC) + timedelta(days=1)
+    delay = timedelta(hours=24) if finalizer == "complete" else timedelta(seconds=60)
+    with transaction_boundary(session_factory) as session:
+        repository = ModelCatalogRepository(session)
+        lease = repository.claim_refresh(
+            f"account-skewed-{finalizer}-due",
+            now=skewed_worker_time,
+            lease_duration=timedelta(seconds=30),
+        )
+        assert lease is not None
+        database_before = session.execute(sa.select(sa.func.clock_timestamp())).scalar_one()
+        if finalizer == "complete":
+            repository.complete_refresh(
+                lease,
+                snapshot_id="snapshot-database-due",
+                items=(),
+                now=skewed_worker_time,
+                ttl=delay,
+            )
+        else:
+            repository.fail_refresh(
+                lease,
+                error="database due test",
+                now=skewed_worker_time,
+                retry_after=delay,
+            )
+        state = repository.get(f"account-skewed-{finalizer}-due")
+        database_after = session.execute(sa.select(sa.func.clock_timestamp())).scalar_one()
+
+    assert state is not None
+    assert database_before + delay <= state.due_at <= database_after + delay

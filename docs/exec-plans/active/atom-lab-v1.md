@@ -229,6 +229,7 @@ Acceptance: Тесты new/removed model, unknown effort list, no reasoning, sta
 - [x] Закрепить HTTP-контракт stale last-good snapshot после refresh failure.
 - [x] Сохранять manual refresh как pending во время cooldown и исполнять после его окончания.
 - [x] Читать актуальную LiteLLM форму reasoning efforts: `reasoning_effort_levels` и per-level flags.
+- [x] Использовать PostgreSQL clock для durable `due_at` eligibility и finalizer scheduling.
 
 Не приняты предложения менять inclusion semantics для audio-capable/unsupported моделей и выносить
 refresh из worker loop: они противоречат зафиксированным правилам AL03 и

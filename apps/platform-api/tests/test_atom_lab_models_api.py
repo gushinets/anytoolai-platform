@@ -166,6 +166,7 @@ def test_get_models_returns_stale_last_good_catalog_after_refresh_failure(app) -
 
     with transaction_boundary(app.state.runtime.storage.session_factory) as session:
         repository = ModelCatalogRepository(session)
+        repository.request_refresh("test-account", now=now)
         lease = repository.claim_refresh(
             "test-account", now=now, lease_duration=timedelta(seconds=30)
         )

@@ -56,7 +56,6 @@ class ModelCatalogRefreshService:
         with transaction_boundary(self._session_factory) as session:
             refresh_is_due = ModelCatalogRepository(session).refresh_is_due(
                 self._account_scope,
-                now=claimed_at,
                 cooldown=self._retry_after,
             )
         if not refresh_is_due:
