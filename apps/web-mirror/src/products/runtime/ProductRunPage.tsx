@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   copyResultAndRecordActivation,
   createInMemoryAsyncStorage,
@@ -167,6 +167,16 @@ function markEventFired(client: PlatformApiClient, scopeKey: string, eventType: 
   fired.add(eventType);
 }
 
+// `useLayoutEffect` is a no-op-with-a-warning during SSR (no DOM) -- Next.js still does an
+// initial server render of "use client" components -- so this falls back to `useEffect` there and
+// only upgrades to the synchronous, pre-paint timing in an actual browser (or jsdom, which defines
+// `window`). Code review finding: `onBusyChange` firing from a plain `useEffect` runs *after* the
+// browser could already have painted the settled result (Copy button visible) while the parent's
+// own mirrored `busy` state was still stale, so a mode-switch click landing in that window was
+// silently dropped -- `useLayoutEffect` flushes the whole child-fires-effect -> parent-setState ->
+// parent-re-renders cascade synchronously, before that intermediate state is ever observable.
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 function shallowEqualValues<V extends Record<string, unknown>>(a: V, b: V): boolean {
   const keys = Object.keys(a);
   return keys.length === Object.keys(b).length && keys.every((key) => Object.is(a[key], b[key]));
@@ -183,7 +193,17 @@ type Phase<R> =
   | { kind: "running"; scenarioSessionId: string }
   | { kind: "result"; scenarioSessionId: string; checkpointId: string | null; result: R }
   | { kind: "quota-exhausted" }
-  | { kind: "retryable-error"; message: string }
+  /**
+   * `scenarioSessionId` is set only when this retryable-error followed an already-*accepted*
+   * start whose outcome then became ambiguous (a poll timeout or connection loss in `runPoll` --
+   * the backend may still be running, or may have already finished, this session) -- never when
+   * the start request itself failed in `runStart` (no session was ever created, nothing to
+   * abandon). Code review finding: `busy` below must stay `true` for the former case too, or a
+   * multi-mode caller's mode-switch guard sees `busy: false` and remounts, destroying
+   * `pendingStart` and this session's reattachment path -- the exact "abandon an active,
+   * quota-consuming run" bug the guard exists to prevent, just reached via a different phase.
+   */
+  | { kind: "retryable-error"; message: string; scenarioSessionId?: string }
   /**
    * The scenario session itself completed successfully (we have a `resultArtifactId`) but the
    * `GET /v1/results/{id}` call failed -- a transient/ambiguous fetch problem, not a backend
@@ -265,14 +285,21 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const [values, setValues] = useState<V>(definition.emptyValues);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, string>>>({});
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
-  const busy = phase.kind === "submitting" || phase.kind === "running";
+  // Also covers the ambiguous-retry case (see Phase["retryable-error"]'s own docstring): unsafe to
+  // remount either way, so the form's own Submit button and fields are gated on this same flag too
+  // (below), not just the mode-switch guard -- editing values or resubmitting during that specific
+  // ambiguous window would equally abandon the original Idempotency-Key reattachment path.
+  const busy =
+    phase.kind === "submitting" ||
+    phase.kind === "running" ||
+    (phase.kind === "retryable-error" && phase.scenarioSessionId !== undefined);
   // Always-current, same reasoning as `onEventRef` above -- `onBusyChange` itself is not a
   // dependency of the effect below (a new identity every render must not re-fire it).
   const onBusyChangeRef = useRef(onBusyChange);
   useEffect(() => {
     onBusyChangeRef.current = onBusyChange;
   });
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     onBusyChangeRef.current?.(busy);
   }, [busy]);
   // Holds the one Idempotency-Key-bound handle for the current logical submission (ANY-150): a
@@ -408,12 +435,16 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     if (!polled.result.ok) {
+      // scenarioSessionId included -- see Phase["retryable-error"]'s own docstring: the start
+      // already succeeded, so the backend may still be running (or may have already finished) this
+      // exact session, and it must not be abandoned by a mode switch while this is showing.
       setPhase({
         kind: "retryable-error",
         message:
           polled.reason === "timeout"
             ? "This is taking longer than expected. Please try again."
             : "Lost connection while waiting for your result. Please try again.",
+        scenarioSessionId,
       });
       return;
     }
@@ -423,9 +454,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       // polling budget ran out -- not a backend conclusion about the run, just this poll giving
       // up early. Treating that as enterUnknownError() (like a genuinely terminal status below)
       // would clear pendingStart and abandon a job that may still be actively running server-side.
-      // Ambiguous, so this is retryable-error: its retry reuses the same Idempotency-Key, and the
-      // backend collapses that back onto this same session rather than starting a new one.
-      setPhase({ kind: "retryable-error", message: "This is taking longer than expected. Please try again." });
+      // Ambiguous, so this is retryable-error (with scenarioSessionId set, same reasoning as
+      // above): its retry reuses the same Idempotency-Key, and the backend collapses that back
+      // onto this same session rather than starting a new one.
+      setPhase({
+        kind: "retryable-error",
+        message: "This is taking longer than expected. Please try again.",
+        scenarioSessionId,
+      });
       return;
     }
     const session = polled.result.value;

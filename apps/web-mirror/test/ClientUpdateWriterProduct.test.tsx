@@ -17,6 +17,7 @@ import {
 import {
   errorResponse,
   guestIdentityResponse,
+  idempotencyKeyOf,
   makeClient,
   makeClientWithDeferredRoute,
   quotaResponse,
@@ -471,13 +472,62 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     resolveDeferred(sessionResponse());
     await waitFor(() => expect(screen.getByText("Still going.")).toBeTruthy());
 
-    // The run settled -- mode switching is available again, and does switch mode now. The
-    // Copy button's own render settling doesn't guarantee onBusyChange's separate effect (on the
-    // parent) has already flushed, so this waits for it explicitly rather than asserting inline.
-    await waitFor(() =>
-      expect((screen.getByRole("radio", { name: "Update" }) as HTMLInputElement).disabled).toBe(false),
-    );
+    // The run settled -- mode switching is available again, and does switch mode now. Asserted
+    // synchronously (no waitFor) right after the result text appears -- code review finding: an
+    // earlier version notified the parent's busy state from a plain useEffect, which could still
+    // be stale at this exact instant (result rendered, guard not yet lifted), silently dropping a
+    // click landing in that window; onBusyChange now fires from a (isomorphic) layout effect, so
+    // the whole child-settles -> parent-unblocks cascade is flushed before this line runs.
+    expect((screen.getByRole("radio", { name: "Update" }) as HTMLInputElement).disabled).toBe(false);
     fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
     await waitFor(() => expect(screen.getByLabelText("Client message")).toBeTruthy());
+  });
+
+  it("keeps mode switching blocked through an ambiguous poll failure, and Try again continues the same logical run", async () => {
+    // Code review finding [P1]: an accepted start whose poll then fails (timeout/connection loss)
+    // lands on retryable-error, not running/submitting -- busy used to go back to false there,
+    // so a mode switch could still remount and abandon a session the backend might still be
+    // running, destroying pendingStart/the Idempotency-Key reattachment path. busy now also covers
+    // this specific ambiguous retryable-error (one with its own scenarioSessionId).
+    const ids = MODE_IDS.update;
+    const routes = routesFor(ids);
+    const { client, calls } = makeClient({
+      [routes.RUNTIME_CONFIG]: [runtimeConfigResponse(ids)],
+      [routes.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [routes.QUOTA]: [quotaResponse(ids)],
+      // Same Idempotency-Key handle retries START a second time -- both return the same session.
+      [routes.START]: [startResponse(), startResponse()],
+      // First poll GET fails outright (connection loss); the retry's poll GET then succeeds.
+      [routes.SESSION]: [errorResponse(500, "internal_error"), sessionResponse()],
+      [routes.RESULT]: [resultResponse(ids, { output: { text: "Reattached." } })],
+    });
+
+    render(<ClientUpdateWriterProduct client={client} />);
+    await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
+
+    fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Working on it still." } });
+    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("button", { name: "Write update" }));
+    await waitFor(() =>
+      expect(screen.getByText("Lost connection while waiting for your result. Please try again.")).toBeTruthy(),
+    );
+
+    // The accepted start's own session may still be running server-side -- mode switching stays
+    // blocked, and the form itself (not just the "Try again" control) is gated too.
+    for (const label of ["Update", "Reply Draft", "Prepaid Request"]) {
+      expect((screen.getByRole("radio", { name: label }) as HTMLInputElement).disabled).toBe(true);
+    }
+    fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
+    expect(screen.queryByLabelText("Client message")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByText("Reattached.")).toBeTruthy());
+
+    // Reattached to the same logical run via the same Idempotency-Key, not a fresh one.
+    const startCalls = calls.filter((call) => call.key === routes.START);
+    expect(startCalls).toHaveLength(2);
+    expect(idempotencyKeyOf(startCalls[0]!)).toBeTruthy();
+    expect(idempotencyKeyOf(startCalls[1]!)).toBe(idempotencyKeyOf(startCalls[0]!));
+    expect((screen.getByRole("radio", { name: "Update" }) as HTMLInputElement).disabled).toBe(false);
   });
 });
