@@ -3,13 +3,12 @@
 ## Status
 
 - State: active
-- Phase: AL03/ANY-461 implemented and verified on feature/ANY-461
+- Phase: AL03/ANY-461 PR review fixes complete on feature/ANY-461
 - Owner: mixed
 - Created: 2026-09-09
 - Last updated: 2026-09-15
 - Review date: 2026-09-16
-- Next action: Implement ANY-463/AL05, then use its preset contracts with the completed AL03
-  catalog in ANY-462/AL04 admission.
+- Next action: Merge PR #126 after CI/re-review, then continue with ANY-463/AL05.
 - Blocker: none for development; operator configuration required before rollout.
 - Linear project: [Atom Lab](https://linear.app/paveldik/project/atom-lab-e1efc95ce888)
 - Milestone: Atom Lab v1
@@ -210,6 +209,14 @@ Acceptance: Тесты new/removed model, unknown effort list, no reasoning, sta
 - [x] GET /models возвращает `items, snapshot_id, last_success_at, stale, refresh_status, error`. У item: `model_id, compatibility, reason, reasoning_supported, allowed_reasoning_efforts, provenance`; unknown — явно unknown/null, а не false. Исчезнувшая модель не разрешается override. POST refresh возвращает 202 и pending/running состояние; GET models служит polling endpoint.
 - [x] Empty cache: items пуст, execution disabled, refresh error видна; last-good stale cache остаётся доступен с предупреждением. TTL и cooldown — именованные backend settings. Подготовить worker Compose/env wiring в этом тикете; key остаётся только worker.
 - [x] Каталог не реализует применение provider параметров повторно: это ANY-460. Проверки ANY-461: initial load, TTL без кликов пользователя, manual refresh, coalescing/cooldown, expired lease, restart, upstream failure/invalid JSON, model removal, unknown capabilities. API parsing и refresh tests плюс PostgreSQL lease tests; `apps/platform-worker/src/anytoolai_platform_worker/worker.py` и `composition.py` входят в scope.
+
+### PR #126 review follow-up
+
+- [x] Не брать новый workflow job, если shutdown был запрошен во время catalog refresh.
+- [x] Не публиковать success/failure после истечения lease по времени PostgreSQL.
+- [x] Строго валидировать source и ISO date в capability overrides.
+- [x] Не срывать целый refresh на неизвестном LiteLLM reasoning effort; сохранять support и
+  трактовать точный список как unknown.
 
 
 ### AL04 — [ANY-462](https://linear.app/paveldik/issue/ANY-462/atom-lab-zapusk-atoma-i-zashishyonnaya-postoyannaya-istoriya-api): Atom Lab: запуск атома и защищённая постоянная история API

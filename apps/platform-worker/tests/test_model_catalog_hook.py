@@ -33,6 +33,17 @@ class OneJobQueue:
         return message
 
 
+class TwoJobQueue:
+    def __init__(self) -> None:
+        self._messages = [
+            WorkflowJobMessage(job_id="job-one"),
+            WorkflowJobMessage(job_id="job-two"),
+        ]
+
+    def next_message(self) -> WorkflowJobMessage | None:
+        return self._messages.pop(0) if self._messages else None
+
+
 def test_catalog_refresh_runs_on_start_and_between_workflow_jobs() -> None:
     holder: dict[str, Worker] = {}
 
@@ -79,6 +90,34 @@ def test_catalog_refresh_failure_does_not_stop_workflow_loop() -> None:
     worker = Worker(
         handler,
         job_queue=OneJobQueue(),
+        poll_interval_seconds=0,
+        catalog_refresh_hook=hook,
+    )
+    holder["worker"] = worker
+
+    asyncio.run(worker.run_forever())
+
+    assert handler.handled == ["job-one"]
+    assert hook.calls == EXPECTED_REFRESH_CALLS
+
+
+def test_shutdown_requested_during_refresh_does_not_claim_another_job() -> None:
+    holder: dict[str, Worker] = {}
+
+    class ShutdownOnSecondRefreshHook:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def refresh_if_due(self) -> None:
+            self.calls += 1
+            if self.calls == EXPECTED_REFRESH_CALLS:
+                holder["worker"].request_shutdown()
+
+    hook = ShutdownOnSecondRefreshHook()
+    handler = NoopHandler()
+    worker = Worker(
+        handler,
+        job_queue=TwoJobQueue(),
         poll_interval_seconds=0,
         catalog_refresh_hook=hook,
     )

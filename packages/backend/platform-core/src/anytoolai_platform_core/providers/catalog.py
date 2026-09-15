@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -86,12 +86,20 @@ def load_model_capability_overrides(path: Path) -> dict[str, ModelCapabilityOver
         raw_reasoning = raw_override.get("reasoning_supported")
         if raw_reasoning is not None and not isinstance(raw_reasoning, bool):
             raise ValueError(f"reasoning_supported for {raw_model_id} must be boolean or null")
+        source = raw_override["source"]
+        if not isinstance(source, str) or not source.strip():
+            raise ValueError(f"source for {raw_model_id} must be a non-empty string")
         checked_at_value = raw_override["checked_at"]
-        checked_at = (
-            checked_at_value.isoformat()
-            if hasattr(checked_at_value, "isoformat")
-            else str(checked_at_value)
-        )
+        if isinstance(checked_at_value, datetime) or not isinstance(checked_at_value, (str, date)):
+            raise ValueError(f"checked_at for {raw_model_id} must be an ISO date")
+        try:
+            checked_at = date.fromisoformat(
+                checked_at_value
+                if isinstance(checked_at_value, str)
+                else checked_at_value.isoformat()
+            ).isoformat()
+        except ValueError as exc:
+            raise ValueError(f"checked_at for {raw_model_id} must be an ISO date") from exc
         result[raw_model_id] = ModelCapabilityOverride(
             compatibility=(
                 None
@@ -104,7 +112,7 @@ def load_model_capability_overrides(path: Path) -> dict[str, ModelCapabilityOver
                 if raw_efforts is None
                 else tuple(ReasoningEffort(value) for value in raw_efforts)
             ),
-            source=str(raw_override["source"]),
+            source=source.strip(),
             checked_at=checked_at,
         )
     return result
@@ -280,7 +288,10 @@ def _reasoning(
     else:
         declared_efforts = metadata.get("supported_reasoning_efforts")
         if isinstance(declared_efforts, list):
-            efforts = tuple(ReasoningEffort(value) for value in declared_efforts)
+            try:
+                efforts = tuple(ReasoningEffort(value) for value in declared_efforts)
+            except (TypeError, ValueError):
+                efforts = None
     return (
         reasoning_supported,
         efforts,

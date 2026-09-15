@@ -108,6 +108,23 @@ def test_reasoning_support_does_not_invent_effort_list() -> None:
     assert item.allowed_reasoning_efforts is None
 
 
+def test_unknown_litellm_reasoning_effort_keeps_support_but_makes_list_unknown() -> None:
+    [item] = build_openai_gpt_catalog(
+        account_model_ids=["gpt-reasoning"],
+        litellm_metadata={
+            "gpt-reasoning": _metadata(
+                supports_reasoning=True,
+                supported_reasoning_efforts=["low", "future-effort"],
+            )
+        },
+        overrides={},
+        fetched_at=FETCHED_AT,
+    )
+
+    assert item.reasoning_supported is True
+    assert item.allowed_reasoning_efforts is None
+
+
 def test_known_absence_of_reasoning_has_empty_effort_list() -> None:
     [item] = build_openai_gpt_catalog(
         account_model_ids=["gpt-non-reasoning"],
@@ -195,6 +212,35 @@ models:
     )
 
     with pytest.raises(ValueError, match="turbo"):
+        load_model_capability_overrides(path)
+
+
+@pytest.mark.parametrize(
+    ("source", "checked_at"),
+    [
+        ("null", "2026-09-15"),
+        ('""', "2026-09-15"),
+        ("42", "2026-09-15"),
+        ("https://example.invalid/model", '"not-a-date"'),
+        ("https://example.invalid/model", "null"),
+    ],
+)
+def test_override_loader_rejects_invalid_source_or_checked_at(
+    tmp_path: Path, source: str, checked_at: str
+) -> None:
+    path = tmp_path / "overrides.yaml"
+    path.write_text(
+        f"""
+models:
+  gpt-example:
+    compatibility: compatible
+    source: {source}
+    checked_at: {checked_at}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="source|checked_at"):
         load_model_capability_overrides(path)
 
 

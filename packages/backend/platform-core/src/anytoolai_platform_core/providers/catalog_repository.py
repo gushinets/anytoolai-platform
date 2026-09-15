@@ -123,6 +123,7 @@ class ModelCatalogRepository:
             .where(
                 model_catalog_state_table.c.account_scope == lease.account_scope,
                 model_catalog_state_table.c.lease_id == lease.lease_id,
+                model_catalog_state_table.c.lease_until > sa.func.clock_timestamp(),
             )
             .values(
                 snapshot_id=snapshot_id,
@@ -155,6 +156,7 @@ class ModelCatalogRepository:
             .where(
                 model_catalog_state_table.c.account_scope == lease.account_scope,
                 model_catalog_state_table.c.lease_id == lease.lease_id,
+                model_catalog_state_table.c.lease_until > sa.func.clock_timestamp(),
             )
             .values(
                 due_at=now + retry_after,

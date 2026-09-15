@@ -122,6 +122,8 @@ class Worker:
         self._sweep_orphaned_jobs()
         while not self._stopping.is_set():
             await self._refresh_model_catalog()
+            if self._stopping.is_set():
+                break
             try:
                 result = await self.process_next_job()
             except asyncio.CancelledError:
