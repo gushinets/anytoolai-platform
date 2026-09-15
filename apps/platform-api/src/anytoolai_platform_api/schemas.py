@@ -9,6 +9,7 @@ from anytoolai_platform_core.handoffs.models import HandoffStatus
 from anytoolai_platform_core.products.models import FrontendType
 from anytoolai_platform_core.providers.models import (
     ModelCatalogCompatibility,
+    ModelCatalogReason,
     ModelCatalogRefreshStatus,
     ReasoningEffort,
 )
@@ -190,7 +191,7 @@ class AtomLabModelResponse(BaseModel):
 
     model_id: str
     compatibility: ModelCatalogCompatibility
-    reason: str
+    reason: ModelCatalogReason
     reasoning_supported: bool | None
     allowed_reasoning_efforts: list[ReasoningEffort] | None
     provenance: dict[str, dict[str, str]]

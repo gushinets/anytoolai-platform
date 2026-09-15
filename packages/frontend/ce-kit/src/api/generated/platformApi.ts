@@ -393,8 +393,7 @@ export interface components {
                     [key: string]: string;
                 };
             };
-            /** Reason */
-            reason: string;
+            reason: components["schemas"]["ModelCatalogReason"];
             /** Reasoning Supported */
             reasoning_supported: boolean | null;
         };
@@ -555,6 +554,11 @@ export interface components {
          * @enum {string}
          */
         ModelCatalogCompatibility: "compatible" | "unknown" | "unsupported";
+        /**
+         * ModelCatalogReason
+         * @enum {string}
+         */
+        ModelCatalogReason: "override_compatible" | "override_unknown" | "override_unsupported" | "litellm_metadata_missing" | "litellm_compatibility_incomplete" | "confirmed_openai_text_gpt";
         /**
          * ModelCatalogRefreshStatus
          * @enum {string}

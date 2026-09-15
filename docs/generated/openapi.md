@@ -56,6 +56,7 @@ Version: 0.1.0
 - HandoffPreviewResponse
 - HandoffStatus
 - ModelCatalogCompatibility
+- ModelCatalogReason
 - ModelCatalogRefreshStatus
 - QuotaDimension
 - QuotaPeriod

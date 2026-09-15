@@ -32,7 +32,7 @@ class ModelCatalogSettings:
             )
         fetch_timeout_seconds = _positive_seconds(FETCH_TIMEOUT_SECONDS_ENV, 10, "fetch timeout")
         lease_duration = _positive_duration(LEASE_SECONDS_ENV, 30, "lease")
-        if lease_duration.total_seconds() <= fetch_timeout_seconds * 2:
+        if model_catalog_refresh_deadline_seconds(lease_duration) <= fetch_timeout_seconds * 2:
             raise ValueError("model catalog lease must exceed the two upstream fetch deadlines")
         return cls(
             account_scope=account_scope,
@@ -43,6 +43,11 @@ class ModelCatalogSettings:
             lease_duration=lease_duration,
             fetch_timeout_seconds=fetch_timeout_seconds,
         )
+
+
+def model_catalog_refresh_deadline_seconds(lease_duration: timedelta) -> float:
+    lease_seconds = lease_duration.total_seconds()
+    return max(lease_seconds * 0.9, lease_seconds - 1.0)
 
 
 def _positive_duration(name: str, default: float, label: str) -> timedelta:

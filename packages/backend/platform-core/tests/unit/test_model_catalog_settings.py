@@ -46,6 +46,16 @@ def test_model_catalog_settings_reject_lease_that_cannot_cover_both_fetches(
         ModelCatalogSettings.from_env()
 
 
+def test_model_catalog_settings_reject_lease_whose_refresh_deadline_is_too_short(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ANYTOOLAI_MODEL_CATALOG_LEASE_SECONDS", "20.5")
+    monkeypatch.setenv("ANYTOOLAI_MODEL_CATALOG_FETCH_TIMEOUT_SECONDS", "10")
+
+    with pytest.raises(ValueError, match="lease.*two upstream fetch deadlines"):
+        ModelCatalogSettings.from_env()
+
+
 def test_model_catalog_settings_reject_oversized_account_scope(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

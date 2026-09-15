@@ -232,8 +232,7 @@
             "type": "object"
           },
           "reason": {
-            "title": "Reason",
-            "type": "string"
+            "$ref": "#/components/schemas/ModelCatalogReason"
           },
           "reasoning_supported": {
             "anyOf": [
@@ -716,6 +715,18 @@
           "unsupported"
         ],
         "title": "ModelCatalogCompatibility",
+        "type": "string"
+      },
+      "ModelCatalogReason": {
+        "enum": [
+          "override_compatible",
+          "override_unknown",
+          "override_unsupported",
+          "litellm_metadata_missing",
+          "litellm_compatibility_incomplete",
+          "confirmed_openai_text_gpt"
+        ],
+        "title": "ModelCatalogReason",
         "type": "string"
       },
       "ModelCatalogRefreshStatus": {

@@ -291,3 +291,17 @@ def test_cached_catalog_parser_rejects_malformed_provenance() -> None:
                 "provenance": {"availability": "not-a-mapping"},
             }
         )
+
+
+def test_cached_catalog_parser_rejects_unknown_reason_code() -> None:
+    with pytest.raises(ValueError, match="future_reason"):
+        deserialize_catalog_item(
+            {
+                "model_id": "gpt-example",
+                "compatibility": "compatible",
+                "reason": "future_reason",
+                "reasoning_supported": None,
+                "allowed_reasoning_efforts": None,
+                "provenance": {"availability": {"source": "openai_models_api"}},
+            }
+        )

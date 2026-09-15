@@ -10,6 +10,7 @@ import yaml
 
 from anytoolai_platform_core.providers.models import (
     ModelCatalogCompatibility,
+    ModelCatalogReason,
     ReasoningEffort,
 )
 
@@ -35,7 +36,7 @@ class ModelCapabilityOverride:
 class ModelCatalogItem:
     model_id: str
     compatibility: ModelCatalogCompatibility
-    reason: str
+    reason: ModelCatalogReason
     reasoning_supported: bool | None
     allowed_reasoning_efforts: tuple[ReasoningEffort, ...] | None
     provenance: Mapping[str, Mapping[str, str]]
@@ -122,7 +123,7 @@ def serialize_catalog_item(item: ModelCatalogItem) -> dict[str, Any]:
     return {
         "model_id": item.model_id,
         "compatibility": item.compatibility.value,
-        "reason": item.reason,
+        "reason": item.reason.value,
         "reasoning_supported": item.reasoning_supported,
         "allowed_reasoning_efforts": (
             None
@@ -148,7 +149,7 @@ def deserialize_catalog_item(value: Mapping[str, Any]) -> ModelCatalogItem:
     return ModelCatalogItem(
         model_id=str(value["model_id"]),
         compatibility=ModelCatalogCompatibility(value["compatibility"]),
-        reason=str(value["reason"]),
+        reason=ModelCatalogReason(value["reason"]),
         reasoning_supported=reasoning_supported,
         allowed_reasoning_efforts=(
             None if efforts is None else tuple(ReasoningEffort(item) for item in efforts)
@@ -224,17 +225,17 @@ def _compatibility(
     metadata: Mapping[str, Any] | None,
     override: ModelCapabilityOverride | None,
     fetched_at: datetime,
-) -> tuple[ModelCatalogCompatibility, str, Mapping[str, str]] | None:
+) -> tuple[ModelCatalogCompatibility, ModelCatalogReason, Mapping[str, str]] | None:
     if override is not None and override.compatibility is not None:
         return (
             override.compatibility,
-            f"override_{override.compatibility.value}",
+            ModelCatalogReason(f"override_{override.compatibility.value}"),
             _override_provenance(override),
         )
     if metadata is None:
         return (
             ModelCatalogCompatibility.unknown,
-            "litellm_metadata_missing",
+            ModelCatalogReason.litellm_metadata_missing,
             {"source": "unknown"},
         )
 
@@ -244,7 +245,7 @@ def _compatibility(
     if not isinstance(provider, str) or not isinstance(mode, str):
         return (
             ModelCatalogCompatibility.unknown,
-            "litellm_compatibility_incomplete",
+            ModelCatalogReason.litellm_compatibility_incomplete,
             {
                 "source": "litellm_metadata",
                 "model_id": model_id,
@@ -259,7 +260,7 @@ def _compatibility(
         return None
     return (
         ModelCatalogCompatibility.compatible,
-        "confirmed_openai_text_gpt",
+        ModelCatalogReason.confirmed_openai_text_gpt,
         {
             "source": "litellm_metadata",
             "model_id": model_id,

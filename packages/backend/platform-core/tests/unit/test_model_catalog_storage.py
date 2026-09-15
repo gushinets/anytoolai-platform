@@ -12,8 +12,10 @@ from anytoolai_platform_core.providers.catalog_refresh import ModelCatalogRefres
 from anytoolai_platform_core.providers.catalog_repository import ModelCatalogRepository
 from anytoolai_platform_core.providers.models import (
     ModelCatalogCompatibility,
+    ModelCatalogReason,
     ModelCatalogRefreshStatus,
 )
+from anytoolai_platform_core.storage.db import model_catalog_state_table
 from anytoolai_platform_core.storage.transactions import build_session_factory, transaction_boundary
 
 from tests.db_support import provision_database
@@ -42,7 +44,7 @@ def _item(model_id: str) -> ModelCatalogItem:
     return ModelCatalogItem(
         model_id=model_id,
         compatibility=ModelCatalogCompatibility.compatible,
-        reason="confirmed_openai_text_gpt",
+        reason=ModelCatalogReason.confirmed_openai_text_gpt,
         reasoning_supported=None,
         allowed_reasoning_efforts=None,
         provenance={"availability": {"source": "openai_models_api"}},
@@ -236,4 +238,57 @@ def test_refresh_service_loads_initial_snapshot_and_refreshes_after_ttl(
         assert state is not None
         assert [item.model_id for item in state.items] == ["gpt-2"]
         assert state.last_error is None
+        snapshot = session.execute(
+            sa.select(model_catalog_state_table.c.snapshot).where(
+                model_catalog_state_table.c.account_scope == "account-a"
+            )
+        ).scalar_one()
+        assert set(snapshot) == {"items"}
     assert source.calls == EXPECTED_REFRESH_CALLS
+
+
+def test_refresh_service_failure_keeps_last_good_snapshot_and_reports_pending(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session], now: datetime
+) -> None:
+    class Source:
+        fail = False
+
+        async def fetch_openai_model_ids(self) -> tuple[str, ...]:
+            if self.fail:
+                raise RuntimeError("upstream failed")
+            return ("gpt-last-good",)
+
+        async def fetch_litellm_metadata(self) -> dict[str, dict[str, object]]:
+            return {
+                "gpt-last-good": {
+                    "litellm_provider": "openai",
+                    "mode": "chat",
+                    "supported_output_modalities": ["text"],
+                }
+            }
+
+    source = Source()
+    current_time = [now]
+    service = ModelCatalogRefreshService(
+        session_factory=session_factory,
+        account_scope="account-failure",
+        source=source,
+        overrides={},
+        ttl=timedelta(hours=24),
+        retry_after=timedelta(seconds=60),
+        lease_duration=timedelta(seconds=30),
+        now=lambda: current_time[0],
+    )
+
+    asyncio.run(service.refresh_if_due())
+    current_time[0] = now + timedelta(hours=24, seconds=1)
+    source.fail = True
+    asyncio.run(service.refresh_if_due())
+
+    with transaction_boundary(session_factory) as session:
+        state = ModelCatalogRepository(session).get("account-failure")
+        assert state is not None
+        assert [item.model_id for item in state.items] == ["gpt-last-good"]
+        assert state.last_error == "Upstream model catalog refresh failed."
+        assert state.lease_id is None
+        assert state.refresh_status(current_time[0]) is ModelCatalogRefreshStatus.pending

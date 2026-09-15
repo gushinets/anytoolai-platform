@@ -12,7 +12,10 @@ from anytoolai_platform_api.main import create_app
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.providers.catalog import ModelCatalogItem
 from anytoolai_platform_core.providers.catalog_repository import ModelCatalogRepository
-from anytoolai_platform_core.providers.models import ModelCatalogCompatibility
+from anytoolai_platform_core.providers.models import (
+    ModelCatalogCompatibility,
+    ModelCatalogReason,
+)
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 
 from tests.db_support import provision_database
@@ -88,7 +91,7 @@ def test_get_models_returns_last_good_catalog_without_credentials(app) -> None:
                 ModelCatalogItem(
                     model_id="gpt-one",
                     compatibility=ModelCatalogCompatibility.compatible,
-                    reason="confirmed_openai_text_gpt",
+                    reason=ModelCatalogReason.confirmed_openai_text_gpt,
                     reasoning_supported=True,
                     allowed_reasoning_efforts=None,
                     provenance={

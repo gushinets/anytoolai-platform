@@ -35,6 +35,15 @@ class ModelCatalogCompatibility(StrEnum):
     unsupported = "unsupported"
 
 
+class ModelCatalogReason(StrEnum):
+    override_compatible = "override_compatible"
+    override_unknown = "override_unknown"
+    override_unsupported = "override_unsupported"
+    litellm_metadata_missing = "litellm_metadata_missing"
+    litellm_compatibility_incomplete = "litellm_compatibility_incomplete"
+    confirmed_openai_text_gpt = "confirmed_openai_text_gpt"
+
+
 class ModelCatalogRefreshStatus(StrEnum):
     current = "current"
     pending = "pending"

@@ -15,6 +15,9 @@ from anytoolai_platform_core.providers.catalog import (
     build_openai_gpt_catalog,
 )
 from anytoolai_platform_core.providers.catalog_repository import ModelCatalogRepository
+from anytoolai_platform_core.providers.catalog_settings import (
+    model_catalog_refresh_deadline_seconds,
+)
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 
 _SAFE_REFRESH_ERROR = "Upstream model catalog refresh failed."
@@ -68,8 +71,7 @@ class ModelCatalogRefreshService:
             return
 
         try:
-            lease_seconds = self._lease_duration.total_seconds()
-            refresh_deadline_seconds = max(lease_seconds * 0.9, lease_seconds - 1.0)
+            refresh_deadline_seconds = model_catalog_refresh_deadline_seconds(self._lease_duration)
             async with asyncio.timeout(refresh_deadline_seconds):
                 model_ids = await self._source.fetch_openai_model_ids()
                 metadata = await self._source.fetch_litellm_metadata()
@@ -87,11 +89,6 @@ class ModelCatalogRefreshService:
                     items=items,
                     now=completed_at,
                     ttl=self._ttl,
-                    source_snapshot={
-                        "openai_model_ids": list(model_ids),
-                        "litellm_metadata": dict(metadata),
-                        "fetched_at": completed_at.isoformat(),
-                    },
                 )
         except Exception:
             logger.exception(

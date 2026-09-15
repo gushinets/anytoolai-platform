@@ -217,6 +217,16 @@ Acceptance: Тесты new/removed model, unknown effort list, no reasoning, sta
 - [x] Строго валидировать source и ISO date в capability overrides.
 - [x] Не срывать целый refresh на неизвестном LiteLLM reasoning effort; сохранять support и
   трактовать точный список как unknown.
+- [x] Не возвращать refresh_status=current в retry window после failed refresh.
+- [x] Не сохранять неиспользуемые полные upstream documents в polling-row каталога.
+- [x] Типизировать закрытый wire-набор catalog reason codes.
+- [x] Валидировать lease против фактического aggregate refresh deadline.
+- [x] Добавить service-level regression для failed refresh с сохранением last-good snapshot.
+
+Не приняты предложения менять inclusion semantics для audio-capable/unsupported моделей и выносить
+refresh из worker loop: они противоречат зафиксированным правилам AL03 и
+`docs/architecture/provider-gateway.md`. Отдельный client-visible not-configured error не добавлен:
+текущий generic upstream error намеренно остаётся безопасным, а operator detail уже пишется в log.
 
 
 ### AL04 — [ANY-462](https://linear.app/paveldik/issue/ANY-462/atom-lab-zapusk-atoma-i-zashishyonnaya-postoyannaya-istoriya-api): Atom Lab: запуск атома и защищённая постоянная история API

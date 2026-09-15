@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -41,6 +40,8 @@ class ModelCatalogState:
     def refresh_status(self, now: datetime) -> ModelCatalogRefreshStatus:
         if self.lease_id is not None and self.lease_until is not None and self.lease_until > now:
             return ModelCatalogRefreshStatus.running
+        if self.last_error is not None:
+            return ModelCatalogRefreshStatus.pending
         if self.refresh_requested_at is not None:
             return ModelCatalogRefreshStatus.pending
         if self.due_at <= now:
@@ -116,7 +117,6 @@ class ModelCatalogRepository:
         items: tuple[ModelCatalogItem, ...],
         now: datetime,
         ttl: timedelta,
-        source_snapshot: Mapping[str, Any] | None = None,
     ) -> None:
         result = self._session.execute(
             sa.update(model_catalog_state_table)
@@ -129,7 +129,6 @@ class ModelCatalogRepository:
                 snapshot_id=snapshot_id,
                 snapshot={
                     "items": [serialize_catalog_item(item) for item in items],
-                    "sources": dict(source_snapshot or {}),
                 },
                 due_at=now + ttl,
                 refresh_requested_at=None,
