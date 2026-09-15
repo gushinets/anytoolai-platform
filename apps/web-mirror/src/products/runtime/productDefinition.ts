@@ -92,14 +92,6 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
   extractResult: (output: Record<string, unknown>) => R | null;
   Fields: ComponentType<ProductFieldsProps<V>>;
   Result: ComponentType<ProductResultProps<R>>;
-  /**
-   * The next-action id the Copy button records (ce-kit's `copyResultAndRecordActivation`
-   * defaults to `COPY_RESULT_NEXT_ACTION_ID`, `"copy_result"`, when this is omitted -- every
-   * product built so far uses that default). Exists so a future product whose own
-   * `renderer_contract.yaml` names a different `next_action` has somewhere to say so, instead of
-   * the id being unconditionally hardcoded with no override path (code review finding).
-   */
-  copyNextActionId?: string;
   copy: {
     submit: string;
     running: string;

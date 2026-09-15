@@ -325,40 +325,41 @@ describe("Client Update Writer product definitions", () => {
   });
 });
 
+// The real backend's runtime-config endpoint is product-scoped, not scenario-scoped -- it lists
+// all three modes' scenarios in one response (proven at the bundle level by
+// apps/platform-api/tests/test_client_update_writer_bundle.py). Building that full response
+// (rather than runtimeConfigResponse()'s single-scenario default) matters for any mode-switcher
+// test, since ProductRunPage caches it per (client, productId): a mode switch reuses this same
+// response rather than fetching a fresh, mode-specific one.
+function fullRuntimeConfigResponse(ids: (typeof MODE_IDS)[keyof typeof MODE_IDS]) {
+  return runtimeConfigResponse(ids, {
+    scenario_ids: Object.values(MODE_IDS).map((modeIds) => modeIds.scenarioId),
+    scenarios: Object.values(MODE_IDS).map((modeIds) => ({
+      scenario_id: modeIds.scenarioId,
+      version: 1,
+      allowed_next_actions: ["copy_result"],
+      input_renderer_hint: { renderer: "json_schema", schema_ref: `${modeIds.productId}.input_v1`, schema_version: 1 },
+      output_renderer_hint: { renderer: "json_schema", schema_ref: `${modeIds.productId}.output_v1`, schema_version: 1 },
+    })),
+  });
+}
+
 describe("ClientUpdateWriterProduct (mode switcher)", () => {
   it("defaults to Update mode and switches its own form fields when another mode is selected", async () => {
     const ids = MODE_IDS.update;
     const routes = routesFor(ids);
-    // The real backend's runtime-config endpoint is product-scoped, not scenario-scoped -- it
-    // lists all three modes' scenarios in one response (proven at the bundle level by
-    // apps/platform-api/tests/test_client_update_writer_bundle.py). Building that full response
-    // here (rather than runtimeConfigResponse()'s single-scenario default) matters now that
-    // ProductRunPage caches it per (client, productId): a mode switch reuses this same response
-    // rather than fetching a fresh, mode-specific one.
-    const fullRuntimeConfig = runtimeConfigResponse(ids, {
-      scenario_ids: Object.values(MODE_IDS).map((modeIds) => modeIds.scenarioId),
-      scenarios: Object.values(MODE_IDS).map((modeIds) => ({
-        scenario_id: modeIds.scenarioId,
-        version: 1,
-        allowed_next_actions: ["copy_result"],
-        input_renderer_hint: { renderer: "json_schema", schema_ref: `${modeIds.productId}.input_v1`, schema_version: 1 },
-        output_renderer_hint: { renderer: "json_schema", schema_ref: `${modeIds.productId}.output_v1`, schema_version: 1 },
-      })),
-    });
     const { client, calls } = makeClient({
-      // RUNTIME_CONFIG/GUEST_IDENTITY/QUOTA are keyed by product id only, shared across all three
-      // modes. `key={modeId}` still remounts ProductRunPage on switch (each mode's form values
-      // have an incompatible shape), but ProductRunPage caches runtime config per (client,
-      // productId) -- code review finding: it used to re-fetch identical runtime config on every
-      // mode switch -- so only one RUNTIME_CONFIG response is needed. It also caches quota once a
-      // response reveals it's product-dimensioned (this product's `quotas.yaml` declares
-      // `dimension: product`, and `quotaResponse()`'s fixture default matches that) -- code review
-      // finding: a shared, single 3-run pool was re-fetched on every mode switch as if it might
-      // differ per mode -- so one QUOTA response covers both mounts too. Identity is deliberately
-      // not cached here (it caches itself via guestStorage), so it still queues one per mount.
-      [routes.RUNTIME_CONFIG]: [fullRuntimeConfig],
+      // RUNTIME_CONFIG is keyed by product id only, shared across all three modes. `key={modeId}`
+      // still remounts ProductRunPage on switch (each mode's form values have an incompatible
+      // shape), but ProductRunPage caches runtime config per (client, productId) -- code review
+      // finding: it used to re-fetch identical runtime config on every mode switch -- so only one
+      // RUNTIME_CONFIG response is needed. Identity and quota are deliberately NOT cached this way
+      // (identity caches itself via guestStorage; an earlier attempt at caching quota the same way
+      // went stale after a run actually consumed it -- code review finding), so those still queue
+      // one response per mount.
+      [routes.RUNTIME_CONFIG]: [fullRuntimeConfigResponse(ids)],
       [routes.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
-      [routes.QUOTA]: [quotaResponse(ids)],
+      [routes.QUOTA]: [quotaResponse(ids), quotaResponse(MODE_IDS.reply_draft)],
     });
 
     render(<ClientUpdateWriterProduct client={client} />);
@@ -371,7 +372,41 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     await waitFor(() => expect(screen.getByLabelText("Client message")).toBeTruthy());
     expect(screen.queryByLabelText("Progress notes")).toBeNull();
     expect(calls.filter((call) => call.key === routes.RUNTIME_CONFIG)).toHaveLength(1);
-    expect(calls.filter((call) => call.key === routes.QUOTA)).toHaveLength(1);
+  });
+
+  it("reflects quota actually consumed by a run when switching modes, instead of a stale cached value", async () => {
+    // Code review finding: an earlier attempt at caching quota across a mode switch never
+    // invalidated after a run actually consumed it -- a guest who ran Update (spending one of the
+    // shared pool's 3 runs) and then switched to Reply Draft would still see the pre-run "3 of 3"
+    // forever. Quota is fetched fresh on every mount here, so the second mount's own response
+    // (simulating what the real backend would now report) must be what's shown.
+    const ids = MODE_IDS.update;
+    const routes = routesFor(ids);
+    // QUOTA/GUEST_IDENTITY are keyed by product id only (both modes share the same
+    // client_update_writer product id), so each is one FIFO queue covering both mounts, not two
+    // separate per-mode keys.
+    const { client } = makeClient({
+      [routes.RUNTIME_CONFIG]: [fullRuntimeConfigResponse(ids)],
+      [routes.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
+      [routes.QUOTA]: [
+        quotaResponse(ids, { remaining_count: 3, used_count: 0 }),
+        quotaResponse(MODE_IDS.reply_draft, { remaining_count: 2, used_count: 1 }),
+      ],
+      [routes.START]: [startResponse()],
+      [routes.SESSION]: [sessionResponse()],
+      [routes.RESULT]: [resultResponse(ids)],
+    });
+
+    render(<ClientUpdateWriterProduct client={client} />);
+    await waitFor(() => expect(screen.getByText("3 of 3 Client Update Writer runs remaining.")).toBeTruthy());
+
+    fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Still working on it." } });
+    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("button", { name: "Write update" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
+    await waitFor(() => expect(screen.getByText("2 of 3 Client Update Writer runs remaining.")).toBeTruthy());
   });
 
   it("shows the same shared-pool quota wording regardless of which mode is showing", async () => {

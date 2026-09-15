@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { GeneratedTextRenderer } from "@anytoolai/web-result-kit";
 
 export type ResultViewProps = {
@@ -15,20 +15,6 @@ export type ResultViewProps = {
  * even if the copy fails -- only `onCopy`'s own outcome gates the "Copied" state. */
 export function ResultView({ text, onCopy }: ResultViewProps) {
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied" | "error">("idle");
-  // Guards a stale setState after unmount (e.g. the result page navigates away while onCopy is
-  // still in flight) -- code review finding. Set `true` inside the effect body itself, not only
-  // via the initial `useRef(true)`: React StrictMode's dev-only mount -> cleanup -> remount runs
-  // this same cleanup once before the real, lasting mount -- without resetting it back to `true`
-  // here, the ref would stay permanently `false` for the whole rest of that component instance's
-  // life, silently dropping every future setCopyState (same fix shape as ProductRunPage's own
-  // `controllerRef` effect, for the same StrictMode reason).
-  const isMountedRef = useRef(true);
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
 
   function handleCopy() {
     if (!onCopy) {
@@ -36,15 +22,13 @@ export function ResultView({ text, onCopy }: ResultViewProps) {
       return;
     }
     // Disables the button below for the duration of the copy -- code review finding: a fast
-    // double-click had no guard against firing onCopy twice for the same result.
+    // double-click had no guard against firing onCopy twice for the same result. A setState after
+    // unmount (e.g. the page navigates away mid-copy) needs no guard of its own -- React 18+
+    // already makes that a silent no-op, not a warning or an error.
     setCopyState("copying");
     onCopy(text).then(
-      (copied) => {
-        if (isMountedRef.current) setCopyState(copied ? "copied" : "error");
-      },
-      () => {
-        if (isMountedRef.current) setCopyState("error");
-      },
+      (copied) => setCopyState(copied ? "copied" : "error"),
+      () => setCopyState("error"),
     );
   }
 

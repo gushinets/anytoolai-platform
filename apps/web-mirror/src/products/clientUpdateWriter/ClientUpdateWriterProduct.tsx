@@ -7,9 +7,15 @@ import { ResultView } from "../../components/ResultView";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import { collectFieldErrors, optionalTrimmedFieldError, requiredTrimmedFieldError } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductResultProps, ProductRunEvent } from "../runtime/productDefinition";
-import { TONE_OPTIONS, type Tone } from "../runtime/tone";
+import { ToneSelect, type Tone } from "../runtime/tone";
 
 const PRODUCT_ID = "client_update_writer";
+
+// Mirrors each mode's own input schema maxLength (schemas/*.json under
+// products/client_update_writer/) -- named once instead of as bare literals repeated at every
+// field's validate() call (code review finding).
+const LONG_FIELD_MAX_LENGTH = 4000;
+const SHORT_FIELD_MAX_LENGTH = 200;
 
 // `quotas.yaml` declares `dimension: product` -- one 3-run pool shared by all three modes, not a
 // separate pool per mode -- so every mode's `quotaRemaining` copy uses this same, mode-agnostic
@@ -36,20 +42,14 @@ function ToneField({
   return (
     <>
       <label htmlFor="client-update-writer-tone">Tone</label>
-      <select
+      <ToneSelect
         id="client-update-writer-tone"
         value={value}
-        onChange={(event: ChangeEvent<HTMLSelectElement>) => onChange(event.target.value as Tone | "")}
+        onChange={onChange}
         disabled={disabled}
-        aria-invalid={Boolean(error)}
-      >
-        <option value="">Select a tone</option>
-        {TONE_OPTIONS.map((tone) => (
-          <option key={tone} value={tone}>
-            {tone}
-          </option>
-        ))}
-      </select>
+        placeholderLabel="Select a tone"
+        ariaInvalid={Boolean(error)}
+      />
       {error ? <p role="alert">{error}</p> : null}
     </>
   );
@@ -88,7 +88,7 @@ type UpdateValues = { progressNotes: string; tone: Tone | "" };
 
 function validateUpdate(values: UpdateValues): Partial<Record<keyof UpdateValues, string>> {
   return collectFieldErrors<UpdateValues>([
-    ["progressNotes", requiredTrimmedFieldError(values.progressNotes, "Progress notes", 4000)],
+    ["progressNotes", requiredTrimmedFieldError(values.progressNotes, "Progress notes", LONG_FIELD_MAX_LENGTH)],
     ["tone", toneError(values.tone)],
   ]);
 }
@@ -134,8 +134,8 @@ type ReplyDraftValues = { clientMessage: string; replyGoal: string; tone: Tone |
 
 function validateReplyDraft(values: ReplyDraftValues): Partial<Record<keyof ReplyDraftValues, string>> {
   return collectFieldErrors<ReplyDraftValues>([
-    ["clientMessage", requiredTrimmedFieldError(values.clientMessage, "Client message", 4000)],
-    ["replyGoal", requiredTrimmedFieldError(values.replyGoal, "Reply goal", 4000)],
+    ["clientMessage", requiredTrimmedFieldError(values.clientMessage, "Client message", LONG_FIELD_MAX_LENGTH)],
+    ["replyGoal", requiredTrimmedFieldError(values.replyGoal, "Reply goal", LONG_FIELD_MAX_LENGTH)],
     ["tone", toneError(values.tone)],
   ]);
 }
@@ -191,9 +191,9 @@ type PrepaidRequestValues = { billingNotes: string; billingAmount: string; billi
 
 function validatePrepaidRequest(values: PrepaidRequestValues): Partial<Record<keyof PrepaidRequestValues, string>> {
   return collectFieldErrors<PrepaidRequestValues>([
-    ["billingNotes", requiredTrimmedFieldError(values.billingNotes, "Billing notes", 4000)],
-    ["billingAmount", requiredTrimmedFieldError(values.billingAmount, "Amount", 200)],
-    ["billingDueDate", optionalTrimmedFieldError(values.billingDueDate, "Due date", 200)],
+    ["billingNotes", requiredTrimmedFieldError(values.billingNotes, "Billing notes", LONG_FIELD_MAX_LENGTH)],
+    ["billingAmount", requiredTrimmedFieldError(values.billingAmount, "Amount", SHORT_FIELD_MAX_LENGTH)],
+    ["billingDueDate", optionalTrimmedFieldError(values.billingDueDate, "Due date", SHORT_FIELD_MAX_LENGTH)],
     ["tone", toneError(values.tone)],
   ]);
 }

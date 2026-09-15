@@ -19,12 +19,6 @@ export type CopyResultAndRecordActivationRequest = {
    */
   checkpointId: string | null;
   /**
-   * The next-action id to record. Defaults to `COPY_RESULT_NEXT_ACTION_ID` (`"copy_result"`) when
-   * omitted -- every product built so far uses that default; a future product whose own
-   * `renderer_contract.yaml` names a different `next_action` can pass it here instead.
-   */
-  nextActionId?: string;
-  /**
    * Performs the actual clipboard write (typically `(text) => navigator.clipboard.writeText(text)`).
    * Injected rather than called directly so the ordering contract below is testable without a
    * DOM, and so a host can substitute a fallback (execCommand, a native bridge) without CE-kit
@@ -88,7 +82,7 @@ export async function copyResultAndRecordActivation(
     client,
     {
       scenarioSessionId: request.scenarioSessionId,
-      nextActionId: request.nextActionId ?? COPY_RESULT_NEXT_ACTION_ID,
+      nextActionId: COPY_RESULT_NEXT_ACTION_ID,
       checkpointId: request.checkpointId,
     },
     options,

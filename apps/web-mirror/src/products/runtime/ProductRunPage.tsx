@@ -89,8 +89,15 @@ function cacheSuccessOnly<T extends { ok: boolean }>(
 // sequence (e.g. Client Update Writer's mode switcher, which remounts on every mode change since
 // each mode's form values have an incompatible shape) doesn't re-fetch identical data on every
 // switch. Keyed by the client instance (not a bare module-level cache) so distinct clients --
-// different tests, or a real app with more than one client -- never share entries. Guest identity
-// is deliberately NOT cached here: it already caches itself via guestStorage.
+// different tests, or a real app with more than one client -- never share entries.
+//
+// Guest identity and quota are deliberately NOT cached this way: identity already caches itself
+// via guestStorage, and quota genuinely changes over the page's lifetime as the guest consumes
+// it -- a code review finding caught a first attempt at caching quota the same way this file
+// caches runtime config, which went stale the instant a run actually consumed quota (never
+// invalidated after a successful start), didn't key by guestId (a guest-identity self-heal could
+// read a stale/wrong guest's cached result), and didn't dedupe concurrent calls the way this
+// function does. Quota is cheap, advisory, and re-fetched on every mount instead.
 const runtimeConfigCache = new WeakMap<PlatformApiClient, Map<string, ReturnType<typeof getRuntimeConfig>>>();
 
 function getCachedRuntimeConfig(client: PlatformApiClient, productId: string) {
@@ -128,38 +135,6 @@ function markEventFired(client: PlatformApiClient, productId: string, eventType:
     byProductId.set(productId, fired);
   }
   fired.add(eventType);
-}
-
-/**
- * Advisory quota is only cached once a response has revealed its policy is product-dimensioned
- * (`quotaDimension === "product"`) -- only then is the value actually identical across every
- * scenario/mode of that product, so only then is reusing it across a Client Update Writer-style
- * mode switch correct. A scenario-dimensioned policy's value can legitimately differ per
- * scenario, so it's deliberately never cached here, and re-fetches per mode exactly as before.
- */
-const productLevelQuotaCache = new WeakMap<PlatformApiClient, Map<string, ReturnType<typeof getQuota>>>();
-
-function getCachedOrFreshQuota(
-  client: PlatformApiClient,
-  request: { productId: string; guestId: string; scenarioId: string },
-) {
-  const byProductId = productLevelQuotaCache.get(client);
-  const cached = byProductId?.get(request.productId);
-  if (cached) {
-    return cached;
-  }
-  const pending = getQuota(client, request).then((result) => {
-    if (result.ok && result.value.quotaDimension === "product") {
-      let map = productLevelQuotaCache.get(client);
-      if (!map) {
-        map = new Map();
-        productLevelQuotaCache.set(client, map);
-      }
-      map.set(request.productId, Promise.resolve(result));
-    }
-    return result;
-  });
-  return pending;
 }
 
 function shallowEqualValues<V extends Record<string, unknown>>(a: V, b: V): boolean {
@@ -319,11 +294,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           // product-wide policy simply "does not require it" (optional, not rejected) -- passing
           // it unconditionally keeps this shared runtime correct for either policy shape without
           // needing to know which one a given product uses.
-          getCachedOrFreshQuota(client, {
-            productId,
-            guestId: resolvedGuestId,
-            scenarioId: scenario.scenarioId,
-          }).then((quotaResult) => {
+          getQuota(client, { productId, guestId: resolvedGuestId, scenarioId: scenario.scenarioId }).then((quotaResult) => {
             if (controller?.signal.aborted || !quotaResult.ok) {
               return;
             }
@@ -608,7 +579,6 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           scenarioSessionId,
           checkpointId,
           writeToClipboard,
-          nextActionId: definition.copyNextActionId,
           onCopied: () => {
             emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId, guestId });
             resolve(true);

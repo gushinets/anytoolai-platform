@@ -6,7 +6,7 @@ import { ResultView } from "../../components/ResultView";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import { collectFieldErrors, requiredTrimmedFieldError } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductRunEvent } from "../runtime/productDefinition";
-import { TONE_OPTIONS, type Tone } from "../runtime/tone";
+import { ToneSelect, type Tone } from "../runtime/tone";
 
 export type ProposalAIValues = {
   taskText: string;
@@ -57,19 +57,13 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
       {errors.freelancerPositioning ? <p role="alert">{errors.freelancerPositioning}</p> : null}
 
       <label htmlFor="proposal-ai-tone">Tone (optional)</label>
-      <select
+      <ToneSelect
         id="proposal-ai-tone"
         value={values.tone}
-        onChange={(event: ChangeEvent<HTMLSelectElement>) => onChange("tone", event.target.value as Tone | "")}
+        onChange={(tone) => onChange("tone", tone)}
         disabled={disabled}
-      >
-        <option value="">Default</option>
-        {TONE_OPTIONS.map((tone) => (
-          <option key={tone} value={tone}>
-            {tone}
-          </option>
-        ))}
-      </select>
+        placeholderLabel="Default"
+      />
 
       <label htmlFor="proposal-ai-language">Language (optional)</label>
       <input

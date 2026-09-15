@@ -126,24 +126,6 @@ describe("copyResultAndRecordActivation", () => {
     expect(result.copied && result.activation?.ok).toBe(false);
   });
 
-  it("records the caller-supplied nextActionId instead of the default when one is given", async () => {
-    // Code review finding: the next-action id was unconditionally hardcoded to
-    // COPY_RESULT_NEXT_ACTION_ID, with no way for a future product whose own renderer_contract.yaml
-    // names a different next_action to override it.
-    const fetchImpl = vi.fn(async () => jsonResponse(200, SESSION_PAYLOAD));
-    const client = makeClient(fetchImpl as unknown as typeof fetch);
-
-    await copyResultAndRecordActivation(client, {
-      ...request(async () => undefined),
-      nextActionId: "custom_next_action",
-    });
-
-    const [calledUrl] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
-    expect(calledUrl).toBe(
-      "https://api.example.com/v1/scenario-sessions/scenario_session_123/next-actions/custom_next_action",
-    );
-  });
-
   it("skips the activation request entirely when checkpointId is null, but still fires onCopied", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse(200, SESSION_PAYLOAD));
     const client = makeClient(fetchImpl as unknown as typeof fetch);
