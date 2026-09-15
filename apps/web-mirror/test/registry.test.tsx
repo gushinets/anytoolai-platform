@@ -10,6 +10,10 @@ describe("getRegisteredProduct", () => {
     expect(getRegisteredProduct("proposal_ai")?.productId).toBe("proposal_ai");
   });
 
+  it("returns the enabled Client Update Writer product", () => {
+    expect(getRegisteredProduct("client_update_writer")?.productId).toBe("client_update_writer");
+  });
+
   it("returns null for an unknown product id", () => {
     expect(getRegisteredProduct("does_not_exist")).toBeNull();
   });

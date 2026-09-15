@@ -112,9 +112,8 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> =
     ...(values.language ? { language: values.language } : {}),
   }),
   extractResult: (output) => (typeof output.text === "string" ? output.text : null),
-  copyNextActionId: "copy_result",
   Fields: ProposalAIFields,
-  Result: ({ result, onCopied }) => <ResultView text={result} onCopied={onCopied} />,
+  Result: ({ result, onCopy }) => <ResultView text={result} onCopy={onCopy} />,
   copy: {
     submit: "Generate proposal",
     running: "Generating your proposal…",

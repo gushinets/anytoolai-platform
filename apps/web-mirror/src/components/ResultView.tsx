@@ -5,30 +5,25 @@ import { GeneratedTextRenderer } from "@anytoolai/web-result-kit";
 
 export type ResultViewProps = {
   text: string;
-  /** Called once the clipboard write itself succeeds. Which (if any) next action to fire after a
-   * copy is product-specific, so it stays out of this shared component. */
-  onCopied?: () => void;
+  /** Performs the actual copy (clipboard write, then any next-action recording); resolves `true`
+   * iff the clipboard write itself succeeded. Product-specific (e.g. which next action to fire),
+   * so it stays out of this shared component -- see `ProductDefinition.onCopy`. */
+  onCopy?: (text: string) => Promise<boolean>;
 };
 
 /** Canonical text result plus a copy-to-clipboard button. The result stays visible and copyable
- * even if `onCopied` (or whatever it triggers) fails -- only the clipboard write itself gates
- * the "Copied" state. */
-export function ResultView({ text, onCopied }: ResultViewProps) {
+ * even if the copy fails -- only `onCopy`'s own outcome gates the "Copied" state. */
+export function ResultView({ text, onCopy }: ResultViewProps) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
 
   function handleCopy() {
-    if (!navigator.clipboard?.writeText) {
+    if (!onCopy) {
       setCopyState("error");
       return;
     }
-    navigator.clipboard.writeText(text).then(
-      () => {
-        setCopyState("copied");
-        onCopied?.();
-      },
-      () => {
-        setCopyState("error");
-      },
+    onCopy(text).then(
+      (copied) => setCopyState(copied ? "copied" : "error"),
+      () => setCopyState("error"),
     );
   }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
+  copyResultAndRecordActivation,
   createInMemoryAsyncStorage,
   createWindowLocalStorageAdapter,
   getQuota,
@@ -11,7 +12,6 @@ import {
   isQuotaExhausted,
   isResultNotFound,
   isResultUnavailable,
-  nextAction,
   pollScenarioSession,
   prepareScenarioStart,
   refreshGuestIdentity,
@@ -98,8 +98,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // emitEvent() call site below, not just the mount effect: `handleSubmit`/`handleRetry`/
   // `updateField` are genuinely synchronous DOM-event-handler closures where using the `onEvent`
   // prop directly would already be safe, but `runPoll` (a multi-second async continuation) and
-  // `handleCopied` (invoked from the product renderer's own clipboard-write promise, itself
-  // async) are not -- either can run after a re-render has already handed the parent a new
+  // `handleCopy` (invoked from the product renderer's own copy-button handler, itself async) are
+  // not -- either can run after a re-render has already handed the parent a new
   // `onEvent` identity, and a closure captured before that await would fire the stale one. Using
   // the ref uniformly, rather than trying to classify each call site as "safe," avoids
   // re-introducing this exact bug: an earlier version used `onEvent` directly in `runPoll`.
@@ -461,29 +461,46 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     void fetchResult(phase.scenarioSessionId, phase.resultArtifactId, phase.checkpointId);
   }
 
-  function handleCopied() {
+  // The clipboard write always happens; the `copy_result` activation is only recorded when the
+  // session has an active checkpoint to record it against (`currentCheckpointId` is legitimately
+  // nullable on a completed session -- there is nothing to validate the next action against).
+  // Either way, a failed activation-record must never make an already-copied, already-displayed
+  // result look broken (ANY-243): `copied` reflects only the clipboard write, never the
+  // activation's own HTTP outcome (see `copyResultAndRecordActivation`'s own contract).
+  async function handleCopy(text: string): Promise<boolean> {
     if (phase.kind !== "result") {
-      return;
+      return false;
     }
-    // Emitted on a successful clipboard write regardless of the next-action HTTP outcome below,
-    // and regardless of whether this session even has a checkpoint id (`currentCheckpointId` is
-    // legitimately nullable on a completed session) -- the funnel event reflects the user's copy,
-    // not the backend's acknowledgement of it.
-    emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId: phase.scenarioSessionId });
-    if (!phase.checkpointId) {
-      return;
+    const { scenarioSessionId, checkpointId } = phase;
+    const controller = controllerRef.current;
+    const writeToClipboard = (value: string) =>
+      navigator.clipboard?.writeText
+        ? navigator.clipboard.writeText(value)
+        : Promise.reject(new Error("Clipboard API unavailable."));
+    if (!checkpointId) {
+      try {
+        await writeToClipboard(text);
+      } catch {
+        return false;
+      }
+      emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId });
+      return true;
     }
-    // Fire-and-forget: a failed activation event must never make an already-copied,
-    // already-displayed result look broken (ANY-243).
-    nextAction(
+    const outcome = await copyResultAndRecordActivation(
       client,
       {
-        scenarioSessionId: phase.scenarioSessionId,
-        nextActionId: definition.copyNextActionId,
-        checkpointId: phase.checkpointId,
+        text,
+        scenarioSessionId,
+        checkpointId,
+        writeToClipboard,
       },
-      { signal: controllerRef.current?.signal },
-    ).then(_noop, _noop);
+      { signal: controller?.signal },
+    );
+    if (!outcome.copied) {
+      return false;
+    }
+    emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId });
+    return true;
   }
 
   function updateField<K extends keyof V>(field: K, value: V[K]) {
@@ -513,7 +530,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   let mainContent: ReactNode;
   switch (phase.kind) {
     case "result":
-      mainContent = <Result result={phase.result} onCopied={handleCopied} />;
+      mainContent = <Result result={phase.result} onCopy={handleCopy} />;
       break;
     case "quota-exhausted":
       mainContent = <ErrorState message={`You've used all your ${definition.title} runs for now.`} />;

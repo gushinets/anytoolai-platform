@@ -260,6 +260,40 @@ describe("ProductRunPage", () => {
     expect(JSON.parse(nextActionCall?.init.body as string)).toEqual({ checkpoint_id: "checkpoint_1" });
   });
 
+  it("writes to the clipboard before recording the copy_result activation, exactly once per copy", async () => {
+    const order: string[] = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: vi.fn(() => {
+          order.push("clipboard_write");
+          return Promise.resolve();
+        }),
+      },
+    });
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.NEXT_ACTION]: [
+        () => {
+          order.push("next_action_recorded");
+          return sessionResponse({ status: "completed" });
+        },
+      ],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+
+    expect(order).toEqual(["clipboard_write", "next_action_recorded"]);
+    expect(calls.filter((call) => call.key === ROUTES.NEXT_ACTION)).toHaveLength(1);
+  });
+
   it("enters a quota-exhausted state from the advisory quota check, with no form and no scenario started", async () => {
     const { client, calls } = makeClient({
       ...bootRoutes(),
