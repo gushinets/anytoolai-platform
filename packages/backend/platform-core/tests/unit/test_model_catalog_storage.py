@@ -51,14 +51,25 @@ def _item(model_id: str) -> ModelCatalogItem:
     )
 
 
-def test_manual_refresh_coalesces_and_obeys_cooldown(
+def _expire_refresh_cooldown(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session], account_scope: str
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        session.execute(
+            sa.update(model_catalog_state_table)
+            .where(model_catalog_state_table.c.account_scope == account_scope)
+            .values(last_attempt_at=sa.func.clock_timestamp() - sa.text("interval '61 seconds'"))
+        )
+
+
+def test_manual_refresh_queues_during_cooldown_and_runs_when_eligible(
     session_factory: sa.orm.sessionmaker[sa.orm.Session], now: datetime
 ) -> None:
     with transaction_boundary(session_factory) as session:
         repository = ModelCatalogRepository(session)
-        first = repository.request_refresh("account-a", now=now, cooldown=timedelta(seconds=60))
+        first = repository.request_refresh("account-a", now=now)
         second = repository.request_refresh(
-            "account-a", now=now + timedelta(seconds=1), cooldown=timedelta(seconds=60)
+            "account-a", now=now + timedelta(seconds=1)
         )
         assert first.refresh_status(now) is ModelCatalogRefreshStatus.pending
         assert second.refresh_requested_at == first.refresh_requested_at
@@ -76,13 +87,35 @@ def test_manual_refresh_coalesces_and_obeys_cooldown(
         )
 
     with transaction_boundary(session_factory) as session:
-        state = ModelCatalogRepository(session).request_refresh(
-            "account-a", now=now + timedelta(seconds=20), cooldown=timedelta(seconds=60)
+        repository = ModelCatalogRepository(session)
+        state = repository.request_refresh(
+            "account-a", now=now + timedelta(seconds=20)
         )
         assert (
-            state.refresh_status(now + timedelta(seconds=20)) is ModelCatalogRefreshStatus.current
+            state.refresh_status(now + timedelta(seconds=20))
+            is ModelCatalogRefreshStatus.pending
+        )
+        assert state.refresh_requested_at == now + timedelta(seconds=20)
+        assert (
+            repository.claim_refresh(
+                "account-a",
+                now=now + timedelta(seconds=20),
+                lease_duration=timedelta(seconds=30),
+                cooldown=timedelta(seconds=60),
+            )
+            is None
         )
         assert state.snapshot_id == "snapshot-1"
+
+    _expire_refresh_cooldown(session_factory, "account-a")
+    with transaction_boundary(session_factory) as session:
+        lease = ModelCatalogRepository(session).claim_refresh(
+            "account-a",
+            now=now + timedelta(seconds=20),
+            lease_duration=timedelta(seconds=30),
+            cooldown=timedelta(seconds=60),
+        )
+        assert lease is not None
 
 
 def test_only_one_postgresql_lease_is_claimed_and_expired_lease_is_recoverable(
@@ -90,7 +123,7 @@ def test_only_one_postgresql_lease_is_claimed_and_expired_lease_is_recoverable(
 ) -> None:
     with transaction_boundary(session_factory) as session:
         ModelCatalogRepository(session).request_refresh(
-            "account-a", now=now, cooldown=timedelta(seconds=60)
+            "account-a", now=now
         )
 
     def claim(at: datetime) -> str | None:
@@ -130,7 +163,7 @@ def test_failed_refresh_keeps_last_good_snapshot_and_marks_it_stale(
 ) -> None:
     with transaction_boundary(session_factory) as session:
         repository = ModelCatalogRepository(session)
-        repository.request_refresh("account-a", now=now, cooldown=timedelta(seconds=60))
+        repository.request_refresh("account-a", now=now)
         lease = repository.claim_refresh("account-a", now=now, lease_duration=timedelta(seconds=30))
         assert lease is not None
         repository.complete_refresh(
@@ -144,7 +177,7 @@ def test_failed_refresh_keeps_last_good_snapshot_and_marks_it_stale(
     with transaction_boundary(session_factory) as session:
         repository = ModelCatalogRepository(session)
         repository.request_refresh(
-            "account-a", now=now + timedelta(seconds=61), cooldown=timedelta(seconds=60)
+            "account-a", now=now + timedelta(seconds=61)
         )
         lease = repository.claim_refresh(
             "account-a", now=now + timedelta(seconds=61), lease_duration=timedelta(seconds=30)
@@ -242,6 +275,7 @@ def test_refresh_service_loads_initial_snapshot_and_refreshes_after_ttl(
 
     asyncio.run(service.refresh_if_due())
     current_time[0] = now + timedelta(hours=24, seconds=1)
+    _expire_refresh_cooldown(session_factory, "account-a")
     asyncio.run(service.refresh_if_due())
 
     statements: list[str] = []
@@ -316,6 +350,7 @@ def test_refresh_service_failure_keeps_last_good_snapshot_and_reports_pending(
     asyncio.run(service.refresh_if_due())
     current_time[0] = now + timedelta(hours=24, seconds=1)
     source.fail = True
+    _expire_refresh_cooldown(session_factory, "account-failure")
     asyncio.run(service.refresh_if_due())
 
     with transaction_boundary(session_factory) as session:
@@ -345,3 +380,39 @@ def test_lease_expiry_is_derived_from_database_clock(
     assert state is not None
     assert state.lease_until is not None
     assert state.lease_until > database_now
+
+
+def test_refresh_cooldown_is_derived_from_database_clock(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    skewed_worker_time = datetime.now(UTC) - timedelta(days=1)
+    with transaction_boundary(session_factory) as session:
+        repository = ModelCatalogRepository(session)
+        lease = repository.claim_refresh(
+            "account-skewed-cooldown",
+            now=skewed_worker_time,
+            lease_duration=timedelta(seconds=30),
+            cooldown=timedelta(seconds=60),
+        )
+        assert lease is not None
+        repository.complete_refresh(
+            lease,
+            snapshot_id="snapshot-skewed-cooldown",
+            items=(),
+            now=skewed_worker_time,
+            ttl=timedelta(hours=24),
+        )
+        repository.request_refresh(
+            "account-skewed-cooldown",
+            now=skewed_worker_time + timedelta(days=2),
+        )
+
+    with transaction_boundary(session_factory) as session:
+        lease = ModelCatalogRepository(session).claim_refresh(
+            "account-skewed-cooldown",
+            now=skewed_worker_time + timedelta(days=2),
+            lease_duration=timedelta(seconds=30),
+            cooldown=timedelta(seconds=60),
+        )
+
+    assert lease is None

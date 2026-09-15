@@ -108,13 +108,60 @@ def test_reasoning_support_does_not_invent_effort_list() -> None:
     assert item.allowed_reasoning_efforts is None
 
 
+def test_current_litellm_reasoning_effort_list_is_published() -> None:
+    [item] = build_openai_gpt_catalog(
+        account_model_ids=["gpt-reasoning"],
+        litellm_metadata={
+            "gpt-reasoning": _metadata(
+                supports_reasoning=True,
+                reasoning_effort_levels=["minimal", "low", "medium", "high"],
+            )
+        },
+        overrides={},
+        fetched_at=FETCHED_AT,
+    )
+
+    assert item.reasoning_supported is True
+    assert item.allowed_reasoning_efforts == (
+        ReasoningEffort.minimal,
+        ReasoningEffort.low,
+        ReasoningEffort.medium,
+        ReasoningEffort.high,
+    )
+
+
+def test_current_litellm_reasoning_effort_flags_are_resolved_conservatively() -> None:
+    [item] = build_openai_gpt_catalog(
+        account_model_ids=["gpt-reasoning"],
+        litellm_metadata={
+            "gpt-reasoning": _metadata(
+                supports_none_reasoning_effort=False,
+                supports_minimal_reasoning_effort=False,
+                supports_low_reasoning_effort=True,
+                supports_xhigh_reasoning_effort=True,
+                supports_max_reasoning_effort=False,
+            )
+        },
+        overrides={},
+        fetched_at=FETCHED_AT,
+    )
+
+    assert item.reasoning_supported is True
+    assert item.allowed_reasoning_efforts == (
+        ReasoningEffort.low,
+        ReasoningEffort.medium,
+        ReasoningEffort.high,
+        ReasoningEffort.xhigh,
+    )
+
+
 def test_unknown_litellm_reasoning_effort_keeps_support_but_makes_list_unknown() -> None:
     [item] = build_openai_gpt_catalog(
         account_model_ids=["gpt-reasoning"],
         litellm_metadata={
             "gpt-reasoning": _metadata(
                 supports_reasoning=True,
-                supported_reasoning_efforts=["low", "future-effort"],
+                reasoning_effort_levels=["low", "future-effort"],
             )
         },
         overrides={},

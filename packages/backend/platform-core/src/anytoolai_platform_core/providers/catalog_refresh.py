@@ -57,6 +57,7 @@ class ModelCatalogRefreshService:
             refresh_is_due = ModelCatalogRepository(session).refresh_is_due(
                 self._account_scope,
                 now=claimed_at,
+                cooldown=self._retry_after,
             )
         if not refresh_is_due:
             return
@@ -66,6 +67,7 @@ class ModelCatalogRefreshService:
                 self._account_scope,
                 now=claimed_at,
                 lease_duration=self._lease_duration,
+                cooldown=self._retry_after,
             )
         if lease is None:
             return

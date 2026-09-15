@@ -79,7 +79,7 @@ def test_get_models_returns_last_good_catalog_without_credentials(app) -> None:
     now = utc_now()
     with transaction_boundary(app.state.runtime.storage.session_factory) as session:
         repository = ModelCatalogRepository(session)
-        repository.request_refresh("test-account", now=now, cooldown=timedelta(seconds=60))
+        repository.request_refresh("test-account", now=now)
         lease = repository.claim_refresh(
             "test-account", now=now, lease_duration=timedelta(seconds=30)
         )
@@ -114,6 +114,29 @@ def test_get_models_returns_last_good_catalog_without_credentials(app) -> None:
     assert payload["refresh_status"] == "current"
     assert payload["items"][0]["allowed_reasoning_efforts"] is None
     assert "OPENAI_API_KEY" not in response.text
+
+
+def test_manual_refresh_during_cooldown_returns_pending(app) -> None:
+    now = utc_now()
+    with transaction_boundary(app.state.runtime.storage.session_factory) as session:
+        repository = ModelCatalogRepository(session)
+        lease = repository.claim_refresh(
+            "test-account", now=now, lease_duration=timedelta(seconds=30)
+        )
+        assert lease is not None
+        repository.complete_refresh(
+            lease,
+            snapshot_id="snapshot-current",
+            items=(),
+            now=now,
+            ttl=timedelta(hours=24),
+        )
+
+    response = asyncio.run(_request(app, "POST", "/v1/atom-lab/models/refresh"))
+
+    assert response.status_code == HTTPStatus.ACCEPTED
+    assert response.json()["snapshot_id"] == "snapshot-current"
+    assert response.json()["refresh_status"] == "pending"
 
 
 def test_get_models_returns_stale_last_good_catalog_after_refresh_failure(app) -> None:

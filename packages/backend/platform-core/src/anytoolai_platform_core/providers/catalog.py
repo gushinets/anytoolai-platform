@@ -280,19 +280,52 @@ def _reasoning(
         if override.reasoning_supported is False:
             efforts = ()
         return override.reasoning_supported, efforts, _override_provenance(override)
-    if metadata is None or not isinstance(metadata.get("supports_reasoning"), bool):
+    if metadata is None:
         return None, None, {"source": "unknown"}
-    reasoning_supported = bool(metadata["supports_reasoning"])
+    raw_reasoning_supported = metadata.get("supports_reasoning")
+    effort_flags = {
+        ReasoningEffort.none: metadata.get("supports_none_reasoning_effort"),
+        ReasoningEffort.minimal: metadata.get("supports_minimal_reasoning_effort"),
+        ReasoningEffort.low: metadata.get("supports_low_reasoning_effort"),
+        ReasoningEffort.xhigh: metadata.get("supports_xhigh_reasoning_effort"),
+        ReasoningEffort.max: metadata.get("supports_max_reasoning_effort"),
+    }
+    has_effort_flag = any(value is not None for value in effort_flags.values())
+    if not isinstance(raw_reasoning_supported, bool) and not has_effort_flag:
+        return None, None, {"source": "unknown"}
+    reasoning_supported = raw_reasoning_supported is True or (
+        raw_reasoning_supported is not False and has_effort_flag
+    )
     efforts: tuple[ReasoningEffort, ...] | None = None
     if not reasoning_supported:
         efforts = ()
     else:
-        declared_efforts = metadata.get("supported_reasoning_efforts")
+        declared_efforts = metadata.get("reasoning_effort_levels")
         if isinstance(declared_efforts, list):
             try:
                 efforts = tuple(ReasoningEffort(value) for value in declared_efforts)
             except (TypeError, ValueError):
                 efforts = None
+        elif has_effort_flag:
+            efforts = tuple(
+                effort
+                for effort in ReasoningEffort
+                if (
+                    effort in (ReasoningEffort.medium, ReasoningEffort.high)
+                    or (
+                        effort in (
+                            ReasoningEffort.none,
+                            ReasoningEffort.minimal,
+                            ReasoningEffort.low,
+                        )
+                        and effort_flags[effort] is not False
+                    )
+                    or (
+                        effort in (ReasoningEffort.xhigh, ReasoningEffort.max)
+                        and effort_flags[effort] is True
+                    )
+                )
+            )
     return (
         reasoning_supported,
         efforts,

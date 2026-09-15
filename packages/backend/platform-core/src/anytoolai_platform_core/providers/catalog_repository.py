@@ -68,13 +68,16 @@ class ModelCatalogRepository:
         )
         return self._from_row(row)
 
-    def refresh_is_due(self, account_scope: str, *, now: datetime) -> bool:
+    def refresh_is_due(
+        self, account_scope: str, *, now: datetime, cooldown: timedelta
+    ) -> bool:
         row = (
             self._session.execute(
                 sa.select(
                     model_catalog_state_table.c.due_at,
                     model_catalog_state_table.c.refresh_requested_at,
                     model_catalog_state_table.c.lease_until,
+                    model_catalog_state_table.c.last_attempt_at,
                     sa.func.clock_timestamp().label("database_now"),
                 ).where(model_catalog_state_table.c.account_scope == account_scope)
             )
@@ -84,20 +87,20 @@ class ModelCatalogRepository:
         if row is None:
             return True
         active_lease = row["lease_until"] is not None and row["lease_until"] > row["database_now"]
+        cooling_down = (
+            row["last_attempt_at"] is not None
+            and row["last_attempt_at"] + cooldown > row["database_now"]
+        )
         return not active_lease and (
-            row["refresh_requested_at"] is not None or row["due_at"] <= now
+            not cooling_down
+            and (row["refresh_requested_at"] is not None or row["due_at"] <= now)
         )
 
-    def request_refresh(
-        self, account_scope: str, *, now: datetime, cooldown: timedelta
-    ) -> ModelCatalogState:
+    def request_refresh(self, account_scope: str, *, now: datetime) -> ModelCatalogState:
         row = self._get_or_create_for_update(account_scope, now=now)
         database_now = self._session.execute(sa.select(sa.func.clock_timestamp())).scalar_one()
         active_lease = row["lease_until"] is not None and row["lease_until"] > database_now
-        cooling_down = (
-            row["last_attempt_at"] is not None and row["last_attempt_at"] + cooldown > now
-        )
-        if not active_lease and row["refresh_requested_at"] is None and not cooling_down:
+        if not active_lease and row["refresh_requested_at"] is None:
             self._session.execute(
                 sa.update(model_catalog_state_table)
                 .where(model_catalog_state_table.c.account_scope == account_scope)
@@ -110,11 +113,21 @@ class ModelCatalogRepository:
         return state
 
     def claim_refresh(
-        self, account_scope: str, *, now: datetime, lease_duration: timedelta
+        self,
+        account_scope: str,
+        *,
+        now: datetime,
+        lease_duration: timedelta,
+        cooldown: timedelta = timedelta(0),
     ) -> ModelCatalogLease | None:
         row = self._get_or_create_for_update(account_scope, now=now)
         database_now = self._session.execute(sa.select(sa.func.clock_timestamp())).scalar_one()
         if row["lease_until"] is not None and row["lease_until"] > database_now:
+            return None
+        if (
+            row["last_attempt_at"] is not None
+            and row["last_attempt_at"] + cooldown > database_now
+        ):
             return None
         if row["refresh_requested_at"] is None and row["due_at"] > now:
             return None
@@ -125,7 +138,7 @@ class ModelCatalogRepository:
             .values(
                 lease_id=lease_id,
                 lease_until=sa.func.clock_timestamp() + lease_duration,
-                last_attempt_at=now,
+                last_attempt_at=sa.func.clock_timestamp(),
                 updated_at=now,
             )
         )

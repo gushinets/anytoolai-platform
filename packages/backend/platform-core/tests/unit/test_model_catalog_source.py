@@ -55,6 +55,8 @@ def test_litellm_metadata_parser_keeps_valid_model_mapping() -> None:
                 "litellm_provider": "openai",
                 "mode": "chat",
                 "supported_output_modalities": ["text"],
+                "reasoning_effort_levels": ["minimal", "low", "medium", "high"],
+                "supports_low_reasoning_effort": True,
             }
         }
     ).encode()

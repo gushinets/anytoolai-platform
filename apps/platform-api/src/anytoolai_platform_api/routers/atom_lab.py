@@ -137,7 +137,6 @@ def request_model_refresh(
         state = ModelCatalogRepository(session).request_refresh(
             settings.account_scope,
             now=now,
-            cooldown=settings.refresh_cooldown,
         )
     response = _models_response(state, now=now)
     return AtomLabModelRefreshResponse(

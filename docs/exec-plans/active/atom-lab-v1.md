@@ -197,7 +197,7 @@ Acceptance: Два lab запуска при повышенном test concurren
 - Depends on: ANY-459.
 - Files/areas: `platform-core/src/anytoolai_platform_core/providers/ (catalog logic inside boundary), providers/adapters/litellm.py`; `apps/platform-worker`; `configs/kernel (small capability override YAML)`; `platform-api atom_lab router`; `storage/migrations`.
 
-Получать доступные account model IDs OpenAI, совмещать с актуализируемым снимком LiteLLM metadata и небольшими YAML overrides с source/date. Priority override > metadata > unknown. Поддержка reasoning не доказывает список effort; неизвестное не равно unsupported. Допускать только подтверждённые text GPT для текущего prompted path, не фильтровать по native JSON Schema. API отдаёт модели, allowed efforts, compatibility reason, provenance, stale/last_success. GET /models; POST /models/refresh возвращает queued/current refresh status. Refresh обслуживается отдельным hook существующего worker loop через provider boundary и сохраняет last-good snapshot в PostgreSQL: OPENAI_API_KEY остаётся у worker, не добавлять его в API. Один refresh в работе, TTL 24h, rate limit refresh 60s, без платных probes. Проверить текущие provider/LiteLLM документы при реализации; не угадывать capabilities по имени.
+Получать доступные account model IDs OpenAI, совмещать с актуализируемым снимком LiteLLM metadata и небольшими YAML overrides с source/date. Priority override > metadata > unknown. Поддержка reasoning не доказывает список effort; неизвестное не равно unsupported. Допускать только подтверждённые text GPT для текущего prompted path, не фильтровать по native JSON Schema. API отдаёт модели, allowed efforts, compatibility reason, provenance, stale/last_success. GET /models; POST /models/refresh возвращает pending/running refresh status. Refresh обслуживается отдельным hook существующего worker loop через provider boundary и сохраняет last-good snapshot в PostgreSQL: OPENAI_API_KEY остаётся у worker, не добавлять его в API. Один refresh в работе, TTL 24h, rate limit refresh 60s, без платных probes. Проверить текущие provider/LiteLLM документы при реализации; не угадывать capabilities по имени.
 
 Acceptance: Тесты new/removed model, unknown effort list, no reasoning, stale/failure, empty initial cache; native schema unsupported не исключает prompted-compatible модель. API и UI не содержат SDK/credentials. Каталог явно различает known/unknown/unsupported; отклонение при admission принадлежит AL04, отсутствие silent drop/fallback в adapter — AL02. Refresh не выполняет generation.
 
@@ -227,6 +227,8 @@ Acceptance: Тесты new/removed model, unknown effort list, no reasoning, sta
 - [x] Вычислять lease expiry по PostgreSQL clock и оставить достаточный publish budget.
 - [x] Не создавать failing refresh hook в credential-free worker composition.
 - [x] Закрепить HTTP-контракт stale last-good snapshot после refresh failure.
+- [x] Сохранять manual refresh как pending во время cooldown и исполнять после его окончания.
+- [x] Читать актуальную LiteLLM форму reasoning efforts: `reasoning_effort_levels` и per-level flags.
 
 Не приняты предложения менять inclusion semantics для audio-capable/unsupported моделей и выносить
 refresh из worker loop: они противоречат зафиксированным правилам AL03 и

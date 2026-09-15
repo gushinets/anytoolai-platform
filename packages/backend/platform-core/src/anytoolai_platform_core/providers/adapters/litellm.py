@@ -129,13 +129,22 @@ def parse_litellm_model_metadata_payload(
             raise ValueError("LiteLLM metadata supports_reasoning must be boolean")
         if "supports_audio_output" in item and not isinstance(item["supports_audio_output"], bool):
             raise ValueError("LiteLLM metadata supports_audio_output must be boolean")
-        for field_name in ("supported_output_modalities", "supported_reasoning_efforts"):
+        for field_name in ("supported_output_modalities", "reasoning_effort_levels"):
             field_value = item.get(field_name)
             if field_value is not None and (
                 not isinstance(field_value, list)
                 or not all(isinstance(value, str) for value in field_value)
             ):
                 raise ValueError(f"LiteLLM metadata {field_name} must be a string list")
+        for field_name in (
+            "supports_none_reasoning_effort",
+            "supports_minimal_reasoning_effort",
+            "supports_low_reasoning_effort",
+            "supports_xhigh_reasoning_effort",
+            "supports_max_reasoning_effort",
+        ):
+            if field_name in item and not isinstance(item[field_name], bool):
+                raise ValueError(f"LiteLLM metadata {field_name} must be boolean")
     return document
 
 
