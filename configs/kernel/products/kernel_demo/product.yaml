@@ -2,6 +2,17 @@ product_id: kernel_demo
 product_platform: platform_kernel
 display_name: Kernel Demo
 scenarios:
+  - kernel_demo.atom_lab_a01_v1
+  - kernel_demo.atom_lab_a02_v1
+  - kernel_demo.atom_lab_a03_v1
+  - kernel_demo.atom_lab_a04_v1
+  - kernel_demo.atom_lab_a05_v1
+  - kernel_demo.atom_lab_a06_v1
+  - kernel_demo.atom_lab_a07_v1
+  - kernel_demo.atom_lab_a08_v1
+  - kernel_demo.atom_lab_a09_v1
+  - kernel_demo.atom_lab_a10_v1
+  - kernel_demo.atom_lab_a11_v1
   - kernel_demo.single_action_smoke_v1
   - kernel_demo.multi_step_workflow_smoke_v1
   - kernel_demo.detect_questions_smoke_v1

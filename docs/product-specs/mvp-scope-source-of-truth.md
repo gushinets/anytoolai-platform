@@ -98,6 +98,23 @@ Every user journey starts with `scenario_session_id`.
 - full regional deployment
 - product-specific domain tables
 
+### Internal Atom Lab exception
+
+Atom Lab is an internal kernel experimentation surface, not a public product, admin panel, or new
+MVP-A release dependency. Its static shell is served by `platform-api` at `/atom-lab`; protected
+data routes live only under `/v1/atom-lab/*` and require the separate
+`X-Atom-Lab-Access-Code`. Missing server configuration fails closed.
+
+The catalog may expose the live `kernel_demo` action configuration, repository prompt, fixed input
+and output schemas, prepared Russian description, and validated example for each A01-A11 atom.
+This is a narrow exception to the ordinary frontend prohibition on prompt/model visibility. Public
+product clients and shared frontend packages still cannot receive prompt/provider/model overrides.
+
+Lab ownership is established by a server-written runtime scope stored on the scenario session.
+Related jobs, action runs, artifacts, and handoffs inherit classification only through their
+server-owned session relationship. All public session/result/artifact/handoff reads and actions
+must treat non-public scope as not found. Client input or metadata cannot opt into lab scope.
+
 ## Product-Neutral Action Types
 
 All 11 action types must be registered and runnable through the generic action runner.
@@ -137,6 +154,10 @@ Platform Core must not contain product semantics such as:
 - `send-ready verdict`
 
 Platform Core may know only neutral runtime identifiers such as `product_id`, `frontend_id`, `scenario_id`, `scenario_session_id`, `workflow_id`, `workflow_version`, `action_type`, `action_config_id`, `prompt_ref`, `provider_policy_ref`, `job_id`, `artifact_id`, `handoff_id`, `guest_id`, `tenant_id`, `region`, and `event_type`.
+
+Platform Core may additionally know the closed, product-neutral runtime scope values needed to
+separate public execution from internal Atom Lab execution. It must not contain Atom Lab catalog
+copy, UI meaning, access-code handling, or experimental prompt/model selection logic.
 
 ## Runtime State
 

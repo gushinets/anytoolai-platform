@@ -1,4 +1,8 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from anytoolai_platform_core.actions.executor import RunLocalActionSettings
 
 
 @dataclass(frozen=True)
@@ -28,3 +32,4 @@ class ExecutionContext:
     physical_call_index: int | None = None
     pydantic_run_id: str | None = None
     litellm_response_id: str | None = None
+    run_local_action_settings: "RunLocalActionSettings | None" = None

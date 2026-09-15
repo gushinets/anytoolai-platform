@@ -53,6 +53,8 @@ Actions, workflows, products, scenarios, and executors must not call LiteLLM dir
 - carries runtime dimensions through `action_run_id`
 - carries `provider_policy_ref`, `workflow_version`, prompt/messages, response schema, and safe
   metadata
+- may carry a trusted run-local policy snapshot plus explicit model addressing/reasoning effort;
+  this path is constructed only from a validated Atom Lab snapshot, never from ordinary clients
 
 `ResolvedProviderRequest`
 
@@ -194,6 +196,8 @@ It owns:
 - provider response normalization inputs such as usage, model ids, and response ids
 - per-attempt transport retry count through
   `retry_policy.transport.litellm_num_retries_per_attempt`
+- direct adapter addressing for a validated Atom Lab model selection; direct mode calls the exact
+  selected LiteLLM model string and does not resolve a static router alias or fallback
 
 LiteLLM does not own:
 
@@ -202,6 +206,20 @@ LiteLLM does not own:
 - event emission
 - structured-output validation
 - hard physical-call limits
+
+## Atom Lab run-local settings
+
+Ordinary jobs continue to resolve immutable registry policy and router model aliases. For an
+internal Atom Lab job, the worker may attach `RunLocalActionSettings` only after it reloads and
+validates the durable run snapshot. `ActionRunner`, the structured executor, and `ProviderGateway`
+pass those typed settings without mutating shared registry or Router state.
+
+The run-local policy is the admitted server-side snapshot of timeouts and retry/hard limits. The
+selected model is adapter-addressed directly and fallback remains disabled, so a static alias cannot
+replace it. Reasoning effort is forwarded only when explicitly present; absence does not inherit a
+static `medium` value. Unsupported parameters are not silently dropped. Validation retries and
+gateway transport retries reuse the same immutable settings and retain their existing ownership and
+per-physical-call ledger semantics.
 
 ## PydanticAI Responsibilities
 

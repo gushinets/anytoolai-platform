@@ -43,6 +43,10 @@ def build_provider_call_metadata(
         "correlation_id": request.correlation_id,
         "fixture_key": request.fixture_key,
         "structured_output_mode": request.structured_output_mode.value,
+        "model_addressing": request.model_addressing.value,
+        "reasoning_effort": (
+            None if request.reasoning_effort is None else request.reasoning_effort.value
+        ),
         "temperature": request.temperature,
         "timeout": {"configured_seconds": request.timeout_seconds},
         "retry_policy": {
@@ -102,8 +106,7 @@ def sanitize_metadata(value: Mapping[str, Any] | None) -> dict[str, Any]:
     if value is None:
         return {}
     return {
-        str(key): _sanitize_value(key=str(key), value=item, depth=0)
-        for key, item in value.items()
+        str(key): _sanitize_value(key=str(key), value=item, depth=0) for key, item in value.items()
     }
 
 
