@@ -27,7 +27,16 @@ describe("shared runtime boundary", () => {
     // global is jsdom's URL class, which Node's fs rejects as "must be of scheme file".
     const here = dirname(fileURLToPath(import.meta.url));
     const source = readFileSync(resolve(here, "../src/products/runtime/ProductRunPage.tsx"), "utf8");
-    const imports = source.match(/^import .* from "(.*)";$/gm) ?? [];
+    // `[\s\S]*?` (not `.` with `^$`/`m`), so a genuinely multi-line `import {\n  ...\n} from "...";`
+    // (e.g. this file's own ce-kit import) is still captured -- a single-line-anchored regex here
+    // previously skipped it silently, so this boundary check never actually inspected that import.
+    const imports = source.match(/import[\s\S]*?from "(.*)";/g) ?? [];
+    // Self-check that the regex above missed no import statement at all (multi-line or not): every
+    // line starting with `import` must belong to exactly one matched import statement. (Not a raw
+    // count of `from "` substrings -- a comment can coincidentally contain that text, e.g. this
+    // file's own prose quoting a string literal, without being an import.)
+    const importStatementCount = (source.match(/^import\b/gm) ?? []).length;
+    expect(imports.length).toBe(importStatementCount);
     expect(imports.length).toBeGreaterThan(0);
     for (const line of imports) {
       // From src/products/runtime/, exactly one level up (`../x/...`, not `../../x/...`) is a
