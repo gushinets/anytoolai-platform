@@ -10,6 +10,10 @@ dedicated Chrome Extensions are optional product surfaces.
 
 Frontends call approved scenarios only. Frontends do not choose action chains, prompts, providers, or models.
 
+Atom Lab is the sole narrow exception: its protected, internal-only API may return registry-owned
+prompts and later accept run-local prompt/model choices for laboratory experiments. This authority
+does not extend to public product clients, shared frontend packages, or public runtime routes.
+
 ## 3. Actions are stateless, scenarios are stateful
 
 Action implementations do not own scenario state. Scenario state belongs to Platform Runtime.
@@ -21,6 +25,11 @@ No FreelancerProfile, Proposal, Brief, ScopeCreep, AcceptanceDocument, CaseStudy
 ## 5. Runtime state goes to PostgreSQL, definitions go to config
 
 In MVP, definitions are YAML/Markdown and runtime state is database-backed.
+
+Atom Lab catalog metadata is definition data and remains in repository configuration. A
+server-written runtime scope on the scenario session is the root of trust for classifying related
+jobs, actions, artifacts, and handoffs; browser input and public request metadata are never trusted
+to establish that scope.
 
 ## 6. Every scenario has scenario_session_id
 

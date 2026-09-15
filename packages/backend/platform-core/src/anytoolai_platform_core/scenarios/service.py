@@ -11,8 +11,8 @@ from sqlalchemy.exc import IntegrityError
 
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.hashing import digest_parts
-from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.common.ids import new_id
+from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
@@ -42,6 +42,10 @@ from anytoolai_platform_core.scenarios.repository import (
     MAX_IDEMPOTENCY_KEY_LENGTH,
     ScenarioSessionRepository,
     is_expected_idempotency_race,
+)
+from anytoolai_platform_core.scenarios.runtime_scope import (
+    RuntimeScope,
+    runtime_scope_metadata,
 )
 from anytoolai_platform_core.workflows.models import JobRecord
 from anytoolai_platform_core.workflows.repository import JobRepository
@@ -137,6 +141,7 @@ class ScenarioRuntimeService:
         source_frontend_instance_id: str | None = None,
         idempotency_key: str | None = None,
         live_canary_token: str | None = None,
+        runtime_scope: RuntimeScope = RuntimeScope.public,
     ) -> ScenarioSessionSnapshot:
         # An empty or whitespace-only header (e.g. a proxy sending "Idempotency-Key: ")
         # must mean "no key was sent", not a real, distinct empty-string key -- two
@@ -162,6 +167,7 @@ class ScenarioRuntimeService:
                 guest_id=guest_id,
                 user_id=user_id,
                 input_payload=input_payload,
+                runtime_scope=runtime_scope,
             )
         )
 
@@ -243,7 +249,10 @@ class ScenarioRuntimeService:
             source_frontend_instance_id=source_frontend_instance_id,
             idempotency_key=idempotency_key,
             idempotency_request_hash=idempotency_request_hash,
-            metadata={"input": dict(input_payload)},
+            metadata={
+                "input": dict(input_payload),
+                **runtime_scope_metadata(runtime_scope),
+            },
         )
 
         # Validate guest identity/quota policy before any write: consume_for_accepted_start()
@@ -670,8 +679,7 @@ class ScenarioSessionService:
             )
             if raced is None:
                 raise RuntimeError(
-                    "scenario session idempotency race but no row found: "
-                    f"{record.id}"
+                    f"scenario session idempotency race but no row found: {record.id}"
                 ) from exc
             return raced, False
 
@@ -823,6 +831,7 @@ def compute_idempotency_request_hash(
     guest_id: str | None,
     user_id: str | None,
     input_payload: Mapping[str, Any],
+    runtime_scope: RuntimeScope = RuntimeScope.public,
 ) -> str:
     """Hash the parts of a scenario-start request that must match on replay.
 
@@ -839,7 +848,7 @@ def compute_idempotency_request_hash(
         # custom object). Surface the same safe validation error the caller already
         # raises for a non-Mapping payload instead of an unhandled TypeError.
         raise ScenarioInputInvalidError() from exc
-    return digest_parts(
+    hash_parts = [
         tenant_id,
         region,
         product_id,
@@ -848,7 +857,10 @@ def compute_idempotency_request_hash(
         guest_id or "",
         user_id or "",
         canonical_input,
-    )
+    ]
+    if runtime_scope is not RuntimeScope.public:
+        hash_parts.append(runtime_scope.value)
+    return digest_parts(*hash_parts)
 
 
 def _context_from_record(record: ScenarioSessionRecord) -> ExecutionContext:

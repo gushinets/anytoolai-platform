@@ -80,6 +80,29 @@ Production access to `/demo` requires HTTPS at the reverse-proxy/load-balancer b
 TLS certificates, firewall rules, OpenAI budget controls, and code rotation are operator-owned;
 the repository does not provision them.
 
+### Internal Atom Lab access
+
+The Atom Lab shell is available at `/atom-lab`, but it contains no protected catalog data.
+Every data request under `/v1/atom-lab/*` requires `X-Atom-Lab-Access-Code`, compared by the API in
+constant time with `ANYTOOLAI_ATOM_LAB_ACCESS_CODE`. A missing or blank server value keeps the data
+API fail-closed. This code is separate from `ANYTOOLAI_DEMO_ACCESS_CODE` and is injected only into
+`platform-api`; `OPENAI_API_KEY` remains worker-only and the server live token is not sent to the
+browser.
+
+For a closed local check, set the code only in the shell that starts Compose:
+
+```bash
+export ANYTOOLAI_ATOM_LAB_ACCESS_CODE='replace-with-a-local-lab-code'
+python3 scripts/agent/runner.py dev-up
+```
+
+Open the worktree-specific API URL reported by `dev-up` with `/atom-lab` appended. Enter the code in
+the page; the page keeps it only in tab memory and sends it as a header. Do not place it in a URL,
+committed `.env`, logs, screenshots, or browser storage. Use HTTPS and an internal network gate for
+any non-local deployment, distribute the code separately, and rotate it by changing the operator
+secret followed by an API restart. Production rollout remains operator-owned and is not performed
+by ANY-459.
+
 ### Run the stakeholder page locally
 
 Start Docker Desktop, then run the worktree-aware development stack from the repository root:

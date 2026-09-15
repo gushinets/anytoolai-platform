@@ -3,6 +3,21 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol
 
+from anytoolai_platform_core.providers.models import ProviderPolicy, ReasoningEffort
+
+
+@dataclass(frozen=True)
+class RunLocalActionSettings:
+    run_id: str
+    action_type: str
+    action_config_id: str
+    prompt: str
+    prompt_ref: str
+    prompt_version: int
+    provider_policy: ProviderPolicy
+    model_id: str
+    reasoning_effort: ReasoningEffort | None
+
 
 @dataclass(frozen=True)
 class ActionExecutorRequest:
@@ -25,6 +40,7 @@ class ActionExecutorRequest:
     fixture_key: str | None = None
     request_id: str | None = None
     correlation_id: str | None = None
+    run_local_settings: RunLocalActionSettings | None = None
 
 
 @dataclass(frozen=True)

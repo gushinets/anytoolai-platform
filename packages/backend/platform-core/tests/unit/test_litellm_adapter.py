@@ -3,11 +3,9 @@ from __future__ import annotations
 import asyncio
 import math
 from pathlib import Path
-from types import SimpleNamespace
-from types import MappingProxyType
+from types import MappingProxyType, SimpleNamespace
 
 import pytest
-
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.providers.adapters.litellm import (
@@ -18,10 +16,12 @@ from anytoolai_platform_core.providers.adapters.litellm import (
 )
 from anytoolai_platform_core.providers.models import (
     ProviderMessage,
+    ProviderModelAddressing,
     ProviderRetryHardLimits,
     ProviderRetryPolicy,
     ProviderTransportRetryPolicy,
     ProviderValidationRetryPolicy,
+    ReasoningEffort,
     ResolvedProviderRequest,
     StructuredOutputMode,
 )
@@ -35,7 +35,9 @@ class RecordingRouter:
         self.response = response
         self.calls: list[dict[str, object]] = []
 
-    async def acompletion(self, model: str, messages: list[dict[str, object]], **kwargs: object) -> object:
+    async def acompletion(
+        self, model: str, messages: list[dict[str, object]], **kwargs: object
+    ) -> object:
         self.calls.append({"model": model, "messages": messages, **kwargs})
         return self.response
 
@@ -127,6 +129,67 @@ def test_litellm_adapter_maps_messages_to_router_acompletion() -> None:
     ]
 
 
+def test_litellm_adapter_sends_direct_lab_model_and_reasoning_without_alias_substitution() -> None:
+    """Catches routing a selected lab model through the static default alias."""
+    router = RecordingRouter(make_router_response())
+    direct_calls: list[dict[str, object]] = []
+
+    async def direct_completion(**kwargs: object) -> object:
+        direct_calls.append(dict(kwargs))
+        return make_router_response(model="gpt-5.4-mini")
+
+    adapter = LiteLLMProviderAdapter(router, direct_completion=direct_completion)
+
+    asyncio.run(
+        adapter.complete(
+            make_request(
+                model="openai/gpt-5.4-mini",
+                model_addressing=ProviderModelAddressing.direct,
+                reasoning_effort=ReasoningEffort.high,
+            )
+        )
+    )
+
+    assert router.calls == []
+    assert direct_calls == [
+        {
+            "model": "openai/gpt-5.4-mini",
+            "messages": [
+                {"role": "system", "content": "You are structured"},
+                {"role": "user", "content": "Return JSON"},
+            ],
+            "temperature": 0.3,
+            "timeout": 60.0,
+            "num_retries": 0,
+            "reasoning_effort": "high",
+        }
+    ]
+
+
+def test_litellm_adapter_does_not_inherit_reasoning_for_direct_model_when_omitted() -> None:
+    """Catches the router deployment's static medium effort leaking into a lab run."""
+    router = RecordingRouter(make_router_response())
+    direct_calls: list[dict[str, object]] = []
+
+    async def direct_completion(**kwargs: object) -> object:
+        direct_calls.append(dict(kwargs))
+        return make_router_response(model="gpt-5.4-mini")
+
+    adapter = LiteLLMProviderAdapter(router, direct_completion=direct_completion)
+
+    asyncio.run(
+        adapter.complete(
+            make_request(
+                model="openai/gpt-5.4-mini",
+                model_addressing=ProviderModelAddressing.direct,
+                reasoning_effort=None,
+            )
+        )
+    )
+
+    assert "reasoning_effort" not in direct_calls[0]
+
+
 def test_litellm_adapter_reports_nan_cost_when_litellm_omits_cost_metadata() -> None:
     router = RecordingRouter(
         make_router_response(_hidden_params={"response_cost": None, "additional_headers": {}})
@@ -161,7 +224,9 @@ def test_litellm_adapter_reports_nan_cost_when_billed_tokens_report_a_zero_cost(
     assert math.isnan(response.estimated_cost)
 
 
-def test_litellm_adapter_reports_nan_cost_when_the_aggregate_total_is_missing_but_tokens_were_billed() -> None:
+def test_litellm_adapter_reports_nan_cost_when_the_aggregate_total_is_missing_but_tokens_were_billed() -> (
+    None
+):
     router = RecordingRouter(
         make_router_response(
             _hidden_params={"response_cost": 0.0},
@@ -193,7 +258,9 @@ def test_litellm_adapter_prefers_a_finite_fallback_over_an_infinite_primary_cost
     assert response.estimated_cost == pytest.approx(0.0002)
 
 
-def test_litellm_adapter_uses_the_fallback_header_when_primary_cost_is_a_non_positive_zero() -> None:
+def test_litellm_adapter_uses_the_fallback_header_when_primary_cost_is_a_non_positive_zero() -> (
+    None
+):
     router = RecordingRouter(
         make_router_response(
             _hidden_params={
@@ -400,7 +467,9 @@ def test_litellm_adapter_handles_response_content_lists() -> None:
     assert response.http_status == 200
 
 
-def test_load_litellm_router_config_resolves_env_sentinels(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_litellm_router_config_resolves_env_sentinels(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "secret-value")
     config_path = tmp_path / "litellm_router.yaml"
     config_path.write_text(
@@ -452,7 +521,9 @@ def test_load_litellm_router_config_rejects_missing_env_sentinel(
 def test_build_litellm_router_uses_repo_default_config_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    expected_path = Path(__file__).resolve().parents[5] / "configs" / "kernel" / "litellm_router.yaml"
+    expected_path = (
+        Path(__file__).resolve().parents[5] / "configs" / "kernel" / "litellm_router.yaml"
+    )
 
     monkeypatch.setenv("OPENAI_API_KEY", "secret-value")
 

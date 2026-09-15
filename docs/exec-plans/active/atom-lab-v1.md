@@ -3,19 +3,15 @@
 ## Status
 
 - State: active
-- Phase: audit corrections approved; implementation not started
+- Phase: AL02 implemented and verified on feature/ANY-460
 - Owner: mixed
 - Created: 2026-09-09
-- Last updated: 2026-09-09
+- Last updated: 2026-09-14
 - Review date: 2026-09-16
-- Next action: Begin ANY-459 by publishing the spec/plan and internal contracts before dependent development.
+- Next action: Review and commit ANY-460; begin AL03 only after this branch is integrated.
 - Blocker: none for development; operator configuration required before rollout.
 - Linear project: [Atom Lab](https://linear.app/paveldik/project/atom-lab-e1efc95ce888)
 - Milestone: Atom Lab v1
-
-Publication update: these documents are submitted for review under ANY-399. Once that PR is merged,
-the document-publication prerequisite mentioned under AL01 is satisfied; its implementation,
-controlling-doc/guard changes and all runtime acceptance criteria remain outstanding.
 
 ## Goal
 
@@ -149,7 +145,7 @@ Do not postpone all testing to final QA.
 
 ### AL01 — [ANY-459](https://linear.app/paveldik/issue/ANY-459/atom-lab-zakrytaya-poverhnost-i-katalog-11-atomov): Atom Lab: закрытая поверхность и каталог 11 атомов
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 - Depends on: none.
 - Files/areas: `apps/platform-api/src/anytoolai_platform_api/routers/demo.py (reference), routers/atom_lab.py (new), main.py, schemas.py`; `configs/kernel/products/kernel_demo`; `docs/core-beliefs.md`; `docs/product-specs/mvp-scope-source-of-truth.md`; `docs/architecture/frontend-boundaries.md`.
 
@@ -159,16 +155,16 @@ Acceptance: Без кода невозможно прочитать катало
 
 ### Уточнения после аудита
 
-- [ ] Первым изменением ANY-459 опубликовать спецификацию и этот план в репозитории до зависимой разработки. Одновременно описать узкое исключение внутреннего Lab в controlling docs и guards, не ослабляя публичные frontend boundaries.
-- [ ] Сервер создаёт доверенную маркировку lab scope; пользовательский input/metadata не может её включить. Определить проверку принадлежности session/job/action/artifact к lab через серверную связь с сессией, пригодную для хранилища ANY-460. До появления run API проверить guards на seeded fixtures. Отрицательные проверки охватывают чтение и действия публичных session/result/artifact/handoff маршрутов.
-- [ ] Добавить раннюю Compose/env-настройку отдельного lab access code на API, сохранить server live token и OpenAI key только у worker. Документировать закрытый локальный запуск и fail-closed режим; без production rollout и без секретов в git. Статический shell не содержит защищённых данных; запросы используют `X-Atom-Lab-Access-Code`.
-- [ ] Каталог атомов возвращает `atom_id, action_type, base_action_config_id, prompt, prompt_ref, input_schema, output_schema, schema_refs, description, example_input`. Схемы и промпт берутся из registry; описания подготовлены без LLM. `atom_id` — стабильный код A01–A11, а не произвольный scenario ID.
-- [ ] Приёмка: доступ к каталогу и seeded lab IDs закрыт без кода; обычные demo/results работают; все 11 примеров валидны. Добавить `apps/platform-api/tests/test_atom_lab_access.py` и `test_atom_lab_catalog.py`. Точная сериализация каталога и safe error envelope фиксируется API-моделями в этом PR.
+- [x] Первым изменением ANY-459 опубликовать спецификацию и этот план в репозитории до зависимой разработки. Одновременно описать узкое исключение внутреннего Lab в controlling docs и guards, не ослабляя публичные frontend boundaries.
+- [x] Сервер создаёт доверенную маркировку lab scope; пользовательский input/metadata не может её включить. Определить проверку принадлежности session/job/action/artifact к lab через серверную связь с сессией, пригодную для хранилища ANY-460. До появления run API проверить guards на seeded fixtures. Отрицательные проверки охватывают чтение и действия публичных session/result/artifact/handoff маршрутов.
+- [x] Добавить раннюю Compose/env-настройку отдельного lab access code на API, сохранить server live token и OpenAI key только у worker. Документировать закрытый локальный запуск и fail-closed режим; без production rollout и без секретов в git. Статический shell не содержит защищённых данных; запросы используют `X-Atom-Lab-Access-Code`.
+- [x] Каталог атомов возвращает `atom_id, action_type, base_action_config_id, prompt, prompt_ref, input_schema, output_schema, schema_refs, description, example_input`. Схемы и промпт берутся из registry; описания подготовлены без LLM. `atom_id` — стабильный код A01–A11, а не произвольный scenario ID.
+- [x] Приёмка: доступ к каталогу и seeded lab IDs закрыт без кода; обычные demo/results работают; все 11 примеров валидны. Добавить `apps/platform-api/tests/test_atom_lab_access.py` и `test_atom_lab_catalog.py`. Точная сериализация каталога и safe error envelope фиксируется API-моделями в этом PR.
 
 
 ### AL02 — [ANY-460](https://linear.app/paveldik/issue/ANY-460/atom-lab-neizmenyaemyj-snimok-nastroek-cherez-postgres-i-worker): Atom Lab: неизменяемый снимок настроек через Postgres и worker
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 - Depends on: ANY-459.
 - Files/areas: `platform-core: scenarios/service.py, actions/executor.py, storage/db.py, storage/repositories.py`; `platform-actions: structured_llm/executor.py, pydanticai_runner.py`; `apps/platform-worker: handlers/run_workflow.py, composition.py`; `existing migration directory`.
 
@@ -178,16 +174,16 @@ Acceptance: Два lab запуска при повышенном test concurren
 
 ### Уточнения после аудита
 
-- [ ] Сначала реализовать атомарный storage snapshot, затем laboratory workflow bindings, затем run-local provider settings. Каждый шаг — отдельный reviewable diff с собственным failing/passing тестом; тикет закрывается после интеграционной проверки всех трёх.
-- [ ] Добавить 11 allowlisted internal-only laboratory scenario/workflow definitions в существующий registry, используя те же live action configurations и атомные schema refs. Вход workflow — фиксированная входная схема атома; `input_mapping: {}` использует существующий `resolve_step_input` для передачи всего payload. Не переиспользовать smoke literals и не изменять существующие smoke workflows. Нового executor или изменения контрактов атомов нет.
-- [ ] Snapshot содержит полный атомный input, редактируемый prompt, base config/prompt provenance, schema refs/versions и сохранённое содержимое для чтения, workflow binding/version, выбранные model/reasoning, источник/версию capabilities, неизменные server policy limits и runtime IDs по мере появления. Сохранять минимальные execution definitions/hash, чтобы worker проверял совместимость, а не исполнял изменившийся registry молча. Новый framework для исполнения произвольных исторических definitions не нужен.
-- [ ] Сначала доступны `run_id, scenario_session_id, job_id`; `action_run_id` и `artifact_id` nullable до соответствующей стадии. Ошибка до создания action не требует выдуманного action ID.
-- [ ] Пресет на этом шаге необязателен: создать nullable `preset_id/preset_version` без зависимости от ещё не созданных preset tables. ANY-463 добавляет constraints/валидацию ссылки. Storage предоставляет создание snapshot в caller-owned transaction и чтение по run_id для ANY-463; публичный POST /runs появляется только в ANY-462.
-- [ ] Через typed run-local execution settings передать model/reasoning из доверенного snapshot в `ProviderRequest`, `ResolvedProviderRequest`, Gateway и LiteLLM adapter, включая validation/transport retries. Разрешение настроек не меняет глобальный Router или default policy. Выбранная реальная модель должна быть адресуемой адаптером, а не только известной строкой каталога; статический alias `anytoolai.default_text` не должен подменять выбор.
-- [ ] Владение фактическим применением model/effort — ANY-460; ANY-461 поставляет metadata, ANY-462 валидирует выбор при admission. Tests используют фиксированный capability fixture и не зависят от network catalog. Проверить аргументы непосредственно на вызове LiteLLM adapter, не ограничиваться mock Gateway; отсутствие effort не должно наследовать статический `medium`. Не вводить silent fallback/drop_params; при несовместимости server-owned дополнительных параметров — явная ошибка, без нового пользовательского редактора.
-- [ ] Изоляцию двух lab runs проверять с test concurrency >1 вместе с обычным job; default admission=1 не ослаблять. Проверить неизменность payload до ActionRunner для всех 11 атомов, включая значения, отличные от smoke literals.
-- [ ] Worker restart сохраняет snapshot/history. Ожидающий job выполняется по текущим правилам; прерванный running job получает существующий статус/error reconciliation (например worker_lease_lost). Автоматическое повторение платного вызова после crash не добавлять. Existing validation/transport retries сохраняются.
-- [ ] Дополнительные точки изменения: `configs/kernel/products/kernel_demo/workflows.yaml`, `scenarios.yaml`, `product.yaml`; `workflows/mappings.py` (reuse), `providers/models.py`, `providers/gateway/`, `providers/adapters/litellm.py`. Regression tests: `apps/platform-worker/tests/test_atom_lab_execution.py`, `apps/platform-api/tests/test_atom_lab_workflow_config.py`; PostgreSQL snapshot tests в existing storage suite.
+- [x] Сначала реализовать атомарный storage snapshot, затем laboratory workflow bindings, затем run-local provider settings. Каждый шаг — отдельный reviewable diff с собственным failing/passing тестом; тикет закрывается после интеграционной проверки всех трёх.
+- [x] Добавить 11 allowlisted internal-only laboratory scenario/workflow definitions в существующий registry, используя те же live action configurations и атомные schema refs. Вход workflow — фиксированная входная схема атома; `input_mapping: {}` использует существующий `resolve_step_input` для передачи всего payload. Не переиспользовать smoke literals и не изменять существующие smoke workflows. Нового executor или изменения контрактов атомов нет.
+- [x] Snapshot содержит полный атомный input, редактируемый prompt, base config/prompt provenance, schema refs/versions и сохранённое содержимое для чтения, workflow binding/version, выбранные model/reasoning, источник/версию capabilities, неизменные server policy limits и runtime IDs по мере появления. Сохранять минимальные execution definitions/hash, чтобы worker проверял совместимость, а не исполнял изменившийся registry молча. Новый framework для исполнения произвольных исторических definitions не нужен.
+- [x] Сначала доступны `run_id, scenario_session_id, job_id`; `action_run_id` и `artifact_id` nullable до соответствующей стадии. Ошибка до создания action не требует выдуманного action ID.
+- [x] Пресет на этом шаге необязателен: создать nullable `preset_id/preset_version` без зависимости от ещё не созданных preset tables. ANY-463 добавляет constraints/валидацию ссылки. Storage предоставляет создание snapshot в caller-owned transaction и чтение по run_id для ANY-463; публичный POST /runs появляется только в ANY-462.
+- [x] Через typed run-local execution settings передать model/reasoning из доверенного snapshot в `ProviderRequest`, `ResolvedProviderRequest`, Gateway и LiteLLM adapter, включая validation/transport retries. Разрешение настроек не меняет глобальный Router или default policy. Выбранная реальная модель должна быть адресуемой адаптером, а не только известной строкой каталога; статический alias `anytoolai.default_text` не должен подменять выбор.
+- [x] Владение фактическим применением model/effort — ANY-460; ANY-461 поставляет metadata, ANY-462 валидирует выбор при admission. Tests используют фиксированный capability fixture и не зависят от network catalog. Проверить аргументы непосредственно на вызове LiteLLM adapter, не ограничиваться mock Gateway; отсутствие effort не должно наследовать статический `medium`. Не вводить silent fallback/drop_params; при несовместимости server-owned дополнительных параметров — явная ошибка, без нового пользовательского редактора.
+- [x] Изоляцию двух lab runs проверять с test concurrency >1 вместе с обычным job; default admission=1 не ослаблять. Проверить неизменность payload до ActionRunner для всех 11 атомов, включая значения, отличные от smoke literals.
+- [x] Worker restart сохраняет snapshot/history. Ожидающий job выполняется по текущим правилам; прерванный running job получает существующий статус/error reconciliation (например worker_lease_lost). Автоматическое повторение платного вызова после crash не добавлять. Existing validation/transport retries сохраняются.
+- [x] Дополнительные точки изменения: `configs/kernel/products/kernel_demo/workflows.yaml`, `scenarios.yaml`, `product.yaml`; `workflows/mappings.py` (reuse), `providers/models.py`, `providers/gateway/`, `providers/adapters/litellm.py`. Regression tests: `apps/platform-worker/tests/test_atom_lab_execution.py`, `apps/platform-api/tests/test_atom_lab_workflow_config.py`; PostgreSQL snapshot tests в existing storage suite.
 
 
 ### AL03 — [ANY-461](https://linear.app/paveldik/issue/ANY-461/atom-lab-obnovlyaemyj-katalog-openai-gpt-i-reasoning-capabilities): Atom Lab: обновляемый каталог OpenAI GPT и reasoning capabilities
@@ -388,6 +384,8 @@ Acceptance: Compose smoke: migrations, API/worker ready, assets доступны
 | --- | --- | --- |
 | 2026-09-09 | Inspected demo/runtime flow and existing Linear work; created project, milestone and ten dependency-linked tickets. | Start AL01; no implementation has been performed. |
 | 2026-09-09 | User approved audit corrections: full-payload lab bindings, adapter settings, worker refresh mechanism, preset dependencies, recovery semantics and early test environment. | Ten existing tickets synchronized and read back; implementation remains unstarted. |
+| 2026-09-14 | ANY-460 started on `feature/ANY-460`; confirmed ANY-459 is the branch base, reviewed the approved Atom Lab spec/AL02 contracts, and selected immutable snapshot + registry compatibility hash + typed run-local execution settings. `doctor` under system `python3` reported missing pytest/yaml/pydantic, while the repository-managed `.quick-check-venv` is present for canonical checks. | Add failing storage, config, worker/provider isolation tests before implementation. |
+| 2026-09-14 | Implemented AL02: migration/repository snapshot, 11 internal full-payload bindings, worker compatibility loading, typed prompt/model/effort/policy propagation, direct LiteLLM model addressing, fill-once runtime links, and ordinary-job isolation. TDD regressions, `quick-check` (1283 passed) and a real PostgreSQL `postgresql-check` completed successfully, including three-worker concurrency and restart coverage. | Review and commit ANY-460. |
 
 ## Planning revision verification (2026-09-09)
 

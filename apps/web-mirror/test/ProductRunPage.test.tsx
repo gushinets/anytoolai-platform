@@ -504,10 +504,13 @@ describe("ProductRunPage", () => {
     });
 
     renderPage({ client, onEvent: (event) => events.push(event) });
-    await waitFor(() => expect(events).toEqual([{ type: "product_viewed" }]));
+    await waitFor(() => expect(events).toEqual([{ type: "product_viewed", guestId: "guest_1" }]));
 
     fillValidForm();
-    expect(events).toEqual([{ type: "product_viewed" }, { type: "form_started" }]);
+    expect(events).toEqual([
+      { type: "product_viewed", guestId: "guest_1" },
+      { type: "form_started", guestId: "guest_1" },
+    ]);
 
     // A second field edit must not emit a second "form_started".
     fireEvent.change(screen.getByLabelText("Text"), { target: { value: "Edited input text." } });
@@ -519,11 +522,11 @@ describe("ProductRunPage", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
 
     expect(events).toEqual([
-      { type: "product_viewed" },
-      { type: "form_started" },
-      { type: "form_submitted" },
-      { type: "scenario_completed", scenarioSessionId: "session_1" },
-      { type: "copy_activated", scenarioSessionId: "session_1" },
+      { type: "product_viewed", guestId: "guest_1" },
+      { type: "form_started", guestId: "guest_1" },
+      { type: "form_submitted", guestId: "guest_1" },
+      { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1" },
+      { type: "copy_activated", scenarioSessionId: "session_1", guestId: "guest_1" },
     ]);
     const serialized = JSON.stringify(events);
     expect(serialized).not.toContain("input text");
@@ -804,6 +807,26 @@ describe("ProductRunPage", () => {
 
     expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
     expect(screen.queryByText("Your result is ready, but we couldn't load it. Please try again.")).toBeNull();
+  });
+
+  it("does not emit form_started with no guest id when identity fails at boot, not just after a self-heal retry", async () => {
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(TEST_PRODUCT_IDS)],
+      // Boot-time identity resolution itself fails -- no self-heal (that only runs after a start
+      // call rejects with guest_identity_not_found) is involved here.
+      [ROUTES.GUEST_IDENTITY]: [errorResponse(500, "internal_error")],
+    });
+
+    renderPage({ client, onEvent: (event) => events.push(event) });
+    await waitForForm();
+    expect(screen.getByText("We couldn't verify your identity. Please reload the page and try again.")).toBeTruthy();
+
+    // The form is still interactive despite the unresolved identity; typing into it must not fire
+    // a permanently-unrecoverable form_started with guestId: undefined.
+    fillValidForm();
+
+    expect(events.some((event) => event.type === "form_started")).toBe(false);
   });
 
   it("does not offer a retry that would submit with no guest identity after a failed guest-identity self-heal", async () => {

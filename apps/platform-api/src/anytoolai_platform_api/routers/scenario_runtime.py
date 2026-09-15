@@ -28,6 +28,7 @@ from anytoolai_platform_core.scenarios.repository import (
     MAX_IDEMPOTENCY_KEY_LENGTH,
     ScenarioSessionRepository,
 )
+from anytoolai_platform_core.scenarios.runtime_scope import is_public_runtime_session
 from anytoolai_platform_core.scenarios.service import ScenarioRuntimeService, ScenarioSessionService
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 from anytoolai_platform_core.workflows.repository import JobRepository
@@ -154,9 +155,7 @@ SAFE_IDEMPOTENCY_CONFLICT_409_EXAMPLE = {
                 "match the original request. No new scenario session is created and quota "
                 "is not consumed; retry with a new Idempotency-Key or the original request."
             ),
-            "content": {
-                "application/json": {"example": SAFE_IDEMPOTENCY_CONFLICT_409_EXAMPLE}
-            },
+            "content": {"application/json": {"example": SAFE_IDEMPOTENCY_CONFLICT_409_EXAMPLE}},
         },
         422: {
             "model": ErrorResponse,
@@ -264,6 +263,12 @@ def get_scenario_session(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ScenarioSessionResponse:
     with transaction_boundary(session_factory) as session:
+        _require_public_session(
+            ScenarioSessionRepository(session),
+            scenario_session_id,
+            tenant_id=settings.default_tenant_id,
+            region=settings.default_region,
+        )
         snapshot = _wrap_platform_errors(
             lambda: _runtime_service(
                 session=session,
@@ -317,6 +322,12 @@ def post_next_action(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ScenarioSessionResponse:
     with transaction_boundary(session_factory) as session:
+        _require_public_session(
+            ScenarioSessionRepository(session),
+            scenario_session_id,
+            tenant_id=settings.default_tenant_id,
+            region=settings.default_region,
+        )
         snapshot = _wrap_platform_errors(
             lambda: _runtime_service(
                 session=session,
@@ -397,9 +408,7 @@ def _status_code_for_platform_error(error: PlatformError) -> int:
 
 
 def _to_api_error(error: PlatformError) -> ApiError:
-    return platform_error_to_api_error(
-        error, status_code=_status_code_for_platform_error(error)
-    )
+    return platform_error_to_api_error(error, status_code=_status_code_for_platform_error(error))
 
 
 def _wrap_platform_errors(callable_):
@@ -407,3 +416,23 @@ def _wrap_platform_errors(callable_):
         return callable_()
     except PlatformError as exc:
         raise _to_api_error(exc) from exc
+
+
+def _require_public_session(
+    repository: ScenarioSessionRepository,
+    scenario_session_id: str,
+    *,
+    tenant_id: str,
+    region: str,
+) -> None:
+    record = repository.get_in_scope(
+        scenario_session_id,
+        tenant_id=tenant_id,
+        region=region,
+    )
+    if record is not None and not is_public_runtime_session(record):
+        raise ApiError(
+            status_code=404,
+            code="scenario_session_not_found",
+            message="Scenario session not found.",
+        )

@@ -19,7 +19,11 @@ from anytoolai_platform_core.artifacts.service import ArtifactService
 from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.providers.gateway import ProviderGateway
-from anytoolai_platform_core.providers.models import ProviderRequest, ProviderResponse
+from anytoolai_platform_core.providers.models import (
+    ProviderModelAddressing,
+    ProviderRequest,
+    ProviderResponse,
+)
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.structured_output.errors import (
     StructuredOutputError,
@@ -70,6 +74,13 @@ class StructuredLlmActionExecutor:
         action_config = self._require_action_config(request.action_config_id)
         action_definition = self._require_action_definition(action_config.action_type)
         prompt = self._require_prompt(action_config.prompt_ref)
+        run_local_settings = request.run_local_settings
+        if run_local_settings is not None and (
+            run_local_settings.action_type != action_config.action_type
+            or run_local_settings.action_config_id != request.action_config_id
+            or run_local_settings.prompt_ref != prompt.prompt_ref
+        ):
+            raise ValueError("run-local action settings are incompatible with the action config")
         response_schema = self._config_registry.get_schema(action_definition.output_schema_ref)
         provider_request = ProviderRequest(
             provider_policy_ref=action_config.provider_policy_ref,
@@ -85,15 +96,33 @@ class StructuredLlmActionExecutor:
             action_run_id=request.action_run_id,
             action_type=action_config.action_type,
             action_config_id=request.action_config_id,
-            prompt=self._render_prompt(prompt.content, request.input_payload),
+            prompt=self._render_prompt(
+                prompt.content if run_local_settings is None else run_local_settings.prompt,
+                request.input_payload,
+            ),
             prompt_ref=prompt.prompt_ref,
             response_schema=None if response_schema is None else response_schema.schema,
             metadata=request.metadata,
             fixture_key=request.fixture_key,
             request_id=request.request_id,
             correlation_id=request.correlation_id,
+            policy_override=(
+                None if run_local_settings is None else run_local_settings.provider_policy
+            ),
+            model_addressing=(
+                ProviderModelAddressing.policy_alias
+                if run_local_settings is None
+                else ProviderModelAddressing.direct
+            ),
+            reasoning_effort=(
+                None if run_local_settings is None else run_local_settings.reasoning_effort
+            ),
         )
-        provider_policy = self._require_provider_policy(action_config.provider_policy_ref)
+        provider_policy = (
+            self._require_provider_policy(action_config.provider_policy_ref)
+            if run_local_settings is None
+            else run_local_settings.provider_policy
+        )
         cross_validator = self._output_cross_validators.get(action_config.action_type)
         try:
             result = await self._structured_runner.run(

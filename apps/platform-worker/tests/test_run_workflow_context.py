@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from anytoolai_platform_core.actions.executor import RunLocalActionSettings
 from anytoolai_platform_core.context.execution_context import ExecutionContext
+from anytoolai_platform_core.providers.models import ProviderPolicy, ReasoningEffort
 from anytoolai_platform_core.scenarios.correlation import build_scenario_identity_metadata
 from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
 from anytoolai_platform_core.workflows.models import JobRecord
@@ -69,9 +71,7 @@ def test_execution_context_uses_guest_scenario_identity_contract() -> None:
 
     context = _execution_context(job, scenario)
 
-    assert _identity_from_context(context, scenario) == build_scenario_identity_metadata(
-        scenario
-    )
+    assert _identity_from_context(context, scenario) == build_scenario_identity_metadata(scenario)
     assert context.guest_id == "guest_context"
     assert context.user_id is None
     assert context.scenario_chain_id == "scenario_chain_context"
@@ -89,9 +89,37 @@ def test_execution_context_uses_authenticated_scenario_identity_contract() -> No
 
     context = _execution_context(job, scenario)
 
-    assert _identity_from_context(context, scenario) == build_scenario_identity_metadata(
-        scenario
-    )
+    assert _identity_from_context(context, scenario) == build_scenario_identity_metadata(scenario)
     assert context.guest_id is None
     assert context.user_id == "user_context"
     assert context.scenario_chain_id == "scenario_chain_context"
+
+
+def test_execution_context_carries_typed_run_local_settings_only_when_supplied() -> None:
+    """Catches dropping the trusted snapshot between worker and ActionRunner."""
+    scenario = _scenario(
+        guest_id=None,
+        user_id="lab_user",
+        scenario_chain_id="scenario_chain_lab",
+    )
+    job = _job(scenario.id)
+    settings = RunLocalActionSettings(
+        run_id="atom_lab_run_1",
+        action_type="text.extract_structured_fields",
+        action_config_id="kernel_demo.extract_structured_fields_live_v1",
+        prompt="edited prompt",
+        prompt_ref="kernel_demo.extract_structured_fields.v1",
+        prompt_version=1,
+        provider_policy=ProviderPolicy(
+            provider_policy_ref="default_text_generation_v1",
+            provider="litellm",
+            model="openai/gpt-5.4-mini",
+        ),
+        model_id="openai/gpt-5.4-mini",
+        reasoning_effort=ReasoningEffort.high,
+    )
+
+    handler = object.__new__(RunWorkflowHandler)
+    context = handler._execution_context(job, scenario, run_local_settings=settings)
+
+    assert context.run_local_action_settings is settings

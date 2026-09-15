@@ -61,6 +61,17 @@ Canonical source: configs/kernel via ConfigLoader.
 
 ## Workflows
 
+- kernel_demo.atom_lab_a01_v1
+- kernel_demo.atom_lab_a02_v1
+- kernel_demo.atom_lab_a03_v1
+- kernel_demo.atom_lab_a04_v1
+- kernel_demo.atom_lab_a05_v1
+- kernel_demo.atom_lab_a06_v1
+- kernel_demo.atom_lab_a07_v1
+- kernel_demo.atom_lab_a08_v1
+- kernel_demo.atom_lab_a09_v1
+- kernel_demo.atom_lab_a10_v1
+- kernel_demo.atom_lab_a11_v1
 - kernel_demo.composite_analyze_and_clarify_live_v1
 - kernel_demo.composite_analyze_and_clarify_v1
 - kernel_demo.composite_evaluate_match_live_v1
@@ -97,6 +108,17 @@ Canonical source: configs/kernel via ConfigLoader.
 
 ## Scenarios
 
+- kernel_demo.atom_lab_a01_v1
+- kernel_demo.atom_lab_a02_v1
+- kernel_demo.atom_lab_a03_v1
+- kernel_demo.atom_lab_a04_v1
+- kernel_demo.atom_lab_a05_v1
+- kernel_demo.atom_lab_a06_v1
+- kernel_demo.atom_lab_a07_v1
+- kernel_demo.atom_lab_a08_v1
+- kernel_demo.atom_lab_a09_v1
+- kernel_demo.atom_lab_a10_v1
+- kernel_demo.atom_lab_a11_v1
 - kernel_demo.composite_analyze_and_clarify_live_smoke_v1
 - kernel_demo.composite_analyze_and_clarify_smoke_v1
 - kernel_demo.composite_evaluate_match_live_smoke_v1
