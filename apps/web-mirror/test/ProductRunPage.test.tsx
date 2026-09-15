@@ -696,9 +696,12 @@ describe("ProductRunPage", () => {
   });
 
   it("submits freshly edited values, with a new Idempotency-Key, instead of silently replaying stale ones after a retryable failure", async () => {
+    // Code review finding [P1]: a definite 4xx (never an ambiguous 5xx/network/timeout) is what
+    // makes this edit safe -- the backend rejected the request before ever creating a session, so
+    // there's nothing to reattach to and no risk a fresh submit doubles up a run.
     const { client, calls } = makeClient({
       ...happyPathRoutes(),
-      [ROUTES.START]: [errorResponse(500, "internal_error"), startResponse()],
+      [ROUTES.START]: [errorResponse(422, "scenario_input_invalid"), startResponse()],
     });
 
     renderPage({ client });
@@ -707,7 +710,8 @@ describe("ProductRunPage", () => {
     submit();
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start test product/i));
 
-    // The form stays editable in this phase -- an edit made here must actually reach the backend.
+    // The form re-enables in this phase -- an edit made here must actually reach the backend.
+    await waitFor(() => expect((screen.getByLabelText("Text") as HTMLInputElement).disabled).toBe(false));
     fireEvent.change(screen.getByLabelText("Text"), { target: { value: "Edited input text." } });
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
@@ -1066,5 +1070,67 @@ describe("ProductRunPage", () => {
     await waitForResult();
 
     expect(busyStates).toEqual([false, true, false]);
+  });
+
+  it("reports busy true through a result-fetch-error, and false again once the retry succeeds", async () => {
+    // Code review finding [P1]: result-fetch-error means the scenario session already completed
+    // and consumed its quota unit -- only the follow-up result GET failed. A multi-mode caller must
+    // not be told it's safe to remount (destroying the only handle on that already-paid-for result)
+    // just because the phase isn't "submitting"/"running"/an ambiguous "retryable-error".
+    const busyStates: boolean[] = [];
+    const { client } = makeClient({
+      ...bootRoutes(),
+      [ROUTES.START]: [startResponse()],
+      [ROUTES.SESSION]: [sessionResponse()],
+      [ROUTES.RESULT]: [errorResponse(500, "internal_error"), resultResponse(TEST_PRODUCT_IDS)],
+    });
+
+    renderPage({ client, onBusyChange: (busy) => busyStates.push(busy) });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitFor(() =>
+      expect(screen.getByText("Your result is ready, but we couldn't load it. Please try again.")).toBeTruthy(),
+    );
+    expect(busyStates.at(-1)).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitForResult();
+
+    expect(busyStates.at(-1)).toBe(false);
+  });
+
+  it("stays busy through an ambiguous /start failure, but not through a deterministic one", async () => {
+    // Code review finding [P1]: only a genuinely ambiguous /start failure (network/timeout/5xx) may
+    // have already created a session server-side before the response was lost -- a definite 4xx
+    // (e.g. scenario_input_invalid) never did, so treating it the same way over-blocks the form and
+    // mode switch on a failure that's actually safe to abandon and resubmit.
+    const ambiguousBusyStates: boolean[] = [];
+    const { client: ambiguousClient } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [errorResponse(500, "internal_error"), startResponse()],
+    });
+    renderPage({ client: ambiguousClient, onBusyChange: (busy) => ambiguousBusyStates.push(busy) });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start test product/i));
+    expect(ambiguousBusyStates.at(-1)).toBe(true);
+    expect((screen.getByLabelText("Text") as HTMLInputElement).disabled).toBe(true);
+
+    cleanup();
+
+    const deterministicBusyStates: boolean[] = [];
+    const { client: deterministicClient } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [errorResponse(422, "scenario_input_invalid"), startResponse()],
+    });
+    renderPage({ client: deterministicClient, onBusyChange: (busy) => deterministicBusyStates.push(busy) });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start test product/i));
+    expect(deterministicBusyStates.at(-1)).toBe(false);
+    expect((screen.getByLabelText("Text") as HTMLInputElement).disabled).toBe(false);
   });
 });

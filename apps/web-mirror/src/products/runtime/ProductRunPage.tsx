@@ -290,14 +290,27 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // mode switch remounting this component would destroy that same `pendingStart`, so `pendingStart
   // !== null` -- not a per-phase flag guessing which specific ambiguous case this is -- is the
   // actual thing worth gating on: it's already true in exactly (and only) the cases where
-  // abandoning this instance would lose real, uncommitted reattachment state (the one
-  // `retryable-error` transition that's genuinely safe, after a deterministic guest-identity-not-
-  // found rejection, explicitly clears `pendingStart` itself -- see `runStart`). Also covers the
+  // abandoning this instance would lose real, uncommitted reattachment state. Two `retryable-error`
+  // transitions are genuinely safe and explicitly clear `pendingStart` themselves before landing
+  // here: the deterministic guest-identity-not-found self-heal, and (code review finding) any other
+  // deterministic `/start` rejection -- see `runStart`'s own comment for why a definite 4xx there
+  // means no session/job was ever created, unlike a network failure/timeout/5xx. Also covers the
   // form's own Submit button and fields (below), not just the mode-switch guard -- editing values
   // or resubmitting during any of these ambiguous windows would equally abandon the original
   // Idempotency-Key reattachment path.
+  //
+  // Code review finding: `result-fetch-error` needs the same "unsafe to abandon" treatment for a
+  // different reason -- that phase means the scenario session already completed and consumed its
+  // quota unit, and only the follow-up `GET /results/{id}` failed. There's no `pendingStart` to
+  // reattach to (a fresh submit was never on the table), but remounting would still destroy the
+  // only handle the UI has left on an already-paid-for result (`resultArtifactId`), stranding it
+  // just as permanently as abandoning an ambiguous start would. It never renders the form (see the
+  // phase switch below), so this has no effect on the Submit button/fields.
   const busy =
-    phase.kind === "submitting" || phase.kind === "running" || (phase.kind === "retryable-error" && pendingStart !== null);
+    phase.kind === "submitting" ||
+    phase.kind === "running" ||
+    phase.kind === "result-fetch-error" ||
+    (phase.kind === "retryable-error" && pendingStart !== null);
   // Always-current, same reasoning as `onEventRef` above -- `onBusyChange` itself is not a
   // dependency of the effect below (a new identity every render must not re-fire it).
   const onBusyChangeRef = useRef(onBusyChange);
@@ -414,6 +427,19 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         setGuestId(fresh.ok ? fresh.value.guestId : undefined);
         setPendingStart(null);
         setPhase({ kind: "retryable-error", message: "Please try again." });
+        return;
+      }
+      if (result.error.type === "backend_error" && result.error.status < 500) {
+        // Code review finding: a definite 4xx here (`scenario_not_found`, `idempotency_key_conflict`,
+        // `scenario_input_invalid`/`scenario_frontend_invalid`, `guest_identity_required`, ...;
+        // `quota_exhausted`/`guest_identity_not_found` were already peeled off above) means the
+        // backend validated and rejected the request *before* creating a session/job -- unlike a
+        // network failure/timeout/5xx, there's nothing ambiguous left to reattach to. Clearing
+        // `pendingStart` lets the next submit mint a fresh Idempotency-Key (needed either way for
+        // `idempotency_key_conflict`, since replaying the same key would just repeat the same 409
+        // forever) and, via `busy`, immediately unblocks the form/mode switch.
+        setPendingStart(null);
+        setPhase({ kind: "retryable-error", message: `Could not start ${definition.title}. Please try again.` });
         return;
       }
       // Ambiguous, not necessarily a clean rejection: a network failure/timeout/5xx on the start

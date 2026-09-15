@@ -580,4 +580,75 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     expect(idempotencyKeyOf(startCalls[1]!)).toBe(idempotencyKeyOf(startCalls[0]!));
     expect((screen.getByRole("radio", { name: "Update" }) as HTMLInputElement).disabled).toBe(false);
   });
+
+  it("keeps mode switching blocked through a result-fetch-error, and Try again reveals the already-paid-for result", async () => {
+    // Code review finding [P1]: result-fetch-error means the scenario session already completed
+    // and consumed its quota unit -- only the follow-up GET for the result failed. `busy` used to
+    // cover only submitting/running/an ambiguous retryable-error, so a mode switch here could still
+    // remount ProductRunPage and destroy the only handle (resultArtifactId) on an already-paid-for
+    // result, permanently losing it.
+    const ids = MODE_IDS.update;
+    const routes = routesFor(ids);
+    const { client } = makeClient({
+      [routes.RUNTIME_CONFIG]: [runtimeConfigResponse(ids)],
+      [routes.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [routes.QUOTA]: [quotaResponse(ids)],
+      [routes.START]: [startResponse()],
+      [routes.SESSION]: [sessionResponse()],
+      [routes.RESULT]: [errorResponse(500, "internal_error"), resultResponse(ids, { output: { text: "Recovered." } })],
+    });
+
+    render(<ClientUpdateWriterProduct client={client} />);
+    await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
+
+    fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Working on it still." } });
+    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("button", { name: "Write update" }));
+    await waitFor(() =>
+      expect(screen.getByText("Your result is ready, but we couldn't load it. Please try again.")).toBeTruthy(),
+    );
+
+    for (const label of ["Update", "Reply Draft", "Prepaid Request"]) {
+      expect((screen.getByRole("radio", { name: label }) as HTMLInputElement).disabled).toBe(true);
+    }
+    fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
+    expect(screen.queryByLabelText("Client message")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByText("Recovered.")).toBeTruthy());
+    expect((screen.getByRole("radio", { name: "Update" }) as HTMLInputElement).disabled).toBe(false);
+  });
+
+  it("unblocks mode switching right away on a deterministic /start rejection, unlike an ambiguous one", async () => {
+    // Code review finding [P1]: `pendingStart !== null` over-blocked the UI on every non-quota,
+    // non-guest-identity /start failure, including definite 4xx rejections (scenario_not_found,
+    // idempotency_key_conflict, scenario_input_invalid, ...) that the backend validated and
+    // rejected before ever creating a session -- there is nothing ambiguous left to protect there.
+    const ids = MODE_IDS.update;
+    const routes = routesFor(ids);
+    const { client } = makeClient({
+      // RUNTIME_CONFIG is cached per (client, productId) and must list all three modes' scenarios
+      // (see fullRuntimeConfigResponse's own comment) -- the switch below mounts Reply Draft too.
+      [routes.RUNTIME_CONFIG]: [fullRuntimeConfigResponse(ids)],
+      [routes.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
+      [routes.QUOTA]: [quotaResponse(ids), quotaResponse(MODE_IDS.reply_draft)],
+      [routes.START]: [errorResponse(422, "scenario_input_invalid")],
+    });
+
+    render(<ClientUpdateWriterProduct client={client} />);
+    await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
+
+    fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Working on it still." } });
+    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("button", { name: "Write update" }));
+    await waitFor(() =>
+      expect(screen.getByText("Could not start Client Update Writer. Please try again.")).toBeTruthy(),
+    );
+
+    for (const label of ["Update", "Reply Draft", "Prepaid Request"]) {
+      expect((screen.getByRole("radio", { name: label }) as HTMLInputElement).disabled).toBe(false);
+    }
+    fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
+    await waitFor(() => expect(screen.getByLabelText("Client message")).toBeTruthy());
+  });
 });

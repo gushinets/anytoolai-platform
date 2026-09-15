@@ -166,6 +166,33 @@ covers Update mode only, the other two modes' meaning stays proven at the backen
    connection loss -> mode switch blocked -> Try again reattaches via the same Idempotency-Key ->
    mode switch unblocked again`; and the same shape for an ambiguous failure on the `/start`
    request itself, before any session id is ever learned client-side.
+7. **`busy` also gated `result-fetch-error`, and `pendingStart` stopped being kept alive for
+   deterministic `/start` rejections.** A fourth review round found the `pendingStart`-based `busy`
+   from decision 6 was simultaneously under- and over-inclusive. Under: `result-fetch-error` (the
+   scenario session already completed and consumed quota; only the follow-up `GET /results/{id}`
+   failed) was never covered at all — a mode switch there would remount `ProductRunPage` and destroy
+   the only handle (`resultArtifactId`) on an already-paid-for result, losing it exactly as
+   permanently as the ambiguous-start bug decision 6 fixed. Fixed by adding
+   `phase.kind === "result-fetch-error"` as its own disjunct in `busy`; it never renders the form
+   itself, so this has no effect on the Submit button/fields, only the mode-switch guard. Over:
+   `runStart`'s generic failure branch treated *every* non-quota, non-guest-identity `!result.ok` as
+   ambiguous, including deterministic 4xx rejections the Platform API can return from `/start`
+   (`scenario_not_found`, `idempotency_key_conflict`, `scenario_input_invalid`/
+   `scenario_frontend_invalid`, `guest_identity_required`) that the backend validates and rejects
+   *before* ever creating a session — there is nothing to reattach to, so keeping `pendingStart`
+   alive there only over-blocked the form/mode-switch on a failure that's actually safe to abandon
+   and resubmit (and, for `idempotency_key_conflict` specifically, kept replaying the same doomed
+   key forever). Fixed by classifying `result.error.type === "backend_error" && result.error.status
+   < 500` as deterministic — clearing `pendingStart` there the same way the existing
+   guest-identity-not-found branch already does — while every other outcome (network error, timeout,
+   aborted, malformed/`invalid_response`, or a 5xx `backend_error`) stays ambiguous. An existing
+   shared-runtime test's own comment ("the form stays editable in this phase") had baked in the
+   old, too-broad assumption; it now uses a deterministic 422 instead of an ambiguous 500 to justify
+   that editability, and the file gained a second test proving a genuinely ambiguous 500 still keeps
+   the form disabled. New regression tests: `ProductRunPage.test.tsx` gained "reports busy true
+   through a result-fetch-error, and false again once the retry succeeds" and "stays busy through an
+   ambiguous /start failure, but not through a deterministic one"; `ClientUpdateWriterProduct.test.tsx`
+   gained the mode-switch-level equivalents of both.
 
 ## Verification
 
@@ -174,7 +201,7 @@ see design decision 2 and the note below).
 
 - `pnpm --filter @anytoolai/web-mirror typecheck` — passed.
 - `pnpm --filter @anytoolai/web-mirror lint` — passed.
-- `pnpm --filter @anytoolai/web-mirror test` — 90/90 passed post-merge (86/86 before).
+- `pnpm --filter @anytoolai/web-mirror test` — 113/113 passed as of design decision 7 (90/90 post-merge, 86/86 before).
 - `pnpm --filter @anytoolai/ce-kit test` — 315/315 passed (unaffected).
 - `pnpm --filter @anytoolai/ce-kit typecheck` — passed.
 - `python scripts/agent/runner.py frontend-check` — passed (lint, typecheck, test, API-types-drift
