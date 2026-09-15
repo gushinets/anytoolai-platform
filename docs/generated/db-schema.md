@@ -185,6 +185,23 @@ Definitions remain in repository configuration; these tables store runtime state
 | created_at | DATETIME | no |
 | metadata | JSON | no |
 
+## platform.model_catalog_state
+
+| Column | Type | Nullable |
+|---|---|---|
+| account_scope | VARCHAR(128) | no |
+| snapshot_id | VARCHAR(128) | yes |
+| snapshot | JSON | yes |
+| due_at | DATETIME | no |
+| refresh_requested_at | DATETIME | yes |
+| lease_id | VARCHAR(128) | yes |
+| lease_until | DATETIME | yes |
+| last_attempt_at | DATETIME | yes |
+| last_success_at | DATETIME | yes |
+| last_error | VARCHAR(512) | yes |
+| created_at | DATETIME | no |
+| updated_at | DATETIME | no |
+
 ## platform.product_handoffs
 
 | Column | Type | Nullable |

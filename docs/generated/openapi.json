@@ -142,6 +142,185 @@
         "title": "AtomLabFieldErrorResponse",
         "type": "object"
       },
+      "AtomLabModelRefreshResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "refresh_status": {
+            "$ref": "#/components/schemas/ModelCatalogRefreshStatus"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "last_success_at",
+          "stale",
+          "refresh_status",
+          "error"
+        ],
+        "title": "AtomLabModelRefreshResponse",
+        "type": "object"
+      },
+      "AtomLabModelResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_reasoning_efforts": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReasoningEffort"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Reasoning Efforts"
+          },
+          "compatibility": {
+            "$ref": "#/components/schemas/ModelCatalogCompatibility"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "provenance": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Provenance",
+            "type": "object"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "reasoning_supported": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Supported"
+          }
+        },
+        "required": [
+          "model_id",
+          "compatibility",
+          "reason",
+          "reasoning_supported",
+          "allowed_reasoning_efforts",
+          "provenance"
+        ],
+        "title": "AtomLabModelResponse",
+        "type": "object"
+      },
+      "AtomLabModelsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AtomLabModelResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "refresh_status": {
+            "$ref": "#/components/schemas/ModelCatalogRefreshStatus"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "snapshot_id",
+          "last_success_at",
+          "stale",
+          "refresh_status",
+          "error"
+        ],
+        "title": "AtomLabModelsResponse",
+        "type": "object"
+      },
       "AtomLabSchemaRefsResponse": {
         "additionalProperties": false,
         "properties": {
@@ -530,6 +709,24 @@
         "title": "HandoffStatus",
         "type": "string"
       },
+      "ModelCatalogCompatibility": {
+        "enum": [
+          "compatible",
+          "unknown",
+          "unsupported"
+        ],
+        "title": "ModelCatalogCompatibility",
+        "type": "string"
+      },
+      "ModelCatalogRefreshStatus": {
+        "enum": [
+          "current",
+          "pending",
+          "running"
+        ],
+        "title": "ModelCatalogRefreshStatus",
+        "type": "string"
+      },
       "QuotaDimension": {
         "enum": [
           "product",
@@ -622,6 +819,19 @@
           "scenario_run"
         ],
         "title": "QuotaUnit",
+        "type": "string"
+      },
+      "ReasoningEffort": {
+        "enum": [
+          "none",
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "title": "ReasoningEffort",
         "type": "string"
       },
       "ResultArtifactResponse": {
@@ -1286,6 +1496,146 @@
           }
         },
         "summary": "Get Atom",
+        "tags": [
+          "atom-lab",
+          "atom-lab"
+        ]
+      }
+    },
+    "/v1/atom-lab/models": {
+      "get": {
+        "operationId": "list_models_v1_atom_lab_models_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Atom-Lab-Access-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Atom-Lab-Access-Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabModelsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab access denied."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab request validation failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab is not configured."
+          }
+        },
+        "summary": "List Models",
+        "tags": [
+          "atom-lab",
+          "atom-lab"
+        ]
+      }
+    },
+    "/v1/atom-lab/models/refresh": {
+      "post": {
+        "operationId": "request_model_refresh_v1_atom_lab_models_refresh_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Atom-Lab-Access-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Atom-Lab-Access-Code"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabModelRefreshResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab access denied."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab request validation failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab is not configured."
+          }
+        },
+        "summary": "Request Model Refresh",
         "tags": [
           "atom-lab",
           "atom-lab"

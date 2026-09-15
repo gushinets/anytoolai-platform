@@ -66,10 +66,21 @@ async def atom_lab_api_error_handler(request: Request, exc: AtomLabApiError) -> 
         },
     )
     response.headers[REQUEST_ID_HEADER] = request_id
+    apply_atom_lab_cache_policy(request, response)
     return response
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    if request.url.path.startswith("/v1/atom-lab/"):
+        del exc
+        return await atom_lab_api_error_handler(
+            request,
+            AtomLabApiError(
+                status_code=500,
+                code="internal_server_error",
+                message="Внутренняя ошибка сервера.",
+            ),
+        )
     response = _error_response(
         request,
         status_code=500,

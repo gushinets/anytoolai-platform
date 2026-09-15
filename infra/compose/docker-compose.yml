@@ -54,6 +54,11 @@ services:
       # Internal Atom Lab access code. Blank keeps every /v1/atom-lab/* data route fail-closed;
       # this credential belongs only to platform-api and is never passed to the worker.
       ANYTOOLAI_ATOM_LAB_ACCESS_CODE: ${ANYTOOLAI_ATOM_LAB_ACCESS_CODE:-}
+      # Non-secret catalog scope/timing must match the worker. The provider key is intentionally
+      # absent: API only reads cache state and atomically requests refresh.
+      ANYTOOLAI_MODEL_CATALOG_ACCOUNT_SCOPE: ${ANYTOOLAI_MODEL_CATALOG_ACCOUNT_SCOPE:-openai-default}
+      ANYTOOLAI_MODEL_CATALOG_TTL_SECONDS: ${ANYTOOLAI_MODEL_CATALOG_TTL_SECONDS:-86400}
+      ANYTOOLAI_MODEL_CATALOG_REFRESH_COOLDOWN_SECONDS: ${ANYTOOLAI_MODEL_CATALOG_REFRESH_COOLDOWN_SECONDS:-60}
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,6 +81,11 @@ services:
       # Only the worker calls ProviderGateway; unset by default so normal dev-up/quick-check stays
       # credential-free -- only live-canary (ANY-221) needs a real key.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANYTOOLAI_MODEL_CATALOG_ACCOUNT_SCOPE: ${ANYTOOLAI_MODEL_CATALOG_ACCOUNT_SCOPE:-openai-default}
+      ANYTOOLAI_MODEL_CATALOG_TTL_SECONDS: ${ANYTOOLAI_MODEL_CATALOG_TTL_SECONDS:-86400}
+      ANYTOOLAI_MODEL_CATALOG_REFRESH_COOLDOWN_SECONDS: ${ANYTOOLAI_MODEL_CATALOG_REFRESH_COOLDOWN_SECONDS:-60}
+      ANYTOOLAI_MODEL_CATALOG_LEASE_SECONDS: ${ANYTOOLAI_MODEL_CATALOG_LEASE_SECONDS:-30}
+      ANYTOOLAI_MODEL_CATALOG_FETCH_TIMEOUT_SECONDS: ${ANYTOOLAI_MODEL_CATALOG_FETCH_TIMEOUT_SECONDS:-10}
     depends_on:
       postgres:
         condition: service_healthy

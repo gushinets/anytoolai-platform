@@ -5,9 +5,11 @@ from pathlib import Path
 from anytoolai_platform_core.providers.adapters.base import ProviderAdapter
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.adapters.litellm import (
+    LiteLLMModelCatalogSource,
     LiteLLMProviderAdapter,
     build_litellm_router,
 )
+from anytoolai_platform_core.providers.catalog_refresh import ModelCatalogSource
 from anytoolai_platform_core.providers.models import ProviderResponse, ResolvedProviderRequest
 
 
@@ -33,3 +35,9 @@ def build_default_provider_adapters(
         "fake": FakeProviderAdapter(),
         "litellm": LazyLiteLLMProviderAdapter(config_root),
     }
+
+
+def build_openai_model_catalog_source(
+    *, api_key: str, timeout_seconds: float
+) -> ModelCatalogSource:
+    return LiteLLMModelCatalogSource(api_key=api_key, timeout_seconds=timeout_seconds)

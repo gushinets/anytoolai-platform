@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +20,7 @@ from anytoolai_platform_actions.bundle import PlatformActionsBundle
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
 from anytoolai_platform_core.config.errors import RESERVED_BUNDLE_IDS, check_ids_are_unique
 from anytoolai_platform_core.config.registry import ConfigRegistry
+from anytoolai_platform_core.providers.catalog_settings import ModelCatalogSettings
 from anytoolai_platform_core.storage.db import build_postgres_url_from_env, create_sync_engine
 from anytoolai_platform_core.storage.transactions import build_session_factory
 from anytoolai_platform_sdk import ProductBundle
@@ -43,6 +44,9 @@ class RuntimeBootstrapResult:
     loaded_bundles: list[str]
     config_registry: ConfigRegistry
     storage: RuntimeStorageDependencies
+    model_catalog_settings: ModelCatalogSettings = field(
+        default_factory=ModelCatalogSettings.from_env
+    )
 
 
 def build_runtime(
@@ -64,9 +68,7 @@ def build_runtime(
         ref_type="bundle_id",
         context="composed bundles",
     )
-    extra_product_roots = [
-        root for bundle in resolved_bundles for root in bundle.config_roots()
-    ]
+    extra_product_roots = [root for bundle in resolved_bundles for root in bundle.config_roots()]
     config_registry = build_config_registry(config_root, extra_product_roots=extra_product_roots)
     return RuntimeBootstrapResult(
         loaded_bundles=[
@@ -76,6 +78,7 @@ def build_runtime(
         ],
         config_registry=config_registry,
         storage=_build_storage_dependencies(database_url),
+        model_catalog_settings=ModelCatalogSettings.from_env(),
     )
 
 
@@ -84,9 +87,7 @@ def _build_storage_dependencies(database_url: str | None) -> RuntimeStorageDepen
     if not resolved_database_url:
         return RuntimeStorageDependencies()
 
-    engine = create_sync_engine(
-        resolved_database_url, decode_database_name=decode_database_name
-    )
+    engine = create_sync_engine(resolved_database_url, decode_database_name=decode_database_name)
     return RuntimeStorageDependencies(session_factory=build_session_factory(engine))
 
 

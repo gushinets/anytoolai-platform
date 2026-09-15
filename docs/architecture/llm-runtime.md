@@ -302,6 +302,17 @@ mistralai
 
 Extensions and product bundles must use platform contracts only.
 
+## Atom Lab model catalog refresh
+
+Catalog refresh is metadata I/O, not an LLM action or generation call. The existing worker loop
+services one durable PostgreSQL refresh request before taking each workflow job. It reads account
+model IDs from OpenAI and the LiteLLM metadata JSON through the provider boundary, then publishes a
+fully validated last-good snapshot. It creates no scenario/job/action/provider-call rows, performs
+no paid probes, and never exposes `OPENAI_API_KEY` to platform-api or the browser.
+Both response bodies and fetch deadlines are bounded. Deployment validation requires the durable
+lease to outlive both upstream fetch deadlines, and the refresh service also applies a
+lease-relative overall deadline before it can publish a fenced snapshot.
+
 ## Acceptance tests to add with implementation
 
 Before the LLM runtime slice is considered complete:

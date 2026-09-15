@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Mapping
+from typing import Any
 
 from anytoolai_platform_core.common.ids import new_id
 from anytoolai_platform_core.common.time import utc_now
@@ -25,6 +26,19 @@ class ReasoningEffort(StrEnum):
     medium = "medium"
     high = "high"
     xhigh = "xhigh"
+    max = "max"
+
+
+class ModelCatalogCompatibility(StrEnum):
+    compatible = "compatible"
+    unknown = "unknown"
+    unsupported = "unsupported"
+
+
+class ModelCatalogRefreshStatus(StrEnum):
+    current = "current"
+    pending = "pending"
+    running = "running"
 
 
 class ProviderCallStatus(StrEnum):
