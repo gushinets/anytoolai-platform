@@ -167,7 +167,8 @@ Scale path:
 
 ## Model string coupling
 
-LiteLLM-format model strings are allowed only in provider policy/model registry files.
+LiteLLM-format model strings are allowed only in provider policy/model registry files, except for a
+server-validated Atom Lab model stored in that run's immutable snapshot.
 
 Allowed:
 
@@ -189,6 +190,11 @@ gateway_model: anthropic/claude-sonnet-4-20250514
 ```
 
 Product configs reference `provider_policy_ref`. If LiteLLM is replaced later, only provider policy/model registry entries should need migration.
+
+The Atom Lab exception is internal-only and run-local: the worker verifies the saved definition
+bundle against the registry, then the provider adapter invokes the exact selected, adapter-addressable
+model. It does not mutate the shared Router, substitute an alias, enable fallback, or silently drop
+model/reasoning parameters. Ordinary jobs cannot supply this override.
 
 ## Client lifecycle
 

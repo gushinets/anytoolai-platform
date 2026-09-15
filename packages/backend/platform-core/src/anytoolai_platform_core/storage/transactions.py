@@ -22,6 +22,7 @@ class RollbackRecoveryPhase(IntEnum):
     artifact_rows = 10
     provider_rows = 20
     action_rows = 30
+    atom_lab_links = 35
     workflow_rows = 40
     workflow_events = 50
     action_events = 60

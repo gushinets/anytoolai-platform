@@ -3,28 +3,36 @@ from __future__ import annotations
 import json
 import math
 import os
+from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
+import litellm
 import yaml
-from litellm import Router
-
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.providers.models import (
     ProviderCallStatus,
     ProviderMessage,
+    ProviderModelAddressing,
     ProviderResponse,
     ProviderUsage,
     ResolvedProviderRequest,
 )
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
+from litellm import Router
 
 _ENV_SENTINEL_PREFIX = "env/"
 
 
 class LiteLLMProviderAdapter:
-    def __init__(self, router: Router) -> None:
+    def __init__(
+        self,
+        router: Router,
+        *,
+        direct_completion: Callable[..., Awaitable[Any]] | None = None,
+    ) -> None:
         self._router = router
+        self._direct_completion = direct_completion or litellm.acompletion
 
     async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
         kwargs: dict[str, Any] = {
@@ -34,8 +42,15 @@ class LiteLLMProviderAdapter:
             "timeout": float(request.timeout_seconds),
             "num_retries": request.retry_policy.transport.litellm_num_retries_per_attempt,
         }
+        if request.reasoning_effort is not None:
+            kwargs["reasoning_effort"] = request.reasoning_effort.value
 
-        response = await self._router.acompletion(**kwargs)
+        completion = (
+            self._direct_completion
+            if request.model_addressing is ProviderModelAddressing.direct
+            else self._router.acompletion
+        )
+        response = await completion(**kwargs)
         return _normalize_litellm_response(request, response)
 
     def _messages_for(self, request: ResolvedProviderRequest) -> list[dict[str, Any]]:
@@ -174,14 +189,10 @@ def _normalize_litellm_response(
         estimated_cost = math.nan
     else:
         estimated_cost = 0.0
-    actual_model = _string_like(
-        _value_from(response, "model") or hidden_params.get("model")
-    )
+    actual_model = _string_like(_value_from(response, "model") or hidden_params.get("model"))
     actual_provider = _string_like(hidden_params.get("custom_llm_provider"))
     model_id = _string_like(hidden_params.get("model_id"))
-    response_id = _string_like(
-        _value_from(response, "id") or hidden_params.get("response_id")
-    )
+    response_id = _string_like(_value_from(response, "id") or hidden_params.get("response_id"))
     http_status = _int_like(
         hidden_params.get("status_code")
         or hidden_params.get("http_status")

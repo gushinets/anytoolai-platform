@@ -586,3 +586,102 @@ workflows:
           tone: 'literal:"warm"'
         output_mapping:
           context.workflow_output: steps.compose_reply.output
+
+  - workflow_id: kernel_demo.atom_lab_a01_v1
+    version: 1
+    input_schema_ref: kernel.schemas.extract_input_v1
+    output_schema_ref: kernel.schemas.extract_output_v1
+    steps:
+      - step_id: run_atom
+        action_config_id: kernel_demo.extract_structured_fields_live_v1
+        input_mapping: {}
+
+  - workflow_id: kernel_demo.atom_lab_a02_v1
+    version: 1
+    input_schema_ref: kernel.schemas.score_match_input_v1
+    output_schema_ref: kernel.schemas.score_match_output_v1
+    steps:
+      - step_id: run_atom
+        action_config_id: kernel_demo.score_match_by_rubric_live_v1
+        input_mapping: {}
+
+  - workflow_id: kernel_demo.atom_lab_a03_v1
+    version: 1
+    input_schema_ref: kernel.schemas.score_multidim_input_v1
+    output_schema_ref: kernel.schemas.score_multidim_output_v1
+    steps:
+      - step_id: run_atom
+        action_config_id: kernel_demo.score_multidimensional_axes_live_v1
+        input_mapping: {}
+
+  - workflow_id: kernel_demo.atom_lab_a04_v1
+    version: 1
+    input_schema_ref: kernel.schemas.issue_detection_input_v1
+    output_schema_ref: kernel.schemas.issue_detection_output_v1
+    steps:
+      - step_id: run_atom
+        action_config_id: kernel_demo.detect_issues_live_v1
+        input_mapping: {}
+
+  - workflow_id: kernel_demo.atom_lab_a05_v1
+    version: 1
+    input_schema_ref: kernel.schemas.generate_questions_input_v1
+    output_schema_ref: kernel.schemas.generate_questions_output_v1
+    steps:
+      - step_id: run_atom
+        action_config_id: kernel_demo.generate_clarifying_questions_live_v1
+        input_mapping: {}
+
+  - workflow_id: kernel_demo.atom_lab_a06_v1
+    version: 1
+    input_schema_ref: kernel.schemas.compose_persuasive_text_input_v1
+    output_schema_ref: kernel.schemas.compose_persuasive_text_output_v1
+    steps:
+      - step_id: run_atom
+        action_config_id: kernel_demo.compose_persuasive_text_live_v1
+        input_mapping: {}
+
+  - workflow_id: kernel_demo.atom_lab_a07_v1
+    version: 1
+    input_schema_ref: kernel.schemas.compose_reply_input_v1
+    output_schema_ref: kernel.schemas.compose_reply_output_v1
+    steps:
+      - step_id: run_atom
+        action_config_id: kernel_demo.compose_reply_live_v1
+        input_mapping: {}
+
+  - workflow_id: kernel_demo.atom_lab_a08_v1
+    version: 1
+    input_schema_ref: kernel.schemas.generate_gap_rewrites_input_v1
+    output_schema_ref: kernel.schemas.generate_gap_rewrites_output_v1
+    steps:
+      - step_id: run_atom
+        action_config_id: kernel_demo.generate_gap_rewrites_live_v1
+        input_mapping: {}
+
+  - workflow_id: kernel_demo.atom_lab_a09_v1
+    version: 1
+    input_schema_ref: kernel.schemas.synthesize_angle_input_v1
+    output_schema_ref: kernel.schemas.synthesize_angle_output_v1
+    steps:
+      - step_id: run_atom
+        action_config_id: kernel_demo.synthesize_angle_live_v1
+        input_mapping: {}
+
+  - workflow_id: kernel_demo.atom_lab_a10_v1
+    version: 1
+    input_schema_ref: kernel.schemas.generate_document_input_v1
+    output_schema_ref: kernel.schemas.generate_document_output_v1
+    steps:
+      - step_id: run_atom
+        action_config_id: kernel_demo.generate_report_live_v1
+        input_mapping: {}
+
+  - workflow_id: kernel_demo.atom_lab_a11_v1
+    version: 1
+    input_schema_ref: kernel.schemas.compare_classify_input_v1
+    output_schema_ref: kernel.schemas.compare_classify_output_v1
+    steps:
+      - step_id: run_atom
+        action_config_id: kernel_demo.compare_and_classify_live_v1
+        input_mapping: {}
