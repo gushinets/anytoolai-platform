@@ -488,7 +488,7 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     // lands on retryable-error, not running/submitting -- busy used to go back to false there,
     // so a mode switch could still remount and abandon a session the backend might still be
     // running, destroying pendingStart/the Idempotency-Key reattachment path. busy now also covers
-    // this specific ambiguous retryable-error (one with its own scenarioSessionId).
+    // any retryable-error reached with a live pendingStart, this ambiguous-poll case included.
     const ids = MODE_IDS.update;
     const routes = routesFor(ids);
     const { client, calls } = makeClient({
@@ -524,6 +524,56 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     await waitFor(() => expect(screen.getByText("Reattached.")).toBeTruthy());
 
     // Reattached to the same logical run via the same Idempotency-Key, not a fresh one.
+    const startCalls = calls.filter((call) => call.key === routes.START);
+    expect(startCalls).toHaveLength(2);
+    expect(idempotencyKeyOf(startCalls[0]!)).toBeTruthy();
+    expect(idempotencyKeyOf(startCalls[1]!)).toBe(idempotencyKeyOf(startCalls[0]!));
+    expect((screen.getByRole("radio", { name: "Update" }) as HTMLInputElement).disabled).toBe(false);
+  });
+
+  it("keeps mode switching blocked through an ambiguous /start failure itself, and Try again reuses the same Idempotency-Key", async () => {
+    // Code review finding [P1]: the previous fix only covered the *poll* going ambiguous after an
+    // already-accepted start. The start request itself can be just as ambiguous -- a network
+    // failure/timeout/5xx on POST /start doesn't tell the client whether the backend already
+    // created the session/job and charged quota before the response was lost. runStart() lands on
+    // retryable-error here too, without ever learning a scenarioSessionId, but pendingStart (with
+    // its Idempotency-Key) is deliberately kept alive for exactly this case -- so `busy` must gate
+    // on pendingStart itself, not on whether a session id happens to be known yet.
+    const ids = MODE_IDS.update;
+    const routes = routesFor(ids);
+    const { client, calls } = makeClient({
+      [routes.RUNTIME_CONFIG]: [runtimeConfigResponse(ids)],
+      [routes.GUEST_IDENTITY]: [guestIdentityResponse()],
+      [routes.QUOTA]: [quotaResponse(ids)],
+      // First START attempt is itself ambiguous (a lost/failed response, not a clean rejection);
+      // the retry with the same Idempotency-Key is what the real backend would collapse onto
+      // whatever it actually did with the first one.
+      [routes.START]: [errorResponse(500, "internal_error"), startResponse()],
+      [routes.SESSION]: [sessionResponse()],
+      [routes.RESULT]: [resultResponse(ids, { output: { text: "Reattached from start." } })],
+    });
+
+    render(<ClientUpdateWriterProduct client={client} />);
+    await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
+
+    fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Working on it still." } });
+    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("button", { name: "Write update" }));
+    await waitFor(() =>
+      expect(screen.getByText("Could not start Client Update Writer. Please try again.")).toBeTruthy(),
+    );
+
+    // The backend may have already accepted this start -- mode switching stays blocked even though
+    // no scenarioSessionId was ever learned client-side.
+    for (const label of ["Update", "Reply Draft", "Prepaid Request"]) {
+      expect((screen.getByRole("radio", { name: label }) as HTMLInputElement).disabled).toBe(true);
+    }
+    fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
+    expect(screen.queryByLabelText("Client message")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByText("Reattached from start.")).toBeTruthy());
+
     const startCalls = calls.filter((call) => call.key === routes.START);
     expect(startCalls).toHaveLength(2);
     expect(idempotencyKeyOf(startCalls[0]!)).toBeTruthy();

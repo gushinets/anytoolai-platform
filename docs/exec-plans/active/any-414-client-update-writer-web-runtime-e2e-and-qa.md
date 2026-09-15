@@ -135,27 +135,37 @@ covers Update mode only, the other two modes' meaning stays proven at the backen
    to Update mode only — matching proposal-ai-smoke's own "prove the seam once" scope rather than
    re-proving all three modes' product meaning in a browser, which the backend-pipeline correlation
    tests (design point below) already do more cheaply.
-6. **`busy`/`onBusyChange` broadened to cover one ambiguous `retryable-error` case, instead of
-   inventing a second signal.** A second review round found two live bugs in the mode-switch guard
-   itself: (a) it fired from a plain `useEffect`, so the parent's mirrored `busy` could still read
-   `true` for one tick after the child had already rendered a settled result, silently dropping a
-   click landing in that window — fixed by firing it from an isomorphic layout effect instead
-   (`useLayoutEffect` in the browser/jsdom, `useEffect` under SSR, since `useLayoutEffect` warns
-   with no DOM), which flushes the whole child-settles -> parent-unblocks cascade synchronously
-   before anything else can observe the intermediate state; (b) `busy` only covered
-   submitting/running, but `runPoll`'s own timeout/connection-loss failures land on
+6. **`busy`/`onBusyChange` broadened to cover *any* ambiguous `retryable-error`, keyed on
+   `pendingStart` itself rather than a per-phase flag.** A second review round found two live bugs
+   in the mode-switch guard: (a) it fired from a plain `useEffect`, so the parent's mirrored `busy`
+   could still read `true` for one tick after the child had already rendered a settled result,
+   silently dropping a click landing in that window — fixed by firing it from an isomorphic layout
+   effect instead (`useLayoutEffect` in the browser/jsdom, `useEffect` under SSR, since
+   `useLayoutEffect` warns with no DOM), which flushes the whole child-settles -> parent-unblocks
+   cascade synchronously before anything else can observe the intermediate state; (b) `busy` only
+   covered submitting/running, but `runPoll`'s own timeout/connection-loss failures land on
    `retryable-error` while the backend may still be genuinely running that *same* accepted,
    quota-consuming session — `pendingStart`/its Idempotency-Key are deliberately kept alive for
    exactly that reattachment case, so a mode switch there was exactly the "abandon an active run"
-   bug design decision 1's guard exists to prevent, just reached via a different phase. Rather than
-   adding a distinct `canSwitchMode`/`safeToAbandon` concept, `Phase["retryable-error"]` gained an
-   optional `scenarioSessionId` (set only when the *start* already succeeded, not when `runStart`
-   itself failed), and `busy` now also covers that case — which also correctly gates the form's own
-   Submit button and fields for the same underlying reason (editing/resubmitting there would
-   equally strand the original Idempotency-Key). Two regression tests added: a synchronous (no
-   `waitFor`) assertion right after a settled result that the mode switch is already unblocked, and
-   `accepted start -> poll connection loss -> mode switch blocked -> Try again reattaches via the
-   same Idempotency-Key -> mode switch unblocked again`.
+   bug design decision 1's guard exists to prevent, just reached via a different phase. The first
+   fix for (b) added an optional `scenarioSessionId` to `Phase["retryable-error"]`, set only when
+   `runPoll`'s own ambiguity applied — a **third** review round then found this only covered half
+   the problem: the initial `POST /start` request itself can be just as ambiguous (a lost
+   response/timeout/5xx never tells the client whether the backend already accepted it, created
+   the session, and charged quota), and `runStart`'s own generic failure branch lands on
+   `retryable-error` with no `scenarioSessionId` at all, incorrectly reading as safe. Fixed by
+   dropping `scenarioSessionId` entirely and keying `busy` on `phase.kind === "retryable-error" &&
+   pendingStart !== null` instead — `pendingStart` is already exactly true in every ambiguous case
+   (both the start-itself and the poll-after-start ones) and already false in the one genuinely
+   safe `retryable-error` (a deterministic guest-identity-not-found rejection, which explicitly
+   clears it), so this single condition covers all of them correctly without needing to track which
+   specific ambiguous case produced the phase. Also correctly gates the form's own Submit button
+   and fields for the same underlying reason (editing/resubmitting there would equally strand the
+   original Idempotency-Key). Three regression tests: a synchronous (no `waitFor`) assertion right
+   after a settled result that the mode switch is already unblocked; `accepted start -> poll
+   connection loss -> mode switch blocked -> Try again reattaches via the same Idempotency-Key ->
+   mode switch unblocked again`; and the same shape for an ambiguous failure on the `/start`
+   request itself, before any session id is ever learned client-side.
 
 ## Verification
 

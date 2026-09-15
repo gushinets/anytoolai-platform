@@ -193,17 +193,7 @@ type Phase<R> =
   | { kind: "running"; scenarioSessionId: string }
   | { kind: "result"; scenarioSessionId: string; checkpointId: string | null; result: R }
   | { kind: "quota-exhausted" }
-  /**
-   * `scenarioSessionId` is set only when this retryable-error followed an already-*accepted*
-   * start whose outcome then became ambiguous (a poll timeout or connection loss in `runPoll` --
-   * the backend may still be running, or may have already finished, this session) -- never when
-   * the start request itself failed in `runStart` (no session was ever created, nothing to
-   * abandon). Code review finding: `busy` below must stay `true` for the former case too, or a
-   * multi-mode caller's mode-switch guard sees `busy: false` and remounts, destroying
-   * `pendingStart` and this session's reattachment path -- the exact "abandon an active,
-   * quota-consuming run" bug the guard exists to prevent, just reached via a different phase.
-   */
-  | { kind: "retryable-error"; message: string; scenarioSessionId?: string }
+  | { kind: "retryable-error"; message: string }
   /**
    * The scenario session itself completed successfully (we have a `resultArtifactId`) but the
    * `GET /v1/results/{id}` call failed -- a transient/ambiguous fetch problem, not a backend
@@ -285,14 +275,29 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const [values, setValues] = useState<V>(definition.emptyValues);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, string>>>({});
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
-  // Also covers the ambiguous-retry case (see Phase["retryable-error"]'s own docstring): unsafe to
-  // remount either way, so the form's own Submit button and fields are gated on this same flag too
-  // (below), not just the mode-switch guard -- editing values or resubmitting during that specific
-  // ambiguous window would equally abandon the original Idempotency-Key reattachment path.
+  // Holds the one Idempotency-Key-bound handle for the current logical submission (ANY-150): a
+  // "Try again" after a retryable failure reuses `.execute()` on this same handle so the backend
+  // can collapse a duplicate submit into the original session instead of spending quota twice.
+  // Editing any field after a failure makes the next submit build a genuinely new handle instead.
+  // Declared before `busy` below, which reads it.
+  const [pendingStart, setPendingStart] = useState<{ prepared: PreparedScenarioStart; input: V } | null>(null);
+  // Code review finding: `retryable-error` alone isn't a safe-to-remount signal -- both an
+  // ambiguous poll failure (timeout/connection loss in `runPoll`, backend may still be running the
+  // accepted session) *and* an ambiguous `/start` failure itself (network/timeout/5xx -- the
+  // backend may have already accepted the start, created the session, and consumed quota before
+  // the response was lost) land here, and both deliberately keep `pendingStart` alive so a retry
+  // can reattach via the same Idempotency-Key instead of starting (and charging) a new run. A
+  // mode switch remounting this component would destroy that same `pendingStart`, so `pendingStart
+  // !== null` -- not a per-phase flag guessing which specific ambiguous case this is -- is the
+  // actual thing worth gating on: it's already true in exactly (and only) the cases where
+  // abandoning this instance would lose real, uncommitted reattachment state (the one
+  // `retryable-error` transition that's genuinely safe, after a deterministic guest-identity-not-
+  // found rejection, explicitly clears `pendingStart` itself -- see `runStart`). Also covers the
+  // form's own Submit button and fields (below), not just the mode-switch guard -- editing values
+  // or resubmitting during any of these ambiguous windows would equally abandon the original
+  // Idempotency-Key reattachment path.
   const busy =
-    phase.kind === "submitting" ||
-    phase.kind === "running" ||
-    (phase.kind === "retryable-error" && phase.scenarioSessionId !== undefined);
+    phase.kind === "submitting" || phase.kind === "running" || (phase.kind === "retryable-error" && pendingStart !== null);
   // Always-current, same reasoning as `onEventRef` above -- `onBusyChange` itself is not a
   // dependency of the effect below (a new identity every render must not re-fire it).
   const onBusyChangeRef = useRef(onBusyChange);
@@ -302,11 +307,6 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   useIsomorphicLayoutEffect(() => {
     onBusyChangeRef.current?.(busy);
   }, [busy]);
-  // Holds the one Idempotency-Key-bound handle for the current logical submission (ANY-150): a
-  // "Try again" after a retryable failure reuses `.execute()` on this same handle so the backend
-  // can collapse a duplicate submit into the original session instead of spending quota twice.
-  // Editing any field after a failure makes the next submit build a genuinely new handle instead.
-  const [pendingStart, setPendingStart] = useState<{ prepared: PreparedScenarioStart; input: V } | null>(null);
 
   const productId = definition.productId;
   const scenarioId = definition.scenarioId;
@@ -416,6 +416,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         setPhase({ kind: "retryable-error", message: "Please try again." });
         return;
       }
+      // Ambiguous, not necessarily a clean rejection: a network failure/timeout/5xx on the start
+      // request itself doesn't tell us whether the backend actually accepted it (created the
+      // session/job and charged quota) before the response was lost -- `pendingStart` (with its
+      // Idempotency-Key) stays exactly as set by the caller, so a retry collapses onto whatever the
+      // backend actually did rather than risk a second, quota-consuming start. See `busy`'s own
+      // comment for why this is also why a mode switch must stay blocked here.
       setPhase({ kind: "retryable-error", message: `Could not start ${definition.title}. Please try again.` });
       return;
     }
@@ -435,16 +441,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     if (!polled.result.ok) {
-      // scenarioSessionId included -- see Phase["retryable-error"]'s own docstring: the start
-      // already succeeded, so the backend may still be running (or may have already finished) this
-      // exact session, and it must not be abandoned by a mode switch while this is showing.
       setPhase({
         kind: "retryable-error",
         message:
           polled.reason === "timeout"
             ? "This is taking longer than expected. Please try again."
             : "Lost connection while waiting for your result. Please try again.",
-        scenarioSessionId,
       });
       return;
     }
@@ -454,14 +456,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       // polling budget ran out -- not a backend conclusion about the run, just this poll giving
       // up early. Treating that as enterUnknownError() (like a genuinely terminal status below)
       // would clear pendingStart and abandon a job that may still be actively running server-side.
-      // Ambiguous, so this is retryable-error (with scenarioSessionId set, same reasoning as
-      // above): its retry reuses the same Idempotency-Key, and the backend collapses that back
-      // onto this same session rather than starting a new one.
-      setPhase({
-        kind: "retryable-error",
-        message: "This is taking longer than expected. Please try again.",
-        scenarioSessionId,
-      });
+      // Ambiguous, so this is retryable-error: its retry reuses the same Idempotency-Key, and the
+      // backend collapses that back onto this same session rather than starting a new one --
+      // see `busy`'s own comment below for why this stays gated on `pendingStart`, not a
+      // per-phase session id.
+      setPhase({ kind: "retryable-error", message: "This is taking longer than expected. Please try again." });
       return;
     }
     const session = polled.result.value;
