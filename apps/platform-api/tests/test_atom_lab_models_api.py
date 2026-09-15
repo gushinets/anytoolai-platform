@@ -114,3 +114,52 @@ def test_get_models_returns_last_good_catalog_without_credentials(app) -> None:
     assert payload["refresh_status"] == "current"
     assert payload["items"][0]["allowed_reasoning_efforts"] is None
     assert "OPENAI_API_KEY" not in response.text
+
+
+def test_get_models_returns_stale_last_good_catalog_after_refresh_failure(app) -> None:
+    now = utc_now()
+    with transaction_boundary(app.state.runtime.storage.session_factory) as session:
+        repository = ModelCatalogRepository(session)
+        lease = repository.claim_refresh(
+            "test-account", now=now, lease_duration=timedelta(seconds=30)
+        )
+        assert lease is not None
+        repository.complete_refresh(
+            lease,
+            snapshot_id="snapshot-last-good",
+            items=(
+                ModelCatalogItem(
+                    model_id="gpt-last-good",
+                    compatibility=ModelCatalogCompatibility.compatible,
+                    reason=ModelCatalogReason.confirmed_openai_text_gpt,
+                    reasoning_supported=True,
+                    allowed_reasoning_efforts=None,
+                    provenance={"availability": {"source": "openai_models_api"}},
+                ),
+            ),
+            now=now - timedelta(hours=25),
+            ttl=timedelta(hours=24),
+        )
+
+    with transaction_boundary(app.state.runtime.storage.session_factory) as session:
+        repository = ModelCatalogRepository(session)
+        lease = repository.claim_refresh(
+            "test-account", now=now, lease_duration=timedelta(seconds=30)
+        )
+        assert lease is not None
+        repository.fail_refresh(
+            lease,
+            error="Upstream model catalog refresh failed.",
+            now=now,
+            retry_after=timedelta(seconds=60),
+        )
+
+    response = asyncio.run(_request(app, "GET", "/v1/atom-lab/models"))
+
+    assert response.status_code == HTTPStatus.OK
+    payload = response.json()
+    assert payload["snapshot_id"] == "snapshot-last-good"
+    assert [item["model_id"] for item in payload["items"]] == ["gpt-last-good"]
+    assert payload["stale"] is True
+    assert payload["refresh_status"] == "pending"
+    assert payload["error"] == "Upstream model catalog refresh failed."

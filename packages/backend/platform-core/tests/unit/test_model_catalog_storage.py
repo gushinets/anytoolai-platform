@@ -103,6 +103,12 @@ def test_only_one_postgresql_lease_is_claimed_and_expired_lease_is_recoverable(
     with ThreadPoolExecutor(max_workers=2) as executor:
         claimed = list(executor.map(claim, (now, now)))
     assert sum(value is not None for value in claimed) == 1
+    with transaction_boundary(session_factory) as session:
+        session.execute(
+            sa.update(model_catalog_state_table)
+            .where(model_catalog_state_table.c.account_scope == "account-a")
+            .values(lease_until=sa.func.clock_timestamp() - sa.text("interval '1 second'"))
+        )
     assert claim(now + timedelta(seconds=31)) is not None
 
 
@@ -164,15 +170,20 @@ def test_failed_refresh_keeps_last_good_snapshot_and_marks_it_stale(
 def test_expired_lease_cannot_finalize_catalog_state(
     session_factory: sa.orm.sessionmaker[sa.orm.Session], finalizer: str
 ) -> None:
-    expired_start = datetime.now(UTC) - timedelta(minutes=1)
+    claimed_at = datetime.now(UTC)
     with transaction_boundary(session_factory) as session:
         repository = ModelCatalogRepository(session)
         lease = repository.claim_refresh(
             f"account-{finalizer}",
-            now=expired_start,
+            now=claimed_at,
             lease_duration=timedelta(seconds=30),
         )
         assert lease is not None
+        session.execute(
+            sa.update(model_catalog_state_table)
+            .where(model_catalog_state_table.c.account_scope == f"account-{finalizer}")
+            .values(lease_until=sa.func.clock_timestamp() - sa.text("interval '1 second'"))
+        )
 
     with (
         pytest.raises(ValueError, match="lease is no longer owned"),
@@ -184,14 +195,14 @@ def test_expired_lease_cannot_finalize_catalog_state(
                 lease,
                 snapshot_id="expired-snapshot",
                 items=(_item("gpt-expired"),),
-                now=expired_start,
+                now=claimed_at,
                 ttl=timedelta(hours=24),
             )
         else:
             repository.fail_refresh(
                 lease,
                 error="must not publish",
-                now=expired_start,
+                now=claimed_at,
                 retry_after=timedelta(seconds=60),
             )
 
@@ -232,6 +243,28 @@ def test_refresh_service_loads_initial_snapshot_and_refreshes_after_ttl(
     asyncio.run(service.refresh_if_due())
     current_time[0] = now + timedelta(hours=24, seconds=1)
     asyncio.run(service.refresh_if_due())
+
+    statements: list[str] = []
+    engine = session_factory.kw["bind"]
+
+    def record_statement(
+        _connection: sa.Connection,
+        _cursor: object,
+        statement: str,
+        _parameters: object,
+        _context: object,
+        _executemany: bool,
+    ) -> None:
+        statements.append(statement.upper())
+
+    sa.event.listen(engine, "before_cursor_execute", record_statement)
+    try:
+        asyncio.run(service.refresh_if_due())
+    finally:
+        sa.event.remove(engine, "before_cursor_execute", record_statement)
+
+    assert not any("INSERT INTO" in statement for statement in statements)
+    assert not any("FOR UPDATE" in statement for statement in statements)
 
     with transaction_boundary(session_factory) as session:
         state = ModelCatalogRepository(session).get("account-a")
@@ -292,3 +325,23 @@ def test_refresh_service_failure_keeps_last_good_snapshot_and_reports_pending(
         assert state.last_error == "Upstream model catalog refresh failed."
         assert state.lease_id is None
         assert state.refresh_status(current_time[0]) is ModelCatalogRefreshStatus.pending
+
+
+def test_lease_expiry_is_derived_from_database_clock(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    skewed_worker_time = datetime.now(UTC) - timedelta(days=1)
+    with transaction_boundary(session_factory) as session:
+        repository = ModelCatalogRepository(session)
+        lease = repository.claim_refresh(
+            "account-skewed-worker",
+            now=skewed_worker_time,
+            lease_duration=timedelta(seconds=30),
+        )
+        assert lease is not None
+        state = repository.get("account-skewed-worker")
+        database_now = session.execute(sa.select(sa.func.clock_timestamp())).scalar_one()
+
+    assert state is not None
+    assert state.lease_until is not None
+    assert state.lease_until > database_now

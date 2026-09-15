@@ -309,9 +309,14 @@ services one durable PostgreSQL refresh request before taking each workflow job.
 model IDs from OpenAI and the LiteLLM metadata JSON through the provider boundary, then publishes a
 fully validated last-good snapshot. It creates no scenario/job/action/provider-call rows, performs
 no paid probes, and never exposes `OPENAI_API_KEY` to platform-api or the browser.
+Credential-free workers do not install the refresh hook, so local/default deployments do not create
+a perpetual failed-refresh loop. Configured workers use a read-only due check on ordinary polls and
+enter the locking claim path only for an initial, requested, expired-lease, or TTL-due refresh.
 Both response bodies and fetch deadlines are bounded. Deployment validation requires the durable
 lease to outlive both upstream fetch deadlines, and the refresh service also applies a
-lease-relative overall deadline before it can publish a fenced snapshot.
+lease-relative overall deadline before it can publish a fenced snapshot. PostgreSQL time owns lease
+expiry at claim and publication; the deadline reserves both a relative ten-percent margin and at
+least one second for catalog construction and the fenced publish transaction.
 
 ## Acceptance tests to add with implementation
 

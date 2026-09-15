@@ -68,11 +68,32 @@ class ModelCatalogRepository:
         )
         return self._from_row(row)
 
+    def refresh_is_due(self, account_scope: str, *, now: datetime) -> bool:
+        row = (
+            self._session.execute(
+                sa.select(
+                    model_catalog_state_table.c.due_at,
+                    model_catalog_state_table.c.refresh_requested_at,
+                    model_catalog_state_table.c.lease_until,
+                    sa.func.clock_timestamp().label("database_now"),
+                ).where(model_catalog_state_table.c.account_scope == account_scope)
+            )
+            .mappings()
+            .one_or_none()
+        )
+        if row is None:
+            return True
+        active_lease = row["lease_until"] is not None and row["lease_until"] > row["database_now"]
+        return not active_lease and (
+            row["refresh_requested_at"] is not None or row["due_at"] <= now
+        )
+
     def request_refresh(
         self, account_scope: str, *, now: datetime, cooldown: timedelta
     ) -> ModelCatalogState:
         row = self._get_or_create_for_update(account_scope, now=now)
-        active_lease = row["lease_until"] is not None and row["lease_until"] > now
+        database_now = self._session.execute(sa.select(sa.func.clock_timestamp())).scalar_one()
+        active_lease = row["lease_until"] is not None and row["lease_until"] > database_now
         cooling_down = (
             row["last_attempt_at"] is not None and row["last_attempt_at"] + cooldown > now
         )
@@ -92,7 +113,8 @@ class ModelCatalogRepository:
         self, account_scope: str, *, now: datetime, lease_duration: timedelta
     ) -> ModelCatalogLease | None:
         row = self._get_or_create_for_update(account_scope, now=now)
-        if row["lease_until"] is not None and row["lease_until"] > now:
+        database_now = self._session.execute(sa.select(sa.func.clock_timestamp())).scalar_one()
+        if row["lease_until"] is not None and row["lease_until"] > database_now:
             return None
         if row["refresh_requested_at"] is None and row["due_at"] > now:
             return None
@@ -102,7 +124,7 @@ class ModelCatalogRepository:
             .where(model_catalog_state_table.c.account_scope == account_scope)
             .values(
                 lease_id=lease_id,
-                lease_until=now + lease_duration,
+                lease_until=sa.func.clock_timestamp() + lease_duration,
                 last_attempt_at=now,
                 updated_at=now,
             )

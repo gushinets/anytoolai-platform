@@ -37,7 +37,6 @@ from anytoolai_platform_core.providers.catalog import (
 from anytoolai_platform_core.providers.catalog_refresh import (
     ModelCatalogRefreshService,
     ModelCatalogSource,
-    UnavailableModelCatalogSource,
 )
 from anytoolai_platform_core.providers.catalog_settings import ModelCatalogSettings
 from anytoolai_platform_core.providers.gateway import (
@@ -181,24 +180,25 @@ def build_worker(
     catalog_settings = model_catalog_settings or ModelCatalogSettings.from_env()
     if model_catalog_source is None:
         api_key = os.getenv("OPENAI_API_KEY", "")
-        model_catalog_source = (
-            build_openai_model_catalog_source(
+        if api_key.strip():
+            model_catalog_source = build_openai_model_catalog_source(
                 api_key=api_key,
                 timeout_seconds=catalog_settings.fetch_timeout_seconds,
             )
-            if api_key.strip()
-            else UnavailableModelCatalogSource()
+    catalog_refresh_hook = (
+        None
+        if model_catalog_source is None
+        else ModelCatalogRefreshService(
+            session_factory=session_factory,
+            account_scope=catalog_settings.account_scope,
+            source=model_catalog_source,
+            overrides=load_model_capability_overrides(
+                default_model_capability_overrides_path(config_root)
+            ),
+            ttl=catalog_settings.ttl,
+            retry_after=catalog_settings.refresh_cooldown,
+            lease_duration=catalog_settings.lease_duration,
         )
-    catalog_refresh_hook = ModelCatalogRefreshService(
-        session_factory=session_factory,
-        account_scope=catalog_settings.account_scope,
-        source=model_catalog_source,
-        overrides=load_model_capability_overrides(
-            default_model_capability_overrides_path(config_root)
-        ),
-        ttl=catalog_settings.ttl,
-        retry_after=catalog_settings.refresh_cooldown,
-        lease_duration=catalog_settings.lease_duration,
     )
     return Worker(
         handler,

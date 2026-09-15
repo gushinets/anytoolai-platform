@@ -222,11 +222,19 @@ Acceptance: Тесты new/removed model, unknown effort list, no reasoning, sta
 - [x] Типизировать закрытый wire-набор catalog reason codes.
 - [x] Валидировать lease против фактического aggregate refresh deadline.
 - [x] Добавить service-level regression для failed refresh с сохранением last-good snapshot.
+- [x] Добавить read-only due fast path перед atomic lease claim, чтобы idle poll не писал и не
+  блокировал catalog row.
+- [x] Вычислять lease expiry по PostgreSQL clock и оставить достаточный publish budget.
+- [x] Не создавать failing refresh hook в credential-free worker composition.
+- [x] Закрепить HTTP-контракт stale last-good snapshot после refresh failure.
 
 Не приняты предложения менять inclusion semantics для audio-capable/unsupported моделей и выносить
 refresh из worker loop: они противоречат зафиксированным правилам AL03 и
 `docs/architecture/provider-gateway.md`. Отдельный client-visible not-configured error не добавлен:
-текущий generic upstream error намеренно остаётся безопасным, а operator detail уже пишется в log.
+credential-free worker не запускает refresh hook и не создаёт ложный upstream failure; при реальной
+ошибке настроенного источника generic client message остаётся безопасным, а detail пишется в log.
+Строгий LiteLLM root parser оставлен fail-closed: проверенный 2026-09-15 live snapshot содержит
+3958/3958 object-valued model entries и не содержит underscore-prefixed служебных ключей.
 
 
 ### AL04 — [ANY-462](https://linear.app/paveldik/issue/ANY-462/atom-lab-zapusk-atoma-i-zashishyonnaya-postoyannaya-istoriya-api): Atom Lab: запуск атома и защищённая постоянная история API

@@ -47,7 +47,7 @@ class ModelCatalogSettings:
 
 def model_catalog_refresh_deadline_seconds(lease_duration: timedelta) -> float:
     lease_seconds = lease_duration.total_seconds()
-    return max(lease_seconds * 0.9, lease_seconds - 1.0)
+    return min(lease_seconds * 0.9, lease_seconds - 1.0)
 
 
 def _positive_duration(name: str, default: float, label: str) -> timedelta:

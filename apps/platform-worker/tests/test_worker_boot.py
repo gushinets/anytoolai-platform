@@ -137,6 +137,20 @@ def test_production_composition_accepts_configured_psycopg_database_url() -> Non
     worker.dispose()
 
 
+def test_production_composition_disables_catalog_refresh_without_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    worker = build_worker(
+        database_url="postgresql+psycopg://anytoolai:anytoolai@postgres:5432/anytoolai",
+        config_root=CONFIG_ROOT,
+        provider_adapters={"fake": FakeProviderAdapter(FIXTURE_ROOT)},
+    )
+
+    assert worker._catalog_refresh_hook is None
+    worker.dispose()
+
+
 def test_build_worker_fails_closed_on_unresolvable_validator_ref() -> None:
     registry = build_config_registry(CONFIG_ROOT)
     broken_definition = replace(

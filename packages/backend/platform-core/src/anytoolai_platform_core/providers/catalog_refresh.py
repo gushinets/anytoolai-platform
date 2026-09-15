@@ -29,14 +29,6 @@ class ModelCatalogSource(Protocol):
     async def fetch_litellm_metadata(self) -> Mapping[str, Any]: ...
 
 
-class UnavailableModelCatalogSource:
-    async def fetch_openai_model_ids(self) -> Sequence[str]:
-        raise RuntimeError("OpenAI model catalog credentials are not configured")
-
-    async def fetch_litellm_metadata(self) -> Mapping[str, Any]:
-        raise RuntimeError("OpenAI model catalog credentials are not configured")
-
-
 class ModelCatalogRefreshService:
     def __init__(
         self,
@@ -61,6 +53,14 @@ class ModelCatalogRefreshService:
 
     async def refresh_if_due(self) -> None:
         claimed_at = self._now()
+        with transaction_boundary(self._session_factory) as session:
+            refresh_is_due = ModelCatalogRepository(session).refresh_is_due(
+                self._account_scope,
+                now=claimed_at,
+            )
+        if not refresh_is_due:
+            return
+
         with transaction_boundary(self._session_factory) as session:
             lease = ModelCatalogRepository(session).claim_refresh(
                 self._account_scope,

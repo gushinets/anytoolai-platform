@@ -3,9 +3,13 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
-from anytoolai_platform_core.providers.catalog_settings import ModelCatalogSettings
+from anytoolai_platform_core.providers.catalog_settings import (
+    ModelCatalogSettings,
+    model_catalog_refresh_deadline_seconds,
+)
 
 DEFAULT_FETCH_TIMEOUT_SECONDS = 10.0
+DEFAULT_REFRESH_DEADLINE_SECONDS = 27.0
 
 
 def test_model_catalog_settings_have_named_operational_defaults(
@@ -27,6 +31,10 @@ def test_model_catalog_settings_have_named_operational_defaults(
     assert settings.refresh_cooldown == timedelta(seconds=60)
     assert settings.lease_duration == timedelta(seconds=30)
     assert settings.fetch_timeout_seconds == DEFAULT_FETCH_TIMEOUT_SECONDS
+    assert (
+        model_catalog_refresh_deadline_seconds(settings.lease_duration)
+        == DEFAULT_REFRESH_DEADLINE_SECONDS
+    )
 
 
 def test_model_catalog_settings_reject_non_positive_timing(monkeypatch: pytest.MonkeyPatch) -> None:
