@@ -7,7 +7,8 @@
 - Created: 2026-09-15
 - Last updated: 2026-09-15
 - Review date: 2026-09-15
-- Next action: none — implementation, tests, and verification below are complete.
+- Next action: none — implementation, tests, and verification below are complete, including
+  reconciliation with `main` after merge (see design decision 2).
 - Blocker: none
 
 ## Goal
@@ -28,10 +29,11 @@ correlation, copy-activation via ce-kit's ready-made helper).
   `append_after_blank_line`), plus a small mode-selector wrapper around `ProductRunPage`.
 - `apps/web-mirror/src/products/registry.ts` — registers `client_update_writer`; widens
   `RegisteredProduct.Component` to accept the shared `onEvent` prop.
-- `apps/web-mirror/src/products/runtime/clientEventTracker.ts` (new) — translates
-  `ProductRunPage`'s product-neutral funnel events into `POST /v1/client-events` (ANY-17), wired
-  into `apps/web-mirror/src/app/products/[productId]/page.tsx` for every product on this route,
-  not just this one.
+- Client event wiring: originally added as a new `clientEventTracker.ts`, translating
+  `ProductRunPage`'s product-neutral funnel events into `POST /v1/client-events` (ANY-17) and wired
+  into `apps/web-mirror/src/app/products/[productId]/page.tsx`. Superseded during the `main` merge
+  by `productRunEventTracking.ts` (same purpose, landed independently via ANY-243/B02C) — see
+  design decision 2.
 - `apps/web-mirror/src/products/runtime/productDefinition.ts` /
   `apps/web-mirror/src/products/runtime/ProductRunPage.tsx` /
   `apps/web-mirror/src/components/ResultView.tsx` — `ProductResultProps.onCopied: () => void`
@@ -41,9 +43,8 @@ correlation, copy-activation via ce-kit's ready-made helper).
   other caller) and its/the shared runtime's tests.
 - Tests: `apps/web-mirror/test/ClientUpdateWriterProduct.test.tsx` (per-mode validation/mapping,
   happy path per mode, one weak-input safe-result path, quota-exhausted, terminal-error, event
-  correlation, mode switching), `apps/web-mirror/test/clientEventTracker.test.tsx` (new), plus
-  additions to `ProductRunPage.test.tsx` (write-then-record ordering), `ResultView.test.tsx`,
-  `registry.test.tsx`.
+  correlation, mode switching), plus additions to `ProductRunPage.test.tsx` (write-then-record
+  ordering), `ResultView.test.tsx`, `registry.test.tsx`.
 
 ### Out of scope
 
@@ -66,22 +67,24 @@ below (see Risks).
    generic type over a union of differently-shaped `ProductDefinition<V,R>` instances (a real
    TypeScript variance problem with no product-level payoff) and keeps ProposalAI's single-scenario
    path completely untouched.
-2. **Client event wiring lives in a new `clientEventTracker.ts` under `products/runtime/`, composed
-   into the route, not into one product.** `createClientEventTracker(client, productId)` maps
-   `ProductRunEvent` to the backend's `web.*` allowlist (`product_viewed` → `web.product_viewed`,
-   `form_started`/`form_submitted` → matching `web.*`, `scenario_completed` → `web.result_viewed`)
-   and posts via ce-kit's `trackClientEvent`, with one persisted `web_session_id` per tracker
-   lifetime (`getOrCreateWebSessionId`). `copy_activated` is deliberately **not** forwarded: a
-   successful copy already records `client.result_copied`/`client.next_action_clicked`
-   server-side via the `copy_result` next-action call itself, so re-sending it as a `web.*` event
-   would double-count, not add signal. `frontend_id` is a hardcoded `"web_mirror"` constant, not
-   threaded from `ProductRunPage`'s internal boot state: every product's own `frontends.yaml`
-   registers exactly one `web_mirror` web frontend, and `apps/web-mirror` *is* that frontend.
-   `guest_id` is deliberately omitted from these events (the field is optional on
-   `TrackClientEventRequest`) rather than threading guest identity out of `ProductRunPage`'s
-   internal state through `ProductRunEvent`/the tracker — correlation is scenario-session-id-based
-   for the events that carry one, and the added plumbing/StrictMode-timing risk on the delicate
-   existing boot effect wasn't justified by this ticket's acceptance criteria.
+2. **Client event wiring, originally added here, was superseded by an independently-landed `main`
+   implementation during the merge — kept that version, not both.** This ticket originally added
+   its own `clientEventTracker.ts` (composed into the route, not into one product), mapping
+   `ProductRunEvent` to the backend's `web.*` allowlist and posting via ce-kit's `trackClientEvent`,
+   with `guestId` deliberately omitted from events (added plumbing/StrictMode-timing risk on the
+   boot effect, judged not worth it against this ticket's acceptance criteria alone). Merging
+   `main` brought in `productRunEventTracking.ts` — the same gap, closed independently by ANY-243
+   (B02C, ProposalAI's own web-runtime E2E ticket), landed on `main` first. Its design threads
+   `guestId` through every `ProductRunEvent` variant instead (resolved once in `ProductRunPage`'s
+   own boot effect, carried on the event itself so no second, independently-resolved identity can
+   diverge from it — see that type's own docstring in `productDefinition.ts`), which is more
+   complete than this ticket's own omission. The merge left both files and a duplicate/broken
+   `onEvent` declaration in `page.tsx` (two conflicting imports, an invalid double `const onEvent`)
+   — reconciled by deleting `clientEventTracker.ts`/its test and keeping `productRunEventTracking.ts`
+   as the single client-event integration point, matching the "generalize once, don't duplicate"
+   rule this ticket's own description states. `copy_activated` still has no `web.*` counterpart in
+   either version, for the same reason: it's already recorded server-side via the `copy_result`
+   next-action call.
 3. **Copy-activation switches to ce-kit's `copyResultAndRecordActivation`, changing the shared
    `ProductResultProps`/`ResultView` contract.** `onCopied: () => void` (fired *after* `ResultView`
    already wrote to the clipboard itself) becomes `onCopy: (text: string) => Promise<boolean>` (the
@@ -102,14 +105,34 @@ below (see Risks).
 
 ## Verification
 
+Run twice: once before merging `main`, once after (to catch merge-resolution regressions —
+see design decision 2 and the note below).
+
 - `pnpm --filter @anytoolai/web-mirror typecheck` — passed.
 - `pnpm --filter @anytoolai/web-mirror lint` — passed.
-- `pnpm --filter @anytoolai/web-mirror test` — 86/86 passed.
+- `pnpm --filter @anytoolai/web-mirror test` — 90/90 passed post-merge (86/86 before).
 - `pnpm --filter @anytoolai/ce-kit test` — 315/315 passed (unaffected).
+- `pnpm --filter @anytoolai/ce-kit typecheck` — passed.
 - `python scripts/agent/runner.py frontend-check` — passed (lint, typecheck, test, API-types-drift
   check, and `next build`/extension build across every frontend workspace).
-- `python scripts/agent/runner.py quick-check` — passed (1254 passed, 451 deselected), confirming
-  no backend/config/architecture regression.
+- `python scripts/agent/runner.py quick-check` — passed post-merge (1307 passed, 455 deselected),
+  confirming no backend/config/architecture regression from `main`'s large concurrent Atom Lab
+  landing.
+- `python scripts/agent/runner.py full-check` — passed post-merge.
+
+**Merge note**: `git merge main` correctly flagged `ProductRunPage.tsx` and `page.tsx` as conflicts
+(both branches edited the same functions — `handleCopy` and the route's `onEvent` wiring,
+respectively), but the manual conflict resolution left both broken: `handleCopy` referenced
+undeclared identifiers (`scenarioSessionId`/`checkpointId`/`controller`/`writeToClipboard` never
+destructured in the resolved version) plus a duplicate `emitEvent` call, and `page.tsx` kept two
+conflicting `onEvent` implementations (`createProductRunEventTracker` from `main` and this ticket's
+own `createClientEventTracker`) declared under one `const onEvent` name. Both were caught
+immediately by `typecheck` (not a silent runtime-only bug); the still-lingering functional
+duplication — two independently-built client-event trackers doing the same job — only surfaced by
+reading both files and comparing designs (see design decision 2). `productDefinition.ts` (also
+touched by both branches) merged cleanly with no conflict markers. Re-verify the full local
+verification list, not just `git status` looking clean, after any merge that touches a file both
+branches changed.
 
 ## Risks / open items
 

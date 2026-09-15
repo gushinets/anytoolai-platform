@@ -312,11 +312,11 @@ describe("Client Update Writer product definitions", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
 
     expect(events).toEqual([
-      { type: "product_viewed" },
-      { type: "form_started" },
-      { type: "form_submitted" },
-      { type: "scenario_completed", scenarioSessionId: "session_1" },
-      { type: "copy_activated", scenarioSessionId: "session_1" },
+      { type: "product_viewed", guestId: "guest_1" },
+      { type: "form_started", guestId: "guest_1" },
+      { type: "form_submitted", guestId: "guest_1" },
+      { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1" },
+      { type: "copy_activated", scenarioSessionId: "session_1", guestId: "guest_1" },
     ]);
   });
 });

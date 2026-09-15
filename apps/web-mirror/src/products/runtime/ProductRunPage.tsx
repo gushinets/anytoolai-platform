@@ -476,13 +476,20 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     if (phase.kind !== "result") {
       return false;
     }
-    // Emitted on a successful clipboard write regardless of the next-action HTTP outcome below,
-    // and regardless of whether this session even has a checkpoint id (`currentCheckpointId` is
-    // legitimately nullable on a completed session) -- the funnel event reflects the user's copy,
-    // not the backend's acknowledgement of it.
-    emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId: phase.scenarioSessionId, guestId });
-    if (!phase.checkpointId) {
-      return;
+    const { scenarioSessionId, checkpointId } = phase;
+    const controller = controllerRef.current;
+    const writeToClipboard = (value: string) =>
+      navigator.clipboard?.writeText
+        ? navigator.clipboard.writeText(value)
+        : Promise.reject(new Error("Clipboard API unavailable."));
+    if (!checkpointId) {
+      try {
+        await writeToClipboard(text);
+      } catch {
+        return false;
+      }
+      emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId, guestId });
+      return true;
     }
     const outcome = await copyResultAndRecordActivation(
       client,
@@ -497,7 +504,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     if (!outcome.copied) {
       return false;
     }
-    emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId });
+    emitEvent(onEventRef.current, { type: "copy_activated", scenarioSessionId, guestId });
     return true;
   }
 

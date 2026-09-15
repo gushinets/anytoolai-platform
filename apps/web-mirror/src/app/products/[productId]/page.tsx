@@ -6,7 +6,6 @@ import { use, useMemo } from "react";
 import { createPlatformApiClient } from "../../../lib/apiClient";
 import { getRegisteredProduct } from "../../../products/registry";
 import { createProductRunEventTracker } from "../../../products/runtime/productRunEventTracking";
-import { createClientEventTracker } from "../../../products/runtime/clientEventTracker";
 
 type ProductPageProps = {
   params: Promise<{ productId: string }>;
@@ -24,7 +23,6 @@ export default function ProductPage({ params }: ProductPageProps) {
     () => createProductRunEventTracker(client, productId, createWindowLocalStorageAdapter() ?? createInMemoryAsyncStorage()),
     [client, productId],
   );
-  const onEvent = useMemo(() => createClientEventTracker(client, productId), [client, productId]);
 
   if (!product) {
     notFound();
