@@ -47,8 +47,13 @@ export type ProductFieldsProps<V> = {
 
 export type ProductResultProps<R> = {
   result: R;
-  /** Call after a successful clipboard write; the runtime fires `copyNextActionId` from it. */
-  onCopied: () => void;
+  /**
+   * Writes `text` to the clipboard and, when a checkpoint is active, records the `copy_result`
+   * next action -- write, then record, exactly once per call (ce-kit's
+   * `copyResultAndRecordActivation`). Resolves `true` iff the clipboard write itself succeeded; a
+   * failed activation-record never flips this back to `false` (the text is already copied).
+   */
+  onCopy: (text: string) => Promise<boolean>;
 };
 
 /**
@@ -56,8 +61,8 @@ export type ProductResultProps<R> = {
  * fields, renderer, and meaning"). `V` is the product's form values; `R` its canonical result.
  * Fields are a product-owned React component, deliberately not a declarative field schema.
  *
- * `copyNextActionId`/`onCopied` cover exactly the single-checkpoint "run to completion, then one
- * post-completion activation" shape ProposalAI proved (`copy_result` after `completed`) -- not a
+ * `onCopy` covers exactly the single-checkpoint "run to completion, then one post-completion
+ * activation" shape ProposalAI proved (`copy_result` after `completed`) -- not a
  * general `waiting_for_user`/multi-checkpoint/multiple-next-action contract. `ProductRunPage`
  * currently treats any non-`copy_result`-shaped scenario (a mid-flow `waiting_for_user` needing a
  * product-chosen next action, e.g. Send-Ready's user-selected-angle checkpoint) as `unknown-error`.
@@ -85,8 +90,6 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
   toInput: (values: V) => Record<string, unknown>;
   /** Frontend-safe canonical output -> the product's result; null means unusable. */
   extractResult: (output: Record<string, unknown>) => R | null;
-  /** The next action fired after a successful copy (the product's `renderer_contract.yaml`). */
-  copyNextActionId: string;
   Fields: ComponentType<ProductFieldsProps<V>>;
   Result: ComponentType<ProductResultProps<R>>;
   copy: {

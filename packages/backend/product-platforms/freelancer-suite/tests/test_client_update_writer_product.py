@@ -35,28 +35,25 @@ FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_ou
 )
 
 
-def _load_validate_architecture_module() -> Any:
-    # Dynamic-load, same pattern test_proposal_ai_product.py already uses --
-    # validate_architecture.py is pure stdlib (no anytoolai_platform_core import chain), so this
-    # stays within ATAI007/ATAI008's ban on product-platforms code depending on platform-core
-    # internals.
-    path = REPO_ROOT / "scripts" / "agent" / "validate_architecture.py"
-    spec = importlib.util.spec_from_file_location("validate_architecture_module", path)
+def _load_test_support_module() -> Any:
+    # Dynamic-load by explicit path, same pattern this file already used for
+    # validate_architecture.py -- code review finding: _load_validate_architecture_module(),
+    # FORBIDDEN_TOKENS, and _load_yaml() were each duplicated verbatim in
+    # test_proposal_ai_product.py; both now load this one shared module instead.
+    path = Path(__file__).resolve().parent / "_test_support.py"
+    spec = importlib.util.spec_from_file_location("freelancer_suite_test_support", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
+_test_support = _load_test_support_module()
 # Provider-SDK names come from validate_architecture.py's own LLM_PROVIDER_IMPORTS -- the single
 # source of truth ATAI006 already enforces repo-wide -- rather than a second, hand-maintained copy
 # that could silently drift from it (code review finding: team lead #1). Model-string prefixes are
 # a distinct concern (raw text, not an import name) with no central list to reuse.
-FORBIDDEN_TOKENS = tuple(_load_validate_architecture_module().LLM_PROVIDER_IMPORTS) + (
-    "gpt-",
-    "claude-",
-    "gemini-",
-)
+FORBIDDEN_TOKENS = _test_support.FORBIDDEN_PROVIDER_TERMS
 
 
 def _forbidden_token_pattern(token: str) -> re.Pattern[str]:
@@ -71,7 +68,7 @@ def _forbidden_token_pattern(token: str) -> re.Pattern[str]:
 
 
 def _load_yaml(relative_path: str) -> dict[str, Any]:
-    return yaml.safe_load((PRODUCT_DIR / relative_path).read_text(encoding="utf-8"))
+    return _test_support.load_yaml(PRODUCT_DIR, relative_path)
 
 
 def _action_type_by_config_id() -> dict[str, str]:
@@ -105,6 +102,26 @@ def _load_schema(schema_ref: str) -> dict[str, Any]:
         manifest = _load_yaml("schemas.yaml")
     (entry,) = (item for item in manifest["schemas"] if item["schema_ref"] == schema_ref)
     return json.loads((manifest_dir / entry["file_path"]).read_text(encoding="utf-8"))
+
+
+def test_quota_policy_ref_resolves_to_the_declared_lifetime_product_quota() -> None:
+    """Code review finding: this product had no `quota_policy_ref` and no `quotas.yaml` at all --
+    `quotas/service.py`'s `validate_accepted_start()` skips enforcement entirely when
+    `product.quota_policy_ref` is absent, so guest usage of this LLM product was completely
+    unmetered. Mirrors test_proposal_ai_product.py's own regression test for the same shape."""
+    product = _load_yaml("product.yaml")
+    quotas = _load_yaml("quotas.yaml")["quota_policies"]
+
+    assert product["quota_policy_ref"] == "client_update_writer.guest_quota_v1"
+    (policy,) = [
+        policy
+        for policy in quotas
+        if policy["quota_policy_id"] == "client_update_writer.guest_quota_v1"
+    ]
+    assert policy["unit"] == "scenario_run"
+    assert policy["period"] == "lifetime"
+    assert policy["dimension"] == "product"
+    assert isinstance(policy["limit_count"], int) and policy["limit_count"] > 0
 
 
 def test_product_directory_contains_no_python_or_forbidden_provider_references() -> None:
@@ -172,6 +189,13 @@ def test_each_mode_workflow_uses_only_generic_atom_action_types(
                     "reply_goal": "Answer.",
                     "tone": "calm",  # invalid enum
                 },
+                {
+                    "client_message": "Hi",
+                    "reply_goal": "Answer.",
+                    "tone": "neutral",
+                    "extra_field": "nope",
+                },  # additionalProperties: false -- code review finding: only update_input_v1 had
+                # this case before.
             ],
         ),
         (
@@ -183,6 +207,20 @@ def test_each_mode_workflow_uses_only_generic_atom_action_types(
                     "billing_context": {"notes": "Phase 2", "amount": "$500"},
                     "tone": "urgent",  # invalid enum
                 },
+                {
+                    "billing_context": {"notes": "Phase 2", "amount": "$500"},
+                    "tone": "firm",
+                    "extra_field": "nope",
+                },  # additionalProperties: false at the top level -- code review finding.
+                {
+                    "billing_context": {
+                        "notes": "Phase 2",
+                        "amount": "$500",
+                        "extra_field": "nope",
+                    },
+                    "tone": "firm",
+                },  # additionalProperties: false on the nested billing_context object -- code
+                # review finding: this nesting level was entirely untested before.
             ],
         ),
     ],
