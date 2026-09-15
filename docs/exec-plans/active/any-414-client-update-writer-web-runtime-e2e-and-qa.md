@@ -43,16 +43,37 @@ correlation, copy-activation via ce-kit's ready-made helper).
   other caller) and its/the shared runtime's tests.
 - Tests: `apps/web-mirror/test/ClientUpdateWriterProduct.test.tsx` (per-mode validation/mapping,
   happy path per mode, one weak-input safe-result path, quota-exhausted, terminal-error, event
-  correlation, mode switching), plus additions to `ProductRunPage.test.tsx` (write-then-record
-  ordering), `ResultView.test.tsx`, `registry.test.tsx`.
+  correlation, mode switching, mode-switch-disabled-while-busy), plus additions to
+  `ProductRunPage.test.tsx` (write-then-record ordering, `onBusyChange` contract, `visitId`-scoped
+  event dedupe), `ResultView.test.tsx`, `registry.test.tsx`.
+- Mode-switch safety: `ProductRunPage` exposes `onBusyChange`; `ClientUpdateWriterProduct` disables
+  its mode radios (both via `disabled` and a handler-level guard) while a run is submitting/running,
+  so a mode switch can no longer abandon an already-accepted, quota-consuming scenario run
+  (code review finding, round 4).
+- Event-dedupe visit scoping: `ProductRunPage` accepts an optional `visitId`, scoping the
+  once-per-visit `product_viewed`/`form_started` dedupe to one real landing on a product instead of
+  the `(client, productId)` pair's whole lifetime; `page.tsx` mints a fresh `visitId` per `productId`
+  change (code review finding, round 4 — a genuine A -> B -> A revisit previously undercounted).
+- `tests/e2e/client-update-writer-smoke/` — a new Playwright browser-evidence suite (mirrors
+  `tests/e2e/proposal-ai-smoke`) proving the real client -> Platform API -> workflow -> canonical
+  result -> clipboard -> `copy_result` seam for Update mode, plus `scripts/agent/runner.py`'s
+  `client_update_writer_smoke()` command and `.github/workflows/client-update-writer-smoke.yml`
+  (path-filtered, not a required check yet — same precedent as `proposal-ai-smoke.yml`) (code
+  review finding, round 4).
+- `apps/platform-api/tests/test_client_update_writer_bundle.py`'s happy-path test extended with
+  session/job/action/provider/artifact/event correlation assertions (step order, `scenario_session_id`
+  correlation, one `provider_calls` row per `action_run`, artifact lineage, event coverage and
+  per-step `action.started`/`action.succeeded` interleaving) — especially proving PrepaidRequest's
+  two-step chain really ran in order, not just that the job succeeded (code review finding, round 4).
 
 ### Out of scope
 
 Chrome Extension delivery, automated sending, payment/account journeys, load testing, broad visual
-polish, any Platform Core/atom/runner/Provider Gateway/handoff-runtime/mapping-DSL change, a new
-automated browser-level Playwright spec (component tests only, matching ANY-243/ANY-453
-precedent), resolving the `mvp-scope-source-of-truth.md` MVP-B release-order discrepancy flagged
-below (see Risks).
+polish, any Platform Core/atom/runner/Provider Gateway/handoff-runtime/mapping-DSL change,
+resolving the `mvp-scope-source-of-truth.md` MVP-B release-order discrepancy flagged below (see
+Risks). A browser-level Playwright spec was *not* out of scope after all — round 4's review
+correctly rejected that call (see design decision 5); `tests/e2e/client-update-writer-smoke`
+covers Update mode only, the other two modes' meaning stays proven at the backend-pipeline level.
 
 ## Design decisions
 
@@ -102,6 +123,18 @@ below (see Risks).
    ProposalAI's own `language` field is the only existing precedent for exposing an
    advanced/optional knob — adding one here without a concrete need would be speculative. Add if a
    real user need surfaces.
+5. **Reversed course on "no browser-level E2E": a code reviewer correctly rejected that as out of
+   scope.** The Linear ticket's own "Required journey" line names the seam end to end (web page ->
+   shared client -> Platform API -> scenario/workflow/result -> clipboard -> `copy_result`); the
+   component-level Vitest suite (routed-fake `PlatformApiClient`) and the backend pytest suite
+   (starts at Platform API, never touches a browser or the shared client) each individually stop
+   short of that seam, so nothing in this ticket's own test suite actually proved it end to end —
+   only mirroring the ANY-243/ANY-453 precedent's test *level*, not the seam it also crossed via
+   `tests/e2e/proposal-ai-smoke`. Added `tests/e2e/client-update-writer-smoke`, structurally
+   identical to that suite (same package/config shape, same `runner.py`/CI wiring pattern), scoped
+   to Update mode only — matching proposal-ai-smoke's own "prove the seam once" scope rather than
+   re-proving all three modes' product meaning in a browser, which the backend-pipeline correlation
+   tests (design point below) already do more cheaply.
 
 ## Verification
 
@@ -140,6 +173,9 @@ branches changed.
   committed MVP-B validation order and separately calls it "capability backlog without a committed
   release order," even though its backend (ANY-413) is merged and this ticket delivers its web
   runtime. Flagged for a human/reviewer decision, not resolved unilaterally here.
-- No automated browser-level (Playwright) E2E exists for `apps/web-mirror` product pages; "prove
-  the complete vertical" is satisfied at the component-test level (fake routed `PlatformApiClient`,
-  per ANY-243/ANY-453 precedent), not via a new browser spec.
+- `tests/e2e/client-update-writer-smoke` needs a running `dev-up` stack and Playwright's Chromium
+  installed to run locally (`python scripts/agent/runner.py client-update-writer-smoke`); it is not
+  part of `quick-check`/`full-check` and, like `proposal-ai-smoke`, is not yet a required CI check
+  (path-filtered, runs on PR + weekly cron against `main`) — this PR's own CI run has not exercised
+  it, only local backend/frontend checks plus reading the spec against the existing
+  proposal-ai-smoke precedent it mirrors.

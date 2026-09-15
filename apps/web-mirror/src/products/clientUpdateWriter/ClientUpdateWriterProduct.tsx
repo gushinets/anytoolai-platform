@@ -290,10 +290,28 @@ const MODE_IDS = Object.keys(MODE_CONFIG) as ModeId[];
 export type ClientUpdateWriterProductProps = {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
+  visitId?: string;
 };
 
-export function ClientUpdateWriterProduct({ client, onEvent }: ClientUpdateWriterProductProps) {
+export function ClientUpdateWriterProduct({ client, onEvent, visitId }: ClientUpdateWriterProductProps) {
   const [modeId, setModeId] = useState<ModeId>("update");
+  // Code review finding: `key={modeId}` below unmounts the active mode's ProductRunPage the
+  // instant another mode is picked -- its cleanup aborts the in-flight poll/result fetch, but the
+  // backend keeps running an already-accepted, quota-consuming scenario. Switching mode mid-run
+  // silently abandoned that run's result. Disabling the mode switch for the duration of a
+  // submit/run (mirroring how the form's own fields are already disabled then) is simpler and
+  // safer than trying to preserve/reattach the run across a remount, and needs no changes to the
+  // shared runtime's own single-mount contract.
+  const [busy, setBusy] = useState(false);
+  // The `disabled` attribute is the real, sufficient guard in an actual browser; this handler-level
+  // check is a second, independent guard against the actual mode-switching side effect (rather
+  // than only a DOM affordance a test environment's click simulation might not honor identically).
+  function handleModeChange(id: ModeId) {
+    if (busy) {
+      return;
+    }
+    setModeId(id);
+  }
 
   return (
     <>
@@ -306,13 +324,21 @@ export function ClientUpdateWriterProduct({ client, onEvent }: ClientUpdateWrite
               name="client-update-writer-mode"
               value={id}
               checked={id === modeId}
-              onChange={() => setModeId(id)}
+              disabled={busy}
+              onChange={() => handleModeChange(id)}
             />
             {MODE_CONFIG[id].label}
           </label>
         ))}
       </fieldset>
-      <ProductRunPage key={modeId} definition={MODE_CONFIG[modeId].definition} client={client} onEvent={onEvent} />
+      <ProductRunPage
+        key={modeId}
+        definition={MODE_CONFIG[modeId].definition}
+        client={client}
+        onEvent={onEvent}
+        onBusyChange={setBusy}
+        visitId={visitId}
+      />
     </>
   );
 }

@@ -33,6 +33,31 @@ export type ProductRunPageProps<V extends Record<string, unknown>, R> = {
    * dispatch is wired here; this only exposes and tests the callback contract.
    */
   onEvent?: (event: ProductRunEvent) => void;
+  /**
+   * Fires whenever this mount's own submitting/running state changes -- code review finding: a
+   * multi-mode product (Client Update Writer) that remounts `ProductRunPage` on every mode switch
+   * (`key={modeId}`) could switch mode mid-run, abandoning an already-accepted, quota-consuming
+   * scenario run: the remount's cleanup aborts the poll/result fetch, but the backend keeps running
+   * it and the result is lost to the UI. Lets a multi-mode caller disable its own mode switch while
+   * `true`, without this shared runtime needing to know what "mode switching" means for any
+   * particular product. Single-mode products (ProposalAI) have nothing to gate on this and can
+   * ignore it.
+   */
+  onBusyChange?: (busy: boolean) => void;
+  /**
+   * Scopes the `product_viewed`/`form_started` once-per-visit dedupe below to one real page visit
+   * -- code review finding: keying that dedupe by `(client, productId)` alone meant it lived for
+   * as long as the `client` instance did, not for one visit. `apps/web-mirror/src/app/products/
+   * [productId]/page.tsx` keeps one `client` across a client-side navigation between products (its
+   * own `useMemo(..., [])`), so a genuine A -> B -> A revisit shares that same client -- without a
+   * visit-scoped key, the second visit to A silently emitted neither event. The route wrapper
+   * mints a fresh `visitId` per landing on a product (see its own comment); a multi-mode product's
+   * several `ProductRunPage` mounts (one per mode switch) all receive the *same* `visitId` from
+   * their shared parent, so switching modes still doesn't refire either event. Falls back to
+   * `productId` alone when omitted, matching the previous (lifetime-of-client-scoped) behavior --
+   * every existing test constructs `ProductRunPage` directly without a route wrapper.
+   */
+  visitId?: string;
 };
 
 /**
@@ -105,34 +130,39 @@ function getCachedRuntimeConfig(client: PlatformApiClient, productId: string) {
 }
 
 /**
- * Tracks which top-of-funnel events have already fired for a given (client, productId) -- not a
+ * Tracks which top-of-funnel events have already fired for a given (client, scope key) -- not a
  * per-component-instance `useRef`, because a product whose page remounts `ProductRunPage` for the
  * same product (Client Update Writer's mode switcher, via `key={modeId}`) would otherwise refire
  * `product_viewed`/`form_started` once per mode visited instead of once per real visit to that
  * product (code review finding). Survives across those remounts the same way `getCachedRuntimeConfig`
  * does, by living outside the component instance; StrictMode's mount -> cleanup -> remount replay
- * still only fires each event once, same as before. Trade-off: `apps/web-mirror/src/app/products/
- * [productId]/page.tsx` already keeps one `client` instance across a client-side navigation
- * between two *different* products (its own `useMemo(..., [])`), so a return visit to a product
- * already seen this tab session also won't refire -- same category of behavior as that existing
- * per-client memoization, not a new one, and not something any current product/test relies on.
+ * still only fires each event once, same as before.
+ *
+ * The scope key is `visitId ?? productId` (see `ProductRunPageProps.visitId`'s own docstring):
+ * a bare `productId` key alone (an earlier version of this cache) lived for as long as the
+ * `client` instance did, not for one visit -- `apps/web-mirror/src/app/products/[productId]/
+ * page.tsx` keeps one `client` across a client-side navigation between products (its own
+ * `useMemo(..., [])`), so a genuine A -> B -> A revisit shared that same client and silently
+ * undercounted the second visit to A (code review finding). `visitId` closes that gap for the
+ * real production route; direct `ProductRunPage` construction (every current test) has no route
+ * wrapper to mint one and keeps the old, simpler `productId`-only scoping.
  */
 const firedEventTypesCache = new WeakMap<PlatformApiClient, Map<string, Set<string>>>();
 
-function hasEventFired(client: PlatformApiClient, productId: string, eventType: string): boolean {
-  return firedEventTypesCache.get(client)?.get(productId)?.has(eventType) ?? false;
+function hasEventFired(client: PlatformApiClient, scopeKey: string, eventType: string): boolean {
+  return firedEventTypesCache.get(client)?.get(scopeKey)?.has(eventType) ?? false;
 }
 
-function markEventFired(client: PlatformApiClient, productId: string, eventType: string): void {
-  let byProductId = firedEventTypesCache.get(client);
-  if (!byProductId) {
-    byProductId = new Map();
-    firedEventTypesCache.set(client, byProductId);
+function markEventFired(client: PlatformApiClient, scopeKey: string, eventType: string): void {
+  let byScopeKey = firedEventTypesCache.get(client);
+  if (!byScopeKey) {
+    byScopeKey = new Map();
+    firedEventTypesCache.set(client, byScopeKey);
   }
-  let fired = byProductId.get(productId);
+  let fired = byScopeKey.get(scopeKey);
   if (!fired) {
     fired = new Set();
-    byProductId.set(productId, fired);
+    byScopeKey.set(scopeKey, fired);
   }
   fired.add(eventType);
 }
@@ -178,6 +208,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   definition,
   client,
   onEvent,
+  onBusyChange,
+  visitId,
 }: ProductRunPageProps<V, R>) {
   const { Fields, Result } = definition;
 
@@ -233,6 +265,16 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const [values, setValues] = useState<V>(definition.emptyValues);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, string>>>({});
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
+  const busy = phase.kind === "submitting" || phase.kind === "running";
+  // Always-current, same reasoning as `onEventRef` above -- `onBusyChange` itself is not a
+  // dependency of the effect below (a new identity every render must not re-fire it).
+  const onBusyChangeRef = useRef(onBusyChange);
+  useEffect(() => {
+    onBusyChangeRef.current = onBusyChange;
+  });
+  useEffect(() => {
+    onBusyChangeRef.current?.(busy);
+  }, [busy]);
   // Holds the one Idempotency-Key-bound handle for the current logical submission (ANY-150): a
   // "Try again" after a retryable failure reuses `.execute()` on this same handle so the backend
   // can collapse a duplicate submit into the original session instead of spending quota twice.
@@ -241,22 +283,25 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   const productId = definition.productId;
   const scenarioId = definition.scenarioId;
+  // See `ProductRunPageProps.visitId`'s own docstring: falls back to `productId` alone (the old
+  // behavior) when no route wrapper supplies a per-visit id.
+  const eventScopeKey = visitId ?? productId;
   useEffect(() => {
     // Snapshotted once per effect invocation (including StrictMode's replay), not re-read from
     // controllerRef inside the .then() continuations below: by the time those run, the ref could
     // already point at a newer controller from a later invocation, which would wrongly report
     // "not aborted" for a continuation that belongs to an already-superseded one.
     const controller = controllerRef.current;
-    // Deduped via the shared (client, productId) cache above, not a per-instance ref -- guards
-    // both React StrictMode's dev-only double-invoke of effects (mount -> cleanup -> remount) and
-    // a Client Update Writer-style mode-switch remount from double-counting this top-of-funnel
-    // event. Declared inside this effect (its only caller) rather than at component scope so it
-    // doesn't need its own identity in the dependency array below.
+    // Deduped via the shared (client, eventScopeKey) cache above, not a per-instance ref --
+    // guards both React StrictMode's dev-only double-invoke of effects (mount -> cleanup ->
+    // remount) and a Client Update Writer-style mode-switch remount from double-counting this
+    // top-of-funnel event. Declared inside this effect (its only caller) rather than at component
+    // scope so it doesn't need its own identity in the dependency array below.
     function emitProductViewed(resolvedGuestId: string | undefined) {
-      if (hasEventFired(client, productId, "product_viewed")) {
+      if (hasEventFired(client, eventScopeKey, "product_viewed")) {
         return;
       }
-      markEventFired(client, productId, "product_viewed");
+      markEventFired(client, eventScopeKey, "product_viewed");
       emitEvent(onEventRef.current, { type: "product_viewed", guestId: resolvedGuestId });
     }
     Promise.all([getCachedRuntimeConfig(client, productId), client.createGuestIdentity({ storage: guestStorage })]).then(
@@ -316,7 +361,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         }
       },
     );
-  }, [client, guestStorage, productId, scenarioId]);
+  }, [client, guestStorage, productId, scenarioId, eventScopeKey]);
 
   async function runStart(prepared: PreparedScenarioStart) {
     // Snapshotted once: this call's own controller, checked consistently across every await below
@@ -603,13 +648,13 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     // Gated on a resolved guestId too, the same way submitCurrentValues() already gates
     // form_submitted: a boot-time createGuestIdentity() failure (not just the guest-identity-
     // not-found self-heal path) otherwise leaves the form fully interactive with guestId
-    // undefined, and this event only ever fires once per (client, productId) -- firing it here
+    // undefined, and this event only ever fires once per (client, eventScopeKey) -- firing it here
     // with no guestId/scenarioSessionId would be permanently dropped by the backend's
     // identity-required check with no chance to recover it later. Leaving it unmarked-fired while
     // guestId is undefined lets a still-unresolved identity emit on a later keystroke instead of
     // losing the event outright.
-    if (!hasEventFired(client, productId, "form_started") && guestId !== undefined) {
-      markEventFired(client, productId, "form_started");
+    if (!hasEventFired(client, eventScopeKey, "form_started") && guestId !== undefined) {
+      markEventFired(client, eventScopeKey, "form_started");
       emitEvent(onEventRef.current, { type: "form_started", guestId });
     }
     setValues((prev) => {
@@ -626,7 +671,6 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     return <ErrorState message={`${definition.title} is unavailable right now. Please reload the page.`} />;
   }
 
-  const busy = phase.kind === "submitting" || phase.kind === "running";
   const identityUnavailable = guestId === undefined;
 
   // Exhaustive over Phase["kind"] (docs/agent/coding-conventions.md's "Exhaustiveness" rule): a

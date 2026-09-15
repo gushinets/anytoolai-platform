@@ -7,7 +7,14 @@ import type { ProductRunEvent } from "./runtime/productDefinition";
 export type RegisteredProduct = {
   productId: string;
   enabled: boolean;
-  Component: ComponentType<{ client: PlatformApiClient; onEvent?: (event: ProductRunEvent) => void }>;
+  Component: ComponentType<{
+    client: PlatformApiClient;
+    onEvent?: (event: ProductRunEvent) => void;
+    /** See `ProductRunPageProps.visitId`'s own docstring -- a fresh id per real landing on this
+     * product, used to scope the shared runtime's once-per-visit event dedupe (code review
+     * finding: a bare productId-keyed dedupe undercounted a genuine revisit to the same product). */
+    visitId?: string;
+  }>;
 };
 
 /** Static product registry for `/products/{productId}`. This is the composition layer

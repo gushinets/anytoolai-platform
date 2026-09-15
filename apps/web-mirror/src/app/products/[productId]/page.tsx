@@ -23,11 +23,19 @@ export default function ProductPage({ params }: ProductPageProps) {
     () => createProductRunEventTracker(client, productId, createWindowLocalStorageAdapter() ?? createInMemoryAsyncStorage()),
     [client, productId],
   );
+  // A fresh id every time `productId` actually changes -- including a return to a productId
+  // already visited this tab session (`client` above is memoized across that navigation, per its
+  // own comment) -- scopes ProductRunPage's once-per-visit product_viewed/form_started dedupe to
+  // one real landing on this product instead of the client's whole lifetime (code review finding).
+  // `productId` is a dependency purely to force recomputation on that change; the callback itself
+  // has no use for its value.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const visitId = useMemo(() => crypto.randomUUID(), [productId]);
 
   if (!product) {
     notFound();
   }
 
   const { Component } = product;
-  return <Component key={productId} client={client} onEvent={onEvent} />;
+  return <Component key={productId} client={client} onEvent={onEvent} visitId={visitId} />;
 }

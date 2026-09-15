@@ -110,8 +110,9 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> =
 export type ProposalAIProductProps = {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
+  visitId?: string;
 };
 
-export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
-  return <ProductRunPage definition={proposalAiDefinition} client={client} onEvent={onEvent} />;
+export function ProposalAIProduct({ client, onEvent, visitId }: ProposalAIProductProps) {
+  return <ProductRunPage definition={proposalAiDefinition} client={client} onEvent={onEvent} visitId={visitId} />;
 }

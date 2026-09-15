@@ -18,6 +18,7 @@ import {
   errorResponse,
   guestIdentityResponse,
   makeClient,
+  makeClientWithDeferredRoute,
   quotaResponse,
   resultResponse,
   routesFor,
@@ -424,5 +425,59 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     render(<ClientUpdateWriterProduct client={client} />);
 
     await waitFor(() => expect(screen.getByText("2 of 3 Client Update Writer runs remaining.")).toBeTruthy());
+  });
+
+  it("disables mode switching while a run is submitting or in progress, instead of abandoning it", async () => {
+    // Code review finding [P1]: key={modeId} unmounts the active ProductRunPage the instant
+    // another mode is picked -- its cleanup aborts the poll/result fetch, but the backend keeps
+    // running an already-accepted, quota-consuming scenario. A user could switch mode while
+    // "Writing…" and permanently lose that limited run's result.
+    const ids = MODE_IDS.update;
+    const routes = routesFor(ids);
+    const { client, resolveDeferred } = makeClientWithDeferredRoute(
+      {
+        // RUNTIME_CONFIG is cached per (client, productId) and must list all three modes'
+        // scenarios (see fullRuntimeConfigResponse's own comment) -- only one is ever fetched.
+        // GUEST_IDENTITY/QUOTA aren't cached, so the later switch to Reply Draft needs its own.
+        [routes.RUNTIME_CONFIG]: [fullRuntimeConfigResponse(ids)],
+        [routes.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
+        [routes.QUOTA]: [quotaResponse(ids), quotaResponse(MODE_IDS.reply_draft)],
+        [routes.START]: [startResponse()],
+        [routes.RESULT]: [resultResponse(ids, { output: { text: "Still going." } })],
+      },
+      routes.SESSION,
+    );
+
+    render(<ClientUpdateWriterProduct client={client} />);
+    await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
+
+    fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Working on it still." } });
+    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("button", { name: "Write update" }));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/writing your update/i));
+
+    // The run is still in flight (SESSION deferred) -- every mode radio, including the
+    // already-checked Update one, must be disabled so the active run can't be abandoned.
+    for (const label of ["Update", "Reply Draft", "Prepaid Request"]) {
+      expect((screen.getByRole("radio", { name: label }) as HTMLInputElement).disabled).toBe(true);
+    }
+
+    // A click on a disabled radio is a no-op in the DOM -- this proves the guard actually prevents
+    // the switch, not just that the input looks disabled.
+    fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
+    expect(screen.queryByLabelText("Client message")).toBeNull();
+    expect(screen.getByLabelText("Progress notes")).toBeTruthy();
+
+    resolveDeferred(sessionResponse());
+    await waitFor(() => expect(screen.getByText("Still going.")).toBeTruthy());
+
+    // The run settled -- mode switching is available again, and does switch mode now. The
+    // Copy button's own render settling doesn't guarantee onBusyChange's separate effect (on the
+    // parent) has already flushed, so this waits for it explicitly rather than asserting inline.
+    await waitFor(() =>
+      expect((screen.getByRole("radio", { name: "Update" }) as HTMLInputElement).disabled).toBe(false),
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
+    await waitFor(() => expect(screen.getByLabelText("Client message")).toBeTruthy());
   });
 });

@@ -970,4 +970,101 @@ describe("ProductRunPage", () => {
     expect(events.filter((event) => event.type === "product_viewed")).toHaveLength(1);
     expect(events.filter((event) => event.type === "form_started")).toHaveLength(1);
   });
+
+  it("refires product_viewed/form_started on a remount with a new visitId, even sharing the same client", async () => {
+    // Code review finding [P1]: the (client, productId)-only dedupe above lives for as long as the
+    // client instance does, not for one visit -- apps/web-mirror's own route wrapper keeps one
+    // client across a client-side navigation between products, so a genuine A -> B -> A revisit to
+    // the same product shares that client and silently dropped these events on the second visit.
+    // `visitId` (minted fresh per landing by that route wrapper) fixes this: a new visitId here
+    // must refire both events, proving the dedupe is scoped to the visit, not the client.
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(TEST_PRODUCT_IDS), runtimeConfigResponse(TEST_PRODUCT_IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(TEST_PRODUCT_IDS), quotaResponse(TEST_PRODUCT_IDS)],
+    });
+
+    const first = render(
+      <ProductRunPage
+        definition={testProductDefinition}
+        client={client}
+        visitId="visit-1"
+        onEvent={(event) => events.push(event)}
+      />,
+    );
+    await waitForForm();
+    fillValidForm();
+    first.unmount();
+
+    render(
+      <ProductRunPage
+        definition={testProductDefinition}
+        client={client}
+        visitId="visit-2"
+        onEvent={(event) => events.push(event)}
+      />,
+    );
+    await waitForForm();
+    fillValidForm();
+
+    expect(events.filter((event) => event.type === "product_viewed")).toHaveLength(2);
+    expect(events.filter((event) => event.type === "form_started")).toHaveLength(2);
+  });
+
+  it("does not refire product_viewed/form_started across a remount sharing the same visitId (a mode switch)", async () => {
+    // The other half of the visitId fix: Client Update Writer's mode switcher passes the *same*
+    // visitId to every mode's ProductRunPage mount, so switching modes must still dedupe exactly
+    // like the plain (client, productId) case did.
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(TEST_PRODUCT_IDS), runtimeConfigResponse(TEST_PRODUCT_IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(TEST_PRODUCT_IDS), quotaResponse(TEST_PRODUCT_IDS)],
+    });
+
+    const first = render(
+      <ProductRunPage
+        definition={testProductDefinition}
+        client={client}
+        visitId="shared-visit"
+        onEvent={(event) => events.push(event)}
+      />,
+    );
+    await waitForForm();
+    fillValidForm();
+    first.unmount();
+
+    render(
+      <ProductRunPage
+        definition={testProductDefinition}
+        client={client}
+        visitId="shared-visit"
+        onEvent={(event) => events.push(event)}
+      />,
+    );
+    await waitForForm();
+    fillValidForm();
+
+    expect(events.filter((event) => event.type === "product_viewed")).toHaveLength(1);
+    expect(events.filter((event) => event.type === "form_started")).toHaveLength(1);
+  });
+
+  it("reports busy true from submit through a settled result, and false again after", async () => {
+    // Code review finding [P1]: a multi-mode product needs to know when it's safe to remount
+    // (switch mode) without abandoning an in-flight run -- this is the shared-runtime contract a
+    // multi-mode caller (Client Update Writer) disables its own mode switch on.
+    const busyStates: boolean[] = [];
+    const { client } = makeClient(happyPathRoutes());
+
+    renderPage({ client, onBusyChange: (busy) => busyStates.push(busy) });
+    await waitForForm();
+    fillValidForm();
+
+    expect(busyStates).toEqual([false]);
+    submit();
+    await waitForResult();
+
+    expect(busyStates).toEqual([false, true, false]);
+  });
 });
