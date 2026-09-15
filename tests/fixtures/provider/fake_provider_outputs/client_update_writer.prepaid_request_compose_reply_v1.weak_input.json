@@ -1,0 +1,13 @@
+{
+  "response_json": {
+    "text": "Work on the project is ongoing. Could you send the agreed amount now?",
+    "call_to_action": "Please send the agreed amount and let me know once it's on its way."
+  },
+  "input_tokens": 30,
+  "output_tokens": 28,
+  "latency_ms": 7,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "client_update_writer.prepaid_request_compose_reply_v1.weak_input"
+  }
+}

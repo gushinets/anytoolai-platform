@@ -1,0 +1,12 @@
+{
+  "response_json": {
+    "text": "Thanks for checking in -- I'll follow up soon with more details."
+  },
+  "input_tokens": 24,
+  "output_tokens": 24,
+  "latency_ms": 6,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "client_update_writer.reply_draft_compose_reply_v1.weak_input"
+  }
+}
