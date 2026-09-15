@@ -9,7 +9,6 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 from alembic import command
-from tests.db_support import provision_database
 from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
 from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
@@ -32,6 +31,7 @@ from anytoolai_platform_core.storage.db import (
     GUEST_QUOTA_USAGE_DIMENSION_CONSTRAINT_NAME,
     action_runs_table,
     artifacts_table,
+    atom_lab_runs_table,
     guest_quota_usage_table,
     jobs_table,
     product_handoffs_table,
@@ -46,6 +46,7 @@ from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
 from sqlalchemy.exc import IntegrityError
 
+from tests.db_support import provision_database
 
 PROVIDER_INPUT_TOKENS = 128
 PROVIDER_OUTPUT_TOKENS = 64
@@ -275,9 +276,7 @@ def test_runtime_table_enums_create_check_constraints() -> None:
 def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine) -> None:
     with runtime_engine.connect() as connection:
         inspector = sa.inspect(connection)
-        table_names = set(
-            inspector.get_table_names(schema="platform")
-        )
+        table_names = set(inspector.get_table_names(schema="platform"))
         index_names = {
             index["name"]
             for table_name in table_names | {"event_log"}
@@ -329,6 +328,20 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
                 schema="platform",
             )
         }
+        atom_lab_columns = {
+            column["name"]: column
+            for column in inspector.get_columns(
+                "atom_lab_runs",
+                schema="platform",
+            )
+        }
+        atom_lab_foreign_keys = {
+            foreign_key["name"]
+            for foreign_key in inspector.get_foreign_keys(
+                "atom_lab_runs",
+                schema="platform",
+            )
+        }
 
     assert {
         "scenario_sessions",
@@ -339,7 +352,35 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
         "guest_identities",
         "guest_quota_usage",
         "product_handoffs",
+        "atom_lab_runs",
     }.issubset(table_names)
+    assert {
+        "scenario_session_id",
+        "job_id",
+        "action_run_id",
+        "artifact_id",
+        "preset_id",
+        "prompt",
+        "input_payload",
+        "provider_policy",
+        "model_id",
+        "reasoning_effort",
+        "capability_provenance",
+        "execution_definition_hash",
+    } <= atom_lab_columns.keys()
+    assert atom_lab_columns["action_run_id"]["nullable"] is True
+    assert atom_lab_columns["artifact_id"]["nullable"] is True
+    assert atom_lab_columns["preset_id"]["nullable"] is True
+    assert atom_lab_columns["prompt"]["nullable"] is False
+    assert atom_lab_columns["input_payload"]["nullable"] is False
+    assert {
+        "fk_atom_lab_runs_scenario_session",
+        "fk_atom_lab_runs_job",
+        "fk_atom_lab_runs_action_run",
+        "fk_atom_lab_runs_artifact",
+    } <= atom_lab_foreign_keys
+    assert atom_lab_runs_table.c.scenario_session_id.unique is True
+    assert atom_lab_runs_table.c.job_id.unique is True
     assert "created_at" in scenario_session_columns
     assert scenario_session_columns["created_at"]["nullable"] is False
     assert "error_message_safe" in provider_call_columns
@@ -414,8 +455,7 @@ def test_runtime_migration_applies_on_a_clean_database(runtime_engine: sa.Engine
     }
 
 
-def test_quota_dimension_downgrade_to_0006_preserves_current_0003_schema(
-) -> None:
+def test_quota_dimension_downgrade_to_0006_preserves_current_0003_schema() -> None:
     with _provision_runtime_database(upgrade_target=None) as (engine, alembic_config):
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
@@ -453,8 +493,7 @@ def test_quota_dimension_downgrade_to_0006_preserves_current_0003_schema(
         )
 
 
-def test_runtime_migration_upgrade_from_0004_adds_provider_call_error_message_safe(
-) -> None:
+def test_runtime_migration_upgrade_from_0004_adds_provider_call_error_message_safe() -> None:
     with _provision_runtime_database(upgrade_target=None) as (engine, alembic_config):
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
@@ -478,12 +517,12 @@ def test_runtime_migration_upgrade_from_0004_adds_provider_call_error_message_sa
         assert provider_call_columns["error_message_safe"]["nullable"] is True
 
 
-def test_handoff_compatibility_revision_repairs_database_stamped_at_0007(
-) -> None:
+def test_handoff_compatibility_revision_repairs_database_stamped_at_0007() -> None:
     with _provision_runtime_database(upgrade_target=None) as (engine, alembic_config):
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
             command.upgrade(alembic_config, "head")
+            connection.execute(sa.text("DROP TABLE platform.atom_lab_runs"))
             connection.execute(sa.text("DROP TABLE platform.product_handoffs"))
             command.stamp(alembic_config, "0007")
 
@@ -556,8 +595,7 @@ def test_product_handoffs_table_exists_is_schema_aware() -> None:
             assert _product_handoffs_table_exists(connection, platform_schema="platform") is True
 
 
-def test_handoff_index_compatibility_revision_replaces_legacy_target_session_index(
-) -> None:
+def test_handoff_index_compatibility_revision_replaces_legacy_target_session_index() -> None:
     with _provision_runtime_database(upgrade_target=None) as (engine, alembic_config):
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection

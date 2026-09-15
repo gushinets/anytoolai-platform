@@ -6,6 +6,7 @@ from anytoolai_platform_core.scenarios.repository import ScenarioSessionReposito
 from anytoolai_platform_core.workflows.repository import JobRepository
 
 __all__ = [
+    "AtomLabRunRepository",
     "ActionRunRepository",
     "ArtifactRepository",
     "EventLogRepository",
@@ -13,3 +14,4 @@ __all__ = [
     "ProviderCallRepository",
     "ScenarioSessionRepository",
 ]
+from anytoolai_platform_core.atom_lab.repository import AtomLabRunRepository

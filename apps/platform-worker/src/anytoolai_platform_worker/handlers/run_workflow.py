@@ -8,9 +8,17 @@ from collections.abc import Callable, Mapping
 from dataclasses import replace
 from typing import Any
 
+from anytoolai_platform_core.actions.executor import RunLocalActionSettings
+from anytoolai_platform_core.actions.repository import ActionRunRepository
+from anytoolai_platform_core.atom_lab.repository import AtomLabRunRepository
+from anytoolai_platform_core.atom_lab.snapshots import (
+    AtomLabSnapshotCompatibilityError,
+    load_run_local_action_settings,
+)
 from anytoolai_platform_core.common.errors import PlatformError
 from anytoolai_platform_core.common.metadata import metadata_str
 from anytoolai_platform_core.common.time import utc_now
+from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.context.execution_context import ExecutionContext
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
@@ -24,6 +32,7 @@ from anytoolai_platform_core.scenarios.models import (
     ScenarioSessionStatus,
 )
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
+from anytoolai_platform_core.scenarios.runtime_scope import is_atom_lab_session
 from anytoolai_platform_core.scenarios.service import ScenarioSessionService
 from anytoolai_platform_core.storage.transactions import transaction_boundary
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
@@ -57,6 +66,14 @@ class JobScenarioSessionInvalidError(PlatformError):
         )
 
 
+class AtomLabSnapshotInvalidError(PlatformError):
+    def __init__(self) -> None:
+        super().__init__(
+            "atom_lab_snapshot_incompatible",
+            "Atom Lab run snapshot is missing or incompatible with the current registry.",
+        )
+
+
 RunnerFactory = Callable[[Session], SequentialWorkflowRunner]
 
 
@@ -69,10 +86,12 @@ class RunWorkflowHandler:
         session_factory: sessionmaker[Session],
         runner_factory: RunnerFactory,
         lease: JobLease | None = None,
+        config_registry: ConfigRegistry | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._runner_factory = runner_factory
         self._lease = lease if lease is not None else NullJobLease()
+        self._config_registry = config_registry
 
     async def handle(self, job_id: str) -> JobRecord | None:
         try:
@@ -89,6 +108,7 @@ class RunWorkflowHandler:
             # the recovery attempt below), this is the only remaining path that ever
             # revisits it -- without this, that scenario would stay `running` forever.
             self._try_reconcile_succeeded_job_scenario(job_id)
+            self._sync_atom_lab_runtime_ids(job_id)
             return self._get(job_id)
 
         try:
@@ -100,13 +120,23 @@ class RunWorkflowHandler:
                     return job
 
                 scenario = self._load_scenario(session, job)
-                input_payload = self._scenario_input(scenario)
-                context = self._execution_context(job, scenario)
+                input_payload, run_local_settings = self._resolve_execution_input_and_settings(
+                    session, job, scenario
+                )
+                context = self._execution_context(
+                    job, scenario, run_local_settings=run_local_settings
+                )
                 runner = self._runner_factory(session)
                 await runner.run_claimed_job(job, input_payload, context)
                 updated_job = JobRepository(session).get(job_id)
                 if updated_job is None:
                     raise LookupError(f"job not found after execution: {job_id}")
+                if run_local_settings is not None:
+                    self._bind_atom_lab_terminal_runtime_ids(
+                        session,
+                        run_local_settings.run_id,
+                        updated_job,
+                    )
                 if updated_job.status is JobStatus.succeeded:
                     refreshed_scenario = self._load_scenario(session, updated_job)
                     self._complete_scenario_if_still_running(
@@ -119,6 +149,7 @@ class RunWorkflowHandler:
             self._persist_handler_failure(job_id, exc)
         finally:
             self._lease.release(job_id)
+            self._sync_atom_lab_runtime_ids(job_id)
 
         return self._get(job_id)
 
@@ -247,10 +278,88 @@ class RunWorkflowHandler:
             raise ScenarioInputInvalidError()
         return dict(input_payload)
 
+    def _resolve_execution_input_and_settings(
+        self,
+        session: Session,
+        job: JobRecord,
+        scenario: ScenarioSessionRecord,
+    ) -> tuple[dict[str, Any], RunLocalActionSettings | None]:
+        scenario_input = self._scenario_input(scenario)
+        if not is_atom_lab_session(scenario):
+            return scenario_input, None
+        if self._config_registry is None:
+            raise AtomLabSnapshotInvalidError()
+        record = AtomLabRunRepository(session).get_by_scenario_session_id(scenario.id)
+        if (
+            record is None
+            or record.job_id != job.id
+            or record.workflow_id != job.workflow_id
+            or record.workflow_version != job.workflow_version
+            or record.input_payload != scenario_input
+        ):
+            raise AtomLabSnapshotInvalidError()
+        try:
+            settings = load_run_local_action_settings(self._config_registry, record)
+        except AtomLabSnapshotCompatibilityError as exc:
+            raise AtomLabSnapshotInvalidError() from exc
+        return dict(record.input_payload), settings
+
+    def _bind_atom_lab_terminal_runtime_ids(
+        self,
+        session: Session,
+        run_id: str,
+        job: JobRecord,
+    ) -> None:
+        record = AtomLabRunRepository(session).get(run_id)
+        if record is None:
+            raise AtomLabSnapshotInvalidError()
+        action_runs = ActionRunRepository(session).list_for_job_step(job.id, record.step_id)
+        action_run = action_runs[-1] if action_runs else None
+        if action_run is not None or job.result_artifact_id is not None:
+            AtomLabRunRepository(session).bind_runtime_ids(
+                run_id,
+                action_run_id=None if action_run is None else action_run.id,
+                artifact_id=job.result_artifact_id,
+            )
+
+    def _sync_atom_lab_runtime_ids(self, job_id: str) -> None:
+        try:
+            with transaction_boundary(self._session_factory) as session:
+                repository = AtomLabRunRepository(session)
+                record = repository.get_by_job_id(job_id)
+                if record is None:
+                    return
+                action_runs = ActionRunRepository(session).list_for_job_step(job_id, record.step_id)
+                action_run = action_runs[-1] if action_runs else None
+                job = JobRepository(session).get(job_id)
+                artifact_id = (
+                    job.result_artifact_id
+                    if job is not None and job.result_artifact_id is not None
+                    else None
+                    if action_run is None
+                    else action_run.output_artifact_id
+                )
+                if action_run is not None or artifact_id is not None:
+                    repository.bind_runtime_ids(
+                        record.id,
+                        action_run_id=None if action_run is None else action_run.id,
+                        artifact_id=artifact_id,
+                    )
+        except Exception:
+            logger.exception(
+                "run_workflow.atom_lab_runtime_id_sync_failed",
+                extra={
+                    "event": "run_workflow.atom_lab_runtime_id_sync_failed",
+                    "fields": {"job_id": job_id},
+                },
+            )
+
     def _execution_context(
         self,
         job: JobRecord,
         scenario: ScenarioSessionRecord,
+        *,
+        run_local_settings: RunLocalActionSettings | None = None,
     ) -> ExecutionContext:
         identity = build_scenario_identity_metadata(scenario)
         return ExecutionContext(
@@ -267,6 +376,7 @@ class RunWorkflowHandler:
             scenario_chain_id=identity["scenario_chain_id"],
             handoff_id=metadata_str(job.metadata, "handoff_id"),
             acquisition_source=metadata_str(job.metadata, "acquisition_source"),
+            run_local_action_settings=run_local_settings,
         )
 
     def _persist_handler_failure(self, job_id: str, exc: Exception) -> None:

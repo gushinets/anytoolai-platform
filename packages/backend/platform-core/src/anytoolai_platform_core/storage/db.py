@@ -7,7 +7,7 @@ from urllib.parse import quote, unquote
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.engine import Engine, URL, make_url
+from sqlalchemy.engine import URL, Engine, make_url
 
 from anytoolai_platform_core.actions.models import ActionRunStatus
 from anytoolai_platform_core.artifacts.models import ArtifactStatus
@@ -281,6 +281,74 @@ jobs_table = sa.Table(
     sa.Index("ix_jobs_product_id", "product_id"),
     sa.Index("ix_jobs_created_at", "created_at"),
     sa.Index("ix_jobs_status", "status"),
+)
+
+atom_lab_runs_table = sa.Table(
+    "atom_lab_runs",
+    runtime_metadata,
+    sa.Column("id", sa.String(length=128), primary_key=True),
+    sa.Column("tenant_id", sa.String(length=128), nullable=False),
+    sa.Column("region", sa.String(length=64), nullable=False),
+    sa.Column("product_id", sa.String(length=128), nullable=False),
+    sa.Column("frontend_id", sa.String(length=128), nullable=False),
+    sa.Column("scenario_session_id", sa.String(length=128), nullable=False, unique=True),
+    sa.Column("job_id", sa.String(length=128), nullable=False, unique=True),
+    sa.Column("atom_id", sa.String(length=16), nullable=False),
+    sa.Column("scenario_id", sa.String(length=128), nullable=False),
+    sa.Column("scenario_version", sa.Integer(), nullable=False),
+    sa.Column("workflow_id", sa.String(length=128), nullable=False),
+    sa.Column("workflow_version", sa.Integer(), nullable=False),
+    sa.Column("step_id", sa.String(length=128), nullable=False),
+    sa.Column("action_type", sa.String(length=128), nullable=False),
+    sa.Column("action_definition_version", sa.Integer(), nullable=False),
+    sa.Column("action_config_id", sa.String(length=128), nullable=False),
+    sa.Column("action_config_schema_version", sa.Integer(), nullable=False),
+    sa.Column("prompt_ref", sa.String(length=128), nullable=False),
+    sa.Column("prompt_version", sa.Integer(), nullable=False),
+    sa.Column("base_prompt", sa.Text(), nullable=False),
+    sa.Column("prompt", sa.Text(), nullable=False),
+    sa.Column("input_schema_ref", sa.String(length=128), nullable=False),
+    sa.Column("input_schema_version", sa.Integer(), nullable=False),
+    sa.Column("input_schema", json_document, nullable=False),
+    sa.Column("output_schema_ref", sa.String(length=128), nullable=False),
+    sa.Column("output_schema_version", sa.Integer(), nullable=False),
+    sa.Column("output_schema", json_document, nullable=False),
+    sa.Column("input_payload", json_document, nullable=False),
+    sa.Column("provider_policy_ref", sa.String(length=128), nullable=False),
+    sa.Column("provider_policy", json_document, nullable=False),
+    sa.Column("model_id", sa.String(length=256), nullable=False),
+    sa.Column("reasoning_effort", sa.String(length=32)),
+    sa.Column("capability_snapshot_id", sa.String(length=128), nullable=False),
+    sa.Column("capability_provenance", json_document, nullable=False),
+    sa.Column("workflow_definition", json_document, nullable=False),
+    sa.Column("action_definition", json_document, nullable=False),
+    sa.Column("action_config_definition", json_document, nullable=False),
+    sa.Column("execution_definition_hash", sa.String(length=64), nullable=False),
+    sa.Column("preset_id", sa.String(length=128)),
+    sa.Column("preset_version", sa.Integer()),
+    sa.Column("action_run_id", sa.String(length=128)),
+    sa.Column("artifact_id", sa.String(length=128)),
+    sa.Column("created_at", utc_datetime, nullable=False),
+    sa.ForeignKeyConstraint(
+        ["scenario_session_id"],
+        [f"{PLATFORM_SCHEMA}.scenario_sessions.id"],
+        name="fk_atom_lab_runs_scenario_session",
+    ),
+    sa.ForeignKeyConstraint(
+        ["job_id"], [f"{PLATFORM_SCHEMA}.jobs.id"], name="fk_atom_lab_runs_job"
+    ),
+    sa.ForeignKeyConstraint(
+        ["action_run_id"],
+        [f"{PLATFORM_SCHEMA}.action_runs.id"],
+        name="fk_atom_lab_runs_action_run",
+    ),
+    sa.ForeignKeyConstraint(
+        ["artifact_id"],
+        [f"{PLATFORM_SCHEMA}.artifacts.id"],
+        name="fk_atom_lab_runs_artifact",
+    ),
+    sa.Index("ix_atom_lab_runs_created_at", "created_at"),
+    sa.Index("ix_atom_lab_runs_scope", "tenant_id", "region", "product_id"),
 )
 
 action_runs_table = sa.Table(
@@ -580,6 +648,7 @@ event_log_table = sa.Table(
 runtime_tables = {
     "scenario_sessions": scenario_sessions_table,
     "jobs": jobs_table,
+    "atom_lab_runs": atom_lab_runs_table,
     "action_runs": action_runs_table,
     "provider_calls": provider_calls_table,
     "artifacts": artifacts_table,

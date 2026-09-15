@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -30,6 +31,7 @@ from anytoolai_platform_core.providers.gateway.recovery import (
 from anytoolai_platform_core.providers.models import (
     ProviderCallStatus,
     ProviderMessage,
+    ProviderModelAddressing,
     ProviderPolicy,
     ProviderRequest,
     ProviderResponse,
@@ -38,6 +40,7 @@ from anytoolai_platform_core.providers.models import (
     ProviderTransportRetryPolicy,
     ProviderUsage,
     ProviderValidationRetryPolicy,
+    ReasoningEffort,
     ResolvedProviderRequest,
     StructuredOutputMode,
 )
@@ -271,9 +274,11 @@ def test_provider_event_context_uses_canonical_metadata_helper() -> None:
 class TransportRetryAdapter:
     def __init__(self) -> None:
         self.call_count = 0
+        self.requests: list[ResolvedProviderRequest] = []
 
     async def complete(self, request: Any) -> ProviderResponse:
         self.call_count += 1
+        self.requests.append(request)
         if self.call_count == 1:
             raise RuntimeError("transport exploded with secret_token=abc123")
         return ProviderResponse(
@@ -496,7 +501,7 @@ def test_gateway_transport_retry_creates_multiple_rows_with_transport_indexes(
     )
     gateway = ProviderGateway(
         {"fake": adapter},
-        build_policy_resolver(policy),
+        build_policy_resolver(replace(policy, model="static-policy-alias")),
     )
 
     with transaction_boundary(session_factory) as session:
@@ -509,6 +514,9 @@ def test_gateway_transport_retry_creates_multiple_rows_with_transport_indexes(
                     action_run,
                     provider_policy_ref="transport_retry_policy_v1",
                     response_schema=DEFAULT_SCHEMA,
+                    policy_override=policy,
+                    model_addressing=ProviderModelAddressing.direct,
+                    reasoning_effort=ReasoningEffort.high,
                 ),
                 session=session,
             )
@@ -516,6 +524,12 @@ def test_gateway_transport_retry_creates_multiple_rows_with_transport_indexes(
         rows = _provider_rows(session)
 
     assert adapter.call_count == 2
+    assert [request.model for request in adapter.requests] == ["fake-json-v1"] * 2
+    assert all(
+        request.model_addressing is ProviderModelAddressing.direct
+        and request.reasoning_effort is ReasoningEffort.high
+        for request in adapter.requests
+    )
     assert response.structured_output is None
     assert [row["semantic_attempt_index"] for row in rows] == [1, 1]
     assert [row["transport_attempt_index"] for row in rows] == [1, 2]
