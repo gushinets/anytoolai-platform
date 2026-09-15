@@ -2,10 +2,10 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-09-11
-- Last updated: 2026-09-14
+- Last updated: 2026-09-15
 - Review date: 2026-09-14
 - Next action: none — implementation landed, verified live against a real `dev-up` backend, code
   review rounds 1 (13 findings), 2 (3 findings), and 3 (14 findings) all addressed, a self-review's
