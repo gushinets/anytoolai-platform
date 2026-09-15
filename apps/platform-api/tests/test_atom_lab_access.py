@@ -115,6 +115,27 @@ def test_atom_lab_catalog_fails_closed_without_server_configuration(
     }
 
 
+def test_atom_lab_models_use_atom_lab_error_envelope_when_storage_is_unavailable(app) -> None:
+    response = asyncio.run(
+        _request(
+            app,
+            "/v1/atom-lab/models",
+            access_code=ACCESS_CODE,
+            request_id="req_models_no_storage",
+        )
+    )
+
+    assert response.status_code == HTTPStatus.SERVICE_UNAVAILABLE
+    assert response.json() == {
+        "error": {
+            "code": "runtime_storage_unavailable",
+            "message": "Runtime storage is unavailable.",
+            "field_errors": [],
+        },
+        "request_id": "req_models_no_storage",
+    }
+
+
 def test_atom_lab_catalog_returns_protected_registry_data(app) -> None:
     response = asyncio.run(_request(app, "/v1/atom-lab/atoms", access_code=ACCESS_CODE))
 
@@ -148,9 +169,7 @@ def test_atom_lab_protected_responses_are_not_stored_by_caches(
     access_code: str | None,
     expected_status: HTTPStatus,
 ) -> None:
-    response = asyncio.run(
-        _request(app, "/v1/atom-lab/atoms", access_code=access_code)
-    )
+    response = asyncio.run(_request(app, "/v1/atom-lab/atoms", access_code=access_code))
 
     assert response.status_code == expected_status
     assert response.headers["Cache-Control"] == "no-store"
@@ -171,6 +190,14 @@ def test_atom_lab_unhandled_error_response_is_not_stored_by_caches(app) -> None:
     )
 
     assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+    assert response.json() == {
+        "error": {
+            "code": "internal_server_error",
+            "message": "Внутренняя ошибка сервера.",
+            "field_errors": [],
+        },
+        "request_id": "req_atom_lab",
+    }
     assert response.headers["Cache-Control"] == "no-store"
 
 

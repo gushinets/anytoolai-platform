@@ -10,6 +10,7 @@ never loaded)."""
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -29,9 +30,19 @@ from anytoolai_platform_core.config.errors import RESERVED_BUNDLE_IDS, check_ids
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.events.emitter import EventEmitter
 from anytoolai_platform_core.events.repository import EventLogRepository
+from anytoolai_platform_core.providers.catalog import (
+    default_model_capability_overrides_path,
+    load_model_capability_overrides,
+)
+from anytoolai_platform_core.providers.catalog_refresh import (
+    ModelCatalogRefreshService,
+    ModelCatalogSource,
+)
+from anytoolai_platform_core.providers.catalog_settings import ModelCatalogSettings
 from anytoolai_platform_core.providers.gateway import (
     ProviderGateway,
     build_default_provider_adapters,
+    build_openai_model_catalog_source,
 )
 from anytoolai_platform_core.providers.policies import ProviderPolicyResolver
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
@@ -70,6 +81,8 @@ def build_worker(
     bundles: Sequence[ProductBundle] | None = None,
     provider_adapters: Mapping[str, Any] | None = None,
     poll_interval_seconds: float = 1.0,
+    model_catalog_source: ModelCatalogSource | None = None,
+    model_catalog_settings: ModelCatalogSettings | None = None,
 ) -> Worker:
     """Build the production graph, with explicit test seams for DB and provider adapters.
 
@@ -164,9 +177,33 @@ def build_worker(
         lease=lease,
         terminator=handler,
     )
+    catalog_settings = model_catalog_settings or ModelCatalogSettings.from_env()
+    if model_catalog_source is None:
+        api_key = os.getenv("OPENAI_API_KEY", "")
+        if api_key.strip():
+            model_catalog_source = build_openai_model_catalog_source(
+                api_key=api_key,
+                timeout_seconds=catalog_settings.fetch_timeout_seconds,
+            )
+    catalog_refresh_hook = (
+        None
+        if model_catalog_source is None
+        else ModelCatalogRefreshService(
+            session_factory=session_factory,
+            account_scope=catalog_settings.account_scope,
+            source=model_catalog_source,
+            overrides=load_model_capability_overrides(
+                default_model_capability_overrides_path(config_root)
+            ),
+            ttl=catalog_settings.ttl,
+            retry_after=catalog_settings.refresh_cooldown,
+            lease_duration=catalog_settings.lease_duration,
+        )
+    )
     return Worker(
         handler,
         job_queue=DatabaseJobQueue(session_factory),
         poll_interval_seconds=poll_interval_seconds,
         reconciler=reconciler,
+        catalog_refresh_hook=catalog_refresh_hook,
     )

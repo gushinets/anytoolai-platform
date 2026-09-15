@@ -3,12 +3,12 @@
 ## Status
 
 - State: active
-- Phase: AL02 implemented and verified on feature/ANY-460
+- Phase: AL03/ANY-461 PR review fixes complete on feature/ANY-461
 - Owner: mixed
 - Created: 2026-09-09
-- Last updated: 2026-09-14
+- Last updated: 2026-09-15
 - Review date: 2026-09-16
-- Next action: Review and commit ANY-460; begin AL03 only after this branch is integrated.
+- Next action: Merge PR #126 after CI/re-review, then continue with ANY-463/AL05.
 - Blocker: none for development; operator configuration required before rollout.
 - Linear project: [Atom Lab](https://linear.app/paveldik/project/atom-lab-e1efc95ce888)
 - Milestone: Atom Lab v1
@@ -188,22 +188,56 @@ Acceptance: Два lab запуска при повышенном test concurren
 
 ### AL03 — [ANY-461](https://linear.app/paveldik/issue/ANY-461/atom-lab-obnovlyaemyj-katalog-openai-gpt-i-reasoning-capabilities): Atom Lab: обновляемый каталог OpenAI GPT и reasoning capabilities
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
+- [x] Implementation branch: `feature/ANY-461`; ANY-459 and ANY-460 are integrated in `main`.
+- [x] Preflight 2026-09-15: `python3 scripts/agent/runner.py doctor` found `uv`, Node and npm,
+  but the Homebrew Python 3.14 interpreter lacks pytest, PyYAML and Pydantic. Use the
+  repository-managed `.quick-check-venv`/runner commands for validation; do not install into the
+  system interpreter.
 - Depends on: ANY-459.
 - Files/areas: `platform-core/src/anytoolai_platform_core/providers/ (catalog logic inside boundary), providers/adapters/litellm.py`; `apps/platform-worker`; `configs/kernel (small capability override YAML)`; `platform-api atom_lab router`; `storage/migrations`.
 
-Получать доступные account model IDs OpenAI, совмещать с актуализируемым снимком LiteLLM metadata и небольшими YAML overrides с source/date. Priority override > metadata > unknown. Поддержка reasoning не доказывает список effort; неизвестное не равно unsupported. Допускать только подтверждённые text GPT для текущего prompted path, не фильтровать по native JSON Schema. API отдаёт модели, allowed efforts, compatibility reason, provenance, stale/last_success. GET /models; POST /models/refresh возвращает queued/current refresh status. Refresh обслуживается отдельным hook существующего worker loop через provider boundary и сохраняет last-good snapshot в PostgreSQL: OPENAI_API_KEY остаётся у worker, не добавлять его в API. Один refresh в работе, TTL 24h, rate limit refresh 60s, без платных probes. Проверить текущие provider/LiteLLM документы при реализации; не угадывать capabilities по имени.
+Получать доступные account model IDs OpenAI, совмещать с актуализируемым снимком LiteLLM metadata и небольшими YAML overrides с source/date. Priority override > metadata > unknown. Поддержка reasoning не доказывает список effort; неизвестное не равно unsupported. Допускать только подтверждённые text GPT для текущего prompted path, не фильтровать по native JSON Schema. API отдаёт модели, allowed efforts, compatibility reason, provenance, stale/last_success. GET /models; POST /models/refresh возвращает pending/running refresh status. Refresh обслуживается отдельным hook существующего worker loop через provider boundary и сохраняет last-good snapshot в PostgreSQL: OPENAI_API_KEY остаётся у worker, не добавлять его в API. Один refresh в работе, TTL 24h, rate limit refresh 60s, без платных probes. Проверить текущие provider/LiteLLM документы при реализации; не угадывать capabilities по имени.
 
 Acceptance: Тесты new/removed model, unknown effort list, no reasoning, stale/failure, empty initial cache; native schema unsupported не исключает prompted-compatible модель. API и UI не содержат SDK/credentials. Каталог явно различает known/unknown/unsupported; отклонение при admission принадлежит AL04, отсутствие silent drop/fallback в adapter — AL02. Refresh не выполняет generation.
 
 ### Уточнения после аудита
 
-- [ ] Текущий worker не является очередью произвольных заданий: не помещать catalog refresh в workflow jobs и не создавать фиктивные scenario/action/provider-call rows.
-- [ ] Минимальный механизм: одна PostgreSQL cache/state запись на настроенный OpenAI account scope с last-good snapshot, due_at, refresh_requested_at, lease_until, last_success_at и safe last_error. POST /models/refresh только атомарно помечает запрос; worker обслуживает его на старте и между workflow jobs. Наступление TTL также делает refresh необходимым. Один bounded refresh с DB lease; после crash lease истекает, запрос подхватывается снова. Обычный длинный workflow может задержать refresh — API честно показывает pending/stale, не обещает мгновенность.
-- [ ] Refresh обновляет OpenAI IDs и валидируемый LiteLLM JSON snapshot; сохраняет только последний целостный корректный результат. Credentials, base URL, policy limits не берутся из внешних metadata. Никаких generation probes, новой очереди общего назначения или отдельного scheduler service.
-- [ ] GET /models возвращает `items, snapshot_id, last_success_at, stale, refresh_status, error`. У item: `model_id, compatibility, reason, reasoning_supported, allowed_reasoning_efforts, provenance`; unknown — явно unknown/null, а не false. Исчезнувшая модель не разрешается override. POST refresh возвращает 202 и pending/running состояние; GET models служит polling endpoint.
-- [ ] Empty cache: items пуст, execution disabled, refresh error видна; last-good stale cache остаётся доступен с предупреждением. TTL и cooldown — именованные backend settings. Подготовить worker Compose/env wiring в этом тикете; key остаётся только worker.
-- [ ] Каталог не реализует применение provider параметров повторно: это ANY-460. Проверки ANY-461: initial load, TTL без кликов пользователя, manual refresh, coalescing/cooldown, expired lease, restart, upstream failure/invalid JSON, model removal, unknown capabilities. API parsing и refresh tests плюс PostgreSQL lease tests; `apps/platform-worker/src/anytoolai_platform_worker/worker.py` и `composition.py` входят в scope.
+- [x] Текущий worker не является очередью произвольных заданий: не помещать catalog refresh в workflow jobs и не создавать фиктивные scenario/action/provider-call rows.
+- [x] Минимальный механизм: одна PostgreSQL cache/state запись на настроенный OpenAI account scope с last-good snapshot, due_at, refresh_requested_at, lease_until, last_success_at и safe last_error. POST /models/refresh только атомарно помечает запрос; worker обслуживает его на старте и между workflow jobs. Наступление TTL также делает refresh необходимым. Один bounded refresh с DB lease; после crash lease истекает, запрос подхватывается снова. Обычный длинный workflow может задержать refresh — API честно показывает pending/stale, не обещает мгновенность.
+- [x] Refresh обновляет OpenAI IDs и валидируемый LiteLLM JSON snapshot; сохраняет только последний целостный корректный результат. Credentials, base URL, policy limits не берутся из внешних metadata. Никаких generation probes, новой очереди общего назначения или отдельного scheduler service.
+- [x] GET /models возвращает `items, snapshot_id, last_success_at, stale, refresh_status, error`. У item: `model_id, compatibility, reason, reasoning_supported, allowed_reasoning_efforts, provenance`; unknown — явно unknown/null, а не false. Исчезнувшая модель не разрешается override. POST refresh возвращает 202 и pending/running состояние; GET models служит polling endpoint.
+- [x] Empty cache: items пуст, execution disabled, refresh error видна; last-good stale cache остаётся доступен с предупреждением. TTL и cooldown — именованные backend settings. Подготовить worker Compose/env wiring в этом тикете; key остаётся только worker.
+- [x] Каталог не реализует применение provider параметров повторно: это ANY-460. Проверки ANY-461: initial load, TTL без кликов пользователя, manual refresh, coalescing/cooldown, expired lease, restart, upstream failure/invalid JSON, model removal, unknown capabilities. API parsing и refresh tests плюс PostgreSQL lease tests; `apps/platform-worker/src/anytoolai_platform_worker/worker.py` и `composition.py` входят в scope.
+
+### PR #126 review follow-up
+
+- [x] Не брать новый workflow job, если shutdown был запрошен во время catalog refresh.
+- [x] Не публиковать success/failure после истечения lease по времени PostgreSQL.
+- [x] Строго валидировать source и ISO date в capability overrides.
+- [x] Не срывать целый refresh на неизвестном LiteLLM reasoning effort; сохранять support и
+  трактовать точный список как unknown.
+- [x] Не возвращать refresh_status=current в retry window после failed refresh.
+- [x] Не сохранять неиспользуемые полные upstream documents в polling-row каталога.
+- [x] Типизировать закрытый wire-набор catalog reason codes.
+- [x] Валидировать lease против фактического aggregate refresh deadline.
+- [x] Добавить service-level regression для failed refresh с сохранением last-good snapshot.
+- [x] Добавить read-only due fast path перед atomic lease claim, чтобы idle poll не писал и не
+  блокировал catalog row.
+- [x] Вычислять lease expiry по PostgreSQL clock и оставить достаточный publish budget.
+- [x] Не создавать failing refresh hook в credential-free worker composition.
+- [x] Закрепить HTTP-контракт stale last-good snapshot после refresh failure.
+- [x] Сохранять manual refresh как pending во время cooldown и исполнять после его окончания.
+- [x] Читать актуальную LiteLLM форму reasoning efforts: `reasoning_effort_levels` и per-level flags.
+- [x] Использовать PostgreSQL clock для durable `due_at` eligibility и finalizer scheduling.
+
+Не приняты предложения менять inclusion semantics для audio-capable/unsupported моделей и выносить
+refresh из worker loop: они противоречат зафиксированным правилам AL03 и
+`docs/architecture/provider-gateway.md`. Отдельный client-visible not-configured error не добавлен:
+credential-free worker не запускает refresh hook и не создаёт ложный upstream failure; при реальной
+ошибке настроенного источника generic client message остаётся безопасным, а detail пишется в log.
+Строгий LiteLLM root parser оставлен fail-closed: проверенный 2026-09-15 live snapshot содержит
+3958/3958 object-valued model entries и не содержит underscore-prefixed служебных ключей.
 
 
 ### AL04 — [ANY-462](https://linear.app/paveldik/issue/ANY-462/atom-lab-zapusk-atoma-i-zashishyonnaya-postoyannaya-istoriya-api): Atom Lab: запуск атома и защищённая постоянная история API
