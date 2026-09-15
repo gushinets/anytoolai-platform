@@ -100,16 +100,18 @@ class ProviderGateway:
             )
 
         repository = self._resolve_provider_call_repository(session)
-        call_budget = self._call_budgets.setdefault(
-            request.action_run_id, ProviderCallBudget()
-        )
+        call_budget = self._call_budgets.setdefault(request.action_run_id, ProviderCallBudget())
         gateway_state = _GatewayAttemptState(
             repository=repository,
             should_persist=self._should_persist_provider_call(request),
             recovery_session=session,
             call_budget=call_budget,
         )
-        initial_policy = self._policy_resolver.resolve(request.provider_policy_ref)
+        initial_policy = request.policy_override or self._policy_resolver.resolve(
+            request.provider_policy_ref
+        )
+        if initial_policy.provider_policy_ref != request.provider_policy_ref:
+            raise ValueError("run-local provider policy ref does not match the request")
         return await self._execute_policy_chain(
             request=request,
             policy=initial_policy,
@@ -135,8 +137,7 @@ class ProviderGateway:
                 error_code="provider_policy_cycle",
                 error_type="ProviderPolicyCycleError",
                 message=(
-                    "provider policy fallback cycle detected for "
-                    f"{policy.provider_policy_ref}"
+                    f"provider policy fallback cycle detected for {policy.provider_policy_ref}"
                 ),
                 failure_kind="policy_cycle",
             )
@@ -267,8 +268,7 @@ class ProviderGateway:
                 response = replace(
                     response,
                     latency_ms=response.latency_ms or self._latency_ms(started),
-                    pydantic_run_id=attempt_request.pydantic_run_id
-                    or response.pydantic_run_id,
+                    pydantic_run_id=attempt_request.pydantic_run_id or response.pydantic_run_id,
                 )
                 if self._is_success_status(response.status):
                     updated = self._update_provider_call_success(
@@ -496,6 +496,8 @@ class ProviderGateway:
             semantic_attempt_index=request.semantic_attempt_index,
             pydantic_run_id=request.pydantic_run_id,
             fallback_from_policy_ref=fallback_from_policy_ref,
+            model_addressing=request.model_addressing,
+            reasoning_effort=request.reasoning_effort,
         )
 
     async def _invoke_adapter(
@@ -628,6 +630,5 @@ class ProviderGateway:
         if isinstance(response, ProviderResponse):
             return response
         raise TypeError(
-            "provider adapter returned an unsupported response type: "
-            f"{type(response).__name__}"
+            f"provider adapter returned an unsupported response type: {type(response).__name__}"
         )

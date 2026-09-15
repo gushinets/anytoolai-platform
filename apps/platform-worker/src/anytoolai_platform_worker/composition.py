@@ -156,6 +156,7 @@ def build_worker(
         session_factory=session_factory,
         runner_factory=runner_factory,
         lease=lease,
+        config_registry=registry,
     )
     reconciler = build_job_lease_reconciler(
         engine,

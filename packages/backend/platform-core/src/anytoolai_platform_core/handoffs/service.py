@@ -30,6 +30,7 @@ from anytoolai_platform_core.handoffs.repository import HandoffRepository
 from anytoolai_platform_core.handoffs.tokens import HandoffTokenService
 from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
+from anytoolai_platform_core.scenarios.runtime_scope import is_public_runtime_session
 from anytoolai_platform_core.scenarios.service import ScenarioRuntimeService
 
 DEFAULT_TOKEN_TTL = timedelta(minutes=30)
@@ -119,6 +120,8 @@ class HandoffService:
             raise HandoffTargetSchemaInvalidError() from exc
         except HandoffPayloadError as exc:
             raise HandoffSourceInvalidError() from exc
+        if not is_public_runtime_session(built.source_session):
+            raise HandoffSourceInvalidError()
         now = self._clock()
         token = self._token_service.generate()
         record = self._repository.create(
@@ -416,6 +419,13 @@ class HandoffService:
             region=region,
         )
         if locked_record is None:
+            raise HandoffNotFoundError()
+        source_session = self._scenarios.get_in_scope(
+            locked_record.source_scenario_session_id,
+            tenant_id=tenant_id,
+            region=region,
+        )
+        if source_session is None or not is_public_runtime_session(source_session):
             raise HandoffNotFoundError()
         return locked_record
 

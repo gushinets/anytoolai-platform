@@ -51,6 +51,9 @@ services:
       # Stakeholder /demo access code. Blank keeps POST /v1/demo/runs fail-closed while the
       # public page itself remains available; configure only through an operator secret store.
       ANYTOOLAI_DEMO_ACCESS_CODE: ${ANYTOOLAI_DEMO_ACCESS_CODE:-}
+      # Internal Atom Lab access code. Blank keeps every /v1/atom-lab/* data route fail-closed;
+      # this credential belongs only to platform-api and is never passed to the worker.
+      ANYTOOLAI_ATOM_LAB_ACCESS_CODE: ${ANYTOOLAI_ATOM_LAB_ACCESS_CODE:-}
     depends_on:
       postgres:
         condition: service_healthy

@@ -58,53 +58,188 @@ action_configs:
     action_type: text.extract_structured_fields
     prompt_ref: kernel_demo.extract_structured_fields.v1
     provider_policy_ref: default_text_generation_v1
+    metadata:
+      atom_lab:
+        atom_id: A01
+        description: Извлекает из исходного текста значения полей, заданных типизированным списком.
+        example_input:
+          source_text: Срок проекта — 30 сентября, бюджет — 120 000 рублей.
+          fields:
+            - name: deadline
+              type: date
+              description: Срок завершения проекта.
+              required: true
+            - name: budget
+              type: number
+              description: Бюджет проекта в рублях.
+              required: false
+          strict: true
 
   - action_config_id: kernel_demo.detect_issues_live_v1
     action_type: text.detect_issues_by_taxonomy
     prompt_ref: kernel_demo.detect_issues.v1
     provider_policy_ref: default_text_generation_v1
+    metadata:
+      atom_lab:
+        atom_id: A04
+        description: Находит риски, пробелы и неоднозначности по заданной таксономии.
+        example_input:
+          source_text: Нужно запустить сайт скоро, бюджет и ответственный пока не определены.
+          context: Проверка проектного брифа перед стартом работ.
+          taxonomy: [сроки, бюджет, ответственность]
 
   - action_config_id: kernel_demo.generate_report_live_v1
     action_type: document.generate_from_template
     prompt_ref: kernel_demo.generate_report.v1
     provider_policy_ref: default_text_generation_v1
+    metadata:
+      atom_lab:
+        atom_id: A10
+        description: Собирает структурированный документ из шаблона и типизированных данных.
+        example_input:
+          template_ref: project_summary_v1
+          data:
+            project: Внутренняя лаборатория атомов
+            status: готово к проверке
+          style: concise
 
   - action_config_id: kernel_demo.compose_reply_live_v1
     action_type: text.compose_reply
     prompt_ref: kernel_demo.compose_reply.v1
     provider_policy_ref: default_text_generation_v1
+    metadata:
+      atom_lab:
+        atom_id: A07
+        description: Создаёт профессиональный ответ с заданными намерением, тоном и ограничениями.
+        example_input:
+          situation: Клиент просит подтвердить срок поставки до конца недели.
+          intent: Подтвердить получение запроса и назвать следующий шаг.
+          tone: warm
+          constraints:
+            language: ru
+            max_length: 600
+            output_format: plain_text
 
   - action_config_id: kernel_demo.generate_clarifying_questions_live_v1
     action_type: text.generate_clarifying_questions
     prompt_ref: kernel_demo.generate_clarifying_questions.v1
     provider_policy_ref: default_text_generation_v1
+    metadata:
+      atom_lab:
+        atom_id: A05
+        description: Формулирует уточняющие вопросы по найденным проблемам и контексту.
+        example_input:
+          issues:
+            - category: сроки
+              description: Не указана дата завершения проекта.
+              severity: high
+              evidence: В брифе используется слово «скоро».
+          context: Подготовка оценки проекта для клиента.
+          target_audience: Заказчик проекта
+          max_questions: 3
 
   - action_config_id: kernel_demo.synthesize_angle_live_v1
     action_type: text.synthesize_angle
     prompt_ref: kernel_demo.synthesize_angle.v1
     provider_policy_ref: default_text_generation_v1
+    metadata:
+      atom_lab:
+        atom_id: A09
+        description: Синтезирует стратегический угол подачи из сигналов и цели.
+        example_input:
+          signals:
+            - id: speed
+              label: Быстрый запуск
+              value: 14 дней
+              evidence: Команда уже подготовила дизайн-систему.
+          objective: Убедить заказчика начать с ограниченного пилота.
+          options: [скорость запуска, снижение риска]
 
   - action_config_id: kernel_demo.compose_persuasive_text_live_v1
     action_type: text.compose_persuasive_text
     prompt_ref: kernel_demo.compose_persuasive_text.v1
     provider_policy_ref: default_text_generation_v1
+    metadata:
+      atom_lab:
+        atom_id: A06
+        description: Создаёт убедительный текст из контекста, цели, угла подачи и ограничений.
+        example_input:
+          context:
+            product: Сервис автоматизации отчётов
+            deadline: 30 сентября
+          objective: Убедить команду согласовать пилотный запуск.
+          audience: Руководитель проекта
+          angle: Снижение ручной работы без изменения текущего процесса.
+          constraints:
+            tone: neutral
+            length: 900
+            language: ru
+            format: markdown
 
   - action_config_id: kernel_demo.generate_gap_rewrites_live_v1
     action_type: text.generate_gap_rewrites
     prompt_ref: kernel_demo.generate_gap_rewrites.v1
     provider_policy_ref: default_text_generation_v1
+    metadata:
+      atom_lab:
+        atom_id: A08
+        description: Предлагает несколько точечных переписываний, закрывающих указанный пробел.
+        example_input:
+          source_text: Мы сделаем интеграцию быстро и качественно.
+          gap: Нет проверяемого срока и критерия качества.
+          n: 3
+          style: moderate
 
   - action_config_id: kernel_demo.compare_and_classify_live_v1
     action_type: text.compare_and_classify
     prompt_ref: kernel_demo.compare_and_classify.v1
     provider_policy_ref: default_text_generation_v1
+    metadata:
+      atom_lab:
+        atom_id: A11
+        description: Сравнивает два текста по критериям и выбирает одну из заданных категорий.
+        example_input:
+          subject_text: Предложение включает запуск пилота за две недели.
+          reference_text: Требуется пилот не позднее чем через три недели.
+          categories: [соответствует, не соответствует]
+          criteria:
+            - id: deadline
+              description: Соответствие требуемому сроку запуска.
+              weight: 1
 
   - action_config_id: kernel_demo.score_multidimensional_axes_live_v1
     action_type: text.score_multidimensional_axes
     prompt_ref: kernel_demo.score_multidimensional_axes.v1
     provider_policy_ref: default_text_generation_v1
+    metadata:
+      atom_lab:
+        atom_id: A03
+        description: Оценивает текст независимо по нескольким заданным осям.
+        example_input:
+          text: План содержит этапы, владельцев и измеримые критерии завершения.
+          axes:
+            - id: clarity
+              description: Ясность формулировок и структуры.
+              weight: 1
+            - id: completeness
+              description: Полнота обязательных сведений.
+              weight: 1
 
   - action_config_id: kernel_demo.score_match_by_rubric_live_v1
     action_type: text.score_match_by_rubric
     prompt_ref: kernel_demo.score_match_by_rubric.v1
     provider_policy_ref: default_text_generation_v1
+    metadata:
+      atom_lab:
+        atom_id: A02
+        description: Оценивает соответствие двух текстов по взвешенной рубрике.
+        example_input:
+          text_a: Нужен внутренний инструмент для проверки атомов без изменения production-конфигурации.
+          text_b: Предлагается закрытая лаборатория с неизменяемыми схемами атомов.
+          rubric:
+            - id: scope
+              description: Совпадение функциональных границ.
+              weight: 2
+            - id: isolation
+              description: Изоляция экспериментальных настроек.
+              weight: 1

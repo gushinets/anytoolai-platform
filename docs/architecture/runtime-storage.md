@@ -12,6 +12,7 @@ It covers the design that was implemented for:
 - `platform.guest_identities`
 - `platform.guest_quota_usage`
 - `platform.product_handoffs`
+- `platform.atom_lab_runs`
 
 This is the durable runtime state layer for execution. It is not config storage.
 
@@ -27,6 +28,7 @@ The runtime storage slice lives in these files:
 - `migrations/platform/versions/0007_guest_quota_dimension.py`
 - `migrations/platform/versions/0008_handoffs_compat.py`
 - `migrations/platform/versions/0010_handoffs_index_compat.py`
+- `migrations/platform/versions/0012_atom_lab_runs.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/db.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/transactions.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/scenarios/repository.py`
@@ -37,6 +39,7 @@ The runtime storage slice lives in these files:
 - `packages/backend/platform-core/src/anytoolai_platform_core/identity/repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/quotas/repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/handoffs/repository.py`
+- `packages/backend/platform-core/src/anytoolai_platform_core/atom_lab/repository.py`
 - `packages/backend/platform-core/tests/unit/test_runtime_storage.py`
 
 The runtime storage slice does not cover:
@@ -50,7 +53,7 @@ The runtime storage slice does not cover:
 
 ## Migration Chain
 
-The canonical runtime migration chain remains the existing files only.
+The canonical runtime migration chain is append-only; new runtime state is added by a new revision.
 
 For the Provider Gateway ADR-0007 realignment:
 
@@ -74,6 +77,27 @@ For the Provider Gateway ADR-0007 realignment:
 - `0010_handoffs_index_compat.py` repairs already-upgraded handoff tables by dropping the obsolete
   target-session index and ensuring the canonical `status + expires_at` index exists; its downgrade
   restores the legacy target-session index for the historical revision boundary
+- `0012_atom_lab_runs.py` adds the immutable Atom Lab admission snapshot linked one-to-one to its
+  scenario session and job; action/artifact links remain nullable until execution creates them
+
+### Atom Lab run snapshots
+
+`platform.atom_lab_runs` is a narrow laboratory-owned exception to the general rule that definitions
+live only in YAML/Markdown. It does not replace the config registry or execution ledgers. It records
+the immutable settings accepted for one internal Atom Lab job: exact definition identities and
+versions, full saved workflow/action/config/schema documents, base and edited prompt, exact input,
+selected model and reasoning effort, snapshotted provider limits, capability provenance, preset
+version, and a canonical definition hash.
+
+The snapshot is created in the same caller-owned transaction as its already-created laboratory
+scenario session and job. `AtomLabRunRepository` rejects ordinary sessions and inconsistent runtime
+dimensions. The worker reloads the snapshot by job, verifies its definition hash and registry
+compatibility, and fails explicitly with `atom_lab_snapshot_incompatible` when it cannot reproduce
+the admitted run. It never silently migrates to current definitions.
+
+`action_run_id` and `artifact_id` are fill-once execution links. Existing `action_runs`, `artifacts`,
+and `provider_calls` remain the only execution/result ledgers; `atom_lab_runs` is admission
+provenance, not a second executor history.
 
 This keeps fresh installs and already-upgraded databases on the same final schema.
 
@@ -223,6 +247,11 @@ Repository responsibilities:
 - `get(id)`
 - `update(record)`
 
+`AtomLabRunRepository` is the immutable, fill-once exception. It provides `create(record)`, lookup
+methods, and `bind_runtime_ids(...)`; the latter fills nullable execution links exactly once instead
+of exposing `update(record)`. It also validates that those links remain within the snapshot's
+laboratory-owned scenario and job.
+
 Repository non-responsibilities:
 
 - opening the database engine
@@ -244,6 +273,7 @@ These records live next to the rest of the domain models:
 - `artifacts/models.py` -> `ArtifactRecord`
 - `identity/models.py` -> `GuestIdentityRecord`
 - `handoffs/models.py` -> `HandoffRecord`
+- `atom_lab/models.py` -> `AtomLabRunRecord`
 
 This keeps the runtime storage surface aligned with the repo's existing model style.
 

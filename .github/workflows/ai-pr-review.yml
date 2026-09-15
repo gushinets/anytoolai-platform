@@ -27,11 +27,11 @@ concurrency:
 jobs:
   ai-pr-review:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request'
-    uses: gushinets/ai-pr-review/.github/workflows/reusable-ai-pr-review.yml@660525298b8785158fc8339add65f0e5cd87e749
+    uses: gushinets/ai-pr-review/.github/workflows/reusable-ai-pr-review.yml@c3bc681841256f2b12eed940bd3c2f0c3f3acba7
     with:
       mode: ${{ github.event_name == 'workflow_dispatch' && 'manual' || 'automatic' }}
       triggering_run_id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
-      pr_number: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_number || 0 }}
+      pr_number: ${{ github.event_name == 'workflow_dispatch' && fromJSON(inputs.pr_number) || 0 }}
     secrets:
       QWEN_TOKEN_PLAN_API_KEY: ${{ secrets.QWEN_TOKEN_PLAN_API_KEY }}
       LINEAR_CLIENT_ID: ${{ secrets.LINEAR_CLIENT_ID }}
