@@ -218,6 +218,87 @@ class AtomLabModelRefreshResponse(BaseModel):
     error: str | None
 
 
+class AtomLabPresetVersionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=256)
+    description: str = Field(max_length=4096)
+    atom_id: AtomLabAtomId
+    base_action_config_id: str = Field(min_length=1, max_length=128)
+    schema_refs: AtomLabSchemaRefsResponse
+    prompt: str = Field(min_length=1, max_length=65536)
+    prompt_ref: str = Field(min_length=1, max_length=128)
+    model_id: str = Field(min_length=1, max_length=256)
+    reasoning_effort: ReasoningEffort | None = None
+    fixed_fields: list[str] = Field(default_factory=list)
+    example_input: dict[str, Any]
+    source_run_id: str | None = Field(default=None, max_length=128)
+
+
+class AtomLabPresetNextVersionRequest(AtomLabPresetVersionRequest):
+    base_version: int = Field(ge=1)
+
+
+class AtomLabPresetCreatedResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    preset_id: str
+    version: int
+    created_at: datetime
+
+
+class AtomLabPresetVersionResponse(AtomLabPresetVersionRequest):
+    preset_id: str
+    version: int
+    created_at: datetime
+
+
+class AtomLabPresetSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    preset_id: str
+    latest_version: int
+    name: str
+    description: str
+    atom_id: AtomLabAtomId
+    created_at: datetime
+    updated_at: datetime
+
+
+class AtomLabPresetVersionSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    preset_id: str
+    version: int
+    name: str
+    description: str
+    atom_id: AtomLabAtomId
+    created_at: datetime
+
+
+class AtomLabPresetListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[AtomLabPresetSummaryResponse]
+    next_cursor: str | None
+
+
+class AtomLabPresetVersionListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[AtomLabPresetVersionSummaryResponse]
+    next_cursor: str | None
+
+
+class AtomLabPresetExportResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    format_version: Literal[1] = 1
+    preset_id: str
+    version: int
+    configuration: AtomLabPresetVersionRequest
+
+
 class ScenarioSessionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

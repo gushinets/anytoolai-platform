@@ -8,6 +8,54 @@ from anytoolai_platform_core.common.ids import new_id
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.providers.models import ReasoningEffort
 
+ATOM_LAB_TENANT_ID = "atom_lab"
+ATOM_LAB_REGION = "global"
+
+
+@dataclass(frozen=True)
+class AtomLabPresetIdentityRecord:
+    tenant_id: str = ATOM_LAB_TENANT_ID
+    region: str = ATOM_LAB_REGION
+    id: str = field(default_factory=lambda: new_id("atom_lab_preset"))
+    latest_version: int = 1
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
+
+
+@dataclass(frozen=True)
+class AtomLabPresetVersionRecord:
+    preset_id: str
+    version: int
+    name: str
+    description: str
+    atom_id: str
+    base_action_config_id: str
+    input_schema_ref: str
+    input_schema_version: int
+    output_schema_ref: str
+    output_schema_version: int
+    prompt: str
+    prompt_ref: str
+    model_id: str
+    reasoning_effort: ReasoningEffort | None
+    fixed_fields: tuple[str, ...]
+    example_input: dict[str, Any]
+    source_run_id: str | None = None
+    tenant_id: str = ATOM_LAB_TENANT_ID
+    region: str = ATOM_LAB_REGION
+    created_at: datetime = field(default_factory=utc_now)
+
+
+@dataclass(frozen=True)
+class AtomLabPresetSummary:
+    preset_id: str
+    latest_version: int
+    name: str
+    description: str
+    atom_id: str
+    created_at: datetime
+    updated_at: datetime
+
 
 @dataclass(frozen=True)
 class AtomLabRunRecord:
@@ -107,4 +155,12 @@ class AtomLabRunRecord:
         }
 
 
-__all__ = ["AtomLabRunRecord", "ReasoningEffort"]
+__all__ = [
+    "ATOM_LAB_REGION",
+    "ATOM_LAB_TENANT_ID",
+    "AtomLabPresetIdentityRecord",
+    "AtomLabPresetSummary",
+    "AtomLabPresetVersionRecord",
+    "AtomLabRunRecord",
+    "ReasoningEffort",
+]

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
-from typing import Any, Iterator
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -11,8 +12,18 @@ from anytoolai_platform_core.actions.repository import ActionRunRepository
 from anytoolai_platform_core.actions.runner import _recover_atom_lab_action_link_after_rollback
 from anytoolai_platform_core.artifacts.models import ArtifactRecord
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
-from anytoolai_platform_core.atom_lab.models import AtomLabRunRecord, ReasoningEffort
-from anytoolai_platform_core.atom_lab.repository import AtomLabRunRepository
+from anytoolai_platform_core.atom_lab.models import (
+    AtomLabPresetIdentityRecord,
+    AtomLabPresetVersionRecord,
+    AtomLabRunRecord,
+    ReasoningEffort,
+)
+from anytoolai_platform_core.atom_lab.repository import (
+    AtomLabPresetRepository,
+    AtomLabRunRepository,
+    PresetVersionConflictError,
+)
+from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
 from anytoolai_platform_core.storage.transactions import build_session_factory, transaction_boundary
@@ -22,6 +33,7 @@ from anytoolai_platform_core.workflows.repository import JobRepository
 from tests.db_support import provision_database
 
 pytestmark = [pytest.mark.postgresql, pytest.mark.slow]
+SECOND_VERSION = 2
 
 
 @pytest.fixture
@@ -172,39 +184,41 @@ def test_snapshot_create_rejects_non_lab_or_mismatched_runtime_link(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:
     """Catches orphan snapshots and snapshots attached to ordinary jobs."""
-    with pytest.raises(ValueError, match="Atom Lab scenario session"):
-        with transaction_boundary(session_factory) as session:
-            scenario = ScenarioSessionRepository(session).create(
-                ScenarioSessionRecord(
-                    id="scenario_session_public",
-                    tenant_id="tenant_demo",
-                    region="eu-central",
-                    product_id="kernel_demo",
-                    frontend_id="kernel_demo_web",
-                    scenario_id="kernel_demo.single_action_smoke_v1",
-                    scenario_version=1,
-                    metadata={"input": {}},
-                )
+    with (
+        pytest.raises(ValueError, match="Atom Lab scenario session"),
+        transaction_boundary(session_factory) as session,
+    ):
+        scenario = ScenarioSessionRepository(session).create(
+            ScenarioSessionRecord(
+                id="scenario_session_public",
+                tenant_id="tenant_demo",
+                region="eu-central",
+                product_id="kernel_demo",
+                frontend_id="kernel_demo_web",
+                scenario_id="kernel_demo.single_action_smoke_v1",
+                scenario_version=1,
+                metadata={"input": {}},
             )
-            JobRepository(session).create(
-                JobRecord(
-                    id="job_public",
-                    tenant_id=scenario.tenant_id,
-                    region=scenario.region,
-                    product_id=scenario.product_id,
-                    frontend_id=scenario.frontend_id,
-                    scenario_session_id=scenario.id,
-                    workflow_id="kernel_demo.single_action_extract_v1",
-                    workflow_version=1,
-                )
+        )
+        JobRepository(session).create(
+            JobRecord(
+                id="job_public",
+                tenant_id=scenario.tenant_id,
+                region=scenario.region,
+                product_id=scenario.product_id,
+                frontend_id=scenario.frontend_id,
+                scenario_session_id=scenario.id,
+                workflow_id="kernel_demo.single_action_extract_v1",
+                workflow_version=1,
             )
-            AtomLabRunRepository(session).create(
-                replace(
-                    _snapshot(),
-                    scenario_session_id=scenario.id,
-                    job_id="job_public",
-                )
+        )
+        AtomLabRunRepository(session).create(
+            replace(
+                _snapshot(),
+                scenario_session_id=scenario.id,
+                job_id="job_public",
             )
+        )
 
 
 def test_runtime_id_binding_is_fill_once_under_postgresql_concurrency(
@@ -277,3 +291,76 @@ def test_runtime_id_binding_is_fill_once_under_postgresql_concurrency(
         stored = AtomLabRunRepository(session).get(record.id)
         assert stored is not None
         assert stored.action_run_id in {"action_run_one", "action_run_two"}
+
+
+def test_preset_version_number_is_atomic_under_postgresql_concurrency(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    identity = AtomLabPresetIdentityRecord(
+        tenant_id="tenant_demo",
+        region="eu-central",
+    )
+    base_values: dict[str, Any] = {
+        "preset_id": identity.id,
+        "version": 1,
+        "name": "Version one",
+        "description": "Initial preset",
+        "atom_id": "A01",
+        "base_action_config_id": "kernel_demo.extract_structured_fields_live_v1",
+        "input_schema_ref": "kernel.schemas.extract_input_v1",
+        "input_schema_version": 1,
+        "output_schema_ref": "kernel.schemas.extract_output_v1",
+        "output_schema_version": 1,
+        "prompt": "Initial prompt",
+        "prompt_ref": "kernel_demo.extract_structured_fields.v1",
+        "model_id": "openai/gpt-5.4-mini",
+        "reasoning_effort": ReasoningEffort.high,
+        "fixed_fields": ("fields",),
+        "example_input": {"source_text": "fixture", "fields": [], "strict": False},
+        "tenant_id": identity.tenant_id,
+        "region": identity.region,
+    }
+    with transaction_boundary(session_factory) as session:
+        AtomLabPresetRepository(session).create(
+            identity,
+            AtomLabPresetVersionRecord(**base_values),
+        )
+
+    def save_version(name: str) -> str:
+        try:
+            with transaction_boundary(session_factory) as session:
+                AtomLabPresetRepository(session).add_version(
+                    AtomLabPresetVersionRecord(
+                        **{
+                            **base_values,
+                            "version": SECOND_VERSION,
+                            "name": name,
+                            "created_at": utc_now(),
+                        }
+                    ),
+                    base_version=1,
+                )
+            return name
+        except PresetVersionConflictError:
+            return "conflict"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = list(executor.map(save_version, ("Version two A", "Version two B")))
+
+    assert outcomes.count("conflict") == 1
+    with transaction_boundary(session_factory) as session:
+        repository = AtomLabPresetRepository(session)
+        stored_identity = repository.get_identity(
+            identity.id,
+            tenant_id=identity.tenant_id,
+            region=identity.region,
+        )
+        versions = repository.list_versions(
+            identity.id,
+            tenant_id=identity.tenant_id,
+            region=identity.region,
+            limit=10,
+        )
+    assert stored_identity is not None
+    assert stored_identity.latest_version == SECOND_VERSION
+    assert [version.version for version in versions] == [SECOND_VERSION, 1]
