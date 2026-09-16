@@ -13,8 +13,14 @@ It covers the design that was implemented for:
 - `platform.guest_quota_usage`
 - `platform.product_handoffs`
 - `platform.atom_lab_runs`
+- `platform.model_catalog_state`
 
 This is the durable runtime state layer for execution. It is not config storage.
+
+`platform.model_catalog_state` is the narrow Atom Lab exception for one last-good OpenAI model
+catalog snapshot per configured account scope. Its row owns TTL scheduling, manual refresh
+coalescing, a crash-expiring worker lease, last-success time, and a safe last error. It is not a
+workflow job and never creates scenario, action, artifact, event, or provider-call ledger rows.
 
 ## Scope
 
@@ -29,12 +35,14 @@ The runtime storage slice lives in these files:
 - `migrations/platform/versions/0008_handoffs_compat.py`
 - `migrations/platform/versions/0010_handoffs_index_compat.py`
 - `migrations/platform/versions/0012_atom_lab_runs.py`
+- `migrations/platform/versions/0013_model_catalog_state.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/db.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/storage/transactions.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/scenarios/repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/workflows/repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/actions/repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/providers/repository.py`
+- `packages/backend/platform-core/src/anytoolai_platform_core/providers/catalog_repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/artifacts/repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/identity/repository.py`
 - `packages/backend/platform-core/src/anytoolai_platform_core/quotas/repository.py`

@@ -351,6 +351,23 @@ atom_lab_runs_table = sa.Table(
     sa.Index("ix_atom_lab_runs_scope", "tenant_id", "region", "product_id"),
 )
 
+model_catalog_state_table = sa.Table(
+    "model_catalog_state",
+    runtime_metadata,
+    sa.Column("account_scope", sa.String(length=128), primary_key=True),
+    sa.Column("snapshot_id", sa.String(length=128)),
+    sa.Column("snapshot", json_document),
+    sa.Column("due_at", utc_datetime, nullable=False),
+    sa.Column("refresh_requested_at", utc_datetime),
+    sa.Column("lease_id", sa.String(length=128)),
+    sa.Column("lease_until", utc_datetime),
+    sa.Column("last_attempt_at", utc_datetime),
+    sa.Column("last_success_at", utc_datetime),
+    sa.Column("last_error", sa.String(length=512)),
+    sa.Column("created_at", utc_datetime, nullable=False),
+    sa.Column("updated_at", utc_datetime, nullable=False),
+)
+
 action_runs_table = sa.Table(
     "action_runs",
     runtime_metadata,
@@ -649,6 +666,7 @@ runtime_tables = {
     "scenario_sessions": scenario_sessions_table,
     "jobs": jobs_table,
     "atom_lab_runs": atom_lab_runs_table,
+    "model_catalog_state": model_catalog_state_table,
     "action_runs": action_runs_table,
     "provider_calls": provider_calls_table,
     "artifacts": artifacts_table,

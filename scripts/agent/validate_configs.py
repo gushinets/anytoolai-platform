@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import sys
 from collections.abc import Iterable
 from pathlib import Path
-import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 PLATFORM_CORE_SRC = ROOT / "packages" / "backend" / "platform-core" / "src"
@@ -30,6 +30,10 @@ from anytoolai_platform_core.config.errors import (  # noqa: E402
 )
 from anytoolai_platform_core.config.loader import ConfigLoader  # noqa: E402
 from anytoolai_platform_core.config.registry import ConfigRegistry  # noqa: E402
+from anytoolai_platform_core.providers.catalog import (  # noqa: E402
+    default_model_capability_overrides_path,
+    load_model_capability_overrides,
+)
 from anytoolai_platform_sdk import ProductBundle  # noqa: E402
 
 # Mirrors apps/platform-api/bootstrap.py's and apps/platform-worker/composition.py's identically-
@@ -59,10 +63,14 @@ def load_registry(bundles: Iterable[ProductBundle] | None = None) -> ConfigRegis
 def main() -> int:
     try:
         load_registry()
+        load_model_capability_overrides(default_model_capability_overrides_path())
     except RegistryLoadError as error:
         print(str(error), file=sys.stderr)
         return 1
     except ConfigError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except ValueError as error:
         print(str(error), file=sys.stderr)
         return 1
 

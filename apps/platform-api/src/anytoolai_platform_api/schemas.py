@@ -7,6 +7,12 @@ from typing import Any, Literal
 from anytoolai_platform_core.events.client_events import WebClientEventType
 from anytoolai_platform_core.handoffs.models import HandoffStatus
 from anytoolai_platform_core.products.models import FrontendType
+from anytoolai_platform_core.providers.models import (
+    ModelCatalogCompatibility,
+    ModelCatalogReason,
+    ModelCatalogRefreshStatus,
+    ReasoningEffort,
+)
 from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaPeriod, QuotaUnit
 from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
 from pydantic import BaseModel, ConfigDict, Field
@@ -178,6 +184,38 @@ class AtomLabAtomResponse(BaseModel):
     schema_refs: AtomLabSchemaRefsResponse
     description: str
     example_input: dict[str, Any]
+
+
+class AtomLabModelResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model_id: str
+    compatibility: ModelCatalogCompatibility
+    reason: ModelCatalogReason
+    reasoning_supported: bool | None
+    allowed_reasoning_efforts: list[ReasoningEffort] | None
+    provenance: dict[str, dict[str, str]]
+
+
+class AtomLabModelsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[AtomLabModelResponse]
+    snapshot_id: str | None
+    last_success_at: datetime | None
+    stale: bool
+    refresh_status: ModelCatalogRefreshStatus
+    error: str | None
+
+
+class AtomLabModelRefreshResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    snapshot_id: str | None
+    last_success_at: datetime | None
+    stale: bool
+    refresh_status: ModelCatalogRefreshStatus
+    error: str | None
 
 
 class ScenarioSessionResponse(BaseModel):

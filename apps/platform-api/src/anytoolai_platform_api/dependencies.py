@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from typing import Annotated
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import Depends, Request
-
-from anytoolai_platform_api.errors import ApiError
 from anytoolai_platform_api.bootstrap import RuntimeBootstrapResult
+from anytoolai_platform_api.errors import ApiError, AtomLabApiError
 from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.config.registry import ConfigRegistry
+from anytoolai_platform_core.providers.catalog_settings import ModelCatalogSettings
+from fastapi import Depends, Request
 
 
 def get_settings() -> Settings:
@@ -34,6 +33,25 @@ def get_session_factory(
     session_factory = runtime.storage.session_factory
     if session_factory is None:
         raise ApiError(
+            status_code=503,
+            code="runtime_storage_unavailable",
+            message="Runtime storage is unavailable.",
+        )
+    return session_factory
+
+
+def get_model_catalog_settings(
+    runtime: Annotated[RuntimeBootstrapResult, Depends(get_runtime)],
+) -> ModelCatalogSettings:
+    return runtime.model_catalog_settings
+
+
+def get_atom_lab_session_factory(
+    runtime: Annotated[RuntimeBootstrapResult, Depends(get_runtime)],
+) -> Any:
+    session_factory = runtime.storage.session_factory
+    if session_factory is None:
+        raise AtomLabApiError(
             status_code=503,
             code="runtime_storage_unavailable",
             message="Runtime storage is unavailable.",

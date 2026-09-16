@@ -1,0 +1,7 @@
+models:
+  gpt-5:
+    compatibility: compatible
+    reasoning_supported: true
+    allowed_reasoning_efforts: [minimal, low, medium, high]
+    source: https://developers.openai.com/api/docs/models/gpt-5
+    checked_at: 2026-09-15
