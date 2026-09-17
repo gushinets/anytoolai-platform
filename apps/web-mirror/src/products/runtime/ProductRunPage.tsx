@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Button, Spinner } from "@anytoolai/shared-ui";
+import { Button } from "@anytoolai/shared-ui";
 import {
   createInMemoryAsyncStorage,
   createWindowLocalStorageAdapter,
@@ -551,11 +551,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           <Button type="submit" loading={busy} disabled={identityUnavailable}>
             {phase.kind === "submitting" ? "Starting…" : phase.kind === "running" ? "Generating…" : definition.copy.submit}
           </Button>
-          {phase.kind === "running" ? (
-            <p role="status">
-              <Spinner /> {definition.copy.running}
-            </p>
-          ) : null}
+          {phase.kind === "running" ? <p role="status">{definition.copy.running}</p> : null}
           {identityUnavailable ? (
             <p role="alert">We couldn&apos;t verify your identity. Please reload the page and try again.</p>
           ) : null}
