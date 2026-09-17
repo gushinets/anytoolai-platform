@@ -2,6 +2,7 @@
 
 import type { ChangeEvent } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import { Input, Select, TextArea } from "@anytoolai/shared-ui";
 import { ResultView } from "../../components/ResultView";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import type { ProductDefinition, ProductFieldsProps, ProductRunEvent } from "../runtime/productDefinition";
@@ -46,7 +47,7 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
   return (
     <>
       <label htmlFor="proposal-ai-task-text">Describe the task</label>
-      <textarea
+      <TextArea
         id="proposal-ai-task-text"
         value={values.taskText}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("taskText", event.target.value)}
@@ -56,7 +57,7 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
       {errors.taskText ? <p role="alert">{errors.taskText}</p> : null}
 
       <label htmlFor="proposal-ai-positioning">Your positioning</label>
-      <textarea
+      <TextArea
         id="proposal-ai-positioning"
         value={values.freelancerPositioning}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("freelancerPositioning", event.target.value)}
@@ -66,7 +67,7 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
       {errors.freelancerPositioning ? <p role="alert">{errors.freelancerPositioning}</p> : null}
 
       <label htmlFor="proposal-ai-tone">Tone (optional)</label>
-      <select
+      <Select
         id="proposal-ai-tone"
         value={values.tone}
         onChange={(event: ChangeEvent<HTMLSelectElement>) => onChange("tone", event.target.value as Tone | "")}
@@ -78,10 +79,10 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
             {tone}
           </option>
         ))}
-      </select>
+      </Select>
 
       <label htmlFor="proposal-ai-language">Language (optional)</label>
-      <input
+      <Input
         id="proposal-ai-language"
         value={values.language}
         onChange={(event: ChangeEvent<HTMLInputElement>) => onChange("language", event.target.value)}
