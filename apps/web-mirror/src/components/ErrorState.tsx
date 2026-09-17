@@ -1,3 +1,5 @@
+import { Button, Card, Toast } from "@anytoolai/shared-ui";
+
 export type ErrorStateProps = {
   message: string;
   onRetry?: () => void;
@@ -7,13 +9,13 @@ export type ErrorStateProps = {
  * passed raw backend/exception text -- callers own picking a user-safe `message`. */
 export function ErrorState({ message, onRetry }: ErrorStateProps) {
   return (
-    <div role="alert">
-      <p>{message}</p>
+    <Card>
+      <Toast variant="error">{message}</Toast>
       {onRetry ? (
-        <button type="button" onClick={onRetry}>
+        <Button variant="secondary" onClick={onRetry}>
           Try again
-        </button>
+        </Button>
       ) : null}
-    </div>
+    </Card>
   );
 }
