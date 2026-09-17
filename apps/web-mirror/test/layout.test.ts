@@ -50,6 +50,14 @@ function fontshareSlug(family: string): string {
   return family.toLowerCase().replace(/\s+/g, "-");
 }
 
+// SKILL.md's typography table pairs each heading weight with a specific size range -- Display
+// (900) and Section (800) are the only roles this codebase's heading weights can currently be, so
+// only those two are listed; a weight outside this map means a role this test doesn't know yet.
+const HEADING_ROLE_SIZE_RANGES: Record<number, [min: number, max: number]> = {
+  900: [44, 56], // Display
+  800: [26, 36], // Section
+};
+
 describe("layout.tsx's fonts stay in sync with tokens.json's typography", () => {
   it("tokens.json's typography section still has the values this test (and layout.tsx) assume", () => {
     expect(tokens.typography).toEqual(EXPECTED_TYPOGRAPHY);
@@ -102,5 +110,25 @@ describe("layout.tsx's fonts stay in sync with tokens.json's typography", () => 
     // number, not just both present, or a delivery-driven weight change (like the one that
     // motivated 900 here) can silently mismatch the role its own size still implies.
     expect(headingBlock).toMatch(new RegExp(`font-weight:\\s*${requestedWeight}\\b`));
+
+    // font-size lives in h1's OWN rule, a separate block from the shared h1/h2/h3 one above --
+    // checking headingBlock alone would miss a size that silently regressed to a different role's
+    // range while the weight stayed correct (exactly what happened before this was added).
+    const weightNum = Number(requestedWeight);
+    const sizeRange = HEADING_ROLE_SIZE_RANGES[weightNum];
+    if (!sizeRange) {
+      throw new Error(`No known Bundle 3 heading role size range for weight ${weightNum}`);
+    }
+    const h1OwnBlock = tokensCss.match(/\bh1\s*\{([\s\S]*?)\}/)?.[1];
+    if (h1OwnBlock === undefined) {
+      throw new Error("tokens.css has no standalone h1 { ... } rule for font-size");
+    }
+    const sizeMatch = h1OwnBlock.match(/font-size:\s*(\d+)px/);
+    if (!sizeMatch) {
+      throw new Error("tokens.css's h1 { ... } rule has no font-size declaration");
+    }
+    const size = Number(sizeMatch[1]);
+    expect(size).toBeGreaterThanOrEqual(sizeRange[0]);
+    expect(size).toBeLessThanOrEqual(sizeRange[1]);
   });
 });
