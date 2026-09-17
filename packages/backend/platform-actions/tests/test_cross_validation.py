@@ -26,6 +26,40 @@ from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.structured_output.errors import StructuredOutputValidationError
 
 
+# TestPersuasiveTextCrossValidator (A06) and TestComposeReplyCrossValidator (A07) apply the
+# identical ANY-502 plain_text-with-lists policy to their `text` field, so these cases are
+# pinned once instead of duplicated byte-for-byte across both classes.
+_PLAIN_TEXT_LIST_ACCEPT_CASES: list[tuple[dict, dict]] = [
+    ({}, {"text": "1. First\n2. Second"}),
+    ({}, {"text": "1) First\n2) Second"}),
+    ({}, {"text": "- First\n- Second"}),
+    ({}, {"text": "* First\n* Second"}),
+    ({}, {"text": "+ First\n+ Second"}),
+    ({}, {"text": "Intro paragraph.\n\nSecond paragraph."}),
+]
+
+_PLAIN_TEXT_LIST_REJECT_CASES: list[tuple[dict, dict]] = [
+    # A blockquote is still disallowed markup for plain_text.
+    ({}, {"text": "> quote"}),
+    # A list item with disallowed nested markup must still fail — allowing list structure
+    # doesn't allow markup inside a list item.
+    ({}, {"text": "- **Important item**"}),
+    # Empty list items ("-", "1)") carry no meaningful content, not a real list.
+    ({}, {"text": "-\n-\n-"}),
+    ({}, {"text": "1.\n2.\n3."}),
+    # GFM task-list checkboxes are checkbox formatting, not a plain list marker — the prompt
+    # only allows "ordered/unordered list markers".
+    ({}, {"text": "- [ ] Send the invoice\n- [x] Follow up next week"}),
+    # A bare checkbox with no task text at all (checkbox is the item's entire content, not
+    # just a prefix) must reject too — round-2 review found this false negative.
+    ({}, {"text": "- [ ]"}),
+    ({}, {"text": "- [x]"}),
+    ({}, {"text": "1. [ ]\n2. real item"}),
+    # A nested list isn't the flat "ordered/unordered list markers" the prompt allows.
+    ({}, {"text": "- a\n  - b"}),
+]
+
+
 def _field(name: str, field_type: str, *, required: bool) -> dict:
     return {
         "name": name,
@@ -612,6 +646,9 @@ class TestComposeReplyCrossValidator:
                 {"constraints": {"output_format": "html"}},
                 {"text": "<!DOCTYPE html><html>Real reply.</html>"},
             ),
+            # plain_text allows ordered/unordered list markers (ANY-502) — a live model
+            # naturally reaches for lists on multi-item asks.
+            *_PLAIN_TEXT_LIST_ACCEPT_CASES,
         ],
     )
     def test_accepts(self, input_payload: dict, output: dict) -> None:
@@ -681,6 +718,10 @@ class TestComposeReplyCrossValidator:
                 {"constraints": {"output_format": "html"}},
                 {"text": "  <!-- internal comment -->"},
             ),
+            *_PLAIN_TEXT_LIST_REJECT_CASES,
+            # text and call_to_action diverge now (ANY-502): list syntax is allowed in text
+            # but call_to_action keeps the stricter no-markup contract unchanged.
+            ({}, {"text": "Plain reply.", "call_to_action": "- Book a call"}),
             ({}, None),
             ({}, {"text": 123}),
         ],
@@ -978,6 +1019,9 @@ class TestPersuasiveTextCrossValidator:
                 {"constraints": {"format": "html"}},
                 {"text": "<!DOCTYPE html><html>Real persuasion.</html>"},
             ),
+            # plain_text allows ordered/unordered list markers (ANY-502) — a live model
+            # naturally reaches for lists on multi-item asks.
+            *_PLAIN_TEXT_LIST_ACCEPT_CASES,
         ],
     )
     def test_accepts(self, input_payload: dict, output: dict) -> None:
@@ -1023,6 +1067,7 @@ class TestPersuasiveTextCrossValidator:
                 {"constraints": {"format": "html"}},
                 {"text": "  <!-- internal note -->"},
             ),
+            *_PLAIN_TEXT_LIST_REJECT_CASES,
             ({}, None),
             ({}, {"text": 123}),
         ],
