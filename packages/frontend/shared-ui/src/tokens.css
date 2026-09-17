@@ -45,6 +45,9 @@
  * the var() fallback here only covers a consumer that never wires next/font at all. */
 body {
   font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  /* The browser's UA stylesheet default (8px) would otherwise sit outside .page-background's
+   * full-bleed gradient/min-height:100vh, leaving an unstyled gap and risking overflow. */
+  margin: 0;
 }
 
 /* Cabinet Grotesk is delivered via the Fontshare API (layout.tsx's <link>), which declares a
