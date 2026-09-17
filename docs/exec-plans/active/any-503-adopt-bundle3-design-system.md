@@ -7,7 +7,7 @@
 - Created: 2026-09-16
 - Last updated: 2026-09-17
 - Review date: 2026-09-17
-- Next action: none outstanding from code review round #6; awaiting further review.
+- Next action: none outstanding from code review round #8; awaiting further review.
 - Blocker: none
 
 ## Goal
@@ -86,6 +86,12 @@ construction instead of each page/product styling itself. Full ticket text: `pla
 - `Toast` has no `warning` variant (missing token pair upstream).
 - No nav/modal surface component (missing token pair upstream).
 - `HandoffConsent.tsx` still renders raw unstyled elements — needs its own restyle pass.
+- Upstream Bundle 3's `SKILL.md` calls for automated accessibility checks and desktop/mobile
+  screenshots as part of validating a design-system change; this PR's verification is
+  role/attribute/class-based `@testing-library/react` assertions only (per this repo's own testing
+  convention — no snapshot/visual-regression precedent exists elsewhere in this frontend either).
+  Raised across multiple review rounds as non-blocking; decision (2026-09-17): leave as documented
+  debt rather than add new a11y/screenshot tooling in this PR.
 
 ## Verification
 
