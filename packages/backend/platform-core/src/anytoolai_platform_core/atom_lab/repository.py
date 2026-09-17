@@ -49,7 +49,11 @@ class AtomLabPresetRepository:
         identity: AtomLabPresetIdentityRecord,
         version: AtomLabPresetVersionRecord,
     ) -> AtomLabPresetVersionRecord:
-        if version.preset_id != identity.id or version.version != 1:
+        if (
+            version.preset_id != identity.id
+            or version.version != 1
+            or identity.latest_version != 1
+        ):
             raise ValueError("A new Atom Lab preset must start at version 1")
         self._require_same_scope(identity, version)
         self._require_same_atom(identity.atom_id, version.atom_id)

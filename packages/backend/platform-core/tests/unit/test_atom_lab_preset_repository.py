@@ -255,6 +255,26 @@ def test_source_run_requires_matching_lab_scope_and_provenance(
         )
 
 
+def test_create_rejects_identity_that_does_not_point_to_version_one(
+    session_factory: SessionFactory,
+) -> None:
+    identity = AtomLabPresetIdentityRecord(
+        tenant_id=TENANT_ID,
+        region=REGION,
+        atom_id="A01",
+        latest_version=2,
+    )
+
+    with (
+        pytest.raises(ValueError, match="start at version 1"),
+        transaction_boundary(session_factory) as session,
+    ):
+        AtomLabPresetRepository(session).create(
+            identity,
+            _preset_version(identity.id, tenant_id=TENANT_ID, region=REGION),
+        )
+
+
 def test_new_version_cannot_switch_preset_atom(
     session_factory: SessionFactory,
 ) -> None:
