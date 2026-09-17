@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, type ReactNode } from "react";
 import { Button, type ButtonProps } from "./Button";
 
@@ -22,12 +24,24 @@ export function CopyButton({ text, onCopied, children = "Copy", variant = "secon
     navigator.clipboard.writeText(text).then(
       () => {
         setState("copied");
-        onCopied?.();
+        invokeOnCopied();
       },
       () => {
         setState("error");
       },
     );
+  }
+
+  // Neither a synchronous throw nor an async `onCopied`'s later rejection (TS's `() => void`
+  // return type structurally accepts `() => Promise<void>`) may propagate as an unhandled
+  // rejection or break the already-successful copy -- same reasoning as ProductRunPage's own
+  // `emitEvent`.
+  function invokeOnCopied(): void {
+    try {
+      Promise.resolve(onCopied?.()).catch(_noop);
+    } catch {
+      // onCopied threw synchronously -- nothing to attach a rejection handler to.
+    }
   }
 
   return (
@@ -38,4 +52,8 @@ export function CopyButton({ text, onCopied, children = "Copy", variant = "secon
       {state === "error" ? <p role="alert">Could not copy to clipboard. Please copy the text above manually.</p> : null}
     </>
   );
+}
+
+function _noop(): void {
+  // Deliberately discards a settled promise's rejection -- see invokeOnCopied()'s own comment.
 }

@@ -30,4 +30,26 @@ describe("CopyButton", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/could not copy to clipboard/i);
     expect(onCopied).not.toHaveBeenCalled();
   });
+
+  it.each<{ label: string; onCopied: () => void }>([
+    {
+      label: "a throwing handler",
+      onCopied: () => {
+        throw new Error("onCopied boom");
+      },
+    },
+    {
+      label: "an async handler that rejects",
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
+      onCopied: () => Promise.reject(new Error("async onCopied boom")),
+    },
+  ])("still shows the Copied label with $label, without throwing", async ({ onCopied }) => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+
+    render(<CopyButton text="Dear client, ..." onCopied={onCopied} />);
+
+    expect(() => fireEvent.click(screen.getByRole("button", { name: "Copy" }))).not.toThrow();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+  });
 });
