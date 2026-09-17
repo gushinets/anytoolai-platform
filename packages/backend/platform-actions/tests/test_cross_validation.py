@@ -36,6 +36,9 @@ _PLAIN_TEXT_LIST_ACCEPT_CASES: list[tuple[dict, dict]] = [
     ({}, {"text": "* First\n* Second"}),
     ({}, {"text": "+ First\n+ Second"}),
     ({}, {"text": "Intro paragraph.\n\nSecond paragraph."}),
+    # Nested lists are allowed too (round-3 review) — the Linear-decided policy allows
+    # "ordered/unordered list markers" without a flat/nesting-depth restriction.
+    ({}, {"text": "- Parent\n  - Child"}),
 ]
 
 _PLAIN_TEXT_LIST_REJECT_CASES: list[tuple[dict, dict]] = [
@@ -55,8 +58,9 @@ _PLAIN_TEXT_LIST_REJECT_CASES: list[tuple[dict, dict]] = [
     ({}, {"text": "- [ ]"}),
     ({}, {"text": "- [x]"}),
     ({}, {"text": "1. [ ]\n2. real item"}),
-    # A nested list isn't the flat "ordered/unordered list markers" the prompt allows.
-    ({}, {"text": "- a\n  - b"}),
+    # Disallowed markup nested inside a sub-list item must still fail — nesting is allowed,
+    # markup inside any item (top-level or nested) is not.
+    ({}, {"text": "- Parent\n  - **Child**"}),
 ]
 
 

@@ -182,24 +182,20 @@ def _has_markup(value: str) -> bool:
 
 
 def _has_disallowed_plain_text_markup(value: str) -> bool:
-    # Same as `_has_markup`, except a *flat* (non-nested) CommonMark list — ordered or
-    # unordered, with real item content — is treated as allowed copy-ready formatting.
-    # Everything else is still rejected, including cases a plain token-type allowlist alone
-    # would miss: an empty list item ("-", "1)") carries no meaningful content; a nested list
-    # isn't the flat "ordered/unordered list markers" the prompt allows; and a GFM task-list
-    # checkbox ("- [ ] todo") is checkbox formatting, not a plain list marker, even though this
-    # parser tokenizes it as an ordinary list item (see `_TASK_LIST_CHECKBOX_RE`).
+    # Same as `_has_markup`, except a CommonMark list — ordered or unordered, flat or
+    # nested, with real item content — is treated as allowed copy-ready formatting (the
+    # Linear-decided policy allows "ordered/unordered list markers" without a nesting-depth
+    # restriction; a list nested inside something already disallowed, e.g. a blockquote, is
+    # still rejected via that construct's own token type below). Everything else is still
+    # rejected, including cases a plain token-type allowlist alone would miss: an empty list
+    # item ("-", "1)") carries no meaningful content, and a GFM task-list checkbox
+    # ("- [ ] todo") is checkbox formatting, not a plain list marker, even though this parser
+    # tokenizes it as an ordinary list item (see `_TASK_LIST_CHECKBOX_RE`).
     if _has_html_construct(value):
         return True
     tokens = _tokenize_markdown(value)
     for index, token in enumerate(tokens):
         if token.type not in _PLAIN_TEXT_WITH_LISTS_TOKEN_TYPES:
-            return True
-        if token.type in ("bullet_list_open", "ordered_list_open") and token.level != 0:
-            # `token.level` already carries nesting depth, so a list container that isn't at
-            # the top level is nested inside another list (or inside something already
-            # rejected above, e.g. a blockquote) — not the flat "ordered/unordered list
-            # markers" the prompt allows.
             return True
         if token.type == "list_item_open":
             # markdown-it-py guarantees every `_open` token has a matching `_close`, so
