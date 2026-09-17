@@ -7,7 +7,7 @@
 - Created: 2026-09-16
 - Last updated: 2026-09-17
 - Review date: 2026-09-17
-- Next action: none outstanding from code review round #5; awaiting further review.
+- Next action: none outstanding from code review round #6; awaiting further review.
 - Blocker: none
 
 ## Goal
@@ -50,6 +50,25 @@ construction instead of each page/product styling itself. Full ticket text: `pla
    specific delivery mechanism (public source repo vs. private build artifact vs. the font
    distributor's own CDN/API) before committing a binary, not just against "is self-hosting allowed
    at all."
+
+   **2026-09-17 resolution: Fontshare API delivery.** The same ITF Free Font License explicitly
+   sanctions a second delivery method: "the Font Software is delivered directly from servers used
+   by Indian Type Foundry to the Licensee's website, without the Licensee having to download or
+   host the Font Software" — the Fontshare CSS API (`api.fontshare.com/v2/css?f[]=<slug>@<weight>`),
+   verified against real-world usage and confirmed working directly. This sidesteps the
+   redistribution question entirely: no binary is ever committed to this repo or bundled into the
+   build; the browser fetches the font straight from Fontshare's own CDN at runtime (a `<link
+   rel="stylesheet">` in `layout.tsx`, with `preconnect` hints). Trade-off accepted knowingly: this
+   is a third-party runtime request on every page load (unlike DM Sans/DM Mono, which `next/font/
+   google` self-hosts at build time) — a privacy/performance consideration, chosen deliberately
+   over the alternative (a private build-time artifact fetch, which needs infrastructure this
+   session can't provision).
+
+   Found and worked around a Fontshare API quirk during implementation: requesting Cabinet
+   Grotesk at weight 700 or 800 intermittently returns extra, unrelated `@font-face` blocks for
+   other font families (verified non-deterministic across repeated requests — different unwanted
+   fonts each time). Weight 900 ("Black", SKILL.md's own "Display" role weight — not an invented
+   value) was verified clean across five repeated requests and is what's actually wired.
 4. **Scope addition beyond the ticket's named component list:** `Input`/`Select` are added
    alongside `TextArea`, because `ProposalAIFields` (tone `<select>`, language `<input>`) would
    otherwise stay unstyled after this ticket.
@@ -64,8 +83,6 @@ construction instead of each page/product styling itself. Full ticket text: `pla
 
 ## Follow-up debt (explicit, not silently dropped)
 
-- Cabinet Grotesk: temporary fallback font stack for headline role; swap to `next/font/local` once
-  a licensed file is sourced.
 - `Toast` has no `warning` variant (missing token pair upstream).
 - No nav/modal surface component (missing token pair upstream).
 - `HandoffConsent.tsx` still renders raw unstyled elements — needs its own restyle pass.

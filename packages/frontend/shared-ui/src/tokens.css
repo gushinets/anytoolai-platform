@@ -47,20 +47,19 @@ body {
   font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif);
 }
 
-/* Cabinet Grotesk (tokens.json's "headline" family) isn't a Google Font and no licensed file is
- * available in this pass -- documented fallback, not an improvised replacement value; see the
- * exec-plan's design-decisions log. `next/font/google` only exposes DM Sans through the
- * --font-body variable it sets on <html> (there is no globally-resolvable "DM Sans" family name
- * unless a consumer also uses `.className`), so headings reuse that same variable rather than
- * repeating the literal font name, which would silently fail to resolve. */
+/* Cabinet Grotesk is delivered via the Fontshare API (layout.tsx's <link>), which declares a
+ * plain, globally-resolvable `font-family: 'Cabinet Grotesk'` -- unlike next/font/google, it isn't
+ * scoped behind a --font-* variable, so the literal name is used directly here. */
 h1,
 h2,
 h3 {
-  font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif);
-  /* SKILL.md's "Section" role (800 weight) -- the closest defined role to a page-level <h1>; no
-   * <h2>/<h3> exists anywhere in apps/web-mirror yet, so only <h1> also gets an explicit size,
-   * rather than guessing sizes for heading levels nothing renders. */
-  font-weight: 800;
+  font-family: "Cabinet Grotesk", var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  /* SKILL.md's "Display" role weight (900, "Black") -- Fontshare's CSS API intermittently bundles
+   * unrelated extra @font-face declarations for this font at 700/800 (verified), but is reliably
+   * clean at 900 across repeated requests; see layout.tsx's own comment. No <h2>/<h3> exists
+   * anywhere in apps/web-mirror yet, so only <h1> also gets an explicit size, rather than guessing
+   * sizes for heading levels nothing renders. */
+  font-weight: 900;
 }
 
 h1 {

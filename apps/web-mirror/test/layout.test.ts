@@ -3,16 +3,12 @@ import { describe, expect, it } from "vitest";
 import { tokens } from "@anytoolai/shared-ui";
 
 /**
- * `next/font/google` requires a literal, statically-analyzable import per font -- it can't be
- * driven by an arbitrary runtime string -- so layout.tsx's `DM_Sans`/`DM_Mono` imports can't
+ * Neither `next/font/google` nor a Fontshare API URL can be driven by an arbitrary runtime string
+ * -- both require a literal, statically-analyzable value -- so layout.tsx's font wiring can't
  * actually read tokens.json's typography section at runtime. This is the invariant that keeps
  * that hardcoding honest instead of silently drifting: it fails the moment tokens.json's
- * typography values change without a matching update here and in layout.tsx, or the two font
- * calls' `variable` options get swapped/detached from `<html>`'s className.
- *
- * `headline` (Cabinet Grotesk) isn't loaded by any font import yet -- documented follow-up debt
- * (exec-plan risk #3), not implemented -- but is still asserted so an unrelated edit to that value
- * is a deliberate, visible diff rather than a silent one.
+ * typography values change without a matching update here and in layout.tsx, or a font call's
+ * `variable` option gets swapped/detached from `<html>`'s className.
  */
 const EXPECTED_TYPOGRAPHY = {
   headline: "Cabinet Grotesk",
@@ -38,19 +34,30 @@ function extractFontCall(source: string, importName: string): { identifier: stri
   return { identifier: match[1]!, args: match[2]! };
 }
 
+function requireHtmlTag(source: string): string {
+  // The whole opening tag, not just a captured className value: className's own template literal
+  // contains nested `${...}` braces that a `[^}]*`-style capture would stop at early.
+  const htmlTag = source.match(/<html[\s\S]*?>/)?.[0];
+  if (htmlTag === undefined) {
+    throw new Error("layout.tsx has no <html> opening tag");
+  }
+  return htmlTag;
+}
+
+// Fontshare's font-family slug is the family name, lowercased and hyphen-joined
+// (e.g. "Cabinet Grotesk" -> "cabinet-grotesk") -- matches every family path on fontshare.com.
+function fontshareSlug(family: string): string {
+  return family.toLowerCase().replace(/\s+/g, "-");
+}
+
 describe("layout.tsx's fonts stay in sync with tokens.json's typography", () => {
   it("tokens.json's typography section still has the values this test (and layout.tsx) assume", () => {
     expect(tokens.typography).toEqual(EXPECTED_TYPOGRAPHY);
   });
 
-  it("layout.tsx configures each font's variable option to what tokens.css consumes, and applies it on <html>", () => {
+  it("layout.tsx configures each Google font's variable option to what tokens.css consumes, and applies it on <html>", () => {
     const source = readFileSync("src/app/layout.tsx", "utf-8");
-    // The whole opening tag, not just a captured className value: className's own template
-    // literal contains nested `${...}` braces that a `[^}]*`-style capture would stop at early.
-    const htmlTag = source.match(/<html[\s\S]*?>/)?.[0];
-    if (htmlTag === undefined) {
-      throw new Error("layout.tsx has no <html> opening tag");
-    }
+    const htmlTag = requireHtmlTag(source);
 
     for (const role of ["body", "mono"] as const) {
       const config = GOOGLE_FONT_CONFIG[tokens.typography[role]];
@@ -61,5 +68,14 @@ describe("layout.tsx's fonts stay in sync with tokens.json's typography", () => 
       expect(call.args).toContain(`variable: "${config.variable}"`);
       expect(htmlTag).toContain(`${call.identifier}.variable`);
     }
+  });
+
+  it("layout.tsx loads the headline font from Fontshare's API (its license forbids a self-hosted binary in this public repo), and tokens.css references its exact family name", () => {
+    const layoutSource = readFileSync("src/app/layout.tsx", "utf-8");
+    const slug = fontshareSlug(tokens.typography.headline);
+    expect(layoutSource).toMatch(new RegExp(`api\\.fontshare\\.com/v2/css\\?f\\[\\]=${slug}@`));
+
+    const tokensCss = readFileSync("../../packages/frontend/shared-ui/src/tokens.css", "utf-8");
+    expect(tokensCss).toContain(`"${tokens.typography.headline}"`);
   });
 });
