@@ -5,9 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-09-16
-- Last updated: 2026-09-16
-- Review date: 2026-09-16
-- Next action: run full verification (frontend-check/full-check) and address any findings.
+- Last updated: 2026-09-17
+- Review date: 2026-09-17
+- Next action: none outstanding from code review round #5; awaiting further review.
 - Blocker: none
 
 ## Goal
@@ -33,6 +33,23 @@ construction instead of each page/product styling itself. Full ticket text: `pla
    temporary fallback stack (`"DM Sans", ui-sans-serif, system-ui, sans-serif`) for the headline
    role instead of Cabinet Grotesk. Follow-up debt: self-host a licensed Cabinet Grotesk file via
    `next/font/local` once one is sourced.
+
+   **2026-09-17 attempt and revert:** sourced Cabinet Grotesk Variable from Fontshare and self-hosted
+   it via `next/font/local`, believing its ITF Free Font License's explicit self-hosting permission
+   ("You may self-host the Font Software on your own servers or infrastructure...") covered
+   committing the `.woff2` into this repo. Code review round #5 correctly caught that the same
+   license separately and explicitly prohibits distributing the Font Software "through another...
+   repository... publicly accessible servers... or any other means" (Section 02) — and this repo is
+   public. A public git repository is itself a distribution channel independent of the deployed
+   website's own self-hosting, so checking the binary in here is very plausibly what Section 02
+   prohibits, regardless of Section 01's self-hosting permission. Reverted (commits `720dc94f`/
+   `42b35e08`) and the branch history was rewritten (`git reset --hard` past both + force-push) to
+   drop the already-pushed blob from this branch's reachable history, since this repo is public and
+   the file had already been pushed. **Lesson for the next attempt:** self-hosting permission and
+   redistribution-channel restrictions are separate clauses — verify a font's license against the
+   specific delivery mechanism (public source repo vs. private build artifact vs. the font
+   distributor's own CDN/API) before committing a binary, not just against "is self-hosting allowed
+   at all."
 4. **Scope addition beyond the ticket's named component list:** `Input`/`Select` are added
    alongside `TextArea`, because `ProposalAIFields` (tone `<select>`, language `<input>`) would
    otherwise stay unstyled after this ticket.
