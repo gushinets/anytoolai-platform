@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
+from anytoolai_platform_actions.structured_llm.cross_validation import (
+    ValidatorRefNotFoundError,
+)
 from anytoolai_platform_api.dependencies import get_atom_lab_session_factory
 from anytoolai_platform_api.main import create_app
+from anytoolai_platform_api.routers import atom_lab as atom_lab_router
 from anytoolai_platform_core.storage.db import runtime_metadata
 from anytoolai_platform_core.storage.transactions import build_session_factory
 from fastapi import FastAPI
@@ -88,6 +95,21 @@ def _version_payload(**overrides: Any) -> dict[str, Any]:
     }
     payload.update(overrides)
     return payload
+
+
+def _version_payload_for_atom(app: FastAPI, atom_id: str) -> dict[str, Any]:
+    response = asyncio.run(_request(app, "GET", f"/v1/atom-lab/atoms/{atom_id}"))
+    assert response.status_code == HTTPStatus.OK
+    atom = response.json()
+    return _version_payload(
+        atom_id=atom_id,
+        base_action_config_id=atom["base_action_config_id"],
+        schema_refs=atom["schema_refs"],
+        prompt=atom["prompt"],
+        prompt_ref=atom["prompt_ref"],
+        fixed_fields=[],
+        example_input=atom["example_input"],
+    )
 
 
 def test_create_read_list_version_and_export_preserves_immutable_payload(app: FastAPI) -> None:
@@ -205,14 +227,19 @@ def test_new_version_is_append_only_and_rejects_stale_base(app: FastAPI) -> None
         ({"fixed_fields": ["fields", "fields"]}, "fixed_fields"),
         ({"fixed_fields": ["fields.items"]}, "fixed_fields.0"),
         ({"fixed_fields": ["missing"]}, "fixed_fields.0"),
-        ({"atom_id": "A12"}, "atom_id"),
         (
             {
                 "base_action_config_id": "kernel_demo.compose_reply_live_v1",
             },
             "base_action_config_id",
         ),
-        ({"example_input": {"source_text": "incomplete"}}, "example_input"),
+        (
+            {
+                "fixed_fields": [],
+                "example_input": {"source_text": "incomplete"},
+            },
+            "example_input",
+        ),
         (
             {
                 "example_input": {
@@ -254,11 +281,65 @@ def test_create_rejects_invalid_contract_and_fixed_fields(
 
     assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
     payload = response.json()
-    assert payload["error"]["code"] in {
-        "request_validation_failed",
-        "preset_contract_invalid",
-    }
-    assert expected_path in {item["path"] for item in payload["error"]["field_errors"]}
+    assert payload["error"]["code"] == "preset_contract_invalid"
+    assert payload["error"]["field_errors"] == [
+        {"path": expected_path, "message": "Недопустимое значение."}
+    ]
+
+
+def test_create_rejects_unknown_closed_atom_id_at_request_boundary(app: FastAPI) -> None:
+    response = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/atom-lab/presets",
+            json=_version_payload(atom_id="A12"),
+        )
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "request_validation_failed"
+    assert [item["path"] for item in response.json()["error"]["field_errors"]] == ["atom_id"]
+
+
+def test_create_rejects_model_id_that_runtime_cannot_address(app: FastAPI) -> None:
+    response = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/atom-lab/presets",
+            json=_version_payload(model_id="gpt-5.4-mini"),
+        )
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "preset_contract_invalid"
+    assert response.json()["error"]["field_errors"] == [
+        {"path": "model_id", "message": "Недопустимое значение."}
+    ]
+
+
+def test_create_maps_unresolved_input_validator_to_catalog_unavailable(
+    app: FastAPI,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = ValidatorRefNotFoundError(
+        ref="missing.validator",
+        field_name="input_validator_ref",
+        action_type="text.extract_structured_fields",
+    )
+    monkeypatch.setattr(
+        atom_lab_router,
+        "build_input_validator",
+        lambda _definition: (_ for _ in ()).throw(error),
+    )
+
+    response = asyncio.run(
+        _request(app, "POST", "/v1/atom-lab/presets", json=_version_payload())
+    )
+
+    assert response.status_code == HTTPStatus.SERVICE_UNAVAILABLE
+    assert response.json()["error"]["code"] == "atom_lab_catalog_unavailable"
 
 
 def test_preset_routes_require_atom_lab_access(app: FastAPI) -> None:
@@ -275,7 +356,12 @@ def test_preset_routes_require_atom_lab_access(app: FastAPI) -> None:
     assert response.json()["error"]["code"] == "atom_lab_access_denied"
 
 
-def test_preset_list_cursor_is_stable_and_invalid_cursor_is_safe(app: FastAPI) -> None:
+def test_preset_list_cursor_is_stable_and_invalid_cursor_is_safe(
+    app: FastAPI,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixed_now = datetime(2026, 9, 17, 8, 0, tzinfo=UTC)
+    monkeypatch.setattr(atom_lab_router, "utc_now", lambda: fixed_now)
     created_ids = []
     for index in range(3):
         response = asyncio.run(
@@ -305,7 +391,7 @@ def test_preset_list_cursor_is_stable_and_invalid_cursor_is_safe(app: FastAPI) -
     assert second_page.status_code == HTTPStatus.OK
     returned_ids = [item["preset_id"] for item in first_payload["items"]]
     returned_ids.extend(item["preset_id"] for item in second_page.json()["items"])
-    assert set(returned_ids) == set(created_ids)
+    assert returned_ids == sorted(created_ids, reverse=True)
     assert second_page.json()["next_cursor"] is None
 
     invalid = asyncio.run(
@@ -316,6 +402,118 @@ def test_preset_list_cursor_is_stable_and_invalid_cursor_is_safe(app: FastAPI) -
     assert invalid.json()["error"]["field_errors"] == [
         {"path": "cursor", "message": "Недопустимое значение."}
     ]
+
+    naive_cursor = base64.urlsafe_b64encode(
+        json.dumps(["2026-09-17T08:00:00", "preset-id"]).encode("utf-8")
+    ).decode("ascii")
+    naive = asyncio.run(
+        _request(app, "GET", f"/v1/atom-lab/presets?cursor={naive_cursor}")
+    )
+    assert naive.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert naive.json()["error"]["code"] == "invalid_cursor"
+
+
+def test_version_list_cursor_and_missing_preset_paths(app: FastAPI) -> None:
+    created = asyncio.run(
+        _request(app, "POST", "/v1/atom-lab/presets", json=_version_payload())
+    ).json()
+    preset_id = created["preset_id"]
+    for base_version in (1, 2):
+        response = asyncio.run(
+            _request(
+                app,
+                "POST",
+                f"/v1/atom-lab/presets/{preset_id}/versions",
+                json={
+                    "base_version": base_version,
+                    **_version_payload(name=f"Version {base_version + 1}"),
+                },
+            )
+        )
+        assert response.status_code == HTTPStatus.CREATED
+
+    first = asyncio.run(
+        _request(app, "GET", f"/v1/atom-lab/presets/{preset_id}/versions?limit=2")
+    ).json()
+    second = asyncio.run(
+        _request(
+            app,
+            "GET",
+            f"/v1/atom-lab/presets/{preset_id}/versions?limit=2&cursor={first['next_cursor']}",
+        )
+    ).json()
+    assert [item["version"] for item in first["items"] + second["items"]] == [3, 2, 1]
+    assert second["next_cursor"] is None
+
+    invalid = asyncio.run(
+        _request(
+            app,
+            "GET",
+            f"/v1/atom-lab/presets/{preset_id}/versions?cursor=invalid",
+        )
+    )
+    assert invalid.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert invalid.json()["error"]["code"] == "invalid_cursor"
+
+    missing_id = "atom_lab_preset_missing"
+    for method, path, body in (
+        ("GET", f"/v1/atom-lab/presets/{missing_id}/versions/1", None),
+        ("GET", f"/v1/atom-lab/presets/{missing_id}/versions/1/export", None),
+        (
+            "POST",
+            f"/v1/atom-lab/presets/{missing_id}/versions",
+            {"base_version": 1, **_version_payload()},
+        ),
+    ):
+        response = asyncio.run(_request(app, method, path, json=body))
+        assert response.status_code == HTTPStatus.NOT_FOUND
+        assert response.json()["error"]["code"] == "preset_not_found"
+
+
+def test_reasoning_effort_null_round_trips(app: FastAPI) -> None:
+    created = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/atom-lab/presets",
+            json=_version_payload(reasoning_effort=None),
+        )
+    ).json()
+    detail = asyncio.run(
+        _request(
+            app,
+            "GET",
+            f"/v1/atom-lab/presets/{created['preset_id']}/versions/1",
+        )
+    )
+    assert detail.status_code == HTTPStatus.OK
+    assert detail.json()["reasoning_effort"] is None
+
+
+def test_new_version_cannot_switch_preset_atom(app: FastAPI) -> None:
+    created = asyncio.run(
+        _request(app, "POST", "/v1/atom-lab/presets", json=_version_payload())
+    ).json()
+    preset_id = created["preset_id"]
+
+    response = asyncio.run(
+        _request(
+            app,
+            "POST",
+            f"/v1/atom-lab/presets/{preset_id}/versions",
+            json={"base_version": 1, **_version_payload_for_atom(app, "A02")},
+        )
+    )
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "preset_contract_invalid"
+    assert response.json()["error"]["field_errors"] == [
+        {"path": "atom_id", "message": "Недопустимое значение."}
+    ]
+
+    versions = asyncio.run(
+        _request(app, "GET", f"/v1/atom-lab/presets/{preset_id}/versions")
+    )
+    assert [item["version"] for item in versions.json()["items"]] == [1]
 
 
 def test_source_run_must_exist_in_matching_lab_scope(app: FastAPI) -> None:

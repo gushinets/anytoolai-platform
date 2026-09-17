@@ -8,14 +8,20 @@ from anytoolai_platform_core.common.ids import new_id
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.providers.models import ReasoningEffort
 
-ATOM_LAB_TENANT_ID = "atom_lab"
-ATOM_LAB_REGION = "global"
+ATOM_LAB_MODEL_PREFIX = "openai/"
+
+
+def is_addressable_atom_lab_model(model_id: str) -> bool:
+    return model_id.startswith(ATOM_LAB_MODEL_PREFIX) and len(model_id) > len(
+        ATOM_LAB_MODEL_PREFIX
+    )
 
 
 @dataclass(frozen=True)
 class AtomLabPresetIdentityRecord:
-    tenant_id: str = ATOM_LAB_TENANT_ID
-    region: str = ATOM_LAB_REGION
+    tenant_id: str
+    region: str
+    atom_id: str
     id: str = field(default_factory=lambda: new_id("atom_lab_preset"))
     latest_version: int = 1
     created_at: datetime = field(default_factory=utc_now)
@@ -40,9 +46,9 @@ class AtomLabPresetVersionRecord:
     reasoning_effort: ReasoningEffort | None
     fixed_fields: tuple[str, ...]
     example_input: dict[str, Any]
+    tenant_id: str
+    region: str
     source_run_id: str | None = None
-    tenant_id: str = ATOM_LAB_TENANT_ID
-    region: str = ATOM_LAB_REGION
     created_at: datetime = field(default_factory=utc_now)
 
 
@@ -156,11 +162,11 @@ class AtomLabRunRecord:
 
 
 __all__ = [
-    "ATOM_LAB_REGION",
-    "ATOM_LAB_TENANT_ID",
+    "ATOM_LAB_MODEL_PREFIX",
     "AtomLabPresetIdentityRecord",
     "AtomLabPresetSummary",
     "AtomLabPresetVersionRecord",
     "AtomLabRunRecord",
     "ReasoningEffort",
+    "is_addressable_atom_lab_model",
 ]

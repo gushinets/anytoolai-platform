@@ -289,6 +289,7 @@ atom_lab_presets_table = sa.Table(
     sa.Column("id", sa.String(length=128), primary_key=True),
     sa.Column("tenant_id", sa.String(length=128), nullable=False),
     sa.Column("region", sa.String(length=64), nullable=False),
+    sa.Column("atom_id", sa.String(length=16), nullable=False),
     sa.Column("latest_version", sa.Integer(), nullable=False),
     sa.Column("created_at", utc_datetime, nullable=False),
     sa.Column("updated_at", utc_datetime, nullable=False),

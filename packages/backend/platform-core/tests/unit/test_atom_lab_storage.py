@@ -299,6 +299,7 @@ def test_preset_version_number_is_atomic_under_postgresql_concurrency(
     identity = AtomLabPresetIdentityRecord(
         tenant_id="tenant_demo",
         region="eu-central",
+        atom_id="A01",
     )
     base_values: dict[str, Any] = {
         "preset_id": identity.id,

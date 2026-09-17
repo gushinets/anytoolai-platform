@@ -34,6 +34,10 @@ class PresetSourceRunError(ValueError):
     pass
 
 
+class PresetAtomMismatchError(ValueError):
+    pass
+
+
 class AtomLabPresetRepository:
     """Immutable preset versions within the server-owned Atom Lab scope."""
 
@@ -48,6 +52,7 @@ class AtomLabPresetRepository:
         if version.preset_id != identity.id or version.version != 1:
             raise ValueError("A new Atom Lab preset must start at version 1")
         self._require_same_scope(identity, version)
+        self._require_same_atom(identity.atom_id, version.atom_id)
         self._require_source_run(version)
         self._session.execute(sa.insert(atom_lab_presets_table).values(asdict(identity)))
         self._insert_version(version)
@@ -85,6 +90,7 @@ class AtomLabPresetRepository:
             raise LookupError("Atom Lab preset not found")
         if row["latest_version"] != base_version:
             raise PresetVersionConflictError("Atom Lab preset base version is stale")
+        self._require_same_atom(row["atom_id"], version.atom_id)
         expected_version = base_version + 1
         if version.version != expected_version:
             raise ValueError("Atom Lab preset version number is not sequential")
@@ -160,7 +166,7 @@ class AtomLabPresetRepository:
                 atom_lab_presets_table.c.latest_version,
                 latest.c.name,
                 latest.c.description,
-                latest.c.atom_id,
+                atom_lab_presets_table.c.atom_id,
                 atom_lab_presets_table.c.created_at,
                 atom_lab_presets_table.c.updated_at,
             )
@@ -183,9 +189,19 @@ class AtomLabPresetRepository:
         )
         if before is not None:
             created_at, preset_id = before
+            before_created_at = sa.bindparam(
+                "preset_before_created_at",
+                created_at,
+                type_=atom_lab_presets_table.c.created_at.type,
+            )
+            before_preset_id = sa.bindparam(
+                "preset_before_id",
+                preset_id,
+                type_=atom_lab_presets_table.c.id.type,
+            )
             statement = statement.where(
                 sa.tuple_(atom_lab_presets_table.c.created_at, atom_lab_presets_table.c.id)
-                < sa.tuple_(created_at, preset_id)
+                < sa.tuple_(before_created_at, before_preset_id)
             )
         rows = self._session.execute(statement).mappings().all()
         return tuple(AtomLabPresetSummary(**dict(row)) for row in rows)
@@ -283,6 +299,11 @@ class AtomLabPresetRepository:
     ) -> None:
         if (identity.tenant_id, identity.region) != (version.tenant_id, version.region):
             raise ValueError("Atom Lab preset identity and version scope differ")
+
+    @staticmethod
+    def _require_same_atom(identity_atom_id: str, version_atom_id: str) -> None:
+        if identity_atom_id != version_atom_id:
+            raise PresetAtomMismatchError("Atom Lab preset atom cannot change between versions")
 
     @staticmethod
     def _version_from_row(row: sa.RowMapping | None) -> AtomLabPresetVersionRecord | None:

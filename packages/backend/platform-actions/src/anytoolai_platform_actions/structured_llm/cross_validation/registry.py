@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import TypeVar
 
 from anytoolai_platform_core.actions.input_validation import ActionInputValidator
 from anytoolai_platform_core.actions.models import ActionDefinition
@@ -77,17 +76,14 @@ class ValidatorRefNotFoundError(LookupError):
         self.mismatched_owner = mismatched_owner
 
 
-_V = TypeVar("_V")
-
-
-def _resolve_validators(
+def _resolve_validators[V](
     action_definitions: Mapping[str, ActionDefinition],
     *,
     ref_getter: Callable[[ActionDefinition], str],
-    lookup: Mapping[str, type[_V]],
+    lookup: Mapping[str, type[V]],
     field_name: str,
-) -> dict[str, _V]:
-    validators: dict[str, _V] = {}
+) -> dict[str, V]:
+    validators: dict[str, V] = {}
     for action_type, definition in action_definitions.items():
         ref = ref_getter(definition)
         if ref == NONE_REF:
@@ -127,3 +123,14 @@ def build_input_validators(
         lookup=_INPUT_VALIDATORS,
         field_name="input_validator_ref",
     )
+
+
+def build_input_validator(
+    action_definition: ActionDefinition,
+) -> ActionInputValidator | None:
+    return _resolve_validators(
+        {action_definition.action_type: action_definition},
+        ref_getter=lambda definition: definition.input_validator_ref,
+        lookup=_INPUT_VALIDATORS,
+        field_name="input_validator_ref",
+    ).get(action_definition.action_type)

@@ -30,6 +30,7 @@ def upgrade() -> None:
         sa.Column("id", sa.String(128), primary_key=True),
         sa.Column("tenant_id", sa.String(128), nullable=False),
         sa.Column("region", sa.String(64), nullable=False),
+        sa.Column("atom_id", sa.String(16), nullable=False),
         sa.Column("latest_version", sa.Integer(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),

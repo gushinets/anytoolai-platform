@@ -3,12 +3,15 @@ from __future__ import annotations
 import base64
 import binascii
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
 from typing import Annotated, Any
 
-from anytoolai_platform_actions.structured_llm.cross_validation import build_input_validators
+from anytoolai_platform_actions.structured_llm.cross_validation import (
+    ValidatorRefNotFoundError,
+    build_input_validator,
+)
 from anytoolai_platform_api.atom_lab.access import require_atom_lab_access
 from anytoolai_platform_api.atom_lab.catalog import (
     AtomLabCatalogConfigError,
@@ -19,6 +22,7 @@ from anytoolai_platform_api.dependencies import (
     get_atom_lab_session_factory,
     get_config_registry,
     get_model_catalog_settings,
+    get_settings,
 )
 from anytoolai_platform_api.errors import AtomLabApiError
 from anytoolai_platform_api.schemas import (
@@ -37,15 +41,16 @@ from anytoolai_platform_api.schemas import (
     AtomLabPresetVersionResponse,
     AtomLabPresetVersionSummaryResponse,
 )
+from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.actions.runner import ActionInputValidationError
 from anytoolai_platform_core.atom_lab.models import (
-    ATOM_LAB_REGION,
-    ATOM_LAB_TENANT_ID,
     AtomLabPresetIdentityRecord,
     AtomLabPresetVersionRecord,
+    is_addressable_atom_lab_model,
 )
 from anytoolai_platform_core.atom_lab.repository import (
     AtomLabPresetRepository,
+    PresetAtomMismatchError,
     PresetSourceRunError,
     PresetVersionConflictError,
 )
@@ -188,11 +193,25 @@ def create_preset(
     payload: AtomLabPresetVersionRequest,
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> AtomLabPresetCreatedResponse:
     _validate_preset_payload(payload, registry)
     now = utc_now()
-    identity = AtomLabPresetIdentityRecord(created_at=now, updated_at=now)
-    version = _preset_version_record(identity.id, 1, payload, created_at=now)
+    identity = AtomLabPresetIdentityRecord(
+        tenant_id=settings.default_tenant_id,
+        region=settings.default_region,
+        atom_id=payload.atom_id.value,
+        created_at=now,
+        updated_at=now,
+    )
+    version = _preset_version_record(
+        identity.id,
+        1,
+        payload,
+        tenant_id=identity.tenant_id,
+        region=identity.region,
+        created_at=now,
+    )
     try:
         with transaction_boundary(session_factory) as session:
             stored = AtomLabPresetRepository(session).create(identity, version)
@@ -212,14 +231,15 @@ def create_preset(
 )
 def list_presets(
     session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
+    settings: Annotated[Settings, Depends(get_settings)],
     limit: Annotated[int, Query(ge=1, le=_PRESET_PAGE_MAX)] = _PRESET_PAGE_DEFAULT,
     cursor: str | None = None,
 ) -> AtomLabPresetListResponse:
     before = _decode_preset_cursor(cursor) if cursor is not None else None
     with transaction_boundary(session_factory) as session:
         rows = AtomLabPresetRepository(session).list_presets(
-            tenant_id=ATOM_LAB_TENANT_ID,
-            region=ATOM_LAB_REGION,
+            tenant_id=settings.default_tenant_id,
+            region=settings.default_region,
             before=before,
             limit=limit + 1,
         )
@@ -252,12 +272,15 @@ def create_preset_version(
     payload: AtomLabPresetNextVersionRequest,
     registry: Annotated[ConfigRegistry, Depends(get_config_registry)],
     session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> AtomLabPresetCreatedResponse:
     _validate_preset_payload(payload, registry)
     version = _preset_version_record(
         preset_id,
         payload.base_version + 1,
         payload,
+        tenant_id=settings.default_tenant_id,
+        region=settings.default_region,
         created_at=utc_now(),
     )
     try:
@@ -274,6 +297,8 @@ def create_preset_version(
             code="preset_version_conflict",
             message="Пресет уже содержит более новую версию.",
         ) from exc
+    except PresetAtomMismatchError as exc:
+        raise _preset_contract_invalid("atom_id") from exc
     except PresetSourceRunError as exc:
         raise _preset_source_invalid() from exc
     return AtomLabPresetCreatedResponse(
@@ -291,6 +316,7 @@ def create_preset_version(
 def list_preset_versions(
     preset_id: str,
     session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
+    settings: Annotated[Settings, Depends(get_settings)],
     limit: Annotated[int, Query(ge=1, le=_PRESET_PAGE_MAX)] = _PRESET_PAGE_DEFAULT,
     cursor: str | None = None,
 ) -> AtomLabPresetVersionListResponse:
@@ -299,14 +325,14 @@ def list_preset_versions(
         repository = AtomLabPresetRepository(session)
         if repository.get_identity(
             preset_id,
-            tenant_id=ATOM_LAB_TENANT_ID,
-            region=ATOM_LAB_REGION,
+            tenant_id=settings.default_tenant_id,
+            region=settings.default_region,
         ) is None:
             raise _preset_not_found()
         rows = repository.list_versions(
             preset_id,
-            tenant_id=ATOM_LAB_TENANT_ID,
-            region=ATOM_LAB_REGION,
+            tenant_id=settings.default_tenant_id,
+            region=settings.default_region,
             before_version=before_version,
             limit=limit + 1,
         )
@@ -337,8 +363,9 @@ def get_preset_version(
     preset_id: str,
     version: int,
     session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> AtomLabPresetVersionResponse:
-    stored = _get_preset_version(session_factory, preset_id, version)
+    stored = _get_preset_version(session_factory, settings, preset_id, version)
     return _preset_version_response(stored)
 
 
@@ -351,8 +378,9 @@ def export_preset_version(
     preset_id: str,
     version: int,
     session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> AtomLabPresetExportResponse:
-    stored = _get_preset_version(session_factory, preset_id, version)
+    stored = _get_preset_version(session_factory, settings, preset_id, version)
     detail = _preset_version_response(stored)
     configuration = AtomLabPresetVersionRequest.model_validate(
         detail.model_dump(exclude={"preset_id", "version", "created_at"})
@@ -431,6 +459,8 @@ def _validate_preset_payload(
         field_errors.append(_field_error("prompt_ref"))
     if payload.schema_refs.model_dump(mode="json") != expected_refs:
         field_errors.append(_field_error("schema_refs"))
+    if not is_addressable_atom_lab_model(payload.model_id):
+        field_errors.append(_field_error("model_id"))
 
     field_errors.extend(_validate_fixed_fields(payload))
 
@@ -441,14 +471,10 @@ def _validate_preset_payload(
         path = "example_input" if not suffix else f"example_input.{suffix}"
         field_errors.append(_field_error(path))
     else:
-        input_validator = build_input_validators(registry.action_definitions).get(
-            atom.action_type
-        )
-        if input_validator is not None:
-            try:
-                input_validator.validate(input_payload=payload.example_input)
-            except ActionInputValidationError:
-                field_errors.append(_field_error("example_input"))
+        try:
+            _validate_semantic_input(registry, atom.action_type, payload.example_input)
+        except ActionInputValidationError:
+            field_errors.append(_field_error("example_input"))
 
     if field_errors:
         raise AtomLabApiError(
@@ -457,6 +483,22 @@ def _validate_preset_payload(
             message="Конфигурация пресета не соответствует контракту атома.",
             field_errors=field_errors,
         )
+
+
+def _validate_semantic_input(
+    registry: ConfigRegistry,
+    action_type: str,
+    input_payload: dict[str, Any],
+) -> None:
+    action_definition = registry.get_action_definition(action_type)
+    if action_definition is None:
+        raise _catalog_unavailable()
+    try:
+        input_validator = build_input_validator(action_definition)
+    except ValidatorRefNotFoundError as exc:
+        raise _catalog_unavailable() from exc
+    if input_validator is not None:
+        input_validator.validate(input_payload=input_payload)
 
 
 def _validate_fixed_fields(
@@ -479,6 +521,8 @@ def _preset_version_record(
     version: int,
     payload: AtomLabPresetVersionRequest,
     *,
+    tenant_id: str,
+    region: str,
     created_at: datetime,
 ) -> AtomLabPresetVersionRecord:
     return AtomLabPresetVersionRecord(
@@ -498,6 +542,8 @@ def _preset_version_record(
         reasoning_effort=payload.reasoning_effort,
         fixed_fields=tuple(payload.fixed_fields),
         example_input=payload.example_input,
+        tenant_id=tenant_id,
+        region=region,
         source_run_id=payload.source_run_id,
         created_at=created_at,
     )
@@ -505,6 +551,7 @@ def _preset_version_record(
 
 def _get_preset_version(
     session_factory: Any,
+    settings: Settings,
     preset_id: str,
     version: int,
 ) -> AtomLabPresetVersionRecord:
@@ -512,8 +559,8 @@ def _get_preset_version(
         stored = AtomLabPresetRepository(session).get_version(
             preset_id,
             version,
-            tenant_id=ATOM_LAB_TENANT_ID,
-            region=ATOM_LAB_REGION,
+            tenant_id=settings.default_tenant_id,
+            region=settings.default_region,
         )
     if stored is None:
         raise _preset_not_found()
@@ -598,7 +645,10 @@ def _decode_preset_cursor(cursor: str) -> tuple[datetime, str]:
             or not value[1]
         ):
             raise ValueError
-        return datetime.fromisoformat(value[0]), value[1]
+        created_at = datetime.fromisoformat(value[0])
+        if created_at.utcoffset() is None:
+            raise ValueError
+        return created_at.astimezone(UTC), value[1]
     except (ValueError, TypeError, json.JSONDecodeError, binascii.Error) as exc:
         raise AtomLabApiError(
             status_code=HTTPStatus.UNPROCESSABLE_ENTITY,

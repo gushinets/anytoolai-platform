@@ -7,6 +7,7 @@ from anytoolai_platform_core.atom_lab.models import (
 from anytoolai_platform_core.atom_lab.repository import (
     AtomLabPresetRepository,
     AtomLabRunRepository,
+    PresetAtomMismatchError,
     PresetSourceRunError,
     PresetVersionConflictError,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "AtomLabPresetVersionRecord",
     "AtomLabRunRecord",
     "AtomLabRunRepository",
+    "PresetAtomMismatchError",
     "PresetSourceRunError",
     "PresetVersionConflictError",
 ]

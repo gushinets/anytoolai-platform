@@ -81,6 +81,7 @@ Definitions remain in repository configuration; these tables store runtime state
 | id | VARCHAR(128) | no |
 | tenant_id | VARCHAR(128) | no |
 | region | VARCHAR(64) | no |
+| atom_id | VARCHAR(16) | no |
 | latest_version | INTEGER | no |
 | created_at | DATETIME | no |
 | updated_at | DATETIME | no |

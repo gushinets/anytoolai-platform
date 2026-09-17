@@ -6,7 +6,7 @@
 - Phase: AL05/ANY-463 implementation and verification complete on feature/ANY-463
 - Owner: mixed
 - Created: 2026-09-09
-- Last updated: 2026-09-16
+- Last updated: 2026-09-17
 - Review date: 2026-09-16
 - Next action: Review and commit ANY-463, then continue with ANY-462/AL04.
 - Blocker: none for development; operator configuration required before rollout.
@@ -271,6 +271,12 @@ Acceptance: Первый полный API vertical slice одного атома
 
 Общая для команды библиотека: GET/POST /presets, GET /presets/{id}/versions/{version}, POST /presets/{id}/versions, GET /presets/{id}/versions/{version}/export. PostgreSQL preset identity + immutable versions, optimistic base_version check и атомарная нумерация. Сохранять имя/описание, atom/base config/schema refs+versions, prompt/provenance, model/effort, fixed top-level fields, пример входа, optional source run. Фиксация целого поля, без произвольных JSON paths; запуск использует видимый полный payload, нет скрытого overwrite. Export versioned JSON secret-free, достаточный для ручного переноса в YAML/prompt/provider policy через review. No production config DB registry, import, auto PR, delete UI. Недоступная модель/старый контракт не лишают чтения пресета; запуск требует явной адаптации.
 
+Preset identity относится ровно к одному `atom_id`; новые версии могут обновлять contract/schema/prompt
+версии, но не могут менять атом. Tenant/region пресета берутся из того же server-owned
+`Settings.default_tenant_id/default_region`, который API использует при создании scenario sessions;
+lab ownership определяется typed `RuntimeScope.atom_lab`, а repository дополнительно сохраняет и
+сверяет scope для source-run и run-to-preset связей. Отдельных Atom Lab tenant/region literals нет.
+
 Acceptance: Сохранение и reopen после restart, immutable old versions, concurrent save -> conflict без потери данных. Создание, чтение, версионирование и экспорт защищены; удаление не входит в v1. Сохранение не вызывает LLM и не меняет production. Невалидные refs/fields отвергаются; source run проверяется в lab scope. PostgreSQL tests и export fixture с точными полями/без secrets.
 
 ### Уточнения после аудита
@@ -281,6 +287,13 @@ Acceptance: Сохранение и reopen после restart, immutable old ver
 - [x] Проверить source_run_id в lab scope и соответствие atom/schema provenance. Ссылка означает происхождение, а не доказательство идентичности настроек или качества результата. Черновой пресет можно сохранить без successful run; не ставить статус «проверен» автоматически. Невалидный input не проходит contract validation, но плохой по смыслу prompt допустим.
 - [x] Экспорт конкретной версии: `{format_version:1,preset_id,version,configuration}`, configuration содержит version payload без credentials, provider base URL и внутренних auth данных. Модель/effort — настройки для ручного переноса в provider policy, не raw поля production action config. Runtime не читает production configs из этой библиотеки.
 - [x] Чтение старых версий не требует доступности модели. Сохранённые schema/provenance сведения остаются читаемыми; ANY-462 проверяет совместимость перед новым запуском. Contract tests покрывают exact export fields, conflicts, scope, разные версии и отсутствие LLM вызова при save. Добавить `apps/platform-api/tests/test_atom_lab_presets.py`; error envelope совпадает с разделом API плана.
+
+AL05 API errors: `404 preset_not_found`; `409 preset_version_conflict`; `422
+preset_contract_invalid`, `preset_source_run_invalid` или `invalid_cursor`; `503
+atom_lab_catalog_unavailable`. Оба list endpoint возвращают `{items,next_cursor}` с opaque cursor и
+стабильным keyset order. Export возвращает ровно
+`{format_version:1,preset_id,version,configuration}`; `configuration` — secret-free version payload
+для ручного переноса через review, а не runtime production registry.
 
 
 ### AL06 — [ANY-464](https://linear.app/paveldik/issue/ANY-464/atom-lab-vybor-atoma-pasport-formy-vseh-kontraktov-i-redaktor-prompta): Atom Lab: выбор атома, паспорт, формы всех контрактов и редактор промпта
@@ -421,6 +434,7 @@ Acceptance: Compose smoke: migrations, API/worker ready, assets доступны
 | 2026-09-14 | ANY-460 started on `feature/ANY-460`; confirmed ANY-459 is the branch base, reviewed the approved Atom Lab spec/AL02 contracts, and selected immutable snapshot + registry compatibility hash + typed run-local execution settings. `doctor` under system `python3` reported missing pytest/yaml/pydantic, while the repository-managed `.quick-check-venv` is present for canonical checks. | Add failing storage, config, worker/provider isolation tests before implementation. |
 | 2026-09-14 | Implemented AL02: migration/repository snapshot, 11 internal full-payload bindings, worker compatibility loading, typed prompt/model/effort/policy propagation, direct LiteLLM model addressing, fill-once runtime links, and ordinary-job isolation. TDD regressions, `quick-check` (1283 passed) and a real PostgreSQL `postgresql-check` completed successfully, including three-worker concurrency and restart coverage. | Review and commit ANY-460. |
 | 2026-09-16 | Implemented AL05/ANY-463: immutable preset identities and versions, optimistic concurrent saves, source-run and contract validation, protected list/detail/version/export APIs, run-to-preset integrity constraints, and exact secret-free export. Added API, SQLite, and real PostgreSQL concurrency coverage; regenerated OpenAPI and frontend contracts; `quick-check`, `postgresql-check`, and `full-check` passed. | Review and commit ANY-463, then continue with ANY-462/AL04. |
+| 2026-09-17 | Addressed PR #128 review: unified preset/run tenant-region scope through API settings, made `atom_id` an identity invariant, hardened cursor/model/validator boundaries, expanded deterministic pagination/error/source-run coverage, and documented AL05 error/list/export contracts. `quick-check` (1358 passed), real PostgreSQL `postgresql-check`, Ruff, docs checks, and `full-check` passed. | Commit and push review fixes; resolve review threads after GitHub readback. |
 
 ## Planning revision verification (2026-09-09)
 
