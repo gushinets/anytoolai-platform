@@ -57,6 +57,23 @@ h1,
 h2,
 h3 {
   font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  /* SKILL.md's "Section" role (800 weight) -- the closest defined role to a page-level <h1>; no
+   * <h2>/<h3> exists anywhere in apps/web-mirror yet, so only <h1> also gets an explicit size,
+   * rather than guessing sizes for heading levels nothing renders. */
+  font-weight: 800;
+}
+
+h1 {
+  font-size: 28px;
+}
+
+/* SKILL.md's "Label" role: DM Sans, 600 weight, 10-11px -- ProposalAIFields's <label> elements
+ * were rendering as unstyled browser-default text (same as body), which both looks wrong and
+ * technically falls under Bundle 3's "unapproved system-font replacement" prohibition. */
+label {
+  font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  font-weight: 600;
+  font-size: 11px;
 }
 
 /* SKILL.md: "At 520px, actions become full width where necessary" -- scoped to the primary

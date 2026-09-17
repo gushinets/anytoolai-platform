@@ -7,57 +7,42 @@ import tokens from "../src/tokens.json";
 // guarantee resolves to a real file:// URL for every test file.
 const css = readFileSync("src/tokens.css", "utf-8");
 
+function toKebabCase(name: string): string {
+  return name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+}
+
 /**
  * tokens.json is the canonical source; tokens.css hand-derives CSS custom properties from it with
- * no generator, so this is the sync guarantee -- it fails the moment a value drifts between the
- * two. typography.* is excluded: those map to next/font-loaded families in layout.tsx, not a
+ * no generator. The expected set is built programmatically from tokens.json itself (not a
+ * hand-maintained list), so this fails both on a value drift AND on a key-set drift: a token added
+ * to tokens.json but never wired into CSS, or a stale CSS custom property whose JSON source was
+ * removed. typography.* is excluded: those map to next/font-loaded families in layout.tsx, not a
  * 1:1 custom property.
  */
-const EXPECTED: Record<string, string> = {
-  "--color-background": tokens.colors.background,
-  "--color-background-secondary": tokens.colors.backgroundSecondary,
-  "--color-background-tertiary": tokens.colors.backgroundTertiary,
-  "--color-surface-card": tokens.colors.surfaceCard,
-  "--color-surface-hover": tokens.colors.surfaceHover,
-  "--color-surface-active": tokens.colors.surfaceActive,
-  "--color-border": tokens.colors.border,
-  "--color-border-strong": tokens.colors.borderStrong,
-  "--color-text": tokens.colors.text,
-  "--color-text-secondary": tokens.colors.textSecondary,
-  "--color-text-disabled": tokens.colors.textDisabled,
-  "--color-accent": tokens.colors.accent,
-  "--color-accent-deep": tokens.colors.accentDeep,
-  "--color-accent-glow": tokens.colors.accentGlow,
-  "--color-teal": tokens.colors.teal,
-  "--color-teal-glow": tokens.colors.tealGlow,
-  "--color-success": tokens.colors.success,
-  "--color-success-background": tokens.colors.successBackground,
-  "--color-success-border": tokens.colors.successBorder,
-  "--color-error": tokens.colors.error,
-  "--color-error-background": tokens.colors.errorBackground,
-  "--color-warning": tokens.colors.warning,
-  "--gradient-accent": tokens.gradients.accent,
-  "--gradient-headline": tokens.gradients.headline,
-  "--layout-max-width": tokens.layout.maxWidth,
-  "--layout-grid-gap": tokens.layout.gridGap,
-  "--radius-input": tokens.radius.input,
-  "--radius-button": tokens.radius.button,
-  "--radius-card": tokens.radius.card,
-  "--radius-panel": tokens.radius.panel,
-  "--radius-hero": tokens.radius.hero,
-  "--radius-pill": tokens.radius.pill,
-};
+const PREFIXES = { colors: "color", gradients: "gradient", layout: "layout", radius: "radius" } as const;
 
-function cssValueOf(name: string): string {
-  const match = css.match(new RegExp(`${name}:\\s*([^;]+);`));
-  if (!match) {
-    throw new Error(`tokens.css has no declaration for ${name}`);
+const expected = new Map<string, string>();
+for (const [group, prefix] of Object.entries(PREFIXES) as [keyof typeof PREFIXES, string][]) {
+  for (const [key, value] of Object.entries(tokens[group])) {
+    expected.set(`--${prefix}-${toKebabCase(key)}`, value);
   }
-  return match[1]!.trim();
+}
+
+const rootBlock = css.match(/:root\s*{([^}]*)}/s)?.[1];
+if (rootBlock === undefined) {
+  throw new Error("tokens.css has no :root block");
+}
+const actual = new Map<string, string>();
+for (const match of rootBlock.matchAll(/(--[a-z0-9-]+):\s*([^;]+);/g)) {
+  actual.set(match[1]!, match[2]!.trim());
 }
 
 describe("tokens.css stays in sync with tokens.json", () => {
-  it.each(Object.entries(EXPECTED))("%s matches tokens.json", (name, expected) => {
-    expect(cssValueOf(name)).toBe(expected);
+  it("declares exactly the custom properties tokens.json's colors/gradients/layout/radius define -- no more, no fewer", () => {
+    expect([...actual.keys()].sort()).toEqual([...expected.keys()].sort());
+  });
+
+  it.each([...expected.entries()])("%s matches tokens.json", (name, value) => {
+    expect(actual.get(name)).toBe(value);
   });
 });

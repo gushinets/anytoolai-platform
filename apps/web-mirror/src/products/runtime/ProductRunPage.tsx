@@ -513,10 +513,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   if (boot.kind === "loading") {
-    return <p role="status">Loading {definition.title}…</p>;
+    return (
+      <main className="page-container">
+        <p role="status">Loading {definition.title}…</p>
+      </main>
+    );
   }
   if (boot.kind === "boot-error") {
-    return <ErrorState message={`${definition.title} is unavailable right now. Please reload the page.`} />;
+    return (
+      <main className="page-container">
+        <ErrorState message={`${definition.title} is unavailable right now. Please reload the page.`} />
+      </main>
+    );
   }
 
   const busy = phase.kind === "submitting" || phase.kind === "running";
