@@ -11,14 +11,31 @@ from typing import Any
 
 import httpx
 import pytest
+import sqlalchemy as sa
 from anytoolai_platform_actions.structured_llm.cross_validation import (
     ValidatorRefNotFoundError,
 )
 from anytoolai_platform_api.dependencies import get_atom_lab_session_factory
 from anytoolai_platform_api.main import create_app
 from anytoolai_platform_api.routers import atom_lab as atom_lab_router
-from anytoolai_platform_core.storage.db import runtime_metadata
-from anytoolai_platform_core.storage.transactions import build_session_factory
+from anytoolai_platform_api.settings import Settings
+from anytoolai_platform_core.atom_lab.repository import AtomLabRunRepository
+from anytoolai_platform_core.atom_lab.snapshots import (
+    AtomLabSnapshotRequest,
+    build_atom_lab_run_record,
+)
+from anytoolai_platform_core.bootstrap.registry import build_config_registry
+from anytoolai_platform_core.providers.models import ReasoningEffort
+from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
+from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
+from anytoolai_platform_core.storage.db import provider_calls_table, runtime_metadata
+from anytoolai_platform_core.storage.transactions import (
+    SessionFactory,
+    build_session_factory,
+    transaction_boundary,
+)
+from anytoolai_platform_core.workflows.models import JobRecord
+from anytoolai_platform_core.workflows.repository import JobRepository
 from fastapi import FastAPI
 
 from tests.support.sqlite_harness import build_sqlite_runtime_engine
@@ -112,6 +129,70 @@ def _version_payload_for_atom(app: FastAPI, atom_id: str) -> dict[str, Any]:
     )
 
 
+def _session_factory(app: FastAPI) -> SessionFactory:
+    return app.dependency_overrides[get_atom_lab_session_factory]()
+
+
+def _provider_call_count(app: FastAPI) -> int:
+    with transaction_boundary(_session_factory(app)) as session:
+        return int(
+            session.scalar(sa.select(sa.func.count()).select_from(provider_calls_table)) or 0
+        )
+
+
+def _seed_lab_run(
+    app: FastAPI,
+    *,
+    tenant_id: str,
+    region: str,
+    suffix: str,
+) -> str:
+    input_payload = _version_payload()["example_input"]
+    session_factory = _session_factory(app)
+    with transaction_boundary(session_factory) as session:
+        scenario = ScenarioSessionRepository(session).create(
+            ScenarioSessionRecord(
+                id=f"scenario_session_lab_{suffix}",
+                tenant_id=tenant_id,
+                region=region,
+                product_id="kernel_demo",
+                frontend_id="kernel_demo_web",
+                scenario_id="kernel_demo.atom_lab_a01_v1",
+                scenario_version=1,
+                metadata={"runtime_scope": "atom_lab", "input": input_payload},
+            )
+        )
+        job = JobRepository(session).create(
+            JobRecord(
+                id=f"job_lab_{suffix}",
+                tenant_id=tenant_id,
+                region=region,
+                product_id=scenario.product_id,
+                frontend_id=scenario.frontend_id,
+                scenario_session_id=scenario.id,
+                workflow_id="kernel_demo.atom_lab_a01_v1",
+                workflow_version=1,
+            )
+        )
+
+    run = build_atom_lab_run_record(
+        build_config_registry(CONFIG_ROOT),
+        scenario=scenario,
+        job=job,
+        request=AtomLabSnapshotRequest(
+            atom_id="A01",
+            input_payload=input_payload,
+            prompt=_version_payload()["prompt"],
+            model_id="openai/gpt-5.4-mini",
+            reasoning_effort=ReasoningEffort.high,
+            capability_snapshot_id=f"capability_snapshot_{suffix}",
+            capability_provenance={},
+        ),
+    )
+    with transaction_boundary(session_factory) as session:
+        return AtomLabRunRepository(session).create(run).id
+
+
 def test_create_read_list_version_and_export_preserves_immutable_payload(app: FastAPI) -> None:
     created = asyncio.run(
         _request(app, "POST", "/v1/atom-lab/presets", json=_version_payload())
@@ -180,6 +261,26 @@ def test_create_read_list_version_and_export_preserves_immutable_payload(app: Fa
     }
     assert "credential" not in exported.text.lower()
     assert "base_url" not in exported.text.lower()
+
+
+def test_saving_preset_versions_does_not_invoke_provider(app: FastAPI) -> None:
+    assert _provider_call_count(app) == 0
+
+    created = asyncio.run(
+        _request(app, "POST", "/v1/atom-lab/presets", json=_version_payload())
+    )
+    assert created.status_code == HTTPStatus.CREATED
+
+    versioned = asyncio.run(
+        _request(
+            app,
+            "POST",
+            f"/v1/atom-lab/presets/{created.json()['preset_id']}/versions",
+            json={"base_version": 1, **_version_payload(name="Вторая версия")},
+        )
+    )
+    assert versioned.status_code == HTTPStatus.CREATED
+    assert _provider_call_count(app) == 0
 
 
 def test_new_version_is_append_only_and_rejects_stale_base(app: FastAPI) -> None:
@@ -531,3 +632,49 @@ def test_source_run_must_exist_in_matching_lab_scope(app: FastAPI) -> None:
     assert response.json()["error"]["field_errors"] == [
         {"path": "source_run_id", "message": "Недопустимое значение."}
     ]
+
+
+def test_source_run_accepts_default_scope_and_rejects_cross_scope(app: FastAPI) -> None:
+    settings = Settings()
+    source_run_id = _seed_lab_run(
+        app,
+        tenant_id=settings.default_tenant_id,
+        region=settings.default_region,
+        suffix="default_scope",
+    )
+
+    created = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/atom-lab/presets",
+            json=_version_payload(source_run_id=source_run_id),
+        )
+    )
+    assert created.status_code == HTTPStatus.CREATED
+    detail = asyncio.run(
+        _request(
+            app,
+            "GET",
+            f"/v1/atom-lab/presets/{created.json()['preset_id']}/versions/1",
+        )
+    )
+    assert detail.status_code == HTTPStatus.OK
+    assert detail.json()["source_run_id"] == source_run_id
+
+    cross_scope_run_id = _seed_lab_run(
+        app,
+        tenant_id="other_tenant",
+        region=settings.default_region,
+        suffix="cross_scope",
+    )
+    rejected = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/atom-lab/presets",
+            json=_version_payload(source_run_id=cross_scope_run_id),
+        )
+    )
+    assert rejected.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert rejected.json()["error"]["code"] == "preset_source_run_invalid"
