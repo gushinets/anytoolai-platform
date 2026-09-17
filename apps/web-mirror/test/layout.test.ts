@@ -70,12 +70,37 @@ describe("layout.tsx's fonts stay in sync with tokens.json's typography", () => 
     }
   });
 
-  it("layout.tsx loads the headline font from Fontshare's API (its license forbids a self-hosted binary in this public repo), and tokens.css references its exact family name", () => {
+  it("layout.tsx actually renders a <link> to Fontshare's headline font (its license forbids a self-hosted binary in this public repo), at the same weight tokens.css's heading rule uses", () => {
     const layoutSource = readFileSync("src/app/layout.tsx", "utf-8");
     const slug = fontshareSlug(tokens.typography.headline);
-    expect(layoutSource).toMatch(new RegExp(`api\\.fontshare\\.com/v2/css\\?f\\[\\]=${slug}@`));
+
+    // Captures the identifier, the full URL, and the requested weight together -- a URL edited to
+    // a different weight without touching tokens.css (or vice versa) is exactly what this test
+    // must catch, so both values come from the same regex match, not two independent lookups.
+    const urlMatch = layoutSource.match(
+      new RegExp(`const (\\w+)\\s*=\\s*"(https://api\\.fontshare\\.com/v2/css\\?f\\[\\]=${slug}@(\\d+)[^"]*)"`),
+    );
+    if (!urlMatch) {
+      throw new Error(`layout.tsx has no Fontshare CSS URL constant for slug "${slug}"`);
+    }
+    const [, identifier, , requestedWeight] = urlMatch as [string, string, string, string];
+
+    // A `<link>` tag that never actually references the URL constant (e.g. left over after the
+    // <link> itself was deleted, or pointed at a different constant) must fail this, not just the
+    // constant's own existence.
+    const linkPattern = new RegExp(`<link(?=[^>]*\\brel="stylesheet")(?=[^>]*\\bhref=\\{${identifier}\\})[^>]*/?>`);
+    expect(layoutSource).toMatch(linkPattern);
 
     const tokensCss = readFileSync("../../packages/frontend/shared-ui/src/tokens.css", "utf-8");
-    expect(tokensCss).toContain(`"${tokens.typography.headline}"`);
+    const headingBlock = tokensCss.match(/\bh1\b[\s\S]*?\{([\s\S]*?)\}/)?.[1];
+    if (headingBlock === undefined) {
+      throw new Error("tokens.css has no h1 rule block");
+    }
+    expect(headingBlock).toContain(`"${tokens.typography.headline}"`);
+    // Bundle 3's roles pair a specific weight with a specific size (e.g. Display: 900/44-56px,
+    // Section: 800/26-36px) -- the requested weight and the CSS weight must be the literal same
+    // number, not just both present, or a delivery-driven weight change (like the one that
+    // motivated 900 here) can silently mismatch the role its own size still implies.
+    expect(headingBlock).toMatch(new RegExp(`font-weight:\\s*${requestedWeight}\\b`));
   });
 });
