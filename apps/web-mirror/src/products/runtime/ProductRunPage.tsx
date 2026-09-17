@@ -563,7 +563,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   return (
-    <main>
+    <main className="page-container">
       <h1>{definition.title}</h1>
       {quota ? <p aria-live="polite">{definition.copy.quotaRemaining(quota.remainingCount, quota.limitCount)}</p> : null}
 
