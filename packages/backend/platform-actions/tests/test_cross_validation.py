@@ -657,6 +657,24 @@ class TestComposeReplyCrossValidator:
             # plain_text allows ordered/unordered list markers (ANY-502) — a live model
             # naturally reaches for lists on multi-item asks.
             *_PLAIN_TEXT_LIST_ACCEPT_CASES,
+            # Code review finding (me #15): _visible_text_content ignored code_inline/fence
+            # content entirely, so a schema-valid markdown reply that's *entirely* code (a
+            # legitimate answer to "what's the build command?") was wrongly treated as blank.
+            ({"constraints": {"output_format": "markdown"}}, {"text": "`npm run build`"}),
+            (
+                {"constraints": {"output_format": "markdown"}},
+                {"text": "```\nnpm run build\n```"},
+            ),
+            (
+                # plain_text keeps its own separate, stricter no-markup rule for
+                # call_to_action (unrelated to this blank-content fix) -- markdown format
+                # isn't subject to that rule, so it isolates the blank-content check alone.
+                {"constraints": {"output_format": "markdown"}},
+                {"text": "Plain reply.", "call_to_action": "`npm run build`"},
+            ),
+            # HTML entities must decode before the blank check -- "&amp;" is real visible
+            # content ("&"), not whitespace.
+            ({"constraints": {"output_format": "html"}}, {"text": "<p>&amp;</p>"}),
         ],
     )
     def test_accepts(self, input_payload: dict, output: dict) -> None:
@@ -740,6 +758,19 @@ class TestComposeReplyCrossValidator:
             ({"constraints": {"output_format": "html"}}, {"text": "<p></p>"}),
             ({"constraints": {"output_format": "html"}}, {"text": "<p>  </p>"}),
             ({}, {"text": "Plain reply.", "call_to_action": "   "}),
+            # Code review finding (me #15): a raw HTML block's content is never
+            # parser-decoded, so an unescaped character reference like "&nbsp;" survived the
+            # tag-strip as a literal, non-whitespace string and wrongly counted as content.
+            ({"constraints": {"output_format": "html"}}, {"text": "<p>&nbsp;</p>"}),
+            ({"constraints": {"output_format": "html"}}, {"text": "<div>&nbsp;</div>"}),
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "<p>&#32;&#x09;&#10;</p>"},
+            ),
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "Plain reply.", "call_to_action": "<p>&nbsp;</p>"},
+            ),
         ],
     )
     def test_rejects(self, input_payload: dict, output: dict | None) -> None:
@@ -1038,6 +1069,11 @@ class TestPersuasiveTextCrossValidator:
             # plain_text allows ordered/unordered list markers (ANY-502) — a live model
             # naturally reaches for lists on multi-item asks.
             *_PLAIN_TEXT_LIST_ACCEPT_CASES,
+            # Code review finding (me #15): code-only markdown content and a real decoded
+            # HTML entity must count as visible text, same as A07's sibling validator.
+            ({"constraints": {"format": "markdown"}}, {"text": "`npm run build`"}),
+            ({"constraints": {"format": "markdown"}}, {"text": "```\nnpm run build\n```"}),
+            ({"constraints": {"format": "html"}}, {"text": "<p>&amp;</p>"}),
         ],
     )
     def test_accepts(self, input_payload: dict, output: dict) -> None:
@@ -1092,6 +1128,11 @@ class TestPersuasiveTextCrossValidator:
             ({}, {"text": "\n\t"}),
             ({"constraints": {"format": "html"}}, {"text": "<p></p>"}),
             ({"constraints": {"format": "html"}}, {"text": "<p>  </p>"}),
+            # Code review finding (me #15): same character-reference-decoding gap as A07's
+            # sibling validator -- "&nbsp;" survives a raw tag-strip as a literal string.
+            ({"constraints": {"format": "html"}}, {"text": "<p>&nbsp;</p>"}),
+            ({"constraints": {"format": "html"}}, {"text": "<div>&nbsp;</div>"}),
+            ({"constraints": {"format": "html"}}, {"text": "<p>&#32;&#x09;&#10;</p>"}),
         ],
     )
     def test_rejects(self, input_payload: dict, output: dict | None) -> None:

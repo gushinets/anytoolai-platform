@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import re
 import unicodedata
 from typing import Any
@@ -193,16 +194,25 @@ def _strip_html_constructs(content: str) -> str:
         index = start + 1
 
 
+# Code review finding (me #15): "text" alone missed code content -- `code_inline` ("`npm run
+# build`"), `fence` and `code_block` (fenced/indented code) are all legitimate, already-decoded
+# visible content in their own right, not markup to strip.
+_TEXT_CONTENT_TOKEN_TYPES = frozenset({"text", "code_inline", "fence", "code_block"})
+
+
 def _visible_text_content(value: str) -> str:
-    """Concatenates `value`'s actual rendered text: plain "text" tokens as-is, and (for
-    html_inline/html_block tokens) whatever remains of their raw content once every HTML5
-    construct is stripped out. Tells real content ("Hello", `<p>Hello</p>`) apart from markup
-    with nothing inside it (`<p></p>`, a lone `<Tuesday>`-shaped tag) or literal whitespace."""
+    """Concatenates `value`'s actual rendered text: plain-text-shaped tokens as-is (already
+    entity-decoded by the parser), and (for html_inline/html_block tokens) whatever remains of
+    their raw content once every HTML5 construct is stripped and any character reference
+    (`&nbsp;`, `&#32;`, ...) is decoded -- raw HTML content is never parser-decoded the way a
+    "text" token's content already is. Tells real content ("Hello", `<p>Hello</p>`,
+    `` `npm run build` ``) apart from markup with nothing visible inside it (`<p></p>`,
+    `<p>&nbsp;</p>`, a lone `<Tuesday>`-shaped tag) or literal whitespace."""
     parts: list[str] = []
     for token in _flatten_tokens(_HTML_RENDERER.parse(value)):
         if token.type.startswith("html_"):
-            parts.append(_strip_html_constructs(token.content))
-        elif token.type == "text":
+            parts.append(html.unescape(_strip_html_constructs(token.content)))
+        elif token.type in _TEXT_CONTENT_TOKEN_TYPES:
             parts.append(token.content)
     return "".join(parts)
 
