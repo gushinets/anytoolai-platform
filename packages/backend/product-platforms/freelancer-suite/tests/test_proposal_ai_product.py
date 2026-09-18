@@ -13,7 +13,6 @@ from typing import Any
 
 import jsonschema
 import pytest
-import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 PRODUCT_DIR = (
@@ -31,32 +30,25 @@ PRODUCT_DIR = (
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 
 
-def _load_validate_architecture_module() -> Any:
-    # Dynamic-load, same pattern as tests/architecture/test_bundle_composition_parity.py's
-    # _load_validate_configs_module -- validate_architecture.py is pure stdlib (no
-    # anytoolai_platform_core import chain), so this stays within ATAI007/ATAI008's ban on
-    # product-platforms code depending on platform-core internals.
-    path = REPO_ROOT / "scripts" / "agent" / "validate_architecture.py"
-    spec = importlib.util.spec_from_file_location("validate_architecture_module", path)
+def _load_test_support_module() -> Any:
+    # Dynamic-load by explicit path, same pattern this file already used for
+    # validate_architecture.py -- code review finding: _load_validate_architecture_module(),
+    # FORBIDDEN_PROVIDER_TERMS, and _load_yaml() were each duplicated verbatim in
+    # test_client_update_writer_product.py; both now load this one shared module instead.
+    path = Path(__file__).resolve().parent / "_test_support.py"
+    spec = importlib.util.spec_from_file_location("freelancer_suite_test_support", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-# Provider-SDK names come from validate_architecture.py's own LLM_PROVIDER_IMPORTS -- the single
-# source of truth ATAI006 already enforces repo-wide -- rather than a second, hand-maintained copy
-# that could silently drift from it (code review finding, round 3). Model-string prefixes are a
-# distinct concern (raw text, not an import name) with no central list to reuse.
-FORBIDDEN_PROVIDER_TERMS = tuple(_load_validate_architecture_module().LLM_PROVIDER_IMPORTS) + (
-    "gpt-",
-    "claude-",
-    "gemini-",
-)
+_test_support = _load_test_support_module()
+FORBIDDEN_PROVIDER_TERMS = _test_support.FORBIDDEN_PROVIDER_TERMS
 
 
 def _load_yaml(name: str) -> dict:
-    return yaml.safe_load((PRODUCT_DIR / name).read_text(encoding="utf-8"))
+    return _test_support.load_yaml(PRODUCT_DIR, name)
 
 
 def test_action_type_sequence_is_exactly_compose_persuasive_text() -> None:

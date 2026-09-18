@@ -7,27 +7,29 @@ afterEach(() => {
 });
 
 describe("ResultView", () => {
-  it("copies the text and calls onCopied on a successful clipboard write", async () => {
-    const writeText = vi.fn(() => Promise.resolve());
-    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
-    const onCopied = vi.fn();
+  it("calls onCopy with the displayed text and shows Copied when it resolves true", async () => {
+    const onCopy = vi.fn(() => Promise.resolve(true));
 
-    render(<ResultView text="Dear client, ..." onCopied={onCopied} />);
+    render(<ResultView text="Dear client, ..." onCopy={onCopy} />);
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
-    expect(writeText).toHaveBeenCalledWith("Dear client, ...");
-    expect(onCopied).toHaveBeenCalledOnce();
+    expect(onCopy).toHaveBeenCalledWith("Dear client, ...");
   });
 
-  it("shows the manual-copy error state, without throwing, when the Clipboard API is unavailable", () => {
-    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
-    const onCopied = vi.fn();
+  it("shows the manual-copy error state, without throwing, when onCopy resolves false", async () => {
+    const onCopy = vi.fn(() => Promise.resolve(false));
 
-    render(<ResultView text="Dear client, ..." onCopied={onCopied} />);
+    render(<ResultView text="Dear client, ..." onCopy={onCopy} />);
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not copy to clipboard/i));
+  });
+
+  it("shows the manual-copy error state, without throwing, when no onCopy is provided", () => {
+    render(<ResultView text="Dear client, ..." />);
 
     expect(() => fireEvent.click(screen.getByRole("button", { name: "Copy" }))).not.toThrow();
     expect(screen.getByRole("alert").textContent).toMatch(/could not copy to clipboard/i);
-    expect(onCopied).not.toHaveBeenCalled();
   });
 });

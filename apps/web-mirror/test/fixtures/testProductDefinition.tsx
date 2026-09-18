@@ -36,9 +36,8 @@ export const testProductDefinition: ProductDefinition<TestProductValues, string>
   validate: (values) => (values.text.trim().length === 0 ? { text: "Text is required." } : {}),
   toInput: (values) => ({ text: values.text }),
   extractResult: (output) => (typeof output.text === "string" ? output.text : null),
-  copyNextActionId: "copy_result",
   Fields: TestProductFields,
-  Result: ({ result, onCopied }) => <ResultView text={result} onCopied={onCopied} />,
+  Result: ({ result, onCopy }) => <ResultView text={result} onCopy={onCopy} />,
   copy: {
     submit: "Run",
     running: "Running…",

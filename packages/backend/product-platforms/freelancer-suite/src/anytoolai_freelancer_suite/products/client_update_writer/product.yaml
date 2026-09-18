@@ -5,3 +5,4 @@ scenarios:
   - client_update_writer.update_v1
   - client_update_writer.prepaid_request_v1
   - client_update_writer.reply_draft_v1
+quota_policy_ref: client_update_writer.guest_quota_v1

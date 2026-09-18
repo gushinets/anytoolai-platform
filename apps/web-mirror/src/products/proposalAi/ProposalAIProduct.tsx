@@ -2,13 +2,12 @@
 
 import type { ChangeEvent } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
-import { Input, Select, TextArea } from "@anytoolai/shared-ui";
+import { Input, TextArea } from "@anytoolai/shared-ui";
 import { ResultView } from "../../components/ResultView";
 import { ProductRunPage } from "../runtime/ProductRunPage";
+import { collectFieldErrors, requiredTrimmedFieldError } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductRunEvent } from "../runtime/productDefinition";
-
-const TONE_OPTIONS = ["neutral", "warm", "firm"] as const;
-type Tone = (typeof TONE_OPTIONS)[number];
+import { ToneSelect, type Tone } from "../runtime/tone";
 
 export type ProposalAIValues = {
   taskText: string;
@@ -17,30 +16,22 @@ export type ProposalAIValues = {
   language: string;
 };
 
-// Mirrors generate_input.schema.json's `language` pattern; task_text/freelancer_positioning are
-// checked structurally below instead of transcribing that schema's equivalent (but harder to
-// read) regex. Backend validation stays authoritative either way.
+// Mirrors generate_input.schema.json's `language` pattern -- checked structurally below instead
+// of transcribing that schema's equivalent (but harder to read) regex. Backend validation stays
+// authoritative either way.
 const LANGUAGE_PATTERN = /^[a-z]{2}(-[A-Z]{2})?$/;
 
 function validate(values: ProposalAIValues): Partial<Record<keyof ProposalAIValues, string>> {
-  const errors: Partial<Record<keyof ProposalAIValues, string>> = {};
-  for (const [field, label] of [
-    ["taskText", "Task description"],
-    ["freelancerPositioning", "Your positioning"],
-  ] as const) {
-    const value = values[field];
-    if (value.trim().length === 0) {
-      errors[field] = `${label} is required.`;
-    } else if (value !== value.trim()) {
-      errors[field] = `${label} must not start or end with whitespace.`;
-    } else if (value.length > 4000) {
-      errors[field] = `${label} must be 4000 characters or fewer.`;
-    }
-  }
-  if (values.language && !LANGUAGE_PATTERN.test(values.language)) {
-    errors.language = 'Language must look like "en" or "en-US".';
-  }
-  return errors;
+  return collectFieldErrors<ProposalAIValues>([
+    ["taskText", requiredTrimmedFieldError(values.taskText, "Task description", 4000)],
+    ["freelancerPositioning", requiredTrimmedFieldError(values.freelancerPositioning, "Your positioning", 4000)],
+    [
+      "language",
+      values.language && !LANGUAGE_PATTERN.test(values.language)
+        ? 'Language must look like "en" or "en-US".'
+        : undefined,
+    ],
+  ]);
 }
 
 function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsProps<ProposalAIValues>) {
@@ -67,19 +58,13 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
       {errors.freelancerPositioning ? <p role="alert">{errors.freelancerPositioning}</p> : null}
 
       <label htmlFor="proposal-ai-tone">Tone (optional)</label>
-      <Select
+      <ToneSelect
         id="proposal-ai-tone"
         value={values.tone}
-        onChange={(event: ChangeEvent<HTMLSelectElement>) => onChange("tone", event.target.value as Tone | "")}
+        onChange={(tone) => onChange("tone", tone)}
         disabled={disabled}
-      >
-        <option value="">Default</option>
-        {TONE_OPTIONS.map((tone) => (
-          <option key={tone} value={tone}>
-            {tone}
-          </option>
-        ))}
-      </Select>
+        placeholderLabel="Default"
+      />
 
       <label htmlFor="proposal-ai-language">Language (optional)</label>
       <Input
@@ -113,9 +98,8 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> =
     ...(values.language ? { language: values.language } : {}),
   }),
   extractResult: (output) => (typeof output.text === "string" ? output.text : null),
-  copyNextActionId: "copy_result",
   Fields: ProposalAIFields,
-  Result: ({ result, onCopied }) => <ResultView text={result} onCopied={onCopied} />,
+  Result: ({ result, onCopy }) => <ResultView text={result} onCopy={onCopy} />,
   copy: {
     submit: "Generate proposal",
     running: "Generating your proposal…",
@@ -127,8 +111,9 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> =
 export type ProposalAIProductProps = {
   client: PlatformApiClient;
   onEvent?: (event: ProductRunEvent) => void;
+  visitId?: string;
 };
 
-export function ProposalAIProduct({ client, onEvent }: ProposalAIProductProps) {
-  return <ProductRunPage definition={proposalAiDefinition} client={client} onEvent={onEvent} />;
+export function ProposalAIProduct({ client, onEvent, visitId }: ProposalAIProductProps) {
+  return <ProductRunPage definition={proposalAiDefinition} client={client} onEvent={onEvent} visitId={visitId} />;
 }

@@ -60,9 +60,25 @@ def load_registry(bundles: Iterable[ProductBundle] | None = None) -> ConfigRegis
     return ConfigLoader(config_root, extra_product_roots=extra_product_roots).load()
 
 
+def products_missing_a_quota_policy(registry: ConfigRegistry) -> list[str]:
+    """Code review finding (ANY-414): `quotas/service.py`'s `validate_accepted_start()` silently
+    treats a product with no `quota_policy_ref` as "quota does not apply" -- guest usage of that
+    product's LLM actions is then completely unmetered. This exact bug has already shipped twice
+    (ProposalAI, then Client Update Writer), each time caught only by a point-fix test rather than
+    a structural check here. Every product in the default bundle set is expected to declare one;
+    a genuinely free/unlimited product should say so by adding an explicit, documented exemption
+    to this function rather than by silently omitting `quota_policy_ref`.
+    """
+    return sorted(
+        product_id
+        for product_id, product in registry.products.items()
+        if not product.quota_policy_ref
+    )
+
+
 def main() -> int:
     try:
-        load_registry()
+        registry = load_registry()
         load_model_capability_overrides(default_model_capability_overrides_path())
     except RegistryLoadError as error:
         print(str(error), file=sys.stderr)
@@ -72,6 +88,15 @@ def main() -> int:
         return 1
     except ValueError as error:
         print(str(error), file=sys.stderr)
+        return 1
+
+    missing_quota_policy = products_missing_a_quota_policy(registry)
+    if missing_quota_policy:
+        print(
+            "Config validation failed: product(s) with no quota_policy_ref (quota enforcement is "
+            "silently skipped for these): " + ", ".join(missing_quota_policy),
+            file=sys.stderr,
+        )
         return 1
 
     print("Config validation passed")
