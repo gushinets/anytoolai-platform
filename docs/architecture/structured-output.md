@@ -111,6 +111,15 @@ provider events.
 Raw provider output must not appear in safe user-facing validation errors. It is preserved only in
 the debug artifact path for platform debugging.
 
+Atom Lab final contract failures use that same debug artifact and rollback-recovery path, tagged
+with the trusted run-local run ID. Its final-answer text is limited to 8 KiB of UTF-8 without
+splitting a character, with explicit `truncated` and `redacted` flags. Control/terminal escape
+sequences are removed; credential or reasoning-envelope markers withhold the entire diagnostic,
+including JSON-escaped key names. The protected run-history API exposes text only from matching,
+versioned Lab diagnostics and reapplies the bound and sanitization when reading. It never reads
+provider reasoning/credential metadata into this diagnostic. Untagged historical debug content
+remains undisclosed, and no debug artifact becomes a successful result or a second execution ledger.
+
 ## Provider Schema Ownership
 
 PydanticAI owns the structured-output schema/retry path for structured actions.

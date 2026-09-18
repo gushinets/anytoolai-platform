@@ -21,6 +21,13 @@ FORBIDDEN_PUBLIC_FRONTEND_TOKENS = {
     "provider_policy_ref",
     "model_id",
 }
+ATOM_LAB_RUN_LIMITS = {
+    "ANYTOOLAI_ATOM_LAB_RUN_BODY_MAX_BYTES": "${ANYTOOLAI_ATOM_LAB_RUN_BODY_MAX_BYTES:-393216}",
+    "ANYTOOLAI_ATOM_LAB_RUN_INPUT_MAX_BYTES": "${ANYTOOLAI_ATOM_LAB_RUN_INPUT_MAX_BYTES:-262144}",
+    "ANYTOOLAI_ATOM_LAB_RUN_PROMPT_MAX_BYTES": "${ANYTOOLAI_ATOM_LAB_RUN_PROMPT_MAX_BYTES:-65536}",
+    "ANYTOOLAI_ATOM_LAB_RUN_DAILY_LIMIT": "${ANYTOOLAI_ATOM_LAB_RUN_DAILY_LIMIT:-100}",
+    "ANYTOOLAI_ATOM_LAB_RUN_ACTIVE_LIMIT": "${ANYTOOLAI_ATOM_LAB_RUN_ACTIVE_LIMIT:-1}",
+}
 
 
 def test_atom_lab_access_code_is_wired_only_to_platform_api() -> None:
@@ -35,6 +42,21 @@ def test_atom_lab_access_code_is_wired_only_to_platform_api() -> None:
         if service_name == "platform-api":
             continue
         assert "ANYTOOLAI_ATOM_LAB_ACCESS_CODE" not in service.get("environment", {})
+
+
+def test_atom_lab_run_limits_are_wired_only_to_platform_api() -> None:
+    compose = yaml.safe_load(COMPOSE_PATH.read_text(encoding="utf-8"))
+    services = compose["services"]
+
+    api_environment = services["platform-api"]["environment"]
+    for variable, defaulted_value in ATOM_LAB_RUN_LIMITS.items():
+        assert api_environment[variable] == defaulted_value
+
+    for service_name, service in services.items():
+        if service_name == "platform-api":
+            continue
+        environment = service.get("environment", {})
+        assert all(variable not in environment for variable in ATOM_LAB_RUN_LIMITS)
 
 
 def test_public_frontends_cannot_import_atom_lab_authority_or_overrides() -> None:
