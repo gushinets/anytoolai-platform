@@ -123,7 +123,7 @@ jobs:
     if: >-
       always() &&
       (github.event_name == 'workflow_dispatch' || needs.comment-gate.outputs.run == 'true')
-    uses: gushinets/ai-pr-review/.github/workflows/reusable-ai-pr-review.yml@93c2b412bb81ab51ddc43c0952e1f83067585720
+    uses: gushinets/ai-pr-review/.github/workflows/reusable-ai-pr-review.yml@95418b2d1575c9624da2a15db42657b5fef96aeb
     with:
       mode: manual
       triggering_run_id: ""
