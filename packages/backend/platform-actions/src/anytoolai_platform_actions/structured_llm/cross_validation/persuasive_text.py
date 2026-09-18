@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from ._markup import _has_disallowed_plain_text_markup, _has_html_tag
+from ._markup import _has_disallowed_plain_text_markup, _has_html_tag, _has_visible_text
 from ._shared import _coerce_integer_valued, _cross_validation_error, _require_output
 
 
@@ -21,6 +21,11 @@ class PersuasiveTextCrossValidator:
         text = output.get("text")
         if not isinstance(text, str):
             raise _cross_validation_error("malformed_compose_persuasive_text_output")
+        # Code review finding (P2): `minLength: 1` on the output schema accepts a
+        # whitespace-only string, and an HTML-formatted `<p></p>` has a real tag but no
+        # actual content -- neither is usable persuasive text.
+        if not _has_visible_text(text):
+            raise _cross_validation_error("text_has_no_visible_content")
         constraints = input_payload.get("constraints")
         constraints = constraints if isinstance(constraints, Mapping) else {}
 

@@ -732,6 +732,14 @@ class TestComposeReplyCrossValidator:
             ({}, {"text": "Plain reply.", "call_to_action": "- Book a call"}),
             ({}, None),
             ({}, {"text": 123}),
+            # Code review finding (P2): `minLength: 1` on the output schema accepts a
+            # whitespace-only string, and a real HTML tag with nothing inside it -- neither
+            # is a usable client-facing message.
+            ({}, {"text": "   "}),
+            ({}, {"text": "\n\t"}),
+            ({"constraints": {"output_format": "html"}}, {"text": "<p></p>"}),
+            ({"constraints": {"output_format": "html"}}, {"text": "<p>  </p>"}),
+            ({}, {"text": "Plain reply.", "call_to_action": "   "}),
         ],
     )
     def test_rejects(self, input_payload: dict, output: dict | None) -> None:
@@ -1078,6 +1086,12 @@ class TestPersuasiveTextCrossValidator:
             *_PLAIN_TEXT_LIST_REJECT_CASES,
             ({}, None),
             ({}, {"text": 123}),
+            # Code review finding (P2): same empty/whitespace-content gap as A07's sibling
+            # validator.
+            ({}, {"text": "   "}),
+            ({}, {"text": "\n\t"}),
+            ({"constraints": {"format": "html"}}, {"text": "<p></p>"}),
+            ({"constraints": {"format": "html"}}, {"text": "<p>  </p>"}),
         ],
     )
     def test_rejects(self, input_payload: dict, output: dict | None) -> None:

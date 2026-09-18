@@ -164,6 +164,53 @@ def _has_html_tag(value: str) -> bool:
     )
 
 
+def _strip_html_constructs(content: str) -> str:
+    """Removes every HTML5 construct markdown-it-py's grammar recognizes (tags, comments,
+    processing instructions, declarations, CDATA) from `content`, leaving only whatever text
+    sits outside them. Reuses `_content_has_element_tag`'s own scan so both stay in lockstep."""
+    pieces: list[str] = []
+    index = 0
+    while True:
+        start = content.find("<", index)
+        if start == -1:
+            pieces.append(content[index:])
+            return "".join(pieces)
+        pieces.append(content[index:start])
+        if _starts_non_element_construct(content, start):
+            match = _NON_ELEMENT_CONSTRUCT_RE.match(content, start)
+            if match is None:
+                # An unterminated comment/PI/declaration/CDATA swallows the rest of the
+                # block verbatim (same as _content_has_element_tag) -- nothing after it
+                # counts as visible text either.
+                return "".join(pieces)
+            index = match.end()
+            continue
+        tag_match = _ELEMENT_TAG_RE.match(content, start)
+        if tag_match is not None:
+            index = tag_match.end()
+            continue
+        pieces.append("<")
+        index = start + 1
+
+
+def _visible_text_content(value: str) -> str:
+    """Concatenates `value`'s actual rendered text: plain "text" tokens as-is, and (for
+    html_inline/html_block tokens) whatever remains of their raw content once every HTML5
+    construct is stripped out. Tells real content ("Hello", `<p>Hello</p>`) apart from markup
+    with nothing inside it (`<p></p>`, a lone `<Tuesday>`-shaped tag) or literal whitespace."""
+    parts: list[str] = []
+    for token in _flatten_tokens(_HTML_RENDERER.parse(value)):
+        if token.type.startswith("html_"):
+            parts.append(_strip_html_constructs(token.content))
+        elif token.type == "text":
+            parts.append(token.content)
+    return "".join(parts)
+
+
+def _has_visible_text(value: str) -> bool:
+    return _visible_text_content(value).strip() != ""
+
+
 def _tokenize_markdown(value: str) -> list[Any]:
     # Shared by `_has_markdown` and `_has_disallowed_plain_text_markup` so both check the
     # identical parse (same escaping, same renderer instance) and only diverge on which
