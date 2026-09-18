@@ -28,6 +28,25 @@ _MARKDOWN_RENDERER.options["html"] = False
 # Token types a plain paragraph of text (no formatting) produces on its own.
 _PLAIN_TEXT_TOKEN_TYPES = frozenset({"paragraph_open", "paragraph_close", "inline", "text", "softbreak"})
 
+# List container token types produced by ordered (`1.`/`1)`) and unordered (`-`/`*`/`+`)
+# CommonMark lists — the marker character lives in `token.markup`, not `token.type`, so all
+# three unordered markers and both ordered delimiters collapse to the same token types.
+# Copy-ready plain text still reads fine with list markers, so these are allowed on top of
+# `_PLAIN_TEXT_TOKEN_TYPES`, unlike the stricter `_has_markup` allowlist. A list item's own
+# `inline` content is still walked by `_flatten_tokens`, so disallowed markup nested inside a
+# list item (e.g. "- **Important**") is still caught via its `strong_open`/`strong_close`
+# children.
+_PLAIN_TEXT_WITH_LISTS_TOKEN_TYPES = _PLAIN_TEXT_TOKEN_TYPES | frozenset(
+    {
+        "ordered_list_open",
+        "ordered_list_close",
+        "bullet_list_open",
+        "bullet_list_close",
+        "list_item_open",
+        "list_item_close",
+    }
+)
+
 # CommonMark's real emphasis rule allows an unspaced `*` to open/close emphasis intraword
 # (unlike `_`), so a parser alone flags plain arithmetic/dimension expressions - numeric
 # ("2*3*4"), variable ("a*b*c", "2*x*4"), symbolic ("L*W*H"), or localized (
@@ -43,6 +62,16 @@ _PLAIN_TEXT_TOKEN_TYPES = frozenset({"paragraph_open", "paragraph_close", "inlin
 # trail their base character, so they never sit between `*` and the start of a word on the
 # right.
 _ASTERISK = re.compile(r"\*")
+
+# GFM task-list checkboxes ("- [ ] todo", "1. [x] done") aren't tokenized as a distinct
+# construct by this parser (the task-lists rule is a separate, unloaded plugin) — they parse
+# as an ordinary list item whose inline content happens to start with literal "[ ]"/"[x]".
+# The team-lead-specified plain_text allowance only covers plain "ordered/unordered list
+# markers", not checkbox syntax, so it's matched by regex against the item's own leading text
+# instead. The checkbox may be the item's *entire* content ("- [ ]", no task text at all), not
+# just a prefix followed by more text, so the marker must match at end-of-string too, not only
+# when trailing whitespace follows it.
+_TASK_LIST_CHECKBOX_RE = re.compile(r"^\[[ xX]\](?:\s|$)")
 
 
 def _base_character_before(value: str, index: int) -> str | None:
@@ -135,13 +164,48 @@ def _has_html_tag(value: str) -> bool:
     )
 
 
+def _tokenize_markdown(value: str) -> list[Any]:
+    # Shared by `_has_markdown` and `_has_disallowed_plain_text_markup` so both check the
+    # identical parse (same escaping, same renderer instance) and only diverge on which
+    # token types/structure they treat as disallowed — a single pipeline instead of two
+    # independently-maintained copies that could quietly drift apart.
+    escaped = _escape_alnum_flanked_asterisks(value)
+    return list(_flatten_tokens(_MARKDOWN_RENDERER.parse(escaped)))
+
+
 def _has_markdown(value: str) -> bool:
-    value = _escape_alnum_flanked_asterisks(value)
-    return any(
-        token_type not in _PLAIN_TEXT_TOKEN_TYPES
-        for token_type in _flatten_token_types(_MARKDOWN_RENDERER.parse(value))
-    )
+    return any(token.type not in _PLAIN_TEXT_TOKEN_TYPES for token in _tokenize_markdown(value))
 
 
 def _has_markup(value: str) -> bool:
     return _has_html_construct(value) or _has_markdown(value)
+
+
+def _has_disallowed_plain_text_markup(value: str) -> bool:
+    # Same as `_has_markup`, except a CommonMark list — ordered or unordered, flat or
+    # nested, with real item content — is treated as allowed copy-ready formatting (the
+    # Linear-decided policy allows "ordered/unordered list markers" without a nesting-depth
+    # restriction; a list nested inside something already disallowed, e.g. a blockquote, is
+    # still rejected via that construct's own token type below). Everything else is still
+    # rejected, including cases a plain token-type allowlist alone would miss: an empty list
+    # item ("-", "1)") carries no meaningful content, and a GFM task-list checkbox
+    # ("- [ ] todo") is checkbox formatting, not a plain list marker, even though this parser
+    # tokenizes it as an ordinary list item (see `_TASK_LIST_CHECKBOX_RE`).
+    if _has_html_construct(value):
+        return True
+    tokens = _tokenize_markdown(value)
+    for index, token in enumerate(tokens):
+        if token.type not in _PLAIN_TEXT_WITH_LISTS_TOKEN_TYPES:
+            return True
+        if token.type == "list_item_open":
+            # markdown-it-py guarantees every `_open` token has a matching `_close`, so
+            # `list_item_open` is never the last token in the stream.
+            next_token = tokens[index + 1]
+            if next_token.type == "list_item_close":
+                # An empty item ("-", "1)") carries no meaningful content — not a real list.
+                return True
+            if next_token.type == "paragraph_open":
+                inline_token = tokens[index + 2]
+                if inline_token.type == "inline" and _TASK_LIST_CHECKBOX_RE.match(inline_token.content):
+                    return True
+    return False

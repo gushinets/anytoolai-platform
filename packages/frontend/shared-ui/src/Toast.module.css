@@ -1,0 +1,19 @@
+.toast {
+  border-radius: var(--radius-input);
+  padding: 12px 16px;
+  border: 1px solid transparent;
+}
+
+.success {
+  background: var(--color-success-background);
+  border-color: var(--color-success-border);
+  color: var(--color-success);
+}
+
+.error {
+  background: var(--color-error-background);
+  /* tokens.json has no errorBorder (only successBorder exists as a pair) -- reuses the generic
+   * border token rather than inventing one; see the exec-plan's design-decisions log. */
+  border-color: var(--color-border-strong);
+  color: var(--color-error);
+}

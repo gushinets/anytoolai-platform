@@ -55,6 +55,17 @@ no frontend dependency.
 Inside `apps/web-mirror`, the composition layer may import the shared product runtime and enabled
 product definitions. Shared runtime must not import individual products or contain product meaning.
 
+### `@anytoolai/shared-ui` (ANY-503)
+
+`packages/frontend/shared-ui` is the canonical design-system package (Bundle 3 tokens plus
+`Button`/`Card`/`CopyButton`/`Input`/`Select`/`Spinner`/`TextArea`/`Toast`) for every web product
+surface. Dependency direction: `shared-ui` depends only on `react`; `apps/web-mirror` (its layout,
+page background/fonts, and every product's `Fields`/result/error chrome) depends on `shared-ui`.
+`shared-ui` must not import `ce-kit`, `web-result-kit`, or any product-specific module -- it owns
+presentation only, never product meaning or client transport/state. See
+`docs/exec-plans/active/any-503-adopt-bundle3-design-system.md` for the token-gap and font-sourcing
+decisions this package's implementation made.
+
 After A13/A15 (ANY-8, ANY-170/ANY-171/ANY-226), `createGuestIdentity()`, `getQuota()`,
 `startScenario()` (via `prepareScenarioStart()`), `getScenarioSession()`, `pollScenarioSession()`,
 `nextAction()`, and `getResult()` are real CE-kit helpers backed by `PlatformApiClient`.
