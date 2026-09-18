@@ -99,6 +99,19 @@ _VISIBLE_TEXT_ACCEPT_CASES: list[tuple[str | None, str]] = [
     ("html", "<template>Hidden draft</template><p>Ready.</p>"),
     ("html", "<p>&lt;title&gt;Client update&lt;/title&gt;</p>"),
     ("html", "<head><title>Client update</title><body><p>Ready.</p>"),
+    # Code review finding (me #19): html-format tag detection went through the Markdown
+    # parser, which reads 4 spaces / a tab as an indented code block -- ordinarily-indented
+    # HTML showed no tag at all and was rejected as "missing markup".
+    ("html", "    <p>Ready.</p>"),
+    ("html", "\t<p>Ready.</p>"),
+    ("html", "<div>\n        <p>Ready.</p>\n        <p>Delivered.</p>\n</div>"),
+    # `</rp>` is optional in valid HTML and HTMLParser never synthesizes implicit closes, so
+    # `rp` must not be tracked as a skipped element (it hid everything after it).
+    ("html", "<ruby><rp>(<rt>Ready<rp>)</ruby><p>Delivered.</p>"),
+    ("html", "<ruby><rp>(</rp><rt>Ready</rt><rp>)</rp></ruby><p>Delivered.</p>"),
+    # A trailing slash really self-closes inside SVG/MathML, and void elements are untouched.
+    ("html", "<svg><title/></svg><p>Ready.</p>"),
+    ("html", "<p>Ready.<br/></p>"),
 ]
 
 _VISIBLE_TEXT_REJECT_CASES: list[tuple[str | None, str]] = [
@@ -125,6 +138,13 @@ _VISIBLE_TEXT_REJECT_CASES: list[tuple[str | None, str]] = [
     # enclosing `<template>`'s skipped region, nor may an inner same-name element's end tag.
     ("html", "<template></style>Hidden draft</template>"),
     ("html", "<template><template>Inner</template>Hidden draft</template>"),
+    # Code review finding (me #19): HTML ignores a trailing slash on its own elements, so
+    # `<template/>` stays open in a browser -- HTMLParser's default start+end would expose
+    # the hidden text.
+    ("html", "<template/>Hidden draft"),
+    ("html", "<script/>Hidden draft"),
+    ("html", "<style/>Hidden draft"),
+    ("html", "<template><ruby><rp>(<rt>Ready<rp>)</ruby></template>"),
 ]
 
 
@@ -843,6 +863,10 @@ class TestComposeReplyCrossValidator:
             (
                 {"constraints": {"output_format": "html"}},
                 {"text": "<p>Reply.</p>", "call_to_action": "<style>p { color: red; }</style>"},
+            ),
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "<p>Reply.</p>", "call_to_action": "<template/>Hidden draft"},
             ),
         ],
     )
