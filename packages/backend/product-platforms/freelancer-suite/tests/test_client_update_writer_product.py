@@ -400,6 +400,45 @@ def test_prepaid_request_reply_step_intent_preserves_urgency_and_correct_confirm
     assert "promptly" in intent
 
 
+# Code review finding (team lead #2): `?scenario.input...` silently skips an absent source, and the
+# fake provider isn't input-sensitive, so a typo'd/deleted source path here could keep E2E green
+# while dropping language/length/format for a live provider. Pins the exact source paths.
+def test_prepaid_request_persuasive_text_step_maps_constraints_from_expected_sources() -> None:
+    workflow = _workflow_by_id()["client_update_writer.prepaid_request_v1"]
+    persuasive_step = next(
+        step for step in workflow["steps"] if step["step_id"] == "compose_persuasive_text"
+    )
+    mapping = persuasive_step["input_mapping"]
+
+    assert mapping["constraints.language"] == "?scenario.input.constraints.language"
+    assert mapping["constraints.length"] == "?scenario.input.constraints.max_length"
+    assert mapping["constraints.format"] == "?scenario.input.constraints.output_format"
+
+
+# Code review finding (team lead #2): the compose_reply fixtures repeated the compose_persuasive_text
+# fixture's first sentence verbatim, while prepaid_request_compose_reply.v1.md says to build on
+# `situation` "without repeating it verbatim".
+@pytest.mark.parametrize("fixture_suffix", ["", ".weak_input"])
+def test_prepaid_request_reply_fixture_does_not_repeat_the_situation_verbatim(
+    fixture_suffix: str,
+) -> None:
+    persuasive_text = json.loads(
+        (
+            FIXTURE_ROOT
+            / f"client_update_writer.prepaid_request_compose_persuasive_text_v1{fixture_suffix}.json"
+        ).read_text(encoding="utf-8")
+    )["response_json"]["text"]
+    reply_text = json.loads(
+        (
+            FIXTURE_ROOT
+            / f"client_update_writer.prepaid_request_compose_reply_v1{fixture_suffix}.json"
+        ).read_text(encoding="utf-8")
+    )["response_json"]["text"]
+
+    first_sentence = persuasive_text.split(". ")[0]
+    assert first_sentence not in reply_text, fixture_suffix
+
+
 def test_prepaid_request_weak_fixture_preserves_urgency_across_both_steps() -> None:
     persuasive_text = json.loads(
         (
