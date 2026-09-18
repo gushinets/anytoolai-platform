@@ -112,6 +112,16 @@ _VISIBLE_TEXT_ACCEPT_CASES: list[tuple[str | None, str]] = [
     # A trailing slash really self-closes inside SVG/MathML, and void elements are untouched.
     ("html", "<svg><title/></svg><p>Ready.</p>"),
     ("html", "<p>Ready.<br/></p>"),
+    # Code review finding (me #20): real content at an SVG/MathML HTML integration point is
+    # still visible, and a non-HTML `annotation-xml` encoding keeps foreign self-closing.
+    ("html", "<svg><foreignObject><p>Ready.</p></foreignObject></svg>"),
+    ("html", '<math><annotation-xml encoding="text/html"><p>Ready.</p></annotation-xml></math>'),
+    (
+        "html",
+        '<math><annotation-xml encoding="application/mathml+xml"><template/>Shown</annotation-xml></math>',
+    ),
+    # Ruby base text and annotation stay visible with `rp` skipped again.
+    ("html", "<ruby>漢<rp>(<rt>kan<rp>)</ruby>"),
 ]
 
 _VISIBLE_TEXT_REJECT_CASES: list[tuple[str | None, str]] = [
@@ -145,6 +155,24 @@ _VISIBLE_TEXT_REJECT_CASES: list[tuple[str | None, str]] = [
     ("html", "<script/>Hidden draft"),
     ("html", "<style/>Hidden draft"),
     ("html", "<template><ruby><rp>(<rt>Ready<rp>)</ruby></template>"),
+    # Code review finding (me #20): `rp` is fallback parentheses a browser never shows -- a
+    # reply made only of them is blank, with explicit or omitted `</rp>`.
+    ("html", "<ruby><rp>(</rp><rp>)</rp></ruby>"),
+    ("html", "<ruby><rp>(<rp>)</ruby>"),
+    ("markdown", "<ruby><rp>(</rp><rp>)</rp></ruby>"),
+    # Inside SVG/MathML, children of an HTML integration point are parsed as HTML again, so
+    # `<template/>` there is *not* self-closed and its text stays hidden.
+    ("html", "<svg><foreignObject><template/>Hidden draft</foreignObject></svg>"),
+    ("html", "<svg><desc><template/>Hidden draft</desc></svg>"),
+    (
+        "html",
+        '<math><annotation-xml encoding="text/html"><template/>Hidden draft</annotation-xml></math>',
+    ),
+    (
+        "html",
+        '<math><annotation-xml encoding="APPLICATION/XHTML+XML"><template/>Hidden draft</annotation-xml></math>',
+    ),
+    ("html", "<math><mtext><template/>Hidden draft</mtext></math>"),
 ]
 
 

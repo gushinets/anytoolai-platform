@@ -118,23 +118,55 @@ def _has_html_construct(value: str) -> bool:
 
 
 # Every content-bearing element the HTML spec's rendering section hides by name
-# (`display: none` in the user-agent stylesheet) *whose end tag is mandatory* -- taken from the
-# spec as a set rather than grown one review finding at a time. The mandatory-end-tag half is
-# what keeps this extractor honest: HTMLParser never synthesizes the implicit closes a browser
-# does, so an element allowed to omit its end tag would leave the skip active and hide
-# everything after it. Deliberately absent for that reason: `head` (its text-bearing children
-# are listed instead) and `rp` (`<rp>(<rt>x<rp>)` is valid; its content is only fallback
-# parentheses anyway). Also absent: the spec's void entries (`base`, `link`, `meta`, ... -- no
-# content), and `noscript` (rendered whenever scripting is off, which a copied message can't
-# assume).
+# (`display: none` in the user-agent stylesheet) -- taken from the spec as a set rather than
+# grown one review finding at a time. HTMLParser never synthesizes the implicit closes a
+# browser does, so an element allowed to omit its end tag would leave the skip active and hide
+# everything after it; every entry therefore has a mandatory end tag, with one exception
+# handled explicitly: `rp`, whose implicit closes are emulated via `_RP_IMPLICIT_CLOSE_*`
+# below. Deliberately absent: `head` (optional end tag, and no bounded set of closers -- its
+# text-bearing children are listed instead), the spec's void entries (`base`, `link`, `meta`,
+# ... -- no content), and `noscript` (rendered whenever scripting is off, which a copied
+# message can't assume).
 # ponytail: element names only; CSS/attribute hiding (`hidden`, `display:none`) is not
 # detected -- needs style resolution, add if a live model ever produces it.
 _NON_RENDERED_ELEMENTS = frozenset(
-    {"datalist", "noembed", "noframes", "script", "style", "template", "title"}
+    {"datalist", "noembed", "noframes", "rp", "script", "style", "template", "title"}
 )
 
-# Foreign (SVG/MathML) content is the one place a trailing `/` really self-closes an element.
+# "An rp element's end tag can be omitted if [it] is immediately followed by an rb, rt, rtc or
+# rp element, or if there is no more content in the parent element" (HTML spec, optional tags).
+# ponytail: the parent is assumed to be ruby/rtc -- an `rp` anywhere else is invalid HTML.
+_RP_IMPLICIT_CLOSE_START_TAGS = frozenset({"rb", "rt", "rtc", "rp"})
+_RP_IMPLICIT_CLOSE_END_TAGS = frozenset({"ruby", "rtc"})
+
+# Foreign (SVG/MathML) content is the one place a trailing `/` really self-closes an element
+# -- but not everywhere inside it: at the spec's integration points children are parsed as
+# HTML again (HTMLParser lowercases tag names, hence `foreignobject`).
 _FOREIGN_CONTENT_ROOTS = frozenset({"svg", "math"})
+_SVG_HTML_INTEGRATION_POINTS = frozenset({"foreignobject", "desc", "title"})
+_MATHML_TEXT_INTEGRATION_POINTS = frozenset({"mi", "mo", "mn", "ms", "mtext"})
+_ANNOTATION_XML_HTML_ENCODINGS = frozenset({"text/html", "application/xhtml+xml"})
+
+
+def _is_html_integration_point(foreign_root: str, tag: str, attrs: Any) -> bool:
+    if foreign_root == "svg":
+        return tag in _SVG_HTML_INTEGRATION_POINTS
+    if tag in _MATHML_TEXT_INTEGRATION_POINTS:
+        return True
+    return tag == "annotation-xml" and any(
+        name == "encoding" and (value or "").lower() in _ANNOTATION_XML_HTML_ENCODINGS
+        for name, value in attrs
+    )
+
+
+def _close_innermost(open_elements: list[Any], tag: str, *, key: Any = lambda entry: entry) -> None:
+    """Pops the innermost open `tag` plus anything left open inside it -- the recovery a
+    browser applies to mis-nested tags. A tag that isn't open is ignored: HTMLParser doesn't
+    pair end tags with start tags, so a stray `</style>` must not end a `<template>`."""
+    for index in range(len(open_elements) - 1, -1, -1):
+        if key(open_elements[index]) == tag:
+            del open_elements[index:]
+            return
 
 
 class _HtmlTextExtractor(HTMLParser):
@@ -149,35 +181,46 @@ class _HtmlTextExtractor(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.parts: list[str] = []
         self.saw_element_tag = False
-        # Names, not a bare counter: HTMLParser doesn't match end tags to start tags, so a
-        # stray `</style>` inside `<template>` must not end the template's skipped region.
         self._open_non_rendered: list[str] = []
-        self._foreign_depth = 0
+        # (tag, is_foreign) per namespace switch: an svg/math root enters foreign content, an
+        # integration point inside it re-enters HTML. A bare depth counter can't tell
+        # `<svg><title/>` (foreign: self-closed) from `<svg><foreignObject><template/>`
+        # (HTML again: the slash is ignored and the template stays open).
+        self._namespace_contexts: list[tuple[str, bool]] = []
+
+    def _foreign_root(self) -> str | None:
+        if self._namespace_contexts and self._namespace_contexts[-1][1]:
+            return self._namespace_contexts[-1][0]
+        return None
 
     def handle_starttag(self, tag: str, attrs: Any) -> None:
         self.saw_element_tag = True
+        foreign_root = self._foreign_root()
         if tag in _FOREIGN_CONTENT_ROOTS:
-            self._foreign_depth += 1
+            self._namespace_contexts.append((tag, True))
+        elif foreign_root and _is_html_integration_point(foreign_root, tag, attrs):
+            self._namespace_contexts.append((tag, False))
+        if tag in _RP_IMPLICIT_CLOSE_START_TAGS and self._open_non_rendered[-1:] == ["rp"]:
+            self._open_non_rendered.pop()
         if tag in _NON_RENDERED_ELEMENTS:
             self._open_non_rendered.append(tag)
 
     def handle_startendtag(self, tag: str, attrs: Any) -> None:
         # HTMLParser's default treats `<x/>` as start + end. HTML itself ignores the slash on
         # its own elements -- `<template/>Hidden` leaves the template open in a browser --
-        # and honors it only inside foreign content (`<svg><title/></svg>`).
+        # and honors it only in foreign content (`<svg><title/></svg>`). Foreign-ness is read
+        # *before* the start tag, which may itself switch namespace (svg `<title/>`).
+        was_foreign = self._foreign_root() is not None
         self.handle_starttag(tag, attrs)
-        if self._foreign_depth or tag not in _NON_RENDERED_ELEMENTS:
+        if was_foreign or tag not in _NON_RENDERED_ELEMENTS:
             self.handle_endtag(tag)
 
     def handle_endtag(self, tag: str) -> None:
         self.saw_element_tag = True
-        if tag in _FOREIGN_CONTENT_ROOTS and self._foreign_depth:
-            self._foreign_depth -= 1
-        if tag in self._open_non_rendered:
-            # Closes the innermost open element of that name, plus anything left open
-            # inside it -- the same recovery a browser applies to mis-nested tags.
-            last_open = len(self._open_non_rendered) - 1 - self._open_non_rendered[::-1].index(tag)
-            del self._open_non_rendered[last_open:]
+        _close_innermost(self._namespace_contexts, tag, key=lambda context: context[0])
+        if tag in _RP_IMPLICIT_CLOSE_END_TAGS and self._open_non_rendered[-1:] == ["rp"]:
+            self._open_non_rendered.pop()
+        _close_innermost(self._open_non_rendered, tag)
 
     def handle_data(self, data: str) -> None:
         if not self._open_non_rendered:
