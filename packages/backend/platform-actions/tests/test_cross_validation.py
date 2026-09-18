@@ -72,6 +72,10 @@ _PLAIN_TEXT_LIST_REJECT_CASES: list[tuple[dict, dict]] = [
 # it's rendered as, so these are (format, text) pairs -- A06 and A07 share the identical
 # `_has_visible_text` policy and differ only in the constraint key (`format` vs
 # `output_format`), so the cases are pinned once and expanded per validator below.
+_HTML_DOCUMENT_WITH_TITLE = (
+    "<html><head><title>Client update</title></head><body>%s</body></html>"
+)
+
 _VISIBLE_TEXT_ACCEPT_CASES: list[tuple[str | None, str]] = [
     # plain_text (or omitted) is copied to the client literally, never entity-decoded: these
     # are six/five/nine visible characters, e.g. a reply answering "which entity is a
@@ -87,6 +91,14 @@ _VISIBLE_TEXT_ACCEPT_CASES: list[tuple[str | None, str]] = [
     # Indented code block and a list of inline-code items are visible markdown content.
     ("markdown", "    npm run build"),
     ("markdown", "- `npm ci`\n- `npm run build`"),
+    # Code review finding (me #18): a document title next to a real body, a skipped element
+    # next to real text, an escaped literal `<title>`, and an omitted (optional) `</head>`
+    # must all stay accepted once title/template content is excluded.
+    ("html", _HTML_DOCUMENT_WITH_TITLE % "<p>Ready.</p>"),
+    ("markdown", _HTML_DOCUMENT_WITH_TITLE % "<p>Ready.</p>"),
+    ("html", "<template>Hidden draft</template><p>Ready.</p>"),
+    ("html", "<p>&lt;title&gt;Client update&lt;/title&gt;</p>"),
+    ("html", "<head><title>Client update</title><body><p>Ready.</p>"),
 ]
 
 _VISIBLE_TEXT_REJECT_CASES: list[tuple[str | None, str]] = [
@@ -103,6 +115,16 @@ _VISIBLE_TEXT_REJECT_CASES: list[tuple[str | None, str]] = [
     ("markdown", "<style>p { color: red; }</style>"),
     # A genuinely empty code block is still empty.
     ("markdown", "```\n\n```"),
+    # Code review finding (me #18): `<title>` is document metadata, not the client message --
+    # a well-formed document with a filled title and an empty/blank body shows nothing.
+    ("html", _HTML_DOCUMENT_WITH_TITLE % ""),
+    ("html", _HTML_DOCUMENT_WITH_TITLE % "<p>&nbsp;</p>"),
+    ("markdown", _HTML_DOCUMENT_WITH_TITLE % ""),
+    ("html", "<datalist><option>Hidden option</option></datalist>"),
+    # HTMLParser doesn't pair end tags with start tags: a stray `</style>` must not end the
+    # enclosing `<template>`'s skipped region, nor may an inner same-name element's end tag.
+    ("html", "<template></style>Hidden draft</template>"),
+    ("html", "<template><template>Inner</template>Hidden draft</template>"),
 ]
 
 

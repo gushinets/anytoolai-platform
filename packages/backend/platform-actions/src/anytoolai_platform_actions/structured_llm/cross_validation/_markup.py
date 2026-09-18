@@ -165,11 +165,19 @@ def _has_html_tag(value: str) -> bool:
     )
 
 
-# Elements whose content a browser never renders as text. `script`/`style` content is also
-# raw text to a real HTML parser (no tags/entities inside), which HTMLParser already honors.
-# ponytail: element-name list only; CSS/attribute hiding (`hidden`, `display:none`) is not
-# detected -- needs a real layout engine, add if a live model ever produces it.
-_NON_RENDERED_ELEMENTS = frozenset({"script", "style", "template"})
+# Every content-bearing element the HTML spec's rendering section hides by name
+# (`display: none` in the user-agent stylesheet) -- taken from the spec as a set rather than
+# grown one review finding at a time (`title` was the miss: a whole document whose only text
+# is `<head><title>...</title>` has no client message). Deliberately absent:
+# - the spec's void entries (`base`, `link`, `meta`, ...): no content, and no end tag to pop;
+# - `head`: its end tag is optional, so tracking it would swallow a following `<body>`; its
+#   text-bearing children are all listed here instead;
+# - `noscript`: rendered whenever scripting is off, which a copied message can't assume.
+# ponytail: element names only; CSS/attribute hiding (`hidden`, `display:none`) is not
+# detected -- needs style resolution, add if a live model ever produces it.
+_NON_RENDERED_ELEMENTS = frozenset(
+    {"datalist", "noembed", "noframes", "rp", "script", "style", "template", "title"}
+)
 
 
 class _HtmlTextExtractor(HTMLParser):
@@ -181,18 +189,23 @@ class _HtmlTextExtractor(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.parts: list[str] = []
-        self._skip_depth = 0
+        # Names, not a bare counter: HTMLParser doesn't match end tags to start tags, so a
+        # stray `</style>` inside `<template>` must not end the template's skipped region.
+        self._open_non_rendered: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: Any) -> None:
         if tag in _NON_RENDERED_ELEMENTS:
-            self._skip_depth += 1
+            self._open_non_rendered.append(tag)
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in _NON_RENDERED_ELEMENTS and self._skip_depth:
-            self._skip_depth -= 1
+        if tag in self._open_non_rendered:
+            # Closes the innermost open element of that name, plus anything left open
+            # inside it -- the same recovery a browser applies to mis-nested tags.
+            last_open = len(self._open_non_rendered) - 1 - self._open_non_rendered[::-1].index(tag)
+            del self._open_non_rendered[last_open:]
 
     def handle_data(self, data: str) -> None:
-        if not self._skip_depth:
+        if not self._open_non_rendered:
             self.parts.append(data)
 
 
