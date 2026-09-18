@@ -1,11 +1,8 @@
 name: AI PR Review
 
 on:
-  workflow_run:
-    workflows:
-      - baseline-backend
-    types:
-      - completed
+  issue_comment:
+    types: [created]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -20,19 +17,145 @@ permissions:
   pull-requests: write
   checks: write
 
-concurrency:
-  group: ai-pr-review-${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || github.run_id }}
-  cancel-in-progress: true
-
 jobs:
+  comment-gate:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request != null &&
+      startsWith(github.event.comment.body, '/ai-review')
+    runs-on: ubuntu-24.04
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+      pr_number: ${{ steps.gate.outputs.pr_number }}
+      head_sha: ${{ steps.gate.outputs.head_sha }}
+      check_run_id: ${{ steps.gate.outputs.check_run_id }}
+    steps:
+      - id: gate
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        with:
+          script: |
+            if (context.payload.comment.body.trim() !== '/ai-review') {
+              core.setOutput('run', 'false');
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const prNumber = context.payload.issue.number;
+            const actor = context.actor;
+
+            const permission = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner,
+              repo,
+              username: actor,
+            });
+            if (!['write', 'maintain', 'admin'].includes(permission.data.permission)) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: `🤖 @${actor}, you need write access to run \`/ai-review\`.`,
+              });
+              core.setOutput('run', 'false');
+              return;
+            }
+
+            const pull = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: prNumber,
+            });
+            if (pull.data.state !== 'open') {
+              core.setOutput('run', 'false');
+              return;
+            }
+
+            const headSha = pull.data.head.sha;
+            const checks = await github.rest.checks.listForRef({
+              owner,
+              repo,
+              ref: headSha,
+              check_name: 'AI PR Review Trigger',
+              filter: 'latest',
+              per_page: 100,
+            });
+            const alreadyRunning = checks.data.check_runs.some(
+              (check) => check.status === 'queued' || check.status === 'in_progress',
+            );
+            if (alreadyRunning) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: `🤖 AI Review is already running for \`${headSha.slice(0, 7)}\`.`,
+              });
+              core.setOutput('run', 'false');
+              return;
+            }
+
+            const detailsUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const check = await github.rest.checks.create({
+              owner,
+              repo,
+              name: 'AI PR Review Trigger',
+              head_sha: headSha,
+              status: 'in_progress',
+              details_url: detailsUrl,
+              output: {
+                title: 'AI PR Review started',
+                summary: `Manual review requested by @${actor} for ${headSha}.`,
+              },
+            });
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNumber,
+              body: `🤖 AI Review started for \`${headSha.slice(0, 7)}\` (requested by @${actor}).`,
+            });
+
+            core.setOutput('run', 'true');
+            core.setOutput('pr_number', String(prNumber));
+            core.setOutput('head_sha', headSha);
+            core.setOutput('check_run_id', String(check.data.id));
+
   ai-pr-review:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request'
-    uses: gushinets/ai-pr-review/.github/workflows/reusable-ai-pr-review.yml@c3bc681841256f2b12eed940bd3c2f0c3f3acba7
+    needs: [comment-gate]
+    if: >-
+      always() &&
+      (github.event_name == 'workflow_dispatch' || needs.comment-gate.outputs.run == 'true')
+    uses: gushinets/ai-pr-review/.github/workflows/reusable-ai-pr-review.yml@93c2b412bb81ab51ddc43c0952e1f83067585720
     with:
-      mode: ${{ github.event_name == 'workflow_dispatch' && 'manual' || 'automatic' }}
-      triggering_run_id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
-      pr_number: ${{ github.event_name == 'workflow_dispatch' && fromJSON(inputs.pr_number) || 0 }}
+      mode: manual
+      triggering_run_id: ""
+      pr_number: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_number || fromJSON(needs.comment-gate.outputs.pr_number) }}
+      expected_head_sha: ${{ github.event_name == 'issue_comment' && needs.comment-gate.outputs.head_sha || '' }}
     secrets:
       QWEN_TOKEN_PLAN_API_KEY: ${{ secrets.QWEN_TOKEN_PLAN_API_KEY }}
       LINEAR_CLIENT_ID: ${{ secrets.LINEAR_CLIENT_ID }}
       LINEAR_CLIENT_SECRET: ${{ secrets.LINEAR_CLIENT_SECRET }}
+
+  finalize-trigger:
+    needs: [comment-gate, ai-pr-review]
+    if: >-
+      always() &&
+      github.event_name == 'issue_comment' &&
+      needs.comment-gate.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        env:
+          CHECK_RUN_ID: ${{ needs.comment-gate.outputs.check_run_id }}
+          REVIEW_RESULT: ${{ needs.ai-pr-review.result }}
+        with:
+          script: |
+            const conclusion = process.env.REVIEW_RESULT === 'success' ? 'success' : 'failure';
+            await github.rest.checks.update({
+              ...context.repo,
+              check_run_id: Number(process.env.CHECK_RUN_ID),
+              status: 'completed',
+              conclusion,
+              output: {
+                title: 'AI PR Review trigger completed',
+                summary: `Review workflow result: ${process.env.REVIEW_RESULT}.`,
+              },
+            });
