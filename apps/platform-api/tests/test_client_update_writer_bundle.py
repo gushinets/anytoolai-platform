@@ -30,6 +30,7 @@ from typing import Any
 import httpx
 import jsonschema
 import pytest
+import sqlalchemy as sa
 from anytoolai_platform_api.bootstrap import RuntimeStorageDependencies, build_runtime
 from anytoolai_platform_api.main import create_app
 from anytoolai_platform_core.identity.models import GuestIdentityRecord
@@ -37,6 +38,7 @@ from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.models import ProviderResponse, ResolvedProviderRequest
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
+from anytoolai_platform_core.storage.db import event_log_table
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
 from anytoolai_platform_core.workflows.models import JobStatus
@@ -358,6 +360,33 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
         billing_context = start_input["billing_context"]
         assert billing_context["amount"] in result_body["output"]["text"]
         assert billing_context["due_date"] in result_body["output"]["text"]
+
+    # Code review finding (me #13): the happy path stopped at asserting `copy_result` is
+    # *allowed* -- it never actually called the next-action endpoint or checked that the
+    # activation event this product's own contract promises actually gets recorded.
+    next_action_response = asyncio.run(
+        _request(
+            app,
+            "POST",
+            f"/v1/scenario-sessions/{started['scenario_session_id']}/next-actions/copy_result",
+            json={"checkpoint_id": RESULT_READY_CHECKPOINT_ID},
+        )
+    )
+    assert next_action_response.status_code == HTTPStatus.OK
+
+    with transaction_boundary(session_factory) as session:
+        event_row = session.execute(
+            sa.select(event_log_table).where(
+                event_log_table.c.event_type == "client.next_action_clicked"
+            )
+        ).mappings().one()
+
+    assert event_row["scenario_session_id"] == started["scenario_session_id"]
+    assert event_row["job_id"] == started["job_id"]
+    assert event_row["properties"] == {
+        "checkpoint_id": RESULT_READY_CHECKPOINT_ID,
+        "next_action_id": "copy_result",
+    }
 
 
 class _WeakInputProviderAdapter(FakeProviderAdapter):
