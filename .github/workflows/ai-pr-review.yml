@@ -151,7 +151,7 @@ jobs:
   ai-pr-review:
     needs: [comment-gate]
     if: needs.comment-gate.outputs.run == 'true'
-    uses: gushinets/ai-pr-review/.github/workflows/reusable-ai-pr-review.yml@95418b2d1575c9624da2a15db42657b5fef96aeb
+    uses: gushinets/ai-pr-review/.github/workflows/reusable-ai-pr-review.yml@c1351f2e944006dbddb04f16aebb1c77b17f2900
     with:
       mode: manual
       triggering_run_id: ""
