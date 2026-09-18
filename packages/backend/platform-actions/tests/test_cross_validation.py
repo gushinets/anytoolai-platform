@@ -68,6 +68,51 @@ _PLAIN_TEXT_LIST_REJECT_CASES: list[tuple[dict, dict]] = [
 ]
 
 
+# Code review finding (me #17): whether `text` shows the reader anything depends on the format
+# it's rendered as, so these are (format, text) pairs -- A06 and A07 share the identical
+# `_has_visible_text` policy and differ only in the constraint key (`format` vs
+# `output_format`), so the cases are pinned once and expanded per validator below.
+_VISIBLE_TEXT_ACCEPT_CASES: list[tuple[str | None, str]] = [
+    # plain_text (or omitted) is copied to the client literally, never entity-decoded: these
+    # are six/five/nine visible characters, e.g. a reply answering "which entity is a
+    # non-breaking space?".
+    ("plain_text", "&nbsp;"),
+    ("plain_text", "&#32;"),
+    ("plain_text", "&NewLine;"),
+    (None, "&nbsp;"),
+    # Non-rendered elements next to real message text don't make the message blank.
+    ("html", "<style>p { color: red; }</style><p>Ready.</p>"),
+    # An escaped tag is literal visible text, not markup to strip.
+    ("html", "<p>&lt;p&gt;</p>"),
+    # Indented code block and a list of inline-code items are visible markdown content.
+    ("markdown", "    npm run build"),
+    ("markdown", "- `npm ci`\n- `npm run build`"),
+]
+
+_VISIBLE_TEXT_REJECT_CASES: list[tuple[str | None, str]] = [
+    # A browser never renders script/style/template content as text -- a real tag is
+    # present (so the html-format check alone passes) but the client would see nothing.
+    ("html", "<style>p { color: red; }</style>"),
+    ("html", "<script>console.log(1)</script>"),
+    ("html", "<template>Hidden template text.</template>"),
+    ("html", "<template><p>Hidden template text.</p></template>"),
+    ("html", "<style>p { color: red; }</style><p>&nbsp;</p>"),
+    # markdown renders entities and passes raw HTML through, so the same blanks apply.
+    ("markdown", "&nbsp;"),
+    ("markdown", "<p>&nbsp;</p>"),
+    ("markdown", "<style>p { color: red; }</style>"),
+    # A genuinely empty code block is still empty.
+    ("markdown", "```\n\n```"),
+]
+
+
+def _visible_text_cases(cases: list[tuple[str | None, str]], format_key: str) -> list[tuple[dict, dict]]:
+    return [
+        ({"constraints": {format_key: text_format}} if text_format else {}, {"text": text})
+        for text_format, text in cases
+    ]
+
+
 def _field(name: str, field_type: str, *, required: bool) -> dict:
     return {
         "name": name,
@@ -675,6 +720,7 @@ class TestComposeReplyCrossValidator:
             # HTML entities must decode before the blank check -- "&amp;" is real visible
             # content ("&"), not whitespace.
             ({"constraints": {"output_format": "html"}}, {"text": "<p>&amp;</p>"}),
+            *_visible_text_cases(_VISIBLE_TEXT_ACCEPT_CASES, "output_format"),
         ],
     )
     def test_accepts(self, input_payload: dict, output: dict) -> None:
@@ -770,6 +816,11 @@ class TestComposeReplyCrossValidator:
             (
                 {"constraints": {"output_format": "html"}},
                 {"text": "Plain reply.", "call_to_action": "<p>&nbsp;</p>"},
+            ),
+            *_visible_text_cases(_VISIBLE_TEXT_REJECT_CASES, "output_format"),
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "<p>Reply.</p>", "call_to_action": "<style>p { color: red; }</style>"},
             ),
         ],
     )
@@ -1074,6 +1125,7 @@ class TestPersuasiveTextCrossValidator:
             ({"constraints": {"format": "markdown"}}, {"text": "`npm run build`"}),
             ({"constraints": {"format": "markdown"}}, {"text": "```\nnpm run build\n```"}),
             ({"constraints": {"format": "html"}}, {"text": "<p>&amp;</p>"}),
+            *_visible_text_cases(_VISIBLE_TEXT_ACCEPT_CASES, "format"),
         ],
     )
     def test_accepts(self, input_payload: dict, output: dict) -> None:
@@ -1133,6 +1185,7 @@ class TestPersuasiveTextCrossValidator:
             ({"constraints": {"format": "html"}}, {"text": "<p>&nbsp;</p>"}),
             ({"constraints": {"format": "html"}}, {"text": "<div>&nbsp;</div>"}),
             ({"constraints": {"format": "html"}}, {"text": "<p>&#32;&#x09;&#10;</p>"}),
+            *_visible_text_cases(_VISIBLE_TEXT_REJECT_CASES, "format"),
         ],
     )
     def test_rejects(self, input_payload: dict, output: dict | None) -> None:

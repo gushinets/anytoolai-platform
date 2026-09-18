@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import html
 import re
 import unicodedata
+from html.parser import HTMLParser
 from typing import Any
 
 from markdown_it import MarkdownIt
@@ -165,60 +165,63 @@ def _has_html_tag(value: str) -> bool:
     )
 
 
-def _strip_html_constructs(content: str) -> str:
-    """Removes every HTML5 construct markdown-it-py's grammar recognizes (tags, comments,
-    processing instructions, declarations, CDATA) from `content`, leaving only whatever text
-    sits outside them. Reuses `_content_has_element_tag`'s own scan so both stay in lockstep."""
-    pieces: list[str] = []
-    index = 0
-    while True:
-        start = content.find("<", index)
-        if start == -1:
-            pieces.append(content[index:])
-            return "".join(pieces)
-        pieces.append(content[index:start])
-        if _starts_non_element_construct(content, start):
-            match = _NON_ELEMENT_CONSTRUCT_RE.match(content, start)
-            if match is None:
-                # An unterminated comment/PI/declaration/CDATA swallows the rest of the
-                # block verbatim (same as _content_has_element_tag) -- nothing after it
-                # counts as visible text either.
-                return "".join(pieces)
-            index = match.end()
-            continue
-        tag_match = _ELEMENT_TAG_RE.match(content, start)
-        if tag_match is not None:
-            index = tag_match.end()
-            continue
-        pieces.append("<")
-        index = start + 1
+# Elements whose content a browser never renders as text. `script`/`style` content is also
+# raw text to a real HTML parser (no tags/entities inside), which HTMLParser already honors.
+# ponytail: element-name list only; CSS/attribute hiding (`hidden`, `display:none`) is not
+# detected -- needs a real layout engine, add if a live model ever produces it.
+_NON_RENDERED_ELEMENTS = frozenset({"script", "style", "template"})
 
 
-# Code review finding (me #15): "text" alone missed code content -- `code_inline` ("`npm run
-# build`"), `fence` and `code_block` (fenced/indented code) are all legitimate, already-decoded
-# visible content in their own right, not markup to strip.
-_TEXT_CONTENT_TOKEN_TYPES = frozenset({"text", "code_inline", "fence", "code_block"})
+class _HtmlTextExtractor(HTMLParser):
+    """Collects the text a browser would actually show: character references decoded
+    (`convert_charrefs`), tags/comments/doctypes dropped, `_NON_RENDERED_ELEMENTS` content
+    skipped. A single structural pass, so an escaped `&lt;p&gt;` stays literal text instead of
+    being re-read as a tag the way strip-tags-then-unescape would risk."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: Any) -> None:
+        if tag in _NON_RENDERED_ELEMENTS:
+            self._skip_depth += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in _NON_RENDERED_ELEMENTS and self._skip_depth:
+            self._skip_depth -= 1
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip_depth:
+            self.parts.append(data)
 
 
-def _visible_text_content(value: str) -> str:
-    """Concatenates `value`'s actual rendered text: plain-text-shaped tokens as-is (already
-    entity-decoded by the parser), and (for html_inline/html_block tokens) whatever remains of
-    their raw content once every HTML5 construct is stripped and any character reference
-    (`&nbsp;`, `&#32;`, ...) is decoded -- raw HTML content is never parser-decoded the way a
-    "text" token's content already is. Tells real content ("Hello", `<p>Hello</p>`,
-    `` `npm run build` ``) apart from markup with nothing visible inside it (`<p></p>`,
-    `<p>&nbsp;</p>`, a lone `<Tuesday>`-shaped tag) or literal whitespace."""
-    parts: list[str] = []
-    for token in _flatten_tokens(_HTML_RENDERER.parse(value)):
-        if token.type.startswith("html_"):
-            parts.append(html.unescape(_strip_html_constructs(token.content)))
-        elif token.type in _TEXT_CONTENT_TOKEN_TYPES:
-            parts.append(token.content)
-    return "".join(parts)
+def _html_text_content(value: str) -> str:
+    extractor = _HtmlTextExtractor()
+    extractor.feed(value)
+    extractor.close()
+    return "".join(extractor.parts)
 
 
-def _has_visible_text(value: str) -> bool:
-    return _visible_text_content(value).strip() != ""
+def _has_visible_text(value: str, text_format: Any) -> bool:
+    """Whether `value` shows the reader any non-whitespace text *in the format it will be
+    rendered as* -- the same string is content in one format and empty in another:
+    `&nbsp;` is six literal characters as plain_text but a lone space as html/markdown.
+
+    Code review findings this shape replaces a format-blind token walk for: plain_text was
+    entity-decoded like markup ("&nbsp;" rejected as blank), and a regex tag-strip counted
+    `<style>`/`<script>`/`<template>` content as visible text."""
+    if text_format == "html":
+        rendered = _html_text_content(value)
+    elif text_format == "markdown":
+        # Rendering first makes every markdown construct (code spans/blocks, entities, raw
+        # HTML passthrough) reduce to the one question the HTML extractor already answers.
+        rendered = _html_text_content(_HTML_RENDERER.render(value))
+    else:
+        # plain_text / omitted: copied to the client literally, never parsed. Disallowed
+        # markup is a separate check (`_has_disallowed_plain_text_markup`).
+        rendered = value
+    return rendered.strip() != ""
 
 
 def _tokenize_markdown(value: str) -> list[Any]:
