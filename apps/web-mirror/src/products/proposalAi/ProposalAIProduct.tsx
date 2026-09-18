@@ -2,7 +2,7 @@
 
 import type { ChangeEvent } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
-import { Input, Select, TextArea } from "@anytoolai/shared-ui";
+import { Input, TextArea } from "@anytoolai/shared-ui";
 import { ResultView } from "../../components/ResultView";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import { collectFieldErrors, requiredTrimmedFieldError } from "../runtime/fieldValidation";

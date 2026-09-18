@@ -1,6 +1,7 @@
 "use client";
 
-import { Card, CopyButton } from "@anytoolai/shared-ui";
+import { useState } from "react";
+import { Card } from "@anytoolai/shared-ui";
 import { GeneratedTextRenderer } from "@anytoolai/web-result-kit";
 
 export type ResultViewProps = {
