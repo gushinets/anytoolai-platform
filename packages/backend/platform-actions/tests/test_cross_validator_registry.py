@@ -23,6 +23,7 @@ from anytoolai_platform_actions.structured_llm.cross_validation import (
     ScoreMultidimensionalAxesInputValidator,
     SynthesizeAngleCrossValidator,
     ValidatorRefNotFoundError,
+    build_input_validator,
     build_input_validators,
     build_output_cross_validators,
 )
@@ -86,6 +87,18 @@ def test_build_input_validators_resolves_known_ref() -> None:
     assert isinstance(
         validators["text.extract_structured_fields"], ExtractStructuredFieldsInputValidator
     )
+
+
+def test_build_input_validator_resolves_only_the_selected_definition() -> None:
+    validator = build_input_validator(
+        _definition(
+            "text.extract_structured_fields",
+            cross_validator_ref="none",
+            input_validator_ref="text.extract_structured_fields",
+        )
+    )
+
+    assert isinstance(validator, ExtractStructuredFieldsInputValidator)
 
 
 def test_build_output_cross_validators_skips_none_ref() -> None:

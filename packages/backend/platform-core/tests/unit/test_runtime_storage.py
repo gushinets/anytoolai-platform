@@ -31,6 +31,7 @@ from anytoolai_platform_core.storage.db import (
     GUEST_QUOTA_USAGE_DIMENSION_CONSTRAINT_NAME,
     action_runs_table,
     artifacts_table,
+    atom_lab_presets_table,
     atom_lab_runs_table,
     guest_quota_usage_table,
     jobs_table,
@@ -517,11 +518,46 @@ def test_runtime_migration_upgrade_from_0004_adds_provider_call_error_message_sa
         assert provider_call_columns["error_message_safe"]["nullable"] is True
 
 
+def test_atom_lab_preset_revision_repairs_partially_created_schema() -> None:
+    with _provision_runtime_database(upgrade_target=None) as (engine, alembic_config):
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "0013")
+            atom_lab_presets_table.create(connection)
+
+        with engine.begin() as connection:
+            alembic_config.attributes["connection"] = connection
+            command.upgrade(alembic_config, "head")
+            inspector = sa.inspect(connection)
+            table_names = set(inspector.get_table_names(schema="platform"))
+            check_constraint_names = {
+                constraint["name"]
+                for constraint in inspector.get_check_constraints(
+                    "atom_lab_runs",
+                    schema="platform",
+                )
+            }
+            foreign_key_names = {
+                foreign_key["name"]
+                for foreign_key in inspector.get_foreign_keys(
+                    "atom_lab_runs",
+                    schema="platform",
+                )
+            }
+
+        assert "atom_lab_presets" in table_names
+        assert "atom_lab_preset_versions" in table_names
+        assert "ck_atom_lab_runs_complete_preset_ref" in check_constraint_names
+        assert "fk_atom_lab_runs_preset_version" in foreign_key_names
+
+
 def test_handoff_compatibility_revision_repairs_database_stamped_at_0007() -> None:
     with _provision_runtime_database(upgrade_target=None) as (engine, alembic_config):
         with engine.begin() as connection:
             alembic_config.attributes["connection"] = connection
             command.upgrade(alembic_config, "head")
+            connection.execute(sa.text("DROP TABLE platform.atom_lab_preset_versions CASCADE"))
+            connection.execute(sa.text("DROP TABLE platform.atom_lab_presets"))
             connection.execute(sa.text("DROP TABLE platform.atom_lab_runs"))
             connection.execute(sa.text("DROP TABLE platform.product_handoffs"))
             command.stamp(alembic_config, "0007")
