@@ -3,12 +3,6 @@ name: AI PR Review
 on:
   issue_comment:
     types: [created]
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: PR number to review
-        required: true
-        type: number
 
 permissions:
   actions: read
@@ -20,7 +14,6 @@ permissions:
 jobs:
   comment-gate:
     if: >-
-      github.event_name == 'issue_comment' &&
       github.event.issue.pull_request != null &&
       startsWith(github.event.comment.body, '/ai-review')
     runs-on: ubuntu-24.04
@@ -34,8 +27,9 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
           script: |
+            core.setOutput('run', 'false');
+
             if (context.payload.comment.body.trim() !== '/ai-review') {
-              core.setOutput('run', 'false');
               return;
             }
 
@@ -55,7 +49,6 @@ jobs:
                 issue_number: prNumber,
                 body: `🤖 @${actor}, you need write access to run \`/ai-review\`.`,
               });
-              core.setOutput('run', 'false');
               return;
             }
 
@@ -65,33 +58,10 @@ jobs:
               pull_number: prNumber,
             });
             if (pull.data.state !== 'open') {
-              core.setOutput('run', 'false');
               return;
             }
 
             const headSha = pull.data.head.sha;
-            const checks = await github.rest.checks.listForRef({
-              owner,
-              repo,
-              ref: headSha,
-              check_name: 'AI PR Review Trigger',
-              filter: 'latest',
-              per_page: 100,
-            });
-            const alreadyRunning = checks.data.check_runs.some(
-              (check) => check.status === 'queued' || check.status === 'in_progress',
-            );
-            if (alreadyRunning) {
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number: prNumber,
-                body: `🤖 AI Review is already running for \`${headSha.slice(0, 7)}\`.`,
-              });
-              core.setOutput('run', 'false');
-              return;
-            }
-
             const detailsUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const check = await github.rest.checks.create({
               owner,
@@ -101,34 +71,94 @@ jobs:
               status: 'in_progress',
               details_url: detailsUrl,
               output: {
-                title: 'AI PR Review started',
+                title: 'AI PR Review requested',
                 summary: `Manual review requested by @${actor} for ${headSha}.`,
               },
             });
 
-            await github.rest.issues.createComment({
-              owner,
-              repo,
-              issue_number: prNumber,
-              body: `🤖 AI Review started for \`${headSha.slice(0, 7)}\` (requested by @${actor}).`,
-            });
-
-            core.setOutput('run', 'true');
             core.setOutput('pr_number', String(prNumber));
             core.setOutput('head_sha', headSha);
             core.setOutput('check_run_id', String(check.data.id));
 
+            let checkCompleted = false;
+            try {
+              const checks = await github.rest.checks.listForRef({
+                owner,
+                repo,
+                ref: headSha,
+                check_name: 'AI PR Review Trigger',
+                filter: 'all',
+                per_page: 100,
+              });
+              const activeCandidates = checks.data.check_runs
+                .filter((candidate) => candidate.status === 'queued' || candidate.status === 'in_progress')
+                .sort((left, right) => left.id - right.id);
+              const winner = activeCandidates[0];
+
+              if (!winner || winner.id !== check.data.id) {
+                await github.rest.checks.update({
+                  owner,
+                  repo,
+                  check_run_id: check.data.id,
+                  status: 'completed',
+                  conclusion: 'neutral',
+                  output: {
+                    title: 'AI PR Review already running',
+                    summary: `Another request is already reviewing ${headSha}.`,
+                  },
+                });
+                checkCompleted = true;
+                try {
+                  await github.rest.issues.createComment({
+                    owner,
+                    repo,
+                    issue_number: prNumber,
+                    body: `🤖 AI Review is already running for \`${headSha.slice(0, 7)}\`.`,
+                  });
+                } catch (error) {
+                  core.warning(`Could not post duplicate-review notice: ${error instanceof Error ? error.message : String(error)}`);
+                }
+                return;
+              }
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: `🤖 AI Review started for \`${headSha.slice(0, 7)}\` (requested by @${actor}).`,
+              });
+
+              core.setOutput('run', 'true');
+            } catch (error) {
+              if (!checkCompleted) {
+                try {
+                  await github.rest.checks.update({
+                    owner,
+                    repo,
+                    check_run_id: check.data.id,
+                    status: 'completed',
+                    conclusion: 'failure',
+                    output: {
+                      title: 'AI PR Review trigger failed',
+                      summary: 'The manual review request failed before the review pipeline started.',
+                    },
+                  });
+                } catch (cleanupError) {
+                  core.warning(`Could not finalize failed trigger check: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`);
+                }
+              }
+              throw error;
+            }
+
   ai-pr-review:
     needs: [comment-gate]
-    if: >-
-      always() &&
-      (github.event_name == 'workflow_dispatch' || needs.comment-gate.outputs.run == 'true')
+    if: needs.comment-gate.outputs.run == 'true'
     uses: gushinets/ai-pr-review/.github/workflows/reusable-ai-pr-review.yml@95418b2d1575c9624da2a15db42657b5fef96aeb
     with:
       mode: manual
       triggering_run_id: ""
-      pr_number: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_number || fromJSON(needs.comment-gate.outputs.pr_number) }}
-      expected_head_sha: ${{ github.event_name == 'issue_comment' && needs.comment-gate.outputs.head_sha || '' }}
+      pr_number: ${{ fromJSON(needs.comment-gate.outputs.pr_number) }}
+      expected_head_sha: ${{ needs.comment-gate.outputs.head_sha }}
     secrets:
       QWEN_TOKEN_PLAN_API_KEY: ${{ secrets.QWEN_TOKEN_PLAN_API_KEY }}
       LINEAR_CLIENT_ID: ${{ secrets.LINEAR_CLIENT_ID }}
@@ -138,7 +168,6 @@ jobs:
     needs: [comment-gate, ai-pr-review]
     if: >-
       always() &&
-      github.event_name == 'issue_comment' &&
       needs.comment-gate.outputs.run == 'true'
     runs-on: ubuntu-24.04
     steps:
