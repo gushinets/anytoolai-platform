@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import re
 from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
@@ -84,6 +85,8 @@ _ERROR_RESPONSES = {
 _PRESET_PAGE_DEFAULT = 20
 _PRESET_PAGE_MAX = 100
 _PRESET_CURSOR_PARTS = 2
+_PRESET_ID_MAX_LENGTH = 128
+_POSTGRESQL_INTEGER_MAX = 2_147_483_647
 
 
 @router.get("/atom-lab", include_in_schema=False)
@@ -195,7 +198,7 @@ def create_preset(
     session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> AtomLabPresetCreatedResponse:
-    _validate_preset_payload(payload, registry)
+    _validate_preset_payload(payload, registry, settings)
     now = utc_now()
     identity = AtomLabPresetIdentityRecord(
         tenant_id=settings.default_tenant_id,
@@ -274,7 +277,7 @@ def create_preset_version(
     session_factory: Annotated[Any, Depends(get_atom_lab_session_factory)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> AtomLabPresetCreatedResponse:
-    _validate_preset_payload(payload, registry)
+    _validate_preset_payload(payload, registry, settings)
     version = _preset_version_record(
         preset_id,
         payload.base_version + 1,
@@ -443,6 +446,7 @@ def _catalog_unavailable() -> AtomLabApiError:
 def _validate_preset_payload(
     payload: AtomLabPresetVersionRequest,
     registry: ConfigRegistry,
+    settings: Settings,
 ) -> None:
     try:
         atom = get_atom_catalog_entry(registry, payload.atom_id.value)
@@ -452,7 +456,7 @@ def _validate_preset_payload(
         raise _preset_contract_invalid("atom_id")
 
     expected_refs = atom.schema_refs.model_dump(mode="json")
-    field_errors: list[dict[str, str]] = []
+    field_errors = _validate_required_preset_text(payload)
     if payload.base_action_config_id != atom.base_action_config_id:
         field_errors.append(_field_error("base_action_config_id"))
     if payload.prompt_ref != atom.prompt_ref:
@@ -464,17 +468,15 @@ def _validate_preset_payload(
 
     field_errors.extend(_validate_fixed_fields(payload))
 
-    try:
-        validate_json_schema(instance=payload.example_input, schema=atom.input_schema)
-    except JsonSchemaValidationError as exc:
-        suffix = ".".join(str(part) for part in exc.absolute_path)
-        path = "example_input" if not suffix else f"example_input.{suffix}"
-        field_errors.append(_field_error(path))
-    else:
-        try:
-            _validate_semantic_input(registry, atom.action_type, payload.example_input)
-        except ActionInputValidationError:
-            field_errors.append(_field_error("example_input"))
+    field_errors.extend(
+        _validate_example_input(
+            payload.example_input,
+            registry=registry,
+            action_type=atom.action_type,
+            input_schema=atom.input_schema,
+            max_bytes=settings.atom_lab_preset_example_input_max_bytes,
+        )
+    )
 
     if field_errors:
         raise AtomLabApiError(
@@ -483,6 +485,49 @@ def _validate_preset_payload(
             message="Конфигурация пресета не соответствует контракту атома.",
             field_errors=field_errors,
         )
+
+
+def _validate_required_preset_text(
+    payload: AtomLabPresetVersionRequest,
+) -> list[dict[str, str]]:
+    return [
+        _field_error(field_name)
+        for field_name, value in (("name", payload.name), ("prompt", payload.prompt))
+        if not value.strip()
+    ]
+
+
+def _validate_example_input(
+    example_input: dict[str, Any],
+    *,
+    registry: ConfigRegistry,
+    action_type: str,
+    input_schema: dict[str, Any],
+    max_bytes: int,
+) -> list[dict[str, str]]:
+    try:
+        serialized = json.dumps(
+            example_input,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except UnicodeEncodeError:
+        return [_field_error("example_input")]
+    if len(serialized) > max_bytes:
+        return [_field_error("example_input")]
+
+    try:
+        validate_json_schema(instance=example_input, schema=input_schema)
+    except JsonSchemaValidationError as exc:
+        suffix = ".".join(str(part) for part in exc.absolute_path)
+        path = "example_input" if not suffix else f"example_input.{suffix}"
+        return [_field_error(path)]
+
+    try:
+        _validate_semantic_input(registry, action_type, example_input)
+    except ActionInputValidationError:
+        return [_field_error("example_input")]
+    return []
 
 
 def _validate_semantic_input(
@@ -635,21 +680,28 @@ def _encode_preset_cursor(created_at: datetime, preset_id: str) -> str:
 
 def _decode_preset_cursor(cursor: str) -> tuple[datetime, str]:
     try:
-        padded = cursor + "=" * (-len(cursor) % 4)
-        value = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
+        value = json.loads(_decode_urlsafe_base64(cursor))
         if (
             not isinstance(value, list)
             or len(value) != _PRESET_CURSOR_PARTS
             or not isinstance(value[0], str)
             or not isinstance(value[1], str)
             or not value[1]
+            or len(value[1]) > _PRESET_ID_MAX_LENGTH
         ):
             raise ValueError
         created_at = datetime.fromisoformat(value[0])
         if created_at.utcoffset() is None:
             raise ValueError
         return created_at.astimezone(UTC), value[1]
-    except (ValueError, TypeError, json.JSONDecodeError, binascii.Error) as exc:
+    except (
+        ValueError,
+        TypeError,
+        OverflowError,
+        UnicodeError,
+        json.JSONDecodeError,
+        binascii.Error,
+    ) as exc:
         raise AtomLabApiError(
             status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
             code="invalid_cursor",
@@ -664,18 +716,32 @@ def _encode_version_cursor(version: int) -> str:
 
 def _decode_version_cursor(cursor: str) -> int:
     try:
-        padded = cursor + "=" * (-len(cursor) % 4)
-        version = int(base64.urlsafe_b64decode(padded.encode("ascii")).decode("ascii"))
-        if version < 1:
+        raw_version = _decode_urlsafe_base64(cursor).decode("ascii")
+        version = int(raw_version)
+        if str(version) != raw_version or version < 1 or version > _POSTGRESQL_INTEGER_MAX:
             raise ValueError
         return version
-    except (ValueError, UnicodeDecodeError, binascii.Error) as exc:
+    except (ValueError, UnicodeError, binascii.Error) as exc:
         raise AtomLabApiError(
             status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
             code="invalid_cursor",
             message="Курсор списка недействителен.",
             field_errors=[_field_error("cursor")],
         ) from exc
+
+
+def _decode_urlsafe_base64(value: str) -> bytes:
+    if re.fullmatch(r"[A-Za-z0-9_-]+={0,2}", value) is None:
+        raise ValueError
+    unpadded = value.rstrip("=")
+    padded = unpadded + "=" * (-len(unpadded) % 4)
+    if value not in {unpadded, padded}:
+        raise ValueError
+    decoded = base64.b64decode(padded.encode("ascii"), altchars=b"-_", validate=True)
+    canonical = base64.urlsafe_b64encode(decoded).decode("ascii").rstrip("=")
+    if canonical != unpadded:
+        raise ValueError
+    return decoded
 
 
 router.include_router(protected_router)

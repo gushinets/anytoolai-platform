@@ -82,6 +82,27 @@ async def _request(
         )
 
 
+async def _request_raw_json(
+    app: FastAPI,
+    method: str,
+    path: str,
+    payload: dict[str, Any],
+) -> httpx.Response:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://testserver",
+    ) as client:
+        return await client.request(
+            method,
+            path,
+            headers={
+                "Content-Type": "application/json",
+                "X-Atom-Lab-Access-Code": ACCESS_CODE,
+            },
+            content=json.dumps(payload).encode("ascii"),
+        )
+
+
 def _version_payload(**overrides: Any) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "name": "Извлечение реквизитов",
@@ -420,6 +441,76 @@ def test_create_rejects_model_id_that_runtime_cannot_address(app: FastAPI) -> No
     ]
 
 
+def test_create_rejects_example_input_larger_than_256_kib(app: FastAPI) -> None:
+    response = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/atom-lab/presets",
+            json=_version_payload(
+                example_input={
+                    "source_text": "x" * 262_144,
+                    "fields": [
+                        {
+                            "name": "deadline",
+                            "type": "date",
+                            "description": "Срок выполнения",
+                            "required": True,
+                        }
+                    ],
+                    "strict": False,
+                },
+            ),
+        )
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "preset_contract_invalid"
+    assert response.json()["error"]["field_errors"] == [
+        {"path": "example_input", "message": "Недопустимое значение."}
+    ]
+
+
+def test_create_rejects_example_input_with_invalid_unicode(app: FastAPI) -> None:
+    example_input = dict(_version_payload()["example_input"])
+    example_input["source_text"] = "\ud800"
+    response = asyncio.run(
+        _request_raw_json(
+            app,
+            "POST",
+            "/v1/atom-lab/presets",
+            _version_payload(example_input=example_input),
+        )
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "preset_contract_invalid"
+    assert response.json()["error"]["field_errors"] == [
+        {"path": "example_input", "message": "Недопустимое значение."}
+    ]
+
+
+@pytest.mark.parametrize("field_name", ["name", "prompt"])
+def test_create_rejects_whitespace_only_required_text(
+    app: FastAPI,
+    field_name: str,
+) -> None:
+    response = asyncio.run(
+        _request(
+            app,
+            "POST",
+            "/v1/atom-lab/presets",
+            json=_version_payload(**{field_name: " \t "}),
+        )
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "preset_contract_invalid"
+    assert response.json()["error"]["field_errors"] == [
+        {"path": field_name, "message": "Недопустимое значение."}
+    ]
+
+
 def test_create_maps_unresolved_input_validator_to_catalog_unavailable(
     app: FastAPI,
     monkeypatch: pytest.MonkeyPatch,
@@ -514,6 +605,43 @@ def test_preset_list_cursor_is_stable_and_invalid_cursor_is_safe(
     assert naive.json()["error"]["code"] == "invalid_cursor"
 
 
+@pytest.mark.parametrize(
+    "cursor",
+    [
+        "!"
+        + base64.urlsafe_b64encode(
+            json.dumps(["2026-09-17T08:00:00+00:00", "preset-id"]).encode("utf-8")
+        ).decode("ascii"),
+        base64.urlsafe_b64encode(
+            json.dumps(["2026-09-17T08:00:00+00:00", "p" * 129]).encode("utf-8")
+        ).decode("ascii"),
+        base64.urlsafe_b64encode(
+            json.dumps(
+                ["0001-01-01T00:00:00+23:59", "preset-id"],
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).decode("ascii"),
+        base64.urlsafe_b64encode(
+            json.dumps(
+                ["2026-09-17T08:00:00+00:00", "࠾"],
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        )
+        .decode("ascii")
+        .replace("-", "%2B"),
+    ],
+)
+def test_preset_list_rejects_noncanonical_or_out_of_domain_cursor(
+    app: FastAPI,
+    cursor: str,
+) -> None:
+    response = asyncio.run(_request(app, "GET", f"/v1/atom-lab/presets?cursor={cursor}"))
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "invalid_cursor"
+
+
 def test_version_list_cursor_and_missing_preset_paths(app: FastAPI) -> None:
     created = asyncio.run(
         _request(app, "POST", "/v1/atom-lab/presets", json=_version_payload())
@@ -569,6 +697,20 @@ def test_version_list_cursor_and_missing_preset_paths(app: FastAPI) -> None:
         response = asyncio.run(_request(app, method, path, json=body))
         assert response.status_code == HTTPStatus.NOT_FOUND
         assert response.json()["error"]["code"] == "preset_not_found"
+
+
+@pytest.mark.parametrize("raw_version", ["0", "01", "2147483648"])
+def test_version_list_rejects_noncanonical_or_out_of_domain_cursor(
+    app: FastAPI,
+    raw_version: str,
+) -> None:
+    cursor = base64.urlsafe_b64encode(raw_version.encode("ascii")).decode("ascii")
+    response = asyncio.run(
+        _request(app, "GET", f"/v1/atom-lab/presets/missing/versions?cursor={cursor}")
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "invalid_cursor"
 
 
 def test_reasoning_effort_null_round_trips(app: FastAPI) -> None:
