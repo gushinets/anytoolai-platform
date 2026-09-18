@@ -510,8 +510,9 @@ def _validate_example_input(
             example_input,
             ensure_ascii=False,
             separators=(",", ":"),
+            allow_nan=False,
         ).encode("utf-8")
-    except UnicodeEncodeError:
+    except (ValueError, UnicodeEncodeError):
         return [_field_error("example_input")]
     if len(serialized) > max_bytes:
         return [_field_error("example_input")]

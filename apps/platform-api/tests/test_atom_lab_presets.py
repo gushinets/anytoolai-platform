@@ -490,6 +490,37 @@ def test_create_rejects_example_input_with_invalid_unicode(app: FastAPI) -> None
     ]
 
 
+@pytest.mark.parametrize(
+    "invalid_number",
+    [
+        pytest.param(float("nan"), id="nan"),
+        pytest.param(float("inf"), id="positive-infinity"),
+        pytest.param(float("-inf"), id="negative-infinity"),
+    ],
+)
+def test_create_rejects_non_finite_numbers_in_example_input(
+    app: FastAPI,
+    invalid_number: float,
+) -> None:
+    payload = _version_payload_for_atom(app, "A06")
+    example_input = dict(payload["example_input"])
+    example_input["context"] = {"invalid_number": invalid_number}
+    response = asyncio.run(
+        _request_raw_json(
+            app,
+            "POST",
+            "/v1/atom-lab/presets",
+            {**payload, "example_input": example_input},
+        )
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["error"]["code"] == "preset_contract_invalid"
+    assert response.json()["error"]["field_errors"] == [
+        {"path": "example_input", "message": "Недопустимое значение."}
+    ]
+
+
 @pytest.mark.parametrize("field_name", ["name", "prompt"])
 def test_create_rejects_whitespace_only_required_text(
     app: FastAPI,
