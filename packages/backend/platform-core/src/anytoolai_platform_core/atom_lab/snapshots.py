@@ -7,7 +7,10 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from anytoolai_platform_core.actions.executor import RunLocalActionSettings
-from anytoolai_platform_core.atom_lab.models import AtomLabRunRecord
+from anytoolai_platform_core.atom_lab.models import (
+    AtomLabRunRecord,
+    is_addressable_atom_lab_model,
+)
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.providers.models import (
     ProviderPolicy,
@@ -57,7 +60,7 @@ def build_atom_lab_run_record(
         raise ValueError("Atom Lab snapshot input does not match the scenario input")
     if not request.prompt.strip():
         raise ValueError("Atom Lab prompt must not be empty")
-    if not request.model_id.startswith("openai/"):
+    if not is_addressable_atom_lab_model(request.model_id):
         raise ValueError("Atom Lab selected model must be an addressable OpenAI model")
     policy = registry.get_provider_policy(action_config.provider_policy_ref)
     if policy is None:

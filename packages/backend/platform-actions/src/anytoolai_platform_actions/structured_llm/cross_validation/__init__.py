@@ -13,19 +13,20 @@ from .extract_structured_fields import (
 from .generate_clarifying_questions import GenerateClarifyingQuestionsCrossValidator
 from .generate_gap_rewrites import GAP_REWRITES_DEFAULT_N, GapRewritesCrossValidator
 from .persuasive_text import PersuasiveTextCrossValidator
-from .score_multidimensional_axes import (
-    ScoreMultidimensionalAxesCrossValidator,
-    ScoreMultidimensionalAxesInputValidator,
+from .registry import (
+    NONE_REF,
+    ValidatorRefNotFoundError,
+    build_input_validator,
+    build_input_validators,
+    build_output_cross_validators,
 )
 from .score_match_by_rubric import (
     ScoreMatchByRubricCrossValidator,
     ScoreMatchByRubricInputValidator,
 )
-from .registry import (
-    NONE_REF,
-    ValidatorRefNotFoundError,
-    build_input_validators,
-    build_output_cross_validators,
+from .score_multidimensional_axes import (
+    ScoreMultidimensionalAxesCrossValidator,
+    ScoreMultidimensionalAxesInputValidator,
 )
 from .synthesize_angle import SynthesizeAngleCrossValidator
 
@@ -47,6 +48,7 @@ __all__ = [
     "ScoreMatchByRubricInputValidator",
     "SynthesizeAngleCrossValidator",
     "ValidatorRefNotFoundError",
+    "build_input_validator",
     "build_input_validators",
     "build_output_cross_validators",
 ]

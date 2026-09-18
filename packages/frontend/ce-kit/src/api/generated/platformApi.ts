@@ -89,6 +89,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/atom-lab/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Presets */
+        get: operations["list_presets_v1_atom_lab_presets_get"];
+        put?: never;
+        /** Create Preset */
+        post: operations["create_preset_v1_atom_lab_presets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/atom-lab/presets/{preset_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Preset Versions */
+        get: operations["list_preset_versions_v1_atom_lab_presets__preset_id__versions_get"];
+        put?: never;
+        /** Create Preset Version */
+        post: operations["create_preset_version_v1_atom_lab_presets__preset_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/atom-lab/presets/{preset_id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Preset Version */
+        get: operations["get_preset_version_v1_atom_lab_presets__preset_id__versions__version__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/atom-lab/presets/{preset_id}/versions/{version}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Preset Version */
+        get: operations["export_preset_version_v1_atom_lab_presets__preset_id__versions__version__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/client-events": {
         parameters: {
             query?: never;
@@ -410,6 +480,174 @@ export interface components {
             snapshot_id: string | null;
             /** Stale */
             stale: boolean;
+        };
+        /** AtomLabPresetCreatedResponse */
+        AtomLabPresetCreatedResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Preset Id */
+            preset_id: string;
+            /** Version */
+            version: number;
+        };
+        /** AtomLabPresetExportResponse */
+        AtomLabPresetExportResponse: {
+            configuration: components["schemas"]["AtomLabPresetVersionRequest"];
+            /**
+             * Format Version
+             * @default 1
+             * @constant
+             */
+            format_version: 1;
+            /** Preset Id */
+            preset_id: string;
+            /** Version */
+            version: number;
+        };
+        /** AtomLabPresetListResponse */
+        AtomLabPresetListResponse: {
+            /** Items */
+            items: components["schemas"]["AtomLabPresetSummaryResponse"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** AtomLabPresetNextVersionRequest */
+        AtomLabPresetNextVersionRequest: {
+            atom_id: components["schemas"]["AtomLabAtomId"];
+            /** Base Action Config Id */
+            base_action_config_id: string;
+            /** Base Version */
+            base_version: number;
+            /** Description */
+            description: string;
+            /** Example Input */
+            example_input: {
+                [key: string]: unknown;
+            };
+            /** Fixed Fields */
+            fixed_fields?: string[];
+            /** Model Id */
+            model_id: string;
+            /** Name */
+            name: string;
+            /** Prompt */
+            prompt: string;
+            /** Prompt Ref */
+            prompt_ref: string;
+            reasoning_effort?: components["schemas"]["ReasoningEffort"] | null;
+            schema_refs: components["schemas"]["AtomLabSchemaRefsResponse"];
+            /** Source Run Id */
+            source_run_id?: string | null;
+        };
+        /** AtomLabPresetSummaryResponse */
+        AtomLabPresetSummaryResponse: {
+            atom_id: components["schemas"]["AtomLabAtomId"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /** Latest Version */
+            latest_version: number;
+            /** Name */
+            name: string;
+            /** Preset Id */
+            preset_id: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** AtomLabPresetVersionListResponse */
+        AtomLabPresetVersionListResponse: {
+            /** Items */
+            items: components["schemas"]["AtomLabPresetVersionSummaryResponse"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** AtomLabPresetVersionRequest */
+        AtomLabPresetVersionRequest: {
+            atom_id: components["schemas"]["AtomLabAtomId"];
+            /** Base Action Config Id */
+            base_action_config_id: string;
+            /** Description */
+            description: string;
+            /** Example Input */
+            example_input: {
+                [key: string]: unknown;
+            };
+            /** Fixed Fields */
+            fixed_fields?: string[];
+            /** Model Id */
+            model_id: string;
+            /** Name */
+            name: string;
+            /** Prompt */
+            prompt: string;
+            /** Prompt Ref */
+            prompt_ref: string;
+            reasoning_effort?: components["schemas"]["ReasoningEffort"] | null;
+            schema_refs: components["schemas"]["AtomLabSchemaRefsResponse"];
+            /** Source Run Id */
+            source_run_id?: string | null;
+        };
+        /** AtomLabPresetVersionResponse */
+        AtomLabPresetVersionResponse: {
+            atom_id: components["schemas"]["AtomLabAtomId"];
+            /** Base Action Config Id */
+            base_action_config_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /** Example Input */
+            example_input: {
+                [key: string]: unknown;
+            };
+            /** Fixed Fields */
+            fixed_fields?: string[];
+            /** Model Id */
+            model_id: string;
+            /** Name */
+            name: string;
+            /** Preset Id */
+            preset_id: string;
+            /** Prompt */
+            prompt: string;
+            /** Prompt Ref */
+            prompt_ref: string;
+            reasoning_effort?: components["schemas"]["ReasoningEffort"] | null;
+            schema_refs: components["schemas"]["AtomLabSchemaRefsResponse"];
+            /** Source Run Id */
+            source_run_id?: string | null;
+            /** Version */
+            version: number;
+        };
+        /** AtomLabPresetVersionSummaryResponse */
+        AtomLabPresetVersionSummaryResponse: {
+            atom_id: components["schemas"]["AtomLabAtomId"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /** Name */
+            name: string;
+            /** Preset Id */
+            preset_id: string;
+            /** Version */
+            version: number;
         };
         /** AtomLabSchemaRefsResponse */
         AtomLabSchemaRefsResponse: {
@@ -975,6 +1213,378 @@ export interface operations {
             };
             /** @description Atom Lab access denied. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab request validation failed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab is not configured. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+        };
+    };
+    list_presets_v1_atom_lab_presets_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: {
+                "X-Atom-Lab-Access-Code"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabPresetListResponse"];
+                };
+            };
+            /** @description Atom Lab access denied. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab request validation failed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab is not configured. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+        };
+    };
+    create_preset_v1_atom_lab_presets_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Atom-Lab-Access-Code"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AtomLabPresetVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabPresetCreatedResponse"];
+                };
+            };
+            /** @description Atom Lab access denied. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab request validation failed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab is not configured. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+        };
+    };
+    list_preset_versions_v1_atom_lab_presets__preset_id__versions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: {
+                "X-Atom-Lab-Access-Code"?: string | null;
+            };
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabPresetVersionListResponse"];
+                };
+            };
+            /** @description Atom Lab access denied. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab request validation failed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab is not configured. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+        };
+    };
+    create_preset_version_v1_atom_lab_presets__preset_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Atom-Lab-Access-Code"?: string | null;
+            };
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AtomLabPresetNextVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabPresetCreatedResponse"];
+                };
+            };
+            /** @description Atom Lab access denied. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab request validation failed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab is not configured. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+        };
+    };
+    get_preset_version_v1_atom_lab_presets__preset_id__versions__version__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Atom-Lab-Access-Code"?: string | null;
+            };
+            path: {
+                preset_id: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabPresetVersionResponse"];
+                };
+            };
+            /** @description Atom Lab access denied. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab request validation failed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Atom Lab is not configured. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+        };
+    };
+    export_preset_version_v1_atom_lab_presets__preset_id__versions__version__export_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Atom-Lab-Access-Code"?: string | null;
+            };
+            path: {
+                preset_id: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabPresetExportResponse"];
+                };
+            };
+            /** @description Atom Lab access denied. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomLabErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
