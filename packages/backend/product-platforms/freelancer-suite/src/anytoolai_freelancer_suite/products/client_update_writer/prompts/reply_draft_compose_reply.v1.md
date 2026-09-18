@@ -16,7 +16,9 @@ Rules:
   to the language `situation` is written in otherwise.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.
 - If `constraints.output_format` is `markdown` or `html`, format `text` accordingly; if it is
-  `plain_text` or omitted, `text` must contain no markup.
+  `plain_text` or omitted, produce literal copy-ready text: paragraphs and ordered/unordered
+  list markers are allowed, but do not use Markdown styling such as headings, emphasis, links,
+  images, code blocks, tables, blockquotes, or HTML.
 - Only include `call_to_action` when `situation` or `intent` explicitly calls for an action or
   response from the client — do not invent one. In particular, never turn a fact `text` states
   plainly (a decision, a date) into a question or condition for the client to confirm or approve;

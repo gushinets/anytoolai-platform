@@ -259,7 +259,7 @@ def test_weak_input_fixture_is_distinct_and_invents_no_specific_day(action_confi
     )["response_json"]["text"]
 
     assert weak_text != happy_text
-    assert not any(day in weak_text for day in _DAY_WORDS), action_config_id
+    assert not any(day in weak_text.lower() for day in map(str.lower, _DAY_WORDS)), action_config_id
 
 
 # Code review finding: the day-word check above only catches invented *dates* -- it cannot catch
@@ -415,6 +415,24 @@ def test_prepaid_request_persuasive_text_step_maps_constraints_from_expected_sou
     assert mapping["constraints.format"] == "?scenario.input.constraints.output_format"
 
 
+# Code review finding (xhigh #5): the per-field constraint mapping above already has a pinning
+# test for compose_persuasive_text; the plain `constraints` mapping on each mode's compose_reply
+# step had none.
+@pytest.mark.parametrize(
+    "workflow_id",
+    [
+        "client_update_writer.update_v1",
+        "client_update_writer.reply_draft_v1",
+        "client_update_writer.prepaid_request_v1",
+    ],
+)
+def test_compose_reply_step_maps_constraints_from_scenario_input(workflow_id: str) -> None:
+    workflow = _workflow_by_id()[workflow_id]
+    reply_step = next(step for step in workflow["steps"] if step["step_id"] == "compose_reply")
+
+    assert reply_step["input_mapping"]["constraints"] == "?scenario.input.constraints"
+
+
 # Code review finding (team lead #2): the compose_reply fixtures repeated the compose_persuasive_text
 # fixture's first sentence verbatim, while prepaid_request_compose_reply.v1.md says to build on
 # `situation` "without repeating it verbatim".
@@ -456,6 +474,21 @@ def test_prepaid_request_weak_fixture_preserves_urgency_across_both_steps() -> N
     assert any(word in persuasive_text for word in urgency_words), persuasive_text
     assert any(word in reply_text for word in urgency_words), reply_text
     assert "when you get a chance" not in reply_text
+
+
+# Code review finding (xhigh #5): the reversed call_to_action rule -- CTA is follow-up
+# acknowledgement only, not a repeat of the payment ask -- had no regression test of its own.
+@pytest.mark.parametrize("fixture_suffix", ["", ".weak_input"])
+def test_prepaid_request_reply_call_to_action_does_not_repeat_the_payment_ask(
+    fixture_suffix: str,
+) -> None:
+    call_to_action = json.loads(
+        (
+            FIXTURE_ROOT / f"client_update_writer.prepaid_request_compose_reply_v1{fixture_suffix}.json"
+        ).read_text(encoding="utf-8")
+    )["response_json"]["call_to_action"].lower()
+
+    assert "send" not in call_to_action, fixture_suffix
 
 
 def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:

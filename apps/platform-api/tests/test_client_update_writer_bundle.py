@@ -265,8 +265,11 @@ _MODE_HAPPY_PATH_CASES = {
             "constraints": {"language": "en", "max_length": 500, "output_format": "plain_text"},
         },
         {
-            "text": "Could you send the $500 prepayment for phase 2 by Friday?",
-            "call_to_action": "Please send the $500 prepayment and reply once it's on its way.",
+            "text": (
+                "Now that the approved design phase is wrapping up and phase 2 is about to start, "
+                "could you send the $500 prepayment for phase 2 by Friday?"
+            ),
+            "call_to_action": "Let me know once it's on its way.",
         },
     ),
 }
@@ -342,6 +345,18 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     result_body = result_response.json()
     assert result_body["schema_ref"] == "kernel.schemas.compose_reply_output_v1"
     assert result_body["output"] == expected_output
+
+    # Code review finding (xhigh #5): amount/due_date only reach the client through the
+    # persuasive-text step's free-text `situation` (A07's compose_reply schema has no dedicated
+    # field for them, and the mapping DSL has no string interpolation), so nothing structurally
+    # guarantees they survive a future prompt/fixture edit -- several earlier rounds each caught
+    # one way they'd been dropped or altered. Assert directly against this test's own
+    # `start_input`, independent of `expected_output`'s hardcoded string, so a future edit that
+    # updates the fixture and `expected_output` together but drops a fact still fails here.
+    if mode == "prepaid_request":
+        billing_context = start_input["billing_context"]
+        assert billing_context["amount"] in result_body["output"]["text"]
+        assert billing_context["due_date"] in result_body["output"]["text"]
 
 
 class _WeakInputProviderAdapter(FakeProviderAdapter):

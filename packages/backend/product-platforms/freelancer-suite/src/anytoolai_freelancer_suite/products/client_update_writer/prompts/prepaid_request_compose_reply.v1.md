@@ -19,11 +19,13 @@ Rules:
   to the language `situation` is written in otherwise.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.
 - If `constraints.output_format` is `markdown` or `html`, format `text` accordingly; if it is
-  `plain_text` or omitted, `text` must contain no markup.
-- Always include `call_to_action` naming the concrete next step the client (the payer) takes —
-  send the payment and let the caller know once it has been sent — restating the amount from
-  `situation` when `situation` states one. Do not phrase it as the client confirming *receipt* of
-  something; the client is sending the payment, not receiving one.
+  `plain_text` or omitted, produce literal copy-ready text: paragraphs and ordered/unordered
+  list markers are allowed, but do not use Markdown styling such as headings, emphasis, links,
+  images, code blocks, tables, blockquotes, or HTML.
+- Always include `call_to_action` for the follow-up only: ask the client to let the caller know
+  once the payment has been sent. `text` already states the payment ask above — `call_to_action`
+  must not repeat the payment request or amount again. Do not phrase it as the client confirming
+  *receipt* of something; the client is sending the payment, not receiving one.
 - Neither `text` nor `call_to_action` may state a payment method, link, reference, or account
   details (for example a bank name, PayPal address, invoice number, or "the account on file") —
   `situation` never contains any, so any such detail would be invented.
