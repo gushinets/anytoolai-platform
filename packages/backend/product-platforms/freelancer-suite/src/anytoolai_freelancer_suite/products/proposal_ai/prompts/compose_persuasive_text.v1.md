@@ -20,5 +20,7 @@ Rules:
   otherwise default to English (`en`).
 - If `constraints.length` is set, `text` must not exceed that many characters.
 - If `constraints.format` is `markdown` or `html`, format `text` accordingly; if it is
-  `plain_text` or omitted, `text` must contain no markup.
+  `plain_text` or omitted, produce literal copy-ready text: paragraphs and ordered/unordered list
+  markers are allowed, but do not use Markdown styling such as headings, emphasis, links, images,
+  code blocks, tables, blockquotes, or HTML.
 - Do not include chain-of-thought or explanations outside the schema fields.
