@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from ._markup import _has_html_tag, _has_markup
+from ._markup import _has_disallowed_plain_text_markup, _has_html_tag
 from ._shared import _coerce_integer_valued, _cross_validation_error, _require_output
 
 
@@ -30,9 +30,11 @@ class PersuasiveTextCrossValidator:
                 f"text_exceeds_constraints_length:{len(text)}>{length}"
             )
 
-        # Prompt contract: "if it is plain_text or omitted, text must contain no markup".
+        # Prompt contract: "if it is plain_text or omitted, text must be copy-ready
+        # (paragraphs and ordered/unordered lists are allowed; other Markdown/HTML markup
+        # is not)".
         text_format = constraints.get("format")
-        if text_format in (None, "plain_text") and _has_markup(text):
+        if text_format in (None, "plain_text") and _has_disallowed_plain_text_markup(text):
             raise _cross_validation_error("text_contains_markup_for_plain_text_format")
         # Markdown syntax alone doesn't satisfy "html" — it must contain an actual tag. Same
         # as the sibling A07 validator: "markdown" is not required to prove itself with a

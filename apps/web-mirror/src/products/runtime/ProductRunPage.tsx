@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { Button } from "@anytoolai/shared-ui";
 import {
   copyResultAndRecordActivation,
   createInMemoryAsyncStorage,
@@ -726,10 +727,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   if (boot.kind === "loading") {
-    return <p role="status">Loading {definition.title}…</p>;
+    return (
+      <main className="page-container">
+        <p role="status">Loading {definition.title}…</p>
+      </main>
+    );
   }
   if (boot.kind === "boot-error") {
-    return <ErrorState message={`${definition.title} is unavailable right now. Please reload the page.`} />;
+    return (
+      <main className="page-container">
+        <ErrorState message={`${definition.title} is unavailable right now. Please reload the page.`} />
+      </main>
+    );
   }
 
   const identityUnavailable = guestId === undefined;
@@ -760,9 +769,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       mainContent = (
         <form onSubmit={handleSubmit}>
           <Fields values={values} errors={fieldErrors} disabled={busy || identityUnavailable} onChange={updateField} />
-          <button type="submit" disabled={busy || identityUnavailable}>
+          <Button type="submit" loading={busy} disabled={identityUnavailable}>
             {phase.kind === "submitting" ? "Starting…" : phase.kind === "running" ? "Generating…" : definition.copy.submit}
-          </button>
+          </Button>
           {phase.kind === "running" ? <p role="status">{definition.copy.running}</p> : null}
           {identityUnavailable ? (
             <p role="alert">We couldn&apos;t verify your identity. Please reload the page and try again.</p>
@@ -775,7 +784,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   return (
-    <main>
+    <main className="page-container">
       <h1>{definition.title}</h1>
       {quota ? <p aria-live="polite">{definition.copy.quotaRemaining(quota.remainingCount, quota.limitCount)}</p> : null}
 

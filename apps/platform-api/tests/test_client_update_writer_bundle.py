@@ -269,10 +269,10 @@ _MODE_HAPPY_PATH_CASES = {
         },
         {
             "text": (
-                "The design phase you approved wraps up this week, with phase 2 (development) "
-                "starting next. Could you send the $500 prepayment for phase 2 by Friday?"
+                "Now that the approved design phase is wrapping up and phase 2 is about to start, "
+                "could you send the $500 prepayment for phase 2 by Friday?"
             ),
-            "call_to_action": "Please send the $500 prepayment and reply once it's on its way.",
+            "call_to_action": "Let me know once it's on its way.",
         },
     ),
 }
@@ -436,6 +436,18 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
         if row["event_type"] in _ACTION_EVENT_TYPES
     ]
     assert actual_trace == expected_trace
+
+    # Code review finding (xhigh #5): amount/due_date only reach the client through the
+    # persuasive-text step's free-text `situation` (A07's compose_reply schema has no dedicated
+    # field for them, and the mapping DSL has no string interpolation), so nothing structurally
+    # guarantees they survive a future prompt/fixture edit -- several earlier rounds each caught
+    # one way they'd been dropped or altered. Assert directly against this test's own
+    # `start_input`, independent of `expected_output`'s hardcoded string, so a future edit that
+    # updates the fixture and `expected_output` together but drops a fact still fails here.
+    if mode == "prepaid_request":
+        billing_context = start_input["billing_context"]
+        assert billing_context["amount"] in result_body["output"]["text"]
+        assert billing_context["due_date"] in result_body["output"]["text"]
 
 
 class _WeakInputProviderAdapter(FakeProviderAdapter):

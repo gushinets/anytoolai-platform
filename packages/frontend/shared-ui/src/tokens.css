@@ -1,0 +1,110 @@
+/*
+ * Generated from tokens.json (see that file's own comment in the exec-plan) -- do not add a
+ * custom property for a token that doesn't exist there (surfaceNav/surfaceModal/warningBackground/
+ * warningBorder/errorBorder): see docs/exec-plans/active/any-503-adopt-bundle3-design-system.md.
+ */
+:root {
+  --color-background: #0F0C29;
+  --color-background-secondary: #1A1550;
+  --color-background-tertiary: #0A1A3A;
+  --color-surface-card: rgba(255, 255, 255, 0.07);
+  --color-surface-hover: rgba(255, 255, 255, 0.11);
+  --color-surface-active: rgba(255, 255, 255, 0.16);
+  --color-border: rgba(255, 255, 255, 0.10);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+  --color-text: #F0EFF8;
+  --color-text-secondary: rgba(240, 239, 248, 0.55);
+  --color-text-disabled: rgba(240, 239, 248, 0.30);
+  --color-accent: #818CF8;
+  --color-accent-deep: #6366F1;
+  --color-accent-glow: rgba(99, 102, 241, 0.25);
+  --color-teal: #5EEAD4;
+  --color-teal-glow: rgba(94, 234, 212, 0.15);
+  --color-success: #34D399;
+  --color-success-background: rgba(52, 211, 153, 0.15);
+  --color-success-border: rgba(52, 211, 153, 0.25);
+  --color-error: #F87171;
+  --color-error-background: rgba(248, 113, 113, 0.15);
+  --color-warning: #FBBF24;
+
+  --gradient-accent: linear-gradient(135deg, #6366F1 0%, #818CF8 100%);
+  --gradient-headline: linear-gradient(120deg, #818CF8 0%, #5EEAD4 100%);
+
+  --layout-max-width: 1160px;
+  --layout-grid-gap: 10px;
+
+  --radius-input: 8px;
+  --radius-button: 12px;
+  --radius-card: 18px;
+  --radius-panel: 20px;
+  --radius-hero: 24px;
+  --radius-pill: 999px;
+}
+
+/* --font-body/--font-mono are set by next/font/google on <html> in layout.tsx (DM Sans/DM Mono);
+ * the var() fallback here only covers a consumer that never wires next/font at all. */
+body {
+  font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  /* The browser's UA stylesheet default (8px) would otherwise sit outside .page-background's
+   * full-bleed gradient/min-height:100vh, leaving an unstyled gap and risking overflow. */
+  margin: 0;
+}
+
+/* Cabinet Grotesk is delivered via the Fontshare API (layout.tsx's <link>), which declares a
+ * plain, globally-resolvable `font-family: 'Cabinet Grotesk'` -- unlike next/font/google, it isn't
+ * scoped behind a --font-* variable, so the literal name is used directly here. */
+h1,
+h2,
+h3 {
+  font-family: "Cabinet Grotesk", var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  /* SKILL.md's "Display" role (900 weight, 44-56px) -- Fontshare's CSS API intermittently bundles
+   * unrelated extra @font-face declarations for this font at the "Section" role's 800 weight
+   * (verified non-deterministic), but is reliably clean at 900; see layout.tsx's own comment.
+   * Weight and size must stay paired as one Bundle 3 role, not mixed across roles -- no <h2>/<h3>
+   * exists anywhere in apps/web-mirror yet, so only <h1> also gets an explicit size, rather than
+   * guessing sizes for heading levels nothing renders. */
+  font-weight: 900;
+}
+
+h1 {
+  font-size: 44px;
+}
+
+/* SKILL.md's "Label" role: DM Sans, 600 weight, 10-11px -- ProposalAIFields's <label> elements
+ * were rendering as unstyled browser-default text (same as body), which both looks wrong and
+ * technically falls under Bundle 3's "unapproved system-font replacement" prohibition. */
+label {
+  font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+/* SKILL.md: "At 520px, actions become full width where necessary" -- scoped to the primary
+ * form-submission action (the only current call site), not every Button (a "Copy"/"Try again"
+ * button inline in a Card has no reason to stretch). No 860px multi-column collapse rule exists
+ * here because no current page lays out a multi-column grid needing one. */
+@media (max-width: 520px) {
+  button[type="submit"] {
+    width: 100%;
+  }
+}
+
+/* web.md's Layout section: "max-width: 1160px, centered" -- applied to the product page's <main>
+ * (ProductRunPage.tsx), not the landing-page-specific 80px/40px section padding web.md also
+ * defines, which has no call site here. */
+.page-container {
+  max-width: var(--layout-max-width);
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+/* web.md's "Page Background" recipe -- the one directly-reusable piece of web.md for a plain
+ * product-run page (its nav/hero/tools-grid CSS has no call site in apps/web-mirror). */
+.page-background {
+  background:
+    radial-gradient(ellipse at 65% -5%, rgba(99, 102, 241, 0.22) 0%, transparent 50%),
+    radial-gradient(ellipse at 15% 85%, rgba(94, 234, 212, 0.12) 0%, transparent 48%),
+    linear-gradient(160deg, var(--color-background) 0%, var(--color-background-secondary) 60%, var(--color-background-tertiary) 100%);
+  color: var(--color-text);
+  min-height: 100vh;
+}

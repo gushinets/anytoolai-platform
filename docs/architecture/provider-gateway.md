@@ -207,6 +207,17 @@ LiteLLM does not own:
 - structured-output validation
 - hard physical-call limits
 
+Model catalog discovery also stays inside the provider boundary, but it is not generation and does
+not pass through the provider-call ledger. The worker performs only two bounded read operations:
+OpenAI `GET /v1/models` for account-visible IDs and the LiteLLM JSON metadata snapshot. Platform
+Core validates and merges those inputs with repository YAML overrides; precedence is override,
+then metadata, then explicit unknown. Native JSON Schema support is not an admission requirement
+because Atom Lab retains prompted output. A LiteLLM `openai`/`chat` record confirms the current
+prompted text path even when the optional output-modalities field is absent. Confirmed
+audio-output, realtime, image-generation, and other non-chat specializations are excluded; a
+GPT-shaped account ID with incomplete metadata remains visible as `unknown` rather than being
+guessed from its name.
+
 ## Atom Lab run-local settings
 
 Ordinary jobs continue to resolve immutable registry policy and router model aliases. For an

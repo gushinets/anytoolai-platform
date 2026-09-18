@@ -43,6 +43,10 @@ class OrphanReconciler(Protocol):
     def reconcile_once(self) -> int: ...
 
 
+class ModelCatalogRefreshHook(Protocol):
+    async def refresh_if_due(self) -> None: ...
+
+
 class Worker:
     def __init__(
         self,
@@ -51,11 +55,13 @@ class Worker:
         job_queue: JobQueue | None = None,
         poll_interval_seconds: float = 1.0,
         reconciler: OrphanReconciler | None = None,
+        catalog_refresh_hook: ModelCatalogRefreshHook | None = None,
     ) -> None:
         self._workflow_handler = workflow_handler
         self._job_queue = job_queue
         self._poll_interval_seconds = poll_interval_seconds
         self._reconciler = reconciler
+        self._catalog_refresh_hook = catalog_refresh_hook
         self._stopping = asyncio.Event()
 
     def request_shutdown(self) -> None:
@@ -115,6 +121,9 @@ class Worker:
             raise RuntimeError("worker has no DB job queue configured")
         self._sweep_orphaned_jobs()
         while not self._stopping.is_set():
+            await self._refresh_model_catalog()
+            if self._stopping.is_set():
+                break
             try:
                 result = await self.process_next_job()
             except asyncio.CancelledError:
@@ -132,6 +141,16 @@ class Worker:
             if result is None or result.status is JobStatus.created:
                 self._sweep_orphaned_jobs()
                 await asyncio.sleep(self._poll_interval_seconds)
+
+    async def _refresh_model_catalog(self) -> None:
+        if self._catalog_refresh_hook is None:
+            return
+        try:
+            await self._catalog_refresh_hook.refresh_if_due()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("worker.model_catalog_refresh_hook_failed")
 
     def _sweep_orphaned_jobs(self) -> None:
         """Reconcile `running` jobs whose lease-holder is gone. Best-effort, never raises.

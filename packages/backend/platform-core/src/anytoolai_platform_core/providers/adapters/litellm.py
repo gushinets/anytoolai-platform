@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import os
@@ -7,6 +8,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Any
 
+import httpx
 import litellm
 import yaml
 from anytoolai_platform_core.common.errors import PlatformError
@@ -22,6 +24,128 @@ from anytoolai_platform_core.structured_output.schemas import normalize_schema_m
 from litellm import Router
 
 _ENV_SENTINEL_PREFIX = "env/"
+_OPENAI_MODELS_URL = "https://api.openai.com/v1/models"
+_LITELLM_METADATA_URL = (
+    "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
+)
+_MAX_CATALOG_RESPONSE_BYTES = 32 * 1024 * 1024
+
+
+class LiteLLMModelCatalogSource:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        timeout_seconds: float = 10.0,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
+        if not api_key.strip():
+            raise ValueError("OpenAI API key is required for model catalog refresh")
+        self._api_key = api_key
+        self._timeout_seconds = timeout_seconds
+        self._transport = transport
+
+    async def fetch_openai_model_ids(self) -> tuple[str, ...]:
+        payload = await self._fetch_payload(
+            _OPENAI_MODELS_URL,
+            headers={"Authorization": f"Bearer {self._api_key}"},
+            source="OpenAI models",
+        )
+        return parse_openai_models_payload(payload)
+
+    async def fetch_litellm_metadata(self) -> Mapping[str, Mapping[str, Any]]:
+        payload = await self._fetch_payload(
+            _LITELLM_METADATA_URL,
+            headers={},
+            source="LiteLLM metadata",
+        )
+        return parse_litellm_model_metadata_payload(payload)
+
+    async def _fetch_payload(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str],
+        source: str,
+    ) -> bytes:
+        timeout = httpx.Timeout(self._timeout_seconds)
+        async with asyncio.timeout(self._timeout_seconds):
+            async with httpx.AsyncClient(
+                timeout=timeout,
+                transport=self._transport,
+                follow_redirects=True,
+            ) as client:
+                async with client.stream(
+                    "GET", url, headers={"Accept": "application/json", **headers}
+                ) as response:
+                    response.raise_for_status()
+                    payload = bytearray()
+                    async for chunk in response.aiter_bytes():
+                        payload.extend(chunk)
+                        if len(payload) > _MAX_CATALOG_RESPONSE_BYTES:
+                            raise ValueError(f"{source} response exceeds the size limit")
+        return bytes(payload)
+
+
+def parse_openai_models_payload(payload: bytes) -> tuple[str, ...]:
+    try:
+        document = json.loads(payload)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("OpenAI models response is not valid JSON") from exc
+    if not isinstance(document, dict) or document.get("object") != "list":
+        raise ValueError("OpenAI models response must be a list object")
+    data = document.get("data")
+    if not isinstance(data, list):
+        raise ValueError("OpenAI models response data must be a list")
+    model_ids: list[str] = []
+    for item in data:
+        if (
+            not isinstance(item, dict)
+            or item.get("object") != "model"
+            or not isinstance(item.get("id"), str)
+            or not item["id"].strip()
+        ):
+            raise ValueError("OpenAI models response contains an invalid model object")
+        model_ids.append(item["id"])
+    return tuple(model_ids)
+
+
+def parse_litellm_model_metadata_payload(
+    payload: bytes,
+) -> Mapping[str, Mapping[str, Any]]:
+    try:
+        document = json.loads(payload)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("LiteLLM metadata response is not valid JSON") from exc
+    if not isinstance(document, dict):
+        raise ValueError("LiteLLM metadata response must be a mapping")
+    for model_id, item in document.items():
+        if not isinstance(model_id, str) or not model_id or not isinstance(item, dict):
+            raise ValueError("LiteLLM metadata contains an invalid model entry")
+        for field_name in ("litellm_provider", "mode"):
+            if field_name in item and not isinstance(item[field_name], str):
+                raise ValueError(f"LiteLLM metadata {field_name} must be a string")
+        if "supports_reasoning" in item and not isinstance(item["supports_reasoning"], bool):
+            raise ValueError("LiteLLM metadata supports_reasoning must be boolean")
+        if "supports_audio_output" in item and not isinstance(item["supports_audio_output"], bool):
+            raise ValueError("LiteLLM metadata supports_audio_output must be boolean")
+        for field_name in ("supported_output_modalities", "reasoning_effort_levels"):
+            field_value = item.get(field_name)
+            if field_value is not None and (
+                not isinstance(field_value, list)
+                or not all(isinstance(value, str) for value in field_value)
+            ):
+                raise ValueError(f"LiteLLM metadata {field_name} must be a string list")
+        for field_name in (
+            "supports_none_reasoning_effort",
+            "supports_minimal_reasoning_effort",
+            "supports_low_reasoning_effort",
+            "supports_xhigh_reasoning_effort",
+            "supports_max_reasoning_effort",
+        ):
+            if field_name in item and not isinstance(item[field_name], bool):
+                raise ValueError(f"LiteLLM metadata {field_name} must be boolean")
+    return document
 
 
 class LiteLLMProviderAdapter:

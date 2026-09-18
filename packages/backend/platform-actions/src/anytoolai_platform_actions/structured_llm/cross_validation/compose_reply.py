@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from ._markup import _has_html_tag, _has_markup
+from ._markup import _has_disallowed_plain_text_markup, _has_html_tag, _has_markup
 from ._shared import _coerce_integer_valued, _cross_validation_error
 
 
@@ -32,15 +32,20 @@ class ComposeReplyCrossValidator:
                 f"text_exceeds_constraints_max_length:{len(text)}>{max_length}"
             )
 
-        # Prompt contract: "if it is plain_text or omitted, text must contain no markup".
+        # Prompt contract: "if it is plain_text or omitted, text must be copy-ready
+        # (paragraphs and ordered/unordered lists are allowed; other Markdown/HTML markup
+        # is not)".
         output_format = constraints.get("output_format")
-        if output_format in (None, "plain_text") and _has_markup(text):
+        if output_format in (None, "plain_text") and _has_disallowed_plain_text_markup(text):
             raise _cross_validation_error("text_contains_markup_for_plain_text_format")
         # Only the main body is required to *prove* html-ness; a short call_to_action
         # (e.g. "Book a call") is plausibly plain text even inside an HTML-formatted reply.
         # Markdown syntax alone doesn't satisfy "html" — it must contain an actual tag.
         if output_format == "html" and not _has_html_tag(text):
             raise _cross_validation_error("text_missing_markup_for_html_format")
+        # Deliberately stricter than `text` above: a short call_to_action (e.g. "Book a
+        # call") has no reason to carry list formatting, so it keeps the plain no-markup
+        # contract (ANY-502 only relaxed the main `text` body).
         if (
             output_format in (None, "plain_text")
             and isinstance(call_to_action, str)

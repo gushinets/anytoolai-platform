@@ -1,7 +1,7 @@
 {
   "response_json": {
-    "text": "Work on the project is ongoing. Could you send the agreed amount now?",
-    "call_to_action": "Please send the agreed amount and let me know once it's on its way."
+    "text": "The project is still in progress. Could you send the agreed amount now?",
+    "call_to_action": "Let me know once it's on its way."
   },
   "input_tokens": 30,
   "output_tokens": 28,

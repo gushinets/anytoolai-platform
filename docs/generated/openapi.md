@@ -14,6 +14,8 @@ Version: 0.1.0
 | GET | /health | health_health_get | 200 |
 | GET | /v1/atom-lab/atoms | list_atoms_v1_atom_lab_atoms_get | 200, 401, 422, 503 |
 | GET | /v1/atom-lab/atoms/{atom_id} | get_atom_v1_atom_lab_atoms__atom_id__get | 200, 401, 404, 422, 503 |
+| GET | /v1/atom-lab/models | list_models_v1_atom_lab_models_get | 200, 401, 422, 503 |
+| POST | /v1/atom-lab/models/refresh | request_model_refresh_v1_atom_lab_models_refresh_post | 202, 401, 422, 503 |
 | POST | /v1/client-events | post_client_event_v1_client_events_post | 200, 404, 409, 422 |
 | POST | /v1/demo/runs | start_demo_run_v1_demo_runs_post | 200, 401, 409, 422, 429, 503 |
 | POST | /v1/handoffs | create_handoff_v1_handoffs_post | 200, 404, 409, 422 |
@@ -35,6 +37,9 @@ Version: 0.1.0
 - AtomLabErrorDetailResponse
 - AtomLabErrorResponse
 - AtomLabFieldErrorResponse
+- AtomLabModelRefreshResponse
+- AtomLabModelResponse
+- AtomLabModelsResponse
 - AtomLabSchemaRefsResponse
 - AtomLabVersionedSchemaRefResponse
 - ClientEventRequest
@@ -50,10 +55,14 @@ Version: 0.1.0
 - HandoffCreateResponse
 - HandoffPreviewResponse
 - HandoffStatus
+- ModelCatalogCompatibility
+- ModelCatalogReason
+- ModelCatalogRefreshStatus
 - QuotaDimension
 - QuotaPeriod
 - QuotaStateResponse
 - QuotaUnit
+- ReasoningEffort
 - ResultArtifactResponse
 - RuntimeConfigResponse
 - RuntimeFrontendResponse
