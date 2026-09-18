@@ -266,8 +266,9 @@ _MODE_HAPPY_PATH_CASES = {
         },
         {
             "text": (
-                "Now that the approved design phase is wrapping up and phase 2 is about to start, "
-                "could you send the $500 prepayment for phase 2 by Friday?"
+                "Now that the approved design phase is wrapping up this week and phase 2 "
+                "(development) is starting next, could you send the $500 prepayment for phase 2 "
+                "by Friday?"
             ),
             "call_to_action": "Let me know once it's on its way.",
         },

@@ -478,6 +478,13 @@ def test_prepaid_request_weak_fixture_preserves_urgency_across_both_steps() -> N
 
 # Code review finding (xhigh #5): the reversed call_to_action rule -- CTA is follow-up
 # acknowledgement only, not a repeat of the payment ask -- had no regression test of its own.
+# Code review finding (team lead #4): checking only for the literal word "send" let a repeated
+# payment ask worded differently ("Please pay the $500 now", "Transfer the agreed amount") slip
+# through undetected. Broadened to a payment-verb denylist plus a no-digits check, so any CTA that
+# restates the amount or re-asks for payment in some other verb fails here too.
+_PAYMENT_ASK_TERMS = ("send", "pay", "transfer", "wire")
+
+
 @pytest.mark.parametrize("fixture_suffix", ["", ".weak_input"])
 def test_prepaid_request_reply_call_to_action_does_not_repeat_the_payment_ask(
     fixture_suffix: str,
@@ -486,9 +493,10 @@ def test_prepaid_request_reply_call_to_action_does_not_repeat_the_payment_ask(
         (
             FIXTURE_ROOT / f"client_update_writer.prepaid_request_compose_reply_v1{fixture_suffix}.json"
         ).read_text(encoding="utf-8")
-    )["response_json"]["call_to_action"].lower()
+    )["response_json"]["call_to_action"]
 
-    assert "send" not in call_to_action, fixture_suffix
+    assert not any(term in call_to_action.lower() for term in _PAYMENT_ASK_TERMS), fixture_suffix
+    assert not any(char.isdigit() for char in call_to_action), fixture_suffix
 
 
 def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:
