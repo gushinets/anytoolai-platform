@@ -61,6 +61,10 @@ _PLAIN_TEXT_LIST_REJECT_CASES: list[tuple[dict, dict]] = [
     # Disallowed markup nested inside a sub-list item must still fail — nesting is allowed,
     # markup inside any item (top-level or nested) is not.
     ({}, {"text": "- Parent\n  - **Child**"}),
+    # Inline code (a distinct `code_inline` token from fenced code's `fence`/`code_block`)
+    # must reject too — an explicit ANY-502 regression requirement, not covered by the
+    # existing fenced-code case.
+    ({}, {"text": "Please send the `invoice` today."}),
 ]
 
 

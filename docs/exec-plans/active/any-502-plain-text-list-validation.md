@@ -5,9 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-09-17
-- Last updated: 2026-09-17
-- Review date: 2026-09-18 (code review rounds 1-3)
-- Next action: await round-4 review; move to `completed/` once merged.
+- Last updated: 2026-09-18
+- Review date: 2026-09-18 (code review rounds 1-4)
+- Next action: await round-5 review; move to `completed/` once merged.
 - Blocker: none
 
 ## Goal
@@ -64,8 +64,6 @@ blockquotes/HTML.
 - User-facing validation-error specificity/messaging.
 - Any change to `_has_markup`/`_has_markdown`/`_has_html_construct`/`_has_html_tag` semantics.
 - Any other atom (A01-A05 don't touch `_markup.py`).
-- Live-provider replay of the original reproduction — requires a real `OPENAI_API_KEY`, not
-  available in this sandbox (same blocker ANY-501 documented); left as an operator follow-up.
 
 ## Relevant docs
 
@@ -92,15 +90,25 @@ blockquotes/HTML.
 
 ## Validation
 
-- [x] `uv run pytest packages/backend/platform-actions/tests/test_cross_validation.py -k "PersuasiveText or ComposeReply"` — 120 passed (104 before round 1, 112 before round 2, 118 before round 3).
-- [x] `uv run pytest packages/backend/platform-actions/tests/test_cross_validation.py` — full file green (239 passed).
+- [x] `uv run pytest packages/backend/platform-actions/tests/test_cross_validation.py -k "PersuasiveText or ComposeReply"` — 122 passed (104 before round 1, 112 before round 2, 118 before round 3, 120 before round 4).
+- [x] `uv run pytest packages/backend/platform-actions/tests/test_cross_validation.py` — full file green (241 passed).
 - [x] `python scripts/agent/runner.py validate-configs` — passed.
-- [x] `python scripts/agent/runner.py quick-check` — 1368 passed (1352 before round 1, 1360 before round 2, 1366 before round 3).
+- [x] `python scripts/agent/runner.py quick-check` — 1370 passed (1352 before round 1, 1360 before round 2, 1366 before round 3, 1368 before round 4).
 - [ ] `python scripts/agent/runner.py full-check` — not run this session (quick-check already
       covers the affected backend suite and config/architecture/docs validation; full-check adds
       frontend checks and product-suite tests untouched by this change).
-- [ ] Live replay of the original multi-item reproduction — blocked, no `OPENAI_API_KEY` in this
-      sandbox; follow-up for an operator with live credentials.
+- [x] Live replay of the original multi-item reproduction — user supplied a real `OPENAI_API_KEY`
+      and ran `dev-up` themselves (key never entered the chat). Temporarily repointed
+      `proposal_ai`'s `action_configs.yaml` to `default_text_generation_v1`, rebuilt the
+      `platform-worker`/`platform-api` images (same stale-image gotcha as ANY-501 — `dev-up`
+      doesn't rebuild, so the config edit wasn't picked up until a manual `--no-cache` rebuild),
+      built+served `web-mirror` on port 3100, and drove a real Chrome browser (`claude-in-chrome`)
+      through the exact "5 blog post ideas" scenario that reproduced the original bug in ANY-501.
+      Output was list-formatted (`1) Working title: ...`, `- 5 short blog post ideas...`) and
+      **accepted on the first attempt** — confirmed via `platform.event_log`:
+      `provider.request_succeeded` → `action.succeeded` → `workflow.succeeded` →
+      `scenario.completed`, no `structured_output_validation_failed`, no retry. Config edit
+      reverted, `git status` clean, `validate-configs` passed.
 
 ## Decision log
 
@@ -117,6 +125,7 @@ blockquotes/HTML.
 | 2026-09-17 | Round-2 review: simplified nesting detection to check the parser's own `token.level` (0 for a genuinely top-level list container) instead of a hand-maintained `list_depth` counter; removed the `next_token is None` defensive branch after `list_item_open`. | Live repro confirmed `token.level` already encodes nesting depth (nested `bullet_list_open` is `level=2`, not `0`), making the manual counter redundant. The `None` branch is unreachable — markdown-it-py's token stream always pairs every `_open` with a `_close}`, so `list_item_open` can never be the last token; a task-list-plugin dependency to replace the whole regex approach was considered and declined as unnecessary weight for this one narrow false-negative (YAGNI). |
 | 2026-09-17 | Round-2 review's prompt-wording note (#3) required no change. | The 3 prompts already phrase the disallowed-markdown list with "such as" (non-exhaustive framing) from round 1, which already covers constructs not explicitly named (horizontal rules, strikethrough, autolinks, hard line breaks) that the validator still rejects. |
 | 2026-09-18 | Round-3 review: reversed the round-1/round-2 nested-list rejection — nested ordered/unordered lists are now accepted, matching the Linear decision's literal wording (no stated depth limit) rather than the narrower "flat lists only" reading rounds 1-2 had assumed from its examples. | Genuine product/scope ambiguity, not a clear-cut implementation bug — flagged to the product owner rather than resolved unilaterally a third time; owner confirmed nesting should be allowed. Disallowed markup nested inside a sub-list item still rejects independently (via that markup's own token type), so the "list structure allowed, markup inside items still isn't" invariant is unchanged. |
+| 2026-09-18 | Round-4 review (team lead) added an inline-code (`` `invoice` ``) reject case to the shared `_PLAIN_TEXT_LIST_REJECT_CASES` constant — an explicit ANY-502 "Required regression coverage" item that had no test pin (behavior was already correct: `code_inline` was never in `_PLAIN_TEXT_WITH_LISTS_TOKEN_TYPES`, so this closed a coverage gap, not a behavior bug). Also refreshed the PR description, which still said "flat lists"/"nested lists rejected" and listed the live replay as an open follow-up — both stale since rounds 3-4. | Team lead's finding correctly distinguished "behavior is right, test coverage is missing" from a real defect — verified live before adding the test, per this repo's convention of confirming claims against actual parser behavior rather than trusting the finding's text alone. |
 
 ## Progress log
 
@@ -126,6 +135,8 @@ blockquotes/HTML.
 | 2026-09-17 | Code review round 1 found 3 critical regressions (empty list items, GFM checkboxes, nested lists all wrongly accepted) plus several lower-severity dedup/comment findings. Fixed the 3 critical ones with an explicit token-stream walk (list-depth tracking, empty-item check, checkbox regex); fixed the cheap dedup/comment findings (short-circuit ordering, duplicated parse pipeline, missing asymmetry comment, duplicated test cases); left the text/call_to_action asymmetry, the pre-existing combining-mark escape asymmetry, the pre-existing link-reference-definition gap, and the duplicated prompt sentence as documented, reasoned skips (see Decision log below). Re-verified: `TestPersuasiveTextCrossValidator`/`TestComposeReplyCrossValidator` (112 passed), full `test_cross_validation.py` (231 passed), full `quick-check` (1360 passed). | Await round-2 review; run `full-check` before merge. |
 | 2026-09-17 | Code review round 2 found a real gap the round-1 checkbox fix left behind (a bare checkbox with no task text still passed) plus two code-quality simplifications (use `token.level` instead of a manual depth counter; drop a genuinely unreachable defensive branch) and confirmed the prompt-wording note needed no further change. Fixed the checkbox regex and both simplifications; added 3 new bare-checkbox reject cases to the shared test constant. Re-verified: `TestPersuasiveTextCrossValidator`/`TestComposeReplyCrossValidator` (118 passed), full `test_cross_validation.py` (237 passed), full `quick-check` (1366 passed). | Await round-3 review; run `full-check` before merge. |
 | 2026-09-18 | Code review round 3 (inline PR comment) disputed the round-1/round-2 nested-list rejection as narrower than the actual Linear decision text. Flagged to the product owner as a genuine scope question rather than resolved unilaterally; owner chose to allow nesting. Removed the `token.level != 0` gate; moved the nested-list case from reject to accept and added a nested-item-with-disallowed-markup reject case. Re-verified: `TestPersuasiveTextCrossValidator`/`TestComposeReplyCrossValidator` (120 passed), full `test_cross_validation.py` (239 passed), full `quick-check` (1368 passed). | Await round-4 review; run `full-check` before merge; still need to reply to the GitHub inline review comment (not done — separate ask). |
+| 2026-09-18 | **Live replay completed.** User supplied a real `OPENAI_API_KEY` and ran `dev-up` themselves. Temporarily repointed `proposal_ai.compose_persuasive_text_v1` to `default_text_generation_v1`; hit the same stale-image gotcha ANY-501 documented (`dev-up` never rebuilds, so the config edit sat unbuilt in the running images until a manual `docker compose build --no-cache`) and a related one (recreating containers from a shell without the exported key blanks it — fixed by having the user rerun `dev-up` from their own shell). Built+served `web-mirror` on port 3100, drove a real browser through the exact "5 blog post ideas" scenario from ANY-501's original reproduction. Result: list-formatted output (`1) Working title: ...`, `- ...`) accepted on the first attempt, confirmed via `event_log` (`provider.request_succeeded` → `workflow.succeeded` → `scenario.completed`, no validation failure, no retry). Reverted the config edit, confirmed `git status`/`validate-configs` clean. | Reply to the round-3 GitHub inline review comment (still a separate ask); await round-4 review; move to `completed/` once merged. |
+| 2026-09-18 | Code review round 4 (team lead) found the ANY-502-required inline-code reject case wasn't pinned in tests (real gap, behavior already correct) and that the PR description was stale (still said flat-only/nested-rejected, listed live replay as an open follow-up). Added the inline-code case to the shared reject constant; refreshed the PR description to match current behavior and mark the live replay done. Re-verified: `TestPersuasiveTextCrossValidator`/`TestComposeReplyCrossValidator` (122 passed), full `test_cross_validation.py` (241 passed), full `quick-check` (1370 passed). | Await round-5 review; run `full-check` before merge; still need to reply to the round-3 GitHub inline review comment (separate ask). |
 
 ## Open questions
 
@@ -133,7 +144,7 @@ blockquotes/HTML.
 
 ## Follow-up debt
 
-- Live-provider replay of the original multi-item scenario against a real provider — needs an
-  operator with `OPENAI_API_KEY` (same constraint ANY-501 hit).
 - Quota-consumption timing and user-facing validation-error specificity remain open, tracked
   separately per the ticket's own scope note (not filed as new tickets by this session).
+- Reply to the round-3 code-review inline comment on the GitHub PR (not done this session —
+  separate ask, per this repo's "ask before GH writes" convention).
