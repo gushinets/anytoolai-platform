@@ -80,7 +80,7 @@ def test_public_frontends_cannot_import_atom_lab_authority_or_overrides() -> Non
     assert offenders == [], "public frontend Atom Lab boundary violations: " + ", ".join(offenders)
 
 
-def test_atom_lab_shell_contains_no_embedded_registry_contracts() -> None:
+def test_atom_lab_shell_contains_no_embedded_registry_values() -> None:
     shell_root = (
         ROOT / "apps" / "platform-api" / "src" / "anytoolai_platform_api" / "static" / "atom_lab"
     )
@@ -92,5 +92,3 @@ def test_atom_lab_shell_contains_no_embedded_registry_contracts() -> None:
     assert "kernel.schemas." not in source
     assert "kernel_demo." not in source
     assert "prompt_ref" not in source
-    assert "input_schema" not in source
-    assert "output_schema" not in source

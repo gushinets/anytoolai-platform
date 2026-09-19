@@ -5,19 +5,87 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>AnytoolAI Atom Lab</title>
     <link rel="stylesheet" href="/atom-lab/atom_lab.css">
-    <script src="/atom-lab/atom_lab.js" defer></script>
+    <script src="/atom-lab/atom_lab.mjs" type="module"></script>
   </head>
   <body>
-    <main>
-      <h1>Atom Lab</h1>
-      <p>Закрытая лаборатория атомов AnytoolAI.</p>
-      <form id="access-form">
-        <label for="access-code">Код доступа</label>
-        <input id="access-code" type="password" autocomplete="off" required>
-        <button type="submit">Открыть каталог</button>
-      </form>
+    <main class="page-shell">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Внутренний инструмент</p>
+          <h1>Atom Lab</h1>
+          <p>Проверка контрактов и промптов атомов AnytoolAI.</p>
+        </div>
+        <nav aria-label="Разделы Atom Lab">
+          <button id="presets-button" type="button">Библиотека пресетов</button>
+          <button id="history-button" type="button">История запусков</button>
+        </nav>
+      </header>
+      <section id="access-panel" class="access-card" aria-labelledby="access-title">
+        <h2 id="access-title">Закрытый доступ</h2>
+        <form id="access-form">
+          <label for="access-code">Код доступа</label>
+          <input id="access-code" type="password" autocomplete="off" required>
+          <button type="submit">Открыть каталог</button>
+        </form>
+      </section>
       <p id="status" role="status" aria-live="polite"></p>
-      <section id="catalog" aria-label="Каталог атомов"></section>
+      <section id="workspace" class="workspace" hidden>
+        <aside class="sidebar" aria-label="Выбор атома">
+          <h2>Атомы</h2>
+          <nav id="atom-navigation" aria-label="Каталог из 11 атомов"></nav>
+        </aside>
+        <div class="content-column">
+          <section id="atom-passport" class="card passport" aria-labelledby="atom-title">
+            <p id="atom-action-type" class="eyebrow"></p>
+            <h2 id="atom-title"></h2>
+            <dl>
+              <div><dt>Назначение</dt><dd id="atom-description"></dd></div>
+              <div><dt>Преобразование</dt><dd id="atom-transformation"></dd></div>
+            </dl>
+            <details>
+              <summary>Фиксированные схемы входа и выхода</summary>
+              <div class="schema-grid">
+                <section aria-labelledby="input-schema-title"><h3 id="input-schema-title">Схема входа</h3><pre id="input-schema" tabindex="0"></pre></section>
+                <section aria-labelledby="output-schema-title"><h3 id="output-schema-title">Схема выхода</h3><pre id="output-schema" tabindex="0"></pre></section>
+              </div>
+            </details>
+          </section>
+          <section class="editor-grid">
+            <div class="card editor-card">
+              <div class="tab-list" role="tablist" aria-label="Редактор конфигурации">
+                <button id="input-tab" type="button" role="tab" aria-selected="true" aria-controls="input-panel">Вход</button>
+                <button id="prompt-tab" type="button" role="tab" aria-selected="false" aria-controls="prompt-panel">Промпт</button>
+              </div>
+              <section id="input-panel" role="tabpanel" aria-labelledby="input-tab">
+                <div class="editor-toolbar">
+                  <div role="group" aria-label="Режим редактора">
+                    <button id="form-mode" type="button" aria-pressed="true">Форма</button>
+                    <button id="json-mode" type="button" aria-pressed="false">JSON</button>
+                  </div>
+                  <button id="fill-example" type="button">Заполнить пример</button>
+                </div>
+                <div id="input-editor"></div>
+                <div id="json-panel" hidden>
+                  <label for="json-editor">JSON входного payload</label>
+                  <textarea id="json-editor" rows="18" spellcheck="false"></textarea>
+                  <p id="json-error" class="error" role="alert"></p>
+                </div>
+                <div id="validation-errors" class="validation-errors" aria-live="polite"></div>
+              </section>
+              <section id="prompt-panel" role="tabpanel" aria-labelledby="prompt-tab" hidden>
+                <label for="prompt-editor">Инструкция конфигурации</label>
+                <textarea id="prompt-editor" rows="18"></textarea>
+                <button id="reset-prompt" type="button">Восстановить исходный промпт</button>
+              </section>
+              <p id="draft-state" class="draft-state" aria-live="polite"></p>
+            </div>
+            <aside id="result-placeholder" class="card result-card" aria-label="Результат запуска">
+              <h2>Результат выбранного запуска</h2>
+              <p>Запуск и результат появятся в следующем этапе. Изменения черновика не заменяют состояние результата.</p>
+            </aside>
+          </section>
+        </div>
+      </section>
     </main>
   </body>
 </html>
