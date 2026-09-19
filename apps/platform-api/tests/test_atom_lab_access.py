@@ -255,15 +255,21 @@ def test_atom_lab_request_validation_uses_the_lab_error_envelope(app) -> None:
 def test_atom_lab_shell_is_public_but_contains_no_protected_catalog_data(app) -> None:
     page = asyncio.run(_request(app, "/atom-lab"))
     styles = asyncio.run(_request(app, "/atom-lab/atom_lab.css"))
-    script = asyncio.run(_request(app, "/atom-lab/atom_lab.js"))
+    script = asyncio.run(_request(app, "/atom-lab/atom_lab.mjs"))
 
     assert page.status_code == HTTPStatus.OK
     assert styles.status_code == HTTPStatus.OK
     assert script.status_code == HTTPStatus.OK
     assert '<input id="access-code" type="password"' in page.text
-    assert '<script src="/atom-lab/atom_lab.js" defer></script>' in page.text
+    assert '<script src="/atom-lab/atom_lab.mjs" type="module"></script>' in page.text
     assert "X-Atom-Lab-Access-Code" in script.text
     assert "textContent" in script.text
+    assert 'id="atom-navigation"' in page.text
+    assert 'id="atom-passport"' in page.text
+    assert 'id="input-editor"' in page.text
+    assert 'id="prompt-editor"' in page.text
+    assert 'id="input-schema"' in page.text
+    assert 'id="output-schema"' in page.text
     for forbidden in (
         "localStorage",
         "sessionStorage",

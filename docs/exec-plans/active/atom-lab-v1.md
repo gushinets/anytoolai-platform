@@ -332,7 +332,7 @@ atom_lab_catalog_unavailable`. Оба list endpoint возвращают `{items
 
 ### AL06 — [ANY-464](https://linear.app/paveldik/issue/ANY-464/atom-lab-vybor-atoma-pasport-formy-vseh-kontraktov-i-redaktor-prompta): Atom Lab: выбор атома, паспорт, формы всех контрактов и редактор промпта
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 - Depends on: ANY-459.
 - Files/areas: `apps/platform-api/src/anytoolai_platform_api/static/atom_lab/ (new)`; `API page tests`; `existing browser test harness`.
 
@@ -342,10 +342,10 @@ Acceptance: Матрица schema features по 11 атомам покрыта r
 
 ### Уточнения после аудита
 
-- [ ] Контракт UI — каталог из ANY-459 и единый JSON-совместимый draft. Переключение Form/JSON не добавляет defaults, не удаляет пустые допустимые значения и не превращает omitted в null. Проверка exact payload round-trip параметризована по всем 11 атомам.
-- [ ] Этот тикет отвечает за точность browser payload; равенство submitted/snapshot/executor payload проверяется в ANY-462 и ANY-467, без скрытой зависимости формы от ещё не готового run API.
-- [ ] Упаковка static assets и локальная browser-test команда входят в этот PR, а не ждут ANY-468. Использовать установленный browser test harness; зафиксировать запускаемую команду и подключение tests к canonical checks. Проверка наличия строк в HTML не заменяет интерактивные тесты.
-- [ ] Ошибки по path из safe API envelope привязаны к контролам; невалидный JSON сохраняется дословно до исправления. Секрет только в памяти вкладки, после reload требуется новый вход, но server history не теряется.
+- [x] Контракт UI — каталог из ANY-459 и единый JSON-совместимый draft. Переключение Form/JSON не добавляет defaults, не удаляет пустые допустимые значения и не превращает omitted в null. Проверка exact payload round-trip параметризована по всем 11 атомам.
+- [x] Этот тикет отвечает за точность browser payload; равенство submitted/snapshot/executor payload проверяется в ANY-462 и ANY-467, без скрытой зависимости формы от ещё не готового run API.
+- [x] Упаковка static assets и локальная browser-test команда входят в этот PR, а не ждут ANY-468. Использовать установленный browser test harness; зафиксировать запускаемую команду и подключение tests к canonical checks. Проверка наличия строк в HTML не заменяет интерактивные тесты.
+- [x] Ошибки по path из safe API envelope привязаны к контролам; невалидный JSON сохраняется дословно до исправления. Секрет только в памяти вкладки, после reload требуется новый вход, но server history не теряется.
 
 
 ### AL07 — [ANY-465](https://linear.app/paveldik/issue/ANY-465/atom-lab-gptreasoning-zapusk-i-chitaemyj-rezultat-v-ui): Atom Lab: GPT/reasoning, запуск и читаемый результат в UI
