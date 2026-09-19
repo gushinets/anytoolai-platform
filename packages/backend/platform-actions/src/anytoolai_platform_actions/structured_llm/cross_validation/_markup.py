@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from html.parser import HTMLParser
 from typing import Any
 
 from markdown_it import MarkdownIt
-from markdown_it.common.html_re import cdata, close_tag, comment, declaration, open_tag, processing
 
 # A hand-rolled tag-name allowlist keeps missing real constructs (svg/math, custom
 # elements like <x-card>, comments, doctypes) no matter how many names get added, and a
@@ -117,51 +117,154 @@ def _has_html_construct(value: str) -> bool:
     )
 
 
-# Of CommonMark's six HTML5 constructs, only open/close tags are actual elements; comments,
-# processing instructions, declarations like doctype, and CDATA render nothing and don't
-# prove "html" formatting on their own - a reply consisting solely of "<!-- note -->" is not
-# meaningfully HTML output. A prefix check on the whole token content isn't enough: when a
-# comment/PI/declaration/CDATA isn't followed by a blank line, markdown-it-py's block grammar
-# lumps it together with any real tag that follows into ONE html_block token (e.g.
-# "<!-- note --><p>real</p>"), and leading whitespace before a comment-only token also isn't
-# itself a "<!"/"<?" prefix. Reusing the same construct regexes the tokenizer itself uses
-# (rather than a hand-rolled prefix or tag-name check) keeps this in lockstep with whatever
-# CommonMark/GFM syntax markdown-it-py recognizes.
-_NON_ELEMENT_CONSTRUCT_RE = re.compile(f"(?:{comment}|{processing}|{declaration}|{cdata})")
-_ELEMENT_TAG_RE = re.compile(f"(?:{open_tag}|{close_tag})")
+# Every content-bearing element the HTML spec's rendering section hides by name
+# (`display: none` in the user-agent stylesheet) -- taken from the spec as a set rather than
+# grown one review finding at a time. HTMLParser never synthesizes the implicit closes a
+# browser does, so an element allowed to omit its end tag would leave the skip active and hide
+# everything after it; every entry therefore has a mandatory end tag, with one exception
+# handled explicitly: `rp`, whose implicit closes are emulated via `_RP_IMPLICIT_CLOSE_*`
+# below. Deliberately absent: `head` (optional end tag, and no bounded set of closers -- its
+# text-bearing children are listed instead), the spec's void entries (`base`, `link`, `meta`,
+# ... -- no content), and `noscript` (rendered whenever scripting is off, which a copied
+# message can't assume).
+# ponytail: element names only; CSS/attribute hiding (`hidden`, `display:none`) is not
+# detected -- needs style resolution, add if a live model ever produces it.
+_NON_RENDERED_ELEMENTS = frozenset(
+    {"datalist", "noembed", "noframes", "rp", "script", "style", "template", "title"}
+)
+
+# "An rp element's end tag can be omitted if [it] is immediately followed by an rb, rt, rtc or
+# rp element, or if there is no more content in the parent element" (HTML spec, optional tags).
+# ponytail: the parent is assumed to be ruby/rtc -- an `rp` anywhere else is invalid HTML.
+_RP_IMPLICIT_CLOSE_START_TAGS = frozenset({"rb", "rt", "rtc", "rp"})
+_RP_IMPLICIT_CLOSE_END_TAGS = frozenset({"ruby", "rtc"})
+
+# Foreign (SVG/MathML) content is the one place a trailing `/` really self-closes an element
+# -- but not everywhere inside it: at the spec's integration points children are parsed as
+# HTML again (HTMLParser lowercases tag names, hence `foreignobject`).
+_FOREIGN_CONTENT_ROOTS = frozenset({"svg", "math"})
+_SVG_HTML_INTEGRATION_POINTS = frozenset({"foreignobject", "desc", "title"})
+_MATHML_TEXT_INTEGRATION_POINTS = frozenset({"mi", "mo", "mn", "ms", "mtext"})
+_ANNOTATION_XML_HTML_ENCODINGS = frozenset({"text/html", "application/xhtml+xml"})
 
 
-def _starts_non_element_construct(content: str, index: int) -> bool:
-    if content.startswith(("<!--", "<![CDATA[", "<?"), index):
+def _is_html_integration_point(foreign_root: str, tag: str, attrs: Any) -> bool:
+    if foreign_root == "svg":
+        return tag in _SVG_HTML_INTEGRATION_POINTS
+    if tag in _MATHML_TEXT_INTEGRATION_POINTS:
         return True
-    return content.startswith("<!", index) and content[index + 2 : index + 3].isalpha()
+    return tag == "annotation-xml" and any(
+        name == "encoding" and (value or "").lower() in _ANNOTATION_XML_HTML_ENCODINGS
+        for name, value in attrs
+    )
 
 
-def _content_has_element_tag(content: str) -> bool:
-    index = 0
-    while True:
-        start = content.find("<", index)
-        if start == -1:
-            return False
-        if _starts_non_element_construct(content, start):
-            match = _NON_ELEMENT_CONSTRUCT_RE.match(content, start)
-            if match is None:
-                # An unterminated comment/PI/declaration/CDATA swallows the rest of the
-                # block verbatim (same as a real HTML parser would), so nothing after it
-                # can count as a live tag.
-                return False
-            index = match.end()
-            continue
-        if _ELEMENT_TAG_RE.match(content, start) is not None:
-            return True
-        index = start + 1
+def _close_innermost(open_elements: list[Any], tag: str, *, key: Any = lambda entry: entry) -> None:
+    """Pops the innermost open `tag` plus anything left open inside it -- the recovery a
+    browser applies to mis-nested tags. A tag that isn't open is ignored: HTMLParser doesn't
+    pair end tags with start tags, so a stray `</style>` must not end a `<template>`."""
+    for index in range(len(open_elements) - 1, -1, -1):
+        if key(open_elements[index]) == tag:
+            del open_elements[index:]
+            return
+
+
+class _HtmlTextExtractor(HTMLParser):
+    """One structural pass over HTML, answering both questions the html format asks:
+    `parts` is the text a browser would actually show (character references decoded via
+    `convert_charrefs`, tags/comments/doctypes dropped, `_NON_RENDERED_ELEMENTS` content
+    skipped -- so an escaped `&lt;p&gt;` stays literal text instead of being re-read as a tag),
+    and `saw_element_tag` is whether any real element tag occurred at all (comments, doctypes,
+    processing instructions and CDATA render nothing and don't count)."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.saw_element_tag = False
+        self._open_non_rendered: list[str] = []
+        # (tag, is_foreign) per namespace switch: an svg/math root enters foreign content, an
+        # integration point inside it re-enters HTML. A bare depth counter can't tell
+        # `<svg><title/>` (foreign: self-closed) from `<svg><foreignObject><template/>`
+        # (HTML again: the slash is ignored and the template stays open).
+        self._namespace_contexts: list[tuple[str, bool]] = []
+
+    def _foreign_root(self) -> str | None:
+        if self._namespace_contexts and self._namespace_contexts[-1][1]:
+            return self._namespace_contexts[-1][0]
+        return None
+
+    def handle_starttag(self, tag: str, attrs: Any) -> None:
+        self.saw_element_tag = True
+        foreign_root = self._foreign_root()
+        if tag in _FOREIGN_CONTENT_ROOTS:
+            self._namespace_contexts.append((tag, True))
+        elif foreign_root and _is_html_integration_point(foreign_root, tag, attrs):
+            self._namespace_contexts.append((tag, False))
+        if tag in _RP_IMPLICIT_CLOSE_START_TAGS and self._open_non_rendered[-1:] == ["rp"]:
+            self._open_non_rendered.pop()
+        if tag in _NON_RENDERED_ELEMENTS:
+            self._open_non_rendered.append(tag)
+
+    def handle_startendtag(self, tag: str, attrs: Any) -> None:
+        # HTMLParser's default treats `<x/>` as start + end. HTML itself ignores the slash on
+        # its own elements -- `<template/>Hidden` leaves the template open in a browser --
+        # and honors it only in foreign content (`<svg><title/></svg>`). Foreign-ness is read
+        # *before* the start tag, which may itself switch namespace (svg `<title/>`).
+        was_foreign = self._foreign_root() is not None
+        self.handle_starttag(tag, attrs)
+        if was_foreign or tag not in _NON_RENDERED_ELEMENTS:
+            self.handle_endtag(tag)
+
+    def handle_endtag(self, tag: str) -> None:
+        self.saw_element_tag = True
+        _close_innermost(self._namespace_contexts, tag, key=lambda context: context[0])
+        if tag in _RP_IMPLICIT_CLOSE_END_TAGS and self._open_non_rendered[-1:] == ["rp"]:
+            self._open_non_rendered.pop()
+        _close_innermost(self._open_non_rendered, tag)
+
+    def handle_data(self, data: str) -> None:
+        if not self._open_non_rendered:
+            self.parts.append(data)
+
+
+def _parse_html(value: str) -> _HtmlTextExtractor:
+    extractor = _HtmlTextExtractor()
+    extractor.feed(value)
+    extractor.close()
+    return extractor
 
 
 def _has_html_tag(value: str) -> bool:
-    return any(
-        token.type.startswith("html_") and _content_has_element_tag(token.content)
-        for token in _flatten_tokens(_HTML_RENDERER.parse(value))
-    )
+    """Whether html-format `value` contains a real element tag. Asked of the HTML parser, not
+    the Markdown one: CommonMark reads four leading spaces or a tab as an indented code block,
+    so ordinarily-indented HTML (`    <p>Ready.</p>`) showed no `html_*` token at all and was
+    rejected as "missing markup"."""
+    return _parse_html(value).saw_element_tag
+
+
+def _html_text_content(value: str) -> str:
+    return "".join(_parse_html(value).parts)
+
+
+def _has_visible_text(value: str, text_format: Any) -> bool:
+    """Whether `value` shows the reader any non-whitespace text *in the format it will be
+    rendered as* -- the same string is content in one format and empty in another:
+    `&nbsp;` is six literal characters as plain_text but a lone space as html/markdown.
+
+    Code review findings this shape replaces a format-blind token walk for: plain_text was
+    entity-decoded like markup ("&nbsp;" rejected as blank), and a regex tag-strip counted
+    `<style>`/`<script>`/`<template>` content as visible text."""
+    if text_format == "html":
+        rendered = _html_text_content(value)
+    elif text_format == "markdown":
+        # Rendering first makes every markdown construct (code spans/blocks, entities, raw
+        # HTML passthrough) reduce to the one question the HTML extractor already answers.
+        rendered = _html_text_content(_HTML_RENDERER.render(value))
+    else:
+        # plain_text / omitted: copied to the client literally, never parsed. Disallowed
+        # markup is a separate check (`_has_disallowed_plain_text_markup`).
+        rendered = value
+    return rendered.strip() != ""
 
 
 def _tokenize_markdown(value: str) -> list[Any]:

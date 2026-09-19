@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from ._markup import _has_disallowed_plain_text_markup, _has_html_tag
+from ._markup import _has_disallowed_plain_text_markup, _has_html_tag, _has_visible_text
 from ._shared import _coerce_integer_valued, _cross_validation_error, _require_output
 
 
@@ -23,6 +23,14 @@ class PersuasiveTextCrossValidator:
             raise _cross_validation_error("malformed_compose_persuasive_text_output")
         constraints = input_payload.get("constraints")
         constraints = constraints if isinstance(constraints, Mapping) else {}
+        text_format = constraints.get("format")
+
+        # Code review finding (P2): `minLength: 1` on the output schema accepts a
+        # whitespace-only string, and an HTML-formatted `<p></p>` has a real tag but no
+        # actual content -- neither is usable persuasive text. Judged in the requested
+        # format: "&nbsp;" is literal text as plain_text but blank as html.
+        if not _has_visible_text(text, text_format):
+            raise _cross_validation_error("text_has_no_visible_content")
 
         length = _coerce_integer_valued(constraints.get("length"))
         if length is not None and len(text) > length:
@@ -33,7 +41,6 @@ class PersuasiveTextCrossValidator:
         # Prompt contract: "if it is plain_text or omitted, text must be copy-ready
         # (paragraphs and ordered/unordered lists are allowed; other Markdown/HTML markup
         # is not)".
-        text_format = constraints.get("format")
         if text_format in (None, "plain_text") and _has_disallowed_plain_text_markup(text):
             raise _cross_validation_error("text_contains_markup_for_plain_text_format")
         # Markdown syntax alone doesn't satisfy "html" — it must contain an actual tag. Same
