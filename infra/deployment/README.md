@@ -89,6 +89,15 @@ API fail-closed. This code is separate from `ANYTOOLAI_DEMO_ACCESS_CODE` and is 
 `platform-api`; `OPENAI_API_KEY` remains worker-only and the server live token is not sent to the
 browser.
 
+Atom Lab run admission has five non-secret, `platform-api`-only operational limits. Their Compose
+defaults are `ANYTOOLAI_ATOM_LAB_RUN_BODY_MAX_BYTES=393216`,
+`ANYTOOLAI_ATOM_LAB_RUN_INPUT_MAX_BYTES=262144`,
+`ANYTOOLAI_ATOM_LAB_RUN_PROMPT_MAX_BYTES=65536`,
+`ANYTOOLAI_ATOM_LAB_RUN_DAILY_LIMIT=100`, and
+`ANYTOOLAI_ATOM_LAB_RUN_ACTIVE_LIMIT=1`. They bound HTTP payloads and admission counts; they are
+technical limits, not guarantees about a selected model's context-window capacity. Set overrides in
+the operator environment or gitignored `.env.prod`; never add them to `platform-worker`.
+
 For a closed local check, set the code only in the shell that starts Compose:
 
 ```bash

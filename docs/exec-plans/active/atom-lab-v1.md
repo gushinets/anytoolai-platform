@@ -3,12 +3,12 @@
 ## Status
 
 - State: active
-- Phase: AL05/ANY-463 implementation and verification complete on feature/ANY-463
+- Phase: AL04/ANY-462 implementation and verification complete on feature/ANY-462
 - Owner: mixed
 - Created: 2026-09-09
-- Last updated: 2026-09-17
+- Last updated: 2026-09-18
 - Review date: 2026-09-16
-- Next action: Review and commit ANY-463, then continue with ANY-462/AL04.
+- Next action: Review and commit ANY-462, then continue with the next Atom Lab milestone.
 - Blocker: none for development; operator configuration required before rollout.
 - Linear project: [Atom Lab](https://linear.app/paveldik/project/atom-lab-e1efc95ce888)
 - Milestone: Atom Lab v1
@@ -242,7 +242,7 @@ credential-free worker не запускает refresh hook и не создаё
 
 ### AL04 — [ANY-462](https://linear.app/paveldik/issue/ANY-462/atom-lab-zapusk-atoma-i-zashishyonnaya-postoyannaya-istoriya-api): Atom Lab: запуск атома и защищённая постоянная история API
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 - Depends on: ANY-460, ANY-461, ANY-463.
 - Files/areas: `platform-api routers/atom_lab.py, schemas.py`; `platform-core scenarios/service.py, storage repositories`; `worker terminal status/diagnostics integration`.
 
@@ -252,15 +252,49 @@ Acceptance: Первый полный API vertical slice одного атома
 
 ### Уточнения после аудита
 
-- [ ] Зависимости: ANY-460 (snapshot и laboratory workflows), ANY-461 (catalog), ANY-463 (preset version validation). Порядок AL-номеров не означает порядок разработки.
-- [ ] POST /runs body: `{atom_id, input, prompt, model_id, reasoning_effort, preset_ref?}`; `preset_ref={preset_id,version}`, effort nullable. Extra fields запрещены. `input` — полный видимый payload, без скрытого merge со saved preset. Ссылка на пресет — provenance; допустим изменённый draft, который явно отличается от версии. Проверить существование и соответствие атома/контракта пресета; не выдавать draft за неизменённый preset.
-- [ ] Сервер сам разрешает laboratory scenario по atom_id; принимает только указанный atom contract. Прямые scenario IDs, arbitrary provider/base URL/credentials и schema overrides не принимаются.
-- [ ] Auth выполняется до idempotency lookup. Scope ключа — внутренняя lab область tenant/region. Hash охватывает atom, полный input, prompt, model/effort и preset reference; JSON порядок ключей не влияет. Повтор accepted key+hash возвращает существующий run даже если модель исчезла/лимит исчерпан позже; другой hash ->409. Новому ключу — новая серверная guest identity, retry того же ключа использует сохранённую. Snapshot+session+job и admission count атомарны; не держать admission lock во время provider call.
-- [ ] Успешный POST возвращает 202: `{run_id,scenario_session_id,job_id,status}`. GET /runs — `{items,next_cursor}`, стабильная сортировка created_at+run_id, limit default 20/max100. GET /runs/{id} — `{run_id,status,snapshot,runtime_ids,result,diagnostics,created_at,started_at,finished_at}`. result только при успешной финальной валидации; диагностика отдельно. nullable IDs/времена не заменять фиктивными значениями.
-- [ ] Safe error envelope: `{error:{code,message,field_errors:[{path,message}]},request_id}`. 401 access_denied; 404 lab resource not found; 409 idempotency_conflict/preset_mismatch/contract_unavailable; 413 payload_too_large; 422 input_invalid/model_not_allowed/reasoning_not_allowed; 429 lab_busy/daily_limit_exhausted; 503 lab_unavailable/catalog_unavailable. Framework parsing errors привести к этому формату. Не включать секреты или полный prompt/input в ошибки/логи.
-- [ ] Размеры считать в UTF-8 по документированному JSON encoding, отдельно лимитировать raw request body; проверить unicode и JSON escaping. Начальные лимиты — технические defaults из плана, не изменение атомных схем и не гарантия попадания в context window.
-- [ ] Worker/executor сохраняют bounded contract-failure diagnostics в lab storage по run_id без второго ledger; счётчики берутся из существующих semantic/transport/physical indices. Успех с первой попытки различим от успеха после валидационных исправлений. Невалидный текст — защищённая диагностика с признаком truncation при ограничении, не successful artifact. Terminal projection не теряет сведения при restart/reconciliation.
-- [ ] Один idempotent submission означает один логический job, не обещание одного physical provider call: разрешённые retries остаются. Проверить одинаковые key requests в гонке, replay после terminal/исчезновения модели, падение transaction и worker_lease_lost. Для каждого из 11 атомов submitted input == snapshot input == ActionRunner input; проверить optional omissions/null/false/0 и нестандартные поля из контракта. API tests: `apps/platform-api/tests/test_atom_lab_runs.py`, `test_atom_lab_history.py`.
+- [x] Зависимости: ANY-460 (snapshot и laboratory workflows), ANY-461 (catalog), ANY-463 (preset version validation). Порядок AL-номеров не означает порядок разработки.
+- [x] POST /runs body: `{atom_id, input, prompt, model_id, reasoning_effort, preset_ref?}`; `preset_ref={preset_id,version}`, effort nullable. Extra fields запрещены. `input` — полный видимый payload, без скрытого merge со saved preset. Ссылка на пресет — provenance; допустим изменённый draft, который явно отличается от версии. Проверить существование и соответствие атома/контракта пресета; не выдавать draft за неизменённый preset.
+- [x] Сервер сам разрешает laboratory scenario по atom_id; принимает только указанный atom contract. Прямые scenario IDs, arbitrary provider/base URL/credentials и schema overrides не принимаются.
+- [x] Auth выполняется до idempotency lookup. Scope ключа — внутренняя lab область tenant/region. Hash охватывает atom, полный input, prompt, model/effort и preset reference; JSON порядок ключей не влияет. Повтор accepted key+hash возвращает существующий run даже если модель исчезла/лимит исчерпан позже; другой hash ->409. Новому ключу — новая серверная guest identity, retry того же ключа использует сохранённую. Snapshot+session+job и admission count атомарны; не держать admission lock во время provider call.
+- [x] Успешный POST возвращает 202: `{run_id,scenario_session_id,job_id,status}`. GET /runs — `{items,next_cursor}`, стабильная сортировка created_at+run_id, limit default 20/max100. GET /runs/{id} — `{run_id,status,snapshot,runtime_ids,result,diagnostics,created_at,started_at,finished_at}`. result только при успешной финальной валидации; диагностика отдельно. nullable IDs/времена не заменять фиктивными значениями.
+- [x] Safe error envelope: `{error:{code,message,field_errors:[{path,message}]},request_id}`. 401 access_denied; 404 lab resource not found; 409 idempotency_conflict/preset_mismatch/contract_unavailable; 413 payload_too_large; 422 input_invalid/model_not_allowed/reasoning_not_allowed; 429 lab_busy/daily_limit_exhausted; 503 lab_unavailable/catalog_unavailable. Framework parsing errors привести к этому формату. Не включать секреты или полный prompt/input в ошибки/логи.
+- [x] Размеры считать в UTF-8 по документированному JSON encoding, отдельно лимитировать raw request body; проверить unicode и JSON escaping. Начальные лимиты — технические defaults из плана, не изменение атомных схем и не гарантия попадания в context window.
+- [x] Worker/executor сохраняют bounded contract-failure diagnostics в lab storage по run_id без второго ledger; счётчики берутся из существующих semantic/transport/physical indices. Успех с первой попытки различим от успеха после валидационных исправлений. Невалидный текст — защищённая диагностика с признаком truncation при ограничении, не successful artifact. Terminal projection не теряет сведения при restart/reconciliation.
+- [x] Один idempotent submission означает один логический job, не обещание одного physical provider call: разрешённые retries остаются. Проверить одинаковые key requests в гонке, replay после terminal/исчезновения модели, падение transaction и worker_lease_lost. Для каждого из 11 атомов submitted input == snapshot input == ActionRunner input; проверить optional omissions/null/false/0 и нестандартные поля из контракта. API tests: `apps/platform-api/tests/test_atom_lab_runs.py`, `test_atom_lab_history.py`.
+
+#### Execution checklist (2026-09-18)
+
+The approved specification and AL04 requirements above are the design source. Implementation stays
+inside the existing Atom Lab snapshot/runtime path and proceeds with these independently verifiable
+TDD slices.
+
+- [x] **Slice 1 — durable serialized admission and idempotency.** Add failing repository/service
+  tests in `packages/backend/platform-core/tests/unit/test_atom_lab_run_admission.py` for canonical
+  JSON hashing, stable guest/run replay, conflict, UTC daily rollover, active-run exclusion and
+  concurrent PostgreSQL starts. Extend `migrations/platform/versions/0015_atom_lab_run_admission.py`,
+  `storage/db.py`, `atom_lab/models.py` and `atom_lab/repository.py` with a tenant/region admission
+  lock row and scoped unique idempotency fields. Implement `atom_lab/service.py` so the locked
+  transaction creates guest identity, scenario session, job and immutable snapshot together, then
+  run the focused unit tests and PostgreSQL marker tests.
+- [x] **Slice 2 — strict protected POST `/v1/atom-lab/runs`.** First add failing cases to
+  `apps/platform-api/tests/test_atom_lab_runs.py` for auth-before-lookup, required idempotency key,
+  forbidden extra fields, raw/input/prompt UTF-8 limits, all 11 exact input contracts, model/effort
+  capability validation, preset provenance, replay and the documented safe error codes. Add the
+  request/response models and configurable defaults in `schemas.py`/`settings.py`, then the smallest
+  router orchestration in `routers/atom_lab.py`. Verify red then green with the exact test module.
+- [x] **Slice 3 — persistent history projection.** Add failing list/detail tests in
+  `apps/platform-api/tests/test_atom_lab_history.py` for `created_at + run_id` keyset ordering,
+  running/failed/succeeded runs, nullable runtime IDs/timestamps, immutable normalized result,
+  unknown historical model/contract readability and distinct validation/transport/physical counts.
+  Add scoped projection queries to the Atom Lab repository/service and the exact list/detail wire
+  models without copying the runtime ledger.
+- [x] **Slice 4 — bounded terminal diagnostics and vertical integration.** Add failing worker tests
+  for final invalid output, provider failure and `worker_lease_lost`, proving bounded/truncated raw
+  contract diagnostics are Atom-Lab-only and survive reconciliation. Reuse the existing worker
+  reconciliation and structured-output debug-artifact recovery boundary; add API/worker
+  integration coverage proving one accepted submission creates one logical job while runtime retries
+  retain separate provider-call rows. Run targeted suites, `quick-check`, real `postgresql-check`,
+  `full-check`, generated OpenAPI drift checks and architecture/docs validation before completion.
 
 
 ### AL05 — [ANY-463](https://linear.app/paveldik/issue/ANY-463/atom-lab-biblioteka-neizmenyaemyh-versij-presetov-i-eksport-api): Atom Lab: библиотека неизменяемых версий пресетов и экспорт API

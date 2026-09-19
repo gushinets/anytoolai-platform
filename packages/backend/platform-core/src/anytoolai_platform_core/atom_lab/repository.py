@@ -1,29 +1,45 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, replace
-from datetime import datetime
+from datetime import date, datetime
+from typing import Any
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.orm import Session
 
+from anytoolai_platform_core.actions.models import ActionRunRecord
+from anytoolai_platform_core.artifacts.models import ArtifactRecord
 from anytoolai_platform_core.atom_lab.models import (
+    AtomLabAdmissionScopeRecord,
     AtomLabPresetIdentityRecord,
     AtomLabPresetSummary,
     AtomLabPresetVersionRecord,
+    AtomLabRunHistoryState,
     AtomLabRunRecord,
 )
-from anytoolai_platform_core.providers.models import ReasoningEffort
-from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
-from anytoolai_platform_core.scenarios.runtime_scope import is_atom_lab_session
+from anytoolai_platform_core.providers.models import ProviderCallRecord, ReasoningEffort
+from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord, ScenarioSessionStatus
+from anytoolai_platform_core.scenarios.runtime_scope import (
+    RUNTIME_SCOPE_METADATA_KEY,
+    RuntimeScope,
+    is_atom_lab_session,
+)
 from anytoolai_platform_core.storage.db import (
     action_runs_table,
     artifacts_table,
+    atom_lab_admission_scopes_table,
     atom_lab_preset_versions_table,
     atom_lab_presets_table,
     atom_lab_runs_table,
     jobs_table,
+    provider_calls_table,
     scenario_sessions_table,
 )
+from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
+
+ATOM_LAB_DIAGNOSTIC_ITEMS_MAX = 100
 
 
 class PresetVersionConflictError(RuntimeError):
@@ -350,6 +366,370 @@ class AtomLabRunRepository:
         )
         return self._from_row(row)
 
+    def get_by_idempotency_key(
+        self,
+        *,
+        tenant_id: str,
+        region: str,
+        idempotency_key: str,
+    ) -> AtomLabRunRecord | None:
+        row = (
+            self._session.execute(
+                sa.select(atom_lab_runs_table).where(
+                    atom_lab_runs_table.c.tenant_id == tenant_id,
+                    atom_lab_runs_table.c.region == region,
+                    atom_lab_runs_table.c.idempotency_key == idempotency_key,
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return self._from_row(row)
+
+    def history_in_scope(
+        self,
+        *,
+        tenant_id: str,
+        region: str,
+        limit: int,
+        before: tuple[datetime, str] | None = None,
+        run_id: str | None = None,
+    ) -> tuple[AtomLabRunHistoryState, ...]:
+        statement = (
+            sa.select(
+                atom_lab_runs_table,
+                jobs_table,
+                scenario_sessions_table.c.status.label("session_status"),
+            )
+            .join(jobs_table, jobs_table.c.id == atom_lab_runs_table.c.job_id)
+            .join(
+                scenario_sessions_table,
+                scenario_sessions_table.c.id == atom_lab_runs_table.c.scenario_session_id,
+            )
+            .where(
+                atom_lab_runs_table.c.tenant_id == tenant_id,
+                atom_lab_runs_table.c.region == region,
+                jobs_table.c.tenant_id == tenant_id,
+                jobs_table.c.region == region,
+                jobs_table.c.scenario_session_id == scenario_sessions_table.c.id,
+                scenario_sessions_table.c.tenant_id == tenant_id,
+                scenario_sessions_table.c.region == region,
+                scenario_sessions_table.c.metadata[RUNTIME_SCOPE_METADATA_KEY].as_string()
+                == RuntimeScope.atom_lab.value,
+            )
+            .order_by(atom_lab_runs_table.c.created_at.desc(), atom_lab_runs_table.c.id.desc())
+            .limit(limit)
+        )
+        if run_id is not None:
+            statement = statement.where(atom_lab_runs_table.c.id == run_id)
+        if before is not None:
+            statement = statement.where(
+                sa.tuple_(atom_lab_runs_table.c.created_at, atom_lab_runs_table.c.id)
+                < sa.tuple_(
+                    sa.bindparam(
+                        "history_before_time",
+                        before[0],
+                        type_=atom_lab_runs_table.c.created_at.type,
+                    ),
+                    sa.bindparam(
+                        "history_before_id", before[1], type_=atom_lab_runs_table.c.id.type
+                    ),
+                )
+            )
+        result = []
+        for row in self._session.execute(statement).mappings():
+            run_values = {column.name: row[column] for column in atom_lab_runs_table.c}
+            run = self._from_row(run_values)
+            assert run is not None
+            result.append(
+                AtomLabRunHistoryState(
+                    run=run,
+                    job=JobRecord(**{column.name: row[column] for column in jobs_table.c}),
+                    session_status=row["session_status"],
+                )
+            )
+        return tuple(result)
+
+    @staticmethod
+    def _runtime_scope(
+        table: sa.Table, run: AtomLabRunRecord,
+    ) -> tuple[sa.ColumnElement[bool], ...]:
+        return (
+            table.c.tenant_id == run.tenant_id,
+            table.c.region == run.region,
+            table.c.scenario_session_id == run.scenario_session_id,
+            table.c.job_id == run.job_id,
+        )
+
+    def history_action(self, run: AtomLabRunRecord) -> ActionRunRecord | None:
+        statement = sa.select(action_runs_table).where(
+            *self._runtime_scope(action_runs_table, run),
+            action_runs_table.c.step_id == run.step_id,
+        )
+        if run.action_run_id is not None:
+            statement = statement.where(action_runs_table.c.id == run.action_run_id)
+        row = (
+            self._session.execute(
+                statement.order_by(
+                    action_runs_table.c.created_at.desc(), action_runs_table.c.id.desc()
+                ).limit(1)
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return None if row is None else ActionRunRecord(**dict(row))
+
+    def history_artifact(self, run: AtomLabRunRecord, artifact_id: str) -> ArtifactRecord | None:
+        row = (
+            self._session.execute(
+                sa.select(artifacts_table).where(
+                    *self._runtime_scope(artifacts_table, run),
+                    artifacts_table.c.id == artifact_id,
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return None if row is None else ArtifactRecord(**dict(row))
+
+    def history_provider_calls(
+        self,
+        run: AtomLabRunRecord,
+    ) -> tuple[tuple[ProviderCallRecord, ...], int, int, int]:
+        scope = self._runtime_scope(provider_calls_table, run)
+        # The aggregates use all ledger rows even when the diagnostic page is truncated.
+        physical = self._session.scalar(
+            sa.select(sa.func.count()).select_from(provider_calls_table).where(*scope)
+        )
+        semantic_groups = (
+            sa.select(
+                provider_calls_table.c.action_run_id, provider_calls_table.c.semantic_attempt_index
+            )
+            .where(*scope)
+            .distinct()
+            .subquery()
+        )
+        transport_groups = (
+            sa.select(
+                provider_calls_table.c.action_run_id,
+                provider_calls_table.c.semantic_attempt_index,
+                provider_calls_table.c.transport_attempt_index,
+            )
+            .where(*scope)
+            .distinct()
+            .subquery()
+        )
+        semantic = self._session.scalar(sa.select(sa.func.count()).select_from(semantic_groups))
+        transport = self._session.scalar(sa.select(sa.func.count()).select_from(transport_groups))
+        rows = (
+            self._session.execute(
+                sa.select(provider_calls_table)
+                .where(*scope)
+                .order_by(
+                    provider_calls_table.c.created_at.desc(),
+                    provider_calls_table.c.physical_call_index.desc(),
+                    provider_calls_table.c.id.desc(),
+                )
+                .limit(ATOM_LAB_DIAGNOSTIC_ITEMS_MAX)
+            )
+            .mappings()
+            .all()
+        )
+        calls = tuple(ProviderCallRecord(**dict(row)) for row in reversed(rows))
+        return calls, semantic, transport, physical
+
+    def history_debug_artifacts(self, run: AtomLabRunRecord) -> tuple[ArtifactRecord, ...]:
+        rows = (
+            self._session.execute(
+                sa.select(artifacts_table)
+                .where(
+                    *self._runtime_scope(artifacts_table, run),
+                    artifacts_table.c.artifact_type == "structured_output_debug_raw",
+                )
+                .order_by(artifacts_table.c.created_at.desc(), artifacts_table.c.id.desc())
+                .limit(ATOM_LAB_DIAGNOSTIC_ITEMS_MAX + 1)
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(ArtifactRecord(**dict(row)) for row in rows)
+
+    def list_in_scope(
+        self,
+        *,
+        tenant_id: str,
+        region: str,
+        limit: int,
+        before: tuple[datetime, str] | None = None,
+    ) -> tuple[AtomLabRunRecord, ...]:
+        statement = (
+            sa.select(atom_lab_runs_table)
+            .where(
+                atom_lab_runs_table.c.tenant_id == tenant_id,
+                atom_lab_runs_table.c.region == region,
+            )
+            .order_by(
+                atom_lab_runs_table.c.created_at.desc(),
+                atom_lab_runs_table.c.id.desc(),
+            )
+            .limit(limit)
+        )
+        if before is not None:
+            created_at, run_id = before
+            statement = statement.where(
+                sa.tuple_(atom_lab_runs_table.c.created_at, atom_lab_runs_table.c.id)
+                < sa.tuple_(
+                    sa.bindparam(
+                        "atom_lab_run_before_created_at",
+                        created_at,
+                        type_=atom_lab_runs_table.c.created_at.type,
+                    ),
+                    sa.bindparam(
+                        "atom_lab_run_before_id",
+                        run_id,
+                        type_=atom_lab_runs_table.c.id.type,
+                    ),
+                )
+            )
+        rows = self._session.execute(statement).mappings().all()
+        return tuple(record for row in rows if (record := self._from_row(row)) is not None)
+
+    def lock_admission_scope(
+        self,
+        *,
+        tenant_id: str,
+        region: str,
+        accepted_on: date,
+        now: datetime,
+    ) -> AtomLabAdmissionScopeRecord:
+        values = {
+            "tenant_id": tenant_id,
+            "region": region,
+            "accepted_on": accepted_on,
+            "accepted_count": 0,
+            "updated_at": now,
+        }
+        dialect_name = self._session.get_bind().dialect.name
+        if dialect_name == "postgresql":
+            statement = postgresql.insert(atom_lab_admission_scopes_table).values(values)
+            statement = statement.on_conflict_do_nothing(index_elements=["tenant_id", "region"])
+        elif dialect_name == "sqlite":
+            statement = sqlite.insert(atom_lab_admission_scopes_table).values(values)
+            statement = statement.on_conflict_do_nothing(index_elements=["tenant_id", "region"])
+        else:
+            statement = sa.insert(atom_lab_admission_scopes_table).values(values)
+        if dialect_name in {"postgresql", "sqlite"}:
+            self._session.execute(statement)
+        else:  # pragma: no cover - production and tests use PostgreSQL/SQLite
+            existing = self._get_admission_scope(tenant_id=tenant_id, region=region)
+            if existing is None:
+                self._session.execute(statement)
+        row = (
+            self._session.execute(
+                sa.select(atom_lab_admission_scopes_table)
+                .where(
+                    atom_lab_admission_scopes_table.c.tenant_id == tenant_id,
+                    atom_lab_admission_scopes_table.c.region == region,
+                )
+                .with_for_update()
+            )
+            .mappings()
+            .one()
+        )
+        state = AtomLabAdmissionScopeRecord(**dict(row))
+        return state
+
+    def advance_admission_day(
+        self,
+        state: AtomLabAdmissionScopeRecord,
+        *,
+        accepted_on: date,
+        now: datetime,
+    ) -> AtomLabAdmissionScopeRecord:
+        if state.accepted_on >= accepted_on:
+            return state
+        result = self._session.execute(
+            sa.update(atom_lab_admission_scopes_table)
+            .where(
+                atom_lab_admission_scopes_table.c.tenant_id == state.tenant_id,
+                atom_lab_admission_scopes_table.c.region == state.region,
+                atom_lab_admission_scopes_table.c.accepted_on == state.accepted_on,
+                atom_lab_admission_scopes_table.c.accepted_count == state.accepted_count,
+            )
+            .values(accepted_on=accepted_on, accepted_count=0, updated_at=now)
+        )
+        if result.rowcount != 1:
+            raise RuntimeError("Atom Lab admission day changed without holding its scope lock")
+        self._session.flush()
+        return replace(state, accepted_on=accepted_on, accepted_count=0, updated_at=now)
+
+    def increment_accepted_count(
+        self,
+        state: AtomLabAdmissionScopeRecord,
+        *,
+        now: datetime,
+    ) -> AtomLabAdmissionScopeRecord:
+        result = self._session.execute(
+            sa.update(atom_lab_admission_scopes_table)
+            .where(
+                atom_lab_admission_scopes_table.c.tenant_id == state.tenant_id,
+                atom_lab_admission_scopes_table.c.region == state.region,
+                atom_lab_admission_scopes_table.c.accepted_on == state.accepted_on,
+                atom_lab_admission_scopes_table.c.accepted_count == state.accepted_count,
+            )
+            .values(accepted_count=state.accepted_count + 1, updated_at=now)
+        )
+        if result.rowcount != 1:
+            raise RuntimeError("Atom Lab admission count changed without holding its scope lock")
+        self._session.flush()
+        return replace(state, accepted_count=state.accepted_count + 1, updated_at=now)
+
+    @staticmethod
+    def active_count_statement(
+        *,
+        tenant_id: str,
+        region: str,
+    ) -> sa.Select[tuple[int]]:
+        return (
+            sa.select(sa.func.count())
+            .select_from(atom_lab_runs_table)
+            .join(jobs_table, jobs_table.c.id == atom_lab_runs_table.c.job_id)
+            .join(
+                scenario_sessions_table,
+                scenario_sessions_table.c.id == atom_lab_runs_table.c.scenario_session_id,
+            )
+            .where(
+                atom_lab_runs_table.c.tenant_id == tenant_id,
+                atom_lab_runs_table.c.region == region,
+                jobs_table.c.status.in_((JobStatus.created, JobStatus.running)),
+                scenario_sessions_table.c.status.in_(
+                    (
+                        ScenarioSessionStatus.started,
+                        ScenarioSessionStatus.waiting_for_user,
+                        ScenarioSessionStatus.running,
+                    )
+                ),
+            )
+        )
+
+    def _get_admission_scope(
+        self,
+        *,
+        tenant_id: str,
+        region: str,
+    ) -> AtomLabAdmissionScopeRecord | None:
+        row = (
+            self._session.execute(
+                sa.select(atom_lab_admission_scopes_table).where(
+                    atom_lab_admission_scopes_table.c.tenant_id == tenant_id,
+                    atom_lab_admission_scopes_table.c.region == region,
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return None if row is None else AtomLabAdmissionScopeRecord(**dict(row))
+
     def get_by_scenario_session_id(self, scenario_session_id: str) -> AtomLabRunRecord | None:
         row = (
             self._session.execute(
@@ -550,7 +930,7 @@ class AtomLabRunRepository:
             raise ValueError(f"Atom Lab {field_name} is already bound")
 
     @staticmethod
-    def _from_row(row: sa.RowMapping | None) -> AtomLabRunRecord | None:
+    def _from_row(row: Mapping[str, Any] | None) -> AtomLabRunRecord | None:
         if row is None:
             return None
         values = dict(row)

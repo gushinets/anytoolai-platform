@@ -78,6 +78,54 @@
         "title": "AtomLabAtomResponse",
         "type": "object"
       },
+      "AtomLabDebugArtifactResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "raw_output_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Output Text"
+          },
+          "redacted": {
+            "title": "Redacted",
+            "type": "boolean"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "error_code",
+          "raw_output_text",
+          "truncated",
+          "redacted"
+        ],
+        "title": "AtomLabDebugArtifactResponse",
+        "type": "object"
+      },
       "AtomLabErrorDetailResponse": {
         "additionalProperties": false,
         "properties": {
@@ -817,6 +865,478 @@
         "title": "AtomLabPresetVersionSummaryResponse",
         "type": "object"
       },
+      "AtomLabProviderCallDiagnosticResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "action_run_id": {
+            "title": "Action Run Id",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "latency_ms": {
+            "title": "Latency Ms",
+            "type": "integer"
+          },
+          "physical_call_index": {
+            "title": "Physical Call Index",
+            "type": "integer"
+          },
+          "provider_call_id": {
+            "title": "Provider Call Id",
+            "type": "string"
+          },
+          "response_model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Model Id"
+          },
+          "semantic_attempt_index": {
+            "title": "Semantic Attempt Index",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProviderCallStatus"
+          },
+          "transport_attempt_index": {
+            "title": "Transport Attempt Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "provider_call_id",
+          "action_run_id",
+          "status",
+          "semantic_attempt_index",
+          "transport_attempt_index",
+          "physical_call_index",
+          "response_model_id",
+          "error_code",
+          "latency_ms"
+        ],
+        "title": "AtomLabProviderCallDiagnosticResponse",
+        "type": "object"
+      },
+      "AtomLabRunAcceptedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "scenario_session_id": {
+            "title": "Scenario Session Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AtomLabRunStatus"
+          }
+        },
+        "required": [
+          "run_id",
+          "scenario_session_id",
+          "job_id",
+          "status"
+        ],
+        "title": "AtomLabRunAcceptedResponse",
+        "type": "object"
+      },
+      "AtomLabRunDetailResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "diagnostics": {
+            "$ref": "#/components/schemas/AtomLabRunDiagnosticsResponse"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "runtime_ids": {
+            "$ref": "#/components/schemas/AtomLabRunRuntimeIdsResponse"
+          },
+          "snapshot": {
+            "additionalProperties": true,
+            "title": "Snapshot",
+            "type": "object"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AtomLabRunStatus"
+          }
+        },
+        "required": [
+          "run_id",
+          "status",
+          "snapshot",
+          "runtime_ids",
+          "result",
+          "diagnostics",
+          "created_at",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "AtomLabRunDetailResponse",
+        "type": "object"
+      },
+      "AtomLabRunDiagnosticsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "debug_artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/AtomLabDebugArtifactResponse"
+            },
+            "title": "Debug Artifacts",
+            "type": "array"
+          },
+          "debug_artifacts_truncated": {
+            "title": "Debug Artifacts Truncated",
+            "type": "boolean"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "physical_calls": {
+            "title": "Physical Calls",
+            "type": "integer"
+          },
+          "provider_calls": {
+            "items": {
+              "$ref": "#/components/schemas/AtomLabProviderCallDiagnosticResponse"
+            },
+            "title": "Provider Calls",
+            "type": "array"
+          },
+          "provider_calls_truncated": {
+            "title": "Provider Calls Truncated",
+            "type": "boolean"
+          },
+          "requested_model_id": {
+            "title": "Requested Model Id",
+            "type": "string"
+          },
+          "requested_reasoning_effort": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasoningEffort"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "response_model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Model Id"
+          },
+          "succeeded_first_attempt": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Succeeded First Attempt"
+          },
+          "transport_attempts": {
+            "title": "Transport Attempts",
+            "type": "integer"
+          },
+          "validation_attempts": {
+            "title": "Validation Attempts",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "error_code",
+          "duration_ms",
+          "requested_model_id",
+          "requested_reasoning_effort",
+          "response_model_id",
+          "validation_attempts",
+          "transport_attempts",
+          "physical_calls",
+          "succeeded_first_attempt",
+          "provider_calls",
+          "provider_calls_truncated",
+          "debug_artifacts",
+          "debug_artifacts_truncated"
+        ],
+        "title": "AtomLabRunDiagnosticsResponse",
+        "type": "object"
+      },
+      "AtomLabRunListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AtomLabRunSummaryResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "AtomLabRunListResponse",
+        "type": "object"
+      },
+      "AtomLabRunRuntimeIdsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "action_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Run Id"
+          },
+          "artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Id"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "scenario_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Session Id"
+          }
+        },
+        "required": [
+          "scenario_session_id",
+          "job_id",
+          "action_run_id",
+          "artifact_id"
+        ],
+        "title": "AtomLabRunRuntimeIdsResponse",
+        "type": "object"
+      },
+      "AtomLabRunStatus": {
+        "enum": [
+          "queued",
+          "running",
+          "succeeded",
+          "failed",
+          "expired",
+          "cancelled"
+        ],
+        "title": "AtomLabRunStatus",
+        "type": "string"
+      },
+      "AtomLabRunSummaryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "atom_id": {
+            "title": "Atom Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "preset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset Id"
+          },
+          "preset_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset Version"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AtomLabRunStatus"
+          }
+        },
+        "required": [
+          "run_id",
+          "status",
+          "atom_id",
+          "model_id",
+          "preset_id",
+          "preset_version",
+          "created_at",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "AtomLabRunSummaryResponse",
+        "type": "object"
+      },
       "AtomLabSchemaRefsResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1233,6 +1753,17 @@
           "running"
         ],
         "title": "ModelCatalogRefreshStatus",
+        "type": "string"
+      },
+      "ProviderCallStatus": {
+        "enum": [
+          "created",
+          "running",
+          "succeeded",
+          "failed",
+          "timed_out"
+        ],
+        "title": "ProviderCallStatus",
         "type": "string"
       },
       "QuotaDimension": {
@@ -2750,6 +3281,418 @@
           }
         },
         "summary": "Export Preset Version",
+        "tags": [
+          "atom-lab",
+          "atom-lab"
+        ]
+      }
+    },
+    "/v1/atom-lab/runs": {
+      "get": {
+        "operationId": "list_runs_v1_atom_lab_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Atom-Lab-Access-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Atom-Lab-Access-Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabRunListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab access denied."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab request validation failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab is not configured."
+          }
+        },
+        "summary": "List Runs",
+        "tags": [
+          "atom-lab",
+          "atom-lab"
+        ]
+      },
+      "post": {
+        "operationId": "start_run_v1_atom_lab_runs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Atom-Lab-Access-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Atom-Lab-Access-Code"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "atom_id": {
+                    "enum": [
+                      "A01",
+                      "A02",
+                      "A03",
+                      "A04",
+                      "A05",
+                      "A06",
+                      "A07",
+                      "A08",
+                      "A09",
+                      "A10",
+                      "A11"
+                    ],
+                    "title": "AtomLabAtomId",
+                    "type": "string"
+                  },
+                  "input": {
+                    "additionalProperties": true,
+                    "title": "Input",
+                    "type": "object"
+                  },
+                  "model_id": {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "title": "Model Id",
+                    "type": "string"
+                  },
+                  "preset_ref": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "preset_id": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "pattern": "^[A-Za-z0-9_-]+$",
+                            "title": "Preset Id",
+                            "type": "string"
+                          },
+                          "version": {
+                            "maximum": 2147483647,
+                            "minimum": 1,
+                            "title": "Version",
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "preset_id",
+                          "version"
+                        ],
+                        "title": "AtomLabRunPresetRef",
+                        "type": "object"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "prompt": {
+                    "minLength": 1,
+                    "title": "Prompt",
+                    "type": "string"
+                  },
+                  "reasoning_effort": {
+                    "anyOf": [
+                      {
+                        "enum": [
+                          "none",
+                          "minimal",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ],
+                        "title": "ReasoningEffort",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "atom_id",
+                  "input",
+                  "prompt",
+                  "model_id",
+                  "reasoning_effort"
+                ],
+                "title": "AtomLabRunRequest",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabRunAcceptedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab access denied."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab payload is too large."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab request validation failed."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab is not configured."
+          }
+        },
+        "summary": "Start Run",
+        "tags": [
+          "atom-lab",
+          "atom-lab"
+        ]
+      }
+    },
+    "/v1/atom-lab/runs/{run_id}": {
+      "get": {
+        "operationId": "get_run_v1_atom_lab_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Atom-Lab-Access-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Atom-Lab-Access-Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabRunDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab access denied."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab request validation failed."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtomLabErrorResponse"
+                }
+              }
+            },
+            "description": "Atom Lab is not configured."
+          }
+        },
+        "summary": "Get Run",
         "tags": [
           "atom-lab",
           "atom-lab"

@@ -49,6 +49,16 @@ Definitions remain in repository configuration; these tables store runtime state
 | metadata | JSON | no |
 | created_at | DATETIME | no |
 
+## platform.atom_lab_admission_scopes
+
+| Column | Type | Nullable |
+|---|---|---|
+| tenant_id | VARCHAR(128) | no |
+| region | VARCHAR(64) | no |
+| accepted_on | DATE | no |
+| accepted_count | INTEGER | no |
+| updated_at | DATETIME | no |
+
 ## platform.atom_lab_preset_versions
 
 | Column | Type | Nullable |
@@ -128,6 +138,9 @@ Definitions remain in repository configuration; these tables store runtime state
 | action_definition | JSON | no |
 | action_config_definition | JSON | no |
 | execution_definition_hash | VARCHAR(64) | no |
+| guest_id | VARCHAR(128) | yes |
+| idempotency_key | VARCHAR(256) | yes |
+| idempotency_request_hash | VARCHAR(64) | yes |
 | preset_id | VARCHAR(128) | yes |
 | preset_version | INTEGER | yes |
 | action_run_id | VARCHAR(128) | yes |
