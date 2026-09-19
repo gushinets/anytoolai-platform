@@ -53,10 +53,10 @@
           <section class="editor-grid">
             <div class="card editor-card">
               <div class="tab-list" role="tablist" aria-label="Редактор конфигурации">
-                <button id="input-tab" type="button" role="tab" aria-selected="true">Вход</button>
-                <button id="prompt-tab" type="button" role="tab" aria-selected="false">Промпт</button>
+                <button id="input-tab" type="button" role="tab" aria-selected="true" aria-controls="input-panel">Вход</button>
+                <button id="prompt-tab" type="button" role="tab" aria-selected="false" aria-controls="prompt-panel">Промпт</button>
               </div>
-              <section id="input-panel" aria-label="Входные данные">
+              <section id="input-panel" role="tabpanel" aria-labelledby="input-tab">
                 <div class="editor-toolbar">
                   <div role="group" aria-label="Режим редактора">
                     <button id="form-mode" type="button" aria-pressed="true">Форма</button>
@@ -72,7 +72,7 @@
                 </div>
                 <div id="validation-errors" class="validation-errors" aria-live="polite"></div>
               </section>
-              <section id="prompt-panel" aria-label="Промпт" hidden>
+              <section id="prompt-panel" role="tabpanel" aria-labelledby="prompt-tab" hidden>
                 <label for="prompt-editor">Инструкция конфигурации</label>
                 <textarea id="prompt-editor" rows="18"></textarea>
                 <button id="reset-prompt" type="button">Восстановить исходный промпт</button>

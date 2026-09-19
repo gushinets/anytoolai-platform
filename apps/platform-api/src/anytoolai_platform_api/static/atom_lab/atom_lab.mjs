@@ -54,12 +54,22 @@ function pathLabel(path) {
   ), "");
 }
 
+function defineOwn(target, key, value) {
+  Object.defineProperty(target, key, {
+    value,
+    enumerable: true,
+    configurable: true,
+    writable: true,
+  });
+}
+
 function resolveParent(payload, path, create) {
   let current = payload;
   for (let index = 0; index < path.length - 1; index += 1) {
     const segment = path[index];
-    if (current[segment] === undefined && create) {
-      current[segment] = typeof path[index + 1] === "number" ? [] : {};
+    if (!Object.hasOwn(current, segment)) {
+      if (!create) return null;
+      defineOwn(current, segment, typeof path[index + 1] === "number" ? [] : {});
     }
     current = current[segment];
     if (current === undefined || current === null) return null;
@@ -118,7 +128,7 @@ export function setDraftPath(session, path, value) {
   } else {
     const parent = resolveParent(session.payload, path, true);
     if (parent === null) throw new Error(`Cannot set ${pathLabel(path)}`);
-    parent[path.at(-1)] = cloneJson(value);
+    defineOwn(parent, path.at(-1), cloneJson(value));
   }
   session.jsonError = null;
   session.inputErrors.delete(fieldKey(path));
@@ -611,9 +621,7 @@ function renderObject(context, container, schema, path, value) {
     keyInput.addEventListener("change", () => {
       const nextKey = keyInput.value;
       if (!allowsDynamic || nextKey === key || Object.hasOwn(value, nextKey)) return;
-      Object.defineProperty(value, nextKey, {
-        value: value[key], enumerable: true, configurable: true, writable: true,
-      });
+      defineOwn(value, nextKey, value[key]);
       delete value[key];
       rerender(true, fieldControlId([...path, nextKey], "key"));
     });
@@ -642,8 +650,8 @@ function renderArray(context, container, schema, path, value) {
     renderField(context, row, schema.items ?? {}, [...path, index], `Элемент ${index + 1}`, true);
     const removeButton = button(document, `Удалить элемент ${index + 1}`, () => {
       omitDraftPath(session, [...path, index]);
-      const nextIndex = Math.min(index, Math.max(0, value.length - 2));
-      const focusId = value.length > 1
+      const nextIndex = Math.min(index, value.length - 1);
+      const focusId = value.length > 0
         ? firstControlId(schema.items ?? {}, [...path, nextIndex])
         : fieldControlId(path, "add-item");
       rerender(true, focusId);

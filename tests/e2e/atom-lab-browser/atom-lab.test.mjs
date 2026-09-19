@@ -246,6 +246,21 @@ test("omission remains distinct from null, empty string, false, and zero", async
   assert.deepEqual(JSON.parse(serializeDraft(session)), {nullable: null, empty: "", disabled: false, count: 0});
 });
 
+test("setting a __proto__ path creates an ordinary own JSON property", async () => {
+  const session = createDraftSession(await catalogAtom("A06"));
+
+  setDraftPath(session, ["__proto__"], "данные");
+
+  assert.equal(Object.hasOwn(session.payload, "__proto__"), true);
+  assert.equal(Object.getPrototypeOf(session.payload), Object.prototype);
+  assert.deepEqual(getDraftPayload(session), {["__proto__"]: "данные"});
+
+  setDraftPath(session, ["nested", "__proto__", "value"], 7);
+  assert.equal(Object.hasOwn(session.payload.nested, "__proto__"), true);
+  assert.equal(Object.getPrototypeOf(session.payload.nested), Object.prototype);
+  assert.deepEqual(getDraftPayload(session).nested, {["__proto__"]: {value: 7}});
+});
+
 test("invalid JSON is retained verbatim and blocks returning to the form", async () => {
   const session = createDraftSession(await catalogAtom("A01"));
   replaceWithExample(session);
@@ -428,6 +443,35 @@ test("dynamic unrestricted values can be created and changed through form contro
   assert.equal(context.__proto__, "Сервис");
 });
 
+test("removing an array item focuses the item shifted into its place", async () => {
+  const {document, elements} = createFakeDocument();
+  const atom = await catalogAtom("A04", {
+    input_schema: {
+      type: "object",
+      properties: {items: {type: "array", items: {type: "string"}}},
+      required: ["items"],
+      additionalProperties: false,
+    },
+    example_input: {items: ["первый", "второй", "третий"]},
+  });
+  bootstrapAtomLab({
+    document,
+    fetchImpl: async () => ({ok: true, async json() { return [atom]; }}),
+    confirmImpl: () => true,
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("fill-example").click();
+  const removeSecond = elements.get("input-editor").querySelectorAll("button")
+    .find((node) => node.textContent === "Удалить элемент 2");
+
+  await removeSecond.click();
+
+  const shiftedThird = elements.get("input-editor").querySelectorAll("textarea")
+    .find((node) => node.value === "третий");
+  assert.equal(shiftedThird.focused, true);
+});
+
 test("integer controls never silently truncate decimal or empty text", async () => {
   const {document, elements} = createFakeDocument();
   const atom = await catalogAtom("A05");
@@ -457,6 +501,14 @@ test("closed workspace and narrow content rules are explicit in CSS", async () =
   assert.match(css, /\[hidden\]\s*\{\s*display:\s*none\s*!important/);
   assert.match(css, /overflow-wrap:\s*anywhere/);
   assert.match(css, /min-width:\s*0/);
+});
+
+test("input and prompt tabs are explicitly wired to their tab panels", async () => {
+  const html = await readFile(HTML_URL, "utf8");
+  assert.match(html, /id="input-tab"[^>]+aria-controls="input-panel"/);
+  assert.match(html, /id="prompt-tab"[^>]+aria-controls="prompt-panel"/);
+  assert.match(html, /id="input-panel"[^>]+role="tabpanel"[^>]+aria-labelledby="input-tab"/);
+  assert.match(html, /id="prompt-panel"[^>]+role="tabpanel"[^>]+aria-labelledby="prompt-tab"/);
 });
 
 test("unknown closed-schema fields remain visible in form mode with a path error", async () => {

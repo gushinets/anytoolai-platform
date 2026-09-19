@@ -8,9 +8,8 @@
 - Last updated: 2026-09-19
 - Review date: 2026-09-19
 - Next action: none; implementation and verification are complete.
-- Blocker: aggregate frontend-check has 62 pre-existing local Node 26 `web-mirror` failures because
-  `window.localStorage` is unavailable; the Atom Lab package, lint, typecheck, drift check, and
-  build pass.
+- Local caveat: repository CI `frontend` and `full-check` pass; local Node 26 leaves 62 pre-existing
+  `web-mirror` failures because `window.localStorage` is unavailable.
 
 ## Goal
 
@@ -62,8 +61,8 @@ access code.
 ## Validation
 
 - [x] `python3 scripts/agent/runner.py quick-check` — 1722 passed, 479 deselected.
-- [ ] `python3 scripts/agent/runner.py frontend-check` — lint and typecheck pass, then 62 pre-existing Node 26 `web-mirror` tests fail because `window.localStorage` is unavailable; focused lint, typecheck, build, and Atom Lab tests pass.
-- [x] `pnpm --filter @anytoolai/atom-lab-browser-tests test` — 17 passed.
+- [x] `python3 scripts/agent/runner.py frontend-check` — repository CI passed; locally lint and typecheck pass before 62 pre-existing Node 26 `web-mirror` failures caused by unavailable `window.localStorage`.
+- [x] `pnpm --filter @anytoolai/atom-lab-browser-tests test` — 20 passed.
 - [x] `pnpm --filter @anytoolai/atom-lab-browser-tests browser` — Chromium interaction passed at 375 px.
 - [x] `pnpm --filter @anytoolai/atom-lab-browser-tests lint`.
 - [x] `pnpm -r typecheck` and `pnpm -r build`.
@@ -80,7 +79,7 @@ access code.
 | Date | Progress | Next |
 |---|---|---|
 | 2026-09-19 | Baseline quick-check passed: 1722 passed, 479 deselected. | Implement with TDD. |
-| 2026-09-19 | Focused API tests, 17 browser-state tests, Chromium interaction, lint, typecheck, OpenAPI drift, build, and quick-check passed. Independent review findings were fixed and regression-covered. | Complete. |
+| 2026-09-19 | Focused API tests, 20 browser-state tests, Chromium interaction, lint, typecheck, OpenAPI drift, build, and quick-check passed. Independent review findings were fixed and regression-covered. | Complete. |
 
 ## Open questions
 
