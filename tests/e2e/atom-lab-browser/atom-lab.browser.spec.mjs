@@ -367,11 +367,16 @@ test("model capabilities, stale state, and refresh are explicit", async ({page})
   await expect(page.locator("#reasoning-effort")).toBeDisabled();
   await expect(page.locator("#reasoning-help")).toContainText("неизвестны");
 
+  await page.locator("#model-select").selectOption("gpt-supported");
+  await page.locator("#reasoning-effort").selectOption("high");
+
   await page.locator("#refresh-models").click();
   await expect.poll(() => refreshRequests).toBe(1);
   await expect(page.locator("#model-catalog-warning")).toContainText("обновление запрошено");
   await expect(page.locator('#model-select option[value="gpt-new"]')).toHaveCount(1);
   await expect(page.locator("#model-catalog-warning")).toBeEmpty();
+  await expect(page.locator("#model-select")).toHaveValue("gpt-supported");
+  await expect(page.locator("#reasoning-effort")).toHaveValue("high");
 });
 
 test("one accepted submission survives draft edits and renders safe result diagnostics", async ({page}) => {
@@ -427,9 +432,15 @@ test("one accepted submission survives draft edits and renders safe result diagn
 
 test("network submission retry reuses the idempotency key and polling reconnects without another POST", async ({page}) => {
   const keys = [];
+  const bodies = [];
   let reads = 0;
+  let modelAvailable = true;
+  await page.route("http://atom-lab.test/v1/atom-lab/models/refresh", async (route) => {
+    await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({...MODEL_CATALOG, refresh_status: "pending"})});
+  });
   await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
     keys.push(route.request().headers()["idempotency-key"]);
+    bodies.push(route.request().postDataJSON());
     if (keys.length === 1) {
       await route.abort("connectionfailed");
       return;
@@ -452,18 +463,25 @@ test("network submission retry reuses the idempotency key and polling reconnects
       created_at: "2026-09-20T10:00:00Z", started_at: "2026-09-20T10:00:00Z", finished_at: "2026-09-20T10:00:01Z",
     })});
   });
-  await unlockAtom(page, "A05");
+  await unlockAtom(page, "A05", {models: () => modelAvailable
+    ? MODEL_CATALOG
+    : {...MODEL_CATALOG, items: MODEL_CATALOG.items.filter(({model_id: modelId}) => modelId !== "gpt-supported"), stale: false, refresh_status: "current"}});
   await page.locator("#fill-example").click();
 
   await page.locator("#run-button").click();
   await expect(page.locator("#retry-submit")).toBeVisible();
   await expect(page.locator("#run-state")).toContainText("Черновик сохранён");
+  await page.getByLabel("context").fill("");
+  modelAvailable = false;
+  await page.locator("#refresh-models").click();
+  await expect(page.locator('#model-select option[value="gpt-supported"]')).toHaveCount(0);
   await page.locator("#retry-submit").click();
   await expect(page.locator("#run-state")).toContainText("Переподключение");
   await expect(page.locator("#run-state")).toContainText("Завершён");
 
   expect(keys).toHaveLength(2);
   expect(keys[0]).toBe(keys[1]);
+  expect(bodies[1]).toEqual(bodies[0]);
   expect(reads).toBe(2);
 });
 

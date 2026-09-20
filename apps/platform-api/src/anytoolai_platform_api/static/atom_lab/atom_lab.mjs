@@ -1073,6 +1073,9 @@ export function bootstrapAtomLab({
   let modelOptions = [];
   let activeSubmission = null;
   let submitInFlight = false;
+  let modelCatalogPollTimer = null;
+  let modelCatalogPollStartedAt = null;
+  let destroyed = false;
 
   const updateRunButton = () => {
     const hasSelectableModel = modelOptions.some((option) => option.selectable);
@@ -1084,7 +1087,7 @@ export function bootstrapAtomLab({
     (option) => option.modelId === nodes["model-select"].value,
   ) ?? null;
 
-  const renderReasoning = () => {
+  const renderReasoning = (preferredEffort = "") => {
     const option = selectedModelOption();
     nodes["reasoning-effort"].replaceChildren();
     const none = document.createElement("option");
@@ -1097,12 +1100,16 @@ export function bootstrapAtomLab({
       item.textContent = effort;
       nodes["reasoning-effort"].append(item);
     }
-    nodes["reasoning-effort"].value = "";
+    nodes["reasoning-effort"].value = option?.allowedEfforts.includes(preferredEffort)
+      ? preferredEffort
+      : "";
     nodes["reasoning-effort"].disabled = option?.reasoningMode !== "supported";
     nodes["reasoning-help"].textContent = option ? modelReasonText(option) : "Выберите модель.";
   };
 
   const renderModelCatalog = () => {
+    const previousModelId = nodes["model-select"].value;
+    const previousReasoningEffort = nodes["reasoning-effort"].value;
     nodes["model-select"].replaceChildren();
     for (const option of modelOptions) {
       const item = document.createElement("option");
@@ -1115,13 +1122,16 @@ export function bootstrapAtomLab({
       nodes["model-select"].append(item);
     }
     const first = modelOptions.find((option) => option.selectable);
-    nodes["model-select"].value = first?.modelId ?? "";
+    const selected = modelOptions.find(
+      (option) => option.selectable && option.modelId === previousModelId,
+    ) ?? first;
+    nodes["model-select"].value = selected?.modelId ?? "";
     nodes["model-select"].disabled = !first;
-    updateRunButton();
     nodes["model-catalog-warning"].textContent = modelCatalog?.stale
       ? `Каталог моделей устарел.${modelCatalog.error ? ` ${modelCatalog.error}` : ""}`
       : "";
-    renderReasoning();
+    renderReasoning(selected?.modelId === previousModelId ? previousReasoningEffort : "");
+    updateRunButton();
   };
 
   const loadModels = async () => {
@@ -1150,11 +1160,31 @@ export function bootstrapAtomLab({
     }
   };
 
+  const stopModelCatalogPolling = () => {
+    if (modelCatalogPollTimer !== null) cancelScheduleImpl(modelCatalogPollTimer);
+    modelCatalogPollTimer = null;
+    modelCatalogPollStartedAt = null;
+  };
+
   const pollModelCatalog = async () => {
+    modelCatalogPollTimer = null;
     await loadModels();
-    if (["pending", "running"].includes(modelCatalog?.refresh_status)) {
-      scheduleImpl(pollModelCatalog, RUN_POLL_INTERVAL_MS);
+    if (destroyed || !["pending", "running"].includes(modelCatalog?.refresh_status)) {
+      stopModelCatalogPolling();
+      return;
     }
+    if (pollingTimedOut(modelCatalogPollStartedAt, nowImpl(), pollTimeoutMs)) {
+      nodes["model-catalog-warning"].textContent = "Время ожидания обновления каталога истекло.";
+      stopModelCatalogPolling();
+      return;
+    }
+    modelCatalogPollTimer = scheduleImpl(pollModelCatalog, RUN_POLL_INTERVAL_MS);
+  };
+
+  const startModelCatalogPolling = () => {
+    if (destroyed || modelCatalogPollStartedAt !== null) return;
+    modelCatalogPollStartedAt = nowImpl();
+    modelCatalogPollTimer = scheduleImpl(pollModelCatalog, RUN_POLL_INTERVAL_MS);
   };
 
   const renderRunDetail = (detail, submission) => {
@@ -1271,18 +1301,19 @@ export function bootstrapAtomLab({
 
   const submitRun = async ({retry = false} = {}) => {
     if (submitInFlight || !session) return;
-    const errors = validateDraft(session);
-    if (errors.length > 0) {
-      renderValidation(document, nodes["validation-errors"], session);
-      nodes["run-state"].textContent = "Исправьте входные данные перед запуском.";
-      return;
-    }
-    const option = selectedModelOption();
-    if (!option?.selectable) {
-      nodes["run-state"].textContent = "Выберите доступную модель.";
-      return;
-    }
-    if (!retry || !activeSubmission || activeSubmission.runId) {
+    const pendingReplay = retry && activeSubmission && !activeSubmission.runId;
+    if (!pendingReplay) {
+      const errors = validateDraft(session);
+      if (errors.length > 0) {
+        renderValidation(document, nodes["validation-errors"], session);
+        nodes["run-state"].textContent = "Исправьте входные данные перед запуском.";
+        return;
+      }
+      const option = selectedModelOption();
+      if (!option?.selectable) {
+        nodes["run-state"].textContent = "Выберите доступную модель.";
+        return;
+      }
       activeSubmission = createRunSubmission(session, {
         modelId: option.modelId,
         reasoningEffort: nodes["reasoning-effort"].value || null,
@@ -1455,7 +1486,7 @@ export function bootstrapAtomLab({
       const payload = await response.json();
       if (!response.ok) throw new Error(safeApiMessage(payload, "Не удалось запросить обновление."));
       nodes["model-catalog-warning"].textContent = "Каталог устарел; обновление запрошено.";
-      scheduleImpl(pollModelCatalog, RUN_POLL_INTERVAL_MS);
+      startModelCatalogPolling();
     } catch (error) {
       nodes["model-catalog-warning"].textContent = error instanceof Error
         ? error.message
@@ -1490,7 +1521,13 @@ export function bootstrapAtomLab({
   }
 
   showInputTab(true);
-  return {getSession: () => session, getActiveSubmission: () => activeSubmission};
+  const destroy = () => {
+    destroyed = true;
+    stopModelCatalogPolling();
+    globalThis.removeEventListener?.("pagehide", destroy);
+  };
+  globalThis.addEventListener?.("pagehide", destroy, {once: true});
+  return {getSession: () => session, getActiveSubmission: () => activeSubmission, destroy};
 }
 
 if (typeof document !== "undefined" && document.querySelector("#access-form")) {

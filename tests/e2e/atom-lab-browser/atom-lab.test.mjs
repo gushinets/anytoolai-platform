@@ -382,6 +382,54 @@ test("the interactive shell unlocks, safely renders catalog text, and keeps the 
   assert.equal(elements.get("atom-passport").querySelector("img"), null);
 });
 
+test("repeated refresh requests share one bounded model-catalog polling chain", async () => {
+  const {document, elements} = createFakeDocument();
+  const atom = await catalogAtom("A01");
+  const pendingCatalog = {
+    items: [{model_id: "gpt", compatibility: "compatible", reason: "confirmed", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+    stale: true,
+    refresh_status: "pending",
+    error: null,
+  };
+  const scheduled = new Map();
+  let nextTimerId = 0;
+  let now = 0;
+  const controller = bootstrapAtomLab({
+    document,
+    fetchImpl: async (url) => ({
+      ok: true,
+      status: url.endsWith("/refresh") ? 202 : 200,
+      async json() { return url.endsWith("/atoms") ? [atom] : pendingCatalog; },
+    }),
+    confirmImpl: () => true,
+    scheduleImpl(callback) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, callback);
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+    nowImpl: () => now,
+    pollTimeoutMs: 1_000,
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+
+  await elements.get("refresh-models").click();
+  await elements.get("refresh-models").click();
+  assert.equal(scheduled.size, 1);
+
+  const [timerId, poll] = scheduled.entries().next().value;
+  scheduled.delete(timerId);
+  now = 1_000;
+  await poll();
+  assert.equal(scheduled.size, 0);
+
+  await elements.get("refresh-models").click();
+  assert.equal(scheduled.size, 1);
+  controller.destroy();
+  assert.equal(scheduled.size, 0);
+});
+
 test("dirty atom navigation requires confirmation and preserves the current draft when declined", async () => {
   const {document, elements} = createFakeDocument();
   const atoms = [await catalogAtom("A01"), await catalogAtom("A02")];
