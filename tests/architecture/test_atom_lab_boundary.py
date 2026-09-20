@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_PATH = ROOT / "infra" / "compose" / "docker-compose.yml"
+ATOM_LAB_BROWSER_PACKAGE_PATH = ROOT / "tests" / "e2e" / "atom-lab-browser" / "package.json"
+FRONTEND_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "frontend.yml"
+BACKEND_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "backend.yml"
 PUBLIC_FRONTEND_ROOTS = (
     ROOT / "apps" / "web-mirror",
     ROOT / "packages" / "frontend",
@@ -92,3 +96,27 @@ def test_atom_lab_shell_contains_no_embedded_registry_values() -> None:
     assert "kernel.schemas." not in source
     assert "kernel_demo." not in source
     assert "prompt_ref" not in source
+
+
+def test_atom_lab_canonical_package_test_runs_state_and_chromium_suites() -> None:
+    package = json.loads(ATOM_LAB_BROWSER_PACKAGE_PATH.read_text(encoding="utf-8"))
+
+    assert package["scripts"]["test"] == "node --test atom-lab.test.mjs && playwright test"
+    assert package["scripts"]["browser"] == "playwright test"
+
+
+def test_canonical_frontend_workflows_install_atom_lab_chromium_before_checks() -> None:
+    expected_install = (
+        "pnpm --filter @anytoolai/atom-lab-browser-tests exec "
+        "playwright install --with-deps chromium"
+    )
+    workflows = (
+        (FRONTEND_WORKFLOW_PATH, "frontend", "python scripts/agent/runner.py frontend-check"),
+        (BACKEND_WORKFLOW_PATH, "full-check", "uv run python scripts/agent/runner.py full-check"),
+    )
+
+    for workflow_path, job_name, expected_check in workflows:
+        workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+        commands = [step["run"] for step in workflow["jobs"][job_name]["steps"] if "run" in step]
+        assert expected_install in commands, workflow_path.name
+        assert commands.index(expected_install) < commands.index(expected_check), workflow_path.name

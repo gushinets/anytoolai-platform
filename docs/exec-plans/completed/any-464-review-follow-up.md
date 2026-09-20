@@ -23,6 +23,7 @@ correct focus and ARIA state after edits.
 - [x] Preserve multiline unrestricted strings and maintain input errors across subtree mutations.
 - [x] Resolve compound-field focus targets and reset validation-owned ARIA attributes.
 - [x] Reject Form-mode numbers that cannot round-trip without precision loss.
+- [x] Connect the real Chromium suite to canonical `frontend-check` and `full-check` CI paths.
 - [x] Run focused and canonical validation, then update the pull request.
 
 ## Validation
@@ -31,7 +32,7 @@ correct focus and ARIA state after edits.
 - [x] `pnpm --filter @anytoolai/atom-lab-browser-tests browser` — 13 passed in Chromium.
 - [x] `pnpm --filter @anytoolai/atom-lab-browser-tests lint`.
 - [x] Focused API and architecture tests — 28 passed.
-- [x] `python3 scripts/agent/runner.py quick-check` — 1862 passed, 479 deselected.
+- [x] `python3 scripts/agent/runner.py quick-check` — 1864 passed, 479 deselected.
 
 ## Progress log
 
@@ -42,3 +43,4 @@ correct focus and ARIA state after edits.
 | 2026-09-20 | Rebased recoverable input errors when dynamic dictionary keys are renamed. | Complete. |
 | 2026-09-20 | Rejected lossy JSON numbers and fixed collection focus, recovery ARIA, and duplicate-key rename behavior. | Complete. |
 | 2026-09-20 | Applied exact-number validation to untyped and schema-declared numeric Form controls. | Complete. |
+| 2026-09-20 | Made the package's canonical test run state plus Chromium suites and installed Chromium deterministically in both frontend CI paths. | Complete. |

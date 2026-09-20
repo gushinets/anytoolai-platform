@@ -13,4 +13,6 @@ jobs:
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
           version: 10.34.1
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @anytoolai/atom-lab-browser-tests exec playwright install --with-deps chromium
       - run: python scripts/agent/runner.py frontend-check
