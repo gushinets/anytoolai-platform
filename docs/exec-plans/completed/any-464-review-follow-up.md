@@ -44,3 +44,4 @@ correct focus and ARIA state after edits.
 | 2026-09-20 | Rejected lossy JSON numbers and fixed collection focus, recovery ARIA, and duplicate-key rename behavior. | Complete. |
 | 2026-09-20 | Applied exact-number validation to untyped and schema-declared numeric Form controls. | Complete. |
 | 2026-09-20 | Made the package's canonical test run state plus Chromium suites and installed Chromium deterministically in both frontend CI paths. | Complete. |
+| 2026-09-20 | Fixed the Linux Chromium narrow-layout regression exposed by the newly canonical browser suite by allowing grid cards and long atom titles to shrink and wrap. | Re-run both required CI paths. |

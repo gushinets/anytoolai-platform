@@ -32,8 +32,8 @@ button:hover { background: #eef2ff; border-color: #6f7cd8; }
 #atom-navigation button { overflow-wrap: anywhere; text-align: left; width: 100%; }
 #atom-navigation button[aria-current="true"] { background: #e7eaff; border-color: #5968d9; font-weight: 700; }
 .content-column { display: grid; gap: 1rem; min-width: 0; }
-.passport, .editor-card, .result-card { padding: 1.25rem; }
-.passport h2 { margin: 0.2rem 0 1rem; }
+.passport, .editor-card, .result-card { min-width: 0; padding: 1.25rem; }
+.passport h2 { margin: 0.2rem 0 1rem; overflow-wrap: anywhere; }
 .passport dl { display: grid; gap: 0.75rem; margin: 0; }
 .passport dl div { display: grid; gap: 0.25rem; grid-template-columns: minmax(8rem, 11rem) 1fr; }
 .passport dt { font-weight: 700; }
