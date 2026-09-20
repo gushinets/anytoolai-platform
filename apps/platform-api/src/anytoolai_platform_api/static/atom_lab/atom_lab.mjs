@@ -186,6 +186,17 @@ function reconcileInputErrorsAfterOmit(session, path, removedArrayItem) {
   session.inputErrors = nextErrors;
 }
 
+function rebaseInputErrors(session, fromPath, toPath) {
+  const nextErrors = new Map();
+  for (const error of session.inputErrors.values()) {
+    const nextPath = pathStartsWith(error.path, fromPath)
+      ? [...toPath, ...error.path.slice(fromPath.length)]
+      : error.path;
+    nextErrors.set(fieldKey(nextPath), {path: nextPath, message: error.message});
+  }
+  session.inputErrors = nextErrors;
+}
+
 function setInputError(session, path, message) {
   session.inputErrors.set(fieldKey(path), {path: [...path], message});
 }
@@ -705,6 +716,7 @@ function renderObject(context, container, schema, path, value) {
       if (!allowsDynamic || nextKey === key || Object.hasOwn(value, nextKey)) return;
       defineOwn(value, nextKey, value[key]);
       delete value[key];
+      rebaseInputErrors(session, [...path, key], [...path, nextKey]);
       rerender(true, fieldControlId([...path, nextKey], "key"));
     });
     keyInput.id = fieldControlId([...path, key], "key");

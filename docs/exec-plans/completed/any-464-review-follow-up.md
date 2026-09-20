@@ -27,7 +27,7 @@ correct focus and ARIA state after edits.
 ## Validation
 
 - [x] `pnpm --filter @anytoolai/atom-lab-browser-tests test` — 20 passed.
-- [x] `pnpm --filter @anytoolai/atom-lab-browser-tests browser` — 7 passed in Chromium.
+- [x] `pnpm --filter @anytoolai/atom-lab-browser-tests browser` — 8 passed in Chromium.
 - [x] `pnpm --filter @anytoolai/atom-lab-browser-tests lint`.
 - [x] Focused API and architecture tests — 28 passed.
 - [x] `python3 scripts/agent/runner.py quick-check` — 1862 passed, 479 deselected.
@@ -38,3 +38,4 @@ correct focus and ARIA state after edits.
 |---|---|---|
 | 2026-09-20 | Verified all five review findings against the current head and reproduced each in Chromium. | Implement the fixes. |
 | 2026-09-20 | Added exact-payload, error-recovery, ARIA, and compound-focus fixes with browser coverage. | Complete. |
+| 2026-09-20 | Rebased recoverable input errors when dynamic dictionary keys are renamed. | Complete. |

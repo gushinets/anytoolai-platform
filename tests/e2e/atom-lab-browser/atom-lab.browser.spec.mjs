@@ -154,6 +154,26 @@ test("literal dotted and bracketed keys have identities distinct from nested pat
   await expect(page.locator("#input-editor")).toBeVisible();
 });
 
+test("renaming a dynamic key rebases its recoverable input error", async ({page}) => {
+  await unlockAtom(page, "A06");
+  await importJson(page, {context: {amount: 1}, objective: "pilot"});
+
+  await page.getByLabel("Значение «amount»", {exact: true}).fill("");
+  await expect(page.locator("#validation-errors")).toContainText("context.amount");
+  const key = page.getByLabel("Ключ context.amount", {exact: true});
+  await key.fill("total");
+  await key.press("Tab");
+
+  await expect(page.locator("#validation-errors")).toContainText("context.total");
+  await expect(page.locator("#validation-errors")).not.toContainText("context.amount");
+  await page.getByLabel("Значение «total»", {exact: true}).fill("2");
+  await expect(page.locator("#validation-errors")).toBeEmpty();
+  await page.locator("#json-mode").click();
+
+  await expect(page.locator("#json-panel")).toBeVisible();
+  await expect(page.locator("#json-editor")).toHaveValue(/"total": 2/);
+});
+
 test("correcting a control clears validation-owned ARIA attributes", async ({page}) => {
   await unlockAtom(page, "A06");
   await importJson(page, {context: {}, objective: "pilot", constraints: {length: 900}});
