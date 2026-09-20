@@ -102,7 +102,21 @@ test("protected shell, dynamic values, invalid types, numbers, focus, and narrow
   await integer.fill("2.9");
   await expect(page.locator("#validation-errors")).toContainText("целым числом");
   await integer.fill("3");
-  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await expect.poll(() => page.evaluate(() => ({
+    documentWidth: document.documentElement.scrollWidth,
+    overflowingElements: [...document.querySelectorAll("body *")]
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          selector: `${element.tagName.toLowerCase()}#${element.id}.${element.className}`,
+          left: Math.round(rect.left),
+          right: Math.round(rect.right),
+          text: element.textContent?.trim().slice(0, 80),
+        };
+      })
+      .filter(({left, right}) => left < 0 || right > window.innerWidth),
+    viewportWidth: window.innerWidth,
+  }))).toEqual({documentWidth: 375, overflowingElements: [], viewportWidth: 375});
 
   await page.locator("#json-mode").click();
   await page.locator("#json-editor").fill('{"issues":null,"context":"x","target_audience":"y"}');
