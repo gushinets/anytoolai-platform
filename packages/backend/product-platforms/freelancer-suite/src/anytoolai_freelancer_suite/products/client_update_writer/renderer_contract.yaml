@@ -1,0 +1,21 @@
+renderer_contract:
+  scenarios:
+    - client_update_writer.update_v1
+    - client_update_writer.reply_draft_v1
+    - client_update_writer.prepaid_request_v1
+  output_schema_ref: kernel.schemas.compose_reply_output_v1
+  canonical_field: text
+  call_to_action_field: call_to_action
+  call_to_action_composition: append_after_blank_line
+  next_action: copy_result
+  excluded_fields: []
+  description: >-
+    The copy-ready client message is `text` verbatim -- no wrapping or reformatting. When
+    `call_to_action` is present, the renderer appends it after `text`, separated by one blank line
+    (two newlines); the copy-ready payload is `text` alone when `call_to_action` is absent (every
+    mode's prompt omits it when no client action is needed, per each prompt's own rules). All
+    three modes (Update, ReplyDraft, PrepaidRequest) share this identical composition since they
+    all produce kernel.schemas.compose_reply_output_v1 -- there is no per-mode renderer variation.
+    apps/web-mirror (ANY-412/ANY-414) renders this composed message and records a successful copy
+    as the `copy_result` next action; this file pins the contract those tickets' renderer
+    implementation is built against, not the renderer implementation itself.

@@ -1,0 +1,16 @@
+scenarios:
+  - scenario_id: client_update_writer.update_v1
+    version: 1
+    workflow_id: client_update_writer.update_v1
+    allowed_next_actions:
+      - copy_result
+  - scenario_id: client_update_writer.prepaid_request_v1
+    version: 1
+    workflow_id: client_update_writer.prepaid_request_v1
+    allowed_next_actions:
+      - copy_result
+  - scenario_id: client_update_writer.reply_draft_v1
+    version: 1
+    workflow_id: client_update_writer.reply_draft_v1
+    allowed_next_actions:
+      - copy_result

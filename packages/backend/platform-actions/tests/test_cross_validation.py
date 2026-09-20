@@ -68,6 +68,121 @@ _PLAIN_TEXT_LIST_REJECT_CASES: list[tuple[dict, dict]] = [
 ]
 
 
+# Code review finding (me #17): whether `text` shows the reader anything depends on the format
+# it's rendered as, so these are (format, text) pairs -- A06 and A07 share the identical
+# `_has_visible_text` policy and differ only in the constraint key (`format` vs
+# `output_format`), so the cases are pinned once and expanded per validator below.
+_HTML_DOCUMENT_WITH_TITLE = (
+    "<html><head><title>Client update</title></head><body>%s</body></html>"
+)
+
+_VISIBLE_TEXT_ACCEPT_CASES: list[tuple[str | None, str]] = [
+    # plain_text (or omitted) is copied to the client literally, never entity-decoded: these
+    # are six/five/nine visible characters, e.g. a reply answering "which entity is a
+    # non-breaking space?".
+    ("plain_text", "&nbsp;"),
+    ("plain_text", "&#32;"),
+    ("plain_text", "&NewLine;"),
+    (None, "&nbsp;"),
+    # Non-rendered elements next to real message text don't make the message blank.
+    ("html", "<style>p { color: red; }</style><p>Ready.</p>"),
+    # An escaped tag is literal visible text, not markup to strip.
+    ("html", "<p>&lt;p&gt;</p>"),
+    # Indented code block and a list of inline-code items are visible markdown content.
+    ("markdown", "    npm run build"),
+    ("markdown", "- `npm ci`\n- `npm run build`"),
+    # Code review finding (me #18): a document title next to a real body, a skipped element
+    # next to real text, an escaped literal `<title>`, and an omitted (optional) `</head>`
+    # must all stay accepted once title/template content is excluded.
+    ("html", _HTML_DOCUMENT_WITH_TITLE % "<p>Ready.</p>"),
+    ("markdown", _HTML_DOCUMENT_WITH_TITLE % "<p>Ready.</p>"),
+    ("html", "<template>Hidden draft</template><p>Ready.</p>"),
+    ("html", "<p>&lt;title&gt;Client update&lt;/title&gt;</p>"),
+    ("html", "<head><title>Client update</title><body><p>Ready.</p>"),
+    # Code review finding (me #19): html-format tag detection went through the Markdown
+    # parser, which reads 4 spaces / a tab as an indented code block -- ordinarily-indented
+    # HTML showed no tag at all and was rejected as "missing markup".
+    ("html", "    <p>Ready.</p>"),
+    ("html", "\t<p>Ready.</p>"),
+    ("html", "<div>\n        <p>Ready.</p>\n        <p>Delivered.</p>\n</div>"),
+    # `</rp>` is optional in valid HTML and HTMLParser never synthesizes implicit closes, so
+    # `rp` must not be tracked as a skipped element (it hid everything after it).
+    ("html", "<ruby><rp>(<rt>Ready<rp>)</ruby><p>Delivered.</p>"),
+    ("html", "<ruby><rp>(</rp><rt>Ready</rt><rp>)</rp></ruby><p>Delivered.</p>"),
+    # A trailing slash really self-closes inside SVG/MathML, and void elements are untouched.
+    ("html", "<svg><title/></svg><p>Ready.</p>"),
+    ("html", "<p>Ready.<br/></p>"),
+    # Code review finding (me #20): real content at an SVG/MathML HTML integration point is
+    # still visible, and a non-HTML `annotation-xml` encoding keeps foreign self-closing.
+    ("html", "<svg><foreignObject><p>Ready.</p></foreignObject></svg>"),
+    ("html", '<math><annotation-xml encoding="text/html"><p>Ready.</p></annotation-xml></math>'),
+    (
+        "html",
+        '<math><annotation-xml encoding="application/mathml+xml"><template/>Shown</annotation-xml></math>',
+    ),
+    # Ruby base text and annotation stay visible with `rp` skipped again.
+    ("html", "<ruby>漢<rp>(<rt>kan<rp>)</ruby>"),
+]
+
+_VISIBLE_TEXT_REJECT_CASES: list[tuple[str | None, str]] = [
+    # A browser never renders script/style/template content as text -- a real tag is
+    # present (so the html-format check alone passes) but the client would see nothing.
+    ("html", "<style>p { color: red; }</style>"),
+    ("html", "<script>console.log(1)</script>"),
+    ("html", "<template>Hidden template text.</template>"),
+    ("html", "<template><p>Hidden template text.</p></template>"),
+    ("html", "<style>p { color: red; }</style><p>&nbsp;</p>"),
+    # markdown renders entities and passes raw HTML through, so the same blanks apply.
+    ("markdown", "&nbsp;"),
+    ("markdown", "<p>&nbsp;</p>"),
+    ("markdown", "<style>p { color: red; }</style>"),
+    # A genuinely empty code block is still empty.
+    ("markdown", "```\n\n```"),
+    # Code review finding (me #18): `<title>` is document metadata, not the client message --
+    # a well-formed document with a filled title and an empty/blank body shows nothing.
+    ("html", _HTML_DOCUMENT_WITH_TITLE % ""),
+    ("html", _HTML_DOCUMENT_WITH_TITLE % "<p>&nbsp;</p>"),
+    ("markdown", _HTML_DOCUMENT_WITH_TITLE % ""),
+    ("html", "<datalist><option>Hidden option</option></datalist>"),
+    # HTMLParser doesn't pair end tags with start tags: a stray `</style>` must not end the
+    # enclosing `<template>`'s skipped region, nor may an inner same-name element's end tag.
+    ("html", "<template></style>Hidden draft</template>"),
+    ("html", "<template><template>Inner</template>Hidden draft</template>"),
+    # Code review finding (me #19): HTML ignores a trailing slash on its own elements, so
+    # `<template/>` stays open in a browser -- HTMLParser's default start+end would expose
+    # the hidden text.
+    ("html", "<template/>Hidden draft"),
+    ("html", "<script/>Hidden draft"),
+    ("html", "<style/>Hidden draft"),
+    ("html", "<template><ruby><rp>(<rt>Ready<rp>)</ruby></template>"),
+    # Code review finding (me #20): `rp` is fallback parentheses a browser never shows -- a
+    # reply made only of them is blank, with explicit or omitted `</rp>`.
+    ("html", "<ruby><rp>(</rp><rp>)</rp></ruby>"),
+    ("html", "<ruby><rp>(<rp>)</ruby>"),
+    ("markdown", "<ruby><rp>(</rp><rp>)</rp></ruby>"),
+    # Inside SVG/MathML, children of an HTML integration point are parsed as HTML again, so
+    # `<template/>` there is *not* self-closed and its text stays hidden.
+    ("html", "<svg><foreignObject><template/>Hidden draft</foreignObject></svg>"),
+    ("html", "<svg><desc><template/>Hidden draft</desc></svg>"),
+    (
+        "html",
+        '<math><annotation-xml encoding="text/html"><template/>Hidden draft</annotation-xml></math>',
+    ),
+    (
+        "html",
+        '<math><annotation-xml encoding="APPLICATION/XHTML+XML"><template/>Hidden draft</annotation-xml></math>',
+    ),
+    ("html", "<math><mtext><template/>Hidden draft</mtext></math>"),
+]
+
+
+def _visible_text_cases(cases: list[tuple[str | None, str]], format_key: str) -> list[tuple[dict, dict]]:
+    return [
+        ({"constraints": {format_key: text_format}} if text_format else {}, {"text": text})
+        for text_format, text in cases
+    ]
+
+
 def _field(name: str, field_type: str, *, required: bool) -> dict:
     return {
         "name": name,
@@ -657,6 +772,25 @@ class TestComposeReplyCrossValidator:
             # plain_text allows ordered/unordered list markers (ANY-502) — a live model
             # naturally reaches for lists on multi-item asks.
             *_PLAIN_TEXT_LIST_ACCEPT_CASES,
+            # Code review finding (me #15): _visible_text_content ignored code_inline/fence
+            # content entirely, so a schema-valid markdown reply that's *entirely* code (a
+            # legitimate answer to "what's the build command?") was wrongly treated as blank.
+            ({"constraints": {"output_format": "markdown"}}, {"text": "`npm run build`"}),
+            (
+                {"constraints": {"output_format": "markdown"}},
+                {"text": "```\nnpm run build\n```"},
+            ),
+            (
+                # plain_text keeps its own separate, stricter no-markup rule for
+                # call_to_action (unrelated to this blank-content fix) -- markdown format
+                # isn't subject to that rule, so it isolates the blank-content check alone.
+                {"constraints": {"output_format": "markdown"}},
+                {"text": "Plain reply.", "call_to_action": "`npm run build`"},
+            ),
+            # HTML entities must decode before the blank check -- "&amp;" is real visible
+            # content ("&"), not whitespace.
+            ({"constraints": {"output_format": "html"}}, {"text": "<p>&amp;</p>"}),
+            *_visible_text_cases(_VISIBLE_TEXT_ACCEPT_CASES, "output_format"),
         ],
     )
     def test_accepts(self, input_payload: dict, output: dict) -> None:
@@ -732,6 +866,36 @@ class TestComposeReplyCrossValidator:
             ({}, {"text": "Plain reply.", "call_to_action": "- Book a call"}),
             ({}, None),
             ({}, {"text": 123}),
+            # Code review finding (P2): `minLength: 1` on the output schema accepts a
+            # whitespace-only string, and a real HTML tag with nothing inside it -- neither
+            # is a usable client-facing message.
+            ({}, {"text": "   "}),
+            ({}, {"text": "\n\t"}),
+            ({"constraints": {"output_format": "html"}}, {"text": "<p></p>"}),
+            ({"constraints": {"output_format": "html"}}, {"text": "<p>  </p>"}),
+            ({}, {"text": "Plain reply.", "call_to_action": "   "}),
+            # Code review finding (me #15): a raw HTML block's content is never
+            # parser-decoded, so an unescaped character reference like "&nbsp;" survived the
+            # tag-strip as a literal, non-whitespace string and wrongly counted as content.
+            ({"constraints": {"output_format": "html"}}, {"text": "<p>&nbsp;</p>"}),
+            ({"constraints": {"output_format": "html"}}, {"text": "<div>&nbsp;</div>"}),
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "<p>&#32;&#x09;&#10;</p>"},
+            ),
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "Plain reply.", "call_to_action": "<p>&nbsp;</p>"},
+            ),
+            *_visible_text_cases(_VISIBLE_TEXT_REJECT_CASES, "output_format"),
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "<p>Reply.</p>", "call_to_action": "<style>p { color: red; }</style>"},
+            ),
+            (
+                {"constraints": {"output_format": "html"}},
+                {"text": "<p>Reply.</p>", "call_to_action": "<template/>Hidden draft"},
+            ),
         ],
     )
     def test_rejects(self, input_payload: dict, output: dict | None) -> None:
@@ -1030,6 +1194,12 @@ class TestPersuasiveTextCrossValidator:
             # plain_text allows ordered/unordered list markers (ANY-502) — a live model
             # naturally reaches for lists on multi-item asks.
             *_PLAIN_TEXT_LIST_ACCEPT_CASES,
+            # Code review finding (me #15): code-only markdown content and a real decoded
+            # HTML entity must count as visible text, same as A07's sibling validator.
+            ({"constraints": {"format": "markdown"}}, {"text": "`npm run build`"}),
+            ({"constraints": {"format": "markdown"}}, {"text": "```\nnpm run build\n```"}),
+            ({"constraints": {"format": "html"}}, {"text": "<p>&amp;</p>"}),
+            *_visible_text_cases(_VISIBLE_TEXT_ACCEPT_CASES, "format"),
         ],
     )
     def test_accepts(self, input_payload: dict, output: dict) -> None:
@@ -1078,6 +1248,18 @@ class TestPersuasiveTextCrossValidator:
             *_PLAIN_TEXT_LIST_REJECT_CASES,
             ({}, None),
             ({}, {"text": 123}),
+            # Code review finding (P2): same empty/whitespace-content gap as A07's sibling
+            # validator.
+            ({}, {"text": "   "}),
+            ({}, {"text": "\n\t"}),
+            ({"constraints": {"format": "html"}}, {"text": "<p></p>"}),
+            ({"constraints": {"format": "html"}}, {"text": "<p>  </p>"}),
+            # Code review finding (me #15): same character-reference-decoding gap as A07's
+            # sibling validator -- "&nbsp;" survives a raw tag-strip as a literal string.
+            ({"constraints": {"format": "html"}}, {"text": "<p>&nbsp;</p>"}),
+            ({"constraints": {"format": "html"}}, {"text": "<div>&nbsp;</div>"}),
+            ({"constraints": {"format": "html"}}, {"text": "<p>&#32;&#x09;&#10;</p>"}),
+            *_visible_text_cases(_VISIBLE_TEXT_REJECT_CASES, "format"),
         ],
     )
     def test_rejects(self, input_payload: dict, output: dict | None) -> None:

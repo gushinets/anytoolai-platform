@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from ._markup import _has_disallowed_plain_text_markup, _has_html_tag, _has_markup
+from ._markup import (
+    _has_disallowed_plain_text_markup,
+    _has_html_tag,
+    _has_markup,
+    _has_visible_text,
+)
 from ._shared import _coerce_integer_valued, _cross_validation_error
 
 
@@ -25,6 +30,18 @@ class ComposeReplyCrossValidator:
         call_to_action = output.get("call_to_action")
         constraints = input_payload.get("constraints")
         constraints = constraints if isinstance(constraints, Mapping) else {}
+        output_format = constraints.get("output_format")
+
+        # Code review finding (P2): `minLength: 1` on the output schema accepts a
+        # whitespace-only string, and an HTML-formatted `<p></p>` has a real tag but no
+        # actual content -- neither is a usable client-facing message. Judged in the
+        # requested format: "&nbsp;" is literal text as plain_text but blank as html.
+        if not _has_visible_text(text, output_format):
+            raise _cross_validation_error("text_has_no_visible_content")
+        if isinstance(call_to_action, str) and not _has_visible_text(
+            call_to_action, output_format
+        ):
+            raise _cross_validation_error("call_to_action_has_no_visible_content")
 
         max_length = _coerce_integer_valued(constraints.get("max_length"))
         if max_length is not None and len(text) > max_length:
@@ -35,7 +52,6 @@ class ComposeReplyCrossValidator:
         # Prompt contract: "if it is plain_text or omitted, text must be copy-ready
         # (paragraphs and ordered/unordered lists are allowed; other Markdown/HTML markup
         # is not)".
-        output_format = constraints.get("output_format")
         if output_format in (None, "plain_text") and _has_disallowed_plain_text_markup(text):
             raise _cross_validation_error("text_contains_markup_for_plain_text_format")
         # Only the main body is required to *prove* html-ness; a short call_to_action
