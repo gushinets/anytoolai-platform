@@ -233,10 +233,70 @@ export function serializeDraft(session) {
   return JSON.stringify(session.payload, null, 2);
 }
 
+function jsonNumberTokens(text) {
+  const tokens = [];
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') {
+      inString = true;
+      continue;
+    }
+    if (character !== "-" && (character < "0" || character > "9")) continue;
+    const match = text.slice(index).match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/);
+    if (!match) continue;
+    tokens.push(match[0]);
+    index += match[0].length - 1;
+  }
+  return tokens;
+}
+
+function normalizedDecimal(text) {
+  let source = text.toLowerCase();
+  let sign = 1n;
+  if (source.startsWith("-")) {
+    sign = -1n;
+    source = source.slice(1);
+  }
+  const [mantissa, exponentText = "0"] = source.split("e");
+  const [whole, fraction = ""] = mantissa.split(".");
+  let digits = `${whole}${fraction}`.replace(/^0+/, "") || "0";
+  let exponent = Number(exponentText) - fraction.length;
+  if (digits === "0") return {coefficient: 0n, exponent: 0};
+  while (digits.endsWith("0")) {
+    digits = digits.slice(0, -1);
+    exponent += 1;
+  }
+  return {coefficient: sign * BigInt(digits), exponent};
+}
+
+function numberRoundTrips(token) {
+  const value = Number(token);
+  if (!Number.isFinite(value)) return false;
+  const original = normalizedDecimal(token);
+  const serialized = normalizedDecimal(JSON.stringify(value));
+  return original.coefficient === serialized.coefficient && original.exponent === serialized.exponent;
+}
+
+function hasNonRoundTrippableNumber(text) {
+  return jsonNumberTokens(text).some((token) => !numberRoundTrips(token));
+}
+
 export function applyJsonText(session, text) {
   session.jsonText = text;
   try {
     const parsed = JSON.parse(text);
+    if (hasNonRoundTrippableNumber(text)) {
+      session.jsonError = "JSON содержит число, которое браузер не может сохранить без потери точности.";
+      return false;
+    }
     if (parsed === null || Array.isArray(parsed) || typeof parsed !== "object") {
       session.jsonError = "JSON входа должен содержать объект.";
       return false;
@@ -415,6 +475,8 @@ function renderValidation(document, container, session) {
       ? document.getElementById(controlIdForKey(error.key ?? error.path))
         ?? document.getElementById(controlIdForKey(error.key ?? error.path, "type"))
         ?? document.getElementById(controlIdForKey(error.key ?? error.path, "add"))
+        ?? document.getElementById(controlIdForKey(error.key ?? error.path, "add-item"))
+        ?? document.getElementById(controlIdForKey(error.key ?? error.path, "add-key"))
       : null;
     if (control) {
       if (!session.validationAttributes.has(control.id)) {
@@ -456,14 +518,14 @@ function appendRecoverableJson(context, wrapper, path, label, value) {
   input.rows = 3;
   input.value = JSON.stringify(value, null, 2);
   input.setAttribute("aria-label", `${label}, JSON-значение`);
-  input.setAttribute("aria-invalid", "true");
   input.addEventListener("change", () => {
     try {
-      setDraftPath(session, path, JSON.parse(input.value));
+      const parsed = JSON.parse(input.value);
+      if (hasNonRoundTrippableNumber(input.value)) throw new Error("Inexact JSON number");
+      setDraftPath(session, path, parsed);
       rerender(true, input.id);
     } catch {
       setInputError(session, path, "Введите корректное JSON-значение.");
-      input.setAttribute("aria-invalid", "true");
       rerender(false);
     }
   });
@@ -713,7 +775,11 @@ function renderObject(context, container, schema, path, value) {
     keyInput.setAttribute("aria-label", `Ключ ${pathLabel([...path, key])}`);
     keyInput.addEventListener("change", () => {
       const nextKey = keyInput.value;
-      if (!allowsDynamic || nextKey === key || Object.hasOwn(value, nextKey)) return;
+      if (!allowsDynamic || nextKey === key) return;
+      if (Object.hasOwn(value, nextKey)) {
+        keyInput.value = key;
+        return;
+      }
       defineOwn(value, nextKey, value[key]);
       delete value[key];
       rebaseInputErrors(session, [...path, key], [...path, nextKey]);

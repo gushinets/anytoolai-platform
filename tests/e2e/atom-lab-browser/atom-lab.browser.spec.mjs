@@ -37,10 +37,24 @@ const A06 = {
   example_input: {context: {product: "Сервис"}, objective: "Пилот"},
 };
 
+const A11 = {
+  atom_id: "A11",
+  action_type: "kernel.compare_classify",
+  base_action_config_id: "config.a11",
+  prompt: "Базовый промпт A11",
+  prompt_ref: "prompt.a11",
+  input_schema: await schema("compare_classify_input.schema.json"),
+  output_schema: {type: "object"},
+  schema_refs: {input: {schema_ref: "input.A11", version: 1}, output: {schema_ref: "output.A11", version: 1}},
+  description: "Сравнивает и классифицирует текст.",
+  example_input: {subject_text: "Пилот", reference_text: "Эталон", categories: ["да", "нет"], criteria: [{id: "scope", description: "Границы"}]},
+};
+
 function catalog() {
   return Array.from({length: 11}, (_, index) => {
     if (index === 4) return A05;
     if (index === 5) return A06;
+    if (index === 10) return A11;
     return {...A05, atom_id: `A${String(index + 1).padStart(2, "0")}`, action_type: `kernel.atom_${index + 1}`};
   });
 }
@@ -117,6 +131,19 @@ test("unrestricted strings preserve line breaks through form edits", async ({pag
   await expect(page.locator("#json-editor")).toHaveValue(/first\\nsecond!/);
 });
 
+test("JSON numbers that cannot round-trip are rejected without replacing the accepted draft", async ({page}) => {
+  await unlockAtom(page, "A06");
+  await page.locator("#fill-example").click();
+  await page.locator("#json-mode").click();
+  const unsafeJson = '{"context":{"id":9007199254740993},"objective":"pilot"}';
+  await page.locator("#json-editor").fill(unsafeJson);
+
+  await expect(page.locator("#json-error")).toContainText("точност");
+  await expect(page.locator("#json-editor")).toHaveValue(unsafeJson);
+  await page.locator("#form-mode").click();
+  await expect(page.locator("#json-panel")).toBeVisible();
+});
+
 test("omitting a container clears invalid descendant input errors", async ({page}) => {
   await unlockAtom(page, "A06");
   await importJson(page, {context: {}, objective: "pilot", constraints: {length: 900}});
@@ -172,6 +199,51 @@ test("renaming a dynamic key rebases its recoverable input error", async ({page}
 
   await expect(page.locator("#json-panel")).toBeVisible();
   await expect(page.locator("#json-editor")).toHaveValue(/"total": 2/);
+});
+
+test("duplicate dynamic-key rename restores the key shown by the accepted draft", async ({page}) => {
+  await unlockAtom(page, "A06");
+  await importJson(page, {context: {a: 1, b: 2}, objective: "pilot"});
+
+  const key = page.getByLabel("Ключ context.b", {exact: true});
+  await key.fill("a");
+  await key.press("Tab");
+
+  await expect(key).toHaveValue("b");
+  expect(await page.locator("input.dynamic-key").evaluateAll(
+    (nodes) => nodes.map((node) => node.value),
+  )).toEqual(["a", "b"]);
+});
+
+test("collection validation links focus to its add-item recovery control", async ({page}) => {
+  await unlockAtom(page, "A11");
+  await importJson(page, {
+    subject_text: "Пилот",
+    reference_text: "Эталон",
+    categories: [],
+    criteria: [{id: "scope", description: "Границы"}],
+  });
+  const addCategory = page.locator('[data-path="categories"]')
+    .getByRole("button", {name: "Добавить элемент"});
+
+  await page.getByRole("button", {name: /^categories:/}).click();
+
+  await expect(addCategory).toBeFocused();
+});
+
+test("recovering a schema-invalid scalar clears its ARIA error state", async ({page}) => {
+  await unlockAtom(page, "A06");
+  await importJson(page, {context: {}, objective: 42});
+
+  const recovery = page.getByLabel("objective, JSON-значение", {exact: true});
+  await expect(recovery).toHaveAttribute("aria-invalid", "true");
+  await recovery.fill('"pilot"');
+  await recovery.press("Tab");
+
+  const objective = page.getByLabel("objective", {exact: true});
+  await expect(page.locator("#validation-errors")).toBeEmpty();
+  await expect(objective).not.toHaveAttribute("aria-invalid", "true");
+  await expect(objective).not.toHaveAttribute("aria-describedby", /.+/);
 });
 
 test("correcting a control clears validation-owned ARIA attributes", async ({page}) => {

@@ -276,6 +276,28 @@ test("invalid JSON is retained verbatim and blocks returning to the form", async
   assert.equal(session.dirty, true);
 });
 
+test("non-round-trippable JSON numbers are rejected without mutating the accepted payload", async () => {
+  const session = createDraftSession(await catalogAtom("A06"));
+  replaceWithExample(session);
+  const accepted = getDraftPayload(session);
+
+  assert.equal(applyJsonText(
+    session,
+    '{"context":{"id":9007199254740993},"objective":"pilot"}',
+  ), false);
+  assert.match(session.jsonError, /точност/);
+  assert.deepEqual(getDraftPayload(session), accepted);
+  assert.equal(applyJsonText(
+    session,
+    '{"context":{"ratio":0.1234567890123456789},"objective":"pilot"}',
+  ), false);
+  assert.deepEqual(getDraftPayload(session), accepted);
+  assert.equal(applyJsonText(
+    session,
+    '{"context":{"exact":9007199254740992,"ratio":0.1,"note":"9007199254740993"},"objective":"pilot"}',
+  ), true);
+});
+
 test("unrestricted schemas accept every JSON value including null", async () => {
   const session = createDraftSession(await catalogAtom("A09"));
   replaceWithExample(session);
