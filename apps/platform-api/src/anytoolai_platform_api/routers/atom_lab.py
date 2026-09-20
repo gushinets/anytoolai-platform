@@ -550,10 +550,10 @@ def get_atom_lab_styles() -> FileResponse:
     return FileResponse(_ASSET_ROOT / "atom_lab.css", media_type="text/css; charset=utf-8")
 
 
-@router.get("/atom-lab/atom_lab.js", include_in_schema=False)
+@router.get("/atom-lab/atom_lab.mjs", include_in_schema=False)
 def get_atom_lab_script() -> FileResponse:
     return FileResponse(
-        _ASSET_ROOT / "atom_lab.js", media_type="application/javascript; charset=utf-8"
+        _ASSET_ROOT / "atom_lab.mjs", media_type="application/javascript; charset=utf-8"
     )
 
 
