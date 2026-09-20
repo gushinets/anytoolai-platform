@@ -380,6 +380,9 @@ atom_lab_runs_table = sa.Table(
     sa.Column("action_definition", json_document, nullable=False),
     sa.Column("action_config_definition", json_document, nullable=False),
     sa.Column("execution_definition_hash", sa.String(length=64), nullable=False),
+    sa.Column("guest_id", sa.String(length=128)),
+    sa.Column("idempotency_key", sa.String(length=256)),
+    sa.Column("idempotency_request_hash", sa.String(length=64)),
     sa.Column("preset_id", sa.String(length=128)),
     sa.Column("preset_version", sa.Integer()),
     sa.Column("action_run_id", sa.String(length=128)),
@@ -404,6 +407,12 @@ atom_lab_runs_table = sa.Table(
         name="fk_atom_lab_runs_artifact",
     ),
     sa.ForeignKeyConstraint(
+        ["guest_id"],
+        [f"{PLATFORM_SCHEMA}.guest_identities.id"],
+        name="fk_atom_lab_runs_guest",
+        use_alter=True,
+    ),
+    sa.ForeignKeyConstraint(
         ["preset_id", "preset_version"],
         [
             f"{PLATFORM_SCHEMA}.atom_lab_preset_versions.preset_id",
@@ -418,6 +427,33 @@ atom_lab_runs_table = sa.Table(
     ),
     sa.Index("ix_atom_lab_runs_created_at", "created_at"),
     sa.Index("ix_atom_lab_runs_scope", "tenant_id", "region", "product_id"),
+    sa.Index(
+        "ix_atom_lab_runs_scope_created_at",
+        "tenant_id",
+        "region",
+        "created_at",
+        "id",
+    ),
+    sa.UniqueConstraint(
+        "tenant_id",
+        "region",
+        "idempotency_key",
+        name="uq_atom_lab_runs_scope_idempotency_key",
+    ),
+)
+
+atom_lab_admission_scopes_table = sa.Table(
+    "atom_lab_admission_scopes",
+    runtime_metadata,
+    sa.Column("tenant_id", sa.String(length=128), primary_key=True),
+    sa.Column("region", sa.String(length=64), primary_key=True),
+    sa.Column("accepted_on", sa.Date(), nullable=False),
+    sa.Column("accepted_count", sa.Integer(), nullable=False),
+    sa.Column("updated_at", utc_datetime, nullable=False),
+    sa.CheckConstraint(
+        "accepted_count >= 0",
+        name="ck_atom_lab_admission_scopes_accepted_count",
+    ),
 )
 
 model_catalog_state_table = sa.Table(
@@ -737,6 +773,7 @@ runtime_tables = {
     "atom_lab_presets": atom_lab_presets_table,
     "atom_lab_preset_versions": atom_lab_preset_versions_table,
     "atom_lab_runs": atom_lab_runs_table,
+    "atom_lab_admission_scopes": atom_lab_admission_scopes_table,
     "model_catalog_state": model_catalog_state_table,
     "action_runs": action_runs_table,
     "provider_calls": provider_calls_table,

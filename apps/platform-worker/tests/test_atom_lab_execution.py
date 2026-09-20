@@ -1,22 +1,31 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import threading
 from collections.abc import Iterator, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from time import monotonic
 from typing import Any
 
 import pytest
 import sqlalchemy as sa
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
 from anytoolai_platform_core.actions.executor import ActionExecutorRequest
+from anytoolai_platform_core.atom_lab.models import AtomLabRunStatus
 from anytoolai_platform_core.atom_lab.repository import AtomLabRunRepository
+from anytoolai_platform_core.atom_lab.service import (
+    AtomLabRunAdmissionRequest,
+    AtomLabRunHistoryService,
+    AtomLabRunService,
+)
 from anytoolai_platform_core.atom_lab.snapshots import (
     AtomLabSnapshotRequest,
     build_atom_lab_run_record,
 )
 from anytoolai_platform_core.bootstrap.registry import build_config_registry
+from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.providers.models import (
     ProviderCallStatus,
     ProviderModelAddressing,
@@ -25,7 +34,14 @@ from anytoolai_platform_core.providers.models import (
 )
 from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
 from anytoolai_platform_core.scenarios.repository import ScenarioSessionRepository
-from anytoolai_platform_core.storage.db import runtime_metadata
+from anytoolai_platform_core.storage.db import (
+    artifacts_table,
+    atom_lab_runs_table,
+    guest_identities_table,
+    jobs_table,
+    runtime_metadata,
+    scenario_sessions_table,
+)
 from anytoolai_platform_core.storage.transactions import build_session_factory, transaction_boundary
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
@@ -39,6 +55,11 @@ from tests.db_support import provision_database
 from tests.support.sqlite_harness import build_sqlite_runtime_engine
 
 CONFIG_ROOT = Path(__file__).resolve().parents[3] / "configs" / "kernel"
+LOCK_COORDINATION_TIMEOUT_SECONDS = 10
+LOCK_OBSERVATION_INTERVAL_SECONDS = 0.01
+DIAGNOSTIC_MARKER_SEPARATORS = (
+    "\n", "\t", "\u00a0", "\u2003", "\u202e", "\x00", "\x1b[31m", "\x9b31m", r"\n", r"\t",
+)
 
 EXACT_INPUT_BY_ATOM: dict[str, dict[str, Any]] = {
     "A01": {
@@ -405,6 +426,258 @@ def test_real_worker_path_applies_snapshot_and_binds_runtime_ids(session_factory
         assert stored.artifact_id == processed.result_artifact_id
 
 
+class _SequenceLabAdapter:
+    """Only the external provider is replaced; retry and persistence remain real."""
+
+    def __init__(self, responses: list[str | Exception]) -> None:
+        self.responses = iter(responses)
+
+    async def complete(self, request):
+        response = next(self.responses)
+        if isinstance(response, Exception):
+            raise response
+        return ProviderResponse(
+            provider_policy_ref=request.provider_policy_ref,
+            provider=request.provider,
+            model=request.model,
+            output_text=response,
+            status=ProviderCallStatus.succeeded,
+            metadata={
+                "litellm": {"actual_model": "gpt-5.4-mini-2026-03-17"},
+                "reasoning_content": "private hidden reasoning",
+                "authorization": "Bearer private-provider-key",
+            },
+        )
+
+
+def _history(session_factory, run_id):
+    with transaction_boundary(session_factory) as session:
+        state, = AtomLabRunRepository(session).history_in_scope(
+            tenant_id="anytoolai", region="default", run_id=run_id, limit=1
+        )
+        return AtomLabRunHistoryService(session).detail(state)
+
+
+def _attempt_counts(diagnostics):
+    return tuple(diagnostics[key] for key in (
+        "validation_attempts", "transport_attempts", "physical_calls",
+    ))
+
+
+def test_invalid_lab_output_is_bounded_durable_and_never_a_result(session_factory) -> None:
+    """Catches unbounded raw persistence and missing protected failure diagnostics."""
+    registry = build_config_registry(CONFIG_ROOT)
+    with transaction_boundary(session_factory) as session:
+        _scenario, job, run = _seed_lab_run(session, registry)
+    invalid = "Ж" * 5000
+    worker = build_worker(
+        session_factory=session_factory, config_registry=registry,
+        provider_adapters={"litellm": _SequenceLabAdapter([invalid, invalid])},
+    )
+    try:
+        processed = asyncio.run(worker.process_next_job())
+    finally:
+        worker.dispose()
+    assert processed is not None and processed.status is JobStatus.failed
+    first = _history(session_factory, run.id)
+    assert first["result"] is None
+    diagnostics = first["diagnostics"]
+    assert diagnostics["error_code"] == "structured_output_validation_failed"
+    assert _attempt_counts(diagnostics) == (2, 2, 2)
+    debug, = diagnostics["debug_artifacts"]
+    assert debug["raw_output_text"] == "Ж" * 4096
+    assert debug["truncated"] is True
+    assert debug["redacted"] is False
+    with transaction_boundary(session_factory) as session:
+        artifact = session.execute(
+            sa.select(artifacts_table).where(artifacts_table.c.id == debug["artifact_id"])
+        ).mappings().one()
+        assert artifact["content_text"] == "Ж" * 4096
+        assert artifact["metadata"]["atom_lab_run_id"] == run.id
+    restarted = build_worker(
+        session_factory=session_factory, config_registry=registry,
+        provider_adapters={"litellm": _SequenceLabAdapter([])},
+    )
+    try:
+        replay = asyncio.run(restarted._workflow_handler.handle(job.id))
+    finally:
+        restarted.dispose()
+    assert replay is not None and replay.status is JobStatus.failed
+    assert _history(session_factory, run.id) == first
+
+
+@pytest.mark.parametrize("invalid", [
+    '{"api_key":"sk-sensitive-provider-value"}',
+    "Bearer private-access-code",
+    '<think>private hidden reasoning</think>invalid',
+    '{"reasoning_content":"private hidden reasoning"}',
+    r'{"api\u005fkey":"private-value"}',
+    r'{"rea\u0073oning_content":"private internal content"}',
+    'api\x1b[31m_key=private-value',
+    r'{"api\u005fkey":"private-value",}',
+    r'{"rea\u0000soning_content":"private internal content"}',
+    "-----BEGIN PRIVATE KEY-----\nYWJj\n-----END PRIVATE KEY-----",
+    "-----BEGIN RSA PRIVATE KEY-----\nYWJj\n-----END RSA PRIVATE KEY-----",
+    "-----BEGIN OPENSSH PRIVATE KEY-----\nYWJj\n-----END OPENSSH PRIVATE KEY-----",
+    '{"private_key":"private-value"}',
+    '{"privateKey":"private-value"}',
+    '{"PRIVATE--KEY":"private-value"}',
+    '<thinking>private internal content</thinking>invalid',
+    r'{"api\tkey":"private-value"}',
+    "Here is sk-\nabcdefghijklmnopqrst",
+    "Here is s\tk-abcdefghijklmnopqrst",
+    "Here is eyJ\nhbGciOiJub25lIn0.cGF5bG9hZA.c2lnbmF0dXJl",
+    "Here is e\tyJhbGciOiJub25lIn0.cGF5bG9hZA.c2lnbmF0dXJl",
+    "Here is e\x9b31myJhbGciOiJub25lIn0.cGF5bG9hZA.c2lnbmF0dXJl",
+    "Here is sk-\u202e\tabcdefghijklmnopqrst",
+    "rea\x9b31msoning_content: private deliberation",
+    *[
+        f'{{"rea{separator}soning_content":"private internal content"}}'
+        for separator in DIAGNOSTIC_MARKER_SEPARATORS
+    ],
+    *[
+        f'{{"pr{separator}ivate_k{separator}ey":"private-value"}}'
+        for separator in DIAGNOSTIC_MARKER_SEPARATORS
+    ],
+    *[
+        f'<t{separator}hinking>private internal content</t{separator}hinking>'
+        for separator in DIAGNOSTIC_MARKER_SEPARATORS
+    ],
+])
+def test_invalid_lab_output_with_sensitive_markers_is_withheld(session_factory, invalid) -> None:
+    """Catches credentials or hidden-reasoning envelopes leaking through raw diagnostics."""
+    registry = build_config_registry(CONFIG_ROOT)
+    with transaction_boundary(session_factory) as session:
+        _scenario, _job, run = _seed_lab_run(session, registry)
+    worker = build_worker(
+        session_factory=session_factory, config_registry=registry,
+        provider_adapters={"litellm": _SequenceLabAdapter([invalid, invalid])},
+    )
+    try:
+        asyncio.run(worker.process_next_job())
+    finally:
+        worker.dispose()
+    debug, = _history(session_factory, run.id)["diagnostics"]["debug_artifacts"]
+    assert debug["raw_output_text"] == "[redacted]"
+    assert debug["redacted"] is True
+    assert debug["truncated"] is False
+    with transaction_boundary(session_factory) as session:
+        assert session.scalar(
+            sa.select(artifacts_table.c.content_text).where(
+                artifacts_table.c.id == debug["artifact_id"]
+            )
+        ) == "[redacted]"
+
+
+@pytest.mark.parametrize(
+    ("prefix_responses", "expected_indices", "attempt_counts"),
+    [
+        (["not-json"], [(1, 1, 1), (2, 1, 2)], (2, 2, 2)),
+        ([TimeoutError("private timeout")], [(1, 1, 1), (1, 2, 2)], (1, 2, 2)),
+        (
+            ["not-json", TimeoutError("private timeout")],
+            [(1, 1, 1), (2, 1, 2), (2, 2, 3)], (2, 3, 3),
+        ),
+    ],
+    ids=["validation-correction", "transport-retry", "validation-and-transport"],
+)
+def test_lab_retry_success_keeps_separate_physical_calls_after_restart(
+    session_factory, prefix_responses, expected_indices, attempt_counts,
+) -> None:
+    """Catches conflated retries, dropped ledger rows, or reexecution of a terminal job."""
+    registry = build_config_registry(CONFIG_ROOT)
+    with transaction_boundary(session_factory) as session:
+        _scenario, job, run = _seed_lab_run(session, registry)
+    expected = {
+        "values": {"deadline": "tomorrow"}, "missing_fields": [],
+        "confidence": {"deadline": 0.9},
+    }
+    worker = build_worker(
+        session_factory=session_factory, config_registry=registry,
+        provider_adapters={
+            "litellm": _SequenceLabAdapter([*prefix_responses, json.dumps(expected)])
+        },
+    )
+    try:
+        processed = asyncio.run(worker.process_next_job())
+    finally:
+        worker.dispose()
+    assert processed is not None and processed.status is JobStatus.succeeded
+    first = _history(session_factory, run.id)
+    assert first["result"] == expected
+    diagnostics = first["diagnostics"]
+    assert _attempt_counts(diagnostics) == attempt_counts
+    assert diagnostics["succeeded_first_attempt"] is False
+    assert diagnostics["response_model_id"] == "gpt-5.4-mini-2026-03-17"
+    assert [
+        (row["semantic_attempt_index"], row["transport_attempt_index"], row["physical_call_index"])
+        for row in diagnostics["provider_calls"]
+    ] == expected_indices
+    assert "private" not in json.dumps(diagnostics)
+    restarted = build_worker(
+        session_factory=session_factory, config_registry=registry,
+        provider_adapters={"litellm": _SequenceLabAdapter([])},
+    )
+    try:
+        asyncio.run(restarted._workflow_handler.handle(job.id))
+    finally:
+        restarted.dispose()
+    assert _history(session_factory, run.id) == first
+
+
+def test_lab_provider_failure_exposes_only_safe_code_and_complete_attempts(session_factory):
+    """Catches exception-message leakage and loss of failed physical attempts on rollback."""
+    registry = build_config_registry(CONFIG_ROOT)
+    with transaction_boundary(session_factory) as session:
+        _scenario, _job, run = _seed_lab_run(session, registry)
+    worker = build_worker(
+        session_factory=session_factory, config_registry=registry,
+        provider_adapters={"litellm": _SequenceLabAdapter([
+            TimeoutError("Authorization Bearer private-token; private prompt"),
+            TimeoutError("Authorization Bearer private-token; private prompt"),
+        ])},
+    )
+    try:
+        processed = asyncio.run(worker.process_next_job())
+    finally:
+        worker.dispose()
+    assert processed is not None and processed.status is JobStatus.failed
+    detail = _history(session_factory, run.id)
+    diagnostics = detail["diagnostics"]
+    assert detail["result"] is None
+    assert diagnostics["error_code"] == "provider_request_timed_out"
+    assert _attempt_counts(diagnostics) == (1, 2, 2)
+    assert diagnostics["debug_artifacts"] == []
+    assert "private" not in json.dumps(diagnostics)
+
+
+def test_lab_worker_lease_lost_remains_visible_after_reconciliation(session_factory):
+    """Catches a restarted worker hiding or rerunning an accepted abandoned job."""
+    registry = build_config_registry(CONFIG_ROOT)
+    with transaction_boundary(session_factory) as session:
+        _scenario, job, run = _seed_lab_run(session, registry)
+    worker = build_worker(
+        session_factory=session_factory, config_registry=registry,
+        provider_adapters={"litellm": _SequenceLabAdapter([])},
+    )
+    try:
+        assert worker._workflow_handler._claim(job.id) is not None
+        assert _history(session_factory, run.id)["status"] == "running"
+        worker._workflow_handler.terminate_orphaned_job(job.id)
+        first = _history(session_factory, run.id)
+        worker._workflow_handler.terminate_orphaned_job(job.id)
+        asyncio.run(worker._workflow_handler.handle(job.id))
+    finally:
+        worker.dispose()
+    assert first["status"] == "failed"
+    assert first["finished_at"] is not None
+    assert first["result"] is None
+    assert first["diagnostics"]["error_code"] == "worker_lease_lost"
+    assert first["diagnostics"]["physical_calls"] == 0
+    assert first["runtime_ids"]["action_run_id"] is None
+    assert _history(session_factory, run.id) == first
+
+
 @pytest.fixture
 def postgres_session_factory() -> Iterator[sa.orm.sessionmaker[sa.orm.Session]]:
     with provision_database(
@@ -412,6 +685,133 @@ def postgres_session_factory() -> Iterator[sa.orm.sessionmaker[sa.orm.Session]]:
         skip_reason="PostgreSQL Atom Lab worker concurrency coverage",
     ) as (engine, _alembic_config, _database_url):
         yield build_session_factory(engine)
+
+
+def _admit_with_observed_scope_lock_contention(postgres_session_factory, registry, request):
+    first_locked = threading.Event()
+    second_started = threading.Event()
+    release_first = threading.Event()
+    backend_pids: dict[str, int] = {}
+
+    def hold_first_admission():
+        # Validation is reached after scope locking but before any run/count writes.
+        # Holding here isolates admission row locking from incidental insert conflicts.
+        first_locked.set()
+        assert release_first.wait(LOCK_COORDINATION_TIMEOUT_SECONDS * 2)
+
+    def submit_first():
+        with transaction_boundary(postgres_session_factory) as session:
+            backend_pids["first"] = session.scalar(sa.text("SELECT pg_backend_pid()"))
+            return AtomLabRunService(session=session, config_registry=registry).start(
+                request, validate=hold_first_admission,
+            )
+
+    def submit_second():
+        with transaction_boundary(postgres_session_factory) as session:
+            backend_pids["second"] = session.scalar(sa.text("SELECT pg_backend_pid()"))
+            second_started.set()
+            return AtomLabRunService(session=session, config_registry=registry).start(
+                request, validate=lambda: None,
+            )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(submit_first)
+        try:
+            assert first_locked.wait(LOCK_COORDINATION_TIMEOUT_SECONDS)
+            second = executor.submit(submit_second)
+            assert second_started.wait(LOCK_COORDINATION_TIMEOUT_SECONDS)
+            blocked_by_first = False
+            deadline = monotonic() + LOCK_COORDINATION_TIMEOUT_SECONDS
+            with transaction_boundary(postgres_session_factory) as observer:
+                while monotonic() < deadline and not second.done():
+                    blocked_by_first = observer.scalar(sa.text(
+                        "SELECT :first_pid = ANY(pg_blocking_pids(:second_pid))"
+                    ), {"first_pid": backend_pids["first"], "second_pid": backend_pids["second"]})
+                    if blocked_by_first:
+                        break
+                    release_first.wait(LOCK_OBSERVATION_INTERVAL_SECONDS)
+            assert blocked_by_first, "second admission must wait for the first scope row lock"
+            assert not second.done(), "second admission completed while the first lock was held"
+        finally:
+            release_first.set()
+        return [
+            first.result(timeout=LOCK_COORDINATION_TIMEOUT_SECONDS),
+            second.result(timeout=LOCK_COORDINATION_TIMEOUT_SECONDS),
+        ]
+
+
+@pytest.mark.postgresql
+@pytest.mark.slow
+def test_concurrent_lab_submission_creates_one_job_with_distinct_allowed_retries(
+    postgres_session_factory,
+) -> None:
+    """Catches existing-scope admission races and conflating retry calls with new runs."""
+    registry = build_config_registry(CONFIG_ROOT)
+    request = AtomLabRunAdmissionRequest(
+        tenant_id="anytoolai", region="default", product_id="kernel_demo",
+        frontend_id="kernel_demo_web", atom_id="A01",
+        input_payload={
+            "source_text": "The deadline is tomorrow.",
+            "fields": [{
+                "name": "deadline", "type": "string", "description": "Date", "required": True,
+            }],
+            "strict": False,
+        },
+        prompt="Extract the deadline.", model_id="openai/gpt-5.4-mini",
+        reasoning_effort=ReasoningEffort.high,
+        capability_snapshot_id="worker-integration", capability_provenance={"source": "fixture"},
+        idempotency_key="concurrent-submission",
+    )
+    with transaction_boundary(postgres_session_factory) as session:
+        now = utc_now()
+        AtomLabRunRepository(session).lock_admission_scope(
+            tenant_id=request.tenant_id, region=request.region,
+            accepted_on=now.date(), now=now,
+        )
+    admitted = _admit_with_observed_scope_lock_contention(
+        postgres_session_factory, registry, request,
+    )
+    assert len({run.run_id for run in admitted}) == 1
+    assert sorted(run.replayed for run in admitted) == [False, True]
+    run = admitted[0]
+    expected = {
+        "values": {"deadline": "tomorrow"}, "missing_fields": [],
+        "confidence": {"deadline": 0.9},
+    }
+    worker = build_worker(
+        session_factory=postgres_session_factory, config_registry=registry,
+        provider_adapters={"litellm": _SequenceLabAdapter([
+            "not-json", TimeoutError("temporary timeout"), json.dumps(expected),
+        ])},
+    )
+    try:
+        processed = asyncio.run(worker.process_next_job())
+        assert asyncio.run(worker.process_next_job()) is None
+    finally:
+        worker.dispose()
+    assert processed is not None and processed.status is JobStatus.succeeded
+    detail = _history(postgres_session_factory, run.run_id)
+    assert detail["result"] == expected
+    assert [
+        (row["semantic_attempt_index"], row["transport_attempt_index"], row["physical_call_index"])
+        for row in detail["diagnostics"]["provider_calls"]
+    ] == [(1, 1, 1), (2, 1, 2), (2, 2, 3)]
+    assert _attempt_counts(detail["diagnostics"]) == (2, 3, 3)
+    with transaction_boundary(postgres_session_factory) as session:
+        replay = AtomLabRunService(session=session, config_registry=registry).start(
+            request, validate=lambda: None,
+        )
+        assert replay.run_id == run.run_id
+        assert replay.job_id == run.job_id
+        assert replay.guest_id == run.guest_id
+        assert replay.status is AtomLabRunStatus.succeeded
+        assert replay.replayed is True
+        assert [
+            session.scalar(sa.select(sa.func.count()).select_from(table))
+            for table in (
+                atom_lab_runs_table, jobs_table, scenario_sessions_table, guest_identities_table,
+            )
+        ] == [1, 1, 1, 1]
 
 
 @pytest.mark.postgresql
@@ -501,7 +901,7 @@ def test_parallel_lab_runs_do_not_leak_settings_into_an_ordinary_job(
         ]
     assert all(job is not None and job.status is JobStatus.succeeded for job in final_jobs)
     requests_by_job = {request.job_id: request for request in adapter.requests}
-    assert len(requests_by_job) == 3
+    assert len(requests_by_job) == len(final_jobs)
     assert requests_by_job[job_one.id].model == "openai/gpt-5.4-mini"
     assert requests_by_job[job_one.id].reasoning_effort is ReasoningEffort.low
     assert requests_by_job[job_two.id].model == "openai/gpt-5.4"

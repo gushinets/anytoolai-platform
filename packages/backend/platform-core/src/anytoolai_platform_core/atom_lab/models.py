@@ -1,14 +1,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
+from enum import StrEnum
 from typing import Any
 
 from anytoolai_platform_core.common.ids import new_id
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.providers.models import ReasoningEffort
+from anytoolai_platform_core.scenarios.models import ScenarioSessionStatus
+from anytoolai_platform_core.workflows.models import JobRecord
 
 ATOM_LAB_MODEL_PREFIX = "openai/"
+
+
+class AtomLabRunStatus(StrEnum):
+    queued = "queued"
+    running = "running"
+    succeeded = "succeeded"
+    failed = "failed"
+    expired = "expired"
+    cancelled = "cancelled"
 
 
 def is_addressable_atom_lab_model(model_id: str) -> bool:
@@ -102,6 +114,9 @@ class AtomLabRunRecord:
     action_definition: dict[str, Any]
     action_config_definition: dict[str, Any]
     execution_definition_hash: str
+    guest_id: str | None = None
+    idempotency_key: str | None = None
+    idempotency_request_hash: str | None = None
     id: str = field(default_factory=lambda: new_id("atom_lab_run"))
     preset_id: str | None = None
     preset_version: int | None = None
@@ -161,12 +176,31 @@ class AtomLabRunRecord:
         }
 
 
+@dataclass(frozen=True)
+class AtomLabAdmissionScopeRecord:
+    tenant_id: str
+    region: str
+    accepted_on: date
+    accepted_count: int
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class AtomLabRunHistoryState:
+    run: AtomLabRunRecord
+    job: JobRecord
+    session_status: ScenarioSessionStatus
+
+
 __all__ = [
     "ATOM_LAB_MODEL_PREFIX",
     "AtomLabPresetIdentityRecord",
     "AtomLabPresetSummary",
     "AtomLabPresetVersionRecord",
+    "AtomLabAdmissionScopeRecord",
+    "AtomLabRunHistoryState",
     "AtomLabRunRecord",
+    "AtomLabRunStatus",
     "ReasoningEffort",
     "is_addressable_atom_lab_model",
 ]

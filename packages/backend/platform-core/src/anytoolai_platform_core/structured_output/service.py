@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from anytoolai_platform_core.artifacts.correlation import (
     build_artifact_correlation_metadata,
 )
 from anytoolai_platform_core.artifacts.models import ArtifactRecord
 from anytoolai_platform_core.artifacts.service import ArtifactService
+from anytoolai_platform_core.atom_lab.diagnostics import (
+    ATOM_LAB_DEBUG_VERSION,
+    bound_atom_lab_debug_text,
+)
 from anytoolai_platform_core.providers.models import ProviderCallRecord
 from anytoolai_platform_core.providers.repository import ProviderCallRepository
 from anytoolai_platform_core.structured_output.errors import (
@@ -39,6 +43,7 @@ class StructuredOutputPersistenceContext:
     acquisition_source: str | None = None
     action_type: str | None = None
     action_config_id: str | None = None
+    atom_lab_run_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -128,6 +133,16 @@ class StructuredOutputFinalizer:
         schema_version: int | None = None,
     ) -> ArtifactRecord:
         provider_call = self._latest_provider_call(persistence_context.action_run_id)
+        lab_metadata: dict[str, object] = {}
+        if persistence_context.atom_lab_run_id is not None:
+            diagnostic = bound_atom_lab_debug_text(raw_text)
+            raw_text = diagnostic.text
+            lab_metadata = {
+                "atom_lab_run_id": persistence_context.atom_lab_run_id,
+                "atom_lab_debug_version": ATOM_LAB_DEBUG_VERSION,
+                "truncated": diagnostic.truncated,
+                "redacted": diagnostic.redacted,
+            }
         return self._artifact_service.create_structured_output_debug_artifact(
             tenant_id=persistence_context.tenant_id,
             region=persistence_context.region,
@@ -148,6 +163,7 @@ class StructuredOutputFinalizer:
                 "failure_kind": safe_error.failure_kind,
                 "reason": safe_error.reason,
                 "error_type": safe_error.error_type,
+                **lab_metadata,
             },
         )
 

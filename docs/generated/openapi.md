@@ -22,6 +22,9 @@ Version: 0.1.0
 | POST | /v1/atom-lab/presets/{preset_id}/versions | create_preset_version_v1_atom_lab_presets__preset_id__versions_post | 201, 401, 404, 409, 422, 503 |
 | GET | /v1/atom-lab/presets/{preset_id}/versions/{version} | get_preset_version_v1_atom_lab_presets__preset_id__versions__version__get | 200, 401, 404, 422, 503 |
 | GET | /v1/atom-lab/presets/{preset_id}/versions/{version}/export | export_preset_version_v1_atom_lab_presets__preset_id__versions__version__export_get | 200, 401, 404, 422, 503 |
+| GET | /v1/atom-lab/runs | list_runs_v1_atom_lab_runs_get | 200, 401, 422, 503 |
+| POST | /v1/atom-lab/runs | start_run_v1_atom_lab_runs_post | 202, 401, 404, 409, 413, 422, 429, 503 |
+| GET | /v1/atom-lab/runs/{run_id} | get_run_v1_atom_lab_runs__run_id__get | 200, 401, 404, 422, 503 |
 | POST | /v1/client-events | post_client_event_v1_client_events_post | 200, 404, 409, 422 |
 | POST | /v1/demo/runs | start_demo_run_v1_demo_runs_post | 200, 401, 409, 422, 429, 503 |
 | POST | /v1/handoffs | create_handoff_v1_handoffs_post | 200, 404, 409, 422 |
@@ -40,6 +43,7 @@ Version: 0.1.0
 
 - AtomLabAtomId
 - AtomLabAtomResponse
+- AtomLabDebugArtifactResponse
 - AtomLabErrorDetailResponse
 - AtomLabErrorResponse
 - AtomLabFieldErrorResponse
@@ -55,6 +59,14 @@ Version: 0.1.0
 - AtomLabPresetVersionRequest
 - AtomLabPresetVersionResponse
 - AtomLabPresetVersionSummaryResponse
+- AtomLabProviderCallDiagnosticResponse
+- AtomLabRunAcceptedResponse
+- AtomLabRunDetailResponse
+- AtomLabRunDiagnosticsResponse
+- AtomLabRunListResponse
+- AtomLabRunRuntimeIdsResponse
+- AtomLabRunStatus
+- AtomLabRunSummaryResponse
 - AtomLabSchemaRefsResponse
 - AtomLabVersionedSchemaRefResponse
 - ClientEventRequest
@@ -73,6 +85,7 @@ Version: 0.1.0
 - ModelCatalogCompatibility
 - ModelCatalogReason
 - ModelCatalogRefreshStatus
+- ProviderCallStatus
 - QuotaDimension
 - QuotaPeriod
 - QuotaStateResponse
