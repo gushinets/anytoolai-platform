@@ -1,8 +1,10 @@
 # Atom Lab browser checks
 
-The fast Node tests execute the production Atom Lab module against a minimal DOM harness. A focused
-Playwright scenario exercises the same assets in Chromium, including computed visibility, form
-controls, focus transfer, and a 375-pixel layout.
+The fast Node tests execute the production Atom Lab module against a minimal DOM harness. The
+Playwright suite exercises the same assets in Chromium, including computed visibility, form
+controls, focus transfer, a 375-pixel layout, backend model-capability states, idempotent run
+submission, protected polling/reconnection, immutable submitted snapshots, terminal diagnostics,
+and safe rendering of successful and contract-invalid provider output.
 
 Run locally from the repository root:
 

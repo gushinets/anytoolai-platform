@@ -3,12 +3,12 @@
 ## Status
 
 - State: active
-- Phase: AL04/ANY-462 implementation and verification complete on feature/ANY-462
+- Phase: AL07/ANY-465 implemented and verified on feature/ANY-465
 - Owner: mixed
 - Created: 2026-09-09
-- Last updated: 2026-09-18
+- Last updated: 2026-09-20
 - Review date: 2026-09-16
-- Next action: Review and commit ANY-462, then continue with the next Atom Lab milestone.
+- Next action: Review and commit ANY-465, then continue with AL08/ANY-466.
 - Blocker: none for development; operator configuration required before rollout.
 - Linear project: [Atom Lab](https://linear.app/paveldik/project/atom-lab-e1efc95ce888)
 - Milestone: Atom Lab v1
@@ -350,7 +350,7 @@ Acceptance: Матрица schema features по 11 атомам покрыта r
 
 ### AL07 — [ANY-465](https://linear.app/paveldik/issue/ANY-465/atom-lab-gptreasoning-zapusk-i-chitaemyj-rezultat-v-ui): Atom Lab: GPT/reasoning, запуск и читаемый результат в UI
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 - Depends on: ANY-462, ANY-464.
 - Files/areas: `static/atom_lab/`; `API/browser tests`.
 
@@ -360,10 +360,10 @@ Acceptance: Browser scenarios success/validation correction/final invalid/provid
 
 ### Уточнения после аудита
 
-- [ ] Раздельные сущности UI: editable draft, immutable submitted snapshot, response-derived metadata. Для запуска использовать `model_id/reasoning_effort` и response shape ANY-462; catalog fields — ANY-461. Изменение формы не переписывает карточку уже принятого запуска.
-- [ ] Подписи: «Запрошенная модель», «Модель в ответе», «Запрошенный reasoning». Отсутствие provider-confirmed effort не трактовать как подтверждение; unknown response model отображать как неизвестную, не подставлять запрос.
-- [ ] Browser timeout/network loss оставляют возможность повторного чтения принятого run. Running job после crash может завершиться ошибкой текущего runtime; не показывать автоматическое возобновление или повторять POST с новым key.
-- [ ] В acceptance связать browser-selected настройки с adapter-call evidence ANY-460/467, а не только текстом dropdown. Проверить согласованные safe error codes, last-good stale catalog и сохранение draft после отказа admission.
+- [x] Раздельные сущности UI: editable draft, immutable submitted snapshot, response-derived metadata. Для запуска использовать `model_id/reasoning_effort` и response shape ANY-462; catalog fields — ANY-461. Изменение формы не переписывает карточку уже принятого запуска.
+- [x] Подписи: «Запрошенная модель», «Модель в ответе», «Запрошенный reasoning». Отсутствие provider-confirmed effort не трактовать как подтверждение; unknown response model отображать как неизвестную, не подставлять запрос.
+- [x] Browser timeout/network loss оставляют возможность повторного чтения принятого run. Running job после crash может завершиться ошибкой текущего runtime; не показывать автоматическое возобновление или повторять POST с новым key.
+- [x] В acceptance связать browser-selected настройки с adapter-call evidence ANY-460/467, а не только текстом dropdown. Проверить согласованные safe error codes, last-good stale catalog и сохранение draft после отказа admission.
 
 
 ### AL08 — [ANY-466](https://linear.app/paveldik/issue/ANY-466/atom-lab-presety-eksport-i-vosstanovlenie-istorii-v-ui): Atom Lab: пресеты, экспорт и восстановление истории в UI
@@ -470,6 +470,8 @@ Acceptance: Compose smoke: migrations, API/worker ready, assets доступны
 | 2026-09-16 | Implemented AL05/ANY-463: immutable preset identities and versions, optimistic concurrent saves, source-run and contract validation, protected list/detail/version/export APIs, run-to-preset integrity constraints, and exact secret-free export. Added API, SQLite, and real PostgreSQL concurrency coverage; regenerated OpenAPI and frontend contracts; `quick-check`, `postgresql-check`, and `full-check` passed. | Review and commit ANY-463, then continue with ANY-462/AL04. |
 | 2026-09-17 | Addressed PR #128 review: unified preset/run tenant-region scope through API settings, made `atom_id` an identity invariant, hardened cursor/model/validator boundaries, expanded deterministic pagination/error/source-run coverage, and documented AL05 error/list/export contracts. `quick-check` (1358 passed), real PostgreSQL `postgresql-check`, Ruff, docs checks, and `full-check` passed. | Commit and push review fixes; resolve review threads after GitHub readback. |
 | 2026-09-18 | Addressed follow-up PR #128 review: bounded serialized preset `example_input` at a configurable 256 KiB default, rejected whitespace-only required text, enforced strict bounded cursors, and made migration 0014 repair partially created preset schemas object-by-object. Added API regressions and a real PostgreSQL partial-schema migration test. | Run repository-wide validation, commit and push the fixes, then resolve the `gushinets` review threads after GitHub readback. |
+| 2026-09-20 | Started AL07/ANY-465 on `feature/ANY-465`; reviewed the approved Atom Lab spec, backend catalog/run contracts, existing editor and browser harness. The bounded design separates editable draft, immutable submitted snapshot and response metadata; `doctor` under system `python3` reported missing pytest/yaml/pydantic, so canonical validation will use the repository-managed environment. | Add failing model-selection, idempotent submission/polling and safe-result UI tests before implementation. |
+| 2026-09-20 | Implemented AL07/ANY-465: capability-aware model/reasoning controls, stale catalog refresh, immutable idempotent submissions, protected polling with reconnect/timeout/manual reread, safe readable result/invalid-output views, strict response parsing and full diagnostics. Verified 26 deterministic Node tests, 22 Chromium journeys, 13 API-to-worker adapter tests, ESLint, `git diff --check`, and canonical `quick-check` (1864 passed); independent review found no remaining Critical/Important issues. `frontend-check` was also attempted but the unrelated web-mirror suite fails under local Node 26 because its jsdom `window.localStorage` is unavailable. | Review and commit ANY-465, then continue with AL08/ANY-466. |
 
 ## Planning revision verification (2026-09-09)
 

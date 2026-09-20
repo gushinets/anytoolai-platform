@@ -20,10 +20,15 @@ const {
   applyJsonText,
   bootstrapAtomLab,
   collectSchemaFeatures,
+  createRunSubmission,
   createDraftSession,
+  describeModelOption,
   getDraftPayload,
   hasDraftPath,
   omitDraftPath,
+  parseAcceptedRun,
+  parseRunDetail,
+  pollingTimedOut,
   replaceWithExample,
   resetPrompt,
   serializeDraft,
@@ -131,14 +136,19 @@ function createFakeDocument() {
     "input-tab", "prompt-tab", "input-panel", "prompt-panel", "form-mode", "json-mode", "input-editor",
     "json-panel", "json-editor", "json-error", "prompt-editor", "fill-example", "reset-prompt",
     "draft-state", "validation-errors", "result-placeholder", "presets-button",
-    "history-button",
+    "history-button", "model-select", "reasoning-effort", "reasoning-help",
+    "model-catalog-warning", "refresh-models", "run-button", "retry-submit", "retry-read", "run-state",
+    "submitted-snapshot", "result-section", "result-readable", "result-json",
+    "invalid-response", "invalid-response-code", "invalid-response-raw", "run-metadata",
+    "run-diagnostics",
   ];
   const elements = new Map(ids.map((id) => [id, new FakeElement(id.endsWith("editor") ? "textarea" : "div", id)]));
   elements.get("access-form").tagName = "FORM";
   elements.get("access-code").tagName = "INPUT";
-  for (const id of ["input-tab", "prompt-tab", "form-mode", "json-mode", "fill-example", "reset-prompt", "presets-button", "history-button"]) {
+  for (const id of ["input-tab", "prompt-tab", "form-mode", "json-mode", "fill-example", "reset-prompt", "presets-button", "history-button", "refresh-models", "run-button", "retry-submit", "retry-read"]) {
     elements.get(id).tagName = "BUTTON";
   }
+  for (const id of ["model-select", "reasoning-effort"]) elements.get(id).tagName = "SELECT";
   const document = {
     createElement(tagName) { return new FakeElement(tagName); },
     querySelector(selector) { return selector.startsWith("#") ? elements.get(selector.slice(1)) ?? null : null; },
@@ -599,4 +609,104 @@ test("unknown closed-schema fields remain visible in form mode with a path error
   const messages = elements.get("validation-errors").querySelectorAll("li")
     .map((item) => item.textContent || item.querySelector("button")?.textContent);
   assert.equal(messages.some((message) => message.includes("unexpected")), true);
+});
+
+test("model options distinguish supported, unsupported, unknown, and incompatible choices", () => {
+  assert.deepEqual(describeModelOption({
+    model_id: "gpt-supported",
+    compatibility: "compatible",
+    reason: "confirmed_openai_text_gpt",
+    reasoning_supported: true,
+    allowed_reasoning_efforts: ["low", "high"],
+    provenance: {},
+  }), {
+    modelId: "gpt-supported",
+    selectable: true,
+    compatibility: "compatible",
+    reason: "confirmed_openai_text_gpt",
+    reasoningMode: "supported",
+    allowedEfforts: ["low", "high"],
+  });
+  assert.equal(describeModelOption({
+    model_id: "gpt-no-reasoning",
+    compatibility: "compatible",
+    reason: "confirmed_openai_text_gpt",
+    reasoning_supported: false,
+    allowed_reasoning_efforts: null,
+    provenance: {},
+  }).reasoningMode, "unsupported");
+  assert.equal(describeModelOption({
+    model_id: "gpt-unknown",
+    compatibility: "compatible",
+    reason: "confirmed_openai_text_gpt",
+    reasoning_supported: true,
+    allowed_reasoning_efforts: null,
+    provenance: {},
+  }).reasoningMode, "unknown");
+  assert.equal(describeModelOption({
+    model_id: "not-for-this-path",
+    compatibility: "unsupported",
+    reason: "override_unsupported",
+    reasoning_supported: null,
+    allowed_reasoning_efforts: null,
+    provenance: {},
+  }).selectable, false);
+  const unknown = describeModelOption({
+    model_id: "not-confirmed",
+    compatibility: "unknown",
+    reason: "litellm_compatibility_incomplete",
+    reasoning_supported: null,
+    allowed_reasoning_efforts: null,
+    provenance: {},
+  });
+  assert.equal(unknown.compatibility, "unknown");
+  assert.equal(unknown.reason, "litellm_compatibility_incomplete");
+});
+
+test("a run submission freezes the current draft and uses the exact backend field names", async () => {
+  const session = createDraftSession(await catalogAtom("A01"));
+  replaceWithExample(session);
+  const submission = createRunSubmission(session, {
+    modelId: "gpt-supported",
+    reasoningEffort: "high",
+    idempotencyKey: "submission-1",
+  });
+
+  setDraftPath(session, ["source_text"], "Изменённый черновик");
+
+  assert.equal(submission.idempotencyKey, "submission-1");
+  assert.deepEqual(submission.body, {
+    atom_id: "A01",
+    input: EXAMPLES.A01,
+    prompt: "Базовый промпт A01",
+    model_id: "openai/gpt-supported",
+    reasoning_effort: "high",
+    preset_ref: null,
+  });
+  assert.equal(submission.snapshot.input.source_text, "Срок — 30 сентября");
+});
+
+test("accepted and detail response parsers reject incomplete or unknown lifecycle envelopes", () => {
+  assert.equal(parseAcceptedRun({status: "queued"}), null);
+  assert.equal(parseAcceptedRun({run_id: "run", scenario_session_id: "session", job_id: "job", status: "invented"}), null);
+  assert.deepEqual(parseAcceptedRun({run_id: "run", scenario_session_id: "session", job_id: "job", status: "queued"}), {
+    run_id: "run", scenario_session_id: "session", job_id: "job", status: "queued",
+  });
+  assert.equal(parseRunDetail({run_id: "run", status: "succeeded"}, "run"), null);
+  assert.equal(parseRunDetail({run_id: "other", status: "running", snapshot: {}, runtime_ids: {}, result: null, diagnostics: {}}, "run"), null);
+  const runtimeIds = {scenario_session_id: "session", job_id: "job", action_run_id: null, artifact_id: null};
+  const diagnostics = {error_code: null, duration_ms: null, requested_model_id: "openai/gpt", requested_reasoning_effort: null, response_model_id: null, validation_attempts: 0, transport_attempts: 0, physical_calls: 0, succeeded_first_attempt: null, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false};
+  const detail = {run_id: "run", status: "running", snapshot: {}, runtime_ids: runtimeIds, result: null, diagnostics, created_at: "2026-09-20T10:00:00Z", started_at: null, finished_at: null};
+  assert.equal(parseRunDetail({...detail, runtime_ids: {}}, "run"), null);
+  assert.equal(parseRunDetail({...detail, diagnostics: {...diagnostics, provider_calls: {}}}, "run"), null);
+  assert.equal(parseRunDetail({...detail, diagnostics: {...diagnostics, provider_calls_truncated: undefined}}, "run"), null);
+  assert.equal(parseRunDetail({...detail, diagnostics: {...diagnostics, provider_calls: [{provider_call_id: "call"}]}}, "run"), null);
+  assert.deepEqual(parseRunDetail(detail, "run"), {
+    run_id: "run", status: "running", snapshot: {}, runtime_ids: runtimeIds, result: null, diagnostics,
+  });
+});
+
+test("browser polling timeout is elapsed-time based and does not reinterpret the run status", () => {
+  assert.equal(pollingTimedOut(1_000, 90_999, 90_000), false);
+  assert.equal(pollingTimedOut(1_000, 91_000, 90_000), true);
 });

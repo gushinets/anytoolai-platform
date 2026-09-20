@@ -59,6 +59,18 @@ pre { background: #111827; border-radius: 0.55rem; color: #e5e7eb; max-height: 2
 .validation-errors ul { margin: 0.75rem 0; padding-left: 1.3rem; }
 .draft-state { color: #5f6b85; font-weight: 600; }
 .result-card { min-height: 14rem; }
+.run-controls { display: grid; gap: 0.55rem; }
+.primary-action { background: #2638b8; border-color: #2638b8; color: #fff; font-weight: 700; }
+.help-text { color: #5f6b85; margin: 0; }
+.warning { background: #fff6d8; border-left: 4px solid #b7791f; margin: 0; padding: 0.65rem; }
+.warning:empty { display: none; }
+.run-state { font-weight: 700; }
+.readable-result { display: grid; gap: 0.45rem; overflow-wrap: anywhere; }
+.readable-result dl { display: grid; gap: 0.35rem; margin: 0; }
+.readable-result dt { font-weight: 700; }
+.readable-result dd { margin: 0 0 0.5rem; white-space: pre-wrap; }
+.invalid-response { background: #fff1f1; border-left: 4px solid #a52626; padding: 0.75rem; }
+#run-metadata { line-height: 1.7; white-space: pre-wrap; }
 @media (max-width: 72rem) { .editor-grid { grid-template-columns: 1fr; } .result-card { min-height: auto; } }
 @media (max-width: 52rem) {
   .page-shell { padding: 0.75rem; }
