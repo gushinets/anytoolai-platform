@@ -144,6 +144,25 @@ test("JSON numbers that cannot round-trip are rejected without replacing the acc
   await expect(page.locator("#json-panel")).toBeVisible();
 });
 
+test("Form numbers that cannot round-trip are rejected before changing the draft", async ({page}) => {
+  page.on("dialog", (dialog) => dialog.accept());
+  await unlockAtom(page, "A06");
+  await importJson(page, {context: {id: 1}, objective: "pilot"});
+
+  await page.getByLabel("Значение «id»", {exact: true}).fill("9007199254740993");
+  await expect(page.locator("#validation-errors")).toContainText("точност");
+
+  await page.getByRole("button", {name: /A11/}).click();
+  await importJson(page, {
+    subject_text: "Пилот",
+    reference_text: "Эталон",
+    categories: ["да", "нет"],
+    criteria: [{id: "scope", description: "Границы", weight: 1}],
+  });
+  await page.getByLabel("weight", {exact: true}).fill("0.1234567890123456789");
+  await expect(page.locator("#validation-errors")).toContainText("точност");
+});
+
 test("omitting a container clears invalid descendant input errors", async ({page}) => {
   await unlockAtom(page, "A06");
   await importJson(page, {context: {}, objective: "pilot", constraints: {length: 900}});

@@ -289,6 +289,8 @@ function hasNonRoundTrippableNumber(text) {
   return jsonNumberTokens(text).some((token) => !numberRoundTrips(token));
 }
 
+const NUMBER_PRECISION_ERROR = "Число нельзя сохранить без потери точности.";
+
 export function applyJsonText(session, text) {
   session.jsonText = text;
   try {
@@ -573,7 +575,11 @@ function renderUntyped(context, wrapper, path, label, value) {
       if (kind === "string") {
         setDraftPath(session, path, input.value);
       } else if (input.value !== "" && Number.isFinite(Number(input.value))) {
-        setDraftPath(session, path, Number(input.value));
+        if (numberRoundTrips(input.value)) {
+          setDraftPath(session, path, Number(input.value));
+        } else {
+          setInputError(session, path, NUMBER_PRECISION_ERROR);
+        }
       } else {
         setInputError(session, path, "Введите корректное число.");
       }
@@ -716,7 +722,11 @@ function renderField(context, container, schema, path, label, required) {
       const exactInteger = /^-?(0|[1-9]\d*)$/.test(input.value);
       const parsed = Number(input.value);
       if (input.value !== "" && Number.isFinite(parsed) && (!isInteger || exactInteger)) {
-        setDraftPath(session, path, parsed);
+        if (numberRoundTrips(input.value)) {
+          setDraftPath(session, path, parsed);
+        } else {
+          setInputError(session, path, NUMBER_PRECISION_ERROR);
+        }
       } else {
         setInputError(
           session,

@@ -518,6 +518,48 @@ test("integer controls never silently truncate decimal or empty text", async () 
   assert.equal(controller.getSession().dirty, true);
 });
 
+test("Form numeric controls reject values that cannot round-trip without changing the draft", async () => {
+  const {document, elements} = createFakeDocument();
+  const atom = await catalogAtom("A06", {
+    input_schema: {
+      type: "object",
+      properties: {untyped: {}, score: {type: "number"}},
+      required: ["untyped", "score"],
+      additionalProperties: false,
+    },
+    example_input: {untyped: 1, score: 0.5},
+  });
+  const controller = bootstrapAtomLab({
+    document,
+    fetchImpl: async () => ({ok: true, async json() { return [atom]; }}),
+    confirmImpl: () => true,
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("fill-example").click();
+  const inputByLabel = (label) => elements.get("input-editor").querySelectorAll("input")
+    .find((node) => node.attributes.get("aria-label") === label);
+  const untyped = inputByLabel("untyped");
+  const score = inputByLabel("score");
+
+  untyped.value = "9007199254740993";
+  await untyped.dispatch("input");
+  score.value = "0.1234567890123456789";
+  await score.dispatch("input");
+
+  assert.deepEqual(getDraftPayload(controller.getSession()), {untyped: 1, score: 0.5});
+  assert.equal(validateDraft(controller.getSession()).filter(({message}) => /точност/.test(message)).length, 2);
+
+  const rerenderedUntyped = inputByLabel("untyped");
+  const rerenderedScore = inputByLabel("score");
+  rerenderedUntyped.value = "9007199254740992";
+  await rerenderedUntyped.dispatch("input");
+  rerenderedScore.value = "0.1";
+  await rerenderedScore.dispatch("input");
+  assert.deepEqual(getDraftPayload(controller.getSession()), {untyped: 9007199254740992, score: 0.1});
+  assert.deepEqual(validateDraft(controller.getSession()), []);
+});
+
 test("closed workspace and narrow content rules are explicit in CSS", async () => {
   const css = await readFile(CSS_URL, "utf8");
   assert.match(css, /\[hidden\]\s*\{\s*display:\s*none\s*!important/);
