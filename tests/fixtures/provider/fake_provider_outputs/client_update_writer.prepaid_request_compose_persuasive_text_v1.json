@@ -1,0 +1,12 @@
+{
+  "response_json": {
+    "text": "The design phase you approved wraps up this week, with phase 2 (development) starting next. Sending the $500 prepayment for phase 2 by Friday would be appreciated."
+  },
+  "input_tokens": 76,
+  "output_tokens": 24,
+  "latency_ms": 8,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1"
+  }
+}

@@ -23,6 +23,8 @@ PLATFORM_API_PACKAGE = ROOT / "apps" / "platform-api" / "src" / "anytoolai_platf
 # MVP-B products (docs/product-specs/mvp-scope-source-of-truth.md); platform-api routes must stay
 # parameterized on {product_id} instead of hardcoding one of these.
 FORBIDDEN_PRODUCT_PATH_TERMS = [
+    "client_update_writer",
+    "client-update-writer",
     "proposal_ai",
     "proposal-ai",
     "acceptance_builder",

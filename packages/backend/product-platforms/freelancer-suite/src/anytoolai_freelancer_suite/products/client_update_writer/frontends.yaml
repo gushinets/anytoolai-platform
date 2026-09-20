@@ -1,0 +1,10 @@
+# No Chrome Extension delivery and no apps/web-mirror page implementation in ANY-413's scope
+# (see this ticket's non-goals) -- but ScenarioRuntimeService.start_session requires at least
+# one enabled frontend_id to accept a scenario start at all
+# (packages/backend/platform-core/.../scenarios/service.py's _require_enabled_frontend), so a
+# frontend_id must be registered here even though ANY-412/ANY-414 build the actual page later.
+# No chrome_extension entry: this product has no dedicated CE (see ANY-412's parent ticket).
+frontends:
+  - frontend_id: web_mirror
+    type: web
+    enabled: true
