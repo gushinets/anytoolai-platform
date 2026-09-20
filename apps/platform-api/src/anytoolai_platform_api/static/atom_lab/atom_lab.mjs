@@ -30,21 +30,42 @@ function jsonKind(value) {
 }
 
 function fieldKey(path) {
-  return pathLabel(path);
+  return JSON.stringify(path);
 }
 
 function fieldControlId(path, suffix = "control") {
-  return controlIdForLabel(fieldKey(path), suffix);
+  return controlIdForKey(fieldKey(path), suffix);
 }
 
-function controlIdForLabel(label, suffix = "control") {
-  return `field-${encodeURIComponent(label).replaceAll("%", "-")}-${suffix}`;
+function controlIdForKey(key, suffix = "control") {
+  return `field-${encodeURIComponent(key).replaceAll("%", "-")}-${suffix}`;
 }
 
-function firstControlId(schema, path) {
-  return schemaTypes(schema).length === 0 && !Array.isArray(schema?.enum)
-    ? fieldControlId(path, "type")
-    : fieldControlId(path);
+function firstControlId(schema, path, value) {
+  if (schemaTypes(schema).length === 0 && !Array.isArray(schema?.enum)) {
+    return fieldControlId(path, "type");
+  }
+  if (value === null && schemaTypes(schema).includes("null")) {
+    return fieldControlId(path, "null");
+  }
+  const type = primaryType(schema, value);
+  if (type === "object") {
+    const properties = Object.entries(schema.properties ?? {});
+    if (properties.length > 0) {
+      const [key, childSchema] = properties[0];
+      const childPath = [...path, key];
+      return value && Object.hasOwn(value, key)
+        ? firstControlId(childSchema, childPath, value[key])
+        : fieldControlId(childPath, "add");
+    }
+    return fieldControlId(path, "add-key");
+  }
+  if (type === "array") {
+    return Array.isArray(value) && value.length > 0
+      ? firstControlId(schema.items ?? {}, [...path, 0], value[0])
+      : fieldControlId(path, "add-item");
+  }
+  return fieldControlId(path);
 }
 
 function pathLabel(path) {
@@ -122,6 +143,12 @@ export function getDraftPayload(session) {
   return cloneJson(session.payload);
 }
 
+function clearInputErrorsAtOrBelow(session, path) {
+  for (const [key, error] of session.inputErrors) {
+    if (pathStartsWith(error.path, path)) session.inputErrors.delete(key);
+  }
+}
+
 export function setDraftPath(session, path, value) {
   if (path.length === 0) {
     session.payload = cloneJson(value);
@@ -131,22 +158,53 @@ export function setDraftPath(session, path, value) {
     defineOwn(parent, path.at(-1), cloneJson(value));
   }
   session.jsonError = null;
-  session.inputErrors.delete(fieldKey(path));
+  clearInputErrorsAtOrBelow(session, path);
+}
+
+function pathStartsWith(path, prefix) {
+  return prefix.every((segment, index) => path[index] === segment);
+}
+
+function reconcileInputErrorsAfterOmit(session, path, removedArrayItem) {
+  const nextErrors = new Map();
+  const parentPath = path.slice(0, -1);
+  const removedIndex = path.at(-1);
+  for (const error of session.inputErrors.values()) {
+    if (pathStartsWith(error.path, path)) continue;
+    let nextPath = error.path;
+    if (
+      removedArrayItem
+      && pathStartsWith(error.path, parentPath)
+      && typeof error.path[parentPath.length] === "number"
+      && error.path[parentPath.length] > removedIndex
+    ) {
+      nextPath = [...error.path];
+      nextPath[parentPath.length] -= 1;
+    }
+    nextErrors.set(fieldKey(nextPath), {path: nextPath, message: error.message});
+  }
+  session.inputErrors = nextErrors;
+}
+
+function setInputError(session, path, message) {
+  session.inputErrors.set(fieldKey(path), {path: [...path], message});
 }
 
 export function omitDraftPath(session, path) {
   if (path.length === 0) {
     session.payload = {};
+    session.inputErrors.clear();
     return;
   }
   const parent = resolveParent(session.payload, path, false);
   if (parent === null) return;
-  if (Array.isArray(parent) && typeof path.at(-1) === "number") {
+  const removedArrayItem = Array.isArray(parent) && typeof path.at(-1) === "number";
+  if (removedArrayItem) {
     parent.splice(path.at(-1), 1);
   } else {
     delete parent[path.at(-1)];
   }
-  session.inputErrors.delete(fieldKey(path));
+  reconcileInputErrorsAfterOmit(session, path, removedArrayItem);
 }
 
 export function replaceWithExample(session) {
@@ -218,7 +276,9 @@ export function collectSchemaFeatures(schema, features = new Set()) {
 }
 
 function validationError(errors, path, message) {
-  errors.push({path: pathLabel(path), message});
+  const error = {path: pathLabel(path), message};
+  Object.defineProperty(error, "key", {value: fieldKey(path)});
+  errors.push(error);
 }
 
 function validateValue(value, schema, path, errors) {
@@ -293,7 +353,9 @@ export function validateDraft(session) {
   if (session.jsonError) return [{path: "input", message: session.jsonError}];
   const errors = [];
   validateValue(session.payload, session.atom.input_schema, [], errors);
-  for (const [path, message] of session.inputErrors) errors.push({path, message});
+  for (const error of session.inputErrors.values()) {
+    validationError(errors, error.path, error.message);
+  }
   return errors;
 }
 
@@ -319,6 +381,15 @@ function button(document, label, onClick) {
 }
 
 function renderValidation(document, container, session) {
+  for (const [controlId, previous] of session.validationAttributes ?? []) {
+    const control = document.getElementById?.(controlId);
+    if (!control) continue;
+    if (previous.ariaInvalid === null) control.removeAttribute("aria-invalid");
+    else control.setAttribute("aria-invalid", previous.ariaInvalid);
+    if (previous.ariaDescribedBy === null) control.removeAttribute("aria-describedby");
+    else control.setAttribute("aria-describedby", previous.ariaDescribedBy);
+  }
+  session.validationAttributes = new Map();
   container.replaceChildren();
   const errors = validateDraft(session);
   if (errors.length === 0) return;
@@ -327,16 +398,23 @@ function renderValidation(document, container, session) {
   const list = document.createElement("ul");
   for (const error of errors) {
     const item = document.createElement("li");
-    const errorId = controlIdForLabel(error.path, "error");
+    const errorId = controlIdForKey(error.key ?? error.path, "error");
     item.id = errorId;
     const control = typeof document.getElementById === "function"
-      ? document.getElementById(controlIdForLabel(error.path))
-        ?? document.getElementById(controlIdForLabel(error.path, "type"))
-        ?? document.getElementById(controlIdForLabel(error.path, "add"))
+      ? document.getElementById(controlIdForKey(error.key ?? error.path))
+        ?? document.getElementById(controlIdForKey(error.key ?? error.path, "type"))
+        ?? document.getElementById(controlIdForKey(error.key ?? error.path, "add"))
       : null;
     if (control) {
+      if (!session.validationAttributes.has(control.id)) {
+        session.validationAttributes.set(control.id, {
+          ariaInvalid: control.getAttribute?.("aria-invalid") ?? null,
+          ariaDescribedBy: control.getAttribute?.("aria-describedby") ?? null,
+        });
+      }
       control.setAttribute("aria-invalid", "true");
-      control.setAttribute("aria-describedby", errorId);
+      const descriptions = [control.getAttribute?.("aria-describedby"), errorId].filter(Boolean);
+      control.setAttribute("aria-describedby", [...new Set(descriptions)].join(" "));
       const link = button(document, `${error.path}: ${error.message}`, () => control.focus());
       link.className = "error-link";
       item.append(link);
@@ -373,7 +451,7 @@ function appendRecoverableJson(context, wrapper, path, label, value) {
       setDraftPath(session, path, JSON.parse(input.value));
       rerender(true, input.id);
     } catch {
-      session.inputErrors.set(fieldKey(path), "Введите корректное JSON-значение.");
+      setInputError(session, path, "Введите корректное JSON-значение.");
       input.setAttribute("aria-invalid", "true");
       rerender(false);
     }
@@ -412,9 +490,10 @@ function renderUntyped(context, wrapper, path, label, value) {
   } else if (kind === "array") {
     renderArray(context, wrapper, {type: "array", items: {}}, path, value);
   } else if (kind === "string" || kind === "number") {
-    const input = document.createElement("input");
+    const input = document.createElement(kind === "string" ? "textarea" : "input");
     input.id = fieldControlId(path);
-    input.type = kind === "number" ? "number" : "text";
+    if (kind === "number") input.type = "number";
+    else input.rows = 2;
     input.value = String(value);
     input.setAttribute("aria-label", label);
     input.addEventListener("input", () => {
@@ -423,7 +502,7 @@ function renderUntyped(context, wrapper, path, label, value) {
       } else if (input.value !== "" && Number.isFinite(Number(input.value))) {
         setDraftPath(session, path, Number(input.value));
       } else {
-        session.inputErrors.set(fieldKey(path), "Введите корректное число.");
+        setInputError(session, path, "Введите корректное число.");
       }
       rerender(false);
     });
@@ -461,8 +540,9 @@ function renderField(context, container, schema, path, label, required) {
   heading.append(title);
   if (!exists) {
     const addButton = button(document, `Добавить поле «${label}»`, () => {
-      setDraftPath(session, path, initialValue(schema));
-      rerender(true, firstControlId(schema, path));
+      const valueToAdd = initialValue(schema);
+      setDraftPath(session, path, valueToAdd);
+      rerender(true, firstControlId(schema, path, valueToAdd));
     });
     addButton.id = fieldControlId(path, "add");
     heading.append(addButton);
@@ -495,6 +575,7 @@ function renderField(context, container, schema, path, label, required) {
   if (allowsNull) {
     const nullLabel = document.createElement("label");
     const nullInput = document.createElement("input");
+    nullInput.id = fieldControlId(path, "null");
     nullInput.type = "checkbox";
     nullInput.checked = value === null;
     nullInput.addEventListener("change", () => {
@@ -564,8 +645,9 @@ function renderField(context, container, schema, path, label, required) {
       if (input.value !== "" && Number.isFinite(parsed) && (!isInteger || exactInteger)) {
         setDraftPath(session, path, parsed);
       } else {
-        session.inputErrors.set(
-          fieldKey(path),
+        setInputError(
+          session,
+          path,
           isInteger ? "Значение должно быть целым числом." : "Введите корректное число.",
         );
       }
@@ -635,7 +717,11 @@ function renderObject(context, container, schema, path, value) {
       let index = 1;
       while (Object.hasOwn(value, `key_${index}`)) index += 1;
       setDraftPath(session, [...path, `key_${index}`], initialValue(dynamicSchema));
-      rerender(true, firstControlId(dynamicSchema, [...path, `key_${index}`]));
+      rerender(true, firstControlId(
+        dynamicSchema,
+        [...path, `key_${index}`],
+        value[`key_${index}`],
+      ));
     });
     addKeyButton.id = fieldControlId(path, "add-key");
     container.append(addKeyButton);
@@ -652,7 +738,7 @@ function renderArray(context, container, schema, path, value) {
       omitDraftPath(session, [...path, index]);
       const nextIndex = Math.min(index, value.length - 1);
       const focusId = value.length > 0
-        ? firstControlId(schema.items ?? {}, [...path, nextIndex])
+        ? firstControlId(schema.items ?? {}, [...path, nextIndex], value[nextIndex])
         : fieldControlId(path, "add-item");
       rerender(true, focusId);
     });
@@ -661,8 +747,9 @@ function renderArray(context, container, schema, path, value) {
   });
   const addItemButton = button(document, "Добавить элемент", () => {
     const index = value.length;
-    value.push(initialValue(schema.items ?? {}));
-    rerender(true, firstControlId(schema.items ?? {}, [...path, index]));
+    const valueToAdd = initialValue(schema.items ?? {});
+    value.push(valueToAdd);
+    rerender(true, firstControlId(schema.items ?? {}, [...path, index], valueToAdd));
   });
   addItemButton.id = fieldControlId(path, "add-item");
   container.append(addItemButton);

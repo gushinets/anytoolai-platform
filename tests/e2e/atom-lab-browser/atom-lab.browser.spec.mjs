@@ -59,6 +59,19 @@ async function openLab(page) {
   await page.goto("http://atom-lab.test/atom-lab/");
 }
 
+async function unlockAtom(page, atomId) {
+  await openLab(page);
+  await page.locator("#access-code").fill("secret");
+  await page.locator("#access-form button").click();
+  await page.getByRole("button", {name: new RegExp(atomId)}).click();
+}
+
+async function importJson(page, payload) {
+  await page.locator("#json-mode").click();
+  await page.locator("#json-editor").fill(JSON.stringify(payload));
+  await page.locator("#form-mode").click();
+}
+
 test("protected shell, dynamic values, invalid types, numbers, focus, and narrow layout work in Chromium", async ({page}) => {
   await page.setViewportSize({width: 375, height: 900});
   page.on("dialog", (dialog) => dialog.accept());
@@ -89,4 +102,86 @@ test("protected shell, dynamic values, invalid types, numbers, focus, and narrow
   await expect(type).toBeFocused();
   await type.selectOption("string");
   await expect(page.getByRole("textbox", {name: "Значение «key_1»", exact: true})).toBeVisible();
+});
+
+test("unrestricted strings preserve line breaks through form edits", async ({page}) => {
+  await unlockAtom(page, "A06");
+  await importJson(page, {context: {notes: "first\nsecond"}, objective: "pilot"});
+
+  const notes = page.getByRole("textbox", {name: "Значение «notes»", exact: true});
+  await expect(notes).toHaveJSProperty("tagName", "TEXTAREA");
+  await expect(notes).toHaveValue("first\nsecond");
+  await notes.fill("first\nsecond!");
+  await page.locator("#json-mode").click();
+
+  await expect(page.locator("#json-editor")).toHaveValue(/first\\nsecond!/);
+});
+
+test("omitting a container clears invalid descendant input errors", async ({page}) => {
+  await unlockAtom(page, "A06");
+  await importJson(page, {context: {}, objective: "pilot", constraints: {length: 900}});
+
+  await page.getByLabel("length").fill("2.9");
+  await expect(page.locator("#validation-errors")).toContainText("целым числом");
+  await page.getByRole("button", {name: "Не передавать «constraints»"}).click();
+  await expect(page.locator("#validation-errors")).toBeEmpty();
+  await page.locator("#json-mode").click();
+
+  await expect(page.locator("#json-panel")).toBeVisible();
+  await expect(page.locator("#json-editor")).not.toHaveValue(/constraints/);
+});
+
+test("literal dotted and bracketed keys have identities distinct from nested paths", async ({page}) => {
+  await unlockAtom(page, "A06");
+  await importJson(page, {
+    context: {"a.b": 1, a: {b: 2}, "items[0]": 3, items: [4]},
+    objective: "pilot",
+  });
+
+  const idsAreUnique = await page.locator("#input-editor [id]").evaluateAll((nodes) => {
+    const ids = nodes.map((node) => node.id);
+    return ids.length === new Set(ids).size;
+  });
+  expect(idsAreUnique).toBe(true);
+
+  await page.getByLabel("Значение «a.b»", {exact: true}).fill("");
+  await page.getByLabel("Значение «b»", {exact: true}).fill("3");
+  await page.getByLabel("Значение «items[0]»", {exact: true}).fill("");
+  await page.getByLabel("Элемент 1", {exact: true}).fill("5");
+  await expect(page.locator("#validation-errors li")).toHaveCount(2);
+  await page.locator("#json-mode").click();
+
+  await expect(page.locator("#input-editor")).toBeVisible();
+});
+
+test("correcting a control clears validation-owned ARIA attributes", async ({page}) => {
+  await unlockAtom(page, "A06");
+  await importJson(page, {context: {}, objective: "pilot", constraints: {length: 900}});
+
+  const length = page.getByLabel("length");
+  await length.fill("2.9");
+  await expect(length).toHaveAttribute("aria-invalid", "true");
+  await length.fill("3");
+
+  await expect(page.locator("#validation-errors")).toBeEmpty();
+  await expect(length).not.toHaveAttribute("aria-invalid", "true");
+  await expect(length).not.toHaveAttribute("aria-describedby", /.+/);
+});
+
+test("adding a compound field focuses its first rendered descendant control", async ({page}) => {
+  await unlockAtom(page, "A06");
+  await importJson(page, {context: {}, objective: "pilot"});
+
+  await page.getByRole("button", {name: "Добавить поле «constraints»"}).click();
+
+  await expect(page.getByRole("button", {name: "Добавить поле «tone»"})).toBeFocused();
+});
+
+test("adding a compound array item focuses its first rendered descendant control", async ({page}) => {
+  await unlockAtom(page, "A05");
+  await importJson(page, {issues: [], context: "x", target_audience: "y"});
+
+  await page.getByRole("button", {name: "Добавить элемент"}).click();
+
+  await expect(page.getByRole("button", {name: "Добавить поле «category»"})).toBeFocused();
 });
