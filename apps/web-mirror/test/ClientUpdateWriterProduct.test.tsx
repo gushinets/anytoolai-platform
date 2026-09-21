@@ -707,4 +707,38 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
       storageSpy.mockRestore();
     }
   });
+
+  it("keeps one guest identity across mode switches when localStorage exists but its operations throw", async () => {
+    // Code review finding [P2]: `window.localStorage` itself is reachable but getItem/setItem throw
+    // (Safari private mode with a zero quota, storage denied after the fact). ce-kit treats a failed
+    // read as a cache miss and a failed write as best-effort, so every remount used to mint a new
+    // guest here even after the getter-only fallback existed.
+    const ids = MODE_IDS.update;
+    const routes = routesFor(ids);
+    const { client, calls } = makeClient({
+      [routes.RUNTIME_CONFIG]: [fullRuntimeConfigResponse(ids)],
+      [routes.GUEST_IDENTITY]: [guestIdentityResponse("guest_A"), guestIdentityResponse("guest_B")],
+      [routes.QUOTA]: [quotaResponse(ids), quotaResponse(MODE_IDS.reply_draft)],
+    });
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("denied", "SecurityError");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("quota", "QuotaExceededError");
+    });
+    try {
+      render(<ClientUpdateWriterProduct client={client} />);
+      await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
+
+      fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
+      await waitFor(() => expect(screen.getByLabelText("Client message")).toBeTruthy());
+      fireEvent.click(screen.getByRole("radio", { name: "Prepaid Request" }));
+      await waitFor(() => expect(screen.getByLabelText("Billing notes")).toBeTruthy());
+
+      expect(calls.filter((call) => call.key === routes.GUEST_IDENTITY)).toHaveLength(1);
+    } finally {
+      cleanup();
+      vi.restoreAllMocks();
+    }
+  });
 });

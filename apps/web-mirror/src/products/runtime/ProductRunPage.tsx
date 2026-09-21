@@ -4,8 +4,6 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type Reac
 import { Button } from "@anytoolai/shared-ui";
 import {
   copyResultAndRecordActivation,
-  createInMemoryAsyncStorage,
-  createWindowLocalStorageAdapter,
   getQuota,
   getResult,
   getRuntimeConfig,
@@ -22,6 +20,7 @@ import {
   type QuotaState,
 } from "@anytoolai/ce-kit";
 import { ErrorState } from "../../components/ErrorState";
+import { getClientStorage } from "./clientStorage";
 import { assertNever, type ProductDefinition, type ProductRunEvent } from "./productDefinition";
 
 export type ProductRunPageProps<V extends Record<string, unknown>, R> = {
@@ -128,23 +127,6 @@ const runtimeConfigCache = new WeakMap<PlatformApiClient, Map<string, ReturnType
 
 function getCachedRuntimeConfig(client: PlatformApiClient, productId: string) {
   return cacheSuccessOnly(runtimeConfigCache, client, productId, () => getRuntimeConfig(client, productId));
-}
-
-// In-memory guest storage for when `window.localStorage` is unavailable (privacy-hardened
-// browsers, sandboxed iframes) -- code review finding: it used to be created per mount, so every
-// remount (Client Update Writer's mode switch remounts via `key={modeId}`, or navigating between
-// products on one client) started from an empty storage and minted a brand-new guest, splitting one
-// visit's events across several guest ids. Per client, like the caches above, it behaves the way
-// localStorage would for the page's lifetime: one guest identity, shared by every mount.
-const ephemeralGuestStorageByClient = new WeakMap<PlatformApiClient, AsyncStorage>();
-
-function getEphemeralGuestStorage(client: PlatformApiClient): AsyncStorage {
-  let storage = ephemeralGuestStorageByClient.get(client);
-  if (!storage) {
-    storage = createInMemoryAsyncStorage();
-    ephemeralGuestStorageByClient.set(client, storage);
-  }
-  return storage;
 }
 
 /**
@@ -270,8 +252,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const [boot, setBoot] = useState<BootState>({ kind: "loading" });
   const [quota, setQuota] = useState<QuotaState | null>(null);
   const [guestId, setGuestId] = useState<string | undefined>(undefined);
-  const [ephemeralGuestStorage] = useState<AsyncStorage>(() => getEphemeralGuestStorage(client));
-  const [guestStorage] = useState<AsyncStorage>(() => createWindowLocalStorageAdapter() ?? ephemeralGuestStorage);
+  // See `getClientStorage`: one storage per client, so a remount never mints a new guest.
+  const [guestStorage] = useState<AsyncStorage>(() => getClientStorage(client));
   // Fresh AbortController created inside the effect itself, not a `useState` singleton: aborts
   // every in-flight read (identity/runtime-config/quota on mount, poll/result while a run is
   // active) on unmount so none of them can call setState after this component is gone. A
@@ -438,7 +420,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         // Deterministic and permanent for the stale guest id -- self-heal so a plain resubmit
         // (not a special "retry" action) can succeed. The stale handle's request body carries the
         // old guest_id, so it can't be reused: clearing it forces a fresh prepareScenarioStart().
-        const fresh = await refreshGuestIdentity(client, guestStorage, { fallbackStorage: ephemeralGuestStorage });
+        const fresh = await refreshGuestIdentity(client, guestStorage);
         if (controller?.signal.aborted) {
           return;
         }

@@ -1,10 +1,10 @@
 "use client";
 
-import { createInMemoryAsyncStorage, createWindowLocalStorageAdapter } from "@anytoolai/ce-kit";
 import { notFound } from "next/navigation";
 import { use, useMemo } from "react";
 import { createPlatformApiClient } from "../../../lib/apiClient";
 import { getRegisteredProduct } from "../../../products/registry";
+import { getClientStorage } from "../../../products/runtime/clientStorage";
 import { createProductRunEventTracker } from "../../../products/runtime/productRunEventTracking";
 
 type ProductPageProps = {
@@ -18,9 +18,11 @@ export default function ProductPage({ params }: ProductPageProps) {
   // instance and re-trigger its mount-time identity/runtime-config fetch.
   const client = useMemo(() => createPlatformApiClient(), []);
   const onEvent = useMemo(
-    // Same fallback ProductRunPage itself uses for its own storage: `createWindowLocalStorageAdapter`
-    // returns undefined outside the browser (SSR) or when localStorage is unavailable.
-    () => createProductRunEventTracker(client, productId, createWindowLocalStorageAdapter() ?? createInMemoryAsyncStorage()),
+    // The same per-client storage ProductRunPage uses for the guest id -- code review finding: a
+    // fresh in-memory fallback per `productId` change rotated `web_session_id` when navigating
+    // between products with no usable localStorage, but it should only rotate after 30 minutes
+    // of inactivity.
+    () => createProductRunEventTracker(client, productId, getClientStorage(client)),
     [client, productId],
   );
   // A fresh id every time `productId` actually changes -- including a return to a productId
