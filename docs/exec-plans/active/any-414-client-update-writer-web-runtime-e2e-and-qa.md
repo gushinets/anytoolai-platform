@@ -223,6 +223,23 @@ covers Update mode only, the other two modes' meaning stays proven at the backen
     signal -- there, cancelling on unmount is the point. Regressions: two `ProductRunPage` tests
     (unmount while the write is pending / while the request is in flight) and one Client Update
     Writer test for the exact mode-switch scenario; all three fail without the change.
+11. **The Client Update Writer guest quota is an explicit product decision, not a bug fix.**
+    `client_update_writer.guest_quota_v1` (3 runs, `lifetime`, `dimension: product` -- one pool
+    shared by all three modes) was added in the first review round after a finding that the product
+    was unmetered. That finding was framed as a defect, but ANY-413 had *deliberately* shipped no
+    quota (its design decision 6: the ticket names no quota policy), and neither ANY-414 nor its
+    parent ANY-412 name a limit, period or dimension; the values were chosen by analogy with
+    ProposalAI, whose own plan calls `3` a placeholder to revisit. A later review rightly flagged
+    that this is new production policy (unlimited -> three runs forever) with no authoritative
+    source. It stays, as a decision confirmed by the user on 2026-09-21: ANY-414's acceptance
+    criteria require assertions covering quota, which is impossible for a product with no policy,
+    and an unmetered real-provider LLM product is a cost exposure. Revisit the numbers if the
+    product owner picks a different budget. ANY-413's decision 6 now points here.
+    Also kept: the repo-wide `validate_configs.py` guard that every default-set product declares a
+    `quota_policy_ref` (`add-product-recipe.md` now says so; a free product needs an explicit
+    exemption in the validator). Earlier comments claiming the missing-quota bug "shipped twice
+    (ProposalAI, then Client Update Writer)" were wrong -- ProposalAI has had its quota since it was
+    created -- and were removed.
 
 ## Verification
 

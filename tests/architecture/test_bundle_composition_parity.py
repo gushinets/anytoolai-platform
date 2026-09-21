@@ -237,11 +237,10 @@ def test_non_empty_bundle_actually_lands_in_worker_and_validate_configs_registri
 
 
 def test_default_product_bundles_all_declare_a_quota_policy() -> None:
-    """ANY-414 code review finding: a product with no `quota_policy_ref` silently skips quota
-    enforcement entirely (`quotas/service.py`'s `validate_accepted_start()`) -- this exact bug
-    shipped twice (ProposalAI, then Client Update Writer) before `products_missing_a_quota_policy`
-    existed to catch it structurally. Proves the real default bundle set is actually clean, not
-    just that the checker function exists."""
+    """A product with no `quota_policy_ref` silently skips quota enforcement entirely
+    (`quotas/service.py`'s `validate_accepted_start()`), so `products_missing_a_quota_policy`
+    makes declaring one a repo-wide invariant for the default bundle set. Proves the real default
+    bundle set is actually clean, not just that the checker function exists."""
     validate_configs = _load_validate_configs_module()
     registry = validate_configs.load_registry()
     assert validate_configs.products_missing_a_quota_policy(registry) == []

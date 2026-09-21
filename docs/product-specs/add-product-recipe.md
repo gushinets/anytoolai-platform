@@ -24,8 +24,11 @@ must stay inside, and `tests/architecture/` for the tests that enforce it.
    its own entry to the list.
 2. **Config roots.** Under the bundle's `products/<product_name>/` config root, add the
    product's `product.yaml`, `frontends.yaml`, `action_configs.yaml`, `workflows.yaml`,
-   `scenarios.yaml`, `prompts.yaml`, `schemas.yaml`, and any product-scoped
-   `quotas.yaml`/`handoffs.yaml`/`analytics.yaml` — the same YAML/Markdown-defines-behavior model
+   `scenarios.yaml`, `prompts.yaml`, `schemas.yaml`, a `quotas.yaml` (`product.yaml`'s
+   `quota_policy_ref` is mandatory for every product in the default bundle set --
+   `validate-configs` fails without it, since a product with no quota policy is silently
+   unmetered; a free product needs an explicit exemption in `validate_configs.py`), and any
+   product-scoped `handoffs.yaml`/`analytics.yaml` — the same YAML/Markdown-defines-behavior model
    platform-core already uses for its own atoms and workflows. `apps/platform-api/bootstrap.py`
    passes every composed bundle's `config_roots()` straight through to platform-core's
    product-neutral `ConfigLoader` (its `extra_product_roots` parameter), which validates your

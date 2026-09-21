@@ -10,6 +10,7 @@ on:
       - "apps/platform-api/**"
       - "apps/platform-worker/**"
       - "packages/frontend/ce-kit/**"
+      - "packages/frontend/shared-ui/**"
       - "packages/frontend/web-result-kit/**"
       - "packages/backend/platform-core/**"
       - "packages/backend/platform-actions/**"
