@@ -8,7 +8,7 @@ import { ResultView } from "../../components/ResultView";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import { collectFieldErrors, optionalTrimmedFieldError, requiredTrimmedFieldError } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductResultProps, ProductRunEvent } from "../runtime/productDefinition";
-import { ToneSelect, type Tone } from "../runtime/tone";
+import { ToneSelect, type Tone } from "../shared/tone";
 
 const PRODUCT_ID = "client_update_writer";
 

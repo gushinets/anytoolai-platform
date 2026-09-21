@@ -7,7 +7,7 @@
 - Created: 2026-09-15
 - Last updated: 2026-09-21
 - Review date: 2026-09-21
-- Next action: push the local commits; no open code findings.
+- Next action: wait for CI on the pushed head and for the merge decision; no open code findings.
 - Blocker: none
 
 ## Goal
@@ -192,14 +192,16 @@ covers Update mode only, the other two modes' meaning stays proven at the backen
    through a result-fetch-error, and false again once the retry succeeds" and "stays busy through an
    ambiguous /start failure, but not through a deterministic one"; `ClientUpdateWriterProduct.test.tsx`
    gained the mode-switch-level equivalents of both.
-8. **Shared `TONE_OPTIONS` stays shared, guarded against schema drift instead of parameterized.**
-   A whole-PR review noted the tone list is a semantic enum hand-mirrored from four backend input
-   schemas with no drift check, and that `ToneSelect` cast the DOM value with `as Tone`. Making
-   `ToneSelect` take its options from each product would re-duplicate the list two earlier review
-   rounds explicitly removed, so it stays shared; `test/tone.test.tsx` now fails if any
-   freelancer-suite input schema's `tone` enum differs from it (scanned, so a new product's schema
-   is covered automatically), and the cast became an `isTone` type guard.
-
+8. **The `tone` vocabulary is shared across products but lives outside the runtime.** The tone
+   list is product meaning mirrored from backend input schemas, and
+   `docs/architecture/frontend-boundaries.md` forbids the shared runtime from containing product
+   meaning, so it moved from `products/runtime/` to `products/shared/tone.tsx`. It stays one shared
+   list rather than one per product (two earlier review rounds removed exactly that duplication).
+   Per `coding-conventions.md`, a single map is the source: `Tone` and `TONE_OPTIONS` derive from
+   it and `isTone` is an `Object.hasOwn` guard, so unknown values (including inherited keys like
+   `toString`) never pass as a tone. `test/tone.test.tsx` holds the required drift check against
+   the four input schemas that use `ToneSelect` (an explicit list, so a product with its own tone
+   vocabulary is free to skip the shared control) and the unknown-member negative tests.
 9. **Shared-ui controls, not bare HTML.** Review found the new code had swapped `ResultView`'s
    `CopyButton` (→ `Button variant="secondary"`) for a bare `<button>`, and `ToneSelect` (used by
    ProposalAI, which rendered shared `Select`) for a bare `<select>`; the new Client Update Writer
@@ -216,7 +218,7 @@ see design decision 2 and the note below).
 
 - `pnpm --filter @anytoolai/web-mirror typecheck` — passed.
 - `pnpm --filter @anytoolai/web-mirror lint` — passed.
-- `pnpm --filter @anytoolai/web-mirror test` — 121/121 passed as of design decision 9 (90/90 post-merge, 86/86 before).
+- `pnpm --filter @anytoolai/web-mirror test` — 133/133 passed as of design decision 9 (90/90 post-merge, 86/86 before).
 - `pnpm --filter @anytoolai/ce-kit test` — 315/315 passed (unaffected).
 - `pnpm --filter @anytoolai/ce-kit typecheck` — passed.
 - `python scripts/agent/runner.py frontend-check` — passed (lint, typecheck, test, API-types-drift

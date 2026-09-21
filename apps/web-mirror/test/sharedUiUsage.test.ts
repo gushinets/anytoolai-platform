@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 const here = dirname(fileURLToPath(import.meta.url));
 const FILES = [
   "../src/components/ResultView.tsx",
-  "../src/products/runtime/tone.tsx",
+  "../src/products/shared/tone.tsx",
   "../src/products/clientUpdateWriter/ClientUpdateWriterProduct.tsx",
 ];
 

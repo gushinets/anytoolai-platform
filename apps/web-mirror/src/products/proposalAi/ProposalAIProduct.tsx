@@ -7,7 +7,7 @@ import { ResultView } from "../../components/ResultView";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import { collectFieldErrors, requiredTrimmedFieldError } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductRunEvent } from "../runtime/productDefinition";
-import { ToneSelect, type Tone } from "../runtime/tone";
+import { ToneSelect, type Tone } from "../shared/tone";
 
 export type ProposalAIValues = {
   taskText: string;
