@@ -240,31 +240,36 @@ covers Update mode only, the other two modes' meaning stays proven at the backen
     (Platform Core documents a quota-less product as valid, and making it mandatory is a repo-wide
     decision wider than this ticket), and the earlier claim that the omission had "shipped twice"
     was wrong -- ProposalAI has had its quota since it was created.
-12. **Guest identity and `web_session_id` live in one resilient, per-client storage.** When
-    `window.localStorage` can't hold a value, ce-kit deliberately treats a failed read as a cache
-    miss and a failed write as best-effort, so the page kept minting a *new* guest on every remount
-    -- Client Update Writer's mode switch remounts via `key={modeId}`, and navigating between
-    products keeps the client but remounts the page too. One visit's `product_viewed`/`form_started`
-    then landed on one guest and `form_submitted`/`scenario_completed` on another, and with
-    visit-level dedupe the funnel could no longer be joined. Two variants: the `window.localStorage`
-    getter itself throwing (fixed first, by moving the in-memory fallback from per-mount `useState`
-    to per-client), and -- found by the next review -- the getter working while `getItem`/`setItem`
-    throw (Safari private mode with a zero quota), which a fallback chosen only on the getter can
-    never see. `runtime/clientStorage.ts` now builds one storage per client:
-    `createResilientStorage(localStorage-or-null, in-memory)`. It reads/writes the primary first, so
-    cross-tab sharing is unchanged while localStorage works; the first time any primary operation
-    throws, the primary is no longer trusted for the rest of its life and memory alone is
-    authoritative -- otherwise a stale guest id the primary failed to forget, right after
-    `refreshGuestIdentity()` healed it, would be read straight back. `remove()` never throws, so a
-    self-heal always sticks. Memory-first was rejected: it would ignore another tab's updates to the
-    same `localStorage` keys (guest id, `web_session_id` activity). The route builds its event
-    tracker from the same `getClientStorage(client)` instead of a fresh in-memory storage per
-    `productId`, because a `web_session_id` must rotate after 30 minutes of inactivity, not when the
-    product changes. Fixed once in the shared runtime rather than threading a storage prop through
-    Client Update Writer. The earlier mode-switch tests queued two identical guest responses, which
-    hid all of this; the regressions queue two *different* guests and require a single identity call
-    for both variants, and a structural test pins the route's wiring (it can't be rendered in
-    vitest).
+12. **Guest identity and `web_session_id`: one page-load client, one resilient storage.** With no
+    usable `localStorage` the page kept minting a *new* guest on every remount -- Client Update
+    Writer's mode switch remounts via `key={modeId}` -- because ce-kit deliberately treats a failed
+    read as a cache miss and a failed write as best-effort. One visit's `product_viewed`/
+    `form_started` then landed on one guest and `form_submitted`/`scenario_completed` on another. This
+    was patched three times (an in-memory fallback per mount, then per client, then a layered
+    storage) and each review found a hole in the newest patch, so the model was re-derived. Two root
+    causes:
+    (a) *Lifetime.* The identity state hangs off the `PlatformApiClient` (single-flight identity,
+    `getClientStorage(client)`), but the client was a `useMemo` inside each page, i.e. as short-lived
+    as one component mount. It is now owned by the module: `lib/apiClient.ts`'s
+    `getPlatformApiClient()` is one client per page load, used by the product and handoff pages.
+    (Nothing in the app links or routes between products -- no `next/link`, no `useRouter` -- so
+    moving between them is a full page load that resets everything anyway; the only remount that
+    really occurs is the mode switch. The singleton makes any future client-side navigation safe
+    without a layout/provider, and a router regression test for a path the UI can't take was not
+    written.)
+    (b) *Trust.* `runtime/clientStorage.ts`'s `createResilientStorage(localStorage-or-null,
+    in-memory)` shared **one** "primary is broken" flag across every key, and memory only held what
+    had been *written*. So a failing `web_session_id` write (quota) stopped the guest id being read
+    from the primary, and a guest id persisted by an earlier visit -- only ever read -- was in
+    neither. Now: memory is a complete last-known-good copy (every successful read is mirrored, a
+    primary miss falls back to it, which also covers storage that accepts a write and forgets it),
+    trust is **per key**, and `remove()` never throws so a self-heal sticks. Reads and writes still
+    go to the primary first, so cross-tab sharing is unchanged; memory-first was rejected because it
+    would ignore other tabs' updates to `web_session_id`'s activity.
+    Regressions: the reviewer's exact sequence through ce-kit's real `createGuestIdentity` /
+    `getOrCreateWebSessionId` (zero backend calls), the per-key and read-mirroring semantics, the
+    mode-switch scenarios (two different guests queued, one identity call) for both ways
+    `localStorage` can be unusable, and structural checks that both pages take the page-load client.
 
 ## Verification
 
@@ -273,7 +278,7 @@ see design decision 2 and the note below).
 
 - `pnpm --filter @anytoolai/web-mirror typecheck` — passed.
 - `pnpm --filter @anytoolai/web-mirror lint` — passed.
-- `pnpm --filter @anytoolai/web-mirror test` — 147/147 passed as of design decision 12 (90/90 post-merge, 86/86 before).
+- `pnpm --filter @anytoolai/web-mirror test` — 153/153 passed as of design decision 12 (90/90 post-merge, 86/86 before).
 - `pnpm --filter @anytoolai/ce-kit test` — 315/315 passed (unaffected).
 - `pnpm --filter @anytoolai/ce-kit typecheck` — passed.
 - `python scripts/agent/runner.py frontend-check` — passed (lint, typecheck, test, API-types-drift

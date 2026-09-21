@@ -48,8 +48,9 @@ export type ProductRunPageProps<V extends Record<string, unknown>, R> = {
    * Scopes the `product_viewed`/`form_started` once-per-visit dedupe below to one real page visit
    * -- code review finding: keying that dedupe by `(client, productId)` alone meant it lived for
    * as long as the `client` instance did, not for one visit. `apps/web-mirror/src/app/products/
-   * [productId]/page.tsx` keeps one `client` across a client-side navigation between products (its
-   * own `useMemo(..., [])`), so a genuine A -> B -> A revisit shares that same client -- without a
+   * [productId]/page.tsx` uses the page-load-wide `getPlatformApiClient()`, so a client-side
+   * navigation between products (none exists in the app today, but the client would survive one) and
+   * a genuine A -> B -> A revisit share that same client -- without a
    * visit-scoped key, the second visit to A silently emitted neither event. The route wrapper
    * mints a fresh `visitId` per landing on a product (see its own comment); a multi-mode product's
    * several `ProductRunPage` mounts (one per mode switch) all receive the *same* `visitId` from
@@ -141,8 +142,9 @@ function getCachedRuntimeConfig(client: PlatformApiClient, productId: string) {
  * The scope key is `visitId ?? productId` (see `ProductRunPageProps.visitId`'s own docstring):
  * a bare `productId` key alone (an earlier version of this cache) lived for as long as the
  * `client` instance did, not for one visit -- `apps/web-mirror/src/app/products/[productId]/
- * page.tsx` keeps one `client` across a client-side navigation between products (its own
- * `useMemo(..., [])`), so a genuine A -> B -> A revisit shared that same client and silently
+ * page.tsx` uses the page-load-wide `getPlatformApiClient()`, so a client-side navigation between
+ * products (none exists in the app today, but the client would survive one) shares that same client
+ * and a genuine A -> B -> A revisit silently
  * undercounted the second visit to A (code review finding). `visitId` closes that gap for the
  * real production route; direct `ProductRunPage` construction (every current test) has no route
  * wrapper to mint one and keeps the old, simpler `productId`-only scoping.

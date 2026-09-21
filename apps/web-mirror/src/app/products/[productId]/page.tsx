@@ -2,7 +2,7 @@
 
 import { notFound } from "next/navigation";
 import { use, useMemo } from "react";
-import { createPlatformApiClient } from "../../../lib/apiClient";
+import { getPlatformApiClient } from "../../../lib/apiClient";
 import { getRegisteredProduct } from "../../../products/registry";
 import { getClientStorage } from "../../../products/runtime/clientStorage";
 import { createProductRunEventTracker } from "../../../products/runtime/productRunEventTracking";
@@ -14,9 +14,7 @@ type ProductPageProps = {
 export default function ProductPage({ params }: ProductPageProps) {
   const { productId } = use(params);
   const product = getRegisteredProduct(productId);
-  // Memoized so a re-render that isn't a real navigation doesn't hand the product a new client
-  // instance and re-trigger its mount-time identity/runtime-config fetch.
-  const client = useMemo(() => createPlatformApiClient(), []);
+  const client = getPlatformApiClient();
   const onEvent = useMemo(
     // The same per-client storage ProductRunPage uses for the guest id -- code review finding: a
     // fresh in-memory fallback per `productId` change rotated `web_session_id` when navigating
