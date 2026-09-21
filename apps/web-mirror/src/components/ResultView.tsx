@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Card } from "@anytoolai/shared-ui";
+import { Button, Card } from "@anytoolai/shared-ui";
 import { GeneratedTextRenderer } from "@anytoolai/web-result-kit";
 
 export type ResultViewProps = {
@@ -36,9 +36,9 @@ export function ResultView({ text, onCopy }: ResultViewProps) {
   return (
     <Card>
       <GeneratedTextRenderer text={text} />
-      <button type="button" onClick={handleCopy} disabled={copyState === "copying"}>
+      <Button variant="secondary" onClick={handleCopy} disabled={copyState === "copying"}>
         {copyState === "copied" ? "Copied" : copyState === "copying" ? "Copying…" : "Copy"}
-      </button>
+      </Button>
       {copyState === "error" ? (
         <p role="alert">Could not copy to clipboard. Please copy the text above manually.</p>
       ) : null}

@@ -5,10 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-09-15
-- Last updated: 2026-09-16
-- Review date: 2026-09-16
-- Next action: PR description still claims the browser E2E is "out of scope" (stale, per design
-  decision 5) — update it, and confirm before doing so (a GitHub write).
+- Last updated: 2026-09-21
+- Review date: 2026-09-21
+- Next action: push the local commits; no open code findings.
 - Blocker: none
 
 ## Goal
@@ -201,6 +200,15 @@ covers Update mode only, the other two modes' meaning stays proven at the backen
    freelancer-suite input schema's `tone` enum differs from it (scanned, so a new product's schema
    is covered automatically), and the cast became an `isTone` type guard.
 
+9. **Shared-ui controls, not bare HTML.** Review found the new code had swapped `ResultView`'s
+   `CopyButton` (→ `Button variant="secondary"`) for a bare `<button>`, and `ToneSelect` (used by
+   ProposalAI, which rendered shared `Select`) for a bare `<select>`; the new Client Update Writer
+   fields likewise used bare `<textarea>`/`<input>`. Functional tests stayed green because vitest
+   doesn't process CSS modules, so the visual regression was invisible to them. All now render
+   `Button`/`Select`/`TextArea`/`Input` from `@anytoolai/shared-ui` (the async-copy logic is
+   unchanged); `test/sharedUiUsage.test.ts` pins this structurally for those three files (radio
+   inputs excepted — shared-ui has no radio).
+
 ## Verification
 
 Run twice: once before merging `main`, once after (to catch merge-resolution regressions —
@@ -208,7 +216,7 @@ see design decision 2 and the note below).
 
 - `pnpm --filter @anytoolai/web-mirror typecheck` — passed.
 - `pnpm --filter @anytoolai/web-mirror lint` — passed.
-- `pnpm --filter @anytoolai/web-mirror test` — 118/118 passed as of design decision 8 (90/90 post-merge, 86/86 before).
+- `pnpm --filter @anytoolai/web-mirror test` — 121/121 passed as of design decision 9 (90/90 post-merge, 86/86 before).
 - `pnpm --filter @anytoolai/ce-kit test` — 315/315 passed (unaffected).
 - `pnpm --filter @anytoolai/ce-kit typecheck` — passed.
 - `python scripts/agent/runner.py frontend-check` — passed (lint, typecheck, test, API-types-drift
@@ -234,13 +242,15 @@ branches changed.
 
 ## Risks / open items
 
-- `docs/product-specs/mvp-scope-source-of-truth.md` does not list Client Update Writer in the
-  committed MVP-B validation order and separately calls it "capability backlog without a committed
-  release order," even though its backend (ANY-413) is merged and this ticket delivers its web
-  runtime. Flagged for a human/reviewer decision, not resolved unilaterally here.
+- `docs/product-specs/mvp-scope-source-of-truth.md` keeps Client Update Writer in the capability
+  backlog "without a committed release order" even though its backend (ANY-413) is merged and this
+  ticket delivers its web runtime, enabled in the web registry. That paragraph now states this
+  factually (implemented and enabled, still outside the committed validation order). Whether it
+  should join the committed order is a product-owner decision and is deliberately not made here.
 - `tests/e2e/client-update-writer-smoke` needs a running `dev-up` stack and Playwright's Chromium
   installed to run locally (`python scripts/agent/runner.py client-update-writer-smoke`); it is not
   part of `quick-check`/`full-check` and, like `proposal-ai-smoke`, is not yet a required CI check
-  (path-filtered, runs on PR + weekly cron against `main`) — this PR's own CI run has not exercised
-  it, only local backend/frontend checks plus reading the spec against the existing
-  proposal-ai-smoke precedent it mirrors.
+  (path-filtered, runs on PR + weekly cron against `main`). It passes in this PR's CI, and was
+  also run locally on the tree merged with `main` (3/3, alongside `proposal-ai-smoke` 7/7 and
+  `client-handoff-smoke` 2/2 as shared-runtime regressions). `dev-up` reuses locally cached images
+  without `--build`, so rebuild the compose images first if they predate the checkout.

@@ -3,6 +3,7 @@
 import type { ChangeEvent } from "react";
 import { useState } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import { Input, TextArea } from "@anytoolai/shared-ui";
 import { ResultView } from "../../components/ResultView";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import { collectFieldErrors, optionalTrimmedFieldError, requiredTrimmedFieldError } from "../runtime/fieldValidation";
@@ -97,7 +98,7 @@ function UpdateFields({ values, errors, disabled, onChange }: ProductFieldsProps
   return (
     <>
       <label htmlFor="client-update-writer-progress-notes">Progress notes</label>
-      <textarea
+      <TextArea
         id="client-update-writer-progress-notes"
         value={values.progressNotes}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("progressNotes", event.target.value)}
@@ -144,7 +145,7 @@ function ReplyDraftFields({ values, errors, disabled, onChange }: ProductFieldsP
   return (
     <>
       <label htmlFor="client-update-writer-client-message">Client message</label>
-      <textarea
+      <TextArea
         id="client-update-writer-client-message"
         value={values.clientMessage}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("clientMessage", event.target.value)}
@@ -154,7 +155,7 @@ function ReplyDraftFields({ values, errors, disabled, onChange }: ProductFieldsP
       {errors.clientMessage ? <p role="alert">{errors.clientMessage}</p> : null}
 
       <label htmlFor="client-update-writer-reply-goal">Reply goal</label>
-      <textarea
+      <TextArea
         id="client-update-writer-reply-goal"
         value={values.replyGoal}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("replyGoal", event.target.value)}
@@ -202,7 +203,7 @@ function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFie
   return (
     <>
       <label htmlFor="client-update-writer-billing-notes">Billing notes</label>
-      <textarea
+      <TextArea
         id="client-update-writer-billing-notes"
         value={values.billingNotes}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("billingNotes", event.target.value)}
@@ -212,7 +213,7 @@ function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFie
       {errors.billingNotes ? <p role="alert">{errors.billingNotes}</p> : null}
 
       <label htmlFor="client-update-writer-billing-amount">Amount</label>
-      <input
+      <Input
         id="client-update-writer-billing-amount"
         value={values.billingAmount}
         onChange={(event: ChangeEvent<HTMLInputElement>) => onChange("billingAmount", event.target.value)}
@@ -222,7 +223,7 @@ function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFie
       {errors.billingAmount ? <p role="alert">{errors.billingAmount}</p> : null}
 
       <label htmlFor="client-update-writer-billing-due-date">Due date (optional)</label>
-      <input
+      <Input
         id="client-update-writer-billing-due-date"
         value={values.billingDueDate}
         onChange={(event: ChangeEvent<HTMLInputElement>) => onChange("billingDueDate", event.target.value)}

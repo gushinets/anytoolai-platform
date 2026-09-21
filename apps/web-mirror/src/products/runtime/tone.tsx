@@ -1,6 +1,7 @@
 "use client";
 
 import type { ChangeEvent } from "react";
+import { Select } from "@anytoolai/shared-ui";
 
 /**
  * Shared across every product's form -- extracted once a second product (Client Update Writer)
@@ -39,7 +40,7 @@ export function ToneSelect({
   ariaInvalid?: boolean;
 }) {
   return (
-    <select
+    <Select
       id={id}
       value={value}
       onChange={(event: ChangeEvent<HTMLSelectElement>) =>
@@ -54,6 +55,6 @@ export function ToneSelect({
           {tone}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }
