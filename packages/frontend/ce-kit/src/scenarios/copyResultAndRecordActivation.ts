@@ -49,9 +49,10 @@ export type CopyResultAndRecordActivationResult =
 /**
  * The shared copy-button activation contract (ANY-17, design spec "ProposalAI activation"): the
  * clipboard write completes first, and only then is exactly one `copy_result` next-action
- * recorded for *this call*, producing `client.next_action_clicked(copy_result)` on the backend. A
- * failed clipboard write records nothing; a failed activation request never revokes a successful
- * copy.
+ * recorded for *this call*, producing `client.next_action_clicked(copy_result)` on the backend --
+ * provided there is a checkpoint to record it against (`checkpointId !== null`). With a `null`
+ * checkpoint the copy still succeeds but nothing is recorded, and `activation` is `null`. A failed
+ * clipboard write records nothing; a failed activation request never revokes a successful copy.
  *
  * This is per-call exactly-once, not per-session: the backend's checkpoint validation
  * (`validate_next_action()`) only checks that the supplied checkpoint is still current -- it does
