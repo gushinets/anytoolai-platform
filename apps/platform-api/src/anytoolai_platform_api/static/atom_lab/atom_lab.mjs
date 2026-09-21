@@ -5,6 +5,17 @@ const RUN_POLL_TIMEOUT_MS = 90_000;
 const TERMINAL_RUN_STATUSES = new Set(["succeeded", "failed", "expired", "cancelled"]);
 const RUN_STATUSES = new Set(["queued", "running", ...TERMINAL_RUN_STATUSES]);
 const PROVIDER_CALL_STATUSES = new Set(["created", "running", "succeeded", "failed", "timed_out"]);
+const REASONING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+const MODEL_COMPATIBILITIES = new Set(["compatible", "unknown", "unsupported"]);
+const MODEL_REASONS = new Set([
+  "override_compatible",
+  "override_unknown",
+  "override_unsupported",
+  "litellm_metadata_missing",
+  "litellm_compatibility_incomplete",
+  "confirmed_openai_text_gpt",
+]);
+const MODEL_REFRESH_STATUSES = new Set(["current", "pending", "running"]);
 
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
@@ -187,6 +198,41 @@ function isNullableBoolean(value) {
   return value === null || typeof value === "boolean";
 }
 
+function isNullableReasoningEffort(value) {
+  return value === null || REASONING_EFFORTS.has(value);
+}
+
+function isStringMap(value) {
+  return isRecord(value) && Object.values(value).every((item) => typeof item === "string");
+}
+
+function isModelCatalogItem(value) {
+  return isRecord(value)
+    && isNonEmptyString(value.model_id)
+    && MODEL_COMPATIBILITIES.has(value.compatibility)
+    && MODEL_REASONS.has(value.reason)
+    && isNullableBoolean(value.reasoning_supported)
+    && (value.allowed_reasoning_efforts === null
+      || (Array.isArray(value.allowed_reasoning_efforts)
+        && value.allowed_reasoning_efforts.every((effort) => REASONING_EFFORTS.has(effort))))
+    && isRecord(value.provenance)
+    && Object.values(value.provenance).every(isStringMap);
+}
+
+function parseModelCatalog(value) {
+  if (
+    !isRecord(value)
+    || !Array.isArray(value.items)
+    || !value.items.every(isModelCatalogItem)
+    || !isNullableString(value.snapshot_id)
+    || !isNullableString(value.last_success_at)
+    || typeof value.stale !== "boolean"
+    || !MODEL_REFRESH_STATUSES.has(value.refresh_status)
+    || !isNullableString(value.error)
+  ) return null;
+  return value;
+}
+
 function isProviderCallDiagnostic(value) {
   return isRecord(value)
     && isNonEmptyString(value.provider_call_id)
@@ -251,7 +297,7 @@ export function parseRunDetail(value, expectedRunId) {
     || !(diagnostics.duration_ms === null
       || (typeof diagnostics.duration_ms === "number" && diagnostics.duration_ms >= 0))
     || !isNonEmptyString(diagnostics.requested_model_id)
-    || !isNullableString(diagnostics.requested_reasoning_effort)
+    || !isNullableReasoningEffort(diagnostics.requested_reasoning_effort)
     || !isNullableString(diagnostics.response_model_id)
     || !isNonNegativeInteger(diagnostics.validation_attempts)
     || !isNonNegativeInteger(diagnostics.transport_attempts)
@@ -1141,11 +1187,12 @@ export function bootstrapAtomLab({
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(safeApiMessage(payload, "Каталог моделей недоступен."));
-      if (!payload || !Array.isArray(payload.items)) {
+      const parsedCatalog = parseModelCatalog(payload);
+      if (!parsedCatalog) {
         throw new Error("Каталог моделей вернул некорректный ответ.");
       }
-      modelCatalog = payload;
-      modelOptions = payload.items.map(describeModelOption);
+      modelCatalog = parsedCatalog;
+      modelOptions = parsedCatalog.items.map(describeModelOption);
       renderModelCatalog();
     } catch (error) {
       modelCatalog = null;
@@ -1185,6 +1232,18 @@ export function bootstrapAtomLab({
     if (destroyed || modelCatalogPollStartedAt !== null) return;
     modelCatalogPollStartedAt = nowImpl();
     modelCatalogPollTimer = scheduleImpl(pollModelCatalog, RUN_POLL_INTERVAL_MS);
+  };
+
+  const displayAcceptedSubmission = (submission) => {
+    nodes["submitted-snapshot"].textContent = JSON.stringify(submission.snapshot, null, 2);
+    nodes["run-metadata"].textContent = "";
+    nodes["run-diagnostics"].textContent = "";
+    nodes["result-section"].hidden = true;
+    nodes["result-readable"].replaceChildren();
+    nodes["result-json"].textContent = "";
+    nodes["invalid-response"].hidden = true;
+    nodes["invalid-response-code"].textContent = "";
+    nodes["invalid-response-raw"].textContent = "";
   };
 
   const renderRunDetail = (detail, submission) => {
@@ -1228,9 +1287,10 @@ export function bootstrapAtomLab({
       nodes["invalid-response-code"].textContent = diagnostics.error_code ?? "invalid_response";
       nodes["invalid-response-raw"].textContent = debugArtifact.raw_output_text ?? "Сырой ответ недоступен.";
     }
-    if (TERMINAL_RUN_STATUSES.has(detail.status)) {
-      submission.terminal = true;
-      updateRunButton();
+    submission.detailLoaded = true;
+    submission.terminal = TERMINAL_RUN_STATUSES.has(detail.status);
+    updateRunButton();
+    if (submission.terminal) {
       nodes["retry-read"].hidden = true;
     }
   };
@@ -1325,9 +1385,6 @@ export function bootstrapAtomLab({
     nodes["retry-submit"].hidden = true;
     nodes["retry-read"].hidden = true;
     nodes["run-state"].textContent = "Отправка запуска…";
-    nodes["submitted-snapshot"].textContent = JSON.stringify(activeSubmission.snapshot, null, 2);
-    nodes["result-section"].hidden = true;
-    nodes["invalid-response"].hidden = true;
     try {
       const response = await fetchImpl("/v1/atom-lab/runs", {
         method: "POST",
@@ -1352,8 +1409,10 @@ export function bootstrapAtomLab({
         return;
       }
       activeSubmission.runId = accepted.run_id;
-      activeSubmission.terminal = TERMINAL_RUN_STATUSES.has(accepted.status);
+      activeSubmission.detailLoaded = false;
+      activeSubmission.terminal = false;
       activeSubmission.pollStartedAt = nowImpl();
+      displayAcceptedSubmission(activeSubmission);
       nodes["run-state"].textContent = runStatusLabel(accepted.status);
       const submission = activeSubmission;
       scheduleImpl(() => pollRun(submission), 0);

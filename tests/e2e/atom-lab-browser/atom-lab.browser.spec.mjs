@@ -430,6 +430,48 @@ test("one accepted submission survives draft edits and renders safe result diagn
   }]);
 });
 
+test("a rejected next submission never replaces the previously accepted run card", async ({page}) => {
+  let posts = 0;
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+    posts += 1;
+    if (posts === 1) {
+      await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({run_id: "run-a", scenario_session_id: "session-a", job_id: "job-a", status: "queued"})});
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await route.fulfill({status: 422, contentType: "application/json", body: JSON.stringify({error: {code: "lab_invalid_request", message: "Run B rejected.", field_errors: []}, request_id: "request-b"})});
+  });
+  await page.route("http://atom-lab.test/v1/atom-lab/runs/run-a", async (route) => {
+    await route.fulfill({contentType: "application/json", body: JSON.stringify({
+      run_id: "run-a", status: "succeeded",
+      snapshot: {atom_id: "A05", input: A05.example_input, prompt: "Принятый промпт A", model_id: "openai/gpt-supported", reasoning_effort: null},
+      runtime_ids: {scenario_session_id: "session-a", job_id: "job-a", action_run_id: "action-a", artifact_id: "artifact-a"},
+      result: {questions: ["Результат A"]},
+      diagnostics: {error_code: null, duration_ms: 800, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: null, response_model_id: "gpt-confirmed", validation_attempts: 1, transport_attempts: 1, physical_calls: 1, succeeded_first_attempt: true, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
+      created_at: "2026-09-20T10:00:00Z", started_at: "2026-09-20T10:00:00Z", finished_at: "2026-09-20T10:00:01Z",
+    })});
+  });
+  await unlockAtom(page, "A05");
+  await page.locator("#fill-example").click();
+  await page.locator("#run-button").click();
+  await expect(page.locator("#run-state")).toContainText("Завершён");
+  await expect(page.locator("#submitted-snapshot")).toContainText("Принятый промпт A");
+  await expect(page.locator("#run-diagnostics")).toContainText("artifact-a");
+
+  await page.locator("#prompt-tab").click();
+  await page.locator("#prompt-editor").fill("Непринятый промпт B");
+  await page.locator("#run-button").click();
+  await expect(page.locator("#run-state")).toContainText("Отправка запуска");
+  await expect(page.locator("#submitted-snapshot")).toContainText("Принятый промпт A");
+  await expect(page.locator("#submitted-snapshot")).not.toContainText("Непринятый промпт B");
+  await expect(page.locator("#run-diagnostics")).toContainText("artifact-a");
+  await expect(page.locator("#result-readable")).toContainText("Результат A");
+
+  await expect(page.locator("#run-state")).toContainText("lab_invalid_request");
+  await expect(page.locator("#submitted-snapshot")).toContainText("Принятый промпт A");
+  await expect(page.locator("#run-diagnostics")).toContainText("artifact-a");
+});
+
 test("network submission retry reuses the idempotency key and polling reconnects without another POST", async ({page}) => {
   const keys = [];
   const bodies = [];
@@ -445,7 +487,7 @@ test("network submission retry reuses the idempotency key and polling reconnects
       await route.abort("connectionfailed");
       return;
     }
-    await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({run_id: "run-recovery", scenario_session_id: "session-recovery", job_id: "job-recovery", status: "queued"})});
+    await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({run_id: "run-recovery", scenario_session_id: "session-recovery", job_id: "job-recovery", status: "succeeded"})});
   });
   await page.route("http://atom-lab.test/v1/atom-lab/runs/run-recovery", async (route) => {
     reads += 1;
@@ -476,8 +518,11 @@ test("network submission retry reuses the idempotency key and polling reconnects
   await page.locator("#refresh-models").click();
   await expect(page.locator('#model-select option[value="gpt-supported"]')).toHaveCount(0);
   await page.locator("#retry-submit").click();
+  await expect(page.locator("#run-button")).toBeDisabled();
   await expect(page.locator("#run-state")).toContainText("Переподключение");
+  await expect(page.locator("#run-button")).toBeDisabled();
   await expect(page.locator("#run-state")).toContainText("Завершён");
+  await expect(page.locator("#run-button")).toBeEnabled();
 
   expect(keys).toHaveLength(2);
   expect(keys[0]).toBe(keys[1]);

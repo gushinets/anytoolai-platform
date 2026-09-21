@@ -386,7 +386,9 @@ test("repeated refresh requests share one bounded model-catalog polling chain", 
   const {document, elements} = createFakeDocument();
   const atom = await catalogAtom("A01");
   const pendingCatalog = {
-    items: [{model_id: "gpt", compatibility: "compatible", reason: "confirmed", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+    items: [{model_id: "gpt", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+    snapshot_id: "snapshot-pending",
+    last_success_at: null,
     stale: true,
     refresh_status: "pending",
     error: null,
@@ -659,6 +661,47 @@ test("unknown closed-schema fields remain visible in form mode with a path error
   assert.equal(messages.some((message) => message.includes("unexpected")), true);
 });
 
+test("malformed model catalog closed values fail closed before becoming selectable", async () => {
+  const atom = await catalogAtom("A01");
+  const validItem = {
+    model_id: "gpt-supported",
+    compatibility: "compatible",
+    reason: "confirmed_openai_text_gpt",
+    reasoning_supported: true,
+    allowed_reasoning_efforts: ["low", "high"],
+    provenance: {},
+  };
+  const baseCatalog = {
+    items: [validItem],
+    snapshot_id: "snapshot-1",
+    last_success_at: "2026-09-20T10:00:00Z",
+    stale: false,
+    refresh_status: "current",
+    error: null,
+  };
+  for (const malformedCatalog of [
+    {...baseCatalog, items: [{...validItem, model_id: 42}]},
+    {...baseCatalog, items: [{...validItem, allowed_reasoning_efforts: ["turbo"]}]},
+    {...baseCatalog, refresh_status: "invented"},
+  ]) {
+    const {document, elements} = createFakeDocument();
+    bootstrapAtomLab({
+      document,
+      fetchImpl: async (url) => ({
+        ok: true,
+        async json() { return url.endsWith("/atoms") ? [atom] : malformedCatalog; },
+      }),
+      confirmImpl: () => true,
+    });
+    elements.get("access-code").value = "secret";
+    await elements.get("access-form").dispatch("submit");
+
+    assert.equal(elements.get("model-select").disabled, true);
+    assert.equal(elements.get("run-button").disabled, true);
+    assert.match(elements.get("model-catalog-warning").textContent, /некорректный ответ/);
+  }
+});
+
 test("model options distinguish supported, unsupported, unknown, and incompatible choices", () => {
   assert.deepEqual(describeModelOption({
     model_id: "gpt-supported",
@@ -747,6 +790,7 @@ test("accepted and detail response parsers reject incomplete or unknown lifecycl
   const detail = {run_id: "run", status: "running", snapshot: {}, runtime_ids: runtimeIds, result: null, diagnostics, created_at: "2026-09-20T10:00:00Z", started_at: null, finished_at: null};
   assert.equal(parseRunDetail({...detail, runtime_ids: {}}, "run"), null);
   assert.equal(parseRunDetail({...detail, diagnostics: {...diagnostics, provider_calls: {}}}, "run"), null);
+  assert.equal(parseRunDetail({...detail, diagnostics: {...diagnostics, requested_reasoning_effort: "turbo"}}, "run"), null);
   assert.equal(parseRunDetail({...detail, diagnostics: {...diagnostics, provider_calls_truncated: undefined}}, "run"), null);
   assert.equal(parseRunDetail({...detail, diagnostics: {...diagnostics, provider_calls: [{provider_call_id: "call"}]}}, "run"), null);
   assert.deepEqual(parseRunDetail(detail, "run"), {
