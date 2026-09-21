@@ -299,7 +299,8 @@ export function ClientUpdateWriterProduct({ client, onEvent, visitId }: ClientUp
   const [modeId, setModeId] = useState<ModeId>("update");
   // Code review finding: `key={modeId}` below unmounts the active mode's ProductRunPage the
   // instant another mode is picked -- its cleanup aborts the in-flight poll/result fetch, but the
-  // backend keeps running an already-accepted, quota-consuming scenario. Switching mode mid-run
+  // backend keeps running an already-accepted scenario (a provider call the user has no way to
+  // get back). Switching mode mid-run
   // silently abandoned that run's result. Disabling the mode switch for the duration of a
   // submit/run (mirroring how the form's own fields are already disabled then) is simpler and
   // safer than trying to preserve/reattach the run across a remount, and needs no changes to the

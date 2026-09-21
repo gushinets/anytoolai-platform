@@ -415,8 +415,8 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
   it("disables mode switching while a run is submitting or in progress, instead of abandoning it", async () => {
     // Code review finding [P1]: key={modeId} unmounts the active ProductRunPage the instant
     // another mode is picked -- its cleanup aborts the poll/result fetch, but the backend keeps
-    // running an already-accepted, quota-consuming scenario. A user could switch mode while
-    // "Writing…" and permanently lose that limited run's result.
+    // running an already-accepted scenario. A user could switch mode while "Writing…" and
+    // permanently lose that run's result.
     const ids = MODE_IDS.update;
     const routes = routesFor(ids);
     const { client, resolveDeferred } = makeClientWithDeferredRoute(
@@ -519,7 +519,7 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     // Code review finding [P1]: the previous fix only covered the *poll* going ambiguous after an
     // already-accepted start. The start request itself can be just as ambiguous -- a network
     // failure/timeout/5xx on POST /start doesn't tell the client whether the backend already
-    // created the session/job and charged quota before the response was lost. runStart() lands on
+    // created the session/job before the response was lost. runStart() lands on
     // retryable-error here too, without ever learning a scenarioSessionId, but pendingStart (with
     // its Idempotency-Key) is deliberately kept alive for exactly this case -- so `busy` must gate
     // on pendingStart itself, not on whether a session id happens to be known yet.
@@ -565,11 +565,11 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     expect((screen.getByRole("radio", { name: "Update" }) as HTMLInputElement).disabled).toBe(false);
   });
 
-  it("keeps mode switching blocked through a result-fetch-error, and Try again reveals the already-paid-for result", async () => {
+  it("keeps mode switching blocked through a result-fetch-error, and Try again reveals the already-completed result", async () => {
     // Code review finding [P1]: result-fetch-error means the scenario session already completed
-    // and consumed its quota unit -- only the follow-up GET for the result failed. `busy` used to
-    // cover only submitting/running/an ambiguous retryable-error, so a mode switch here could still
-    // remount ProductRunPage and destroy the only handle (resultArtifactId) on an already-paid-for
+    // -- only the follow-up GET for the result failed. `busy` used to cover only
+    // submitting/running/an ambiguous retryable-error, so a mode switch here could still remount
+    // ProductRunPage and destroy the only handle (resultArtifactId) on an already-completed
     // result, permanently losing it.
     const ids = MODE_IDS.update;
     const routes = routesFor(ids);

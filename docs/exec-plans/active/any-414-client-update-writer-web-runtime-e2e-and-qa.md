@@ -7,7 +7,7 @@
 - Created: 2026-09-15
 - Last updated: 2026-09-21
 - Review date: 2026-09-21
-- Next action: push the rollback and update the PR description; no open code findings.
+- Next action: wait for CI on the pushed head and for the merge decision; no open code findings.
 - Blocker: none
 
 ## Goal
