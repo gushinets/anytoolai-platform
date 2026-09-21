@@ -283,6 +283,62 @@ jobs_table = sa.Table(
     sa.Index("ix_jobs_status", "status"),
 )
 
+atom_lab_presets_table = sa.Table(
+    "atom_lab_presets",
+    runtime_metadata,
+    sa.Column("id", sa.String(length=128), primary_key=True),
+    sa.Column("tenant_id", sa.String(length=128), nullable=False),
+    sa.Column("region", sa.String(length=64), nullable=False),
+    sa.Column("atom_id", sa.String(length=16), nullable=False),
+    sa.Column("latest_version", sa.Integer(), nullable=False),
+    sa.Column("created_at", utc_datetime, nullable=False),
+    sa.Column("updated_at", utc_datetime, nullable=False),
+    sa.Index("ix_atom_lab_presets_scope", "tenant_id", "region"),
+    sa.Index("ix_atom_lab_presets_created_at", "created_at", "id"),
+)
+
+atom_lab_preset_versions_table = sa.Table(
+    "atom_lab_preset_versions",
+    runtime_metadata,
+    sa.Column("preset_id", sa.String(length=128), primary_key=True),
+    sa.Column("version", sa.Integer(), primary_key=True),
+    sa.Column("tenant_id", sa.String(length=128), nullable=False),
+    sa.Column("region", sa.String(length=64), nullable=False),
+    sa.Column("name", sa.String(length=256), nullable=False),
+    sa.Column("description", sa.Text(), nullable=False),
+    sa.Column("atom_id", sa.String(length=16), nullable=False),
+    sa.Column("base_action_config_id", sa.String(length=128), nullable=False),
+    sa.Column("input_schema_ref", sa.String(length=128), nullable=False),
+    sa.Column("input_schema_version", sa.Integer(), nullable=False),
+    sa.Column("output_schema_ref", sa.String(length=128), nullable=False),
+    sa.Column("output_schema_version", sa.Integer(), nullable=False),
+    sa.Column("prompt", sa.Text(), nullable=False),
+    sa.Column("prompt_ref", sa.String(length=128), nullable=False),
+    sa.Column("model_id", sa.String(length=256), nullable=False),
+    sa.Column("reasoning_effort", sa.String(length=32)),
+    sa.Column("fixed_fields", json_document, nullable=False),
+    sa.Column("example_input", json_document, nullable=False),
+    sa.Column("source_run_id", sa.String(length=128)),
+    sa.Column("created_at", utc_datetime, nullable=False),
+    sa.ForeignKeyConstraint(
+        ["preset_id"],
+        [f"{PLATFORM_SCHEMA}.atom_lab_presets.id"],
+        name="fk_atom_lab_preset_versions_preset",
+    ),
+    sa.ForeignKeyConstraint(
+        ["source_run_id"],
+        [f"{PLATFORM_SCHEMA}.atom_lab_runs.id"],
+        name="fk_atom_lab_preset_versions_source_run",
+        use_alter=True,
+    ),
+    sa.UniqueConstraint(
+        "preset_id",
+        "version",
+        name="uq_atom_lab_preset_versions_identity",
+    ),
+    sa.Index("ix_atom_lab_preset_versions_scope", "tenant_id", "region"),
+)
+
 atom_lab_runs_table = sa.Table(
     "atom_lab_runs",
     runtime_metadata,
@@ -324,6 +380,9 @@ atom_lab_runs_table = sa.Table(
     sa.Column("action_definition", json_document, nullable=False),
     sa.Column("action_config_definition", json_document, nullable=False),
     sa.Column("execution_definition_hash", sa.String(length=64), nullable=False),
+    sa.Column("guest_id", sa.String(length=128)),
+    sa.Column("idempotency_key", sa.String(length=256)),
+    sa.Column("idempotency_request_hash", sa.String(length=64)),
     sa.Column("preset_id", sa.String(length=128)),
     sa.Column("preset_version", sa.Integer()),
     sa.Column("action_run_id", sa.String(length=128)),
@@ -347,8 +406,54 @@ atom_lab_runs_table = sa.Table(
         [f"{PLATFORM_SCHEMA}.artifacts.id"],
         name="fk_atom_lab_runs_artifact",
     ),
+    sa.ForeignKeyConstraint(
+        ["guest_id"],
+        [f"{PLATFORM_SCHEMA}.guest_identities.id"],
+        name="fk_atom_lab_runs_guest",
+        use_alter=True,
+    ),
+    sa.ForeignKeyConstraint(
+        ["preset_id", "preset_version"],
+        [
+            f"{PLATFORM_SCHEMA}.atom_lab_preset_versions.preset_id",
+            f"{PLATFORM_SCHEMA}.atom_lab_preset_versions.version",
+        ],
+        name="fk_atom_lab_runs_preset_version",
+    ),
+    sa.CheckConstraint(
+        "(preset_id IS NULL AND preset_version IS NULL) OR "
+        "(preset_id IS NOT NULL AND preset_version IS NOT NULL)",
+        name="ck_atom_lab_runs_complete_preset_ref",
+    ),
     sa.Index("ix_atom_lab_runs_created_at", "created_at"),
     sa.Index("ix_atom_lab_runs_scope", "tenant_id", "region", "product_id"),
+    sa.Index(
+        "ix_atom_lab_runs_scope_created_at",
+        "tenant_id",
+        "region",
+        "created_at",
+        "id",
+    ),
+    sa.UniqueConstraint(
+        "tenant_id",
+        "region",
+        "idempotency_key",
+        name="uq_atom_lab_runs_scope_idempotency_key",
+    ),
+)
+
+atom_lab_admission_scopes_table = sa.Table(
+    "atom_lab_admission_scopes",
+    runtime_metadata,
+    sa.Column("tenant_id", sa.String(length=128), primary_key=True),
+    sa.Column("region", sa.String(length=64), primary_key=True),
+    sa.Column("accepted_on", sa.Date(), nullable=False),
+    sa.Column("accepted_count", sa.Integer(), nullable=False),
+    sa.Column("updated_at", utc_datetime, nullable=False),
+    sa.CheckConstraint(
+        "accepted_count >= 0",
+        name="ck_atom_lab_admission_scopes_accepted_count",
+    ),
 )
 
 model_catalog_state_table = sa.Table(
@@ -665,7 +770,10 @@ event_log_table = sa.Table(
 runtime_tables = {
     "scenario_sessions": scenario_sessions_table,
     "jobs": jobs_table,
+    "atom_lab_presets": atom_lab_presets_table,
+    "atom_lab_preset_versions": atom_lab_preset_versions_table,
     "atom_lab_runs": atom_lab_runs_table,
+    "atom_lab_admission_scopes": atom_lab_admission_scopes_table,
     "model_catalog_state": model_catalog_state_table,
     "action_runs": action_runs_table,
     "provider_calls": provider_calls_table,

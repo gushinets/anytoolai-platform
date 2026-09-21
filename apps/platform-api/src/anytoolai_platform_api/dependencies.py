@@ -8,10 +8,22 @@ from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.config.registry import ConfigRegistry
 from anytoolai_platform_core.providers.catalog_settings import ModelCatalogSettings
 from fastapi import Depends, Request
+from pydantic import ValidationError
 
 
 def get_settings() -> Settings:
     return Settings()
+
+
+def get_atom_lab_run_settings() -> Settings:
+    try:
+        return Settings.from_env()
+    except ValidationError as exc:
+        raise AtomLabApiError(
+            status_code=503,
+            code="lab_unavailable",
+            message="Запуск Atom Lab не может быть принят.",
+        ) from exc
 
 
 def get_runtime(request: Request) -> RuntimeBootstrapResult:

@@ -27,10 +27,14 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
+import httpx
 import jsonschema
 import pytest
 import sqlalchemy as sa
-from anytoolai_platform_api.bootstrap import build_runtime
+from anytoolai_platform_api.bootstrap import RuntimeStorageDependencies, build_runtime
+from anytoolai_platform_api.main import create_app
+from anytoolai_platform_core.identity.models import GuestIdentityRecord
+from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.models import ProviderResponse, ResolvedProviderRequest
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
@@ -220,8 +224,39 @@ def test_compose_reply_output_schema_rejects_malformed_output() -> None:
 
 
 @pytest.fixture
-def app(platform_api_app_factory):
-    return platform_api_app_factory(guest_id=GUEST_ID)
+def app(session_factory: SessionFactory):
+    with transaction_boundary(session_factory) as session:
+        GuestIdentityRepository(session).create(
+            GuestIdentityRecord(
+                id="guest_client_update_writer",
+                tenant_id="anytoolai",
+                region="default",
+            )
+        )
+    application = create_app(config_root=CONFIG_ROOT)
+    application.state.runtime = replace(
+        application.state.runtime,
+        storage=RuntimeStorageDependencies(session_factory=session_factory),
+    )
+    return application
+
+
+async def _request(
+    app: Any,
+    method: str,
+    path: str,
+    *,
+    json: Any | None = None,
+    request_id: str = "req_client_update_writer_test",
+) -> httpx.Response:
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        return await client.request(
+            method,
+            path,
+            json=json,
+            headers={"X-Request-ID": request_id},
+        )
 
 
 _MODE_HAPPY_PATH_CASES = {
@@ -269,8 +304,9 @@ _MODE_HAPPY_PATH_CASES = {
         },
         {
             "text": (
-                "Now that the approved design phase is wrapping up and phase 2 is about to start, "
-                "could you send the $500 prepayment for phase 2 by Friday?"
+                "Now that the approved design phase is wrapping up this week and phase 2 "
+                "(development) is starting next, could you send the $500 prepayment for phase 2 "
+                "by Friday?"
             ),
             "call_to_action": "Let me know once it's on its way.",
         },
@@ -296,7 +332,7 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     # second literal keeps that id defined in exactly one place.
     scenario_id = _MODE_WORKFLOWS[mode][0]
     started = asyncio.run(
-        request_platform_api(
+        _request(
             app,
             "POST",
             f"/v1/products/client_update_writer/scenarios/{scenario_id}/start",
@@ -326,7 +362,7 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     assert processed.result_artifact_id is not None
 
     session_response = asyncio.run(
-        request_platform_api(
+        _request(
             app,
             "GET",
             f"/v1/scenario-sessions/{started['scenario_session_id']}",
@@ -341,7 +377,7 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     assert session_body["result_artifact_id"] == processed.result_artifact_id
 
     result_response = asyncio.run(
-        request_platform_api(
+        _request(
             app,
             "GET",
             f"/v1/results/{processed.result_artifact_id}",
@@ -449,6 +485,33 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
         assert billing_context["amount"] in result_body["output"]["text"]
         assert billing_context["due_date"] in result_body["output"]["text"]
 
+    # Code review finding (me #13): the happy path stopped at asserting `copy_result` is
+    # *allowed* -- it never actually called the next-action endpoint or checked that the
+    # activation event this product's own contract promises actually gets recorded.
+    next_action_response = asyncio.run(
+        _request(
+            app,
+            "POST",
+            f"/v1/scenario-sessions/{started['scenario_session_id']}/next-actions/copy_result",
+            json={"checkpoint_id": RESULT_READY_CHECKPOINT_ID},
+        )
+    )
+    assert next_action_response.status_code == HTTPStatus.OK
+
+    with transaction_boundary(session_factory) as session:
+        event_row = session.execute(
+            sa.select(event_log_table).where(
+                event_log_table.c.event_type == "client.next_action_clicked"
+            )
+        ).mappings().one()
+
+    assert event_row["scenario_session_id"] == started["scenario_session_id"]
+    assert event_row["job_id"] == started["job_id"]
+    assert event_row["properties"] == {
+        "checkpoint_id": RESULT_READY_CHECKPOINT_ID,
+        "next_action_id": "copy_result",
+    }
+
 
 class _WeakInputProviderAdapter(FakeProviderAdapter):
     """Forces every provider call in a worker run to resolve `<action_config_id>.weak_input`
@@ -508,7 +571,7 @@ def test_weak_input_fixture_is_reachable_end_to_end(
     )["response_json"]
 
     started = asyncio.run(
-        request_platform_api(
+        _request(
             app,
             "POST",
             f"/v1/products/client_update_writer/scenarios/{scenario_id}/start",
@@ -537,7 +600,7 @@ def test_weak_input_fixture_is_reachable_end_to_end(
     assert processed.result_artifact_id is not None
 
     result_response = asyncio.run(
-        request_platform_api(
+        _request(
             app,
             "GET",
             f"/v1/results/{processed.result_artifact_id}",

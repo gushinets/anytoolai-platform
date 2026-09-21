@@ -1,0 +1,13 @@
+{
+  "name": "@anytoolai/atom-lab-browser-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test atom-lab.test.mjs && playwright test",
+    "browser": "playwright test",
+    "lint": "cd ../../.. && eslint --config tests/e2e/atom-lab-browser/eslint.config.mjs tests/e2e/atom-lab-browser apps/platform-api/src/anytoolai_platform_api/static/atom_lab/atom_lab.mjs --max-warnings=0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}

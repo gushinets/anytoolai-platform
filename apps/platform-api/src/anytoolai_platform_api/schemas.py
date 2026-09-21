@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
 
+from anytoolai_platform_core.atom_lab.models import AtomLabRunStatus
 from anytoolai_platform_core.events.client_events import WebClientEventType
 from anytoolai_platform_core.handoffs.models import HandoffStatus
 from anytoolai_platform_core.products.models import FrontendType
@@ -11,6 +12,7 @@ from anytoolai_platform_core.providers.models import (
     ModelCatalogCompatibility,
     ModelCatalogReason,
     ModelCatalogRefreshStatus,
+    ProviderCallStatus,
     ReasoningEffort,
 )
 from anytoolai_platform_core.quotas.models import QuotaDimension, QuotaPeriod, QuotaUnit
@@ -216,6 +218,200 @@ class AtomLabModelRefreshResponse(BaseModel):
     stale: bool
     refresh_status: ModelCatalogRefreshStatus
     error: str | None
+
+
+class AtomLabPresetVersionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=256)
+    description: str = Field(max_length=4096)
+    atom_id: AtomLabAtomId
+    base_action_config_id: str = Field(min_length=1, max_length=128)
+    schema_refs: AtomLabSchemaRefsResponse
+    prompt: str = Field(min_length=1, max_length=65536)
+    prompt_ref: str = Field(min_length=1, max_length=128)
+    model_id: str = Field(min_length=1, max_length=256)
+    reasoning_effort: ReasoningEffort | None = None
+    fixed_fields: list[str] = Field(default_factory=list)
+    example_input: dict[str, Any]
+    source_run_id: str | None = Field(default=None, max_length=128)
+
+
+class AtomLabRunPresetRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    preset_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+    version: int = Field(strict=True, ge=1, le=2_147_483_647)
+
+
+class AtomLabRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    atom_id: AtomLabAtomId
+    input: dict[str, Any]
+    prompt: str = Field(min_length=1)
+    model_id: str = Field(min_length=1, max_length=256)
+    reasoning_effort: ReasoningEffort | None
+    preset_ref: AtomLabRunPresetRef | None = None
+
+
+class AtomLabRunRuntimeIdsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scenario_session_id: str | None
+    job_id: str | None
+    action_run_id: str | None
+    artifact_id: str | None
+
+
+class AtomLabProviderCallDiagnosticResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider_call_id: str
+    action_run_id: str
+    status: ProviderCallStatus
+    semantic_attempt_index: int
+    transport_attempt_index: int
+    physical_call_index: int
+    response_model_id: str | None
+    error_code: str | None
+    latency_ms: int
+
+
+class AtomLabDebugArtifactResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    artifact_id: str
+    error_code: str | None
+    raw_output_text: str | None
+    truncated: bool
+    redacted: bool
+
+
+class AtomLabRunDiagnosticsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    error_code: str | None
+    duration_ms: int | None
+    requested_model_id: str
+    requested_reasoning_effort: ReasoningEffort | None
+    response_model_id: str | None
+    validation_attempts: int
+    transport_attempts: int
+    physical_calls: int
+    succeeded_first_attempt: bool | None
+    provider_calls: list[AtomLabProviderCallDiagnosticResponse]
+    provider_calls_truncated: bool
+    debug_artifacts: list[AtomLabDebugArtifactResponse]
+    debug_artifacts_truncated: bool
+
+
+class AtomLabRunSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    status: AtomLabRunStatus
+    atom_id: str
+    model_id: str
+    preset_id: str | None
+    preset_version: int | None
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+
+class AtomLabRunListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[AtomLabRunSummaryResponse]
+    next_cursor: str | None
+
+
+class AtomLabRunDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    status: AtomLabRunStatus
+    snapshot: dict[str, Any]
+    runtime_ids: AtomLabRunRuntimeIdsResponse
+    result: dict[str, Any] | list[Any] | None
+    diagnostics: AtomLabRunDiagnosticsResponse
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+
+class AtomLabRunAcceptedResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    scenario_session_id: str
+    job_id: str
+    status: AtomLabRunStatus
+
+
+class AtomLabPresetNextVersionRequest(AtomLabPresetVersionRequest):
+    base_version: int = Field(ge=1)
+
+
+class AtomLabPresetCreatedResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    preset_id: str
+    version: int
+    created_at: datetime
+
+
+class AtomLabPresetVersionResponse(AtomLabPresetVersionRequest):
+    preset_id: str
+    version: int
+    created_at: datetime
+
+
+class AtomLabPresetSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    preset_id: str
+    latest_version: int
+    name: str
+    description: str
+    atom_id: AtomLabAtomId
+    created_at: datetime
+    updated_at: datetime
+
+
+class AtomLabPresetVersionSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    preset_id: str
+    version: int
+    name: str
+    description: str
+    atom_id: AtomLabAtomId
+    created_at: datetime
+
+
+class AtomLabPresetListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[AtomLabPresetSummaryResponse]
+    next_cursor: str | None
+
+
+class AtomLabPresetVersionListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[AtomLabPresetVersionSummaryResponse]
+    next_cursor: str | None
+
+
+class AtomLabPresetExportResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    format_version: Literal[1] = 1
+    preset_id: str
+    version: int
+    configuration: AtomLabPresetVersionRequest
 
 
 class ScenarioSessionResponse(BaseModel):

@@ -35,13 +35,13 @@ FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_ou
 )
 
 
-def _load_test_support_module() -> Any:
-    # Dynamic-load by explicit path, same pattern this file already used for
-    # validate_architecture.py -- code review finding: _load_validate_architecture_module(),
-    # FORBIDDEN_TOKENS, and _load_yaml() were each duplicated verbatim in
-    # test_proposal_ai_product.py; both now load this one shared module instead.
-    path = Path(__file__).resolve().parent / "_test_support.py"
-    spec = importlib.util.spec_from_file_location("freelancer_suite_test_support", path)
+def _load_validate_architecture_module() -> Any:
+    # Dynamic-load, same pattern test_proposal_ai_product.py already uses --
+    # validate_architecture.py is pure stdlib (no anytoolai_platform_core import chain), so this
+    # stays within ATAI007/ATAI008's ban on product-platforms code depending on platform-core
+    # internals.
+    path = REPO_ROOT / "scripts" / "agent" / "validate_architecture.py"
+    spec = importlib.util.spec_from_file_location("validate_architecture_module", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -53,7 +53,11 @@ _test_support = _load_test_support_module()
 # source of truth ATAI006 already enforces repo-wide -- rather than a second, hand-maintained copy
 # that could silently drift from it (code review finding: team lead #1). Model-string prefixes are
 # a distinct concern (raw text, not an import name) with no central list to reuse.
-FORBIDDEN_TOKENS = _test_support.FORBIDDEN_PROVIDER_TERMS
+FORBIDDEN_TOKENS = tuple(_load_validate_architecture_module().LLM_PROVIDER_IMPORTS) + (
+    "gpt-",
+    "claude-",
+    "gemini-",
+)
 
 
 def _forbidden_token_pattern(token: str) -> re.Pattern[str]:
@@ -68,7 +72,7 @@ def _forbidden_token_pattern(token: str) -> re.Pattern[str]:
 
 
 def _load_yaml(relative_path: str) -> dict[str, Any]:
-    return _test_support.load_yaml(PRODUCT_DIR, relative_path)
+    return yaml.safe_load((PRODUCT_DIR / relative_path).read_text(encoding="utf-8"))
 
 
 def _action_type_by_config_id() -> dict[str, str]:
@@ -495,6 +499,24 @@ def test_prepaid_request_reply_fixture_does_not_repeat_the_situation_verbatim(
     assert first_sentence not in reply_text, fixture_suffix
 
 
+# Code review finding (me #12): the verbatim-repeat check above and the E2E test's amount/due_date
+# assertion don't protect the *other* grounded facts A06 states (week, phase type, sequence) --
+# this exact class of regression (dropping/rewording them while paraphrasing) had already
+# recurred once. Pins that the happy reply keeps all three, independent of exact wording.
+_A06_HAPPY_FRAMING_FACTS = ("this week", "development", "starting next")
+
+
+def test_prepaid_request_happy_reply_preserves_a06_framing_facts() -> None:
+    reply_text = json.loads(
+        (
+            FIXTURE_ROOT / "client_update_writer.prepaid_request_compose_reply_v1.json"
+        ).read_text(encoding="utf-8")
+    )["response_json"]["text"].lower()
+
+    for fact in _A06_HAPPY_FRAMING_FACTS:
+        assert fact in reply_text, fact
+
+
 def test_prepaid_request_weak_fixture_preserves_urgency_across_both_steps() -> None:
     persuasive_text = json.loads(
         (
@@ -516,6 +538,16 @@ def test_prepaid_request_weak_fixture_preserves_urgency_across_both_steps() -> N
 
 # Code review finding (xhigh #5): the reversed call_to_action rule -- CTA is follow-up
 # acknowledgement only, not a repeat of the payment ask -- had no regression test of its own.
+# Code review finding (team lead #4): checking only for the literal word "send" let a repeated
+# payment ask worded differently ("Please pay the $500 now", "Transfer the agreed amount") slip
+# through undetected. Broadened to a payment-verb denylist plus a no-digits check, so any CTA that
+# restates the amount or re-asks for payment in some other verb fails here too.
+# Code review finding (me #12): plain substring matching made "pay" false-positive on the
+# legitimate word "payment" (e.g. "Let me know once the payment is on its way."). Word-boundary
+# matching only, mirroring _forbidden_token_pattern's approach elsewhere in this file.
+_PAYMENT_ASK_TERM_PATTERN = re.compile(r"\b(send|pay|transfer|wire)\b", re.IGNORECASE)
+
+
 @pytest.mark.parametrize("fixture_suffix", ["", ".weak_input"])
 def test_prepaid_request_reply_call_to_action_does_not_repeat_the_payment_ask(
     fixture_suffix: str,
@@ -526,7 +558,8 @@ def test_prepaid_request_reply_call_to_action_does_not_repeat_the_payment_ask(
         ).read_text(encoding="utf-8")
     )["response_json"]["call_to_action"].lower()
 
-    assert "send" not in call_to_action, fixture_suffix
+    assert _PAYMENT_ASK_TERM_PATTERN.search(call_to_action) is None, fixture_suffix
+    assert not any(char.isdigit() for char in call_to_action), fixture_suffix
 
 
 def test_renderer_contract_pins_the_canonical_copy_ready_composition() -> None:

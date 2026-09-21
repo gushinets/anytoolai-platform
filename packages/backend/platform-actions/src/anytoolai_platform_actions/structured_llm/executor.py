@@ -251,6 +251,11 @@ class StructuredLlmActionExecutor:
                 acquisition_source=metadata_str(request.metadata, "acquisition_source"),
                 action_type=action_type,
                 action_config_id=request.action_config_id,
+                atom_lab_run_id=(
+                    None
+                    if request.run_local_settings is None
+                    else request.run_local_settings.run_id
+                ),
             ),
             schema=schema_mapping,
             schema_ref=None if response_schema is None else response_schema.schema_ref,

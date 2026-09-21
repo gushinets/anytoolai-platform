@@ -54,6 +54,13 @@ services:
       # Internal Atom Lab access code. Blank keeps every /v1/atom-lab/* data route fail-closed;
       # this credential belongs only to platform-api and is never passed to the worker.
       ANYTOOLAI_ATOM_LAB_ACCESS_CODE: ${ANYTOOLAI_ATOM_LAB_ACCESS_CODE:-}
+      # Non-secret Atom Lab admission limits apply only at the API boundary. They are technical
+      # request/admission limits, not guarantees about a selected model's context window.
+      ANYTOOLAI_ATOM_LAB_RUN_BODY_MAX_BYTES: ${ANYTOOLAI_ATOM_LAB_RUN_BODY_MAX_BYTES:-393216}
+      ANYTOOLAI_ATOM_LAB_RUN_INPUT_MAX_BYTES: ${ANYTOOLAI_ATOM_LAB_RUN_INPUT_MAX_BYTES:-262144}
+      ANYTOOLAI_ATOM_LAB_RUN_PROMPT_MAX_BYTES: ${ANYTOOLAI_ATOM_LAB_RUN_PROMPT_MAX_BYTES:-65536}
+      ANYTOOLAI_ATOM_LAB_RUN_DAILY_LIMIT: ${ANYTOOLAI_ATOM_LAB_RUN_DAILY_LIMIT:-100}
+      ANYTOOLAI_ATOM_LAB_RUN_ACTIVE_LIMIT: ${ANYTOOLAI_ATOM_LAB_RUN_ACTIVE_LIMIT:-1}
       # Non-secret catalog scope/timing must match the worker. The provider key is intentionally
       # absent: API only reads cache state and atomically requests refresh.
       ANYTOOLAI_MODEL_CATALOG_ACCOUNT_SCOPE: ${ANYTOOLAI_MODEL_CATALOG_ACCOUNT_SCOPE:-openai-default}
