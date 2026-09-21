@@ -234,24 +234,3 @@ def test_non_empty_bundle_actually_lands_in_worker_and_validate_configs_registri
     validate_configs = _load_validate_configs_module()
     registry = validate_configs.load_registry(bundles=[_FixtureBundle()])
     assert "fixture_product" in registry.products
-
-
-def test_default_product_bundles_all_declare_a_quota_policy() -> None:
-    """A product with no `quota_policy_ref` silently skips quota enforcement entirely
-    (`quotas/service.py`'s `validate_accepted_start()`), so `products_missing_a_quota_policy`
-    makes declaring one a repo-wide invariant for the default bundle set. Proves the real default
-    bundle set is actually clean, not just that the checker function exists."""
-    validate_configs = _load_validate_configs_module()
-    registry = validate_configs.load_registry()
-    assert validate_configs.products_missing_a_quota_policy(registry) == []
-
-
-def test_product_with_no_quota_policy_ref_fails_validate_configs_structurally(
-    monkeypatch: Any,
-) -> None:
-    """`fixture_product` (this file's own `_FixtureBundle`) has no `quota_policy_ref` -- it
-    doubles as the regression fixture proving `main()` actually rejects that, not just that
-    `products_missing_a_quota_policy()` can compute the right answer in isolation."""
-    validate_configs = _load_validate_configs_module()
-    monkeypatch.setattr(validate_configs, "DEFAULT_PRODUCT_BUNDLES", [_FixtureBundle()])
-    assert validate_configs.main() == 1

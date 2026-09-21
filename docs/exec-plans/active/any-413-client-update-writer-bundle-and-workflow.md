@@ -93,8 +93,8 @@ this ticket).
    id + type), not a page implementation — `apps/web-mirror` still ships no product page for this
    ticket, matching the non-goals.
 6. **No `quotas.yaml`/`handoffs.yaml`** — the ticket names no quota policy or handoff target, and
-   both are optional to the loader when `product.yaml` sets no `quota_policy_ref`. *(Superseded for
-   quotas by ANY-414, which added a guest quota as an explicit product decision -- see
+   both are optional to the loader when `product.yaml` sets no `quota_policy_ref`. *(For quotas, see
+   ANY-414: its PR adds a guest quota whose parameters are pending a product decision --
    `any-414-client-update-writer-web-runtime-e2e-and-qa.md`, design decision 11.)*
 7. **No `analytics.yaml` file** — it is optional to the loader (`_load_analytics` returns `{}`
    when the file is absent) and no product-specific event IDs are named beyond the generic

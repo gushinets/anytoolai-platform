@@ -60,26 +60,9 @@ def load_registry(bundles: Iterable[ProductBundle] | None = None) -> ConfigRegis
     return ConfigLoader(config_root, extra_product_roots=extra_product_roots).load()
 
 
-def products_missing_a_quota_policy(registry: ConfigRegistry) -> list[str]:
-    """Repo-wide invariant (ANY-414): `quotas/service.py`'s `validate_accepted_start()` silently
-    treats a product with no `quota_policy_ref` as "quota does not apply", so guest usage of that
-    product's LLM actions is then completely unmetered -- easy to do by simply forgetting a
-    `quotas.yaml`. Every product in the default bundle set must therefore declare one; a
-    genuinely free/unlimited product must say so through an explicit exemption added to this
-    function (none exists today), not by silently omitting `quota_policy_ref`. Client Update
-    Writer's own quota (3 runs, lifetime, product-wide) is a product decision recorded in
-    docs/exec-plans/active/any-414-*.md, not something this check derives.
-    """
-    return sorted(
-        product_id
-        for product_id, product in registry.products.items()
-        if not product.quota_policy_ref
-    )
-
-
 def main() -> int:
     try:
-        registry = load_registry()
+        load_registry()
         load_model_capability_overrides(default_model_capability_overrides_path())
     except RegistryLoadError as error:
         print(str(error), file=sys.stderr)
@@ -89,15 +72,6 @@ def main() -> int:
         return 1
     except ValueError as error:
         print(str(error), file=sys.stderr)
-        return 1
-
-    missing_quota_policy = products_missing_a_quota_policy(registry)
-    if missing_quota_policy:
-        print(
-            "Config validation failed: product(s) with no quota_policy_ref (quota enforcement is "
-            "silently skipped for these): " + ", ".join(missing_quota_policy),
-            file=sys.stderr,
-        )
         return 1
 
     print("Config validation passed")

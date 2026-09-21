@@ -7,8 +7,8 @@
 - Created: 2026-09-15
 - Last updated: 2026-09-21
 - Review date: 2026-09-21
-- Next action: wait for CI on the pushed head and for the merge decision; no open code findings.
-- Blocker: none
+- Next action: apply the team lead's answer on the Client Update Writer quota (asked on ANY-414).
+- Blocker: product decision on the Client Update Writer guest quota (design decision 11)
 
 ## Goal
 
@@ -231,15 +231,18 @@ covers Update mode only, the other two modes' meaning stays proven at the backen
     parent ANY-412 name a limit, period or dimension; the values were chosen by analogy with
     ProposalAI, whose own plan calls `3` a placeholder to revisit. A later review rightly flagged
     that this is new production policy (unlimited -> three runs forever) with no authoritative
-    source. It stays, as a decision confirmed by the user on 2026-09-21: ANY-414's acceptance
-    criteria require assertions covering quota, which is impossible for a product with no policy,
-    and an unmetered real-provider LLM product is a cost exposure. Revisit the numbers if the
-    product owner picks a different budget. ANY-413's decision 6 now points here.
-    Also kept: the repo-wide `validate_configs.py` guard that every default-set product declares a
-    `quota_policy_ref` (`add-product-recipe.md` now says so; a free product needs an explicit
-    exemption in the validator). Earlier comments claiming the missing-quota bug "shipped twice
-    (ProposalAI, then Client Update Writer)" were wrong -- ProposalAI has had its quota since it was
-    created -- and were removed.
+    source. **Status: awaiting the team lead's decision** -- asked on ANY-414 in Linear on
+    2026-09-21 (keep 3/lifetime/product, other parameters, or no quota in this PR). The policy
+    stays in the PR until that answer, because this PR adds the public web page and an unmetered
+    real-provider LLM product is a cost exposure; it is not yet an authoritative product decision,
+    and the PR should not merge on it. ANY-413's decision 6 points here.
+    Removed again: an earlier round also added a repo-wide `validate_configs.py` check failing any
+    default-set product without a `quota_policy_ref`. Platform Core documents a quota-less product
+    as a valid runtime contract and `add-product-recipe.md` lists `quotas.yaml` as optional, so
+    making it mandatory is a repo-wide architectural decision wider than this ticket (and its
+    justification -- that the omission had "shipped twice" -- was wrong: ProposalAI has had a quota
+    since it was created). Client Update Writer's own policy stays pinned by its product test
+    (`test_quota_policy_ref_resolves_to_the_declared_lifetime_product_quota`).
 
 ## Verification
 
