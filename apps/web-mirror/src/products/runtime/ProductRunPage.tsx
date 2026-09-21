@@ -667,12 +667,19 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // `copy_result` activation record also completes -- code review finding: awaiting the whole
   // helper before resolving made "Copied" wait on a network round-trip it never used to wait on.
   // The activation record still proceeds to completion in the background either way.
+  //
+  // Deliberately NOT tied to this mount's AbortSignal (code review finding): once the clipboard
+  // write succeeds, the copy has irreversibly happened, so recording it must survive the page
+  // going away (a mode switch remount, navigating off) instead of being cancelled -- before it's
+  // even sent if the write was still pending, or mid-flight otherwise -- which would silently drop
+  // the journey's required `copy_result`. It can't hang past unmount: the client applies its own
+  // request timeout, and nothing here touches component state after unmount (`resolve` only
+  // settles a promise; a setState on an unmounted ResultView is a no-op).
   function handleCopy(text: string): Promise<boolean> {
     if (phase.kind !== "result") {
       return Promise.resolve(false);
     }
     const { scenarioSessionId, checkpointId } = phase;
-    const controller = controllerRef.current;
     const writeToClipboard = (value: string) =>
       navigator.clipboard?.writeText
         ? navigator.clipboard.writeText(value)
@@ -691,7 +698,6 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
             resolve(true);
           },
         },
-        { signal: controller?.signal },
       ).then(
         (outcome) => {
           if (!outcome.copied) {

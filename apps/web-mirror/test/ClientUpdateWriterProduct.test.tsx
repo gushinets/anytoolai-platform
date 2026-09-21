@@ -651,4 +651,43 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
     await waitFor(() => expect(screen.getByLabelText("Client message")).toBeTruthy());
   });
+
+  it("still records copy_result when the mode is switched right after clicking Copy", async () => {
+    // Code review finding [P2]: `busy` is false once a result is showing, so the mode radios are
+    // enabled during a copy, and switching remounts (unmounts) ProductRunPage. Its copy_result
+    // activation used to share the page's abort signal, so a switch while the clipboard write was
+    // still pending cancelled it -- the text reached the clipboard but the journey's required
+    // `copy_result` was silently lost. `init.signal` is the client's per-request signal.
+    let resolveClipboard!: () => void;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn(() => new Promise<void>((resolve) => (resolveClipboard = resolve))) },
+    });
+    const ids = MODE_IDS.update;
+    const routes = routesFor(ids);
+    const { client, calls } = makeClient({
+      [routes.RUNTIME_CONFIG]: [fullRuntimeConfigResponse(ids)],
+      [routes.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
+      [routes.QUOTA]: [quotaResponse(ids), quotaResponse(MODE_IDS.reply_draft)],
+      [routes.START]: [startResponse()],
+      [routes.SESSION]: [sessionResponse()],
+      [routes.RESULT]: [resultResponse(ids)],
+      [routes.NEXT_ACTION]: [sessionResponse({ status: "completed" })],
+    });
+
+    render(<ClientUpdateWriterProduct client={client} />);
+    await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Progress notes"), { target: { value: "Still working on it." } });
+    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "neutral" } });
+    fireEvent.click(screen.getByRole("button", { name: "Write update" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
+    await waitFor(() => expect(screen.getByLabelText("Client message")).toBeTruthy());
+    resolveClipboard();
+    await waitFor(() => expect(calls.some((call) => call.key === routes.NEXT_ACTION)).toBe(true));
+
+    expect(calls.find((call) => call.key === routes.NEXT_ACTION)!.init.signal?.aborted).toBe(false);
+  });
 });

@@ -211,6 +211,19 @@ covers Update mode only, the other two modes' meaning stays proven at the backen
    unchanged); `test/sharedUiUsage.test.ts` pins this structurally for those three files (radio
    inputs excepted — shared-ui has no radio).
 
+10. **`copy_result` activation is not tied to the page's abort signal.** `handleCopy` passed the
+    mount-level `AbortSignal` to `copyResultAndRecordActivation`, so unmounting right after clicking
+    Copy -- a mode switch (`busy` is false once a result shows, so the radios are enabled) or just
+    navigating away -- cancelled the activation: before it was sent if the clipboard write was still
+    pending, or mid-flight otherwise. The text was on the clipboard but the journey's required
+    `copy_result` was lost, and a comment claimed the record "proceeds to completion in the
+    background either way". Once the clipboard write succeeds the copy is irreversible, so recording
+    it is now independent of the page's lifetime; it is still bounded by the client's own request
+    timeout (10s default) and touches no component state after unmount. Reads/polls keep the mount
+    signal -- there, cancelling on unmount is the point. Regressions: two `ProductRunPage` tests
+    (unmount while the write is pending / while the request is in flight) and one Client Update
+    Writer test for the exact mode-switch scenario; all three fail without the change.
+
 ## Verification
 
 Run twice: once before merging `main`, once after (to catch merge-resolution regressions —
@@ -218,7 +231,7 @@ see design decision 2 and the note below).
 
 - `pnpm --filter @anytoolai/web-mirror typecheck` — passed.
 - `pnpm --filter @anytoolai/web-mirror lint` — passed.
-- `pnpm --filter @anytoolai/web-mirror test` — 133/133 passed as of design decision 9 (90/90 post-merge, 86/86 before).
+- `pnpm --filter @anytoolai/web-mirror test` — 136/136 passed as of design decision 10 (90/90 post-merge, 86/86 before).
 - `pnpm --filter @anytoolai/ce-kit test` — 315/315 passed (unaffected).
 - `pnpm --filter @anytoolai/ce-kit typecheck` — passed.
 - `python scripts/agent/runner.py frontend-check` — passed (lint, typecheck, test, API-types-drift

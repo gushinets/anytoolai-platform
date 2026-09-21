@@ -320,6 +320,61 @@ describe("ProductRunPage", () => {
     expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
   });
 
+  describe("a copy that outlives the page", () => {
+    // Code review finding [P2]: the copy_result activation was tied to the page's own mount-level
+    // AbortSignal. Unmounting (a mode switch, or just navigating away) right after clicking Copy
+    // therefore cancelled it -- before it was sent if the clipboard write was still pending, or
+    // mid-flight otherwise -- even though the text had already reached the clipboard, losing the
+    // journey's required `copy_result` for the user's own successful copy. `init.signal` is the
+    // client's per-request signal, aborted by an external abort, so it is what tells these apart.
+    function nextActionCall(calls: Array<{ key: string; init: RequestInit }>) {
+      return calls.find((call) => call.key === ROUTES.NEXT_ACTION);
+    }
+
+    it("still sends copy_result when the page unmounts while the clipboard write is pending", async () => {
+      let resolveClipboard!: () => void;
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: vi.fn(() => new Promise<void>((resolve) => (resolveClipboard = resolve))) },
+      });
+      const { client, calls } = makeClient({
+        ...happyPathRoutes(),
+        [ROUTES.NEXT_ACTION]: [sessionResponse({ status: "completed" })],
+      });
+
+      const view = renderPage({ client });
+      await waitForForm();
+      fillValidForm();
+      submit();
+      await waitForResult();
+
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      view.unmount();
+      resolveClipboard();
+      await waitFor(() => expect(nextActionCall(calls)).toBeTruthy());
+
+      expect(nextActionCall(calls)!.init.signal?.aborted).toBe(false);
+    });
+
+    it("does not cancel an in-flight copy_result when the page unmounts", async () => {
+      const { client, calls, resolveDeferred } = makeClientWithDeferredRoute(happyPathRoutes(), ROUTES.NEXT_ACTION);
+
+      const view = renderPage({ client });
+      await waitForForm();
+      fillValidForm();
+      submit();
+      await waitForResult();
+
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      await waitFor(() => expect(nextActionCall(calls)).toBeTruthy());
+      view.unmount();
+      resolveDeferred(sessionResponse({ status: "completed" }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(nextActionCall(calls)!.init.signal?.aborted).toBe(false);
+    });
+  });
+
   it("disables the Copy button for the duration of a copy, so a fast double-click can't fire two activations", async () => {
     // Code review finding: handleCopy had no debounce/in-flight guard.
     const { client, calls, resolveDeferred } = makeClientWithDeferredRoute(happyPathRoutes(), ROUTES.NEXT_ACTION);

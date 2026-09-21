@@ -27,14 +27,10 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-import httpx
 import jsonschema
 import pytest
 import sqlalchemy as sa
-from anytoolai_platform_api.bootstrap import RuntimeStorageDependencies, build_runtime
-from anytoolai_platform_api.main import create_app
-from anytoolai_platform_core.identity.models import GuestIdentityRecord
-from anytoolai_platform_core.identity.repository import GuestIdentityRepository
+from anytoolai_platform_api.bootstrap import build_runtime
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.models import ProviderResponse, ResolvedProviderRequest
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
@@ -218,45 +214,12 @@ def test_compose_reply_output_schema_rejects_malformed_output() -> None:
 
 
 # `session_factory`/`platform_api_app_factory`/`request_platform_api` (SQLite-backed) come from
-# apps/platform-api/tests/conftest.py, shared with test_demo_api.py and test_proposal_ai_bundle.py
-# (ANY-414 code review finding: this file's own `app` fixture and `_request()` helper were a
-# verbatim duplicate of test_proposal_ai_bundle.py's).
+# apps/platform-api/tests/conftest.py, shared with test_demo_api.py and test_proposal_ai_bundle.py.
 
 
 @pytest.fixture
-def app(session_factory: SessionFactory):
-    with transaction_boundary(session_factory) as session:
-        GuestIdentityRepository(session).create(
-            GuestIdentityRecord(
-                id="guest_client_update_writer",
-                tenant_id="anytoolai",
-                region="default",
-            )
-        )
-    application = create_app(config_root=CONFIG_ROOT)
-    application.state.runtime = replace(
-        application.state.runtime,
-        storage=RuntimeStorageDependencies(session_factory=session_factory),
-    )
-    return application
-
-
-async def _request(
-    app: Any,
-    method: str,
-    path: str,
-    *,
-    json: Any | None = None,
-    request_id: str = "req_client_update_writer_test",
-) -> httpx.Response:
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-        return await client.request(
-            method,
-            path,
-            json=json,
-            headers={"X-Request-ID": request_id},
-        )
+def app(platform_api_app_factory):
+    return platform_api_app_factory(guest_id=GUEST_ID)
 
 
 _MODE_HAPPY_PATH_CASES = {
@@ -332,7 +295,7 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     # second literal keeps that id defined in exactly one place.
     scenario_id = _MODE_WORKFLOWS[mode][0]
     started = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "POST",
             f"/v1/products/client_update_writer/scenarios/{scenario_id}/start",
@@ -362,7 +325,7 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     assert processed.result_artifact_id is not None
 
     session_response = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "GET",
             f"/v1/scenario-sessions/{started['scenario_session_id']}",
@@ -377,7 +340,7 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     assert session_body["result_artifact_id"] == processed.result_artifact_id
 
     result_response = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "GET",
             f"/v1/results/{processed.result_artifact_id}",
@@ -489,11 +452,12 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     # *allowed* -- it never actually called the next-action endpoint or checked that the
     # activation event this product's own contract promises actually gets recorded.
     next_action_response = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "POST",
             f"/v1/scenario-sessions/{started['scenario_session_id']}/next-actions/copy_result",
             json={"checkpoint_id": RESULT_READY_CHECKPOINT_ID},
+            request_id=REQUEST_ID,
         )
     )
     assert next_action_response.status_code == HTTPStatus.OK
@@ -571,7 +535,7 @@ def test_weak_input_fixture_is_reachable_end_to_end(
     )["response_json"]
 
     started = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "POST",
             f"/v1/products/client_update_writer/scenarios/{scenario_id}/start",
@@ -600,7 +564,7 @@ def test_weak_input_fixture_is_reachable_end_to_end(
     assert processed.result_artifact_id is not None
 
     result_response = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "GET",
             f"/v1/results/{processed.result_artifact_id}",
