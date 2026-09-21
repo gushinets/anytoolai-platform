@@ -432,6 +432,68 @@ test("repeated refresh requests share one bounded model-catalog polling chain", 
   assert.equal(scheduled.size, 0);
 });
 
+test("destroy aborts an active run read and prevents another poll", async () => {
+  const {document, elements} = createFakeDocument();
+  const atom = await catalogAtom("A01");
+  const modelCatalog = {
+    items: [{
+      model_id: "gpt-supported",
+      compatibility: "compatible",
+      reason: "confirmed_openai_text_gpt",
+      reasoning_supported: false,
+      allowed_reasoning_efforts: null,
+      provenance: {},
+    }],
+    snapshot_id: "snapshot-current",
+    last_success_at: "2026-09-21T00:00:00Z",
+    stale: false,
+    refresh_status: "current",
+    error: null,
+  };
+  const scheduled = new Map();
+  let nextTimerId = 0;
+  let runReadSignal = null;
+  const controller = bootstrapAtomLab({
+    document,
+    fetchImpl: async (url, options = {}) => {
+      if (url.endsWith("/atoms")) return {ok: true, status: 200, async json() { return [atom]; }};
+      if (url.endsWith("/models")) return {ok: true, status: 200, async json() { return modelCatalog; }};
+      if (url.endsWith("/runs") && options.method === "POST") {
+        return {ok: true, status: 202, async json() { return {run_id: "run-active", scenario_session_id: "session-active", job_id: "job-active", status: "running"}; }};
+      }
+      runReadSignal = options.signal;
+      return new Promise((resolve, reject) => {
+        options.signal.addEventListener("abort", () => {
+          const error = new Error("aborted");
+          error.name = "AbortError";
+          reject(error);
+        }, {once: true});
+      });
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, callback);
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("fill-example").click();
+  await elements.get("run-button").click();
+
+  const [pollTimerId, poll] = scheduled.entries().next().value;
+  scheduled.delete(pollTimerId);
+  const polling = poll();
+  assert.ok(runReadSignal);
+  controller.destroy();
+
+  assert.equal(runReadSignal.aborted, true);
+  await polling;
+  assert.equal(scheduled.size, 0);
+});
+
 test("dirty atom navigation requires confirmation and preserves the current draft when declined", async () => {
   const {document, elements} = createFakeDocument();
   const atoms = [await catalogAtom("A01"), await catalogAtom("A02")];

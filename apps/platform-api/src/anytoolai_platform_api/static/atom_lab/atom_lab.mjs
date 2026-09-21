@@ -1121,6 +1121,8 @@ export function bootstrapAtomLab({
   let submitInFlight = false;
   let modelCatalogPollTimer = null;
   let modelCatalogPollStartedAt = null;
+  let runPollTimer = null;
+  let activeRunAbortController = null;
   let destroyed = false;
 
   const updateRunButton = () => {
@@ -1296,18 +1298,25 @@ export function bootstrapAtomLab({
   };
 
   const scheduleNextPoll = (submission) => {
+    if (destroyed) return;
     if (pollingTimedOut(submission.pollStartedAt, nowImpl(), pollTimeoutMs)) {
       nodes["run-state"].textContent = "Время ожидания в браузере истекло. Backend job не отменён.";
       nodes["retry-read"].hidden = false;
       return;
     }
-    scheduleImpl(() => pollRun(submission), RUN_POLL_INTERVAL_MS);
+    if (runPollTimer !== null) cancelScheduleImpl(runPollTimer);
+    runPollTimer = scheduleImpl(() => {
+      runPollTimer = null;
+      return pollRun(submission);
+    }, RUN_POLL_INTERVAL_MS);
   };
 
   const fetchRunBeforeDeadline = async (submission) => {
+    if (destroyed) return {cancelled: true};
     const remaining = pollTimeoutMs - (nowImpl() - submission.pollStartedAt);
     if (remaining <= 0) return {timedOut: true};
     const controller = new AbortControllerImpl();
+    activeRunAbortController = controller;
     const timeoutId = scheduleImpl(() => controller.abort(), remaining);
     try {
       const response = await fetchImpl(`/v1/atom-lab/runs/${submission.runId}`, {
@@ -1317,18 +1326,20 @@ export function bootstrapAtomLab({
       const payload = await response.json().catch(() => null);
       return {response, payload, timedOut: false};
     } catch (error) {
+      if (destroyed && error?.name === "AbortError") return {cancelled: true};
       if (error?.name === "AbortError") return {timedOut: true};
       throw error;
     } finally {
       cancelScheduleImpl(timeoutId);
+      if (activeRunAbortController === controller) activeRunAbortController = null;
     }
   };
 
   const pollRun = async (submission = activeSubmission) => {
-    if (!submission?.runId || activeSubmission !== submission) return;
+    if (destroyed || !submission?.runId || activeSubmission !== submission) return;
     try {
-      const {response, payload, timedOut} = await fetchRunBeforeDeadline(submission);
-      if (activeSubmission !== submission) return;
+      const {response, payload, timedOut, cancelled} = await fetchRunBeforeDeadline(submission);
+      if (destroyed || cancelled || activeSubmission !== submission) return;
       if (timedOut) {
         nodes["run-state"].textContent = "Время ожидания в браузере истекло. Backend job не отменён.";
         nodes["retry-read"].hidden = false;
@@ -1353,7 +1364,7 @@ export function bootstrapAtomLab({
         scheduleNextPoll(submission);
       }
     } catch {
-      if (activeSubmission !== submission) return;
+      if (destroyed || activeSubmission !== submission) return;
       nodes["run-state"].textContent = "Переподключение… Принятый запуск продолжает выполняться.";
       scheduleNextPoll(submission);
     }
@@ -1415,7 +1426,11 @@ export function bootstrapAtomLab({
       displayAcceptedSubmission(activeSubmission);
       nodes["run-state"].textContent = runStatusLabel(accepted.status);
       const submission = activeSubmission;
-      scheduleImpl(() => pollRun(submission), 0);
+      if (runPollTimer !== null) cancelScheduleImpl(runPollTimer);
+      runPollTimer = scheduleImpl(() => {
+        runPollTimer = null;
+        return pollRun(submission);
+      }, 0);
     } catch (error) {
       nodes["run-state"].textContent = error instanceof Error
         ? `${error.message} Черновик сохранён.`
@@ -1583,6 +1598,10 @@ export function bootstrapAtomLab({
   const destroy = () => {
     destroyed = true;
     stopModelCatalogPolling();
+    if (runPollTimer !== null) cancelScheduleImpl(runPollTimer);
+    runPollTimer = null;
+    activeRunAbortController?.abort();
+    activeRunAbortController = null;
     globalThis.removeEventListener?.("pagehide", destroy);
   };
   globalThis.addEventListener?.("pagehide", destroy, {once: true});
