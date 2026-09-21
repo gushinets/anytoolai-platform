@@ -378,10 +378,11 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
 
   it("reflects quota actually consumed by a run when switching modes, instead of a stale cached value", async () => {
     // Code review finding: an earlier attempt at caching quota across a mode switch never
-    // invalidated after a run actually consumed it -- a guest who ran Update (spending one of the
-    // shared pool's 3 runs) and then switched to Reply Draft would still see the pre-run "3 of 3"
-    // forever. Quota is fetched fresh on every mount here, so the second mount's own response
-    // (simulating what the real backend would now report) must be what's shown.
+    // invalidated after a run actually consumed it -- a guest who ran Update and then switched to
+    // Reply Draft would still see the pre-run "3 of 3" forever. Quota is fetched fresh on every
+    // mount here, so the second mount's own response (simulating what a backend with a quota
+    // policy would report) must be what's shown. The mocked numbers are illustrative: this product
+    // has no quota policy of its own today.
     const ids = MODE_IDS.update;
     const routes = routesFor(ids);
     // QUOTA/GUEST_IDENTITY are keyed by product id only (both modes share the same
@@ -408,23 +409,6 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy());
 
     fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
-    await waitFor(() => expect(screen.getByText("2 of 3 Client Update Writer runs remaining.")).toBeTruthy());
-  });
-
-  it("shows the same shared-pool quota wording regardless of which mode is showing", async () => {
-    // Code review finding: per-mode quota copy ("X of Y updates remaining", "X of Y reply drafts
-    // remaining", ...) implied separate pools, but quotas.yaml declares one dimension:product pool
-    // shared by all three modes.
-    const ids = MODE_IDS.update;
-    const routes = routesFor(ids);
-    const { client } = makeClient({
-      [routes.RUNTIME_CONFIG]: [runtimeConfigResponse(ids)],
-      [routes.GUEST_IDENTITY]: [guestIdentityResponse()],
-      [routes.QUOTA]: [quotaResponse(ids, { remaining_count: 2, used_count: 1 })],
-    });
-
-    render(<ClientUpdateWriterProduct client={client} />);
-
     await waitFor(() => expect(screen.getByText("2 of 3 Client Update Writer runs remaining.")).toBeTruthy());
   });
 

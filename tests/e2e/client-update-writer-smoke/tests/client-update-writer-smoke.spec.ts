@@ -75,7 +75,6 @@ test.describe("Client Update Writer web product (Update mode)", () => {
   }) => {
     await page.goto(PRODUCT_URL);
     await expect(page.locator("h1")).toHaveText("Client Update Writer");
-    await expect(page.getByText("3 of 3 Client Update Writer runs remaining.")).toBeVisible();
 
     const nextActionRequests: string[] = [];
     page.on("request", (request) => {
@@ -90,8 +89,8 @@ test.describe("Client Update Writer web product (Update mode)", () => {
     const copyButton = page.getByRole("button", { name: "Copy" });
     await expect(copyButton).toBeVisible({ timeout: 30_000 });
 
-    // `.last()`, not `.first()`: the advisory quota line is also a `<p>` inside `<main>`, rendered
-    // before the result.
+    // `.last()`, not `.first()`: any other `<p>` inside `<main>` (e.g. an advisory quota line, once
+    // a quota policy exists) renders before the result.
     const resultText = await page.locator("main p").last().innerText();
     expect(resultText.trim().length).toBeGreaterThan(0);
 

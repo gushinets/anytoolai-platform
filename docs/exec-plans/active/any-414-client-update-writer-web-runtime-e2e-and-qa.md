@@ -7,8 +7,8 @@
 - Created: 2026-09-15
 - Last updated: 2026-09-21
 - Review date: 2026-09-21
-- Next action: apply the team lead's answer on the Client Update Writer quota (asked on ANY-414).
-- Blocker: product decision on the Client Update Writer guest quota (design decision 11)
+- Next action: push the rollback and update the PR description; no open code findings.
+- Blocker: none
 
 ## Goal
 
@@ -223,26 +223,23 @@ covers Update mode only, the other two modes' meaning stays proven at the backen
     signal -- there, cancelling on unmount is the point. Regressions: two `ProductRunPage` tests
     (unmount while the write is pending / while the request is in flight) and one Client Update
     Writer test for the exact mode-switch scenario; all three fail without the change.
-11. **The Client Update Writer guest quota is an explicit product decision, not a bug fix.**
-    `client_update_writer.guest_quota_v1` (3 runs, `lifetime`, `dimension: product` -- one pool
-    shared by all three modes) was added in the first review round after a finding that the product
-    was unmetered. That finding was framed as a defect, but ANY-413 had *deliberately* shipped no
-    quota (its design decision 6: the ticket names no quota policy), and neither ANY-414 nor its
-    parent ANY-412 name a limit, period or dimension; the values were chosen by analogy with
-    ProposalAI, whose own plan calls `3` a placeholder to revisit. A later review rightly flagged
-    that this is new production policy (unlimited -> three runs forever) with no authoritative
-    source. **Status: awaiting the team lead's decision** -- asked on ANY-414 in Linear on
-    2026-09-21 (keep 3/lifetime/product, other parameters, or no quota in this PR). The policy
-    stays in the PR until that answer, because this PR adds the public web page and an unmetered
-    real-provider LLM product is a cost exposure; it is not yet an authoritative product decision,
-    and the PR should not merge on it. ANY-413's decision 6 points here.
-    Removed again: an earlier round also added a repo-wide `validate_configs.py` check failing any
-    default-set product without a `quota_policy_ref`. Platform Core documents a quota-less product
-    as a valid runtime contract and `add-product-recipe.md` lists `quotas.yaml` as optional, so
-    making it mandatory is a repo-wide architectural decision wider than this ticket (and its
-    justification -- that the omission had "shipped twice" -- was wrong: ProposalAI has had a quota
-    since it was created). Client Update Writer's own policy stays pinned by its product test
-    (`test_quota_policy_ref_resolves_to_the_declared_lifetime_product_quota`).
+11. **No guest quota policy for Client Update Writer in this PR (ANY-413 semantics kept).** An
+    earlier round added `client_update_writer.guest_quota_v1` (3 runs, `lifetime`,
+    `dimension: product`) after a finding that the product was unmetered. That was new production
+    policy with no authoritative source: ANY-413 had *deliberately* shipped no quota (its design
+    decision 6), neither ANY-414 nor its parent ANY-412 name a limit, period or dimension, and the
+    numbers were picked by analogy with ProposalAI's placeholder `3`. The team lead ruled on
+    ANY-414 (2026-09-21): this ticket must not introduce a guest quota policy; remove it and keep
+    ANY-413's semantics. Before Client Update Writer is switched to a **live provider**, a separate,
+    explicit product decision on guest usage/quota and a separate rollout task are required.
+    Consequences in this PR: `product.yaml`/`quotas.yaml` are back to ANY-413's; the shared runtime
+    still handles an advisory quota generically (ProposalAI, and any future policy), so the page
+    simply shows no quota line here and the product's own `quotaRemaining` copy never renders; the
+    browser smoke no longer asserts a quota line. Also removed with it: the repo-wide
+    `validate_configs.py` check that every default-set product declares a `quota_policy_ref`
+    (Platform Core documents a quota-less product as valid, and making it mandatory is a repo-wide
+    decision wider than this ticket), and the earlier claim that the omission had "shipped twice"
+    was wrong -- ProposalAI has had its quota since it was created.
 
 ## Verification
 
@@ -251,7 +248,7 @@ see design decision 2 and the note below).
 
 - `pnpm --filter @anytoolai/web-mirror typecheck` — passed.
 - `pnpm --filter @anytoolai/web-mirror lint` — passed.
-- `pnpm --filter @anytoolai/web-mirror test` — 136/136 passed as of design decision 10 (90/90 post-merge, 86/86 before).
+- `pnpm --filter @anytoolai/web-mirror test` — 135/135 passed as of design decision 11 (90/90 post-merge, 86/86 before).
 - `pnpm --filter @anytoolai/ce-kit test` — 315/315 passed (unaffected).
 - `pnpm --filter @anytoolai/ce-kit typecheck` — passed.
 - `python scripts/agent/runner.py frontend-check` — passed (lint, typecheck, test, API-types-drift

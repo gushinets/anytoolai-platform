@@ -1,6 +1,0 @@
-quota_policies:
-  - quota_policy_id: client_update_writer.guest_quota_v1
-    unit: scenario_run
-    limit_count: 3
-    period: lifetime
-    dimension: product

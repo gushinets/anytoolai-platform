@@ -18,10 +18,11 @@ const PRODUCT_ID = "client_update_writer";
 const LONG_FIELD_MAX_LENGTH = 4000;
 const SHORT_FIELD_MAX_LENGTH = 200;
 
-// `quotas.yaml` declares `dimension: product` -- one 3-run pool shared by all three modes, not a
-// separate pool per mode -- so every mode's `quotaRemaining` copy uses this same, mode-agnostic
-// wording (code review finding: per-mode wording like "X of Y updates remaining" implied separate
-// pools that don't exist).
+// No quota policy is configured for this product today (ANY-413 semantics; guest usage/quota
+// needs its own product decision before a live-provider rollout), so the advisory quota GET
+// finds nothing and this never renders. It stays because `ProductDefinition.copy` requires it
+// and it is what the shared runtime shows once a policy exists; keep the wording mode-agnostic
+// and revisit it against that policy's dimension.
 const quotaRemainingCopy = (remaining: number, limit: number) =>
   `${remaining} of ${limit} Client Update Writer runs remaining.`;
 
