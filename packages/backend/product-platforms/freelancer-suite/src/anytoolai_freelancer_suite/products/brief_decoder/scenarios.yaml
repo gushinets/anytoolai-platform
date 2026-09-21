@@ -1,0 +1,6 @@
+scenarios:
+  - scenario_id: brief_decoder.decode_v1
+    version: 1
+    workflow_id: brief_decoder.decode_v1
+    allowed_next_actions:
+      - copy_result

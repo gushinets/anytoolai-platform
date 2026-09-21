@@ -1,0 +1,29 @@
+renderer_contract:
+  scenario_id: brief_decoder.decode_v1
+  output_schema_ref: brief_decoder.decode_output_v1
+  # The result is one composed object with four parts. apps/web-mirror (ANY-248) renders them in
+  # this order; this file pins the contract that renderer is built against, not the renderer.
+  parts:
+    - part_id: brief
+      field: brief
+      description: >-
+        Structured brief: `values` (facts the brief states) next to `missing_fields` (facts it
+        does not state). Optional `confidence` is per-field and is not shown as a copy target.
+    - part_id: issues
+      field: issues
+      description: >-
+        Risks and gaps, each with `category`, `severity`, `description` and optional `evidence`.
+        An empty list is valid and renders as "no issues found".
+    - part_id: clarifying_questions
+      field: questions
+      description: >-
+        Questions to send the client, in the given (priority) order, each tied to its issue by
+        `source_issue_index`. An empty list is valid: it renders as "no clarification needed" and
+        is not an activation (activation = first rendering of a non-empty question list).
+    - part_id: summary_document
+      field: document
+      description: >-
+        Ordered `sections` (id, title, content) followed by `summary`. This is the copy-ready part.
+  canonical_field: document
+  next_action: copy_result
+  excluded_fields: []

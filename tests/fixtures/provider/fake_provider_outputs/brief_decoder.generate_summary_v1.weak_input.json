@@ -1,0 +1,40 @@
+{
+  "response_json": {
+    "sections": [
+      {
+        "id": "overview",
+        "title": "Project overview",
+        "content": "The client wants a website; the brief gives no further detail."
+      },
+      {
+        "id": "key-details",
+        "title": "Key details",
+        "content": "No deliverables, deadline, budget or constraints were found in the brief.",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "gaps",
+        "title": "Gaps and risks",
+        "content": "Deliverables, deadline, budget and audience are all missing, and the style request is ambiguous."
+      },
+      {
+        "id": "next-steps",
+        "title": "Questions to ask",
+        "content": "What should the site do? When is it needed? What is the budget? What does \"nice\" mean?",
+        "metadata": {
+          "kind": "list"
+        }
+      }
+    ],
+    "summary": "The brief is not ready to start work: ask for the scope, deadline and budget before anything else."
+  },
+  "input_tokens": 90,
+  "output_tokens": 100,
+  "latency_ms": 11,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.generate_summary_v1.weak_input"
+  }
+}

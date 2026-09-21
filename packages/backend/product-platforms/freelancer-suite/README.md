@@ -11,8 +11,9 @@ require changes to platform-core.
 
 ## Product config roots
 
-As of ANY-413, `FreelancerSuiteBundle.config_roots()` returns two implemented product roots, in
-this order: `proposal_ai` (ANY-227) and `client_update_writer` (ANY-413).
+As of ANY-232, `FreelancerSuiteBundle.config_roots()` returns three implemented product roots, in
+this order: `proposal_ai` (ANY-227), `client_update_writer` (ANY-413) and `brief_decoder`
+(ANY-232).
 
 Per `docs/product-specs/mvp-scope-source-of-truth.md`'s five-product committed release order
 (`ANY-452`):
@@ -21,7 +22,7 @@ Per `docs/product-specs/mvp-scope-source-of-truth.md`'s five-product committed r
 2. Client Message Decoder
 3. Scope Creep Guard
 4. Send-Ready
-5. Brief Decoder
+5. Brief Decoder (ANY-232) -- implemented
 
 Client Update Writer (ANY-413) is implemented as a real product directory -- this ticket landed
 it independently of the five-product sequence above -- but is not itself part of that committed

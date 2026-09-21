@@ -1,0 +1,46 @@
+workflows:
+  - workflow_id: brief_decoder.decode_v1
+    version: 1
+    input_schema_ref: brief_decoder.decode_input_v1
+    output_schema_ref: brief_decoder.decode_output_v1
+    # A01 + A04 -> A05, composed through A10. Each step writes its own key of the composed
+    # workflow output ({brief, issues, questions, document}). A01 -> A04 is order-only: A04
+    # reads the original brief text, not A01's output (docs/architecture/action-model.md).
+    steps:
+      - step_id: extract
+        action_config_id: brief_decoder.extract_brief_v1
+        input_mapping:
+          source_text: scenario.input.brief_text
+          fields: 'literal:[{"name":"project_goal","type":"string","description":"What the project is meant to achieve.","required":false},{"name":"deliverables","type":"array_of_strings","description":"Concrete deliverables the client expects.","required":false},{"name":"deadline","type":"string","description":"Deadline or timeline as the brief states it.","required":false},{"name":"budget","type":"string","description":"Budget or price expectation as the brief states it.","required":false},{"name":"target_audience","type":"string","description":"Who the result is for.","required":false},{"name":"constraints","type":"array_of_strings","description":"Stated constraints, requirements or preferences.","required":false}]'
+          # Not strict: a vague brief must yield `missing_fields`, not a failed run.
+          strict: 'literal:false'
+        output_mapping:
+          context.workflow_output.brief: steps.extract.output
+      - step_id: detect_issues
+        action_config_id: brief_decoder.detect_issues_v1
+        input_mapping:
+          source_text: scenario.input.brief_text
+          taxonomy: 'literal:["missing_information","ambiguity","scope_risk","timeline_risk","budget_risk","contradiction"]'
+        output_mapping:
+          context.workflow_output.issues: steps.detect_issues.output.issues
+          # A05 requires at least one issue; seed the empty default it overrides below.
+          context.workflow_output.questions: 'literal:[]'
+      - step_id: generate_questions
+        action_config_id: brief_decoder.generate_questions_v1
+        # An empty issues list is falsy: a clean brief skips A05 instead of failing its input.
+        when: steps.detect_issues.output.issues
+        input_mapping:
+          issues: steps.detect_issues.output.issues
+          context: scenario.input.brief_text
+          target_audience: 'literal:"the client who wrote the brief"'
+        output_mapping:
+          context.workflow_output.questions: steps.generate_questions.output.questions
+      - step_id: generate_document
+        action_config_id: brief_decoder.generate_summary_v1
+        input_mapping:
+          template_ref: 'literal:"brief_decoder.summary_v1"'
+          data.brief: steps.extract.output
+          data.issues: steps.detect_issues.output.issues
+          data.questions: '?steps.generate_questions.output.questions'
+        output_mapping:
+          context.workflow_output.document: steps.generate_document.output

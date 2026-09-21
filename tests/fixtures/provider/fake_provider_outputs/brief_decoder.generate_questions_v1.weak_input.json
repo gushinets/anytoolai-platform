@@ -1,0 +1,41 @@
+{
+  "response_json": {
+    "questions": [
+      {
+        "question": "What should the website do, and which pages or features do you need?",
+        "rationale": "Without deliverables the work cannot be scoped.",
+        "priority": "high",
+        "category": "missing_information",
+        "source_issue_index": 0
+      },
+      {
+        "question": "When do you need the website to be ready?",
+        "rationale": "A deadline decides what can be delivered and how.",
+        "priority": "high",
+        "category": "timeline_risk",
+        "source_issue_index": 2
+      },
+      {
+        "question": "What budget do you have in mind for this project?",
+        "rationale": "The budget determines what scope is realistic.",
+        "priority": "high",
+        "category": "budget_risk",
+        "source_issue_index": 3
+      },
+      {
+        "question": "What does \"nice\" mean to you -- can you share an example of a website you like?",
+        "rationale": "An example makes the style expectation concrete.",
+        "priority": "medium",
+        "category": "ambiguity",
+        "source_issue_index": 1
+      }
+    ]
+  },
+  "input_tokens": 80,
+  "output_tokens": 90,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.generate_questions_v1.weak_input"
+  }
+}

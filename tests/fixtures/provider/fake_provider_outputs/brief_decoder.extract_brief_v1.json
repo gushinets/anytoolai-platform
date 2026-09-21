@@ -1,0 +1,34 @@
+{
+  "response_json": {
+    "values": {
+      "project_goal": "Let customers order cakes online",
+      "deliverables": [
+        "menu page",
+        "order form",
+        "contact page"
+      ],
+      "deadline": "before the holiday season",
+      "budget": "around $3,000",
+      "constraints": [
+        "should look modern but also traditional"
+      ]
+    },
+    "missing_fields": [
+      "target_audience"
+    ],
+    "confidence": {
+      "project_goal": 0.9,
+      "deliverables": 0.9,
+      "deadline": 0.7,
+      "budget": 0.8,
+      "constraints": 0.6
+    }
+  },
+  "input_tokens": 210,
+  "output_tokens": 96,
+  "latency_ms": 14,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.extract_brief_v1"
+  }
+}

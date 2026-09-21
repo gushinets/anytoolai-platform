@@ -1,0 +1,8 @@
+# Four provider calls per run (A01, A04, A05, A10) make this the most expensive product so far;
+# the limit mirrors proposal_ai's guest quota and is a starting value, not a validated one.
+quota_policies:
+  - quota_policy_id: brief_decoder.guest_quota_v1
+    unit: scenario_run
+    limit_count: 3
+    period: lifetime
+    dimension: product
