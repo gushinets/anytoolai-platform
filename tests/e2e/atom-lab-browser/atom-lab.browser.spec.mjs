@@ -395,7 +395,18 @@ test("one accepted submission survives draft edits and renders safe result diagn
     await route.fulfill({contentType: "application/json", body: JSON.stringify({
       run_id: "run-1",
       status: terminal ? "succeeded" : "running",
-      snapshot: {atom_id: "A05", input: A05.example_input, prompt: "Базовый промпт A05", model_id: "openai/gpt-supported", reasoning_effort: "high"},
+      snapshot: {
+        atom_id: "A05",
+        scenario: {id: "scenario-kernel-demo", version: 1},
+        workflow: {id: "workflow-kernel-demo", version: 1, step_id: "main", definition: {}},
+        action: {type: "score_match", definition_version: 1, definition: {}, config_id: "config-a05", config_schema_version: 1, config_definition: {}},
+        prompt: {ref: "prompt.a05", version: 1, base: "Базовый промпт A05", content: "Базовый промпт A05"},
+        schemas: {input: {ref: "input.a05", version: 1, content: {}}, output: {ref: "output.a05", version: 1, content: {}}},
+        input: A05.example_input,
+        provider: {policy_ref: "policy.default", policy: {}, model_id: "openai/gpt-supported", reasoning_effort: "high", capability_snapshot_id: "snapshot-1", capability_provenance: {}},
+        preset: {id: null, version: null},
+        execution_definition_hash: "execution-hash-1",
+      },
       runtime_ids: {scenario_session_id: "session-1", job_id: "job-1", action_run_id: terminal ? "action-1" : null, artifact_id: terminal ? "artifact-1" : null},
       result: terminal ? {summary: "<img id=unsafe src=x onerror=alert(1)>", score: 0, accepted: false} : null,
       diagnostics: {error_code: null, duration_ms: terminal ? 1250 : null, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: "high", response_model_id: terminal ? "gpt-confirmed" : null, validation_attempts: terminal ? 2 : 0, transport_attempts: terminal ? 3 : 0, physical_calls: terminal ? 3 : 0, succeeded_first_attempt: false, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
@@ -414,6 +425,7 @@ test("one accepted submission survives draft edits and renders safe result diagn
   await expect(page.locator("#run-state")).toContainText("Завершён");
   await expect(page.locator("#submitted-snapshot")).toContainText("Оценка");
   await expect(page.locator("#submitted-snapshot")).not.toContainText("Изменённый после запуска");
+  await expect(page.locator("#submitted-snapshot")).not.toContainText("execution-hash-1");
   await expect(page.locator("#run-metadata")).toContainText("Запрошенная модель");
   await expect(page.locator("#run-metadata")).toContainText("Модель в ответе");
   await expect(page.locator("#run-metadata")).toContainText("1250 мс");
@@ -455,21 +467,41 @@ test("a rejected next submission never replaces the previously accepted run card
   await page.locator("#fill-example").click();
   await page.locator("#run-button").click();
   await expect(page.locator("#run-state")).toContainText("Завершён");
-  await expect(page.locator("#submitted-snapshot")).toContainText("Принятый промпт A");
+  await expect(page.locator("#submitted-snapshot")).toContainText(A05.prompt);
   await expect(page.locator("#run-diagnostics")).toContainText("artifact-a");
 
   await page.locator("#prompt-tab").click();
   await page.locator("#prompt-editor").fill("Непринятый промпт B");
   await page.locator("#run-button").click();
   await expect(page.locator("#run-state")).toContainText("Отправка запуска");
-  await expect(page.locator("#submitted-snapshot")).toContainText("Принятый промпт A");
+  await expect(page.locator("#submitted-snapshot")).toContainText(A05.prompt);
   await expect(page.locator("#submitted-snapshot")).not.toContainText("Непринятый промпт B");
   await expect(page.locator("#run-diagnostics")).toContainText("artifact-a");
   await expect(page.locator("#result-readable")).toContainText("Результат A");
 
   await expect(page.locator("#run-state")).toContainText("lab_invalid_request");
-  await expect(page.locator("#submitted-snapshot")).toContainText("Принятый промпт A");
+  await expect(page.locator("#submitted-snapshot")).toContainText(A05.prompt);
   await expect(page.locator("#run-diagnostics")).toContainText("artifact-a");
+});
+
+test("accepted runtime IDs are visible before the protected detail read returns", async ({page}) => {
+  let releaseDetail;
+  const detailBlocked = new Promise((resolve) => { releaseDetail = resolve; });
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+    await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({run_id: "run-accepted", scenario_session_id: "session-accepted", job_id: "job-accepted", status: "queued"})});
+  });
+  await page.route("http://atom-lab.test/v1/atom-lab/runs/run-accepted", async (route) => {
+    await detailBlocked;
+    await route.abort("connectionfailed");
+  });
+  await unlockAtom(page, "A05");
+  await page.locator("#fill-example").click();
+  await page.locator("#run-button").click();
+
+  await expect(page.locator("#run-diagnostics")).toContainText("run-accepted", {timeout: 1_000});
+  await expect(page.locator("#run-diagnostics")).toContainText("session-accepted");
+  await expect(page.locator("#run-diagnostics")).toContainText("job-accepted");
+  releaseDetail();
 });
 
 test("network submission retry reuses the idempotency key and polling reconnects without another POST", async ({page}) => {
@@ -520,7 +552,7 @@ test("network submission retry reuses the idempotency key and polling reconnects
   await expect(page.locator('#model-select option[value="gpt-supported"]')).toHaveCount(0);
   await page.locator("#retry-submit").click();
   await expect(page.locator("#run-button")).toBeDisabled();
-  await expect(page.locator("#run-state")).toContainText("Переподключение");
+  await expect(page.locator("#run-state")).toContainText("Переподключение… Запуск принят; текущее состояние временно неизвестно.");
   await expect(page.locator("#run-button")).toBeDisabled();
   await expect(page.locator("#run-state")).toContainText("Завершён");
   await expect(page.locator("#run-button")).toBeEnabled();
@@ -613,6 +645,33 @@ test("admission rejection keeps the draft, hides transport retry, and a new laun
 
   expect(keys).toHaveLength(2);
   expect(keys[0]).not.toBe(keys[1]);
+});
+
+test("authoritative admission field errors remain actionable after a rejected run", async ({page}) => {
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+    await route.fulfill({status: 422, contentType: "application/json", body: JSON.stringify({
+      error: {
+        code: "reasoning_not_allowed",
+        message: "Reasoning is no longer allowed.",
+        field_errors: [
+          {path: "input", message: "Server input validation failed."},
+          {path: "reasoning_effort", message: "Selected reasoning is unavailable."},
+        ],
+      },
+      request_id: "request-field-errors",
+    })});
+  });
+  await unlockAtom(page, "A05");
+  await page.locator("#fill-example").click();
+  await page.locator("#model-select").selectOption("gpt-supported");
+  await page.locator("#reasoning-effort").selectOption("high");
+  await page.locator("#run-button").click();
+
+  await expect(page.locator("#run-state")).toContainText("reasoning_not_allowed");
+  await expect(page.locator("#validation-errors")).toContainText("Server input validation failed.");
+  await expect(page.locator("#validation-errors")).toContainText("Selected reasoning is unavailable.");
+  await expect(page.locator("#reasoning-effort")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#retry-submit")).toBeHidden();
 });
 
 test("malformed accepted response keeps the same submission available for safe replay", async ({page}) => {

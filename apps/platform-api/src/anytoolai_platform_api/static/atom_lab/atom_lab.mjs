@@ -659,7 +659,7 @@ function button(document, label, onClick) {
   return node;
 }
 
-function renderValidation(document, container, session) {
+function renderValidation(document, container, session, admissionErrors = []) {
   for (const [controlId, previous] of session.validationAttributes ?? []) {
     const control = document.getElementById?.(controlId);
     if (!control) continue;
@@ -670,7 +670,7 @@ function renderValidation(document, container, session) {
   }
   session.validationAttributes = new Map();
   container.replaceChildren();
-  const errors = validateDraft(session);
+  const errors = [...validateDraft(session), ...admissionErrors];
   if (errors.length === 0) return;
   const heading = document.createElement("p");
   heading.textContent = "Исправьте поля:";
@@ -680,7 +680,7 @@ function renderValidation(document, container, session) {
     const errorId = controlIdForKey(error.key ?? error.path, "error");
     item.id = errorId;
     const control = typeof document.getElementById === "function"
-      ? document.getElementById(controlIdForKey(error.key ?? error.path))
+      ? document.getElementById(error.controlId ?? controlIdForKey(error.key ?? error.path))
         ?? document.getElementById(controlIdForKey(error.key ?? error.path, "type"))
         ?? document.getElementById(controlIdForKey(error.key ?? error.path, "add"))
         ?? document.getElementById(controlIdForKey(error.key ?? error.path, "add-item"))
@@ -1059,6 +1059,26 @@ function safeApiMessage(payload, fallback) {
   return typeof payload?.error?.message === "string" ? payload.error.message : fallback;
 }
 
+function parseAtomLabError(payload) {
+  if (
+    !isRecord(payload)
+    || !isRecord(payload.error)
+    || !isNonEmptyString(payload.error.code)
+    || !isNonEmptyString(payload.error.message)
+    || !Array.isArray(payload.error.field_errors)
+    || !payload.error.field_errors.every((fieldError) => (
+      isRecord(fieldError)
+      && isNonEmptyString(fieldError.path)
+      && isNonEmptyString(fieldError.message)
+    ))
+  ) return null;
+  return {
+    code: payload.error.code,
+    message: payload.error.message,
+    fieldErrors: payload.error.field_errors,
+  };
+}
+
 function runStatusLabel(status) {
   return {
     queued: "Ожидает запуска",
@@ -1135,6 +1155,7 @@ export function bootstrapAtomLab({
   let modelCatalogPollStartedAt = null;
   let runPollTimer = null;
   let activeRunAbortController = null;
+  let admissionErrors = [];
   let destroyed = false;
 
   const updateRunButton = () => {
@@ -1210,16 +1231,24 @@ export function bootstrapAtomLab({
       modelCatalog = parsedCatalog;
       modelOptions = parsedCatalog.items.map(describeModelOption);
       renderModelCatalog();
+      return true;
     } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : "Каталог моделей недоступен.";
+      if (modelCatalog) {
+        modelCatalog = {...modelCatalog, stale: true, error: message};
+        renderModelCatalog();
+        return false;
+      }
       modelCatalog = null;
       modelOptions = [];
       nodes["model-select"].replaceChildren();
       nodes["model-select"].disabled = true;
       nodes["reasoning-effort"].disabled = true;
       nodes["run-button"].disabled = true;
-      nodes["model-catalog-warning"].textContent = error instanceof Error
-        ? error.message
-        : "Каталог моделей недоступен.";
+      nodes["model-catalog-warning"].textContent = message;
+      return false;
     }
   };
 
@@ -1231,8 +1260,8 @@ export function bootstrapAtomLab({
 
   const pollModelCatalog = async () => {
     modelCatalogPollTimer = null;
-    await loadModels();
-    if (destroyed || !["pending", "running"].includes(modelCatalog?.refresh_status)) {
+    const loaded = await loadModels();
+    if (destroyed || (loaded && !["pending", "running"].includes(modelCatalog?.refresh_status))) {
       stopModelCatalogPolling();
       return;
     }
@@ -1253,7 +1282,12 @@ export function bootstrapAtomLab({
   const displayAcceptedSubmission = (submission) => {
     nodes["submitted-snapshot"].textContent = JSON.stringify(submission.snapshot, null, 2);
     nodes["run-metadata"].textContent = "";
-    nodes["run-diagnostics"].textContent = "";
+    nodes["run-diagnostics"].textContent = JSON.stringify({
+      run_id: submission.runId,
+      ...submission.runtimeIds,
+      provider_call_ids: [],
+      error_code: null,
+    }, null, 2);
     nodes["result-section"].hidden = true;
     nodes["result-readable"].replaceChildren();
     nodes["result-json"].textContent = "";
@@ -1265,10 +1299,6 @@ export function bootstrapAtomLab({
   const renderRunDetail = (detail, submission) => {
     if (activeSubmission !== submission) return;
     nodes["run-state"].textContent = runStatusLabel(detail.status);
-    if (detail.snapshot) {
-      activeSubmission.snapshot = cloneJson(detail.snapshot);
-      nodes["submitted-snapshot"].textContent = JSON.stringify(detail.snapshot, null, 2);
-    }
     const diagnostics = detail.diagnostics ?? {};
     const requestedEffort = diagnostics.requested_reasoning_effort ?? "не запрошен";
     const responseModel = diagnostics.response_model_id ?? "неизвестна";
@@ -1284,9 +1314,10 @@ export function bootstrapAtomLab({
       `Transport attempts: ${diagnostics.transport_attempts ?? 0}`,
       `Physical calls: ${diagnostics.physical_calls ?? 0}`,
     ].join("\n");
+    submission.runtimeIds = {...submission.runtimeIds, ...detail.runtime_ids};
     nodes["run-diagnostics"].textContent = JSON.stringify({
       run_id: detail.run_id,
-      ...detail.runtime_ids,
+      ...submission.runtimeIds,
       provider_call_ids: (diagnostics.provider_calls ?? []).map((call) => call.provider_call_id),
       error_code: diagnostics.error_code ?? null,
     }, null, 2);
@@ -1374,7 +1405,7 @@ export function bootstrapAtomLab({
           const retryAfterMs = response.status === 429
             ? retryAfterDelayMs(response.headers?.get?.("Retry-After"), nowImpl())
             : null;
-          nodes["run-state"].textContent = "Переподключение… Принятый запуск продолжает выполняться.";
+          nodes["run-state"].textContent = "Переподключение… Запуск принят; текущее состояние временно неизвестно.";
           scheduleNextPoll(submission, {retryable: true, retryAfterMs});
           return;
         }
@@ -1396,7 +1427,7 @@ export function bootstrapAtomLab({
       }
     } catch {
       if (destroyed || activeSubmission !== submission) return;
-      nodes["run-state"].textContent = "Переподключение… Принятый запуск продолжает выполняться.";
+      nodes["run-state"].textContent = "Переподключение… Запуск принят; текущее состояние временно неизвестно.";
       scheduleNextPoll(submission, {retryable: true});
     }
   };
@@ -1405,9 +1436,10 @@ export function bootstrapAtomLab({
     if (submitInFlight || !session) return;
     const pendingReplay = retry && activeSubmission && !activeSubmission.runId;
     if (!pendingReplay) {
+      admissionErrors = [];
       const errors = validateDraft(session);
       if (errors.length > 0) {
-        renderValidation(document, nodes["validation-errors"], session);
+        renderValidation(document, nodes["validation-errors"], session, admissionErrors);
         nodes["run-state"].textContent = "Исправьте входные данные перед запуском.";
         return;
       }
@@ -1439,8 +1471,20 @@ export function bootstrapAtomLab({
       });
       const payload = await response.json();
       if (!response.ok) {
-        const code = typeof payload?.error?.code === "string" ? payload.error.code : "request_failed";
-        nodes["run-state"].textContent = `${code}: ${safeApiMessage(payload, "Запуск не принят.")} Черновик сохранён.`;
+        const error = parseAtomLabError(payload);
+        const code = error?.code ?? "request_failed";
+        admissionErrors = (error?.fieldErrors ?? []).map(({path, message}) => ({
+          path,
+          message,
+          key: `admission:${path}`,
+          controlId: path === "model_id"
+            ? "model-select"
+            : path === "reasoning_effort"
+              ? "reasoning-effort"
+              : undefined,
+        }));
+        renderValidation(document, nodes["validation-errors"], session, admissionErrors);
+        nodes["run-state"].textContent = `${code}: ${error?.message ?? safeApiMessage(payload, "Запуск не принят.")} Черновик сохранён.`;
         activeSubmission = null;
         return;
       }
@@ -1451,6 +1495,12 @@ export function bootstrapAtomLab({
         return;
       }
       activeSubmission.runId = accepted.run_id;
+      activeSubmission.runtimeIds = {
+        scenario_session_id: accepted.scenario_session_id,
+        job_id: accepted.job_id,
+        action_run_id: null,
+        artifact_id: null,
+      };
       activeSubmission.detailLoaded = false;
       activeSubmission.terminal = false;
       activeSubmission.pollStartedAt = nowImpl();
@@ -1477,7 +1527,7 @@ export function bootstrapAtomLab({
   const updateDraftState = () => {
     if (!session) return;
     nodes["draft-state"].textContent = session.dirty ? "Есть несохранённые правки." : "Черновик без изменений.";
-    renderValidation(document, nodes["validation-errors"], session);
+    renderValidation(document, nodes["validation-errors"], session, admissionErrors);
   };
 
   const renderEditor = (replaceFields = true, focusId = null) => {
@@ -1518,6 +1568,7 @@ export function bootstrapAtomLab({
     if (session?.dirty && !confirmImpl(DIRTY_WARNING)) return;
     selectedAtomId = atom.atom_id;
     session = createDraftSession(atom);
+    admissionErrors = [];
     nodes["atom-title"].textContent = `${atom.atom_id} · ${atom.action_type}`;
     nodes["atom-action-type"].textContent = atom.action_type;
     nodes["atom-description"].textContent = atom.description;

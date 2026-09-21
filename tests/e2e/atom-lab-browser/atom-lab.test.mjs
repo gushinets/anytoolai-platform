@@ -432,6 +432,62 @@ test("repeated refresh requests share one bounded model-catalog polling chain", 
   assert.equal(scheduled.size, 0);
 });
 
+test("catalog refresh retains the last-good selection through a transient read failure", async () => {
+  const {document, elements} = createFakeDocument();
+  const atom = await catalogAtom("A01");
+  const currentCatalog = {
+    items: [{model_id: "gpt", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+    snapshot_id: "snapshot-current",
+    last_success_at: "2026-09-21T00:00:00Z",
+    stale: false,
+    refresh_status: "current",
+    error: null,
+  };
+  const scheduled = new Map();
+  let nextTimerId = 0;
+  let modelReads = 0;
+  const controller = bootstrapAtomLab({
+    document,
+    fetchImpl: async (url) => {
+      if (url.endsWith("/atoms")) return {ok: true, status: 200, async json() { return [atom]; }};
+      if (url.endsWith("/refresh")) return {ok: true, status: 202, async json() { return {refresh_status: "pending"}; }};
+      modelReads += 1;
+      if (modelReads === 2) {
+        return {ok: false, status: 503, async json() { return {error: {message: "Temporary catalog outage."}}; }};
+      }
+      return {ok: true, status: 200, async json() { return currentCatalog; }};
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, callback);
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("refresh-models").click();
+
+  const [failedTimerId, failedPoll] = scheduled.entries().next().value;
+  scheduled.delete(failedTimerId);
+  await failedPoll();
+
+  assert.equal(elements.get("model-select").disabled, false);
+  assert.equal(elements.get("model-select").value, "gpt");
+  assert.match(elements.get("model-catalog-warning").textContent, /устарел/);
+  assert.equal(scheduled.size, 1);
+
+  const [recoveredTimerId, recoveredPoll] = scheduled.entries().next().value;
+  scheduled.delete(recoveredTimerId);
+  await recoveredPoll();
+
+  assert.equal(elements.get("model-select").value, "gpt");
+  assert.equal(elements.get("model-catalog-warning").textContent, "");
+  assert.equal(scheduled.size, 0);
+  controller.destroy();
+});
+
 test("destroy aborts an active run read and prevents another poll", async () => {
   const {document, elements} = createFakeDocument();
   const atom = await catalogAtom("A01");
