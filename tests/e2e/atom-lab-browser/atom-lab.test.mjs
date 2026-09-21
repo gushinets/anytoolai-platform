@@ -128,6 +128,21 @@ class FakeElement {
   }
 }
 
+class FakeLifecycleTarget {
+  constructor() { this.listeners = new Map(); }
+  addEventListener(type, listener) {
+    const listeners = this.listeners.get(type) ?? [];
+    listeners.push(listener);
+    this.listeners.set(type, listeners);
+  }
+  removeEventListener(type, listener) {
+    this.listeners.set(type, (this.listeners.get(type) ?? []).filter((item) => item !== listener));
+  }
+  async dispatch(type, event = {}) {
+    for (const listener of this.listeners.get(type) ?? []) await listener(event);
+  }
+}
+
 function createFakeDocument() {
   const ids = [
     "access-form", "access-code", "access-panel", "workspace", "status",
@@ -548,6 +563,137 @@ test("destroy aborts an active run read and prevents another poll", async () => 
   assert.equal(runReadSignal.aborted, true);
   await polling;
   assert.equal(scheduled.size, 0);
+});
+
+test("a persisted pagehide pauses polling and pageshow resumes the same accepted run", async () => {
+  const {document, elements} = createFakeDocument();
+  const lifecycleTarget = new FakeLifecycleTarget();
+  const atom = await catalogAtom("A01");
+  const scheduled = new Map();
+  let nextTimerId = 0;
+  let posts = 0;
+  let reads = 0;
+  bootstrapAtomLab({
+    document,
+    lifecycleTarget,
+    fetchImpl: async (url, options = {}) => {
+      if (url.endsWith("/atoms")) return {ok: true, status: 200, async json() { return [atom]; }};
+      if (url.endsWith("/models")) return {ok: true, status: 200, async json() { return {
+        items: [{model_id: "gpt-supported", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+        snapshot_id: "snapshot-current", last_success_at: "2026-09-21T00:00:00Z", stale: false, refresh_status: "current", error: null,
+      }; }};
+      if (url.endsWith("/runs") && options.method === "POST") {
+        posts += 1;
+        return {ok: true, status: 202, async json() { return {run_id: "run-bfcache", scenario_session_id: "session-bfcache", job_id: "job-bfcache", status: "running"}; }};
+      }
+      reads += 1;
+      return {ok: true, status: 200, async json() { return {
+        run_id: "run-bfcache", status: "succeeded", snapshot: {atom_id: "A01"},
+        runtime_ids: {scenario_session_id: "session-bfcache", job_id: "job-bfcache", action_run_id: "action-bfcache", artifact_id: "artifact-bfcache"},
+        result: {value: "restored"},
+        diagnostics: {error_code: null, duration_ms: 1, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: null, response_model_id: null, validation_attempts: 1, transport_attempts: 1, physical_calls: 1, succeeded_first_attempt: true, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
+        created_at: "2026-09-21T00:00:00Z", started_at: "2026-09-21T00:00:00Z", finished_at: "2026-09-21T00:00:01Z",
+      }; }};
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback, delay) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, {callback, delay});
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("fill-example").click();
+  await elements.get("run-button").click();
+
+  assert.equal(scheduled.size, 1);
+  await lifecycleTarget.dispatch("pagehide", {persisted: true});
+  assert.equal(scheduled.size, 0);
+  await lifecycleTarget.dispatch("pageshow", {persisted: true});
+
+  assert.equal(posts, 1);
+  assert.equal(reads, 1);
+  assert.match(elements.get("run-state").textContent, /Завершён/);
+  assert.match(elements.get("run-diagnostics").textContent, /run-bfcache/);
+});
+
+async function assertSubmissionDeadlinePreservesReplay(stallAt) {
+  const {document, elements} = createFakeDocument();
+  const atom = await catalogAtom("A01");
+  const scheduled = new Map();
+  const keys = [];
+  const bodies = [];
+  let nextTimerId = 0;
+  bootstrapAtomLab({
+    document,
+    lifecycleTarget: new FakeLifecycleTarget(),
+    submissionTimeoutMs: 1_000,
+    fetchImpl: async (url, options = {}) => {
+      if (url.endsWith("/atoms")) return {ok: true, status: 200, async json() { return [atom]; }};
+      if (url.endsWith("/models")) return {ok: true, status: 200, async json() { return {
+        items: [{model_id: "gpt-supported", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+        snapshot_id: "snapshot-current", last_success_at: "2026-09-21T00:00:00Z", stale: false, refresh_status: "current", error: null,
+      }; }};
+      if (url.endsWith("/runs") && options.method === "POST") {
+        keys.push(options.headers["Idempotency-Key"]);
+        bodies.push(JSON.parse(options.body));
+        if (keys.length > 1) return {ok: false, status: 422, async json() { return {error: {code: "confirmed_rejection", message: "Rejected after replay.", field_errors: []}}; }};
+        if (stallAt === "fetch") {
+          return new Promise((resolve, reject) => options.signal.addEventListener("abort", () => {
+            const error = new Error("aborted");
+            error.name = "AbortError";
+            reject(error);
+          }, {once: true}));
+        }
+        return {ok: true, status: 202, json: () => new Promise((resolve, reject) => {
+          const rejectAborted = () => {
+            const error = new Error("aborted");
+            error.name = "AbortError";
+            reject(error);
+          };
+          if (options.signal.aborted) rejectAborted();
+          else options.signal.addEventListener("abort", rejectAborted, {once: true});
+        })};
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback, delay) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, {callback, delay});
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+    idempotencyKeyFactory: () => "stable-timeout-key",
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("fill-example").click();
+  const submitting = elements.get("run-button").click();
+
+  assert.equal(scheduled.size, 1);
+  const [timerId, timer] = scheduled.entries().next().value;
+  scheduled.delete(timerId);
+  assert.equal(timer.delay, 1_000);
+  timer.callback();
+  await submitting;
+
+  assert.equal(elements.get("retry-submit").hidden, false);
+  assert.equal(elements.get("run-button").disabled, true);
+  assert.match(elements.get("run-state").textContent, /Результат отправки неизвестен/);
+  await elements.get("retry-submit").click();
+  assert.deepEqual(keys, ["stable-timeout-key", "stable-timeout-key"]);
+  assert.deepEqual(bodies[1], bodies[0]);
+}
+
+test("a submission deadline recovers from a fetch that never resolves", async () => {
+  await assertSubmissionDeadlinePreservesReplay("fetch");
+});
+
+test("a submission deadline recovers from a response body that never resolves", async () => {
+  await assertSubmissionDeadlinePreservesReplay("body");
 });
 
 test("run-read retry scheduling is bounded by backoff, Retry-After, and deadline", async () => {

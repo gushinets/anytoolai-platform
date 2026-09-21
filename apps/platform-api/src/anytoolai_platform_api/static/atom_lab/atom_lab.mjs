@@ -1127,8 +1127,10 @@ export function bootstrapAtomLab({
   scheduleImpl = (callback, delay) => globalThis.setTimeout(callback, delay),
   cancelScheduleImpl = (id) => globalThis.clearTimeout(id),
   AbortControllerImpl = globalThis.AbortController,
+  lifecycleTarget = globalThis,
   nowImpl = () => Date.now(),
   pollTimeoutMs = RUN_POLL_TIMEOUT_MS,
+  submissionTimeoutMs = 30_000,
   idempotencyKeyFactory = () => globalThis.crypto?.randomUUID?.()
     ?? `run-${Date.now()}-${Math.random().toString(16).slice(2)}`,
 }) {
@@ -1156,7 +1158,9 @@ export function bootstrapAtomLab({
   let modelCatalogPollStartedAt = null;
   let runPollTimer = null;
   let activeRunAbortController = null;
+  let activeSubmissionAbortController = null;
   let admissionErrors = [];
+  let paused = false;
   let destroyed = false;
 
   const updateRunButton = () => {
@@ -1261,8 +1265,9 @@ export function bootstrapAtomLab({
 
   const pollModelCatalog = async () => {
     modelCatalogPollTimer = null;
+    if (destroyed || paused) return;
     const loaded = await loadModels();
-    if (destroyed || (loaded && !["pending", "running"].includes(modelCatalog?.refresh_status))) {
+    if (destroyed || paused || (loaded && !["pending", "running"].includes(modelCatalog?.refresh_status))) {
       stopModelCatalogPolling();
       return;
     }
@@ -1275,7 +1280,7 @@ export function bootstrapAtomLab({
   };
 
   const startModelCatalogPolling = () => {
-    if (destroyed || modelCatalogPollStartedAt !== null) return;
+    if (destroyed || paused || modelCatalogPollStartedAt !== null) return;
     modelCatalogPollStartedAt = nowImpl();
     modelCatalogPollTimer = scheduleImpl(pollModelCatalog, RUN_POLL_INTERVAL_MS);
   };
@@ -1349,7 +1354,7 @@ export function bootstrapAtomLab({
   };
 
   const scheduleNextPoll = (submission, {retryable = false, retryAfterMs = null} = {}) => {
-    if (destroyed) return;
+    if (destroyed || paused) return;
     const remaining = pollTimeoutMs - (nowImpl() - submission.pollStartedAt);
     if (remaining <= 0) {
       nodes["run-state"].textContent = "Время ожидания в браузере истекло. Backend job не отменён.";
@@ -1372,7 +1377,7 @@ export function bootstrapAtomLab({
   };
 
   const fetchRunBeforeDeadline = async (submission) => {
-    if (destroyed) return {cancelled: true};
+    if (destroyed || paused) return {cancelled: true};
     const remaining = pollTimeoutMs - (nowImpl() - submission.pollStartedAt);
     if (remaining <= 0) return {timedOut: true};
     const controller = new AbortControllerImpl();
@@ -1396,10 +1401,10 @@ export function bootstrapAtomLab({
   };
 
   const pollRun = async (submission = activeSubmission) => {
-    if (destroyed || !submission?.runId || activeSubmission !== submission) return;
+    if (destroyed || paused || !submission?.runId || activeSubmission !== submission) return;
     try {
       const {response, payload, timedOut, cancelled} = await fetchRunBeforeDeadline(submission);
-      if (destroyed || cancelled || activeSubmission !== submission) return;
+      if (destroyed || paused || cancelled || activeSubmission !== submission) return;
       if (timedOut) {
         nodes["run-state"].textContent = "Время ожидания в браузере истекло. Backend job не отменён.";
         nodes["retry-read"].hidden = false;
@@ -1432,14 +1437,14 @@ export function bootstrapAtomLab({
         scheduleNextPoll(submission);
       }
     } catch {
-      if (destroyed || activeSubmission !== submission) return;
+      if (destroyed || paused || activeSubmission !== submission) return;
       nodes["run-state"].textContent = "Переподключение… Запуск принят; текущее состояние временно неизвестно.";
       scheduleNextPoll(submission, {retryable: true});
     }
   };
 
   const submitRun = async ({retry = false} = {}) => {
-    if (submitInFlight || !session) return;
+    if (destroyed || paused || submitInFlight || !session) return;
     const pendingReplay = retry && activeSubmission && !activeSubmission.runId;
     if (!pendingReplay) {
       admissionErrors = [];
@@ -1465,6 +1470,9 @@ export function bootstrapAtomLab({
     nodes["retry-submit"].hidden = true;
     nodes["retry-read"].hidden = true;
     nodes["run-state"].textContent = "Отправка запуска…";
+    const controller = new AbortControllerImpl();
+    activeSubmissionAbortController = controller;
+    const timeoutId = scheduleImpl(() => controller.abort(), submissionTimeoutMs);
     try {
       const response = await fetchImpl("/v1/atom-lab/runs", {
         method: "POST",
@@ -1474,6 +1482,7 @@ export function bootstrapAtomLab({
           "Idempotency-Key": activeSubmission.idempotencyKey,
         },
         body: JSON.stringify(activeSubmission.body),
+        signal: controller.signal,
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -1525,11 +1534,16 @@ export function bootstrapAtomLab({
         return pollRun(submission);
       }, 0);
     } catch (error) {
-      nodes["run-state"].textContent = error instanceof Error
-        ? `${error.message} Черновик сохранён.`
-        : "Сетевая ошибка. Черновик сохранён.";
+      if (destroyed) return;
+      nodes["run-state"].textContent = error?.name === "AbortError"
+        ? "Результат отправки неизвестен. Повторите тот же submission безопасно."
+        : error instanceof Error
+          ? `${error.message} Черновик сохранён.`
+          : "Сетевая ошибка. Черновик сохранён.";
       nodes["retry-submit"].hidden = false;
     } finally {
+      cancelScheduleImpl(timeoutId);
+      if (activeSubmissionAbortController === controller) activeSubmissionAbortController = null;
       submitInFlight = false;
       updateRunButton();
     }
@@ -1692,16 +1706,45 @@ export function bootstrapAtomLab({
   }
 
   showInputTab(true);
-  const destroy = () => {
-    destroyed = true;
+  const pause = () => {
+    paused = true;
     stopModelCatalogPolling();
     if (runPollTimer !== null) cancelScheduleImpl(runPollTimer);
     runPollTimer = null;
     activeRunAbortController?.abort();
     activeRunAbortController = null;
-    globalThis.removeEventListener?.("pagehide", destroy);
+    activeSubmissionAbortController?.abort();
+    activeSubmissionAbortController = null;
   };
-  globalThis.addEventListener?.("pagehide", destroy, {once: true});
+  const resume = () => {
+    if (destroyed || !paused) return undefined;
+    paused = false;
+    if (["pending", "running"].includes(modelCatalog?.refresh_status)) {
+      startModelCatalogPolling();
+    }
+    if (activeSubmission?.runId && !activeSubmission.terminal) {
+      activeSubmission.pollStartedAt = nowImpl();
+      activeSubmission.pollFailureCount = 0;
+      return pollRun(activeSubmission);
+    }
+    return undefined;
+  };
+  const handlePageHide = (event) => {
+    if (event?.persisted) {
+      pause();
+      return;
+    }
+    destroy();
+  };
+  const handlePageShow = (event) => event?.persisted ? resume() : undefined;
+  const destroy = () => {
+    destroyed = true;
+    pause();
+    lifecycleTarget.removeEventListener?.("pagehide", handlePageHide);
+    lifecycleTarget.removeEventListener?.("pageshow", handlePageShow);
+  };
+  lifecycleTarget.addEventListener?.("pagehide", handlePageHide);
+  lifecycleTarget.addEventListener?.("pageshow", handlePageShow);
   return {getSession: () => session, getActiveSubmission: () => activeSubmission, destroy};
 }
 
