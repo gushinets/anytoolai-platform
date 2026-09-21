@@ -76,7 +76,7 @@ export async function copyResultAndRecordActivation(
     return { copied: false, reason };
   }
   request.onCopied?.();
-  if (!request.checkpointId) {
+  if (request.checkpointId === null) {
     return { copied: true, activation: null };
   }
   const activation = await nextAction(
