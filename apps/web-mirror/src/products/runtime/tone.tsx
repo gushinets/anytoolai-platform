@@ -6,8 +6,14 @@ import type { ChangeEvent } from "react";
  * Shared across every product's form -- extracted once a second product (Client Update Writer)
  * declared the exact same tone list ProposalAI already had (code review finding).
  */
+// Hand-mirrors the `tone` enum in every product input schema (backend is authoritative) --
+// test/tone.test.tsx fails if any schema drifts from this list.
 export const TONE_OPTIONS = ["neutral", "warm", "firm"] as const;
 export type Tone = (typeof TONE_OPTIONS)[number];
+
+function isTone(value: string): value is Tone {
+  return (TONE_OPTIONS as readonly string[]).includes(value);
+}
 
 /**
  * The `<select>` + option list every product's own tone field wraps in its own `<label>`/error
@@ -36,7 +42,9 @@ export function ToneSelect({
     <select
       id={id}
       value={value}
-      onChange={(event: ChangeEvent<HTMLSelectElement>) => onChange(event.target.value as Tone | "")}
+      onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+        onChange(isTone(event.target.value) ? event.target.value : "")
+      }
       disabled={disabled}
       aria-invalid={ariaInvalid}
     >

@@ -422,8 +422,11 @@ Send-Ready proves the two-run selected-gap flow without extending the mapping DS
 completes the initial set with brief analysis, questions, and a document.
 
 Client Update Writer, Acceptance Builder, and External Task Finder & Fit remain in the capability
-backlog without a committed release order. Brief Decoder to Acceptance Builder remains a later
-handoff candidate, not a dependency of the initial five-product release set.
+backlog without a committed release order. Client Update Writer is nonetheless already implemented
+(ANY-413 backend bundle, ANY-414 web runtime) and enabled in the `apps/web-mirror` product
+registry; that does not add it to the committed validation order above. Brief Decoder to
+Acceptance Builder remains a later handoff candidate, not a dependency of the initial
+five-product release set.
 
 The 21 concepts in `atom-ready-product-inventory.md` are a capability inventory, not 21 committed
 releases and not an alternative delivery order.

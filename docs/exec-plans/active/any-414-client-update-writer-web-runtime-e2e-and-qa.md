@@ -193,6 +193,13 @@ covers Update mode only, the other two modes' meaning stays proven at the backen
    through a result-fetch-error, and false again once the retry succeeds" and "stays busy through an
    ambiguous /start failure, but not through a deterministic one"; `ClientUpdateWriterProduct.test.tsx`
    gained the mode-switch-level equivalents of both.
+8. **Shared `TONE_OPTIONS` stays shared, guarded against schema drift instead of parameterized.**
+   A whole-PR review noted the tone list is a semantic enum hand-mirrored from four backend input
+   schemas with no drift check, and that `ToneSelect` cast the DOM value with `as Tone`. Making
+   `ToneSelect` take its options from each product would re-duplicate the list two earlier review
+   rounds explicitly removed, so it stays shared; `test/tone.test.tsx` now fails if any
+   freelancer-suite input schema's `tone` enum differs from it (scanned, so a new product's schema
+   is covered automatically), and the cast became an `isTone` type guard.
 
 ## Verification
 
@@ -201,7 +208,7 @@ see design decision 2 and the note below).
 
 - `pnpm --filter @anytoolai/web-mirror typecheck` — passed.
 - `pnpm --filter @anytoolai/web-mirror lint` — passed.
-- `pnpm --filter @anytoolai/web-mirror test` — 113/113 passed as of design decision 7 (90/90 post-merge, 86/86 before).
+- `pnpm --filter @anytoolai/web-mirror test` — 118/118 passed as of design decision 8 (90/90 post-merge, 86/86 before).
 - `pnpm --filter @anytoolai/ce-kit test` — 315/315 passed (unaffected).
 - `pnpm --filter @anytoolai/ce-kit typecheck` — passed.
 - `python scripts/agent/runner.py frontend-check` — passed (lint, typecheck, test, API-types-drift
