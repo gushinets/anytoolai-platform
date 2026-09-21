@@ -246,6 +246,18 @@ function parseModelCatalog(value) {
   return value;
 }
 
+function parseModelRefresh(value) {
+  if (
+    !isRecord(value)
+    || !isNullableString(value.snapshot_id)
+    || !isNullableString(value.last_success_at)
+    || typeof value.stale !== "boolean"
+    || !MODEL_REFRESH_STATUSES.has(value.refresh_status)
+    || !isNullableString(value.error)
+  ) return null;
+  return value;
+}
+
 function isProviderCallDiagnostic(value) {
   return isRecord(value)
     && isNonEmptyString(value.provider_call_id)
@@ -1347,10 +1359,8 @@ export function bootstrapAtomLab({
     }
     submission.detailLoaded = true;
     submission.terminal = TERMINAL_RUN_STATUSES.has(detail.status);
+    nodes["retry-read"].hidden = true;
     updateRunButton();
-    if (submission.terminal) {
-      nodes["retry-read"].hidden = true;
-    }
   };
 
   const scheduleNextPoll = (submission, {retryable = false, retryAfterMs = null} = {}) => {
@@ -1402,6 +1412,7 @@ export function bootstrapAtomLab({
 
   const pollRun = async (submission = activeSubmission) => {
     if (destroyed || paused || !submission?.runId || activeSubmission !== submission) return;
+    nodes["retry-read"].hidden = true;
     try {
       const {response, payload, timedOut, cancelled} = await fetchRunBeforeDeadline(submission);
       if (destroyed || paused || cancelled || activeSubmission !== submission) return;
@@ -1448,6 +1459,7 @@ export function bootstrapAtomLab({
     const pendingReplay = retry && activeSubmission && !activeSubmission.runId;
     if (!pendingReplay) {
       admissionErrors = [];
+      renderValidation(document, nodes["validation-errors"], session, admissionErrors);
       const errors = validateDraft(session);
       if (errors.length > 0) {
         renderValidation(document, nodes["validation-errors"], session, admissionErrors);
@@ -1514,6 +1526,8 @@ export function bootstrapAtomLab({
         nodes["retry-submit"].hidden = false;
         return;
       }
+      admissionErrors = [];
+      renderValidation(document, nodes["validation-errors"], session, admissionErrors);
       activeSubmission.runId = accepted.run_id;
       activeSubmission.runtimeIds = {
         scenario_session_id: accepted.scenario_session_id,
@@ -1667,8 +1681,11 @@ export function bootstrapAtomLab({
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(safeApiMessage(payload, "Не удалось запросить обновление."));
+      const refresh = parseModelRefresh(payload);
+      if (!refresh) throw new Error("Обновление каталога вернуло некорректный ответ.");
+      modelCatalog = modelCatalog ? {...modelCatalog, ...refresh} : modelCatalog;
       nodes["model-catalog-warning"].textContent = "Каталог устарел; обновление запрошено.";
-      startModelCatalogPolling();
+      if (["pending", "running"].includes(refresh.refresh_status)) startModelCatalogPolling();
     } catch (error) {
       nodes["model-catalog-warning"].textContent = error instanceof Error
         ? error.message

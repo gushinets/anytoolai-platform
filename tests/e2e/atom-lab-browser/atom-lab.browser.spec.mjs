@@ -689,8 +689,16 @@ test("admission rejection keeps the draft, hides transport retry, and a new laun
   expect(keys[0]).not.toBe(keys[1]);
 });
 
-test("authoritative admission field errors remain actionable after a rejected run", async ({page}) => {
+test("corrected accepted submission clears authoritative admission field errors", async ({page}) => {
+  let submissions = 0;
   await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+    submissions += 1;
+    if (submissions > 1) {
+      await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({
+        run_id: "run-corrected", scenario_session_id: "session-corrected", job_id: "job-corrected", status: "queued",
+      })});
+      return;
+    }
     await route.fulfill({status: 422, contentType: "application/json", body: JSON.stringify({
       error: {
         code: "reasoning_not_allowed",
@@ -701,6 +709,12 @@ test("authoritative admission field errors remain actionable after a rejected ru
         ],
       },
       request_id: "request-field-errors",
+    })});
+  });
+  await page.route("http://atom-lab.test/v1/atom-lab/runs/run-corrected", async (route) => {
+    await route.fulfill({status: 404, contentType: "application/json", body: JSON.stringify({
+      error: {code: "lab_resource_not_found", message: "Запуск ещё не виден.", field_errors: []},
+      request_id: "request-corrected",
     })});
   });
   await unlockAtom(page, "A05");
@@ -714,6 +728,14 @@ test("authoritative admission field errors remain actionable after a rejected ru
   await expect(page.locator("#validation-errors")).toContainText("Selected reasoning is unavailable.");
   await expect(page.locator("#reasoning-effort")).toHaveAttribute("aria-invalid", "true");
   await expect(page.locator("#retry-submit")).toBeHidden();
+
+  await page.locator("#reasoning-effort").selectOption("low");
+  await page.locator("#run-button").click();
+  await expect(page.locator("#run-state")).toContainText("lab_resource_not_found");
+  await expect(page.locator("#validation-errors")).not.toContainText("Selected reasoning is unavailable.");
+  await expect(page.locator("#validation-errors")).not.toContainText("Server input validation failed.");
+  await expect(page.locator("#reasoning-effort")).not.toHaveAttribute("aria-invalid", "true");
+  expect(submissions).toBe(2);
 });
 
 test("malformed accepted response keeps the same submission available for safe replay", async ({page}) => {

@@ -465,7 +465,13 @@ test("catalog refresh retains the last-good selection through a transient read f
     document,
     fetchImpl: async (url) => {
       if (url.endsWith("/atoms")) return {ok: true, status: 200, async json() { return [atom]; }};
-      if (url.endsWith("/refresh")) return {ok: true, status: 202, async json() { return {refresh_status: "pending"}; }};
+      if (url.endsWith("/refresh")) return {ok: true, status: 202, async json() { return {
+        snapshot_id: "snapshot-current",
+        last_success_at: "2026-09-21T00:00:00Z",
+        stale: true,
+        refresh_status: "pending",
+        error: null,
+      }; }};
       modelReads += 1;
       if (modelReads === 2) {
         return {ok: false, status: 503, async json() { return {error: {message: "Temporary catalog outage."}}; }};
@@ -501,6 +507,62 @@ test("catalog refresh retains the last-good selection through a transient read f
   assert.equal(elements.get("model-catalog-warning").textContent, "");
   assert.equal(scheduled.size, 0);
   controller.destroy();
+});
+
+test("a persisted page resumes a model refresh accepted before its first catalog poll", async () => {
+  const {document, elements} = createFakeDocument();
+  const lifecycleTarget = new FakeLifecycleTarget();
+  const atom = await catalogAtom("A01");
+  const currentCatalog = {
+    items: [{model_id: "gpt", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+    snapshot_id: "snapshot-current",
+    last_success_at: "2026-09-21T00:00:00Z",
+    stale: false,
+    refresh_status: "current",
+    error: null,
+  };
+  const scheduled = new Map();
+  let nextTimerId = 0;
+  let modelReads = 0;
+  bootstrapAtomLab({
+    document,
+    lifecycleTarget,
+    fetchImpl: async (url) => {
+      if (url.endsWith("/atoms")) return {ok: true, status: 200, async json() { return [atom]; }};
+      if (url.endsWith("/refresh")) return {ok: true, status: 202, async json() { return {
+        snapshot_id: "snapshot-current",
+        last_success_at: "2026-09-21T00:00:00Z",
+        stale: true,
+        refresh_status: "pending",
+        error: null,
+      }; }};
+      modelReads += 1;
+      return {ok: true, status: 200, async json() { return currentCatalog; }};
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, callback);
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("refresh-models").click();
+
+  assert.equal(scheduled.size, 1);
+  await lifecycleTarget.dispatch("pagehide", {persisted: true});
+  assert.equal(scheduled.size, 0);
+  await lifecycleTarget.dispatch("pageshow", {persisted: true});
+  assert.equal(scheduled.size, 1);
+
+  const [timerId, poll] = scheduled.entries().next().value;
+  scheduled.delete(timerId);
+  await poll();
+  assert.equal(modelReads, 2);
+  assert.equal(elements.get("model-catalog-warning").textContent, "");
+  assert.equal(scheduled.size, 0);
 });
 
 test("destroy aborts an active run read and prevents another poll", async () => {
@@ -617,6 +679,60 @@ test("a persisted pagehide pauses polling and pageshow resumes the same accepted
   assert.equal(reads, 1);
   assert.match(elements.get("run-state").textContent, /Завершён/);
   assert.match(elements.get("run-diagnostics").textContent, /run-bfcache/);
+});
+
+test("resumed automatic polling hides a stale manual reread action", async () => {
+  const {document, elements} = createFakeDocument();
+  const lifecycleTarget = new FakeLifecycleTarget();
+  const atom = await catalogAtom("A01");
+  const scheduled = new Map();
+  let nextTimerId = 0;
+  let reads = 0;
+  bootstrapAtomLab({
+    document,
+    lifecycleTarget,
+    fetchImpl: async (url, options = {}) => {
+      if (url.endsWith("/atoms")) return {ok: true, status: 200, async json() { return [atom]; }};
+      if (url.endsWith("/models")) return {ok: true, status: 200, async json() { return {
+        items: [{model_id: "gpt-supported", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+        snapshot_id: "snapshot-current", last_success_at: "2026-09-21T00:00:00Z", stale: false, refresh_status: "current", error: null,
+      }; }};
+      if (url.endsWith("/runs") && options.method === "POST") {
+        return {ok: true, status: 202, async json() { return {run_id: "run-reread", scenario_session_id: "session-reread", job_id: "job-reread", status: "running"}; }};
+      }
+      reads += 1;
+      if (reads === 1) return {ok: false, status: 404, async json() { return {error: {code: "lab_resource_not_found", message: "Не найдено.", field_errors: []}}; }};
+      return {ok: true, status: 200, async json() { return {
+        run_id: "run-reread", status: "running", snapshot: {atom_id: "A01"},
+        runtime_ids: {scenario_session_id: "session-reread", job_id: "job-reread", action_run_id: null, artifact_id: null},
+        result: null,
+        diagnostics: {error_code: null, duration_ms: null, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: null, response_model_id: null, validation_attempts: 0, transport_attempts: 0, physical_calls: 0, succeeded_first_attempt: null, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
+        created_at: "2026-09-21T00:00:00Z", started_at: "2026-09-21T00:00:00Z", finished_at: null,
+      }; }};
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, callback);
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("fill-example").click();
+  await elements.get("run-button").click();
+
+  const [pollTimerId, firstPoll] = scheduled.entries().next().value;
+  scheduled.delete(pollTimerId);
+  await firstPoll();
+  assert.equal(elements.get("retry-read").hidden, false);
+
+  await lifecycleTarget.dispatch("pagehide", {persisted: true});
+  await lifecycleTarget.dispatch("pageshow", {persisted: true});
+  assert.equal(reads, 2);
+  assert.equal(elements.get("retry-read").hidden, true);
+  assert.equal(scheduled.size, 1);
 });
 
 async function assertSubmissionDeadlinePreservesReplay(stallAt) {

@@ -6,7 +6,7 @@
 - Phase: AL07/ANY-465 implemented and verified on feature/ANY-465
 - Owner: mixed
 - Created: 2026-09-09
-- Last updated: 2026-09-20
+- Last updated: 2026-09-21
 - Review date: 2026-09-16
 - Next action: Review and commit ANY-465, then continue with AL08/ANY-466.
 - Blocker: none for development; operator configuration required before rollout.
@@ -478,7 +478,9 @@ Acceptance: Compose smoke: migrations, API/worker ready, assets доступны
 | 2026-09-21 | Addressed further PR #138 idempotency and availability feedback: unresolved submission outcomes keep the primary Run action blocked so only the frozen replay can proceed; retryable run reads use deadline-bounded exponential backoff and honor valid `Retry-After`. Added red-green coverage (30 Node tests and 23 Chromium journeys). | Run the full Node 22 gate, push the review commit and resolve the inline threads. |
 | 2026-09-21 | Addressed the next PR #138 review round: transient catalog reads retain the last-good selectable snapshot and continue refresh polling; persisted execution snapshots no longer overwrite immutable submitted configuration; authoritative admission field errors remain actionable; reconnect copy no longer invents workflow state; and IDs from the accepted envelope render before detail recovery. Added red-green coverage with real execution-snapshot fixtures (31 Node tests and 25 Chromium journeys). | Run the full Node 22 gate, push the review commit and resolve the inline threads. |
 | 2026-09-21 | Addressed follow-up PR #138 runtime-ID and submission-integrity feedback: nullable detail IDs no longer erase IDs known from admission, and retryable POST HTTP outcomes retain the frozen body/key for explicit safe replay while 429 remains a confirmed rejection. Added red-green Chromium coverage (31 Node tests and 26 Chromium journeys). | Re-run the full Node 22 gate, push the follow-up commit and resolve all current inline threads. |
+| 2026-09-21 | Started the next PR #138 review round: verify stale admission-error cleanup after accepted correction, persist the model-refresh response across bfcache pause/resume, and keep manual reread hidden while automatic run polling is active. | Add focused regressions for all three findings, implement the smallest UI-state fixes, then run the Atom Lab Node/browser suites and canonical repository checks. |
 | 2026-09-21 | Closed the remaining external review findings: persisted `pagehide` now pauses transport work and `pageshow` resumes the same accepted run without a new POST; the complete submission phase, including response-body parsing, has an abortable 30-second deadline that preserves the frozen replay. Added deterministic red-green coverage for bfcache restore plus stalled fetch and stalled JSON body (34 Node tests and 26 Chromium journeys). | Run the full Node 22 gate, publish the follow-up commit, and report the fixes on PR #138. |
+| 2026-09-21 | Addressed the three latest PR #138 findings: accepted corrected submissions clear obsolete admission errors and ARIA state; the validated refresh response persists `pending`/`running` across bfcache pause/resume; and resumed or valid nonterminal automatic polling hides manual reread. Verified 36 Node tests, 26 Chromium journeys, ESLint, `git diff --check`, and canonical `quick-check` (1864 passed). | Review and commit the four-file remediation, then reply to the three review threads. |
 
 ## Planning revision verification (2026-09-09)
 
