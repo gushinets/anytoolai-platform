@@ -3,6 +3,7 @@ const DIRTY_WARNING = "Несохранённые изменения будут 
 const RUN_POLL_INTERVAL_MS = 250;
 const RUN_POLL_MAX_BACKOFF_MS = 4_000;
 const RUN_POLL_TIMEOUT_MS = 90_000;
+const RETRYABLE_SUBMISSION_STATUSES = new Set([408, 425, 500, 502, 503, 504]);
 const TERMINAL_RUN_STATUSES = new Set(["succeeded", "failed", "expired", "cancelled"]);
 const RUN_STATUSES = new Set(["queued", "running", ...TERMINAL_RUN_STATUSES]);
 const PROVIDER_CALL_STATUSES = new Set(["created", "running", "succeeded", "failed", "timed_out"]);
@@ -1314,7 +1315,12 @@ export function bootstrapAtomLab({
       `Transport attempts: ${diagnostics.transport_attempts ?? 0}`,
       `Physical calls: ${diagnostics.physical_calls ?? 0}`,
     ].join("\n");
-    submission.runtimeIds = {...submission.runtimeIds, ...detail.runtime_ids};
+    submission.runtimeIds = {
+      ...submission.runtimeIds,
+      ...Object.fromEntries(
+        Object.entries(detail.runtime_ids).filter(([, value]) => value !== null),
+      ),
+    };
     nodes["run-diagnostics"].textContent = JSON.stringify({
       run_id: detail.run_id,
       ...submission.runtimeIds,
@@ -1471,6 +1477,11 @@ export function bootstrapAtomLab({
       });
       const payload = await response.json();
       if (!response.ok) {
+        if (RETRYABLE_SUBMISSION_STATUSES.has(response.status)) {
+          nodes["run-state"].textContent = "Результат отправки неизвестен. Повторите тот же submission безопасно.";
+          nodes["retry-submit"].hidden = false;
+          return;
+        }
         const error = parseAtomLabError(payload);
         const code = error?.code ?? "request_failed";
         admissionErrors = (error?.fieldErrors ?? []).map(({path, message}) => ({

@@ -407,7 +407,7 @@ test("one accepted submission survives draft edits and renders safe result diagn
         preset: {id: null, version: null},
         execution_definition_hash: "execution-hash-1",
       },
-      runtime_ids: {scenario_session_id: "session-1", job_id: "job-1", action_run_id: terminal ? "action-1" : null, artifact_id: terminal ? "artifact-1" : null},
+      runtime_ids: {scenario_session_id: null, job_id: null, action_run_id: terminal ? "action-1" : null, artifact_id: terminal ? "artifact-1" : null},
       result: terminal ? {summary: "<img id=unsafe src=x onerror=alert(1)>", score: 0, accepted: false} : null,
       diagnostics: {error_code: null, duration_ms: terminal ? 1250 : null, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: "high", response_model_id: terminal ? "gpt-confirmed" : null, validation_attempts: terminal ? 2 : 0, transport_attempts: terminal ? 3 : 0, physical_calls: terminal ? 3 : 0, succeeded_first_attempt: false, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
       created_at: "2026-09-20T10:00:00Z", started_at: "2026-09-20T10:00:00Z", finished_at: terminal ? "2026-09-20T10:00:01Z" : null,
@@ -432,6 +432,8 @@ test("one accepted submission survives draft edits and renders safe result diagn
   await expect(page.locator("#result-readable")).toContainText("<img id=unsafe");
   await expect(page.locator("#unsafe")).toHaveCount(0);
   await expect(page.locator("#run-diagnostics")).toContainText("artifact-1");
+  await expect(page.locator("#run-diagnostics")).toContainText("session-1");
+  await expect(page.locator("#run-diagnostics")).toContainText("job-1");
   expect(submittedBodies).toEqual([{
     atom_id: "A05",
     input: A05.example_input,
@@ -561,6 +563,46 @@ test("network submission retry reuses the idempotency key and polling reconnects
   expect(keys[0]).toBe(keys[1]);
   expect(bodies[1]).toEqual(bodies[0]);
   expect(reads).toBe(2);
+});
+
+test("retryable HTTP submission responses preserve the frozen replay", async ({page}) => {
+  const keys = [];
+  const bodies = [];
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+    keys.push(route.request().headers()["idempotency-key"]);
+    bodies.push(route.request().postDataJSON());
+    if (keys.length === 1) {
+      await route.fulfill({status: 503, contentType: "application/json", body: JSON.stringify({
+        error: {code: "provider_unavailable", message: "Admission outcome unknown.", field_errors: []},
+        request_id: "request-retryable",
+      })});
+      return;
+    }
+    await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({run_id: "run-http-recovery", scenario_session_id: "session-http-recovery", job_id: "job-http-recovery", status: "succeeded"})});
+  });
+  await page.route("http://atom-lab.test/v1/atom-lab/runs/run-http-recovery", async (route) => {
+    await route.fulfill({contentType: "application/json", body: JSON.stringify({
+      run_id: "run-http-recovery", status: "succeeded",
+      snapshot: {atom_id: "A05"},
+      runtime_ids: {scenario_session_id: "session-http-recovery", job_id: "job-http-recovery", action_run_id: "action-http-recovery", artifact_id: "artifact-http-recovery"},
+      result: {questions: ["Recovered"]},
+      diagnostics: {error_code: null, duration_ms: 500, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: null, response_model_id: null, validation_attempts: 1, transport_attempts: 1, physical_calls: 1, succeeded_first_attempt: true, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
+      created_at: "2026-09-20T10:00:00Z", started_at: "2026-09-20T10:00:00Z", finished_at: "2026-09-20T10:00:01Z",
+    })});
+  });
+  await unlockAtom(page, "A05");
+  await page.locator("#fill-example").click();
+  await page.locator("#run-button").click();
+
+  await expect(page.locator("#retry-submit")).toBeVisible();
+  await expect(page.locator("#run-state")).toContainText("Результат отправки неизвестен");
+  await expect(page.locator("#run-button")).toBeDisabled();
+  await page.locator("#retry-submit").click();
+  await expect(page.locator("#run-state")).toContainText("Завершён");
+
+  expect(keys).toHaveLength(2);
+  expect(keys[1]).toBe(keys[0]);
+  expect(bodies[1]).toEqual(bodies[0]);
 });
 
 test("client validation blocks admission and the corrected draft can be submitted", async ({page}) => {
