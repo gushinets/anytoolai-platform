@@ -1288,6 +1288,7 @@ export function bootstrapAtomLab({
       stopModelCatalogPolling();
       return;
     }
+    if (modelCatalogPollTimer !== null) cancelScheduleImpl(modelCatalogPollTimer);
     modelCatalogPollTimer = scheduleImpl(pollModelCatalog, RUN_POLL_INTERVAL_MS);
   };
 

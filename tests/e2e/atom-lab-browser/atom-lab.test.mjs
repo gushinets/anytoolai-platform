@@ -565,6 +565,61 @@ test("a persisted page resumes a model refresh accepted before its first catalog
   assert.equal(scheduled.size, 0);
 });
 
+test("an in-flight pre-pause catalog read cannot orphan the resumed polling timer", async () => {
+  const {document, elements} = createFakeDocument();
+  const lifecycleTarget = new FakeLifecycleTarget();
+  const atom = await catalogAtom("A01");
+  const pendingCatalog = {
+    items: [{model_id: "gpt", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+    snapshot_id: "snapshot-current",
+    last_success_at: "2026-09-21T00:00:00Z",
+    stale: true,
+    refresh_status: "pending",
+    error: null,
+  };
+  const currentCatalog = {...pendingCatalog, stale: false, refresh_status: "current"};
+  const scheduled = new Map();
+  let nextTimerId = 0;
+  let modelReads = 0;
+  let resolveCatalogRead;
+  const controller = bootstrapAtomLab({
+    document,
+    lifecycleTarget,
+    fetchImpl: (url) => {
+      if (url.endsWith("/atoms")) return Promise.resolve({ok: true, status: 200, async json() { return [atom]; }});
+      if (url.endsWith("/refresh")) return Promise.resolve({ok: true, status: 202, async json() { return pendingCatalog; }});
+      modelReads += 1;
+      if (modelReads === 1) return Promise.resolve({ok: true, status: 200, async json() { return currentCatalog; }});
+      return new Promise((resolve) => { resolveCatalogRead = resolve; });
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, callback);
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("refresh-models").click();
+
+  const [initialTimerId, initialPoll] = scheduled.entries().next().value;
+  scheduled.delete(initialTimerId);
+  const inFlightPoll = initialPoll();
+  assert.equal(typeof resolveCatalogRead, "function");
+
+  await lifecycleTarget.dispatch("pagehide", {persisted: true});
+  await lifecycleTarget.dispatch("pageshow", {persisted: true});
+  assert.equal(scheduled.size, 1);
+
+  resolveCatalogRead({ok: true, status: 200, async json() { return pendingCatalog; }});
+  await inFlightPoll;
+  assert.equal(scheduled.size, 1);
+  controller.destroy();
+  assert.equal(scheduled.size, 0);
+});
+
 test("destroy aborts an active run read and prevents another poll", async () => {
   const {document, elements} = createFakeDocument();
   const atom = await catalogAtom("A01");
