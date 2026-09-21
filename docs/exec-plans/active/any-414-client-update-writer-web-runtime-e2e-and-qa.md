@@ -258,13 +258,20 @@ covers Update mode only, the other two modes' meaning stays proven at the backen
     without a layout/provider, and a router regression test for a path the UI can't take was not
     written.)
     (b) *Trust.* `runtime/clientStorage.ts`'s `createResilientStorage(localStorage-or-null,
-    in-memory)` shared **one** "primary is broken" flag across every key, and memory only held what
-    had been *written*. So a failing `web_session_id` write (quota) stopped the guest id being read
-    from the primary, and a guest id persisted by an earlier visit -- only ever read -- was in
-    neither. Now: memory is a complete last-known-good copy (every successful read is mirrored, a
-    primary miss falls back to it, which also covers storage that accepts a write and forgets it),
-    trust is **per key**, and `remove()` never throws so a self-heal sticks. Reads and writes still
-    go to the primary first, so cross-tab sharing is unchanged; memory-first was rejected because it
+    in-memory)` first shared **one** "primary is broken" flag across every key with memory holding
+    only what had been *written* (a failing `web_session_id` write stopped the guest id being read,
+    and a guest id persisted by an earlier visit -- only ever read -- was kept nowhere); the fix for
+    that then treated a failed *read* as making the key untrusted for good, which contradicts
+    ce-kit's own contract (it re-reads after minting a guest because a read failure may be
+    transient) and would have fragmented ProposalAI's lifetime quota across guest ids. The rule is
+    now derived from one invariant instead of patched case by case: **a key is stale when the
+    primary may hold a value OLDER than memory's**, which only a failed write/removal can cause.
+    Hence: memory is a complete last-known-good copy (every successful read is mirrored); a read
+    that misses or fails is answered from memory for that call only and changes no state; a stale
+    key is never read from the primary (no resurrecting a guest id `refreshGuestIdentity()` just
+    healed) but is still written to, and a successful write or removal ends staleness because the
+    primary matches memory again; staleness is per key; `remove()` never throws. Reads and writes go
+    to the primary first, so cross-tab sharing is unchanged; memory-first was rejected because it
     would ignore other tabs' updates to `web_session_id`'s activity.
     Regressions: the reviewer's exact sequence through ce-kit's real `createGuestIdentity` /
     `getOrCreateWebSessionId` (zero backend calls), the per-key and read-mirroring semantics, the
@@ -278,7 +285,7 @@ see design decision 2 and the note below).
 
 - `pnpm --filter @anytoolai/web-mirror typecheck` — passed.
 - `pnpm --filter @anytoolai/web-mirror lint` — passed.
-- `pnpm --filter @anytoolai/web-mirror test` — 153/153 passed as of design decision 12 (90/90 post-merge, 86/86 before).
+- `pnpm --filter @anytoolai/web-mirror test` — 156/156 passed as of design decision 12 (90/90 post-merge, 86/86 before).
 - `pnpm --filter @anytoolai/ce-kit test` — 315/315 passed (unaffected).
 - `pnpm --filter @anytoolai/ce-kit typecheck` — passed.
 - `python scripts/agent/runner.py frontend-check` — passed (lint, typecheck, test, API-types-drift

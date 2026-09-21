@@ -6,26 +6,42 @@ import { createInMemoryAsyncStorage, createWindowLocalStorageAdapter, type Async
  *
  * ce-kit deliberately treats a failed read as a cache miss and a failed write as best-effort, so
  * without this a guest id (or `web_session_id`) the storage can't hold would be minted anew on every
- * remount. Memory is therefore a complete last-known-good copy of what this page has read or written:
+ * remount. Memory is therefore a complete last-known-good copy of what this page has read or written.
+ *
+ * The one invariant everything below serves: a key is *stale* when the primary may hold a value
+ * OLDER than memory's. Only a failed write or removal can make it so (memory took the new value, the
+ * primary didn't). A failed read cannot -- it produced no value, so ce-kit is free to retry it (it
+ * re-reads after minting a guest precisely because a read failure may be transient) -- and a
+ * successful write or removal ends staleness, since the primary then matches memory again.
  *
  * - Reads and writes go to the primary first, so cross-tab sharing is unchanged while it works, and
- *   every successful read is mirrored into memory -- a value only ever *read* (a guest id persisted
- *   by an earlier visit) is not lost if the primary breaks later.
- * - A primary miss falls back to memory, which covers storage that accepts a write but forgets it.
- * - Trust is per key: the first failing operation on a key stops consulting the primary for that key
- *   only, so a write failing for one key (quota exceeded on `web_session_id`) can't take the guest id
- *   down with it. Not trusting it at all afterwards also means a stale value the primary failed to
- *   forget can't be read back (a guest id `refreshGuestIdentity()` just healed).
+ *   every successful read is mirrored into memory, so a value only ever *read* (a guest id persisted
+ *   by an earlier visit) survives the primary breaking later.
+ * - A read that misses or fails is answered from memory for that call only; it changes no state.
+ * - A stale key is never read from the primary: that could bring back a value already superseded (a
+ *   guest id `refreshGuestIdentity()` just healed). Staleness is per key, so a write failing for one
+ *   key (quota exceeded on `web_session_id`) does not affect the guest id.
+ * - The primary is still written on every mutation, stale or not, so a recovered storage catches up.
  * - `remove()` never throws, so a self-heal always sticks.
  */
 export function createResilientStorage(primary: AsyncStorage | null, memory: AsyncStorage): AsyncStorage {
   if (primary === null) {
     return memory;
   }
-  const untrustedKeys = new Set<string>();
+  const staleKeys = new Set<string>();
+
+  async function mutatePrimary(key: string, mutation: () => Promise<void>): Promise<void> {
+    try {
+      await mutation();
+      staleKeys.delete(key);
+    } catch {
+      staleKeys.add(key);
+    }
+  }
+
   return {
     async get(key) {
-      if (!untrustedKeys.has(key)) {
+      if (!staleKeys.has(key)) {
         try {
           const stored = await primary.get(key);
           if (stored !== undefined) {
@@ -33,30 +49,18 @@ export function createResilientStorage(primary: AsyncStorage | null, memory: Asy
             return stored;
           }
         } catch {
-          untrustedKeys.add(key);
+          // Possibly transient -- answer from memory for this call only.
         }
       }
       return memory.get(key);
     },
     async set(key, value) {
       await memory.set(key, value);
-      if (!untrustedKeys.has(key)) {
-        try {
-          await primary.set(key, value);
-        } catch {
-          untrustedKeys.add(key);
-        }
-      }
+      await mutatePrimary(key, () => primary.set(key, value));
     },
     async remove(key) {
       await memory.remove(key);
-      if (!untrustedKeys.has(key)) {
-        try {
-          await primary.remove(key);
-        } catch {
-          untrustedKeys.add(key);
-        }
-      }
+      await mutatePrimary(key, () => primary.remove(key));
     },
   };
 }

@@ -63,7 +63,7 @@ describe("createResilientStorage", () => {
     expect(await storage.get("guest")).toBe("guest_A");
   });
 
-  it("stops trusting the primary after its first failure, so a stale value it failed to forget is not read back", async () => {
+  it("does not bring back a value the primary failed to forget, until a write makes it current again", async () => {
     // remove() is what refreshGuestIdentity() uses to heal a guest id the backend no longer knows:
     // if the primary's removal fails but its reads still work, the stale id must not come back.
     const primary = createInMemoryAsyncStorage();
@@ -72,9 +72,10 @@ describe("createResilientStorage", () => {
     const storage = createResilientStorage(failingRemove, createInMemoryAsyncStorage());
 
     await storage.remove("guest");
-    await storage.set("guest", "fresh");
+    expect(await storage.get("guest")).toBeUndefined();
 
-    expect(await primary.get("guest")).toBe("stale");
+    await storage.set("guest", "fresh");
+    expect(await primary.get("guest")).toBe("fresh");
     expect(await storage.get("guest")).toBe("fresh");
   });
 
@@ -143,6 +144,82 @@ describe("createResilientStorage", () => {
     expect(first.ok && first.value.guestId).toBe("guest_A");
     expect(afterRemount.ok && afterRemount.value.guestId).toBe("guest_A");
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("treats a failed read as a miss for that call only, and consults the primary again next time", async () => {
+    // Code review finding [P2]: a read failure may be transient (ce-kit re-reads after minting a
+    // guest for exactly that reason), so it must not stop the primary being used for that key.
+    const primary = createInMemoryAsyncStorage();
+    await primary.set("guest", "guest_P");
+    let failNextRead = true;
+    const flaky: AsyncStorage = {
+      ...primary,
+      get: (key) => {
+        if (failNextRead) {
+          failNextRead = false;
+          return Promise.reject(new Error("locked"));
+        }
+        return primary.get(key);
+      },
+    };
+    const storage = createResilientStorage(flaky, createInMemoryAsyncStorage());
+
+    expect(await storage.get("guest")).toBeUndefined();
+    expect(await storage.get("guest")).toBe("guest_P");
+  });
+
+  it("persists an identity minted after a transient read failure, so the next page load reuses it", async () => {
+    // The reviewer's exact sequence, through ce-kit's real createGuestIdentity: the first read
+    // rejects once, the backend mints guest_A, ce-kit's second read works, guest_A reaches the
+    // primary -- and a fresh client and storage over the same primary (a reload) needs no backend.
+    const primary = createInMemoryAsyncStorage();
+    let failNextRead = true;
+    const flaky: AsyncStorage = {
+      ...primary,
+      get: (key) => {
+        if (failNextRead) {
+          failNextRead = false;
+          return Promise.reject(new Error("locked"));
+        }
+        return primary.get(key);
+      },
+    };
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ guest_id: "guest_A" }), { status: 200 }));
+    const client = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    const first = await client.createGuestIdentity({ storage: createResilientStorage(flaky, createInMemoryAsyncStorage()) });
+
+    const reloadedFetch = vi.fn();
+    const reloadedClient = new PlatformApiClient({ baseUrl: "https://api.example.com", fetchImpl: reloadedFetch as unknown as typeof fetch });
+    const afterReload = await reloadedClient.createGuestIdentity({
+      storage: createResilientStorage(primary, createInMemoryAsyncStorage()),
+    });
+
+    expect(first.ok && first.value.guestId).toBe("guest_A");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(await primary.get(DEFAULT_GUEST_STORAGE_KEY)).toBe("guest_A");
+    expect(afterReload.ok && afterReload.value.guestId).toBe("guest_A");
+    expect(reloadedFetch).not.toHaveBeenCalled();
+  });
+
+  it("catches the primary up once a write succeeds again, so another tab's changes are visible again", async () => {
+    const primary = createInMemoryAsyncStorage();
+    let failWrites = true;
+    const recovering: AsyncStorage = {
+      ...primary,
+      set: (key, value) => (failWrites ? Promise.reject(new Error("quota")) : primary.set(key, value)),
+    };
+    const storage = createResilientStorage(recovering, createInMemoryAsyncStorage());
+
+    await storage.set("web_session", "S1");
+    await primary.set("web_session", "older-in-primary");
+    expect(await storage.get("web_session")).toBe("S1");
+
+    failWrites = false;
+    await storage.set("web_session", "S2");
+    await primary.set("web_session", "S3_from_another_tab");
+
+    expect(await storage.get("web_session")).toBe("S3_from_another_tab");
   });
 
   it("never throws from remove(), so a self-heal always sticks", async () => {
