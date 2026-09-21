@@ -1,6 +1,7 @@
 const ACCESS_HEADER = "X-Atom-Lab-Access-Code";
 const DIRTY_WARNING = "Несохранённые изменения будут потеряны. Продолжить?";
 const RUN_POLL_INTERVAL_MS = 250;
+const RUN_POLL_MAX_BACKOFF_MS = 4_000;
 const RUN_POLL_TIMEOUT_MS = 90_000;
 const TERMINAL_RUN_STATUSES = new Set(["succeeded", "failed", "expired", "cancelled"]);
 const RUN_STATUSES = new Set(["queued", "running", ...TERMINAL_RUN_STATUSES]);
@@ -23,6 +24,17 @@ function cloneJson(value) {
 
 function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function retryAfterDelayMs(value, nowMs) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (/^\d+$/.test(normalized)) {
+    const delay = Number(normalized) * 1_000;
+    return Number.isSafeInteger(delay) ? delay : null;
+  }
+  const retryAt = Date.parse(normalized);
+  return Number.isFinite(retryAt) ? Math.max(0, retryAt - nowMs) : null;
 }
 
 function schemaTypes(schema) {
@@ -1127,8 +1139,10 @@ export function bootstrapAtomLab({
 
   const updateRunButton = () => {
     const hasSelectableModel = modelOptions.some((option) => option.selectable);
-    const acceptedRunIsActive = Boolean(activeSubmission?.runId && !activeSubmission.terminal);
-    nodes["run-button"].disabled = submitInFlight || !hasSelectableModel || acceptedRunIsActive;
+    const submissionBlocksNewRun = Boolean(activeSubmission && (
+      !activeSubmission.runId || !activeSubmission.terminal
+    ));
+    nodes["run-button"].disabled = submitInFlight || !hasSelectableModel || submissionBlocksNewRun;
   };
 
   const selectedModelOption = () => modelOptions.find(
@@ -1297,18 +1311,27 @@ export function bootstrapAtomLab({
     }
   };
 
-  const scheduleNextPoll = (submission) => {
+  const scheduleNextPoll = (submission, {retryable = false, retryAfterMs = null} = {}) => {
     if (destroyed) return;
-    if (pollingTimedOut(submission.pollStartedAt, nowImpl(), pollTimeoutMs)) {
+    const remaining = pollTimeoutMs - (nowImpl() - submission.pollStartedAt);
+    if (remaining <= 0) {
       nodes["run-state"].textContent = "Время ожидания в браузере истекло. Backend job не отменён.";
       nodes["retry-read"].hidden = false;
       return;
     }
+    if (retryable) submission.pollFailureCount = (submission.pollFailureCount ?? 0) + 1;
+    const backoff = retryable
+      ? Math.min(
+        RUN_POLL_INTERVAL_MS * (2 ** Math.min(submission.pollFailureCount - 1, 30)),
+        RUN_POLL_MAX_BACKOFF_MS,
+      )
+      : RUN_POLL_INTERVAL_MS;
+    const delay = Math.min(Math.max(backoff, retryAfterMs ?? 0), remaining);
     if (runPollTimer !== null) cancelScheduleImpl(runPollTimer);
     runPollTimer = scheduleImpl(() => {
       runPollTimer = null;
       return pollRun(submission);
-    }, RUN_POLL_INTERVAL_MS);
+    }, delay);
   };
 
   const fetchRunBeforeDeadline = async (submission) => {
@@ -1347,7 +1370,14 @@ export function bootstrapAtomLab({
       }
       if (!response.ok) {
         const retryable = [408, 425, 429, 500, 502, 503, 504].includes(response.status);
-        if (retryable) throw new Error("retryable_poll_error");
+        if (retryable) {
+          const retryAfterMs = response.status === 429
+            ? retryAfterDelayMs(response.headers?.get?.("Retry-After"), nowImpl())
+            : null;
+          nodes["run-state"].textContent = "Переподключение… Принятый запуск продолжает выполняться.";
+          scheduleNextPoll(submission, {retryable: true, retryAfterMs});
+          return;
+        }
         const code = typeof payload?.error?.code === "string" ? payload.error.code : "request_failed";
         nodes["run-state"].textContent = `${code}: ${safeApiMessage(payload, "Не удалось прочитать запуск.")}`;
         nodes["retry-read"].hidden = false;
@@ -1359,6 +1389,7 @@ export function bootstrapAtomLab({
         nodes["retry-read"].hidden = false;
         return;
       }
+      submission.pollFailureCount = 0;
       renderRunDetail(detail, submission);
       if (!TERMINAL_RUN_STATUSES.has(detail.status)) {
         scheduleNextPoll(submission);
@@ -1366,7 +1397,7 @@ export function bootstrapAtomLab({
     } catch {
       if (destroyed || activeSubmission !== submission) return;
       nodes["run-state"].textContent = "Переподключение… Принятый запуск продолжает выполняться.";
-      scheduleNextPoll(submission);
+      scheduleNextPoll(submission, {retryable: true});
     }
   };
 
@@ -1423,6 +1454,7 @@ export function bootstrapAtomLab({
       activeSubmission.detailLoaded = false;
       activeSubmission.terminal = false;
       activeSubmission.pollStartedAt = nowImpl();
+      activeSubmission.pollFailureCount = 0;
       displayAcceptedSubmission(activeSubmission);
       nodes["run-state"].textContent = runStatusLabel(accepted.status);
       const submission = activeSubmission;
@@ -1573,7 +1605,10 @@ export function bootstrapAtomLab({
   nodes["retry-submit"].addEventListener("click", () => submitRun({retry: true}));
   nodes["retry-read"].addEventListener("click", () => {
     nodes["retry-read"].hidden = true;
-    if (activeSubmission) activeSubmission.pollStartedAt = nowImpl();
+    if (activeSubmission) {
+      activeSubmission.pollStartedAt = nowImpl();
+      activeSubmission.pollFailureCount = 0;
+    }
     pollRun(activeSubmission);
   });
   nodes["fill-example"].addEventListener("click", () => {

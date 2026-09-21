@@ -513,6 +513,7 @@ test("network submission retry reuses the idempotency key and polling reconnects
   await page.locator("#run-button").click();
   await expect(page.locator("#retry-submit")).toBeVisible();
   await expect(page.locator("#run-state")).toContainText("Черновик сохранён");
+  await expect(page.locator("#run-button")).toBeDisabled();
   await page.getByLabel("context").fill("");
   modelAvailable = false;
   await page.locator("#refresh-models").click();

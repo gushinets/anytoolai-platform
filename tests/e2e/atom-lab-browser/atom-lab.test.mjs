@@ -494,6 +494,94 @@ test("destroy aborts an active run read and prevents another poll", async () => 
   assert.equal(scheduled.size, 0);
 });
 
+test("run-read retry scheduling is bounded by backoff, Retry-After, and deadline", async () => {
+  const {document, elements} = createFakeDocument();
+  const atom = await catalogAtom("A01");
+  const modelCatalog = {
+    items: [{
+      model_id: "gpt-supported",
+      compatibility: "compatible",
+      reason: "confirmed_openai_text_gpt",
+      reasoning_supported: false,
+      allowed_reasoning_efforts: null,
+      provenance: {},
+    }],
+    snapshot_id: "snapshot-current",
+    last_success_at: "2026-09-21T00:00:00Z",
+    stale: false,
+    refresh_status: "current",
+    error: null,
+  };
+  const runningDetail = {
+    run_id: "run-backoff",
+    status: "running",
+    snapshot: {atom_id: "A01", input: EXAMPLES.A01, prompt: atom.prompt, model_id: "openai/gpt-supported", reasoning_effort: null},
+    runtime_ids: {scenario_session_id: "session-backoff", job_id: "job-backoff", action_run_id: "action-backoff", artifact_id: null},
+    result: null,
+    diagnostics: {error_code: null, duration_ms: null, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: null, response_model_id: null, validation_attempts: 0, transport_attempts: 0, physical_calls: 0, succeeded_first_attempt: null, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
+    created_at: "2026-09-21T00:00:00Z",
+    started_at: "2026-09-21T00:00:00Z",
+    finished_at: null,
+  };
+  const scheduled = new Map();
+  let nextTimerId = 0;
+  let now = 0;
+  let reads = 0;
+  bootstrapAtomLab({
+    document,
+    fetchImpl: async (url, options = {}) => {
+      if (url.endsWith("/atoms")) return {ok: true, status: 200, async json() { return [atom]; }};
+      if (url.endsWith("/models")) return {ok: true, status: 200, async json() { return modelCatalog; }};
+      if (url.endsWith("/runs") && options.method === "POST") {
+        return {ok: true, status: 202, async json() { return {run_id: "run-backoff", scenario_session_id: "session-backoff", job_id: "job-backoff", status: "running"}; }};
+      }
+      reads += 1;
+      if (reads <= 2) {
+        return {ok: false, status: 503, headers: {get: () => null}, async json() { return null; }};
+      }
+      if (reads === 3) {
+        return {ok: true, status: 200, headers: {get: () => null}, async json() { return runningDetail; }};
+      }
+      return {
+        ok: false,
+        status: 429,
+        headers: {get: (name) => name.toLowerCase() === "retry-after" ? "10" : null},
+        async json() { return null; },
+      };
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback, delay) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, {callback, delay});
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+    nowImpl: () => now,
+    pollTimeoutMs: 4_000,
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("fill-example").click();
+  await elements.get("run-button").click();
+
+  const runScheduledPoll = async () => {
+    assert.equal(scheduled.size, 1);
+    const [timerId, timer] = scheduled.entries().next().value;
+    scheduled.delete(timerId);
+    now += timer.delay;
+    await timer.callback();
+    return timer.delay;
+  };
+
+  assert.equal(await runScheduledPoll(), 0);
+  assert.equal(await runScheduledPoll(), 250);
+  assert.equal(await runScheduledPoll(), 500);
+  assert.equal(await runScheduledPoll(), 250);
+  assert.equal(await runScheduledPoll(), 3_000);
+  assert.equal(reads, 4);
+  assert.equal(scheduled.size, 0);
+});
+
 test("dirty atom navigation requires confirmation and preserves the current draft when declined", async () => {
   const {document, elements} = createFakeDocument();
   const atoms = [await catalogAtom("A01"), await catalogAtom("A02")];
