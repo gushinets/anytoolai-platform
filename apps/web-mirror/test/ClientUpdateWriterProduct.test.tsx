@@ -674,4 +674,37 @@ describe("ClientUpdateWriterProduct (mode switcher)", () => {
 
     expect(calls.find((call) => call.key === routes.NEXT_ACTION)!.init.signal?.aborted).toBe(false);
   });
+
+  it("keeps one guest identity across a mode switch when localStorage is unavailable", async () => {
+    // Code review finding [P2]: `key={modeId}` remounts ProductRunPage on every switch, and with no
+    // localStorage each mount used to get its own fresh, empty in-memory guest storage -- so one
+    // visit minted a new guest per mode and events (product_viewed/form_started on the first guest,
+    // form_submitted/scenario_completed on the next) could no longer be joined. Two *different*
+    // guests are queued here (unlike the other mode-switch tests, whose two identical responses
+    // would hide the problem), and exactly one identity call must be made.
+    const ids = MODE_IDS.update;
+    const routes = routesFor(ids);
+    const { client, calls } = makeClient({
+      [routes.RUNTIME_CONFIG]: [fullRuntimeConfigResponse(ids)],
+      [routes.GUEST_IDENTITY]: [guestIdentityResponse("guest_A"), guestIdentityResponse("guest_B")],
+      [routes.QUOTA]: [quotaResponse(ids), quotaResponse(MODE_IDS.reply_draft)],
+    });
+    const storageSpy = vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+      throw new DOMException("denied", "SecurityError");
+    });
+    try {
+      render(<ClientUpdateWriterProduct client={client} />);
+      await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
+
+      fireEvent.click(screen.getByRole("radio", { name: "Reply Draft" }));
+      await waitFor(() => expect(screen.getByLabelText("Client message")).toBeTruthy());
+      fireEvent.click(screen.getByRole("radio", { name: "Prepaid Request" }));
+      await waitFor(() => expect(screen.getByLabelText("Billing notes")).toBeTruthy());
+
+      expect(calls.filter((call) => call.key === routes.GUEST_IDENTITY)).toHaveLength(1);
+    } finally {
+      cleanup();
+      storageSpy.mockRestore();
+    }
+  });
 });

@@ -1109,6 +1109,31 @@ describe("ProductRunPage", () => {
     expect(events.filter((event) => event.type === "form_started")).toHaveLength(1);
   });
 
+  it("reuses one in-memory guest identity across remounts against the same client when localStorage is unavailable", async () => {
+    // Code review finding [P2]: the in-memory fallback storage was created per mount, so every
+    // remount (a multi-mode product's mode switch, or navigating between products on one client)
+    // minted a brand-new guest. It now lives per client, like localStorage would for the page.
+    const { client, calls } = makeClient({
+      ...bootRoutes(),
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse("guest_A"), guestIdentityResponse("guest_B")],
+    });
+    const storageSpy = vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+      throw new DOMException("denied", "SecurityError");
+    });
+    try {
+      const first = renderPage({ client });
+      await waitForForm();
+      first.unmount();
+      renderPage({ client });
+      await waitForForm();
+
+      expect(calls.filter((call) => call.key === ROUTES.GUEST_IDENTITY)).toHaveLength(1);
+    } finally {
+      cleanup();
+      storageSpy.mockRestore();
+    }
+  });
+
   it("reports busy true from submit through a settled result, and false again after", async () => {
     // Code review finding [P1]: a multi-mode product needs to know when it's safe to remount
     // (switch mode) without abandoning an in-flight run -- this is the shared-runtime contract a

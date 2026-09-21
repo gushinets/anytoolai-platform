@@ -47,7 +47,7 @@ correlation, copy-activation via ce-kit's ready-made helper).
   event dedupe), `ResultView.test.tsx`, `registry.test.tsx`.
 - Mode-switch safety: `ProductRunPage` exposes `onBusyChange`; `ClientUpdateWriterProduct` disables
   its mode radios (both via `disabled` and a handler-level guard) while a run is submitting/running,
-  so a mode switch can no longer abandon an already-accepted, quota-consuming scenario run
+  so a mode switch can no longer abandon an already-accepted scenario run
   (code review finding, round 4).
 - Event-dedupe visit scoping: `ProductRunPage` accepts an optional `visitId`, scoping the
   once-per-visit `product_viewed`/`form_started` dedupe to one real landing on a product instead of
@@ -143,15 +143,15 @@ covers Update mode only, the other two modes' meaning stays proven at the backen
    `useLayoutEffect` warns with no DOM), which flushes the whole child-settles -> parent-unblocks
    cascade synchronously before anything else can observe the intermediate state; (b) `busy` only
    covered submitting/running, but `runPoll`'s own timeout/connection-loss failures land on
-   `retryable-error` while the backend may still be genuinely running that *same* accepted,
-   quota-consuming session — `pendingStart`/its Idempotency-Key are deliberately kept alive for
+   `retryable-error` while the backend may still be genuinely running that *same* accepted
+   session — `pendingStart`/its Idempotency-Key are deliberately kept alive for
    exactly that reattachment case, so a mode switch there was exactly the "abandon an active run"
    bug design decision 1's guard exists to prevent, just reached via a different phase. The first
    fix for (b) added an optional `scenarioSessionId` to `Phase["retryable-error"]`, set only when
    `runPoll`'s own ambiguity applied — a **third** review round then found this only covered half
    the problem: the initial `POST /start` request itself can be just as ambiguous (a lost
    response/timeout/5xx never tells the client whether the backend already accepted it, created
-   the session, and charged quota), and `runStart`'s own generic failure branch lands on
+   the session and job), and `runStart`'s own generic failure branch lands on
    `retryable-error` with no `scenarioSessionId` at all, incorrectly reading as safe. Fixed by
    dropping `scenarioSessionId` entirely and keying `busy` on `phase.kind === "retryable-error" &&
    pendingStart !== null` instead — `pendingStart` is already exactly true in every ambiguous case
@@ -168,9 +168,9 @@ covers Update mode only, the other two modes' meaning stays proven at the backen
 7. **`busy` also gated `result-fetch-error`, and `pendingStart` stopped being kept alive for
    deterministic `/start` rejections.** A fourth review round found the `pendingStart`-based `busy`
    from decision 6 was simultaneously under- and over-inclusive. Under: `result-fetch-error` (the
-   scenario session already completed and consumed quota; only the follow-up `GET /results/{id}`
+   scenario session already completed; only the follow-up `GET /results/{id}`
    failed) was never covered at all — a mode switch there would remount `ProductRunPage` and destroy
-   the only handle (`resultArtifactId`) on an already-paid-for result, losing it exactly as
+   the only handle (`resultArtifactId`) on an already-completed result, losing it exactly as
    permanently as the ambiguous-start bug decision 6 fixed. Fixed by adding
    `phase.kind === "result-fetch-error"` as its own disjunct in `busy`; it never renders the form
    itself, so this has no effect on the Submit button/fields, only the mode-switch guard. Over:
@@ -240,6 +240,19 @@ covers Update mode only, the other two modes' meaning stays proven at the backen
     (Platform Core documents a quota-less product as valid, and making it mandatory is a repo-wide
     decision wider than this ticket), and the earlier claim that the omission had "shipped twice"
     was wrong -- ProposalAI has had its quota since it was created.
+12. **The in-memory guest storage fallback lives per client, not per mount.** When
+    `window.localStorage` is unavailable (privacy-hardened browsers, sandboxed iframes),
+    `ProductRunPage` fell back to an in-memory storage created inside `useState`, i.e. once per
+    mount. Client Update Writer's mode switch remounts via `key={modeId}` (and navigating between
+    products on one client remounts too), so every switch started from an empty storage and minted a
+    brand-new guest -- one visit's `product_viewed`/`form_started` landed on one guest and
+    `form_submitted`/`scenario_completed` on another, and, with visit-level dedupe, the funnel could
+    no longer be joined by guest id. The fallback is now a per-client `WeakMap` entry next to the
+    other per-client caches in the same file, so it behaves like localStorage would for the page's
+    lifetime. This fixes the root in the shared runtime (any product that remounts) rather than
+    threading a storage prop through Client Update Writer only. The existing mode-switch tests
+    queued two identical guest responses, which hid this; the regressions queue two *different*
+    guests and require exactly one identity call.
 
 ## Verification
 
@@ -248,7 +261,7 @@ see design decision 2 and the note below).
 
 - `pnpm --filter @anytoolai/web-mirror typecheck` — passed.
 - `pnpm --filter @anytoolai/web-mirror lint` — passed.
-- `pnpm --filter @anytoolai/web-mirror test` — 135/135 passed as of design decision 11 (90/90 post-merge, 86/86 before).
+- `pnpm --filter @anytoolai/web-mirror test` — 137/137 passed as of design decision 12 (90/90 post-merge, 86/86 before).
 - `pnpm --filter @anytoolai/ce-kit test` — 315/315 passed (unaffected).
 - `pnpm --filter @anytoolai/ce-kit typecheck` — passed.
 - `python scripts/agent/runner.py frontend-check` — passed (lint, typecheck, test, API-types-drift
