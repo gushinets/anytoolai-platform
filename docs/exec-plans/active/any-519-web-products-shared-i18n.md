@@ -85,7 +85,7 @@ python scripts/agent/runner.py full-check           # + backend baseline + produ
 python scripts/agent/runner.py validate-architecture
 python scripts/agent/runner.py validate-docs
 python scripts/agent/runner.py generate-docs --check
-pnpm --filter @anytoolai/web-mirror test            # 223 tests, incl. i18n.test.ts, ProductPageShell.test.tsx
+pnpm --filter @anytoolai/web-mirror test            # 224 tests, incl. i18n.test.ts, ProductPageShell.test.tsx
 python scripts/agent/runner.py dev-up
 python scripts/agent/runner.py proposal-ai-smoke          # 8/8, incl. the new language-switch scenario
 python scripts/agent/runner.py client-update-writer-smoke # 3/3, English default unaffected
@@ -101,7 +101,7 @@ python scripts/agent/runner.py dev-down
 
 ## Code review rounds (PR #139)
 
-Five rounds of full re-review on top of the initial PR, each fixed before the next round started:
+Six rounds of full re-review on top of the initial PR, each fixed before the next round started:
 
 1. Compile breakage from the `main` merge (reintroduced pre-i18n `ClientUpdateWriterProduct.tsx`
    code, a duplicate `pnpm-lock.yaml` mapping key) plus first-pass bugs: Russian `max_length`
@@ -127,6 +127,13 @@ Five rounds of full re-review on top of the initial PR, each fixed before the ne
 5. Zero blockers -- one P3: the `storage` listener matched on `key` alone, but `storage` also fires
    for `sessionStorage` (including from a same-origin iframe's own writes); now also checks
    `event.storageArea === window.localStorage`, the only Storage object this module touches.
+6. One P2 code, one P2 docs: the shared runtime's own `<form aria-label>` was still a hardcoded
+   `${title} form` template (English "form" at every locale) -- added a `formLabel` host message,
+   translated seven ways, and a regression proving the accessible name re-localizes on switch.
+   `frontend-boundaries.md` still described a ProposalAI web `language` field that ANY-521/PR #140
+   had already removed, and described tone labels as uniformly living in the shared
+   `products/shared/toneMessages/` bundle when ProposalAI now defines its own; both corrected, and
+   the "add a locale" recipe now mentions `hasDescription`/`hasStartAnother`.
 
 ## `main` merge reconciliation (ANY-521, PR #140)
 

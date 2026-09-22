@@ -12,6 +12,7 @@ export const pt: Shape<typeof en> = {
   generating: "Gerando…",
   identityUnavailable: "Não foi possível verificar sua identidade. Recarregue a página e tente novamente.",
   retry: "Tentar novamente",
+  formLabel: "Formulário {product}",
   errors: {
     startFailed: "Não foi possível iniciar {product}. Tente novamente.",
     timeout: "Está demorando mais do que o esperado. Tente novamente.",

@@ -169,6 +169,18 @@ describe("ProductPageShell locale rendering", () => {
     ]);
   });
 
+  it("re-localizes the submit form's accessible name on a locale switch", async () => {
+    // Code review finding: the generic runtime's own `<form aria-label>` stayed hardcoded English
+    // ("{product} form") -- a real screen-reader-facing string ANY-519 requires localized too.
+    renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
+    await screen.findByRole("form", { name: "ProposalAI form" });
+
+    switchTo("ru");
+
+    expect(await screen.findByRole("form", { name: "Форма ProposalAI" })).toBeTruthy();
+    expect(screen.queryByRole("form", { name: "ProposalAI form" })).toBeNull();
+  });
+
   it("restores document.documentElement.lang on unmount instead of leaking outside the product route", async () => {
     // Code review finding (round 4): App Router does not remount a shared layout on client-side
     // navigation, so leaving this route for an out-of-scope English page must not leave <html> on a

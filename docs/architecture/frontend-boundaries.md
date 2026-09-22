@@ -147,17 +147,25 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   product owns its `product` namespace: title, field labels, validation field names, mode names,
   submit/running/failure and quota copy, supplied through `RegisteredProduct.messages`.
   `ProductDefinition` describes behavior only; it names its copy with `messageScope` and carries no
-  English literals. `neutral|warm|firm` tone labels are product vocabulary (a product-owned wire
-  enum's visible labels), so they live in `products/shared/toneMessages/` -- one translation per
-  locale, shared by every product whose input schema declares that enum, but spread into each such
-  product's own `product` namespace (never into `host`) so `ToneSelect` reads it via
-  `useProductT()`. A product with a differently-meaning `tone`-shaped enum needs no host change.
+  English literals -- two optional flags, `hasDescription`/`hasStartAnother`, tell the shared
+  runtime whether to look up a product's own `description` / `<messageScope>.startAnother` message,
+  without the definition itself holding any text. `neutral|warm|firm` tone labels are product
+  vocabulary (a product-owned wire enum's visible labels), never host's: Client Update Writer's
+  shared `ToneSelect` reads them from `products/shared/toneMessages/` (one translation per locale,
+  spread into its own `product` namespace so a product with a differently-meaning `tone`-shaped enum
+  needs no host change); ProposalAI instead defines its own descriptive `toneOptions` labels
+  ("Warm & personable" etc.) in its own messages and does not use `ToneSelect` at all -- the shared
+  bundle is an opt-in convenience for products that want the same plain wording, not a contract every
+  `tone`-shaped product must join.
 - **Validation:** shared validators return structured `FieldError` data (`required`,
   `outer_whitespace`, `max_length`, `product`), never prose; `FieldErrorMessage` renders it in the
   current locale. Backend schema validation stays authoritative.
-- **UI locale is not the generated-content language.** Changing the UI locale never changes
-  ProposalAI `language`, Client Update Writer `constraints.language` or any future output-language
-  input, and changing those never changes the UI locale. Nothing derives one from the other.
+- **UI locale is not the generated-content language.** ProposalAI's web form has no output-language
+  input at all (ANY-521/PR #140 removed it; output language derives from `task_text`, with an
+  explicit `language` override remaining backend/schema-only for non-web callers). Client Update
+  Writer likewise exposes no `constraints.language` UI. Neither product's `toInput` ever reads the
+  UI locale, so independence holds by construction; any future output-language input must keep that
+  same rule -- changing UI locale must never change it, and vice versa.
 - **Wire values stay untranslated.** Closed-set values (`neutral|warm|firm`, mode ids, enums,
   statuses) are sent to the backend as-is; only visible labels are translated. Prompts, schemas and
   backend product config never depend on UI locale.
@@ -171,7 +179,10 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
 
 1. Create `products/<name>/messages/en.ts` (English is the semantic source: `title`,
    `quotaRemaining` with `{remaining}`/`{limit}`, per-scope `submit`/`running`/`runFailed`, `fields`,
-   `fieldNames`, and any product validation keys).
+   `fieldNames`, and any product validation keys). Want a description under the title, or a
+   "run again" action after a completed run? Add `description` / `<messageScope>.startAnother` here
+   and set `hasDescription`/`hasStartAnother: true` on the `ProductDefinition` -- both optional, the
+   shared runtime only looks them up when the flag is set.
 2. Add `fr it de es ru pt` files typed `Shape<typeof en>`; use the typographic apostrophe `’` (a
    plain `'` before `{` starts ICU quoting); keep placeholders and plural categories. Reusing
    `ToneSelect`? Spread `TONE_MESSAGES[locale]` from `products/shared/toneMessages/` under a `tone`

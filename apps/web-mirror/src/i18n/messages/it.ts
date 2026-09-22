@@ -15,6 +15,7 @@ export const it: Shape<typeof en> = {
   generating: "Generazione in corso…",
   identityUnavailable: "Non è stato possibile verificare la sua identità. Ricaricare la pagina e riprovare.",
   retry: "Riprovare",
+  formLabel: "Modulo {product}",
   errors: {
     startFailed: "Impossibile avviare {product}. Riprovare.",
     timeout: "L’operazione richiede più tempo del previsto. Riprovare.",

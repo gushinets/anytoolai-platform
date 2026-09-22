@@ -12,6 +12,7 @@ export const fr: Shape<typeof en> = {
   generating: "Génération en cours…",
   identityUnavailable: "Nous n’avons pas pu vérifier votre identité. Veuillez recharger la page et réessayer.",
   retry: "Réessayer",
+  formLabel: "Formulaire {product}",
   errors: {
     startFailed: "Impossible de démarrer {product}. Veuillez réessayer.",
     timeout: "Cela prend plus de temps que prévu. Veuillez réessayer.",

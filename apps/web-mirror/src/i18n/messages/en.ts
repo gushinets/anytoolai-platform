@@ -11,6 +11,10 @@ export const en = {
   generating: "Generating…",
   identityUnavailable: "We couldn't verify your identity. Please reload the page and try again.",
   retry: "Try again",
+  // Code review finding: the product's own submit form had no accessible name of its own in any
+  // non-English locale (a bare `${title} form` template with "form" hardcoded), so a screen reader
+  // announced e.g. "ProposalAI form" even at a Russian locale.
+  formLabel: "{product} form",
   errors: {
     startFailed: "Could not start {product}. Please try again.",
     timeout: "This is taking longer than expected. Please try again.",

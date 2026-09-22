@@ -827,7 +827,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         <Card className={styles.formCard}>
           <form
             ref={formRef}
-            aria-label={`${title} form`}
+            aria-label={th("formLabel", { product: title })}
             className={styles.form}
             noValidate
             onSubmit={handleSubmit}
