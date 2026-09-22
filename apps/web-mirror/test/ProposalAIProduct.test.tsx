@@ -35,7 +35,7 @@ function renderReady() {
   const routed = makeClient({
     [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
     [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
-    [ROUTES.QUOTA]: [quotaResponse(IDS)],
+    [ROUTES.QUOTA]: [quotaResponse(IDS, { limit_count: 10, remaining_count: 10 })],
     [ROUTES.START]: [startResponse()],
     [ROUTES.SESSION]: [sessionResponse()],
     [ROUTES.RESULT]: [resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })],
@@ -52,7 +52,17 @@ describe("ProposalAI product definition", () => {
 
     await waitFor(() => expect(screen.getByRole("heading", { name: "ProposalAI" })).toBeTruthy());
     expect(screen.getByRole("button", { name: "Generate proposal" })).toBeTruthy();
-    expect(screen.getByText("3 of 3 proposals remaining.")).toBeTruthy();
+    expect(screen.getByText("10 of 10 proposals remaining.")).toBeTruthy();
+    expect(
+      screen.getByText("Turn a client brief and your relevant strengths into a proposal ready to send."),
+    ).toBeTruthy();
+    expect(screen.getByPlaceholderText("Paste the client's task, brief, or job post.")).toBeTruthy();
+    expect(
+      screen.getByPlaceholderText("Describe the experience and strengths that make you a good fit."),
+    ).toBeTruthy();
+    expect(screen.getByRole("radiogroup", { name: "Proposal style" })).toBeTruthy();
+    expect((screen.getByRole("radio", { name: "Warm & personable" }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.queryByLabelText(/Language/)).toBeNull();
   });
 
   it("validates its own fields client-side, mirroring generate_input.schema.json", async () => {
@@ -60,28 +70,54 @@ describe("ProposalAI product definition", () => {
     await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
 
     fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: " padded " } });
-    fireEvent.change(screen.getByLabelText("Language (optional)"), { target: { value: "English" } });
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
 
     expect(await screen.findByText("Task description is required.")).toBeTruthy();
     expect(screen.getByText("Your positioning must not start or end with whitespace.")).toBeTruthy();
-    expect(screen.getByText('Language must look like "en" or "en-US".')).toBeTruthy();
+    const taskField = screen.getByLabelText("Describe the task");
+    const positioningField = screen.getByLabelText("Your positioning");
+    expect(taskField.getAttribute("aria-describedby")).toBe("proposal-ai-task-help proposal-ai-task-error");
+    expect(positioningField.getAttribute("aria-describedby")).toBe(
+      "proposal-ai-positioning-help proposal-ai-positioning-error",
+    );
+    for (const id of taskField.getAttribute("aria-describedby")!.split(" ")) {
+      expect(document.getElementById(id)).toBeTruthy();
+    }
+    for (const id of positioningField.getAttribute("aria-describedby")!.split(" ")) {
+      expect(document.getElementById(id)).toBeTruthy();
+    }
     expect(calls.some((call) => call.key === ROUTES.START)).toBe(false);
   });
 
-  it("maps its fields to the snake_case input schema, omitting empty optional fields", async () => {
+  it("maps the default warm style to the snake_case input schema and omits language", async () => {
     const { calls } = renderReady();
     await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
 
     fireEvent.change(screen.getByLabelText("Describe the task"), { target: { value: "Build a landing page." } });
     fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
-    fireEvent.change(screen.getByLabelText("Tone (optional)"), { target: { value: "warm" } });
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
 
     await waitFor(() => expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy());
     const startCall = calls.find((call) => call.key === ROUTES.START);
     expect(JSON.parse(startCall?.init.body as string)).toMatchObject({
       input: { task_text: "Build a landing page.", freelancer_positioning: "Frontend freelancer.", tone: "warm" },
+    });
+    expect(JSON.parse(startCall?.init.body as string)).not.toHaveProperty("input.language");
+  });
+
+  it("maps the selected confident style to the firm backend value", async () => {
+    const { calls } = renderReady();
+    await waitFor(() => expect(screen.getByLabelText("Describe the task")).toBeTruthy());
+
+    fireEvent.change(screen.getByLabelText("Describe the task"), { target: { value: "Build a landing page." } });
+    fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
+    fireEvent.click(screen.getByRole("radio", { name: "Confident & direct" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
+
+    await waitFor(() => expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy());
+    const startCall = calls.find((call) => call.key === ROUTES.START);
+    expect(JSON.parse(startCall?.init.body as string)).toMatchObject({
+      input: { task_text: "Build a landing page.", freelancer_positioning: "Frontend freelancer.", tone: "firm" },
     });
     expect(JSON.parse(startCall?.init.body as string)).not.toHaveProperty("input.language");
   });
@@ -93,6 +129,7 @@ describe("ProposalAI product definition", () => {
     fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
     await waitFor(() => expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy());
+    expect(screen.getByRole("button", { name: "Create another proposal" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
 

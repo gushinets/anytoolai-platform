@@ -419,6 +419,35 @@ def test_quota_check_can_be_read_only_without_usage_or_events(
     assert event_types == ["guest.created"]
 
 
+def test_quota_check_uses_the_current_policy_limit_for_existing_usage(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session],
+) -> None:
+    with transaction_boundary(session_factory) as session:
+        guest_id = _create_guest(session)
+        _consume_accepted_start(
+            _quota_service(session),
+            guest_id=guest_id,
+            scenario_id="kernel_demo.single_action_smoke_v1",
+            scenario_session_id="scenario_session_before_limit_change",
+        )
+
+    with transaction_boundary(session_factory) as session:
+        state = _quota_service(session, registry=_registry_with_quota_limit(10)).check_quota(
+            tenant_id="anytoolai",
+            region="default",
+            product_id="kernel_demo",
+            guest_id=guest_id,
+            emit_event=False,
+            persist_usage=False,
+        )
+        stored_limit = session.execute(sa.select(guest_quota_usage_table.c.limit_count)).scalar_one()
+
+    assert state.used_count == 1
+    assert state.limit_count == 10
+    assert state.remaining_count == 9
+    assert stored_limit == 3
+
+
 def test_quota_consume_exhausted_and_repeat_calls(
     session_factory: sa.orm.sessionmaker[sa.orm.Session],
 ) -> None:

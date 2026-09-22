@@ -16,8 +16,14 @@ function TestProductFields({ values, errors, disabled, onChange }: ProductFields
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("text", event.target.value)}
         disabled={disabled}
         aria-invalid={Boolean(errors.text)}
+        aria-describedby={errors.text ? "test-product-text-help test-product-text-error" : "test-product-text-help"}
       />
-      {errors.text ? <p role="alert">{errors.text}</p> : null}
+      <p id="test-product-text-help">Enter the text to process.</p>
+      {errors.text ? (
+        <p id="test-product-text-error" role="alert">
+          {errors.text}
+        </p>
+      ) : null}
     </>
   );
 }
@@ -39,7 +45,9 @@ export const testProductDefinition: ProductDefinition<TestProductValues, string>
   Fields: TestProductFields,
   Result: ({ result, onCopy }) => <ResultView text={result} onCopy={onCopy} />,
   copy: {
+    description: "Describe the test run.",
     submit: "Run",
+    startAnother: "Start another run",
     running: "Running…",
     runFailed: "Something went wrong. Please try again.",
     quotaRemaining: (remaining, limit) => `${remaining} of ${limit} runs remaining.`,
