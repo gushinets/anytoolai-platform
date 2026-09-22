@@ -1,0 +1,37 @@
+{
+  "response_json": {
+    "sections": [
+      {
+        "id": "overview",
+        "title": "Project overview",
+        "content": "A bakery wants a new website that lets customers order cakes online."
+      },
+      {
+        "id": "key-details",
+        "title": "Key details",
+        "content": "Deliverables: menu page, order form, contact page. Deadline: before the holiday season. Budget: around $3,000. Constraint: the look should be modern but also traditional.",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "gaps",
+        "title": "Gaps and risks",
+        "content": "No risks or issues were found in the brief. The only gap is that the target audience is not stated."
+      },
+      {
+        "id": "next-steps",
+        "title": "Questions to ask",
+        "content": "No clarification is needed on the points above; work can start."
+      }
+    ],
+    "summary": "The brief is clear and ready to start work; the only open point is who the site is for, which does not block getting started."
+  },
+  "input_tokens": 240,
+  "output_tokens": 90,
+  "latency_ms": 14,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.generate_summary_v1.no_issues"
+  }
+}

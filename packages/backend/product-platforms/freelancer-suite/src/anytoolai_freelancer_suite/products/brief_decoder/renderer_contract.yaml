@@ -25,5 +25,14 @@ renderer_contract:
       description: >-
         Ordered `sections` (id, title, content) followed by `summary`. This is the copy-ready part.
   canonical_field: document
+  # `document` is an object ({sections[], summary}), not a single string -- unlike sibling
+  # contracts' `canonical_field`, copying it needs a serialization rule, not verbatim use.
+  canonical_field_composition: >-
+    For each entry in `document.sections`, in array order, emit the section's `title` as a
+    heading line followed by its `content` as one paragraph; separate sections by one blank
+    line. After the last section, emit one more blank line followed by `document.summary` as
+    the closing paragraph. `metadata.kind` (when present) is a rendering hint only (e.g. render
+    a `list`-kind section's content as a bulleted list if it already reads as one item per
+    line) and never changes which fields are included.
   next_action: copy_result
   excluded_fields: []

@@ -3,9 +3,10 @@ workflows:
     version: 1
     input_schema_ref: brief_decoder.decode_input_v1
     output_schema_ref: brief_decoder.decode_output_v1
-    # A01 + A04 -> A05, composed through A10. Each step writes its own key of the composed
-    # workflow output ({brief, issues, questions, document}). A01 -> A04 is order-only: A04
-    # reads the original brief text, not A01's output (docs/architecture/action-model.md).
+    # A01 + A04 -> A05, composed through A10. Every output_mapping target writes a key of the
+    # composed workflow output ({brief, issues, questions, document}; detect_issues writes both
+    # `issues` and the `questions` default A05 overrides). A01 -> A04 is order-only: A04 reads
+    # the original brief text, not A01's output (docs/architecture/action-model.md).
     steps:
       - step_id: extract
         action_config_id: brief_decoder.extract_brief_v1

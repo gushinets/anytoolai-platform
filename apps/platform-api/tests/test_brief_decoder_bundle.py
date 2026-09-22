@@ -6,7 +6,8 @@
 3. A real scenario start + one worker pass runs all four steps against the fake provider and the
    composed {brief, issues, questions, document} artifact equals the deterministic fixtures --
    happy path, weak input, and the empty-issues path (A04 finds nothing, so A05 is skipped instead
-   of failing on its `minItems: 1` input).
+   of failing on its `minItems: 1` input) -- with per-step input-payload assertions so a swapped
+   mapping, prompt_ref, or step order fails here, not just a wrong final artifact.
 
 Same SQLite harness as test_client_update_writer_bundle.py (`session_factory` from conftest.py).
 """
@@ -31,7 +32,7 @@ from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.models import ProviderResponse, ResolvedProviderRequest
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
-from anytoolai_platform_core.storage.db import event_log_table
+from anytoolai_platform_core.storage.db import event_log_table, provider_calls_table
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
 from anytoolai_platform_core.workflows.models import JobStatus
@@ -75,21 +76,35 @@ def _expected_output(suffix: str = "", *, questions: bool = True) -> dict[str, A
 
 
 class _RecordingProviderAdapter(FakeProviderAdapter):
-    """Records every provider call's action_config_id and can redirect chosen calls to a
-    fixture variant: `variants` maps action_config_id -> fixture-key suffix, e.g. ".weak_input".
-    Test-only; FakeProviderAdapter alone only ever resolves a call's own action_config_id."""
+    """Records each provider call's step_id/action_config_id/prompt_ref and the input payload
+    actually resolved for it (parsed back out of `request.prompt`, which the structured_llm
+    executor renders as `<template>\\n\\nInput payload:\\n<json.dumps(input_payload)>` --
+    see StructuredLlmActionExecutor._render_prompt). This is what lets a test assert not just
+    the call *sequence* but that each step actually received the right data -- a swapped mapping
+    (e.g. detect_issues reading a fixed string instead of scenario.input.brief_text, or A10
+    dropping data.brief.missing_fields) changes the recorded payload even when every fixture's
+    output still validates and the step-order tuple still matches. Can also redirect chosen
+    calls to a fixture variant: `variants` maps action_config_id -> fixture-key suffix, e.g.
+    ".weak_input". Test-only; FakeProviderAdapter alone only ever resolves a call's own
+    action_config_id."""
 
     def __init__(self, fixture_root: Path, variants: dict[str, str] | None = None) -> None:
         super().__init__(fixture_root)
         self.variants = variants or {}
-        self.calls: list[str] = []
+        self.calls: list[ResolvedProviderRequest] = []
 
     async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
-        self.calls.append(request.action_config_id)
+        self.calls.append(request)
         suffix = self.variants.get(request.action_config_id)
         if suffix is not None:
             request = replace(request, fixture_key=f"{request.action_config_id}{suffix}")
         return await super().complete(request)
+
+    def input_payload(self, index: int) -> dict[str, Any]:
+        prompt = self.calls[index].prompt
+        _, _, payload_json = prompt.partition("\n\nInput payload:\n")
+        assert payload_json, f"call {index} rendered no input payload: {prompt!r}"
+        return json.loads(payload_json)
 
 
 def test_brief_decoder_loads_through_the_real_default_bundle_set() -> None:
@@ -127,10 +142,23 @@ def test_brief_decoder_loads_through_the_real_default_bundle_set() -> None:
         {"brief_text": ""},
         {"brief_text": "   "},
         {"brief_text": " leading space"},
+        {"brief_text": "trailing space "},
+        {"brief_text": "trailing newline\n"},
+        {"brief_text": "\nleading newline"},
         {"brief_text": "x" * 8001},
         {"brief_text": BRIEF_TEXT, "tone": "warm"},
     ],
-    ids=["missing", "empty", "whitespace", "untrimmed", "too_long", "extra_field"],
+    ids=[
+        "missing",
+        "empty",
+        "whitespace",
+        "leading_space",
+        "trailing_space",
+        "trailing_newline",
+        "leading_newline",
+        "too_long",
+        "extra_field",
+    ],
 )
 def test_input_schema_is_non_permissive(invalid_input: dict[str, Any]) -> None:
     registry = build_runtime(config_root=CONFIG_ROOT).config_registry
@@ -143,6 +171,24 @@ def test_input_schema_is_non_permissive(invalid_input: dict[str, Any]) -> None:
         jsonschema.validate(invalid_input, schema)
 
 
+@pytest.mark.parametrize(
+    "valid_input",
+    [
+        "x" * 8000,  # exactly at the max-length boundary
+        "Line one of the brief.\nLine two of the brief.",  # a legal internal newline
+        BRIEF_TEXT,
+    ],
+    ids=["max_length_boundary", "internal_newline", "typical"],
+)
+def test_input_schema_accepts_legitimate_edge_cases(valid_input: str) -> None:
+    registry = build_runtime(config_root=CONFIG_ROOT).config_registry
+    definition = registry.get_schema(INPUT_SCHEMA_REF)
+    assert definition is not None
+    schema = normalize_schema_mapping(definition.schema)
+
+    jsonschema.validate({"brief_text": valid_input}, schema)
+
+
 def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
     registry = build_runtime(config_root=CONFIG_ROOT).config_registry
     definition = registry.get_schema(OUTPUT_SCHEMA_REF)
@@ -151,7 +197,13 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
 
     for suffix in ("", ".weak_input"):
         jsonschema.validate(_expected_output(suffix), schema)
-    jsonschema.validate(_expected_output(questions=False), schema)
+    no_issues_output = {
+        "brief": _fixture(EXTRACT),
+        "issues": [],
+        "questions": [],
+        "document": _fixture(SUMMARY + ".no_issues"),
+    }
+    jsonschema.validate(no_issues_output, schema)
 
     valid = _expected_output()
 
@@ -165,6 +217,8 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
         "missing_part": mutated(lambda o: o.pop("document")),
         "unknown_brief_value": mutated(lambda o: o["brief"]["values"].update(invented="x")),
         "wrong_brief_value_type": mutated(lambda o: o["brief"]["values"].update(deliverables="x")),
+        "empty_string_brief_value": mutated(lambda o: o["brief"]["values"].update(budget="")),
+        "empty_array_brief_value": mutated(lambda o: o["brief"]["values"].update(deliverables=[])),
         "unknown_missing_field": mutated(lambda o: o["brief"]["missing_fields"].append("invented")),
         "category_outside_taxonomy": mutated(lambda o: o["issues"][0].update(category="other")),
         "unknown_question_key": mutated(lambda o: o["questions"][0].update(extra=1)),
@@ -225,6 +279,15 @@ def _run_worker(session_factory: SessionFactory, adapter: FakeProviderAdapter) -
     return processed
 
 
+def _provider_call_count(session_factory: SessionFactory, *, job_id: str) -> int:
+    with transaction_boundary(session_factory) as session:
+        return session.execute(
+            sa.select(sa.func.count())
+            .select_from(provider_calls_table)
+            .where(provider_calls_table.c.job_id == job_id)
+        ).scalar_one()
+
+
 def _run_to_result(
     app: Any,
     session_factory: SessionFactory,
@@ -255,12 +318,36 @@ def _run_to_result(
     return started, body["output"]
 
 
-def test_happy_path_composes_the_four_step_result(app: Any, session_factory: SessionFactory) -> None:
+def test_happy_path_composes_the_four_step_result(
+    app: Any, session_factory: SessionFactory
+) -> None:
     adapter = _RecordingProviderAdapter(FIXTURE_ROOT)
     started, output = _run_to_result(app, session_factory, BRIEF_TEXT, adapter)
 
-    assert tuple(adapter.calls) == STEP_ORDER
+    assert tuple(call.action_config_id for call in adapter.calls) == STEP_ORDER
+    assert tuple(call.step_id for call in adapter.calls) == (
+        "extract",
+        "detect_issues",
+        "generate_questions",
+        "generate_document",
+    )
     assert output == _expected_output()
+
+    # Code review finding (xhigh #2): the call sequence alone doesn't prove each step received
+    # the *right* data -- a mapping swapped between steps could still leave every fixture output
+    # valid. Assert the resolved input payload per step instead of only the fixture outputs.
+    extract_input, detect_input, questions_input, document_input = (
+        adapter.input_payload(i) for i in range(4)
+    )
+    assert extract_input["source_text"] == BRIEF_TEXT
+    assert extract_input["strict"] is False
+    assert detect_input["source_text"] == BRIEF_TEXT  # not steps.extract.output -- order-only
+    detected_issues = _fixture(DETECT)["issues"]
+    assert questions_input["issues"] == detected_issues
+    assert questions_input["context"] == BRIEF_TEXT
+    assert document_input["data"]["brief"] == _fixture(EXTRACT)
+    assert document_input["data"]["issues"] == detected_issues
+    assert document_input["data"]["questions"] == _fixture(QUESTIONS)["questions"]
 
     # The one next action this product allows is recorded through the generic endpoint.
     response = asyncio.run(
@@ -293,31 +380,42 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
     )
     _, output = _run_to_result(app, session_factory, WEAK_BRIEF_TEXT, adapter)
 
-    assert tuple(adapter.calls) == STEP_ORDER
+    assert tuple(call.action_config_id for call in adapter.calls) == STEP_ORDER
     assert output == _expected_output(".weak_input")
     assert output["brief"]["missing_fields"]  # a vague brief reports gaps instead of failing
 
 
-def test_no_issues_skips_question_generation_and_still_produces_the_document(
+def test_no_issues_skips_question_generation_and_still_produces_a_consistent_document(
     app: Any, session_factory: SessionFactory
 ) -> None:
     """A04's `issues` may be empty but A05's input requires at least one: the `when` guard on
-    the questions step must skip it (not fail the run) and leave the seeded `questions: []`."""
-    adapter = _RecordingProviderAdapter(FIXTURE_ROOT, variants={DETECT: ".no_issues"})
+    the questions step must skip it (not fail the run) and leave the seeded `questions: []`.
+
+    Code review finding (xhigh #3): the document must come from a fixture that is itself
+    consistent with an empty `issues`/`questions` pair (not the happy-path document, which
+    narrates 3 issues and 3 questions that don't exist in this run's artifact)."""
+    adapter = _RecordingProviderAdapter(
+        FIXTURE_ROOT, variants={DETECT: ".no_issues", SUMMARY: ".no_issues"}
+    )
     _, output = _run_to_result(app, session_factory, BRIEF_TEXT, adapter)
 
-    assert tuple(adapter.calls) == (EXTRACT, DETECT, SUMMARY)
+    assert tuple(call.action_config_id for call in adapter.calls) == (EXTRACT, DETECT, SUMMARY)
     assert output["issues"] == []
     assert output["questions"] == []
     assert output["brief"] == _fixture(EXTRACT)
-    assert output["document"] == _fixture(SUMMARY)
+    assert output["document"] == _fixture(SUMMARY + ".no_issues")
+    # The empty-issues document must not narrate the happy path's issues/questions, which do not
+    # exist in this run's artifact (code review finding xhigh #3).
+    happy_document_text = json.dumps(_fixture(SUMMARY))
+    no_issues_document_text = json.dumps(output["document"])
+    assert no_issues_document_text != happy_document_text
 
 
 @pytest.mark.parametrize("brief_text", ["", "   ", " padded "], ids=["empty", "blank", "untrimmed"])
 def test_invalid_brief_text_fails_the_job_before_any_provider_call(
     app: Any, session_factory: SessionFactory, brief_text: str
 ) -> None:
-    _start(app, brief_text)
+    started = _start(app, brief_text).json()
 
     adapter = _RecordingProviderAdapter(FIXTURE_ROOT)
     processed = _run_worker(session_factory, adapter)
@@ -325,4 +423,6 @@ def test_invalid_brief_text_fails_the_job_before_any_provider_call(
     assert processed is not None
     assert processed.status is JobStatus.failed
     assert processed.error_code == "workflow_input_validation_failed"
+    assert processed.result_artifact_id is None
     assert adapter.calls == []
+    assert _provider_call_count(session_factory, job_id=started["job_id"]) == 0

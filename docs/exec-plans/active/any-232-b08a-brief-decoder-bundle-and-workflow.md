@@ -114,12 +114,73 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 | 2026-09-21 | Single run, no second-run input | Inventory says one workflow run; AC is conditional |
 | 2026-09-21 | Guard A05 with `when` + seeded `questions: []` | A05 input requires >= 1 issue; precedent `detect_questions_v1` |
 | 2026-09-21 | Composed per-key `workflow_output` | Delivers all four renderer parts; fallback is A10-only output |
+| 2026-09-22 | Round #1 code review fixes (10 of 14 findings; #5 documented as inherited) | See review round below |
 
 ## Progress log
 
 | Date | Progress | Next |
 |---|---|---|
-| 2026-09-21 | Config tree, fixtures, wiring and both test suites written; new tests green | Open PR |
+| 2026-09-21 | Config tree, fixtures, wiring and both test suites written; new tests green | Code review |
+| 2026-09-22 | Round #1 code review: fixed 10 of 14 findings (see below); re-ran quick-check/full-check, both green | Open PR |
+
+## Code review round #1 (2026-09-21)
+
+14 findings; all re-verified directly (including live `ruff`) before fixing. Fixed:
+
+1. **Critical.** A01's shared cross-validator accepts an empty string/array as a value, but
+   `decode_output_v1` requires `minLength: 1`/non-empty arrays -- a brief that yields one could
+   pass A01 then still fail final `output_schema_ref` validation after 3 more paid calls.
+   `extract_brief.v1.md` now explicitly tells the model an empty string or empty array is not an
+   extracted value (treat as missing), and `decode_output_v1` now also requires `minItems: 1` on
+   `deliverables`/`constraints` (previously only strings were closed this way) so the two array
+   fields hold the same "found or omitted, never empty" contract as the four string fields.
+2. Recording adapter only asserted the call *sequence*, not payloads -- a swapped mapping between
+   steps could leave every fixture output valid. `test_brief_decoder_bundle.py`'s adapter now
+   captures the full `ResolvedProviderRequest` and the happy-path test asserts each step's
+   resolved input payload (parsed back out of the rendered prompt) against the actual upstream
+   data, not just the call-id sequence.
+3. The empty-issues test reused the happy-path A10 document fixture, which narrates 3
+   issues/questions that don't exist in that run. Added a dedicated
+   `brief_decoder.generate_summary_v1.no_issues.json` fixture consistent with `issues: []` and
+   the happy A01 brief's own `missing_fields`, and the test now asserts against it.
+4. Added input-schema edge-case coverage: trailing/leading newline, trailing space, the exact
+   8000-char boundary (valid), and a legal internal newline (valid) -- mirrors `proposal_ai`'s
+   own coverage.
+6. Added `test_quota_policy_ref_resolves_to_the_declared_lifetime_product_quota`, mirroring
+   `proposal_ai`'s.
+7. Closed by the same `minItems: 1` fix as #1.
+8. The field-list drift test compared names only; a field's A01 `type` changing (e.g.
+   `target_audience` from `string` to `array_of_strings`) wasn't caught. Now also asserts each
+   field's declared JSON-schema type/items-type matches its A01 spec `type`.
+9. Our inlined copies of the kernel A04/A05/A10 output shapes had no sync test against the kernel
+   schemas they were copied from (cross-file `$ref` isn't supported). Added a structural
+   drift test comparing property/required sets and per-property types (deliberately excluding
+   `category`'s enum, which we narrow to our own taxonomy).
+10. `renderer_contract.yaml`'s `canonical_field: document` pointed at an object with no
+    serialization rule, unlike sibling contracts' plain-string `text`. Added
+    `canonical_field_composition` describing how `sections` + `summary` become copy-ready text,
+    pinned by a test.
+11. Invalid-input test now also asserts `provider_calls_table` count is 0 for the job (DB-level
+    evidence, not just the adapter's own call list), mirroring `proposal_ai`'s pattern.
+12. Fixed inaccurate comments: `quotas.yaml` said "four provider calls" (constant) when the `when`
+    guard makes it "up to four"; `workflows.yaml` said "each step writes its own key" when
+    `detect_issues` writes two.
+13. Fixed all `ruff` E501/import-order findings across the touched files (ruff isn't in
+    quick-check/full-check/CI, but the fix was cheap and correct).
+14. Updated `docs/product-specs/mvp-b-handoff-note.md`'s stale "ANY-227 ... the first real
+    [product root]" line to name all three implemented roots.
+
+Documented as an accepted, inherited platform gap, not fixed here:
+
+5. Guest quota is consumed on scenario *start*, before input-schema validation runs in the
+   worker -- an invalid `brief_text` (e.g. a trailing newline) still burns one lifetime run. This
+   is the same gap ANY-227 documented and explicitly left unfixed for ProposalAI (round #1,
+   finding #1: "Guest quota consumed before input-schema validation" --
+   `docs/exec-plans/completed/any-227-b02a-proposalai-bundle-and-workflow.md`), inherent to
+   `ScenarioRuntimeService.start_session`/quota-then-validate ordering. Fixing it needs a Platform
+   Core change, which this ticket's non-goals explicitly exclude ("any Platform Core/atom/
+   mapping-DSL change"). `apps/web-mirror` (ANY-248, out of scope here) can still add
+   client-side trimming to avoid triggering it in practice.
 
 ## Open questions
 
@@ -131,3 +192,5 @@ want to change; they drive the output schema and all nine fixtures.
 - `kernel_demo.composite_analyze_and_clarify_v1` has the same missing empty-issues guard; not
   fixed here (out of scope).
 - Brief Decoder -> Acceptance Builder handoff is ANY-26.
+- Guest quota consumed before input validation (round #1 finding #5 above) -- inherited platform
+  gap, same as ProposalAI's; needs a Platform Core fix, out of scope for any product ticket.

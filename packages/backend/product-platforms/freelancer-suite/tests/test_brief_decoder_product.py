@@ -3,8 +3,9 @@ renderer-contract agreement, fixture/schema agreement, mapping-path safety, and 
 contains no PydanticAI/LiteLLM/provider SDK/model-string usage" acceptance criterion.
 
 Reads raw YAML/JSON instead of ConfigLoader -- ATAI007 forbids product-platforms code, tests
-included, from importing anytoolai_platform_core (same reason as test_client_update_writer_product.py).
-Config-load through the real composition boundary and the end-to-end runs live in
+included, from importing anytoolai_platform_core (same reason as
+test_client_update_writer_product.py). Config-load through the real composition boundary and the
+end-to-end runs live in
 apps/platform-api/tests/test_brief_decoder_bundle.py (quick-check).
 """
 
@@ -115,7 +116,8 @@ def test_product_directory_contains_no_python_or_forbidden_provider_references()
 
 def test_workflow_uses_only_generic_atom_action_types_with_backend_resolved_policies() -> None:
     action_configs = {
-        entry["action_config_id"]: entry for entry in _load_yaml("action_configs.yaml")["action_configs"]
+        entry["action_config_id"]: entry
+        for entry in _load_yaml("action_configs.yaml")["action_configs"]
     }
     steps = _workflow()["steps"]
 
@@ -127,7 +129,12 @@ def test_workflow_uses_only_generic_atom_action_types_with_backend_resolved_poli
         "default_fake_provider_v1"
     }
     for entry in action_configs.values():
-        assert set(entry) == {"action_config_id", "action_type", "prompt_ref", "provider_policy_ref"}
+        assert set(entry) == {
+            "action_config_id",
+            "action_type",
+            "prompt_ref",
+            "provider_policy_ref",
+        }
 
 
 def test_product_has_exactly_one_scenario_and_one_workflow() -> None:
@@ -177,27 +184,48 @@ def test_a05_is_guarded_and_a10_reads_its_output_optionally() -> None:
     """A04's `issues` may be empty but A05's input requires at least one."""
     steps = _steps()
     assert steps["generate_questions"]["when"] == "steps.detect_issues.output.issues"
-    assert _literal(steps["detect_issues"]["output_mapping"]["context.workflow_output.questions"]) == []
+    seeded_questions = steps["detect_issues"]["output_mapping"]["context.workflow_output.questions"]
+    assert _literal(seeded_questions) == []
     assert (
         steps["generate_document"]["input_mapping"]["data.questions"]
         == "?steps.generate_questions.output.questions"
     )
 
 
+# A01 field-spec `type` -> the JSON-schema shape decode_output_v1 must declare for that field in
+# `brief.values`. Code review finding (xhigh #8): a names-only comparison would miss e.g.
+# `target_audience` silently changing from `string` to `array_of_strings` in the literal.
+_A01_TYPE_TO_JSON_SCHEMA_TYPE = {
+    "string": {"type": "string"},
+    "array_of_strings": {"type": "array", "items": {"type": "string"}},
+}
+
+
 def test_config_owned_literals_agree_with_the_output_schema() -> None:
     """The A01 field list and A04 taxonomy live in workflows.yaml but bound the output schema's
-    closed shapes; editing one without the other must fail here."""
+    closed shapes; editing one -- including a field's *type*, not just its name -- without the
+    other must fail here."""
     steps = _steps()
     fields = _literal(steps["extract"]["input_mapping"]["fields"])
     taxonomy = _literal(steps["detect_issues"]["input_mapping"]["taxonomy"])
     schema = _load_schema("brief_decoder.decode_output_v1")["properties"]
+    value_properties = schema["brief"]["properties"]["values"]["properties"]
 
     field_names = [field["name"] for field in fields]
-    assert set(schema["brief"]["properties"]["values"]["properties"]) == set(field_names)
+    assert set(value_properties) == set(field_names)
     assert set(schema["brief"]["properties"]["missing_fields"]["items"]["enum"]) == set(field_names)
     assert set(schema["brief"]["properties"]["confidence"]["properties"]) == set(field_names)
     assert set(schema["issues"]["items"]["properties"]["category"]["enum"]) == set(taxonomy)
     assert _literal(steps["extract"]["input_mapping"]["strict"]) is False
+
+    for field in fields:
+        expected_shape = _A01_TYPE_TO_JSON_SCHEMA_TYPE[field["type"]]
+        declared_property = value_properties[field["name"]]
+        assert declared_property["type"] == expected_shape["type"], field["name"]
+        if expected_shape["type"] == "array":
+            assert declared_property["items"]["type"] == expected_shape["items"]["type"], (
+                field["name"]
+            )
 
 
 def test_schemas_are_closed() -> None:
@@ -213,6 +241,58 @@ def test_schemas_are_closed() -> None:
 
     for schema_ref in ("brief_decoder.decode_input_v1", "brief_decoder.decode_output_v1"):
         assert_closed(_load_schema(schema_ref), schema_ref)
+
+
+def test_quota_policy_ref_resolves_to_the_declared_lifetime_product_quota() -> None:
+    """Mirrors proposal_ai's own quota test (code review finding xhigh #6): nothing previously
+    checked that `product.yaml`'s `quota_policy_ref` actually resolves to a real, sane policy --
+    a typo'd ref or e.g. `limit_count: 300`/`dimension: scenario` would have passed every other
+    test here."""
+    product = _load_yaml("product.yaml")
+    quotas = _load_yaml("quotas.yaml")["quota_policies"]
+
+    assert product["quota_policy_ref"] == "brief_decoder.guest_quota_v1"
+    (policy,) = [
+        policy for policy in quotas if policy["quota_policy_id"] == "brief_decoder.guest_quota_v1"
+    ]
+    assert policy["unit"] == "scenario_run"
+    assert policy["period"] == "lifetime"
+    assert policy["dimension"] == "product"
+    assert isinstance(policy["limit_count"], int) and policy["limit_count"] > 0
+
+
+# The properties/required a locally-inlined copy of a kernel atom-output schema must keep in sync
+# with the kernel original it was copied from, since cross-file `$ref` isn't supported (code
+# review finding xhigh #9). `category`'s `enum` is deliberately narrower than the kernel's plain
+# string (our taxonomy is a subset), so it is excluded from the equality check below.
+_KERNEL_DRIFT_CASES = [
+    # (our schema property path, kernel schema_ref, kernel property path)
+    (("issues", "items"), "kernel.schemas.issue_detection_output_v1", ("issues", "items")),
+    (("questions", "items"), "kernel.schemas.generate_questions_output_v1", ("questions", "items")),
+    (("document",), "kernel.schemas.generate_document_output_v1", ()),
+]
+
+
+def _resolve(schema: dict[str, Any], path: tuple[str, ...]) -> dict[str, Any]:
+    node = schema
+    for key in path:
+        node = node["properties"][key] if key != "items" else node["items"]
+    return node
+
+
+def test_inlined_kernel_atom_output_copies_stay_in_sync_with_the_kernel_schemas() -> None:
+    output_schema = _load_schema("brief_decoder.decode_output_v1")
+
+    for our_path, kernel_ref, kernel_path in _KERNEL_DRIFT_CASES:
+        ours = _resolve(output_schema, our_path)
+        kernel = _resolve(_load_schema(kernel_ref), kernel_path)
+
+        assert set(ours.get("properties", {})) == set(kernel.get("properties", {})), our_path
+        assert set(ours.get("required", [])) == set(kernel.get("required", [])), our_path
+        for name, kernel_property in kernel.get("properties", {}).items():
+            if name == "category":
+                continue  # intentionally narrowed to our own taxonomy subset
+            assert ours["properties"][name]["type"] == kernel_property["type"], (our_path, name)
 
 
 def test_renderer_contract_agrees_with_workflow_and_scenario() -> None:
@@ -231,9 +311,14 @@ def test_renderer_contract_agrees_with_workflow_and_scenario() -> None:
     ]
     assert {part["field"] for part in contract["parts"]} == set(output_schema["properties"])
     assert contract["canonical_field"] in output_schema["properties"]
+    # Code review finding (xhigh #10): `canonical_field` (`document`) is an object, not a single
+    # string like sibling products' `text` -- pin that a serialization rule for it exists.
+    assert contract["canonical_field_composition"].strip()
 
 
-@pytest.mark.parametrize("fixture_path", sorted(FIXTURE_ROOT.glob("brief_decoder.*.json")), ids=lambda p: p.stem)
+@pytest.mark.parametrize(
+    "fixture_path", sorted(FIXTURE_ROOT.glob("brief_decoder.*.json")), ids=lambda p: p.stem
+)
 def test_fixture_satisfies_its_atoms_output_schema(fixture_path: Path) -> None:
     (stem,) = (s for s in FIXTURE_KERNEL_SCHEMAS if fixture_path.name.startswith(s + "."))
     schema = _load_schema(FIXTURE_KERNEL_SCHEMAS[stem])
