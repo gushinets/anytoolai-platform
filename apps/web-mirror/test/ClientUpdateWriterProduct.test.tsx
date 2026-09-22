@@ -108,8 +108,8 @@ describe("Client Update Writer product definitions", () => {
     await waitFor(() => expect(screen.getByLabelText("Progress notes")).toBeTruthy());
 
     fireEvent.click(screen.getByRole("button", { name: "Write update" }));
-    expect(await screen.findByText("Progress notes is required.")).toBeTruthy();
-    expect(screen.getByText("Tone is required.")).toBeTruthy();
+    expect(await screen.findByText("Progress notes: required.")).toBeTruthy();
+    expect(screen.getByText("Tone: required.")).toBeTruthy();
     expect(calls.some((call) => call.key === routes.START)).toBe(false);
 
     fireEvent.change(screen.getByLabelText("Progress notes"), {

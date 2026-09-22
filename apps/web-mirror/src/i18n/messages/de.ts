@@ -24,10 +24,13 @@ export const de: Shape<typeof en> = {
     copied: "Kopiert",
     copyFailed: "Das Kopieren in die Zwischenablage ist fehlgeschlagen. Bitte kopieren Sie den obigen Text manuell.",
   },
+  // Code review finding: `{field}` (e.g. "Die Fortschrittsnotizen", plural) can no longer be the
+  // grammatical subject of an agreeing verb ("ist"/"sind", "darf"/"dürfen") -- every message is now
+  // a label-colon-fragment, none of which needs a verb at all.
   validation: {
-    required: "{field} ist erforderlich.",
-    outerWhitespace: "{field} darf nicht mit einem Leerzeichen beginnen oder enden.",
-    maxLength: "{field} darf höchstens {maxLength, plural, one {# Zeichen} other {# Zeichen}} lang sein.",
+    required: "{field}: erforderlich.",
+    outerWhitespace: "{field}: keine Leerzeichen am Anfang oder Ende.",
+    maxLength: "{field}: höchstens {maxLength, plural, one {# Zeichen} other {# Zeichen}}.",
   },
   tone: { neutral: "neutral", warm: "herzlich", firm: "bestimmt" },
 };

@@ -24,6 +24,10 @@ export const es: Shape<typeof en> = {
     copied: "Copiado",
     copyFailed: "No se pudo copiar al portapapeles. Copie el texto de arriba manualmente.",
   },
+  // Unlike en/fr/it/de/pt (code review finding, fixed there), `{field}` here is never the
+  // grammatical subject of the verb that follows -- the colon marks it as a label, and "es"/"debe"
+  // always agree with the fixed, invariant implied subject "este campo", never with the label's own
+  // number. Already safe; left as-is.
   validation: {
     required: "{field}: este campo es obligatorio.",
     outerWhitespace: "{field}: no debe empezar ni terminar con espacios en blanco.",

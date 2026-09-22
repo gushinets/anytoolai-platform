@@ -236,7 +236,7 @@ describe("ProductRunPage", () => {
 
     submit();
 
-    expect(await screen.findAllByText("Text is required.")).toHaveLength(1);
+    expect(await screen.findAllByText("Text: required.")).toHaveLength(1);
     expect(calls.some((call) => call.key === ROUTES.START)).toBe(false);
   });
 

@@ -24,10 +24,13 @@ export const it: Shape<typeof en> = {
     copied: "Copiato",
     copyFailed: "Impossibile copiare negli appunti. Copiare manualmente il testo qui sopra.",
   },
+  // Code review finding: outerWhitespace/maxLength made `{field}` the subject of "deve" (which
+  // agrees in number: deve/devono) -- every message is now a label-colon-fragment instead, matching
+  // `required`'s already-safe shape (normalized to "{field}: ..." order for consistency).
   validation: {
-    required: "Campo obbligatorio: {field}.",
-    outerWhitespace: "{field} non deve iniziare né terminare con spazi.",
-    maxLength: "{field} non deve superare {maxLength, plural, one {# carattere} many {# di caratteri} other {# caratteri}}.",
+    required: "{field}: campo obbligatorio.",
+    outerWhitespace: "{field}: niente spazi all’inizio o alla fine.",
+    maxLength: "{field}: massimo {maxLength, plural, one {# carattere} many {# di caratteri} other {# caratteri}}.",
   },
   tone: { neutral: "neutro", warm: "cordiale", firm: "fermo" },
 };

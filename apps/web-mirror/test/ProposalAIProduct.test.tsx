@@ -67,8 +67,8 @@ describe("ProposalAI product definition", () => {
     fireEvent.change(screen.getByLabelText("Language (optional)"), { target: { value: "English" } });
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
 
-    expect(await screen.findByText("Task description is required.")).toBeTruthy();
-    expect(screen.getByText("Your positioning must not start or end with whitespace.")).toBeTruthy();
+    expect(await screen.findByText("Task description: required.")).toBeTruthy();
+    expect(screen.getByText("Your positioning: no leading or trailing whitespace.")).toBeTruthy();
     expect(screen.getByText('Language must look like "en" or "en-US".')).toBeTruthy();
     expect(calls.some((call) => call.key === ROUTES.START)).toBe(false);
   });

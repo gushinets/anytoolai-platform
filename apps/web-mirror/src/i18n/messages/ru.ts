@@ -24,6 +24,8 @@ export const ru: Shape<typeof en> = {
     copied: "Скопировано",
     copyFailed: "Не удалось скопировать в буфер обмена. Пожалуйста, скопируйте текст выше вручную.",
   },
+  // Unlike en/fr/it/de/pt (code review finding, fixed there), these are already label-colon-noun
+  // fragments -- no verb agrees with `{field}`'s own grammatical number. Already safe; left as-is.
   validation: {
     required: "{field}: обязательное поле.",
     outerWhitespace: "{field}: не должно быть пробелов в начале и в конце.",

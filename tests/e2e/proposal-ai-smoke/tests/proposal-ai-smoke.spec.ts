@@ -132,8 +132,8 @@ test.describe("ProposalAI web product", () => {
     });
 
     await page.getByRole("button", { name: "Generate proposal" }).click();
-    await expect(page.getByText("Task description is required.")).toBeVisible();
-    await expect(page.getByText("Your positioning is required.")).toBeVisible();
+    await expect(page.getByText("Task description: required.")).toBeVisible();
+    await expect(page.getByText("Your positioning: required.")).toBeVisible();
     expect(startRequested).toBe(false);
   });
 

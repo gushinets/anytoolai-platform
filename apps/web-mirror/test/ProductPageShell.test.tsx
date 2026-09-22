@@ -339,7 +339,7 @@ describe("UI locale is independent of scenario input and state", () => {
     await screen.findByLabelText(en.fields.taskText);
 
     fireEvent.click(screen.getByRole("button", { name: en.generate.submit }));
-    expect(await screen.findAllByText("Task description is required.")).toBeTruthy();
+    expect(await screen.findAllByText("Task description: required.")).toBeTruthy();
 
     switchTo("ru");
     const required = HOST_MESSAGES.ru.validation.required;
@@ -360,6 +360,23 @@ describe("UI locale is independent of scenario input and state", () => {
     expect(screen.queryByText(startFailed("ru"))).toBeNull();
     expect(valueOf(screen.getByLabelText(PROPOSAL_AI_MESSAGES.de.fields.taskText))).toBe("Task");
   });
+
+  it("stays grammatically safe for a plural field name in French and German (code review finding)", async () => {
+    // "Les notes d’avancement" / "Die Fortschrittsnotizen" are plural -- a message that made the
+    // field name the subject of an agreeing verb ("est"/"sont", "ist"/"sind") rendered a genuinely
+    // ungrammatical sentence. Asserted as literal rendered text, not just key/ICU-placeholder
+    // parity, so a regression is caught even if a future edit keeps the keys and placeholders intact
+    // but reintroduces an agreeing verb.
+    renderShell(registered("client_update_writer"), bootRoutes(CUW_IDS));
+    await screen.findByRole("button", { name: CLIENT_UPDATE_WRITER_MESSAGES.en.update.submit });
+
+    switchTo("fr");
+    fireEvent.click(screen.getByRole("button", { name: CLIENT_UPDATE_WRITER_MESSAGES.fr.update.submit }));
+    expect(await screen.findByText("Les notes d’avancement : champ obligatoire.")).toBeTruthy();
+
+    switchTo("de");
+    expect(await screen.findByText("Die Fortschrittsnotizen: erforderlich.")).toBeTruthy();
+  });
 });
 
 describe("a newly registered product gets the language selector without implementing it", () => {
@@ -378,7 +395,7 @@ describe("a newly registered product gets the language selector without implemen
     expect(selector().options).toHaveLength(LOCALES.length);
 
     fireEvent.click(screen.getByRole("button", { name: TEST_PRODUCT_MESSAGES_EN.run.submit }));
-    expect(await screen.findByText("Text is required.")).toBeTruthy();
+    expect(await screen.findByText("Text: required.")).toBeTruthy();
 
     switchTo("it");
     expect(screen.getByText(HOST_MESSAGES.it.validation.required.replace("{field}", "Text"))).toBeTruthy();

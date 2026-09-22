@@ -24,10 +24,13 @@ export const fr: Shape<typeof en> = {
     copied: "Copié",
     copyFailed: "Impossible de copier dans le presse-papiers. Veuillez copier le texte ci-dessus manuellement.",
   },
+  // Code review finding: `{field}` (e.g. "Notes d’avancement", plural) can no longer be the
+  // grammatical subject of an agreeing verb ("est"/"sont") -- every message is now a label-colon-
+  // fragment, none of which needs number agreement.
   validation: {
-    required: "{field} est obligatoire.",
-    outerWhitespace: "{field} ne doit ni commencer ni se terminer par un espace.",
-    maxLength: "{field} ne doit pas dépasser {maxLength, plural, one {# caractère} many {# de caractères} other {# caractères}}.",
+    required: "{field} : champ obligatoire.",
+    outerWhitespace: "{field} : pas d’espace au début ni à la fin.",
+    maxLength: "{field} : {maxLength, plural, one {# caractère} many {# de caractères} other {# caractères}} maximum.",
   },
   tone: { neutral: "neutre", warm: "chaleureux", firm: "ferme" },
 };

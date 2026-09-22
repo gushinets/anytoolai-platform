@@ -52,6 +52,18 @@ describe("readStoredLocale / writeStoredLocale (staleness on a failed write)", (
     expect(readStoredLocale()).toBe("de");
     expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("de");
   });
+
+  it("does not resurrect an earlier write once the key is genuinely removed", () => {
+    // Code review finding (round 2): a successful write followed by the key actually being cleared
+    // (e.g. site data reset, or code elsewhere in this document calling removeItem) must read back
+    // null -- not the earlier "fr", which would wrongly skip browser-language resolution.
+    writeStoredLocale("fr");
+    expect(readStoredLocale()).toBe("fr");
+
+    window.localStorage.removeItem(LOCALE_STORAGE_KEY);
+
+    expect(readStoredLocale()).toBeNull();
+  });
 });
 
 describe("resolveLocale", () => {
@@ -211,8 +223,8 @@ describe("translation resources", () => {
         "validation.maxLength",
         { field: "F", maxLength },
       );
-    expect(format("en", 1)).toBe("F must be 1 character or fewer.");
-    expect(format("en", 5)).toBe("F must be 5 characters or fewer.");
+    expect(format("en", 1)).toBe("F: 1 character maximum.");
+    expect(format("en", 5)).toBe("F: 5 characters maximum.");
     expect(new Set([1, 2, 5].map((count) => format("ru", count))).size).toBe(3);
   });
 

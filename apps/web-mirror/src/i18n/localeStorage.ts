@@ -9,34 +9,45 @@ export const LOCALE_STORAGE_KEY = "anytoolai.ui_locale";
  * asked to persist (an earlier explicit choice, or nothing) -- reading it back would silently
  * resurrect that stale value instead of the newer, failed write.
  *
- * Code review finding: an earlier version answered `getItem() ?? lastWrittenLocale`, which only
- * covered the case where `getItem()` itself returned null (no explicit choice ever stored). If
- * storage already held an older explicit choice (e.g. "en") and a newer write ("fr") then failed,
- * `getItem()` still returned that non-null "en", so the fallback was never consulted and a remount
- * silently reverted the UI to the stale, no-longer-current choice. `isStale` makes a failed write
- * stop trusting the primary for this key at all -- not just when it happens to read back null --
- * until a later write succeeds and the primary matches memory again.
+ * Code review finding (round 1): an earlier version answered `getItem() ?? lastKnownLocale`, which
+ * only covered the case where `getItem()` itself returned null. If storage already held an older
+ * choice and a newer write then failed, `getItem()` still returned that non-null older value, so
+ * the fallback was never consulted and a remount silently reverted to the stale choice. `isStale`
+ * fixes that: a failed write stops trusting the primary for this key at all (not just when it
+ * happens to read back null) until a later write succeeds.
  *
- * `lastWrittenLocale` is set on every write regardless of outcome (not only on failure): it doubles
- * as the answer for a transient read failure while not stale, mirroring `clientStorage.ts`'s "read
- * failure answered from memory for that call only" contract.
+ * Code review finding (round 2): the round-1 fix over-corrected -- it also used `lastKnownLocale`
+ * as a fallback for a *successful* read that legitimately returned null (the key genuinely removed
+ * or never set), resurrecting a locale written earlier in the same page load when the correct
+ * result is "no explicit choice", i.e. fall through to the browser language. Only a read that
+ * *fails* (the catch below) or a write that fails (`isStale`) means the primary's true state is
+ * unknown; a successful read, even a null one, IS the true state and must be trusted, not
+ * overridden. Every successful read is mirrored into `lastKnownLocale` (matching
+ * `clientStorage.ts`'s own "every successful read is mirrored into memory" rule), so a later
+ * transient read failure is answered by what storage most recently and genuinely said, not by a
+ * possibly much older write.
  */
-let lastWrittenLocale: string | null = null;
+let lastKnownLocale: string | null = null;
 let isStale = false;
 
 export function readStoredLocale(): string | null {
-  if (!isStale) {
-    try {
-      return window.localStorage.getItem(LOCALE_STORAGE_KEY) ?? lastWrittenLocale;
-    } catch {
-      // Possibly transient -- answer from memory for this call only, below.
-    }
+  if (isStale) {
+    return lastKnownLocale;
   }
-  return lastWrittenLocale;
+  try {
+    const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+    lastKnownLocale = stored;
+    return stored;
+  } catch {
+    // Possibly transient -- answer from memory for this call only; a failed *read* never marks the
+    // key stale (it produced no value to distrust the primary over -- the next call is free to
+    // retry it, same as `clientStorage.ts`'s own read-failure contract).
+    return lastKnownLocale;
+  }
 }
 
 export function writeStoredLocale(locale: string): void {
-  lastWrittenLocale = locale;
+  lastKnownLocale = locale;
   try {
     window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
     isStale = false;
@@ -48,6 +59,6 @@ export function writeStoredLocale(locale: string): void {
 /** Test-only: the state above is module-level (see above), so a test that simulates a broken
  * `setItem` must clear it afterward or it would otherwise leak into a later test in the same file. */
 export function resetUnpersistedLocaleForTests(): void {
-  lastWrittenLocale = null;
+  lastKnownLocale = null;
   isStale = false;
 }
