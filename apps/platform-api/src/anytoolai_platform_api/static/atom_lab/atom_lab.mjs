@@ -1300,6 +1300,11 @@ export function bootstrapAtomLab({
   const pollModelCatalog = async () => {
     modelCatalogPollTimer = null;
     if (destroyed || paused) return;
+    if (pollingTimedOut(modelCatalogPollStartedAt, nowImpl(), pollTimeoutMs)) {
+      nodes["model-catalog-warning"].textContent = "Время ожидания обновления каталога истекло.";
+      stopModelCatalogPolling();
+      return;
+    }
     const loaded = await loadModels();
     if (destroyed || paused || (loaded && !["pending", "running"].includes(modelCatalog?.refresh_status))) {
       stopModelCatalogPolling();
@@ -1311,12 +1316,14 @@ export function bootstrapAtomLab({
       return;
     }
     modelCatalogPollFailures = loaded ? 0 : modelCatalogPollFailures + 1;
-    const delay = loaded
+    const remaining = pollTimeoutMs - (nowImpl() - modelCatalogPollStartedAt);
+    const desiredDelay = loaded
       ? RUN_POLL_INTERVAL_MS
       : Math.min(
         RUN_POLL_INTERVAL_MS * (2 ** Math.min(modelCatalogPollFailures - 1, 30)),
         RUN_POLL_MAX_BACKOFF_MS,
       );
+    const delay = Math.min(desiredDelay, remaining);
     if (modelCatalogPollTimer !== null) cancelScheduleImpl(modelCatalogPollTimer);
     modelCatalogPollTimer = scheduleImpl(pollModelCatalog, delay);
   };
@@ -1717,8 +1724,13 @@ export function bootstrapAtomLab({
       if (!refresh) throw new Error("Обновление каталога вернуло некорректный ответ.");
       modelCatalogRefreshStatus = refresh.refresh_status;
       modelCatalog = modelCatalog ? {...modelCatalog, ...refresh} : modelCatalog;
-      nodes["model-catalog-warning"].textContent = "Каталог устарел; обновление запрошено.";
-      if (["pending", "running"].includes(refresh.refresh_status)) startModelCatalogPolling();
+      if (["pending", "running"].includes(refresh.refresh_status)) {
+        nodes["model-catalog-warning"].textContent = "Каталог устарел; обновление запрошено.";
+        startModelCatalogPolling();
+      } else {
+        stopModelCatalogPolling();
+        await loadModels();
+      }
     } catch (error) {
       nodes["model-catalog-warning"].textContent = error instanceof Error
         ? error.message
