@@ -1216,6 +1216,17 @@ export function bootstrapAtomLab({
         : "";
   };
 
+  const showModelCatalogFailure = (message) => {
+    if (!modelCatalog) {
+      nodes["model-catalog-warning"].textContent = message;
+      return;
+    }
+    modelCatalog = {...modelCatalog, stale: true, error: message};
+    const selectionInvalidated = Boolean(nodes["model-select"].value)
+      && selectedModelOption()?.selectable !== true;
+    renderModelCatalogWarning(selectionInvalidated);
+  };
+
   const admissionErrorAppliesToDraft = (path, submission) => {
     if (session.atom.atom_id !== submission.body.atom_id) return false;
     if (path === "model_id") {
@@ -1231,6 +1242,14 @@ export function bootstrapAtomLab({
     }
     if (path === "prompt") return session.prompt === submission.body.prompt;
     return false;
+  };
+
+  const refreshAdmissionValidation = () => {
+    if (!session) return;
+    admissionErrors = admissionErrors.filter(({path, submission}) => (
+      submission && admissionErrorAppliesToDraft(path, submission)
+    ));
+    renderValidation(document, nodes["validation-errors"], session, admissionErrors);
   };
 
   const renderReasoning = (preferredEffort = "") => {
@@ -1262,6 +1281,7 @@ export function bootstrapAtomLab({
       nodes["reasoning-help"].textContent = "Выбранный reasoning effort больше не поддерживается. Выберите effort заново.";
     }
     updateRunButton();
+    refreshAdmissionValidation();
   };
 
   const renderModelCatalog = () => {
@@ -1371,7 +1391,7 @@ export function bootstrapAtomLab({
     modelCatalogPollTimer = null;
     if (destroyed || paused) return;
     if (pollingTimedOut(modelCatalogPollStartedAt, nowImpl(), pollTimeoutMs)) {
-      nodes["model-catalog-warning"].textContent = "Время ожидания обновления каталога истекло.";
+      showModelCatalogFailure("Время ожидания обновления каталога истекло.");
       stopModelCatalogPolling();
       return;
     }
@@ -1379,7 +1399,6 @@ export function bootstrapAtomLab({
     const loaded = await loadModels({timeoutMs: remainingBeforeRead});
     if (loaded === null) return;
     if (loaded === "timed_out") {
-      nodes["model-catalog-warning"].textContent = "Время ожидания обновления каталога истекло.";
       stopModelCatalogPolling();
       return;
     }
@@ -1388,7 +1407,7 @@ export function bootstrapAtomLab({
       return;
     }
     if (pollingTimedOut(modelCatalogPollStartedAt, nowImpl(), pollTimeoutMs)) {
-      nodes["model-catalog-warning"].textContent = "Время ожидания обновления каталога истекло.";
+      showModelCatalogFailure("Время ожидания обновления каталога истекло.");
       stopModelCatalogPolling();
       return;
     }
@@ -1651,6 +1670,7 @@ export function bootstrapAtomLab({
           .map(({path, message}) => ({
             path,
             message,
+            submission,
             key: `admission:${path}`,
             controlId: path === "model_id"
               ? "model-select"
@@ -1711,7 +1731,7 @@ export function bootstrapAtomLab({
   const updateDraftState = () => {
     if (!session) return;
     nodes["draft-state"].textContent = session.dirty ? "Есть несохранённые правки." : "Черновик без изменений.";
-    renderValidation(document, nodes["validation-errors"], session, admissionErrors);
+    refreshAdmissionValidation();
   };
 
   const renderEditor = (replaceFields = true, focusId = null) => {
@@ -1786,7 +1806,7 @@ export function bootstrapAtomLab({
       nodes.workspace.hidden = false;
       nodes.status.textContent = `Доступно атомов: ${catalog.length}.`;
       selectAtom(catalog[0]);
-      await loadModels();
+      await reloadCurrentModelCatalog();
     } catch (error) {
       accessCode = "";
       nodes["access-panel"].hidden = false;
@@ -1826,6 +1846,7 @@ export function bootstrapAtomLab({
     nodes["reasoning-effort"].disabled = option?.reasoningMode !== "supported";
     nodes["reasoning-help"].textContent = option ? modelReasonText(option) : "Выберите модель.";
     updateRunButton();
+    refreshAdmissionValidation();
   });
   nodes["refresh-models"].addEventListener("click", async () => {
     nodes["refresh-models"].disabled = true;
@@ -1862,11 +1883,12 @@ export function bootstrapAtomLab({
       }
     } catch (error) {
       if (error?.name === "AbortError" && (destroyed || paused)) return;
-      nodes["model-catalog-warning"].textContent = error instanceof Error
+      const message = error instanceof Error
         ? timedOut
           ? "Время ожидания обновления каталога истекло."
           : error.message
         : "Не удалось запросить обновление.";
+      showModelCatalogFailure(message);
     } finally {
       cancelScheduleImpl(timeoutId);
       if (activeModelRefreshAbortController === controller) activeModelRefreshAbortController = null;

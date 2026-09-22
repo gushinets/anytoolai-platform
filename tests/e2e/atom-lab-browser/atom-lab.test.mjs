@@ -620,6 +620,7 @@ test("catalog polling checks its deadline before I/O and caps delay to the remai
   assert.equal(modelReads, 2);
   assert.equal(scheduled.size, 0);
   assert.match(elements.get("model-catalog-warning").textContent, /истекло/);
+  assert.match(elements.get("model-catalog-warning").textContent, /2026-09-22T00:00:00Z/);
 });
 
 test("an in-flight catalog read is aborted at the polling deadline and a later refresh can restart", async () => {
@@ -681,6 +682,7 @@ test("an in-flight catalog read is aborted at the polling deadline and a later r
   assert.equal(aborted, true);
   assert.equal(scheduled.size, 0);
   assert.match(elements.get("model-catalog-warning").textContent, /истекло/);
+  assert.match(elements.get("model-catalog-warning").textContent, /2026-09-22T00:00:00Z/);
 
   await elements.get("refresh-models").click();
   assert.equal(scheduled.size, 1);
@@ -788,6 +790,7 @@ test("an immediate-current refresh bounds its catalog reload and re-enables Refr
   assert.equal(elements.get("refresh-models").disabled, false);
   assert.equal(elements.get("model-select").value, "gpt");
   assert.match(elements.get("model-catalog-warning").textContent, /истекло/);
+  assert.match(elements.get("model-catalog-warning").textContent, /2026-09-22T00:00:00Z/);
 });
 
 test("a stalled catalog refresh POST is aborted and leaves the last-good catalog usable", async () => {
@@ -848,6 +851,7 @@ test("a stalled catalog refresh POST is aborted and leaves the last-good catalog
   assert.equal(elements.get("model-select").value, "gpt");
   assert.equal(elements.get("run-button").disabled, false);
   assert.match(elements.get("model-catalog-warning").textContent, /истекло/);
+  assert.match(elements.get("model-catalog-warning").textContent, /2026-09-22T00:00:00Z/);
 });
 
 test("bfcache resume reloads a current catalog interrupted after refresh acceptance", async () => {
@@ -909,6 +913,56 @@ test("bfcache resume reloads a current catalog interrupted after refresh accepta
   assert.equal(elements.get("model-select").value, "gpt-old");
   assert.equal(elements.get("model-select").children.some(({value}) => value === "gpt-new"), true);
   assert.equal(elements.get("model-catalog-warning").textContent, "");
+});
+
+test("bfcache resume retries an interrupted initial catalog load", async () => {
+  const {document, elements} = createFakeDocument();
+  const lifecycleTarget = new FakeLifecycleTarget();
+  const atom = await catalogAtom("A01");
+  const currentCatalog = {
+    items: [{model_id: "gpt", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+    snapshot_id: "snapshot-current",
+    last_success_at: "2026-09-22T00:00:00Z",
+    stale: false,
+    refresh_status: "current",
+    error: null,
+  };
+  let modelReads = 0;
+  let markInitialReadStarted;
+  const initialReadStarted = new Promise((resolve) => { markInitialReadStarted = resolve; });
+  let interrupted = false;
+  bootstrapAtomLab({
+    document,
+    lifecycleTarget,
+    fetchImpl: (url, options = {}) => {
+      if (url.endsWith("/atoms")) return Promise.resolve({ok: true, status: 200, async json() { return [atom]; }});
+      modelReads += 1;
+      if (modelReads === 1) {
+        markInitialReadStarted();
+        return new Promise((resolve, reject) => options.signal.addEventListener("abort", () => {
+          interrupted = true;
+          const error = new Error("aborted");
+          error.name = "AbortError";
+          reject(error);
+        }, {once: true}));
+      }
+      return Promise.resolve({ok: true, status: 200, async json() { return currentCatalog; }});
+    },
+    confirmImpl: () => true,
+  });
+  elements.get("access-code").value = "secret";
+  const unlocking = elements.get("access-form").dispatch("submit");
+  await initialReadStarted;
+
+  await lifecycleTarget.dispatch("pagehide", {persisted: true});
+  await unlocking;
+  assert.equal(interrupted, true);
+  assert.equal(modelReads, 1);
+
+  await lifecycleTarget.dispatch("pageshow", {persisted: true});
+  assert.equal(modelReads, 2);
+  assert.equal(elements.get("model-select").value, "gpt");
+  assert.equal(elements.get("run-button").disabled, false);
 });
 
 test("a current refresh reloads the catalog without silently replacing a removed selection", async () => {

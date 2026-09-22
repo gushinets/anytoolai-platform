@@ -822,6 +822,31 @@ test("prompt admission errors stay visible and identify the prompt editor", asyn
   await expect(page.locator("#validation-errors")).toContainText("Prompt must not be blank.");
   await expect(page.locator("#prompt-editor")).toHaveAttribute("aria-invalid", "true");
   await expect(page.locator("#prompt-editor")).toHaveAttribute("aria-describedby", /.+/);
+
+  await page.locator("#prompt-editor").fill("Corrected prompt");
+  await expect(page.locator("#validation-errors")).not.toContainText("Prompt must not be blank.");
+  await expect(page.locator("#prompt-editor")).not.toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#prompt-editor")).not.toHaveAttribute("aria-describedby", /.+/);
+});
+
+test("input admission errors retire when the input draft changes", async ({page}) => {
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+    await route.fulfill({status: 422, contentType: "application/json", body: JSON.stringify({
+      error: {
+        code: "input_invalid",
+        message: "Input validation failed.",
+        field_errors: [{path: "input", message: "Submitted input is no longer accepted."}],
+      },
+      request_id: "request-input-error",
+    })});
+  });
+  await unlockAtom(page, "A05");
+  await page.locator("#fill-example").click();
+  await page.locator("#run-button").click();
+
+  await expect(page.locator("#validation-errors")).toContainText("Submitted input is no longer accepted.");
+  await page.getByLabel("context").fill("Исправленная оценка");
+  await expect(page.locator("#validation-errors")).not.toContainText("Submitted input is no longer accepted.");
 });
 
 test("corrected accepted submission clears authoritative admission field errors", async ({page}) => {
@@ -865,6 +890,8 @@ test("corrected accepted submission clears authoritative admission field errors"
   await expect(page.locator("#retry-submit")).toBeHidden();
 
   await page.locator("#reasoning-effort").selectOption("low");
+  await expect(page.locator("#validation-errors")).not.toContainText("Selected reasoning is unavailable.");
+  await expect(page.locator("#reasoning-effort")).not.toHaveAttribute("aria-invalid", "true");
   await page.locator("#run-button").click();
   await expect(page.locator("#run-state")).toContainText("lab_resource_not_found");
   await expect(page.locator("#validation-errors")).not.toContainText("Selected reasoning is unavailable.");
