@@ -4,6 +4,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LOCALES, type Locale } from "../src/i18n";
+import { LOCALE_STORAGE_KEY, resetUnpersistedLocaleForTests } from "../src/i18n/localeStorage";
 import { HOST_MESSAGES } from "../src/i18n/messages";
 import { CLIENT_UPDATE_WRITER_MESSAGES } from "../src/products/clientUpdateWriter/messages";
 import { ProductPageShell } from "../src/products/ProductPageShell";
@@ -28,7 +29,6 @@ import { englishForAllLocales } from "./support/renderWithI18n";
 
 const PROPOSAL_IDS = { productId: "proposal_ai", scenarioId: "proposal_ai.generate_v1" } as const;
 const CUW_IDS = { productId: "client_update_writer", scenarioId: "client_update_writer.update_v1" } as const;
-const LOCALE_KEY = "anytoolai.ui_locale";
 
 afterEach(() => {
   cleanup();
@@ -162,10 +162,33 @@ describe("ProductPageShell locale rendering", () => {
 });
 
 describe("ProductPageShell locale resolution and persistence", () => {
+  it("follows an explicit switch made in another same-origin tab", async () => {
+    renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
+    await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.en.generate.submit });
+
+    // The real browser never dispatches `storage` in the tab that wrote the key -- this simulates
+    // the event as another tab's write would arrive here, without going through this tab's own
+    // localStorage.setItem (there is nothing else to assert on the writing tab's side).
+    window.dispatchEvent(new StorageEvent("storage", { key: LOCALE_STORAGE_KEY, newValue: "de" }));
+
+    expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.de.generate.submit })).toBeTruthy();
+  });
+
+  it("re-resolves down to the browser language when another tab clears the stored choice", async () => {
+    mockBrowserLanguages(["it-IT"]);
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, "ru");
+    renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
+    await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.ru.generate.submit });
+
+    window.dispatchEvent(new StorageEvent("storage", { key: LOCALE_STORAGE_KEY, newValue: null }));
+
+    expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.it.generate.submit })).toBeTruthy();
+  });
+
   it("persists an explicit choice and applies it on the next visit", async () => {
     renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
     switchTo("ru");
-    expect(window.localStorage.getItem(LOCALE_KEY)).toBe("ru");
+    expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("ru");
     cleanup();
 
     renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
@@ -179,7 +202,7 @@ describe("ProductPageShell locale resolution and persistence", () => {
 
     expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.pt.generate.submit })).toBeTruthy();
     expect(document.documentElement.lang).toBe("pt");
-    expect(window.localStorage.getItem(LOCALE_KEY)).toBeNull();
+    expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBeNull();
   });
 
   it("falls back to English for an unsupported browser locale", async () => {
@@ -192,20 +215,29 @@ describe("ProductPageShell locale resolution and persistence", () => {
 
   it("prefers the explicit choice over the browser locale", async () => {
     mockBrowserLanguages(["de-DE"]);
-    window.localStorage.setItem(LOCALE_KEY, "it");
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, "it");
     renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
 
     expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.it.generate.submit })).toBeTruthy();
   });
 
-  it("still switches, for the page's lifetime, when localStorage throws", async () => {
+  it("still switches, and survives a remount within the same page load, when localStorage throws", async () => {
+    // getItem is left real (not mocked) on purpose: the classic Safari-private-mode shape this
+    // guards is setItem throwing while getItem keeps succeeding (just never seeing the write).
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("blocked");
     });
     renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
     switchTo("fr");
-
     expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.fr.generate.submit })).toBeTruthy();
+    cleanup();
+
+    // A remount (e.g. navigating to another product and back) re-resolves from storage; the failed
+    // write must not silently revert to English here.
+    renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
+    expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.fr.generate.submit })).toBeTruthy();
+
+    resetUnpersistedLocaleForTests();
   });
 });
 
@@ -347,6 +379,6 @@ describe("a newly registered product gets the language selector without implemen
     switchTo("it");
     expect(screen.getByText(HOST_MESSAGES.it.validation.required.replace("{field}", "Text"))).toBeTruthy();
     expect(document.documentElement.lang).toBe("it");
-    expect(window.localStorage.getItem(LOCALE_KEY)).toBe("it");
+    expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("it");
   });
 });

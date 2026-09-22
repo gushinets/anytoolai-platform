@@ -13,6 +13,7 @@ export const en = {
   fieldNames: {
     taskText: "Task description",
     freelancerPositioning: "Your positioning",
+    language: "Language",
   },
   validation: { languageFormat: 'Language must look like "en" or "en-US".' },
   generate: {

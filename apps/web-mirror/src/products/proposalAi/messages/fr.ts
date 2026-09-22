@@ -15,6 +15,7 @@ export const fr: Shape<typeof en> = {
   fieldNames: {
     taskText: "La description de la mission",
     freelancerPositioning: "Votre positionnement",
+    language: "Langue",
   },
   validation: { languageFormat: 'La langue doit ressembler à "en" ou "en-US".' },
   generate: {

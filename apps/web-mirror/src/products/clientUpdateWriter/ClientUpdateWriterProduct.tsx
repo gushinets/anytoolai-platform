@@ -25,13 +25,6 @@ const PRODUCT_ID = "client_update_writer";
 const LONG_FIELD_MAX_LENGTH = 4000;
 const SHORT_FIELD_MAX_LENGTH = 200;
 
-// No quota policy is configured for this product today (ANY-413 semantics; guest usage/quota
-// needs its own product decision before a live-provider rollout), so the advisory quota GET
-// finds nothing and this never renders. It stays because `ProductDefinition.copy` requires it
-// and it is what the shared runtime shows once a policy exists; keep the wording mode-agnostic
-// and revisit it against that policy's dimension.
-const quotaRemainingCopy = (remaining: number, limit: number) =>
-  `${remaining} of ${limit} Client Update Writer runs remaining.`;
 
 function toneError(tone: Tone | ""): FieldError | undefined {
   return tone ? undefined : { code: "required" };
@@ -131,12 +124,6 @@ export const updateDefinition: ProductDefinition<UpdateValues, ClientUpdateWrite
   extractResult: extractComposeReplyResult,
   Fields: UpdateFields,
   Result: ClientUpdateWriterResultView,
-  copy: {
-    submit: "Write update",
-    running: "Writing your update…",
-    runFailed: "Something went wrong writing your update. Please try again.",
-    quotaRemaining: quotaRemainingCopy,
-  },
 };
 
 // ---- Reply Draft mode: client_message + reply_goal + tone -> ...reply_draft_input_v1 ----
@@ -189,12 +176,6 @@ export const replyDraftDefinition: ProductDefinition<ReplyDraftValues, ClientUpd
   extractResult: extractComposeReplyResult,
   Fields: ReplyDraftFields,
   Result: ClientUpdateWriterResultView,
-  copy: {
-    submit: "Write reply",
-    running: "Writing your reply…",
-    runFailed: "Something went wrong writing your reply. Please try again.",
-    quotaRemaining: quotaRemainingCopy,
-  },
 };
 
 // ---- Prepaid Request mode: billing_context{notes,amount,due_date?} + tone -> ...prepaid_request_input_v1 ----
@@ -265,12 +246,6 @@ export const prepaidRequestDefinition: ProductDefinition<PrepaidRequestValues, C
   extractResult: extractComposeReplyResult,
   Fields: PrepaidRequestFields,
   Result: ClientUpdateWriterResultView,
-  copy: {
-    submit: "Write request",
-    running: "Writing your request…",
-    runFailed: "Something went wrong writing your request. Please try again.",
-    quotaRemaining: quotaRemainingCopy,
-  },
 };
 
 // ---- Mode switcher: product-owned composition, not a shared-runtime concept (ANY-453's

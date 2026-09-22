@@ -104,11 +104,23 @@ function cacheSuccessOnly<T extends { ok: boolean }>(
   const pending = fetch();
   byKey.set(key, pending);
   const settledByKey = byKey;
-  void pending.then((result) => {
-    if (!result.ok && settledByKey.get(key) === pending) {
+  function evictIfCurrent() {
+    if (settledByKey.get(key) === pending) {
       settledByKey.delete(key);
     }
-  });
+  }
+  // Code review finding: `fetch` is only documented to resolve `{ok: false}` on failure, not to
+  // reject -- but nothing enforces that (a thrown error inside it, e.g. from response parsing,
+  // still rejects this `async function`'s promise). Without a rejection handler here, that promise
+  // stayed cached forever for `(client, key)`, defeating this function's whole purpose; evicting
+  // on rejection too, not just on `{ok: false}`, closes that gap. The caller's own subscription to
+  // `pending` (returned below) still sees the rejection independently -- this only stops it being
+  // replayed to the next caller.
+  void pending.then((result) => {
+    if (!result.ok) {
+      evictIfCurrent();
+    }
+  }, evictIfCurrent);
   return pending;
 }
 

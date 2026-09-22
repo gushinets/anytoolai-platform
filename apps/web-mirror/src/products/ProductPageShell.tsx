@@ -26,7 +26,9 @@ export function ProductPageShell({
   return (
     <LocaleProvider productMessages={product.messages}>
       <LanguageSwitcher />
-      <Component key={product.productId} client={client} onEvent={onEvent} visitId={visitId} />
+      {/* No key here: the caller already keys ProductPageShell itself by productId (page.tsx), so
+          this whole subtree -- Component included -- already remounts on a product change. */}
+      <Component client={client} onEvent={onEvent} visitId={visitId} />
     </LocaleProvider>
   );
 }

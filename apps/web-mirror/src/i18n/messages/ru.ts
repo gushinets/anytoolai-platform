@@ -27,7 +27,7 @@ export const ru: Shape<typeof en> = {
   validation: {
     required: "{field}: обязательное поле.",
     outerWhitespace: "{field}: не должно быть пробелов в начале и в конце.",
-    maxLength: "{field}: не более {maxLength, plural, one {# символа} few {# символов} many {# символов} other {# символа}}.",
+    maxLength: "{field}: не более {maxLength, plural, one {# символ} few {# символа} many {# символов} other {# символа}}.",
   },
   tone: { neutral: "нейтральный", warm: "тёплый", firm: "твёрдый" },
 };

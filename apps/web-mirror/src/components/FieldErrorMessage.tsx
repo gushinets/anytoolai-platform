@@ -1,6 +1,7 @@
 "use client";
 
 import { useHostT, useProductT } from "../i18n";
+import { assertNever } from "../products/runtime/productDefinition";
 import type { FieldError } from "../products/runtime/fieldValidation";
 
 /** Renders a structured `FieldError` in the current UI locale. `label` is the product-owned,
@@ -20,5 +21,10 @@ export function FieldErrorMessage({ error, label }: { error: FieldError | undefi
       return <p role="alert">{th("validation.maxLength", { field: label, maxLength: error.maxLength })}</p>;
     case "product":
       return <p role="alert">{tp(error.key)}</p>;
+    default:
+      // Code review finding: no exhaustiveness arm, unlike every other closed-union switch in this
+      // runtime (docs/agent/coding-conventions.md "Exhaustiveness") -- a future FieldError variant
+      // would silently render nothing instead of failing typecheck.
+      return assertNever(error);
   }
 }

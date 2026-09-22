@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { IntlProvider, useTranslations } from "use-intl";
 import { DEFAULT_LOCALE, type Locale } from "./locales";
-import { readStoredLocale, writeStoredLocale } from "./localeStorage";
+import { LOCALE_STORAGE_KEY, readStoredLocale, writeStoredLocale } from "./localeStorage";
 import { HOST_MESSAGES } from "./messages";
 import { mergeMessages, type MessageTree } from "./messageTypes";
 import { resolveLocale } from "./resolveLocale";
@@ -47,6 +47,20 @@ export function LocaleProvider({
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
+  // Code review finding: with no `storage` listener, an explicit switch in one tab left every other
+  // open tab of the same origin showing its old locale until its next reload/remount. `storage`
+  // fires only in OTHER documents of the same origin, never the tab that made the write, so this
+  // can't loop with `setLocale` below. `event.newValue === null` covers the key being cleared
+  // (e.g. site data reset), which re-resolves down to the browser language / English.
+  useEffect(() => {
+    function onStorage(event: StorageEvent) {
+      if (event.key === LOCALE_STORAGE_KEY || event.key === null) {
+        setLocaleState(resolveLocale({ stored: event.newValue, browserLanguages: navigator.languages }));
+      }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const messages = useMemo(
     // English underneath every locale: a key missing from a locale falls back to English.

@@ -4,7 +4,7 @@
 // `append_after_blank_line`), and the mode switcher. The shared runtime behavior every mode rides
 // on (polling, retry, quota, copy-activation ordering, event callbacks) is proven once in
 // ProductRunPage.test.tsx -- not re-proven per mode here.
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProductRunPage } from "../src/products/runtime/ProductRunPage";
 import type { ProductRunEvent } from "../src/products/runtime/productDefinition";

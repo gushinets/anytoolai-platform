@@ -15,6 +15,7 @@ export const ru: Shape<typeof en> = {
   fieldNames: {
     taskText: "Описание задачи",
     freelancerPositioning: "Ваше позиционирование",
+    language: "Язык",
   },
   validation: { languageFormat: 'Язык должен выглядеть как "en" или "en-US".' },
   generate: {

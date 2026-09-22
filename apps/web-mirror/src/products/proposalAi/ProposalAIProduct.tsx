@@ -77,7 +77,7 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
         disabled={disabled}
         aria-invalid={Boolean(errors.language)}
       />
-      <FieldErrorMessage error={errors.language} label={t("fields.language")} />
+      <FieldErrorMessage error={errors.language} label={t("fieldNames.language")} />
     </>
   );
 }
