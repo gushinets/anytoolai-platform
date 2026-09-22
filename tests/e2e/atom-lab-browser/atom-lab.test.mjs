@@ -509,6 +509,60 @@ test("catalog refresh retains the last-good selection through a transient read f
   controller.destroy();
 });
 
+test("catalog polling backs off repeated read failures and resets after recovery", async () => {
+  const {document, elements} = createFakeDocument();
+  const atom = await catalogAtom("A01");
+  const pendingCatalog = {
+    items: [{model_id: "gpt", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+    snapshot_id: "snapshot-current",
+    last_success_at: "2026-09-21T00:00:00Z",
+    stale: true,
+    refresh_status: "pending",
+    error: null,
+  };
+  const currentCatalog = {...pendingCatalog, stale: false, refresh_status: "current"};
+  const scheduled = new Map();
+  const scheduledDelays = [];
+  let nextTimerId = 0;
+  let modelReads = 0;
+  bootstrapAtomLab({
+    document,
+    fetchImpl: async (url) => {
+      if (url.endsWith("/atoms")) return {ok: true, status: 200, async json() { return [atom]; }};
+      if (url.endsWith("/refresh")) return {ok: true, status: 202, async json() { return pendingCatalog; }};
+      modelReads += 1;
+      if (modelReads === 1) return {ok: true, status: 200, async json() { return currentCatalog; }};
+      const refreshRead = modelReads - 1;
+      if (refreshRead <= 6 || refreshRead === 8) {
+        return {ok: false, status: 503, async json() { return {error: {message: "Temporary catalog outage."}}; }};
+      }
+      return {ok: true, status: 200, async json() {
+        return refreshRead === 7 ? pendingCatalog : currentCatalog;
+      }};
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback, delay) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, callback);
+      scheduledDelays.push(delay);
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("refresh-models").click();
+
+  while (scheduled.size > 0) {
+    const [timerId, poll] = scheduled.entries().next().value;
+    scheduled.delete(timerId);
+    await poll();
+  }
+
+  assert.deepEqual(scheduledDelays, [250, 250, 500, 1_000, 2_000, 4_000, 4_000, 250, 250]);
+  assert.equal(elements.get("model-catalog-warning").textContent, "");
+});
+
 test("a persisted page resumes a model refresh accepted before its first catalog poll", async () => {
   const {document, elements} = createFakeDocument();
   const lifecycleTarget = new FakeLifecycleTarget();

@@ -1168,6 +1168,7 @@ export function bootstrapAtomLab({
   let submitInFlight = false;
   let modelCatalogPollTimer = null;
   let modelCatalogPollStartedAt = null;
+  let modelCatalogPollFailures = 0;
   let runPollTimer = null;
   let activeRunAbortController = null;
   let activeSubmissionAbortController = null;
@@ -1273,6 +1274,7 @@ export function bootstrapAtomLab({
     if (modelCatalogPollTimer !== null) cancelScheduleImpl(modelCatalogPollTimer);
     modelCatalogPollTimer = null;
     modelCatalogPollStartedAt = null;
+    modelCatalogPollFailures = 0;
   };
 
   const pollModelCatalog = async () => {
@@ -1288,8 +1290,15 @@ export function bootstrapAtomLab({
       stopModelCatalogPolling();
       return;
     }
+    modelCatalogPollFailures = loaded ? 0 : modelCatalogPollFailures + 1;
+    const delay = loaded
+      ? RUN_POLL_INTERVAL_MS
+      : Math.min(
+        RUN_POLL_INTERVAL_MS * (2 ** Math.min(modelCatalogPollFailures - 1, 30)),
+        RUN_POLL_MAX_BACKOFF_MS,
+      );
     if (modelCatalogPollTimer !== null) cancelScheduleImpl(modelCatalogPollTimer);
-    modelCatalogPollTimer = scheduleImpl(pollModelCatalog, RUN_POLL_INTERVAL_MS);
+    modelCatalogPollTimer = scheduleImpl(pollModelCatalog, delay);
   };
 
   const startModelCatalogPolling = () => {
