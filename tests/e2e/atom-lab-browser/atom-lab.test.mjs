@@ -1137,6 +1137,61 @@ test("a persisted page resumes a model refresh accepted before its first catalog
   assert.equal(scheduled.size, 0);
 });
 
+test("persisted lifecycle resumes keep the original model-catalog polling deadline", async () => {
+  const {document, elements} = createFakeDocument();
+  const lifecycleTarget = new FakeLifecycleTarget();
+  const atom = await catalogAtom("A01");
+  const currentCatalog = {
+    items: [{model_id: "gpt", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+    snapshot_id: "snapshot-current",
+    last_success_at: "2026-09-22T00:00:00Z",
+    stale: false,
+    refresh_status: "current",
+    error: null,
+  };
+  const pendingCatalog = {...currentCatalog, stale: true, refresh_status: "pending"};
+  const scheduled = new Map();
+  let nextTimerId = 0;
+  let now = 0;
+  let modelReads = 0;
+  bootstrapAtomLab({
+    document,
+    lifecycleTarget,
+    nowImpl: () => now,
+    pollTimeoutMs: 1_000,
+    fetchImpl: async (url) => {
+      if (url.endsWith("/atoms")) return {ok: true, status: 200, async json() { return [atom]; }};
+      if (url.endsWith("/refresh")) return {ok: true, status: 202, async json() { return pendingCatalog; }};
+      modelReads += 1;
+      return {ok: true, status: 200, async json() { return currentCatalog; }};
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback, delay) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, {callback, delay});
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("refresh-models").click();
+
+  assert.equal(modelReads, 1);
+  await lifecycleTarget.dispatch("pagehide", {persisted: true});
+  now = 1_000;
+  await lifecycleTarget.dispatch("pageshow", {persisted: true});
+
+  assert.equal(scheduled.size, 1);
+  const [timerId, timer] = scheduled.entries().next().value;
+  assert.equal(timer.delay, 0);
+  scheduled.delete(timerId);
+  await timer.callback();
+  assert.equal(modelReads, 1);
+  assert.equal(scheduled.size, 0);
+  assert.match(elements.get("model-catalog-warning").textContent, /истекло/);
+});
+
 test("a persisted page resumes an accepted refresh without a last-good catalog", async () => {
   const {document, elements} = createFakeDocument();
   const lifecycleTarget = new FakeLifecycleTarget();
@@ -1365,6 +1420,57 @@ test("a persisted pagehide pauses polling and pageshow resumes the same accepted
   assert.equal(reads, 1);
   assert.match(elements.get("run-state").textContent, /Завершён/);
   assert.match(elements.get("run-diagnostics").textContent, /run-bfcache/);
+});
+
+test("persisted lifecycle resumes keep the accepted run polling deadline", async () => {
+  const {document, elements} = createFakeDocument();
+  const lifecycleTarget = new FakeLifecycleTarget();
+  const atom = await catalogAtom("A01");
+  const scheduled = new Map();
+  let nextTimerId = 0;
+  let now = 0;
+  let posts = 0;
+  let reads = 0;
+  bootstrapAtomLab({
+    document,
+    lifecycleTarget,
+    nowImpl: () => now,
+    pollTimeoutMs: 1_000,
+    fetchImpl: async (url, options = {}) => {
+      if (url.endsWith("/atoms")) return {ok: true, status: 200, async json() { return [atom]; }};
+      if (url.endsWith("/models")) return {ok: true, status: 200, async json() { return {
+        items: [{model_id: "gpt-supported", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+        snapshot_id: "snapshot-current", last_success_at: "2026-09-22T00:00:00Z", stale: false, refresh_status: "current", error: null,
+      }; }};
+      if (url.endsWith("/runs") && options.method === "POST") {
+        posts += 1;
+        return {ok: true, status: 202, async json() { return {run_id: "run-deadline", scenario_session_id: "session-deadline", job_id: "job-deadline", status: "running"}; }};
+      }
+      reads += 1;
+      return {ok: true, status: 200, async json() { return null; }};
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback, delay) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, {callback, delay});
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("fill-example").click();
+  await elements.get("run-button").click();
+
+  await lifecycleTarget.dispatch("pagehide", {persisted: true});
+  now = 1_000;
+  await lifecycleTarget.dispatch("pageshow", {persisted: true});
+
+  assert.equal(posts, 1);
+  assert.equal(reads, 0);
+  assert.equal(scheduled.size, 0);
+  assert.match(elements.get("run-state").textContent, /истекло/);
+  assert.equal(elements.get("retry-read").hidden, false);
 });
 
 test("resumed automatic polling hides a stale manual reread action", async () => {

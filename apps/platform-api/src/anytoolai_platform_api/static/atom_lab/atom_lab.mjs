@@ -1376,14 +1376,14 @@ export function bootstrapAtomLab({
     }
   };
 
-  const stopModelCatalogPolling = () => {
+  const stopModelCatalogPolling = ({preserveDeadline = false} = {}) => {
     if (modelCatalogPollTimer !== null) cancelScheduleImpl(modelCatalogPollTimer);
     if (activeModelCatalogReadTimeoutId !== null) cancelScheduleImpl(activeModelCatalogReadTimeoutId);
     activeModelCatalogReadTimeoutId = null;
     activeModelCatalogAbortController?.abort();
     activeModelCatalogAbortController = null;
     modelCatalogPollTimer = null;
-    modelCatalogPollStartedAt = null;
+    if (!preserveDeadline) modelCatalogPollStartedAt = null;
     modelCatalogPollFailures = 0;
   };
 
@@ -1425,9 +1425,13 @@ export function bootstrapAtomLab({
   };
 
   const startModelCatalogPolling = () => {
-    if (destroyed || paused || modelCatalogPollStartedAt !== null) return;
-    modelCatalogPollStartedAt = nowImpl();
-    modelCatalogPollTimer = scheduleImpl(pollModelCatalog, RUN_POLL_INTERVAL_MS);
+    if (destroyed || paused || modelCatalogPollTimer !== null) return;
+    if (modelCatalogPollStartedAt === null) modelCatalogPollStartedAt = nowImpl();
+    const remaining = Math.max(0, pollTimeoutMs - (nowImpl() - modelCatalogPollStartedAt));
+    modelCatalogPollTimer = scheduleImpl(
+      pollModelCatalog,
+      Math.min(RUN_POLL_INTERVAL_MS, remaining),
+    );
   };
 
   const reloadCurrentModelCatalog = async () => {
@@ -1927,7 +1931,7 @@ export function bootstrapAtomLab({
   showInputTab(true);
   const pause = () => {
     paused = true;
-    stopModelCatalogPolling();
+    stopModelCatalogPolling({preserveDeadline: !destroyed});
     if (activeModelRefreshTimeoutId !== null) cancelScheduleImpl(activeModelRefreshTimeoutId);
     activeModelRefreshTimeoutId = null;
     activeModelRefreshAbortController?.abort();
@@ -1948,7 +1952,6 @@ export function bootstrapAtomLab({
     }
     let runReload = null;
     if (activeSubmission?.runId && !activeSubmission.terminal) {
-      activeSubmission.pollStartedAt = nowImpl();
       activeSubmission.pollFailureCount = 0;
       runReload = pollRun(activeSubmission);
     }
