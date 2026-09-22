@@ -648,6 +648,8 @@ test("final invalid output is diagnostics, never a successful result", async ({p
   });
   await unlockAtom(page, "A05");
   await page.locator("#fill-example").click();
+  await page.locator("#model-select").selectOption("gpt-supported");
+  await page.locator("#reasoning-effort").selectOption("low");
   await page.locator("#run-button").click();
 
   await expect(page.locator("#invalid-response")).toBeVisible();
@@ -796,6 +798,52 @@ test("succeeded run without a result fails closed as an invalid API response", a
   await expect(page.locator("#result-section")).toBeHidden();
   await expect(page.locator("#run-button")).toBeDisabled();
 });
+
+for (const mismatch of [
+  {
+    label: "requested model",
+    submittedEffort: null,
+    requestedModelId: "openai/gpt-other",
+    requestedEffort: null,
+  },
+  {
+    label: "requested reasoning effort",
+    submittedEffort: "low",
+    requestedModelId: "openai/gpt-supported",
+    requestedEffort: "high",
+  },
+]) {
+  test(`run detail with conflicting ${mismatch.label} fails closed`, async ({page}) => {
+    await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+      await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({
+        run_id: "run-conflict", scenario_session_id: "session-conflict", job_id: "job-conflict", status: "running",
+      })});
+    });
+    await page.route("http://atom-lab.test/v1/atom-lab/runs/run-conflict", async (route) => {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({
+        run_id: "run-conflict", status: "running",
+        snapshot: {atom_id: "A05", input: A05.example_input, prompt: A05.prompt, model_id: "openai/gpt-supported", reasoning_effort: mismatch.submittedEffort},
+        runtime_ids: {scenario_session_id: "session-conflict", job_id: "job-conflict", action_run_id: "action-conflict", artifact_id: null},
+        result: null,
+        diagnostics: {error_code: null, duration_ms: null, requested_model_id: mismatch.requestedModelId, requested_reasoning_effort: mismatch.requestedEffort, response_model_id: null, validation_attempts: 0, transport_attempts: 0, physical_calls: 0, succeeded_first_attempt: null, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
+        created_at: "2026-09-22T00:00:00Z", started_at: "2026-09-22T00:00:00Z", finished_at: null,
+      })});
+    });
+    await unlockAtom(page, "A05");
+    await page.locator("#fill-example").click();
+    if (mismatch.submittedEffort) {
+      await page.locator("#model-select").selectOption("gpt-supported");
+      await page.locator("#reasoning-effort").selectOption(mismatch.submittedEffort);
+    }
+    await page.locator("#run-button").click();
+
+    await expect(page.locator("#run-state")).toContainText("Некорректный ответ API");
+    await expect(page.locator("#retry-read")).toBeVisible();
+    await expect(page.locator("#run-metadata")).toHaveText("");
+    await expect(page.locator("#submitted-snapshot")).toContainText("openai/gpt-supported");
+    await expect(page.locator("#run-button")).toBeDisabled();
+  });
+}
 
 test("malformed accepted response keeps the same submission available for safe replay", async ({page}) => {
   const keys = [];

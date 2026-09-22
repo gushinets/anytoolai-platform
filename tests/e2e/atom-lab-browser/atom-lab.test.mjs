@@ -666,6 +666,74 @@ test("a current refresh response reloads and renders the latest catalog immediat
   assert.equal(elements.get("model-catalog-warning").textContent, "");
 });
 
+test("a superseded catalog read cannot overwrite a newer current refresh", async () => {
+  const {document, elements} = createFakeDocument();
+  const atom = await catalogAtom("A01");
+  const catalogFor = (modelId, refreshStatus) => ({
+    items: [{model_id: modelId, compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+    snapshot_id: `snapshot-${modelId}`,
+    last_success_at: "2026-09-22T00:00:00Z",
+    stale: refreshStatus !== "current",
+    refresh_status: refreshStatus,
+    error: null,
+  });
+  const scheduled = new Map();
+  let nextTimerId = 0;
+  let modelReads = 0;
+  let refreshes = 0;
+  let resolveOldRead;
+  bootstrapAtomLab({
+    document,
+    fetchImpl: (url) => {
+      if (url.endsWith("/atoms")) return Promise.resolve({ok: true, status: 200, async json() { return [atom]; }});
+      if (url.endsWith("/refresh")) {
+        refreshes += 1;
+        const refresh = refreshes === 1
+          ? catalogFor("gpt-initial", "pending")
+          : catalogFor("gpt-new", "current");
+        return Promise.resolve({ok: true, status: 202, async json() {
+          return {
+            snapshot_id: refresh.snapshot_id,
+            last_success_at: refresh.last_success_at,
+            stale: refresh.stale,
+            refresh_status: refresh.refresh_status,
+            error: refresh.error,
+          };
+        }});
+      }
+      modelReads += 1;
+      if (modelReads === 1) return Promise.resolve({ok: true, status: 200, async json() { return catalogFor("gpt-initial", "current"); }});
+      if (modelReads === 2) return new Promise((resolve) => { resolveOldRead = resolve; });
+      return Promise.resolve({ok: true, status: 200, async json() { return catalogFor("gpt-new", "current"); }});
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, callback);
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("refresh-models").click();
+
+  const [pollTimerId, poll] = scheduled.entries().next().value;
+  scheduled.delete(pollTimerId);
+  const oldPolling = poll();
+  assert.equal(typeof resolveOldRead, "function");
+
+  await elements.get("refresh-models").click();
+  assert.equal(elements.get("model-select").value, "gpt-new");
+  assert.equal(elements.get("model-catalog-warning").textContent, "");
+
+  resolveOldRead({ok: true, status: 200, async json() { return catalogFor("gpt-stale", "pending"); }});
+  await oldPolling;
+  assert.equal(elements.get("model-select").value, "gpt-new");
+  assert.equal(elements.get("model-catalog-warning").textContent, "");
+  assert.equal(scheduled.size, 0);
+});
+
 test("a persisted page resumes a model refresh accepted before its first catalog poll", async () => {
   const {document, elements} = createFakeDocument();
   const lifecycleTarget = new FakeLifecycleTarget();

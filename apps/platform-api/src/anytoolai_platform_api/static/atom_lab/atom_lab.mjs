@@ -1165,6 +1165,7 @@ export function bootstrapAtomLab({
   let selectedAtomId = null;
   let modelCatalog = null;
   let modelCatalogRefreshStatus = null;
+  let modelCatalogReadGeneration = 0;
   let modelOptions = [];
   let activeSubmission = null;
   let submitInFlight = false;
@@ -1255,6 +1256,8 @@ export function bootstrapAtomLab({
   };
 
   const loadModels = async () => {
+    const generation = modelCatalogReadGeneration + 1;
+    modelCatalogReadGeneration = generation;
     try {
       const response = await fetchImpl("/v1/atom-lab/models", {
         headers: {[ACCESS_HEADER]: accessCode},
@@ -1265,12 +1268,14 @@ export function bootstrapAtomLab({
       if (!parsedCatalog) {
         throw new Error("Каталог моделей вернул некорректный ответ.");
       }
+      if (generation !== modelCatalogReadGeneration) return null;
       modelCatalog = parsedCatalog;
       modelCatalogRefreshStatus = parsedCatalog.refresh_status;
       modelOptions = parsedCatalog.items.map(describeModelOption);
       renderModelCatalog();
       return true;
     } catch (error) {
+      if (generation !== modelCatalogReadGeneration) return null;
       const message = error instanceof Error
         ? error.message
         : "Каталог моделей недоступен.";
@@ -1306,6 +1311,7 @@ export function bootstrapAtomLab({
       return;
     }
     const loaded = await loadModels();
+    if (loaded === null) return;
     if (destroyed || paused || (loaded && !["pending", "running"].includes(modelCatalog?.refresh_status))) {
       stopModelCatalogPolling();
       return;
@@ -1474,7 +1480,10 @@ export function bootstrapAtomLab({
         return;
       }
       const detail = parseRunDetail(payload, submission.runId);
-      if (!detail) {
+      const matchesSubmission = detail
+        && detail.diagnostics.requested_model_id === submission.snapshot.model_id
+        && detail.diagnostics.requested_reasoning_effort === submission.snapshot.reasoning_effort;
+      if (!matchesSubmission) {
         nodes["run-state"].textContent = "Некорректный ответ API. Запуск сохранён для повторного чтения.";
         nodes["retry-read"].hidden = false;
         return;
@@ -1722,13 +1731,14 @@ export function bootstrapAtomLab({
       if (!response.ok) throw new Error(safeApiMessage(payload, "Не удалось запросить обновление."));
       const refresh = parseModelRefresh(payload);
       if (!refresh) throw new Error("Обновление каталога вернуло некорректный ответ.");
+      modelCatalogReadGeneration += 1;
       modelCatalogRefreshStatus = refresh.refresh_status;
       modelCatalog = modelCatalog ? {...modelCatalog, ...refresh} : modelCatalog;
+      stopModelCatalogPolling();
       if (["pending", "running"].includes(refresh.refresh_status)) {
         nodes["model-catalog-warning"].textContent = "Каталог устарел; обновление запрошено.";
         startModelCatalogPolling();
       } else {
-        stopModelCatalogPolling();
         await loadModels();
       }
     } catch (error) {
