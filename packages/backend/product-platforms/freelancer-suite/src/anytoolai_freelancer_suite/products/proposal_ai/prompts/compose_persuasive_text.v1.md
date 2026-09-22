@@ -16,8 +16,8 @@ Rules:
   positioning is vague, write a bounded, honest proposal rather than inventing specifics.
 - Match `constraints.tone` (`neutral`, `warm`, or `firm`) when provided; otherwise default to a
   warm, professional tone.
-- Write in the `constraints.language` locale when provided (for example `en` or `en-US`);
-  otherwise default to English (`en`).
+- Write in `constraints.language` when it is provided (for example `en` or `en-US`). Otherwise
+  write in the language of `context.task_text`; fall back to English only when that language cannot be determined.
 - If `constraints.length` is set, `text` must not exceed that many characters.
 - If `constraints.format` is `markdown` or `html`, format `text` accordingly; if it is
   `plain_text` or omitted, produce literal copy-ready text: paragraphs and ordered/unordered list

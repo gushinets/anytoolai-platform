@@ -100,6 +100,9 @@ describe("ProductRunPage", () => {
     await waitForForm();
     await waitFor(() => expect(screen.getByText("3 of 3 runs remaining.")).toBeTruthy());
     expect(screen.getByRole("heading", { name: "Test Product" })).toBeTruthy();
+    expect(screen.getByText("Describe the test run.")).toBeTruthy();
+    expect(screen.getByText("3 of 3 runs remaining.").getAttribute("aria-live")).toBe("polite");
+    expect(screen.getByRole("form", { name: "Test Product form" }).hasAttribute("novalidate")).toBe(true);
   });
 
   it("includes scenario_id in the advisory quota request, so a scenario-dimension quota policy is also supported", async () => {
@@ -229,6 +232,7 @@ describe("ProductRunPage", () => {
     submit();
 
     expect(await screen.findAllByText("Text is required.")).toHaveLength(1);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Text")));
     expect(calls.some((call) => call.key === ROUTES.START)).toBe(false);
   });
 
@@ -413,6 +417,45 @@ describe("ProductRunPage", () => {
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not copy to clipboard/i));
     expect(calls.some((call) => call.key === ROUTES.NEXT_ACTION)).toBe(false);
+  });
+
+  it("starts another run from the result with a cleared form and refreshed quota", async () => {
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.QUOTA]: [
+        quotaResponse(TEST_PRODUCT_IDS),
+        quotaResponse(TEST_PRODUCT_IDS, { used_count: 1, remaining_count: 2 }),
+      ],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start another run" }));
+
+    await waitForForm();
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("");
+    await waitFor(() => expect(screen.getByText("2 of 3 runs remaining.")).toBeTruthy());
+    expect(calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(2);
+  });
+
+  it("does not add a repeat action to products that do not define one", async () => {
+    const { client } = makeClient(happyPathRoutes());
+    const definition = {
+      ...testProductDefinition,
+      copy: { ...testProductDefinition.copy, startAnother: undefined },
+    };
+
+    render(<ProductRunPage definition={definition} client={client} />);
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+
+    expect(screen.queryByRole("button", { name: "Start another run" })).toBeNull();
   });
 
   it("enters a quota-exhausted state from the advisory quota check, with no form and no scenario started", async () => {

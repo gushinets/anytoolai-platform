@@ -51,6 +51,10 @@ def _load_yaml(name: str) -> dict:
     return _test_support.load_yaml(PRODUCT_DIR, name)
 
 
+def _load_prompt(name: str) -> str:
+    return (PRODUCT_DIR / name).read_text(encoding="utf-8")
+
+
 def test_action_type_sequence_is_exactly_compose_persuasive_text() -> None:
     action_configs = _load_yaml("action_configs.yaml")["action_configs"]
     assert [config["action_type"] for config in action_configs] == [
@@ -86,7 +90,7 @@ def test_quota_policy_ref_resolves_to_the_declared_lifetime_product_quota() -> N
     assert policy["unit"] == "scenario_run"
     assert policy["period"] == "lifetime"
     assert policy["dimension"] == "product"
-    assert isinstance(policy["limit_count"], int) and policy["limit_count"] > 0
+    assert policy["limit_count"] == 10
 
 
 def test_renderer_contract_pins_the_canonical_copy_ready_field_to_a06_text() -> None:
@@ -122,6 +126,15 @@ def test_workflow_input_mapping_uses_only_generic_mapping_dsl_syntax() -> None:
     assert mapping["constraints.format"].startswith("literal:")
     assert mapping["constraints.length"].startswith("literal:")
     assert mapping["objective"].startswith("literal:")
+
+
+def test_prompt_uses_task_language_by_default_and_preserves_explicit_override() -> None:
+    prompt = _load_prompt("prompts/compose_persuasive_text.v1.md")
+
+    assert "constraints.language" in prompt
+    assert "language of `context.task_text`" in prompt
+    assert "cannot be determined" in prompt
+    assert "English" in prompt
 
 
 @pytest.mark.parametrize(
