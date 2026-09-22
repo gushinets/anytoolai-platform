@@ -75,6 +75,14 @@ export function LocaleProvider({
   // a write/removal that actually took effect) value into that memory too, before it can be lost.
   useEffect(() => {
     function onStorage(event: StorageEvent) {
+      // Code review finding (round 5): `storage` also fires for `sessionStorage` (a same-origin
+      // iframe sharing this top-level browsing context can dispatch one for its OWN, unrelated
+      // `sessionStorage`), so a bare key match isn't enough -- `storageArea` identifies which
+      // Storage object actually changed. `readStoredLocale`/`writeStoredLocale` only ever touch
+      // `window.localStorage`, so that's the only area this listener may react to.
+      if (event.storageArea !== window.localStorage) {
+        return;
+      }
       if (event.key === LOCALE_STORAGE_KEY || event.key === null) {
         acceptStoredLocaleFromEvent(event.newValue);
         setLocaleState(resolveLocale({ stored: event.newValue, browserLanguages: navigator.languages }));

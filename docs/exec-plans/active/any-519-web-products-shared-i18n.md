@@ -85,7 +85,7 @@ python scripts/agent/runner.py full-check           # + backend baseline + produ
 python scripts/agent/runner.py validate-architecture
 python scripts/agent/runner.py validate-docs
 python scripts/agent/runner.py generate-docs --check
-pnpm --filter @anytoolai/web-mirror test            # 219 tests, incl. i18n.test.ts, ProductPageShell.test.tsx
+pnpm --filter @anytoolai/web-mirror test            # 220 tests, incl. i18n.test.ts, ProductPageShell.test.tsx
 python scripts/agent/runner.py dev-up
 python scripts/agent/runner.py proposal-ai-smoke          # 8/8, incl. the new language-switch scenario
 python scripts/agent/runner.py client-update-writer-smoke # 3/3, English default unaffected
@@ -101,7 +101,7 @@ python scripts/agent/runner.py dev-down
 
 ## Code review rounds (PR #139)
 
-Four rounds of full re-review on top of the initial PR, each fixed before the next round started:
+Five rounds of full re-review on top of the initial PR, each fixed before the next round started:
 
 1. Compile breakage from the `main` merge (reintroduced pre-i18n `ClientUpdateWriterProduct.tsx`
    code, a duplicate `pnpm-lock.yaml` mapping key) plus first-pass bugs: Russian `max_length`
@@ -124,3 +124,6 @@ Four rounds of full re-review on top of the initial PR, each fixed before the ne
    navigation, so it could leak a product page's locale onto an out-of-scope English page --
    switched to the isomorphic layout effect, now captures and restores whatever it overwrote); the
    "add a locale" recipe not yet mentioning `products/shared/toneMessages/`.
+5. Zero blockers -- one P3: the `storage` listener matched on `key` alone, but `storage` also fires
+   for `sessionStorage` (including from a same-origin iframe's own writes); now also checks
+   `event.storageArea === window.localStorage`, the only Storage object this module touches.

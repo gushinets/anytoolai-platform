@@ -192,9 +192,24 @@ describe("ProductPageShell locale resolution and persistence", () => {
     // The real browser never dispatches `storage` in the tab that wrote the key -- this simulates
     // the event as another tab's write would arrive here, without going through this tab's own
     // localStorage.setItem (there is nothing else to assert on the writing tab's side).
-    window.dispatchEvent(new StorageEvent("storage", { key: LOCALE_STORAGE_KEY, newValue: "de" }));
+    window.dispatchEvent(new StorageEvent("storage", { key: LOCALE_STORAGE_KEY, newValue: "de", storageArea: window.localStorage }));
 
     expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.de.generate.submit })).toBeTruthy();
+  });
+
+  it("ignores a storage event from a different Storage object (e.g. sessionStorage), even with a matching key", async () => {
+    // Code review finding (round 5): `storage` also fires for sessionStorage, including from a
+    // same-origin iframe's own, unrelated writes -- `storageArea` identifies which Storage object
+    // actually changed, and this listener only ever reads/writes window.localStorage.
+    renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
+    await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.en.generate.submit });
+
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: LOCALE_STORAGE_KEY, newValue: "de", storageArea: window.sessionStorage }),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByRole("button", { name: PROPOSAL_AI_MESSAGES.en.generate.submit })).toBeTruthy();
   });
 
   it("does not revert to a failed local write after another tab's confirmed write and a remount", async () => {
@@ -212,7 +227,7 @@ describe("ProductPageShell locale resolution and persistence", () => {
     expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.fr.generate.submit })).toBeTruthy();
 
     window.localStorage.setItem(LOCALE_STORAGE_KEY, "de");
-    window.dispatchEvent(new StorageEvent("storage", { key: LOCALE_STORAGE_KEY, newValue: "de" }));
+    window.dispatchEvent(new StorageEvent("storage", { key: LOCALE_STORAGE_KEY, newValue: "de", storageArea: window.localStorage }));
     expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.de.generate.submit })).toBeTruthy();
     cleanup();
 
@@ -226,7 +241,7 @@ describe("ProductPageShell locale resolution and persistence", () => {
     renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
     await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.ru.generate.submit });
 
-    window.dispatchEvent(new StorageEvent("storage", { key: LOCALE_STORAGE_KEY, newValue: null }));
+    window.dispatchEvent(new StorageEvent("storage", { key: LOCALE_STORAGE_KEY, newValue: null, storageArea: window.localStorage }));
 
     expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.it.generate.submit })).toBeTruthy();
   });
