@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Button } from "@anytoolai/shared-ui";
+import { Button, Card } from "@anytoolai/shared-ui";
 import {
   copyResultAndRecordActivation,
   getQuota,
@@ -24,6 +24,7 @@ import { useHostT, useProductT } from "../../i18n";
 import { getClientStorage } from "./clientStorage";
 import type { FieldError } from "./fieldValidation";
 import { assertNever, type ProductDefinition, type ProductRunEvent } from "./productDefinition";
+import styles from "./ProductRunPage.module.css";
 
 export type ProductRunPageProps<V extends Record<string, unknown>, R> = {
   definition: ProductDefinition<V, R>;
@@ -287,6 +288,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   // Recreating the controller inside the effect gives each invocation, including a StrictMode
   // replay, its own independent, un-aborted controller.
   const controllerRef = useRef<AbortController | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -636,6 +638,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     const errors = definition.validate(values);
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
+      requestAnimationFrame(() => {
+        formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+      });
       return;
     }
     const reuseExisting = pendingStart !== null && shallowEqualValues(pendingStart.input, values);
@@ -728,6 +733,27 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     });
   }
 
+  function handleStartAnother() {
+    if (phase.kind !== "result" || guestId === undefined) {
+      return;
+    }
+    setValues(definition.emptyValues);
+    setFieldErrors({});
+    setPendingStart(null);
+    activeScenarioSessionIdRef.current = null;
+    setPhase({ kind: "idle" });
+
+    getQuota(client, { productId, guestId, scenarioId }).then((quotaResult) => {
+      if (controllerRef.current?.signal.aborted || !quotaResult.ok) {
+        return;
+      }
+      setQuota(quotaResult.value);
+      if (quotaResult.value.exhausted) {
+        setPhase((prev) => (prev.kind === "idle" ? { kind: "quota-exhausted" } : prev));
+      }
+    }, _noop);
+  }
+
   function updateField<K extends keyof V>(field: K, value: V[K]) {
     // Gated on a resolved guestId too, the same way submitCurrentValues() already gates
     // form_submitted: a boot-time createGuestIdentity() failure (not just the guest-identity-
@@ -770,7 +796,16 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   let mainContent: ReactNode;
   switch (phase.kind) {
     case "result":
-      mainContent = <Result result={phase.result} onCopy={handleCopy} />;
+      mainContent = (
+        <div className={styles.resultStack}>
+          <Result result={phase.result} onCopy={handleCopy} />
+          {definition.copy.startAnother ? (
+            <Button className={styles.resultAction} variant="secondary" onClick={handleStartAnother}>
+              {definition.copy.startAnother}
+            </Button>
+          ) : null}
+        </div>
+      );
       break;
     case "quota-exhausted":
       mainContent = <ErrorState message={th("quotaExhausted", { product: title })} />;
@@ -789,20 +824,32 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     case "retryable-error":
     case "unknown-error":
       mainContent = (
-        <form onSubmit={handleSubmit}>
-          <Fields values={values} errors={fieldErrors} disabled={busy || identityUnavailable} onChange={updateField} />
-          <Button type="submit" loading={busy} disabled={identityUnavailable}>
-            {phase.kind === "submitting"
-              ? th("starting")
-              : phase.kind === "running"
-                ? th("generating")
-                : tp(`${definition.messageScope}.submit`)}
-          </Button>
-          {phase.kind === "running" ? <p role="status">{tp(`${definition.messageScope}.running`)}</p> : null}
-          {identityUnavailable ? (
-            <p role="alert">{th("identityUnavailable")}</p>
-          ) : null}
-        </form>
+        <Card className={styles.formCard}>
+          <form
+            ref={formRef}
+            aria-label={`${definition.title} form`}
+            className={styles.form}
+            noValidate
+            onSubmit={handleSubmit}
+          >
+            <Fields values={values} errors={fieldErrors} disabled={busy || identityUnavailable} onChange={updateField} />
+            <div className={styles.footer}>
+              <Button type="submit" loading={busy} disabled={identityUnavailable}>
+                {phase.kind === "submitting"
+                  ? "Starting…"
+                  : phase.kind === "running"
+                    ? "Generating…"
+                    : definition.copy.submit}
+              </Button>
+              <div className={styles.statusRegion}>
+                {phase.kind === "running" ? <p role="status">{definition.copy.running}</p> : null}
+                {identityUnavailable ? (
+                  <p role="alert">We couldn&apos;t verify your identity. Please reload the page and try again.</p>
+                ) : null}
+              </div>
+            </div>
+          </form>
+        </Card>
       );
       break;
     default:
@@ -811,12 +858,18 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   return (
     <main className="page-container">
-      <h1>{title}</h1>
-      {quota ? (
-        <p aria-live="polite">{tp("quotaRemaining", { remaining: quota.remainingCount, limit: quota.limitCount })}</p>
-      ) : null}
+      <div className={styles.content}>
+        <header className={styles.header}>
+          <h1>{definition.title}</h1>
+          {definition.copy.description ? <p className={styles.description}>{definition.copy.description}</p> : null}
+          {quota ? (
+            <p className={styles.quota} aria-live="polite">
+              {definition.copy.quotaRemaining(quota.remainingCount, quota.limitCount)}
+            </p>
+          ) : null}
+        </header>
 
-      {mainContent}
+        {mainContent}
 
       {phase.kind === "retryable-error" ? (
         // Not gated on `pendingStart`: submitCurrentValues() (called by both this and the form's
@@ -844,6 +897,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
           }}
         />
       ) : null}
+      </div>
     </main>
   );
 }

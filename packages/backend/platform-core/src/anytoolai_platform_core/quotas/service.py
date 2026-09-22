@@ -537,7 +537,7 @@ def _quota_recovery_audit_pair_exists(
 
 
 def _state_from_usage(record: QuotaUsageRecord, policy: QuotaPolicy) -> QuotaState:
-    remaining_count = max(record.limit_count - record.used_count, 0)
+    remaining_count = max(policy.limit_count - record.used_count, 0)
     return QuotaState(
         guest_id=record.guest_id,
         product_id=record.product_id,
@@ -548,7 +548,7 @@ def _state_from_usage(record: QuotaUsageRecord, policy: QuotaPolicy) -> QuotaSta
         unit=policy.unit,
         period=policy.period,
         period_key=record.period_key,
-        limit_count=record.limit_count,
+        limit_count=policy.limit_count,
         used_count=record.used_count,
         remaining_count=remaining_count,
         exhausted=remaining_count <= 0,
