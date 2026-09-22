@@ -315,6 +315,7 @@ export function parseRunDetail(value, expectedRunId) {
     || !isNullableString(runtimeIds.artifact_id)
     || !isRecord(diagnostics)
     || (value.result !== null && !isRecord(value.result) && !Array.isArray(value.result))
+    || ((value.status === "succeeded") !== (value.result !== null))
     || !isNonEmptyString(value.created_at)
     || !isNullableString(value.started_at)
     || !isNullableString(value.finished_at)
@@ -1163,6 +1164,7 @@ export function bootstrapAtomLab({
   let session = null;
   let selectedAtomId = null;
   let modelCatalog = null;
+  let modelCatalogRefreshStatus = null;
   let modelOptions = [];
   let activeSubmission = null;
   let submitInFlight = false;
@@ -1187,6 +1189,23 @@ export function bootstrapAtomLab({
   const selectedModelOption = () => modelOptions.find(
     (option) => option.modelId === nodes["model-select"].value,
   ) ?? null;
+
+  const admissionErrorAppliesToDraft = (path, submission) => {
+    if (session.atom.atom_id !== submission.body.atom_id) return false;
+    if (path === "model_id") {
+      const modelId = nodes["model-select"].value;
+      const addressedModelId = modelId.startsWith("openai/") ? modelId : `openai/${modelId}`;
+      return addressedModelId === submission.body.model_id;
+    }
+    if (path === "reasoning_effort") {
+      return (nodes["reasoning-effort"].value || null) === submission.body.reasoning_effort;
+    }
+    if (path === "input" || path.startsWith("input.") || path.startsWith("input[")) {
+      return sameJson(getDraftPayload(session), submission.body.input);
+    }
+    if (path === "prompt") return session.prompt === submission.body.prompt;
+    return false;
+  };
 
   const renderReasoning = (preferredEffort = "") => {
     const option = selectedModelOption();
@@ -1247,6 +1266,7 @@ export function bootstrapAtomLab({
         throw new Error("Каталог моделей вернул некорректный ответ.");
       }
       modelCatalog = parsedCatalog;
+      modelCatalogRefreshStatus = parsedCatalog.refresh_status;
       modelOptions = parsedCatalog.items.map(describeModelOption);
       renderModelCatalog();
       return true;
@@ -1487,6 +1507,7 @@ export function bootstrapAtomLab({
         idempotencyKey: idempotencyKeyFactory(),
       });
     }
+    const submission = activeSubmission;
     submitInFlight = true;
     nodes["run-button"].disabled = true;
     nodes["retry-submit"].hidden = true;
@@ -1501,9 +1522,9 @@ export function bootstrapAtomLab({
         headers: {
           [ACCESS_HEADER]: accessCode,
           "Content-Type": "application/json",
-          "Idempotency-Key": activeSubmission.idempotencyKey,
+          "Idempotency-Key": submission.idempotencyKey,
         },
-        body: JSON.stringify(activeSubmission.body),
+        body: JSON.stringify(submission.body),
         signal: controller.signal,
       });
       const payload = await response.json();
@@ -1515,16 +1536,18 @@ export function bootstrapAtomLab({
         }
         const error = parseAtomLabError(payload);
         const code = error?.code ?? "request_failed";
-        admissionErrors = (error?.fieldErrors ?? []).map(({path, message}) => ({
-          path,
-          message,
-          key: `admission:${path}`,
-          controlId: path === "model_id"
-            ? "model-select"
-            : path === "reasoning_effort"
-              ? "reasoning-effort"
-              : undefined,
-        }));
+        admissionErrors = (error?.fieldErrors ?? [])
+          .filter(({path}) => admissionErrorAppliesToDraft(path, submission))
+          .map(({path, message}) => ({
+            path,
+            message,
+            key: `admission:${path}`,
+            controlId: path === "model_id"
+              ? "model-select"
+              : path === "reasoning_effort"
+                ? "reasoning-effort"
+                : undefined,
+          }));
         renderValidation(document, nodes["validation-errors"], session, admissionErrors);
         nodes["run-state"].textContent = `${code}: ${error?.message ?? safeApiMessage(payload, "Запуск не принят.")} Черновик сохранён.`;
         activeSubmission = null;
@@ -1538,20 +1561,19 @@ export function bootstrapAtomLab({
       }
       admissionErrors = [];
       renderValidation(document, nodes["validation-errors"], session, admissionErrors);
-      activeSubmission.runId = accepted.run_id;
-      activeSubmission.runtimeIds = {
+      submission.runId = accepted.run_id;
+      submission.runtimeIds = {
         scenario_session_id: accepted.scenario_session_id,
         job_id: accepted.job_id,
         action_run_id: null,
         artifact_id: null,
       };
-      activeSubmission.detailLoaded = false;
-      activeSubmission.terminal = false;
-      activeSubmission.pollStartedAt = nowImpl();
-      activeSubmission.pollFailureCount = 0;
-      displayAcceptedSubmission(activeSubmission);
+      submission.detailLoaded = false;
+      submission.terminal = false;
+      submission.pollStartedAt = nowImpl();
+      submission.pollFailureCount = 0;
+      displayAcceptedSubmission(submission);
       nodes["run-state"].textContent = runStatusLabel(accepted.status);
-      const submission = activeSubmission;
       if (runPollTimer !== null) cancelScheduleImpl(runPollTimer);
       runPollTimer = scheduleImpl(() => {
         runPollTimer = null;
@@ -1693,6 +1715,7 @@ export function bootstrapAtomLab({
       if (!response.ok) throw new Error(safeApiMessage(payload, "Не удалось запросить обновление."));
       const refresh = parseModelRefresh(payload);
       if (!refresh) throw new Error("Обновление каталога вернуло некорректный ответ.");
+      modelCatalogRefreshStatus = refresh.refresh_status;
       modelCatalog = modelCatalog ? {...modelCatalog, ...refresh} : modelCatalog;
       nodes["model-catalog-warning"].textContent = "Каталог устарел; обновление запрошено.";
       if (["pending", "running"].includes(refresh.refresh_status)) startModelCatalogPolling();
@@ -1746,7 +1769,7 @@ export function bootstrapAtomLab({
   const resume = () => {
     if (destroyed || !paused) return undefined;
     paused = false;
-    if (["pending", "running"].includes(modelCatalog?.refresh_status)) {
+    if (["pending", "running"].includes(modelCatalogRefreshStatus)) {
       startModelCatalogPolling();
     }
     if (activeSubmission?.runId && !activeSubmission.terminal) {

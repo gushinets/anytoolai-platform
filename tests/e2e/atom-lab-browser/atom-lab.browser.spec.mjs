@@ -738,6 +738,65 @@ test("corrected accepted submission clears authoritative admission field errors"
   expect(submissions).toBe(2);
 });
 
+test("delayed admission errors do not invalidate a newer draft selection", async ({page}) => {
+  let releaseRejection;
+  let markRequestStarted;
+  const requestStarted = new Promise((resolve) => { markRequestStarted = resolve; });
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+    markRequestStarted();
+    await new Promise((resolve) => { releaseRejection = resolve; });
+    await route.fulfill({status: 422, contentType: "application/json", body: JSON.stringify({
+      error: {
+        code: "reasoning_not_allowed",
+        message: "Reasoning is no longer allowed.",
+        field_errors: [{path: "reasoning_effort", message: "Submitted reasoning is unavailable."}],
+      },
+      request_id: "request-delayed-rejection",
+    })});
+  });
+  await unlockAtom(page, "A05");
+  await page.locator("#fill-example").click();
+  await page.locator("#model-select").selectOption("gpt-supported");
+  await page.locator("#reasoning-effort").selectOption("high");
+
+  const submission = page.locator("#run-button").click();
+  await requestStarted;
+  await page.locator("#reasoning-effort").selectOption("low");
+  releaseRejection();
+  await submission;
+
+  await expect(page.locator("#run-state")).toContainText("reasoning_not_allowed");
+  await expect(page.locator("#validation-errors")).not.toContainText("Submitted reasoning is unavailable.");
+  await expect(page.locator("#reasoning-effort")).not.toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#reasoning-effort")).toHaveValue("low");
+});
+
+test("succeeded run without a result fails closed as an invalid API response", async ({page}) => {
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+    await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({
+      run_id: "run-empty-success", scenario_session_id: "session-empty-success", job_id: "job-empty-success", status: "queued",
+    })});
+  });
+  await page.route("http://atom-lab.test/v1/atom-lab/runs/run-empty-success", async (route) => {
+    await route.fulfill({contentType: "application/json", body: JSON.stringify({
+      run_id: "run-empty-success", status: "succeeded",
+      snapshot: {atom_id: "A05", input: A05.example_input, prompt: A05.prompt, model_id: "openai/gpt-supported", reasoning_effort: null},
+      runtime_ids: {scenario_session_id: "session-empty-success", job_id: "job-empty-success", action_run_id: "action-empty-success", artifact_id: null},
+      result: null,
+      diagnostics: {error_code: null, duration_ms: 1, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: null, response_model_id: "openai/gpt-supported", validation_attempts: 1, transport_attempts: 1, physical_calls: 1, succeeded_first_attempt: true, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
+      created_at: "2026-09-22T00:00:00Z", started_at: "2026-09-22T00:00:00Z", finished_at: "2026-09-22T00:00:01Z",
+    })});
+  });
+  await unlockAtom(page, "A05");
+  await page.locator("#fill-example").click();
+  await page.locator("#run-button").click();
+
+  await expect(page.locator("#run-state")).toContainText("Некорректный ответ API");
+  await expect(page.locator("#retry-read")).toBeVisible();
+  await expect(page.locator("#result-section")).toBeHidden();
+  await expect(page.locator("#run-button")).toBeDisabled();
+});
+
 test("malformed accepted response keeps the same submission available for safe replay", async ({page}) => {
   const keys = [];
   await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {

@@ -619,6 +619,65 @@ test("a persisted page resumes a model refresh accepted before its first catalog
   assert.equal(scheduled.size, 0);
 });
 
+test("a persisted page resumes an accepted refresh without a last-good catalog", async () => {
+  const {document, elements} = createFakeDocument();
+  const lifecycleTarget = new FakeLifecycleTarget();
+  const atom = await catalogAtom("A01");
+  const currentCatalog = {
+    items: [{model_id: "gpt", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+    snapshot_id: "snapshot-recovered",
+    last_success_at: "2026-09-22T00:00:00Z",
+    stale: false,
+    refresh_status: "current",
+    error: null,
+  };
+  const scheduled = new Map();
+  let nextTimerId = 0;
+  let modelReads = 0;
+  bootstrapAtomLab({
+    document,
+    lifecycleTarget,
+    fetchImpl: async (url) => {
+      if (url.endsWith("/atoms")) return {ok: true, status: 200, async json() { return [atom]; }};
+      if (url.endsWith("/refresh")) return {ok: true, status: 202, async json() { return {
+        snapshot_id: null,
+        last_success_at: null,
+        stale: true,
+        refresh_status: "pending",
+        error: null,
+      }; }};
+      modelReads += 1;
+      if (modelReads === 1) {
+        return {ok: false, status: 503, async json() { return {error: {message: "Catalog unavailable."}}; }};
+      }
+      return {ok: true, status: 200, async json() { return currentCatalog; }};
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, callback);
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  assert.equal(elements.get("model-select").disabled, true);
+  await elements.get("refresh-models").click();
+
+  await lifecycleTarget.dispatch("pagehide", {persisted: true});
+  assert.equal(scheduled.size, 0);
+  await lifecycleTarget.dispatch("pageshow", {persisted: true});
+  assert.equal(scheduled.size, 1);
+
+  const [timerId, poll] = scheduled.entries().next().value;
+  scheduled.delete(timerId);
+  await poll();
+  assert.equal(modelReads, 2);
+  assert.equal(elements.get("model-select").disabled, false);
+  assert.equal(elements.get("model-catalog-warning").textContent, "");
+});
+
 test("an in-flight pre-pause catalog read cannot orphan the resumed polling timer", async () => {
   const {document, elements} = createFakeDocument();
   const lifecycleTarget = new FakeLifecycleTarget();
@@ -1370,8 +1429,13 @@ test("accepted and detail response parsers reject incomplete or unknown lifecycl
   assert.equal(parseRunDetail({...detail, diagnostics: {...diagnostics, requested_reasoning_effort: "turbo"}}, "run"), null);
   assert.equal(parseRunDetail({...detail, diagnostics: {...diagnostics, provider_calls_truncated: undefined}}, "run"), null);
   assert.equal(parseRunDetail({...detail, diagnostics: {...diagnostics, provider_calls: [{provider_call_id: "call"}]}}, "run"), null);
+  assert.equal(parseRunDetail({...detail, status: "succeeded"}, "run"), null);
+  assert.equal(parseRunDetail({...detail, result: {value: "unexpected"}}, "run"), null);
   assert.deepEqual(parseRunDetail(detail, "run"), {
     run_id: "run", status: "running", snapshot: {}, runtime_ids: runtimeIds, result: null, diagnostics,
+  });
+  assert.deepEqual(parseRunDetail({...detail, status: "succeeded", result: {value: "ok"}}, "run"), {
+    run_id: "run", status: "succeeded", snapshot: {}, runtime_ids: runtimeIds, result: {value: "ok"}, diagnostics,
   });
 });
 
