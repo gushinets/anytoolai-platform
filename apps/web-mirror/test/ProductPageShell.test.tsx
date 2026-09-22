@@ -33,6 +33,12 @@ const CUW_IDS = { productId: "client_update_writer", scenarioId: "client_update_
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  // localeStorage.ts's write-failure fallback is module-level (see its own comment) and every
+  // switchTo() below writes through it regardless of outcome, so it must be reset after every test
+  // here, not just the one that deliberately makes a write fail -- otherwise a later test's
+  // (correctly cleared) real localStorage.getItem() returning null falls through to a stale locale
+  // left behind by an earlier, unrelated test.
+  resetUnpersistedLocaleForTests();
   vi.restoreAllMocks();
   document.documentElement.lang = "";
 });
@@ -236,8 +242,6 @@ describe("ProductPageShell locale resolution and persistence", () => {
     // write must not silently revert to English here.
     renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
     expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.fr.generate.submit })).toBeTruthy();
-
-    resetUnpersistedLocaleForTests();
   });
 });
 

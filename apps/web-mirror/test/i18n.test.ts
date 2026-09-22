@@ -4,12 +4,55 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createTranslator } from "use-intl";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LOCALES, LOCALE_NAMES, isLocale, type Locale } from "../src/i18n";
+import {
+  LOCALE_STORAGE_KEY,
+  readStoredLocale,
+  resetUnpersistedLocaleForTests,
+  writeStoredLocale,
+} from "../src/i18n/localeStorage";
 import { HOST_MESSAGES } from "../src/i18n/messages";
 import { mergeMessages, type MessageTree } from "../src/i18n/messageTypes";
 import { resolveLocale } from "../src/i18n/resolveLocale";
 import { listRegisteredProducts } from "../src/products/registry";
+
+describe("readStoredLocale / writeStoredLocale (staleness on a failed write)", () => {
+  afterEach(() => {
+    window.localStorage.clear();
+    resetUnpersistedLocaleForTests();
+    vi.restoreAllMocks();
+  });
+
+  it("keeps the newer explicit choice, not the older stored one, when setItem fails", () => {
+    // The exact regression from code review: storage already holds an explicit choice, so
+    // getItem() keeps succeeding with a non-null (but now stale) value -- a naive `getItem() ??
+    // memory` fallback is never consulted in that case.
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, "en");
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+
+    writeStoredLocale("fr");
+
+    expect(readStoredLocale()).toBe("fr");
+    expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("en");
+  });
+
+  it("trusts storage again once a later write succeeds", () => {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, "en");
+    vi.spyOn(Storage.prototype, "setItem").mockImplementationOnce(() => {
+      throw new Error("blocked");
+    });
+    writeStoredLocale("fr");
+    expect(readStoredLocale()).toBe("fr");
+
+    writeStoredLocale("de");
+
+    expect(readStoredLocale()).toBe("de");
+    expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("de");
+  });
+});
 
 describe("resolveLocale", () => {
   it("prefers an explicit stored choice over the browser languages", () => {
