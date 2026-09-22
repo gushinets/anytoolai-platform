@@ -180,6 +180,29 @@ describe("ProductPageShell locale resolution and persistence", () => {
     expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.de.generate.submit })).toBeTruthy();
   });
 
+  it("does not revert to a failed local write after another tab's confirmed write and a remount", async () => {
+    // Code review finding (round 3), the exact sequence: this tab's own explicit switch fails to
+    // persist, then a genuine `storage` event proves another tab's write to the same key succeeded
+    // -- that confirmation must survive a later remount in THIS tab too, not just the current render.
+    // Only the FIRST setItem call (this tab's own failed switch) throws; jsdom has one shared
+    // localStorage, so "the other tab's write" below is a real, unmocked setItem call, exactly like
+    // a real browser sharing one physical store across tabs of the same origin.
+    vi.spyOn(Storage.prototype, "setItem").mockImplementationOnce(() => {
+      throw new Error("blocked");
+    });
+    renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
+    switchTo("fr");
+    expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.fr.generate.submit })).toBeTruthy();
+
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, "de");
+    window.dispatchEvent(new StorageEvent("storage", { key: LOCALE_STORAGE_KEY, newValue: "de" }));
+    expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.de.generate.submit })).toBeTruthy();
+    cleanup();
+
+    renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
+    expect(await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.de.generate.submit })).toBeTruthy();
+  });
+
   it("re-resolves down to the browser language when another tab clears the stored choice", async () => {
     mockBrowserLanguages(["it-IT"]);
     window.localStorage.setItem(LOCALE_STORAGE_KEY, "ru");
@@ -295,9 +318,9 @@ describe("UI locale is independent of scenario input and state", () => {
     expect([...tone.options].map((option) => option.value)).toEqual(["", "neutral", "warm", "firm"]);
     expect([...tone.options].map((option) => option.textContent)).toEqual([
       PROPOSAL_AI_MESSAGES.ru.fields.tonePlaceholder,
-      HOST_MESSAGES.ru.tone.neutral,
-      HOST_MESSAGES.ru.tone.warm,
-      HOST_MESSAGES.ru.tone.firm,
+      PROPOSAL_AI_MESSAGES.ru.tone.neutral,
+      PROPOSAL_AI_MESSAGES.ru.tone.warm,
+      PROPOSAL_AI_MESSAGES.ru.tone.firm,
     ]);
 
     fireEvent.change(screen.getByLabelText(PROPOSAL_AI_MESSAGES.ru.fields.taskText), { target: { value: "Task" } });

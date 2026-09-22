@@ -33,5 +33,4 @@ export const es: Shape<typeof en> = {
     outerWhitespace: "{field}: no debe empezar ni terminar con espacios en blanco.",
     maxLength: "{field}: debe tener como máximo {maxLength, plural, one {# carácter} many {# de caracteres} other {# caracteres}}.",
   },
-  tone: { neutral: "neutral", warm: "cálido", firm: "firme" },
 };

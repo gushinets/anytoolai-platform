@@ -32,7 +32,4 @@ export const en = {
     outerWhitespace: "{field}: no leading or trailing whitespace.",
     maxLength: "{field}: {maxLength, plural, one {# character} other {# characters}} maximum.",
   },
-  // Visible labels for the `tone` wire values (`neutral|warm|firm`), shared by every product whose
-  // input schema declares that enum. The values sent to the backend are never translated.
-  tone: { neutral: "neutral", warm: "warm", firm: "firm" },
 };

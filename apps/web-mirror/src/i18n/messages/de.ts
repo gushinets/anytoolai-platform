@@ -32,5 +32,4 @@ export const de: Shape<typeof en> = {
     outerWhitespace: "{field}: keine Leerzeichen am Anfang oder Ende.",
     maxLength: "{field}: höchstens {maxLength, plural, one {# Zeichen} other {# Zeichen}}.",
   },
-  tone: { neutral: "neutral", warm: "herzlich", firm: "bestimmt" },
 };

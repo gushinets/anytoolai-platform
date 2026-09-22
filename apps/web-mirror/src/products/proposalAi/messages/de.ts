@@ -1,9 +1,11 @@
 // German ProposalAI messages (Sie-Form).
 import type { Shape } from "../../../i18n/messageTypes";
 import type { en } from "./en";
+import { de as tone } from "../../shared/toneMessages/de";
 
 export const de: Shape<typeof en> = {
   title: "ProposalAI",
+  tone,
   quotaRemaining: "{remaining} von {limit, plural, one {# Angebot} other {# Angeboten}} verbleibend.",
   fields: {
     taskText: "Beschreiben Sie die Aufgabe",

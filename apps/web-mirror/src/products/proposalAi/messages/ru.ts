@@ -1,9 +1,11 @@
 // Russian ProposalAI messages.
 import type { Shape } from "../../../i18n/messageTypes";
 import type { en } from "./en";
+import { ru as tone } from "../../shared/toneMessages/ru";
 
 export const ru: Shape<typeof en> = {
   title: "ProposalAI",
+  tone,
   quotaRemaining: "Осталось {remaining} из {limit, plural, one {# предложения} few {# предложений} many {# предложений} other {# предложения}}.",
   fields: {
     taskText: "Опишите задачу",

@@ -1,5 +1,8 @@
+import { en as tone } from "../../shared/toneMessages/en";
+
 export const en = {
   title: "ProposalAI",
+  tone,
   quotaRemaining: "{remaining} of {limit, plural, one {# proposal} other {# proposals}} remaining.",
   fields: {
     taskText: "Describe the task",

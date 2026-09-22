@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { IntlProvider, useTranslations } from "use-intl";
 import { DEFAULT_LOCALE, type Locale } from "./locales";
-import { LOCALE_STORAGE_KEY, readStoredLocale, writeStoredLocale } from "./localeStorage";
+import { acceptStoredLocaleFromEvent, LOCALE_STORAGE_KEY, readStoredLocale, writeStoredLocale } from "./localeStorage";
 import { HOST_MESSAGES } from "./messages";
 import { mergeMessages, type MessageTree } from "./messageTypes";
 import { resolveLocale } from "./resolveLocale";
@@ -52,9 +52,18 @@ export function LocaleProvider({
   // fires only in OTHER documents of the same origin, never the tab that made the write, so this
   // can't loop with `setLocale` below. `event.newValue === null` covers the key being cleared
   // (e.g. site data reset), which re-resolves down to the browser language / English.
+  //
+  // Code review finding (round 3): updating only this component's React state left
+  // `localeStorage.ts`'s own memory (`lastKnownLocale`/`isStale`) untouched -- a tab whose own last
+  // write had failed kept distrusting the primary (per `readStoredLocale`'s contract) even after
+  // this event proved another tab's write to the same key had just succeeded, so a later remount in
+  // THIS tab silently reverted to its own stale value instead of what the UI had just switched to.
+  // `acceptStoredLocaleFromEvent` folds the event's (authoritative -- `storage` only ever fires for
+  // a write/removal that actually took effect) value into that memory too, before it can be lost.
   useEffect(() => {
     function onStorage(event: StorageEvent) {
       if (event.key === LOCALE_STORAGE_KEY || event.key === null) {
+        acceptStoredLocaleFromEvent(event.newValue);
         setLocaleState(resolveLocale({ stored: event.newValue, browserLanguages: navigator.languages }));
       }
     }

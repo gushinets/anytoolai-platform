@@ -1,9 +1,11 @@
 // Russian Client Update Writer messages.
 import type { Shape } from "../../../i18n/messageTypes";
 import type { en } from "./en";
+import { ru as tone } from "../../shared/toneMessages/ru";
 
 export const ru: Shape<typeof en> = {
   title: "Client Update Writer",
+  tone,
   quotaRemaining: "Осталось {remaining} из {limit, plural, one {# запуска Client Update Writer} few {# запусков Client Update Writer} many {# запусков Client Update Writer} other {# запуска Client Update Writer}}.",
   modes: {
     legend: "Режим",

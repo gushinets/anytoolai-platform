@@ -1,9 +1,11 @@
 // Italian ProposalAI messages (ICU); typographic ’ only.
 import type { Shape } from "../../../i18n/messageTypes";
 import type { en } from "./en";
+import { it as tone } from "../../shared/toneMessages/it";
 
 export const it: Shape<typeof en> = {
   title: "ProposalAI",
+  tone,
   quotaRemaining: "Ne restano {remaining} su {limit, plural, one {# proposta} many {# di proposte} other {# proposte}}.",
   fields: {
     taskText: "Descrivere l’incarico",

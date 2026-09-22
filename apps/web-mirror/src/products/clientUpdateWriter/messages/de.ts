@@ -1,9 +1,11 @@
 // German Client Update Writer messages (Sie-Form).
 import type { Shape } from "../../../i18n/messageTypes";
 import type { en } from "./en";
+import { de as tone } from "../../shared/toneMessages/de";
 
 export const de: Shape<typeof en> = {
   title: "Client Update Writer",
+  tone,
   quotaRemaining: "{remaining} von {limit, plural, one {# Client-Update-Writer-Durchlauf} other {# Client-Update-Writer-Durchläufen}} verbleibend.",
   modes: {
     legend: "Modus",

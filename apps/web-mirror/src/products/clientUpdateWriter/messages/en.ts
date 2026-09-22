@@ -1,5 +1,8 @@
+import { en as tone } from "../../shared/toneMessages/en";
+
 export const en = {
   title: "Client Update Writer",
+  tone,
   // No quota policy is configured for this product yet; kept mode-agnostic for when one exists.
   quotaRemaining: "{remaining} of {limit, plural, one {# Client Update Writer run} other {# Client Update Writer runs}} remaining.",
   modes: {

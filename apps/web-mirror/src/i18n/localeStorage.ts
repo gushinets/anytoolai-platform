@@ -56,6 +56,22 @@ export function writeStoredLocale(locale: string): void {
   }
 }
 
+/**
+ * Code review finding (round 3): `LocaleProvider`'s `storage` listener updated only its own React
+ * state, never this module's memory -- so a tab whose own last write had failed (`isStale = true`)
+ * kept ignoring the primary (per `readStoredLocale`'s own contract) even after a `storage` event
+ * proved another tab's write to the SAME key had just succeeded, silently reverting to its own
+ * stale value on the next remount. The browser only ever fires `storage` for a write/removal that
+ * actually took effect (a failed `setItem` elsewhere fires nothing), so `event.newValue` is
+ * authoritative for this key right now -- call this from that listener to adopt it: it both updates
+ * memory and clears `isStale`, since whatever made THIS tab stale no longer matters once we have
+ * fresher, confirmed truth from elsewhere.
+ */
+export function acceptStoredLocaleFromEvent(newValue: string | null): void {
+  lastKnownLocale = newValue;
+  isStale = false;
+}
+
 /** Test-only: the state above is module-level (see above), so a test that simulates a broken
  * `setItem` must clear it afterward or it would otherwise leak into a later test in the same file. */
 export function resetUnpersistedLocaleForTests(): void {

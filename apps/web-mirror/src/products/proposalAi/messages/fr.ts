@@ -1,9 +1,11 @@
 // French ProposalAI messages; typed against the English source of truth.
 import type { Shape } from "../../../i18n/messageTypes";
 import type { en } from "./en";
+import { fr as tone } from "../../shared/toneMessages/fr";
 
 export const fr: Shape<typeof en> = {
   title: "ProposalAI",
+  tone,
   quotaRemaining: "Il vous en reste {remaining} sur {limit, plural, one {# proposition} many {# de propositions} other {# propositions}}.",
   fields: {
     taskText: "Décrivez la mission",

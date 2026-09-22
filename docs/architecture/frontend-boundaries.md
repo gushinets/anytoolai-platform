@@ -143,10 +143,15 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   never remounts the product (no `key={locale}`), so form values, run state and the selected
   Client Update Writer mode survive.
 - **Ownership:** the host owns locale resolution/persistence/provider/selector and the `host`
-  namespace (runtime, result, error, validation, tone vocabulary). Each product owns its `product`
-  namespace: title, field labels, validation field names, mode names, submit/running/failure and
-  quota copy, supplied through `RegisteredProduct.messages`. `ProductDefinition` describes behavior
-  only; it names its copy with `messageScope` and carries no English literals.
+  namespace (generic runtime/result/error/validation copy only -- never product meaning). Each
+  product owns its `product` namespace: title, field labels, validation field names, mode names,
+  submit/running/failure and quota copy, supplied through `RegisteredProduct.messages`.
+  `ProductDefinition` describes behavior only; it names its copy with `messageScope` and carries no
+  English literals. `neutral|warm|firm` tone labels are product vocabulary (a product-owned wire
+  enum's visible labels), so they live in `products/shared/toneMessages/` -- one translation per
+  locale, shared by every product whose input schema declares that enum, but spread into each such
+  product's own `product` namespace (never into `host`) so `ToneSelect` reads it via
+  `useProductT()`. A product with a differently-meaning `tone`-shaped enum needs no host change.
 - **Validation:** shared validators return structured `FieldError` data (`required`,
   `outer_whitespace`, `max_length`, `product`), never prose; `FieldErrorMessage` renders it in the
   current locale. Backend schema validation stays authoritative.
@@ -168,7 +173,9 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
    `quotaRemaining` with `{remaining}`/`{limit}`, per-scope `submit`/`running`/`runFailed`, `fields`,
    `fieldNames`, and any product validation keys).
 2. Add `fr it de es ru pt` files typed `Shape<typeof en>`; use the typographic apostrophe `’` (a
-   plain `'` before `{` starts ICU quoting); keep placeholders and plural categories.
+   plain `'` before `{` starts ICU quoting); keep placeholders and plural categories. Reusing
+   `ToneSelect`? Spread `TONE_MESSAGES[locale]` from `products/shared/toneMessages/` under a `tone`
+   key in each locale file instead of retranslating `neutral|warm|firm`.
 3. Export `Record<Locale, Shape<typeof en>>` from `messages/index.ts`.
 4. Register the product with `messages` in `products/registry.ts`. The page shell supplies the
    provider and language selector; the completeness tests cover the new product automatically.

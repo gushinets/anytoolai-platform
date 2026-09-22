@@ -1,9 +1,11 @@
 // Portuguese (generic) ProposalAI messages.
 import type { Shape } from "../../../i18n/messageTypes";
 import type { en } from "./en";
+import { pt as tone } from "../../shared/toneMessages/pt";
 
 export const pt: Shape<typeof en> = {
   title: "ProposalAI",
+  tone,
   quotaRemaining: "{remaining} de {limit, plural, one {# proposta} many {# de propostas} other {# propostas}} restantes.",
   fields: {
     taskText: "Descreva a tarefa",

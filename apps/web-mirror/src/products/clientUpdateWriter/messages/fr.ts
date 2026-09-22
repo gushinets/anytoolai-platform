@@ -1,9 +1,11 @@
 // French Client Update Writer messages; typed against the English source of truth.
 import type { Shape } from "../../../i18n/messageTypes";
 import type { en } from "./en";
+import { fr as tone } from "../../shared/toneMessages/fr";
 
 export const fr: Shape<typeof en> = {
   title: "Client Update Writer",
+  tone,
   quotaRemaining: "Il vous en reste {remaining} sur {limit, plural, one {# exécution de Client Update Writer} many {# d’exécutions de Client Update Writer} other {# exécutions de Client Update Writer}}.",
   modes: {
     legend: "Mode",

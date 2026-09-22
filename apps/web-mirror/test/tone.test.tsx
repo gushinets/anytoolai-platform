@@ -4,8 +4,13 @@ import { fileURLToPath } from "node:url";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isTone, TONE_OPTIONS, ToneSelect } from "../src/products/shared/tone";
+import { TONE_MESSAGES } from "../src/products/shared/toneMessages";
 import { englishForAllLocales, makeRender } from "./support/renderWithI18n";
-const render = makeRender(englishForAllLocales({}));
+
+// ToneSelect now reads its option labels from the current PRODUCT namespace (code review finding:
+// tone is product vocabulary, not host's), so this direct render needs a product tree that has a
+// `tone` key -- the real shared bundle, not an empty object.
+const render = makeRender(englishForAllLocales({ tone: TONE_MESSAGES.en }));
 
 
 afterEach(cleanup);

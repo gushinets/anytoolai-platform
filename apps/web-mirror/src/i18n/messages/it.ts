@@ -32,5 +32,4 @@ export const it: Shape<typeof en> = {
     outerWhitespace: "{field}: niente spazi all’inizio o alla fine.",
     maxLength: "{field}: massimo {maxLength, plural, one {# carattere} many {# di caratteri} other {# caratteri}}.",
   },
-  tone: { neutral: "neutro", warm: "cordiale", firm: "fermo" },
 };

@@ -7,6 +7,7 @@ import { createTranslator } from "use-intl";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LOCALES, LOCALE_NAMES, isLocale, type Locale } from "../src/i18n";
 import {
+  acceptStoredLocaleFromEvent,
   LOCALE_STORAGE_KEY,
   readStoredLocale,
   resetUnpersistedLocaleForTests,
@@ -61,6 +62,35 @@ describe("readStoredLocale / writeStoredLocale (staleness on a failed write)", (
     expect(readStoredLocale()).toBe("fr");
 
     window.localStorage.removeItem(LOCALE_STORAGE_KEY);
+
+    expect(readStoredLocale()).toBeNull();
+  });
+
+  it("acceptStoredLocaleFromEvent adopts a confirmed external value even while stale from a failed local write", () => {
+    // Code review finding (round 3): a `storage` event only ever fires for a write/removal that
+    // actually took effect elsewhere, so it is authoritative for this key regardless of whatever
+    // made THIS tab's own memory stale -- readStoredLocale() must stop returning the old,
+    // now-superseded local value once that confirmation arrives. Real storage is updated too (a
+    // real `storage` event always reflects the one physical store this tab's own later getItem()
+    // reads from), same as the fix itself: memory alone, without a matching real value, would be
+    // overwritten by the very next non-stale read.
+    vi.spyOn(Storage.prototype, "setItem").mockImplementationOnce(() => {
+      throw new Error("blocked");
+    });
+    writeStoredLocale("fr");
+    expect(readStoredLocale()).toBe("fr");
+
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, "de");
+    acceptStoredLocaleFromEvent("de");
+
+    expect(readStoredLocale()).toBe("de");
+  });
+
+  it("acceptStoredLocaleFromEvent(null) adopts a cross-tab clear the same way", () => {
+    writeStoredLocale("fr");
+
+    window.localStorage.removeItem(LOCALE_STORAGE_KEY);
+    acceptStoredLocaleFromEvent(null);
 
     expect(readStoredLocale()).toBeNull();
   });
