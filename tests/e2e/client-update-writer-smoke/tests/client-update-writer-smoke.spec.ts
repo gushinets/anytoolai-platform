@@ -123,8 +123,8 @@ test.describe("Client Update Writer web product (Update mode)", () => {
     });
 
     await page.getByRole("button", { name: "Write update" }).click();
-    await expect(page.getByText("Progress notes is required.")).toBeVisible();
-    await expect(page.getByText("Tone is required.")).toBeVisible();
+    await expect(page.getByText("Progress notes: required.")).toBeVisible();
+    await expect(page.getByText("Tone: required.")).toBeVisible();
     expect(startRequested).toBe(false);
   });
 

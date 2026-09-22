@@ -20,7 +20,9 @@ import {
   type QuotaState,
 } from "@anytoolai/ce-kit";
 import { ErrorState } from "../../components/ErrorState";
+import { useHostT, useProductT } from "../../i18n";
 import { getClientStorage } from "./clientStorage";
+import type { FieldError } from "./fieldValidation";
 import { assertNever, type ProductDefinition, type ProductRunEvent } from "./productDefinition";
 import styles from "./ProductRunPage.module.css";
 
@@ -103,11 +105,23 @@ function cacheSuccessOnly<T extends { ok: boolean }>(
   const pending = fetch();
   byKey.set(key, pending);
   const settledByKey = byKey;
-  void pending.then((result) => {
-    if (!result.ok && settledByKey.get(key) === pending) {
+  function evictIfCurrent() {
+    if (settledByKey.get(key) === pending) {
       settledByKey.delete(key);
     }
-  });
+  }
+  // Code review finding: `fetch` is only documented to resolve `{ok: false}` on failure, not to
+  // reject -- but nothing enforces that (a thrown error inside it, e.g. from response parsing,
+  // still rejects this `async function`'s promise). Without a rejection handler here, that promise
+  // stayed cached forever for `(client, key)`, defeating this function's whole purpose; evicting
+  // on rejection too, not just on `{ok: false}`, closes that gap. The caller's own subscription to
+  // `pending` (returned below) still sees the rejection independently -- this only stops it being
+  // replayed to the next caller.
+  void pending.then((result) => {
+    if (!result.ok) {
+      evictIfCurrent();
+    }
+  }, evictIfCurrent);
   return pending;
 }
 
@@ -190,13 +204,17 @@ type BootState =
   | { kind: "boot-error" }
   | { kind: "ready"; scenarioId: string; frontendId: string };
 
+/** Why a run is retryable. A closed reason -- not finished English prose -- so an error already on
+ * screen re-renders in the new language when the UI locale changes (`host.errors.<reason>`). */
+type RetryReason = "startFailed" | "timeout" | "connectionLost" | "tryAgain";
+
 type Phase<R> =
   | { kind: "idle" }
   | { kind: "submitting" }
   | { kind: "running"; scenarioSessionId: string }
   | { kind: "result"; scenarioSessionId: string; checkpointId: string | null; result: R }
   | { kind: "quota-exhausted" }
-  | { kind: "retryable-error"; message: string }
+  | { kind: "retryable-error"; reason: RetryReason }
   /**
    * The scenario session itself completed successfully (we have a `resultArtifactId`) but the
    * `GET /v1/results/{id}` call failed -- a transient/ambiguous fetch problem, not a backend
@@ -225,6 +243,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   visitId,
 }: ProductRunPageProps<V, R>) {
   const { Fields, Result } = definition;
+  const th = useHostT();
+  const tp = useProductT();
+  const title = tp("title");
 
   // Always-current `onEvent` behind a ref, refreshed after every render. Used by every
   // emitEvent() call site below, not just the mount effect: `handleSubmit`/`handleRetry`/
@@ -277,7 +298,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }, []);
 
   const [values, setValues] = useState<V>(definition.emptyValues);
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, string>>>({});
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, FieldError>>>({});
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
   // Holds the one Idempotency-Key-bound handle for the current logical submission (ANY-150): a
   // "Try again" after a retryable failure reuses `.execute()` on this same handle so the backend
@@ -430,7 +451,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         }
         setGuestId(fresh.ok ? fresh.value.guestId : undefined);
         setPendingStart(null);
-        setPhase({ kind: "retryable-error", message: "Please try again." });
+        setPhase({ kind: "retryable-error", reason: "tryAgain" });
         return;
       }
       if (result.error.type === "backend_error" && result.error.status < 500) {
@@ -443,7 +464,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         // `idempotency_key_conflict`, since replaying the same key would just repeat the same 409
         // forever) and, via `busy`, immediately unblocks the form/mode switch.
         setPendingStart(null);
-        setPhase({ kind: "retryable-error", message: `Could not start ${definition.title}. Please try again.` });
+        setPhase({ kind: "retryable-error", reason: "startFailed" });
         return;
       }
       // Ambiguous, not necessarily a clean rejection: a network failure/timeout/5xx on the start
@@ -452,7 +473,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       // Idempotency-Key) stays exactly as set by the caller, so a retry collapses onto whatever the
       // backend actually did rather than risk a second, quota-consuming start. See `busy`'s own
       // comment for why this is also why a mode switch must stay blocked here.
-      setPhase({ kind: "retryable-error", message: `Could not start ${definition.title}. Please try again.` });
+      setPhase({ kind: "retryable-error", reason: "startFailed" });
       return;
     }
     setPhase({ kind: "running", scenarioSessionId: result.value.scenarioSessionId });
@@ -471,13 +492,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     if (!polled.result.ok) {
-      setPhase({
-        kind: "retryable-error",
-        message:
-          polled.reason === "timeout"
-            ? "This is taking longer than expected. Please try again."
-            : "Lost connection while waiting for your result. Please try again.",
-      });
+      setPhase({ kind: "retryable-error", reason: polled.reason === "timeout" ? "timeout" : "connectionLost" });
       return;
     }
     if (polled.reason === "timeout") {
@@ -490,7 +505,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       // backend collapses that back onto this same session rather than starting a new one --
       // see `busy`'s own comment below for why this stays gated on `pendingStart`, not a
       // per-phase session id.
-      setPhase({ kind: "retryable-error", message: "This is taking longer than expected. Please try again." });
+      setPhase({ kind: "retryable-error", reason: "timeout" });
       return;
     }
     const session = polled.result.value;
@@ -762,14 +777,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   if (boot.kind === "loading") {
     return (
       <main className="page-container">
-        <p role="status">Loading {definition.title}…</p>
+        <p role="status">{th("loading", { product: title })}</p>
       </main>
     );
   }
   if (boot.kind === "boot-error") {
     return (
       <main className="page-container">
-        <ErrorState message={`${definition.title} is unavailable right now. Please reload the page.`} />
+        <ErrorState message={th("unavailable", { product: title })} />
       </main>
     );
   }
@@ -784,23 +799,23 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       mainContent = (
         <div className={styles.resultStack}>
           <Result result={phase.result} onCopy={handleCopy} />
-          {definition.copy.startAnother ? (
+          {definition.hasStartAnother ? (
             <Button className={styles.resultAction} variant="secondary" onClick={handleStartAnother}>
-              {definition.copy.startAnother}
+              {tp(`${definition.messageScope}.startAnother`)}
             </Button>
           ) : null}
         </div>
       );
       break;
     case "quota-exhausted":
-      mainContent = <ErrorState message={`You've used all your ${definition.title} runs for now.`} />;
+      mainContent = <ErrorState message={th("quotaExhausted", { product: title })} />;
       break;
     case "result-fetch-error":
       // No form here: the scenario run already succeeded and consumed its quota unit -- showing
       // the form again would invite a second, wasteful run instead of just re-fetching the result
       // that already exists.
       mainContent = (
-        <ErrorState message="Your result is ready, but we couldn't load it. Please try again." onRetry={handleRetryResult} />
+        <ErrorState message={th("resultFetchFailed")} onRetry={handleRetryResult} />
       );
       break;
     case "idle":
@@ -812,7 +827,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         <Card className={styles.formCard}>
           <form
             ref={formRef}
-            aria-label={`${definition.title} form`}
+            aria-label={th("formLabel", { product: title })}
             className={styles.form}
             noValidate
             onSubmit={handleSubmit}
@@ -821,16 +836,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
             <div className={styles.footer}>
               <Button type="submit" loading={busy} disabled={identityUnavailable}>
                 {phase.kind === "submitting"
-                  ? "Starting…"
+                  ? th("starting")
                   : phase.kind === "running"
-                    ? "Generating…"
-                    : definition.copy.submit}
+                    ? th("generating")
+                    : tp(`${definition.messageScope}.submit`)}
               </Button>
               <div className={styles.statusRegion}>
-                {phase.kind === "running" ? <p role="status">{definition.copy.running}</p> : null}
-                {identityUnavailable ? (
-                  <p role="alert">We couldn&apos;t verify your identity. Please reload the page and try again.</p>
-                ) : null}
+                {phase.kind === "running" ? <p role="status">{tp(`${definition.messageScope}.running`)}</p> : null}
+                {identityUnavailable ? <p role="alert">{th("identityUnavailable")}</p> : null}
               </div>
             </div>
           </form>
@@ -845,40 +858,43 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     <main className="page-container">
       <div className={styles.content}>
         <header className={styles.header}>
-          <h1>{definition.title}</h1>
-          {definition.copy.description ? <p className={styles.description}>{definition.copy.description}</p> : null}
+          <h1>{title}</h1>
+          {definition.hasDescription ? <p className={styles.description}>{tp("description")}</p> : null}
           {quota ? (
             <p className={styles.quota} aria-live="polite">
-              {definition.copy.quotaRemaining(quota.remainingCount, quota.limitCount)}
+              {tp("quotaRemaining", { remaining: quota.remainingCount, limit: quota.limitCount })}
             </p>
           ) : null}
         </header>
 
         {mainContent}
 
-        {phase.kind === "retryable-error" ? (
-          // Not gated on `pendingStart`: submitCurrentValues() (called by both this and the form's
-          // own Submit button) builds a fresh prepared start when there's none to reuse -- e.g.
-          // after the guest-identity self-heal path in runStart(), which clears pendingStart while
-          // still landing on retryable-error. It IS gated on `identityUnavailable`: when the
-          // self-heal's own refresh failed too, there's no valid guest id to submit with, and the
-          // form's own "We couldn't verify your identity. Please reload the page and try again."
-          // message (rendered above, inside the form) is the only path back -- offering a "Try
-          // again" here would only loop the user on a doomed retry.
-          <ErrorState message={phase.message} onRetry={identityUnavailable ? undefined : handleRetry} />
-        ) : null}
-        {phase.kind === "unknown-error" ? (
-          <ErrorState
-            message={definition.copy.runFailed}
-            onRetry={() => {
-              // pendingStart was already cleared the moment this phase was entered (see
-              // enterUnknownError()) -- this button (like the form's own Submit button, which stays
-              // reachable while this phase is showing) is guaranteed a fresh Idempotency-Key either
-              // way; it only needs to get the phase back to a submittable state.
-              setPhase({ kind: "idle" });
-            }}
-          />
-        ) : null}
+      {phase.kind === "retryable-error" ? (
+        // Not gated on `pendingStart`: submitCurrentValues() (called by both this and the form's
+        // own Submit button) builds a fresh prepared start when there's none to reuse -- e.g.
+        // after the guest-identity self-heal path in runStart(), which clears pendingStart while
+        // still landing on retryable-error. It IS gated on `identityUnavailable`: when the
+        // self-heal's own refresh failed too, there's no valid guest id to submit with, and the
+        // form's own "We couldn't verify your identity. Please reload the page and try again."
+        // message (rendered above, inside the form) is the only path back -- offering a "Try
+        // again" here would only loop the user on a doomed retry.
+        <ErrorState
+          message={th(`errors.${phase.reason}`, { product: title })}
+          onRetry={identityUnavailable ? undefined : handleRetry}
+        />
+      ) : null}
+      {phase.kind === "unknown-error" ? (
+        <ErrorState
+          message={tp(`${definition.messageScope}.runFailed`)}
+          onRetry={() => {
+            // pendingStart was already cleared the moment this phase was entered (see
+            // enterUnknownError()) -- this button (like the form's own Submit button, which stays
+            // reachable while this phase is showing) is guaranteed a fresh Idempotency-Key either
+            // way; it only needs to get the phase back to a submittable state.
+            setPhase({ kind: "idle" });
+          }}
+        />
+      ) : null}
       </div>
     </main>
   );

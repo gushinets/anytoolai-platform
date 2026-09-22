@@ -1,6 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ResultView } from "../src/components/ResultView";
+import { HOST_MESSAGES } from "../src/i18n/messages";
+import { englishForAllLocales, makeRender } from "./support/renderWithI18n";
+const render = makeRender(englishForAllLocales({}));
+
 
 afterEach(() => {
   cleanup();
@@ -31,5 +35,18 @@ describe("ResultView", () => {
 
     expect(() => fireEvent.click(screen.getByRole("button", { name: "Copy" }))).not.toThrow();
     expect(screen.getByRole("alert").textContent).toMatch(/could not copy to clipboard/i);
+  });
+});
+
+describe("ResultView localization", () => {
+  it.each(["fr", "ru", "pt"] as const)("shows its copy states and clipboard failure in %s", async (locale) => {
+    window.localStorage.setItem("anytoolai.ui_locale", locale);
+    const messages = HOST_MESSAGES[locale].result;
+    render(<ResultView text="Dear client, ..." onCopy={vi.fn().mockResolvedValue(false)} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: messages.copy }));
+
+    expect(await screen.findByText(messages.copyFailed)).toBeTruthy();
+    window.localStorage.clear();
   });
 });

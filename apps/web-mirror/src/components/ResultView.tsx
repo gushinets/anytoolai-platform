@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button, Card } from "@anytoolai/shared-ui";
 import { GeneratedTextRenderer } from "@anytoolai/web-result-kit";
+import { useHostT } from "../i18n";
 
 export type ResultViewProps = {
   text: string;
@@ -15,6 +16,7 @@ export type ResultViewProps = {
 /** Canonical text result plus a copy-to-clipboard button. The result stays visible and copyable
  * even if the copy fails -- only `onCopy`'s own outcome gates the "Copied" state. */
 export function ResultView({ text, onCopy }: ResultViewProps) {
+  const t = useHostT();
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied" | "error">("idle");
 
   function handleCopy() {
@@ -37,10 +39,10 @@ export function ResultView({ text, onCopy }: ResultViewProps) {
     <Card>
       <GeneratedTextRenderer text={text} />
       <Button variant="secondary" onClick={handleCopy} disabled={copyState === "copying"}>
-        {copyState === "copied" ? "Copied" : copyState === "copying" ? "Copying…" : "Copy"}
+        {copyState === "copied" ? t("result.copied") : copyState === "copying" ? t("result.copying") : t("result.copy")}
       </Button>
       {copyState === "error" ? (
-        <p role="alert">Could not copy to clipboard. Please copy the text above manually.</p>
+        <p role="alert">{t("result.copyFailed")}</p>
       ) : null}
     </Card>
   );

@@ -1,7 +1,7 @@
 // ProposalAI's own meaning only -- fields and their validation copy, the mapping to
 // `proposal_ai.generate_input_v1`, the canonical `text` field, and the `copy_result`
 // activation. The shared runtime behavior it rides on is proven in ProductRunPage.test.tsx.
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProposalAIProduct, proposalAiDefinition } from "../src/products/proposalAi/ProposalAIProduct";
 import {
@@ -14,6 +14,10 @@ import {
   sessionResponse,
   startResponse,
 } from "./fixtures/platformResponses";
+import { PROPOSAL_AI_MESSAGES } from "../src/products/proposalAi/messages";
+import { makeRender } from "./support/renderWithI18n";
+
+const render = makeRender(PROPOSAL_AI_MESSAGES);
 
 const IDS = { productId: "proposal_ai", scenarioId: "proposal_ai.generate_v1" } as const;
 const ROUTES = routesFor(IDS);
@@ -72,8 +76,8 @@ describe("ProposalAI product definition", () => {
     fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: " padded " } });
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
 
-    expect(await screen.findByText("Task description is required.")).toBeTruthy();
-    expect(screen.getByText("Your positioning must not start or end with whitespace.")).toBeTruthy();
+    expect(await screen.findByText("Task description: required.")).toBeTruthy();
+    expect(screen.getByText("Your positioning: no leading or trailing whitespace.")).toBeTruthy();
     const taskField = screen.getByLabelText("Describe the task");
     const positioningField = screen.getByLabelText("Your positioning");
     expect(taskField.getAttribute("aria-describedby")).toBe("proposal-ai-task-help proposal-ai-task-error");
