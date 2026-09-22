@@ -44,8 +44,21 @@ export function LocaleProvider({
   useIsomorphicLayoutEffect(() => {
     setLocaleState(resolveLocale({ stored: readStoredLocale(), browserLanguages: navigator.languages }));
   }, []);
-  useEffect(() => {
+  // Code review finding (round 4): a passive `useEffect` left a one-paint lag between the switch
+  // itself and `<html lang>` catching up, and never restored the value it overwrote -- App Router
+  // does not remount a shared layout on client-side navigation, so leaving `/products/{id}` for an
+  // out-of-scope English page (this provider is only mounted on product routes) could leave
+  // `<html lang="ru">` over English content. `useIsomorphicLayoutEffect` (already used above for
+  // resolution) removes the lag; capturing and restoring whatever was on `<html lang>` right before
+  // this effect's own write -- not a hardcoded "en" -- correctly chains back to the root layout's
+  // real value through any number of in-between switches, same as any effect that must leave a
+  // shared, externally-owned value exactly as it found it.
+  useIsomorphicLayoutEffect(() => {
+    const previous = document.documentElement.lang;
     document.documentElement.lang = locale;
+    return () => {
+      document.documentElement.lang = previous;
+    };
   }, [locale]);
   // Code review finding: with no `storage` listener, an explicit switch in one tab left every other
   // open tab of the same origin showing its old locale until its next reload/remount. `storage`
@@ -111,7 +124,9 @@ export function useLocale(): LocaleContextValue {
  * `use-intl`. Keys are dotted paths inside the namespace. */
 export type Translate = (key: string, values?: Record<string, string | number>) => string;
 
-/** Generic runtime/result/error/validation/tone messages owned by the shared host. */
+/** Generic runtime/result/error/validation messages owned by the shared host -- never product
+ * meaning (e.g. `tone` labels are product-owned, spread from `products/shared/toneMessages/` into
+ * each product's own `product` namespace instead). */
 export function useHostT(): Translate {
   return useTranslations("host");
 }

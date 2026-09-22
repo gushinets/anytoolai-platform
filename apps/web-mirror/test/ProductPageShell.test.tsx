@@ -165,6 +165,23 @@ describe("ProductPageShell locale rendering", () => {
       "Português",
     ]);
   });
+
+  it("restores document.documentElement.lang on unmount instead of leaking outside the product route", async () => {
+    // Code review finding (round 4): App Router does not remount a shared layout on client-side
+    // navigation, so leaving this route for an out-of-scope English page must not leave <html> on a
+    // stale, product-page-chosen locale. Uses a sentinel unrelated to any real locale so the
+    // assertion cannot pass by accident (e.g. a leftover "" from a previous test's own afterEach).
+    document.documentElement.lang = "x-test-default";
+    renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
+    await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.en.generate.submit });
+    switchTo("ru");
+    await screen.findByRole("button", { name: PROPOSAL_AI_MESSAGES.ru.generate.submit });
+    expect(document.documentElement.lang).toBe("ru");
+
+    cleanup();
+
+    expect(document.documentElement.lang).toBe("x-test-default");
+  });
 });
 
 describe("ProductPageShell locale resolution and persistence", () => {

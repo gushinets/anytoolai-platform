@@ -33,17 +33,17 @@ export const it: Shape<typeof en> = {
     tone: "Tono",
   },
   update: {
-    submit: "Scrivi aggiornamento",
+    submit: "Scrivere l’aggiornamento",
     running: "Scrittura dell’aggiornamento in corso…",
     runFailed: "Si è verificato un problema durante la scrittura dell’aggiornamento. Riprovare.",
   },
   reply_draft: {
-    submit: "Scrivi risposta",
+    submit: "Scrivere la risposta",
     running: "Scrittura della risposta in corso…",
     runFailed: "Si è verificato un problema durante la scrittura della risposta. Riprovare.",
   },
   prepaid_request: {
-    submit: "Scrivi richiesta",
+    submit: "Scrivere la richiesta",
     running: "Scrittura della richiesta in corso…",
     runFailed: "Si è verificato un problema durante la scrittura della richiesta. Riprovare.",
   },

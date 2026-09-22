@@ -21,7 +21,7 @@ export const it: Shape<typeof en> = {
   },
   validation: { languageFormat: 'Il formato della lingua deve essere simile a "en" o "en-US".' },
   generate: {
-    submit: "Genera proposta",
+    submit: "Generare la proposta",
     running: "Generazione della proposta in corso…",
     runFailed: "Si è verificato un problema durante la generazione della proposta. Riprovare.",
   },

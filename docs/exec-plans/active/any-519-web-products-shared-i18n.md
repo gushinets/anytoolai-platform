@@ -85,7 +85,7 @@ python scripts/agent/runner.py full-check           # + backend baseline + produ
 python scripts/agent/runner.py validate-architecture
 python scripts/agent/runner.py validate-docs
 python scripts/agent/runner.py generate-docs --check
-pnpm --filter @anytoolai/web-mirror test            # 218 tests, incl. i18n.test.ts, ProductPageShell.test.tsx
+pnpm --filter @anytoolai/web-mirror test            # 219 tests, incl. i18n.test.ts, ProductPageShell.test.tsx
 python scripts/agent/runner.py dev-up
 python scripts/agent/runner.py proposal-ai-smoke          # 8/8, incl. the new language-switch scenario
 python scripts/agent/runner.py client-update-writer-smoke # 3/3, English default unaffected
@@ -101,7 +101,7 @@ python scripts/agent/runner.py dev-down
 
 ## Code review rounds (PR #139)
 
-Three rounds of full re-review on top of the initial PR, each fixed before the next round started:
+Four rounds of full re-review on top of the initial PR, each fixed before the next round started:
 
 1. Compile breakage from the `main` merge (reintroduced pre-i18n `ClientUpdateWriterProduct.tsx`
    code, a duplicate `pnpm-lock.yaml` mapping key) plus first-pass bugs: Russian `max_length`
@@ -117,3 +117,10 @@ Three rounds of full re-review on top of the initial PR, each fixed before the n
    namespace (fixed, design decision 7). Plus a second read/write conflation found in the round-1
    fix itself: a *successful* null read was still overridden by memory, resurrecting an
    already-cleared locale.
+4. One blocker, two P2s: Italian mixed formal/informal register (`retry`, `result.copy`, and all
+   four submit buttons used the informal "tu" imperative against an otherwise formal/impersonal
+   page -- normalized to the infinitive form already dominant everywhere else); `<html lang>` set
+   via a passive effect with no unmount restoration (App Router doesn't remount a shared layout on
+   navigation, so it could leak a product page's locale onto an out-of-scope English page --
+   switched to the isomorphic layout effect, now captures and restores whatever it overwrote); the
+   "add a locale" recipe not yet mentioning `products/shared/toneMessages/`.

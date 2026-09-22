@@ -11,7 +11,7 @@ export const en = {
     tonePlaceholder: "Default",
     language: "Language (optional)",
   },
-  // Names used inside validation messages ("{field} is required."), which read differently from the
+  // Names used inside validation messages ("{field}: required."), which read differently from the
   // input labels above.
   fieldNames: {
     taskText: "Task description",

@@ -21,7 +21,7 @@ export const en = {
     tone: "Tone",
     tonePlaceholder: "Select a tone",
   },
-  // Names used inside validation messages ("{field} is required."); differ from the labels above
+  // Names used inside validation messages ("{field}: required."); differ from the labels above
   // where a label carries a suffix such as "(optional)".
   fieldNames: {
     progressNotes: "Progress notes",

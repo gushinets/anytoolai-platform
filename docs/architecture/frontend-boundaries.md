@@ -185,8 +185,9 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
 ### Recipe: add a locale
 
 1. Add it to `LOCALE_NAMES` in `i18n/locales.ts` (endonym).
-2. TypeScript then requires an entry in `HOST_MESSAGES` and in every product's messages record:
-   add `i18n/messages/<code>.ts` and `products/*/messages/<code>.ts`, typed `Shape<typeof en>`.
+2. TypeScript then requires an entry in `HOST_MESSAGES`, `TONE_MESSAGES` and every product's
+   messages record: add `i18n/messages/<code>.ts`, `products/shared/toneMessages/<code>.ts` and
+   `products/*/messages/<code>.ts`, typed `Shape<typeof en>`.
 3. Run `pnpm --filter @anytoolai/web-mirror test`; the parity, placeholder and ICU-syntax checks
    fail on any gap. No product runtime change is needed.
 

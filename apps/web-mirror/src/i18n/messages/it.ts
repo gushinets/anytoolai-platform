@@ -1,4 +1,7 @@
-// Italian host messages (ICU); typographic ’ only.
+// Italian host messages (ICU); typographic ’ only. Register: formal/impersonal throughout (infinitive
+// or "Lei" possessive, e.g. "la sua identità") -- code review finding: `retry`/`result.copy` (and the
+// matching submit buttons in ProposalAI/Client Update Writer's own messages) used the informal "tu"
+// imperative instead, inconsistent with every other string on the same page.
 import type { Shape } from "../messageTypes";
 import type { en } from "./en";
 
@@ -11,7 +14,7 @@ export const it: Shape<typeof en> = {
   starting: "Avvio in corso…",
   generating: "Generazione in corso…",
   identityUnavailable: "Non è stato possibile verificare la sua identità. Ricaricare la pagina e riprovare.",
-  retry: "Riprova",
+  retry: "Riprovare",
   errors: {
     startFailed: "Impossibile avviare {product}. Riprovare.",
     timeout: "L’operazione richiede più tempo del previsto. Riprovare.",
@@ -19,7 +22,7 @@ export const it: Shape<typeof en> = {
     tryAgain: "Riprovare.",
   },
   result: {
-    copy: "Copia",
+    copy: "Copiare",
     copying: "Copia in corso…",
     copied: "Copiato",
     copyFailed: "Impossibile copiare negli appunti. Copiare manualmente il testo qui sopra.",
