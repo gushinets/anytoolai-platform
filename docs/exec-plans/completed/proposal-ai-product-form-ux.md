@@ -6,12 +6,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-09-22
 - Last updated: 2026-09-22
 - Review date: 2026-09-22
-- Next action: run the isolated fake-provider browser smoke and final repository gates
+- Next action: product-owner review; optionally fix the two pre-existing Windows runner launchers separately
 - Blocker: none
 
 **Goal:** Turn ProposalAI's scaffold-like form into a focused, accessible proposal-writing flow
@@ -386,7 +386,7 @@ Bundle 3 source of truth in `docs/exec-plans/active/any-503-adopt-bundle3-design
   `Warm & personable` is checked, and no Language textbox or combobox is present. Keep the existing
   helper functions and backend-recorded copy assertion; do not add a new E2E file or snapshot tool.
 
-- [ ] **Step 2: Run frontend and config gates**
+- [x] **Step 2: Run frontend and config gates**
 
   Run:
 
@@ -397,7 +397,7 @@ Bundle 3 source of truth in `docs/exec-plans/active/any-503-adopt-bundle3-design
 
   Expected: both commands exit `0`.
 
-- [ ] **Step 3: Run the ProposalAI browser smoke in a clean provider-test composition**
+- [x] **Step 3: Run the ProposalAI browser smoke in a clean provider-test composition**
 
   Use the repository's normal ProposalAI smoke setup, not the developer's local real-provider
   override:
@@ -425,7 +425,7 @@ Bundle 3 source of truth in `docs/exec-plans/active/any-503-adopt-bundle3-design
   - result/error states are not wrapped in duplicate glass cards;
   - reduced-motion mode introduces no hidden content or required animation.
 
-- [ ] **Step 5: Run the final repository gate and diff hygiene**
+- [x] **Step 5: Run the final repository gate and diff hygiene**
 
   Run:
 
@@ -438,12 +438,12 @@ Bundle 3 source of truth in `docs/exec-plans/active/any-503-adopt-bundle3-design
   Expected: `full-check` and `git diff --check` exit `0`; status contains only this plan's intended
   implementation files plus explicitly preserved pre-existing user changes.
 
-- [ ] **Step 6: Record evidence and complete the plan**
+- [x] **Step 6: Record evidence and complete the plan**
 
   Update this plan's Status with exact command results, browser viewport coverage, and remaining
   risks. Move it to `docs/exec-plans/completed/` only after all applicable checks pass.
 
-- [ ] **Step 7: Commit browser evidence and plan closeout**
+- [x] **Step 7: Commit browser evidence and plan closeout**
 
   ```powershell
   git add tests/e2e/proposal-ai-smoke/tests/proposal-ai-smoke.spec.ts docs/exec-plans/active/proposal-ai-product-form-ux.md
@@ -452,6 +452,27 @@ Bundle 3 source of truth in `docs/exec-plans/active/any-503-adopt-bundle3-design
 
   If the plan has already moved to `completed/`, stage that destination path instead of the active
   path. Never stage the unrelated local provider override or other pre-existing untracked files.
+
+## Completion Evidence
+
+- `validate-configs`: passed.
+- Focused web-mirror verification: 78/78 tests passed; typecheck, lint, and production build passed.
+- Freelancer ProposalAI backend tests: 15/15 passed before the final repository run.
+- Strict premium design audit: 0 findings.
+- Isolated fake-provider browser smoke: all 7 Playwright scenarios passed. The Windows runner then
+  returned `1` only while cleaning up the already-successful run because `os.getpgid` is not
+  available on Windows; the exact orphaned port-3100 process and temporary Compose project were
+  stopped separately.
+- Clean-worktree `full-check`: 1861 backend tests passed (3 skipped, 479 deselected); repository
+  lint, typecheck, 315 ce-kit tests, 48 shared-ui tests, 78 web-mirror tests, and 13 atom-lab browser
+  tests passed. The wrapper then returned `1` at the pre-existing Windows/Node 24
+  `openapi-typescript` extensionless-shim launch. Running the same generator through `pnpm exec`
+  and diffing its output against the committed generated client passed with exit `0`.
+- Live browser: desktop, 768px, and 390px layouts inspected; 390px had no horizontal overflow and
+  stacked Tone choices; checked state included a non-color check mark; ArrowRight moved native
+  radio selection; invalid submit focused `proposal-ai-task-text` with a visible outline.
+- `git diff --check`: passed. The user's real-provider `action_configs.yaml`, `.cursor/`, and the
+  unrelated `atoms-proof-required-ci-gate.md` remain outside these commits.
 
 ## Explicitly Deferred
 
