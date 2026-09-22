@@ -100,6 +100,9 @@ describe("ProductRunPage", () => {
     await waitForForm();
     await waitFor(() => expect(screen.getByText("3 of 3 runs remaining.")).toBeTruthy());
     expect(screen.getByRole("heading", { name: "Test Product" })).toBeTruthy();
+    expect(screen.getByText("Describe the test run.")).toBeTruthy();
+    expect(screen.getByText("3 of 3 runs remaining.").getAttribute("aria-live")).toBe("polite");
+    expect(screen.getByRole("form", { name: "Test Product form" }).hasAttribute("novalidate")).toBe(true);
   });
 
   it("includes scenario_id in the advisory quota request, so a scenario-dimension quota policy is also supported", async () => {
@@ -229,6 +232,7 @@ describe("ProductRunPage", () => {
     submit();
 
     expect(await screen.findAllByText("Text is required.")).toHaveLength(1);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Text")));
     expect(calls.some((call) => call.key === ROUTES.START)).toBe(false);
   });
 
