@@ -83,7 +83,14 @@ test.describe("ProposalAI web product", () => {
   }) => {
     await page.goto(PRODUCT_URL);
     await expect(page.locator("h1")).toHaveText("ProposalAI");
-    await expect(page.getByText("3 of 3 proposals remaining.")).toBeVisible();
+    await expect(
+      page.getByText("Turn a client brief and your relevant strengths into a proposal ready to send."),
+    ).toBeVisible();
+    await expect(page.getByText("10 of 10 proposals remaining.")).toBeVisible();
+    await expect(page.getByRole("radiogroup", { name: "Proposal style" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "Warm & personable" })).toBeChecked();
+    await expect(page.getByRole("textbox", { name: /Language/i })).toHaveCount(0);
+    await expect(page.getByRole("combobox", { name: /Language/i })).toHaveCount(0);
 
     const nextActionRequests: string[] = [];
     page.on("request", (request) => {
@@ -97,6 +104,7 @@ test.describe("ProposalAI web product", () => {
     await expect(page.getByRole("status")).toHaveText(/Generating your proposal/);
     const copyButton = page.getByRole("button", { name: "Copy" });
     await expect(copyButton).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: "Create another proposal" })).toBeVisible();
 
     // `.last()`, not `.first()`: the advisory quota line is also a `<p>` inside `<main>`, rendered
     // before the result.
@@ -170,7 +178,7 @@ test.describe("ProposalAI web product", () => {
     page,
   }) => {
     await page.goto(PRODUCT_URL);
-    await expect(page.getByText("3 of 3 proposals remaining.")).toBeVisible();
+    await expect(page.getByText("10 of 10 proposals remaining.")).toBeVisible();
     await fillValidForm(page);
 
     const idempotencyKeys: (string | null)[] = [];
@@ -214,7 +222,7 @@ test.describe("ProposalAI web product", () => {
     // call rather than starting (and charging) a new one -- confirmed by exactly one unit gone.
     await page.unroute(START_ROUTE_PATTERN);
     await page.goto(PRODUCT_URL);
-    await expect(page.getByText("2 of 3 proposals remaining.")).toBeVisible();
+    await expect(page.getByText("9 of 10 proposals remaining.")).toBeVisible();
   });
 
   test("safe-error: a terminal backend failure preserves entered form values and shows no fake progress or result", async ({
@@ -266,27 +274,25 @@ test.describe("ProposalAI web product", () => {
   test("quota: advisory display reflects consumption, and the next genuinely new start is authoritatively rejected", async ({
     page,
   }) => {
-    // 3 full submit-and-wait cycles plus a 4th submit, each against a real (if fake-provider-backed)
-    // job/worker round trip -- comfortably over the file's default 60s under any CI load.
-    test.setTimeout(120_000);
+    // 10 full submit-and-wait cycles plus an 11th submit, each against a real
+    // fake-provider-backed job/worker round trip.
+    test.setTimeout(240_000);
     await page.goto(PRODUCT_URL);
-    await expect(page.getByText("3 of 3 proposals remaining.")).toBeVisible();
+    await expect(page.getByText("10 of 10 proposals remaining.")).toBeVisible();
 
-    for (const remainingAfter of [2, 1, 0]) {
+    for (const remainingAfter of [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]) {
       await fillValidForm(page);
       await submitAndWaitForResult(page);
-      // Each run only has one shot at the form (no "run another" affordance on the result view by
-      // design -- MVP-A2's the-page-is-the-run-record shape), so the next run is a fresh
-      // navigation, whose boot-time advisory GET now reflects the just-consumed unit.
-      await page.goto(PRODUCT_URL);
-      await expect(page.getByText(`${remainingAfter} of 3 proposals remaining.`)).toBeVisible();
+      if (remainingAfter > 0) {
+        await page.getByRole("button", { name: "Create another proposal" }).click();
+        await expect(page.getByText(`${remainingAfter} of 10 proposals remaining.`)).toBeVisible();
+      }
     }
 
-    // The advisory GET itself would already short-circuit into quota-exhausted before any submit,
-    // which is correct behavior but wouldn't prove the *authoritative* 429 path -- so this last
-    // navigation blocks that one advisory call, forcing a genuine submit against the real backend.
+    // The refresh would short-circuit into quota-exhausted before any submit, which is correct but
+    // wouldn't prove the authoritative 429 path, so block that advisory call for the final attempt.
     await page.route("**/v1/products/proposal_ai/quota**", (route) => route.abort());
-    await page.goto(PRODUCT_URL);
+    await page.getByRole("button", { name: "Create another proposal" }).click();
     await fillValidForm(page);
     await page.getByRole("button", { name: "Generate proposal" }).click();
 
