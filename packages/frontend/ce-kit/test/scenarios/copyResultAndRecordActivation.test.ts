@@ -51,7 +51,7 @@ describe("copyResultAndRecordActivation", () => {
     const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(JSON.parse(init.body as string)).toEqual({ checkpoint_id: "result_ready" });
     expect(result.copied).toBe(true);
-    expect(result.copied && result.activation.ok).toBe(true);
+    expect(result.copied && result.activation?.ok).toBe(true);
     expect(COPY_RESULT_NEXT_ACTION_ID).toBe("copy_result");
   });
 
@@ -106,9 +106,9 @@ describe("copyResultAndRecordActivation", () => {
     const result = await copyResultAndRecordActivation(client, request(async () => undefined));
 
     expect(result.copied).toBe(true);
-    expect(result.copied && result.activation.ok).toBe(false);
+    expect(result.copied && result.activation?.ok).toBe(false);
     expect(
-      result.copied && !result.activation.ok && result.activation.error.type === "backend_error"
+      result.copied && result.activation && !result.activation.ok && result.activation.error.type === "backend_error"
         ? result.activation.error.code
         : undefined,
     ).toBe("scenario_checkpoint_conflict");
@@ -123,6 +123,75 @@ describe("copyResultAndRecordActivation", () => {
     const result = await copyResultAndRecordActivation(client, request(async () => undefined));
 
     expect(result.copied).toBe(true);
-    expect(result.copied && result.activation.ok).toBe(false);
+    expect(result.copied && result.activation?.ok).toBe(false);
+  });
+
+  it("skips the activation request entirely when checkpointId is null, but still fires onCopied", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(200, SESSION_PAYLOAD));
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+    const onCopied = vi.fn();
+
+    const result = await copyResultAndRecordActivation(client, {
+      ...request(async () => undefined),
+      checkpointId: null,
+      onCopied,
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(onCopied).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ copied: true, activation: null });
+  });
+
+  it("skips the activation only for a null checkpointId, not for any falsy one (an empty string is still sent)", async () => {
+    // The public contract is `checkpointId: string | null`, and the API declares
+    // `current_checkpoint_id` as `str | None` with no minimum length, so `""` is a value this helper
+    // can receive. It is not "no checkpoint": send it and let the backend, which is authoritative
+    // on checkpoints, reject it -- the copy itself must still stand.
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(409, {
+        error: {
+          code: "scenario_checkpoint_conflict",
+          message: "Scenario checkpoint no longer matches the requested action.",
+          request_id: "req_1",
+        },
+      }),
+    );
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+
+    const result = await copyResultAndRecordActivation(client, {
+      ...request(async () => undefined),
+      checkpointId: "",
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const init = (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect(JSON.parse(init.body as string)).toEqual({ checkpoint_id: "" });
+    expect(result.copied).toBe(true);
+    expect(result.copied && result.activation?.ok).toBe(false);
+  });
+
+  it("fires onCopied as soon as the clipboard write succeeds, before the activation request settles", async () => {
+    let resolveFetch: (value: Response) => void = () => undefined;
+    const fetchImpl = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    const client = makeClient(fetchImpl as unknown as typeof fetch);
+    const onCopied = vi.fn();
+
+    const inFlight = copyResultAndRecordActivation(client, { ...request(async () => undefined), onCopied });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // onCopied has already fired, and the activation request is in flight, while its response is
+    // still deliberately unresolved -- proves onCopied doesn't wait for it.
+    expect(onCopied).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+    resolveFetch(jsonResponse(200, SESSION_PAYLOAD));
+    const result = await inFlight;
+    expect(result.copied).toBe(true);
   });
 });

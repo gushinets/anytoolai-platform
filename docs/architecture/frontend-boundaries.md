@@ -78,7 +78,8 @@ Required `ce-kit` capabilities:
 - `getScenarioSession()`
 - `nextAction()`
 - `copyResultAndRecordActivation()` (clipboard write first, then exactly one `copy_result`
-  next-action -- the shared copy-button activation contract every product's result page uses)
+  next-action when the session has an active checkpoint, none otherwise -- the shared copy-button
+  activation contract every product's result page uses)
 - `pollScenarioSession()`
 - `getResult()`
 - `createHandoff()`

@@ -27,26 +27,35 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-import httpx
 import jsonschema
 import pytest
 import sqlalchemy as sa
-from anytoolai_platform_api.bootstrap import RuntimeStorageDependencies, build_runtime
-from anytoolai_platform_api.main import create_app
-from anytoolai_platform_core.identity.models import GuestIdentityRecord
-from anytoolai_platform_core.identity.repository import GuestIdentityRepository
+from anytoolai_platform_api.bootstrap import build_runtime
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.models import ProviderResponse, ResolvedProviderRequest
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
-from anytoolai_platform_core.storage.db import event_log_table
+from anytoolai_platform_core.storage.db import (
+    action_runs_table,
+    artifacts_table,
+    event_log_table,
+    provider_calls_table,
+)
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_worker.composition import build_worker
+from test_atom_runtime_matrix import _EXPECTED_EVENT_TYPES
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
+GUEST_ID = "guest_client_update_writer"
+REQUEST_ID = "req_client_update_writer_test"
+
+# action.started/action.succeeded, the two event types whose ordering (per action_run_id) proves
+# real step-by-step interleaving rather than just "two rows of each type exist somewhere" --
+# mirrors test_composite_workflow_matrix.py's own constant of the same name/shape.
+_ACTION_EVENT_TYPES = ("action.started", "action.succeeded")
 
 
 _MODE_WORKFLOWS = {
@@ -64,6 +73,27 @@ _MODE_WORKFLOWS = {
         "client_update_writer.reply_draft_v1",
         "client_update_writer.reply_draft_input_v1",
         ("text.compose_reply",),
+    ),
+}
+
+# Full (step_id, action_type, action_config_id) triples per mode, in declared workflow order --
+# code review finding: the existing per-mode evidence only correlated job_id -> processed job and
+# scenario_session_id -> result artifact; it never proved that action_run/provider_call/artifact/
+# event rows for a run are correctly linked to each other and to the run's own identifiers,
+# especially PrepaidRequest's two-step chain (each step needs its own correctly-linked
+# action_run + provider_call, not just "two of something exist").
+_MODE_EXPECTED_STEPS = {
+    "update": (("compose_reply", "text.compose_reply", "client_update_writer.update_compose_reply_v1"),),
+    "reply_draft": (
+        ("compose_reply", "text.compose_reply", "client_update_writer.reply_draft_compose_reply_v1"),
+    ),
+    "prepaid_request": (
+        (
+            "compose_persuasive_text",
+            "text.compose_persuasive_text",
+            "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+        ),
+        ("compose_reply", "text.compose_reply", "client_update_writer.prepaid_request_compose_reply_v1"),
     ),
 }
 
@@ -183,44 +213,13 @@ def test_compose_reply_output_schema_rejects_malformed_output() -> None:
         )
 
 
-# `session_factory` (SQLite-backed) comes from apps/platform-api/tests/conftest.py, shared with
-# test_demo_api.py and test_proposal_ai_bundle.py.
+# `session_factory`/`platform_api_app_factory`/`request_platform_api` (SQLite-backed) come from
+# apps/platform-api/tests/conftest.py, shared with test_demo_api.py and test_proposal_ai_bundle.py.
 
 
 @pytest.fixture
-def app(session_factory: SessionFactory):
-    with transaction_boundary(session_factory) as session:
-        GuestIdentityRepository(session).create(
-            GuestIdentityRecord(
-                id="guest_client_update_writer",
-                tenant_id="anytoolai",
-                region="default",
-            )
-        )
-    application = create_app(config_root=CONFIG_ROOT)
-    application.state.runtime = replace(
-        application.state.runtime,
-        storage=RuntimeStorageDependencies(session_factory=session_factory),
-    )
-    return application
-
-
-async def _request(
-    app: Any,
-    method: str,
-    path: str,
-    *,
-    json: Any | None = None,
-    request_id: str = "req_client_update_writer_test",
-) -> httpx.Response:
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-        return await client.request(
-            method,
-            path,
-            json=json,
-            headers={"X-Request-ID": request_id},
-        )
+def app(platform_api_app_factory):
+    return platform_api_app_factory(guest_id=GUEST_ID)
 
 
 _MODE_HAPPY_PATH_CASES = {
@@ -285,6 +284,7 @@ _MODE_HAPPY_PATH_CASES = {
 )
 def test_mode_happy_path_produces_the_deterministic_fixture_result(
     app: Any,
+    request_platform_api,
     session_factory: SessionFactory,
     mode: str,
     start_input: dict[str, Any],
@@ -295,15 +295,16 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     # second literal keeps that id defined in exactly one place.
     scenario_id = _MODE_WORKFLOWS[mode][0]
     started = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "POST",
             f"/v1/products/client_update_writer/scenarios/{scenario_id}/start",
             json={
                 "frontend_id": "web_mirror",
-                "guest_id": "guest_client_update_writer",
+                "guest_id": GUEST_ID,
                 "input": start_input,
             },
+            request_id=REQUEST_ID,
         )
     ).json()
 
@@ -324,10 +325,11 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     assert processed.result_artifact_id is not None
 
     session_response = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "GET",
             f"/v1/scenario-sessions/{started['scenario_session_id']}",
+            request_id=REQUEST_ID,
         )
     )
     assert session_response.status_code == HTTPStatus.OK
@@ -338,16 +340,101 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     assert session_body["result_artifact_id"] == processed.result_artifact_id
 
     result_response = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "GET",
             f"/v1/results/{processed.result_artifact_id}",
+            request_id=REQUEST_ID,
         )
     )
     assert result_response.status_code == HTTPStatus.OK
     result_body = result_response.json()
     assert result_body["schema_ref"] == "kernel.schemas.compose_reply_output_v1"
     assert result_body["output"] == expected_output
+
+    # Code review finding: prove session/job/action/provider/artifact/event correlation across the
+    # real pipeline, not just that the final output matches -- especially PrepaidRequest's two-step
+    # chain, where each step needs its own correctly-linked action_run/provider_call row.
+    with transaction_boundary(session_factory) as session:
+        action_runs = list(
+            session.execute(
+                sa.select(action_runs_table)
+                .where(action_runs_table.c.job_id == started["job_id"])
+                .order_by(action_runs_table.c.created_at, action_runs_table.c.id)
+            ).mappings()
+        )
+        provider_calls = list(
+            session.execute(
+                sa.select(provider_calls_table).where(provider_calls_table.c.job_id == started["job_id"])
+            ).mappings()
+        )
+        artifacts = list(
+            session.execute(
+                sa.select(artifacts_table)
+                .where(artifacts_table.c.job_id == started["job_id"])
+                .order_by(artifacts_table.c.created_at, artifacts_table.c.id)
+            ).mappings()
+        )
+        events = list(
+            session.execute(
+                sa.select(event_log_table)
+                .where(event_log_table.c.scenario_session_id == started["scenario_session_id"])
+                .order_by(event_log_table.c.timestamp, event_log_table.c.event_id)
+            ).mappings()
+        )
+
+    # Step order: the action_runs row sequence matches the workflow's declared step order exactly
+    # -- for PrepaidRequest, this is what actually distinguishes "both steps really ran, in order"
+    # from "the job merely succeeded".
+    actual_steps = tuple((run["step_id"], run["action_type"], run["action_config_id"]) for run in action_runs)
+    assert actual_steps == _MODE_EXPECTED_STEPS[mode]
+
+    # scenario_session_id correlation: every action_run/provider_call/artifact row for this job
+    # carries this run's scenario_session_id, not just job_id.
+    for label, rows in (("action_runs", action_runs), ("provider_calls", provider_calls), ("artifacts", artifacts)):
+        for row in rows:
+            assert row["scenario_session_id"] == started["scenario_session_id"], label
+
+    # Provider-call correlation: exactly one provider_calls row per action_run -- proves
+    # PrepaidRequest's two steps each made their own provider call, not one call shared/skipped.
+    provider_calls_by_action_run: dict[str, list[dict[str, Any]]] = {}
+    for call in provider_calls:
+        provider_calls_by_action_run.setdefault(call["action_run_id"], []).append(call)
+    for run in action_runs:
+        assert len(provider_calls_by_action_run.get(run["id"], [])) == 1
+        assert provider_calls_by_action_run[run["id"]][0]["job_id"] == started["job_id"]
+
+    # Artifact lineage: every step has its own output artifact, and the job's canonical result
+    # artifact is a separate row (action_run_id is None), never reusing a step's own artifact id.
+    step_output_artifact_ids = {run["id"]: run["output_artifact_id"] for run in action_runs}
+    for artifact_id in step_output_artifact_ids.values():
+        assert artifact_id is not None
+        assert any(artifact["id"] == artifact_id for artifact in artifacts)
+    result_artifact = next(artifact for artifact in artifacts if artifact["id"] == processed.result_artifact_id)
+    assert result_artifact["action_run_id"] is None
+    assert processed.result_artifact_id not in step_output_artifact_ids.values()
+
+    # Event coverage, plus per-step action.started/action.succeeded ordering: flattens those two
+    # event types into one trace ordered by timestamp and resolves each row to its step via
+    # action_run_id, proving real interleaving (started(step1), succeeded(step1), started(step2),
+    # ...) rather than each event type's own sub-sequence independently matching step order.
+    event_types = {event_row["event_type"] for event_row in events}
+    assert _EXPECTED_EVENT_TYPES.issubset(event_types)
+    for event_row in events:
+        if event_row["job_id"] is not None:
+            assert event_row["job_id"] == started["job_id"]
+
+    step_id_by_action_run_id = {run["id"]: run["step_id"] for run in action_runs}
+    expected_step_order = [step_id for step_id, _action_type, _config_id in _MODE_EXPECTED_STEPS[mode]]
+    expected_trace = [
+        (step_id, event_type) for step_id in expected_step_order for event_type in _ACTION_EVENT_TYPES
+    ]
+    actual_trace = [
+        (step_id_by_action_run_id[row["action_run_id"]], row["event_type"])
+        for row in events
+        if row["event_type"] in _ACTION_EVENT_TYPES
+    ]
+    assert actual_trace == expected_trace
 
     # Code review finding (xhigh #5): amount/due_date only reach the client through the
     # persuasive-text step's free-text `situation` (A07's compose_reply schema has no dedicated
@@ -365,11 +452,12 @@ def test_mode_happy_path_produces_the_deterministic_fixture_result(
     # *allowed* -- it never actually called the next-action endpoint or checked that the
     # activation event this product's own contract promises actually gets recorded.
     next_action_response = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "POST",
             f"/v1/scenario-sessions/{started['scenario_session_id']}/next-actions/copy_result",
             json={"checkpoint_id": RESULT_READY_CHECKPOINT_ID},
+            request_id=REQUEST_ID,
         )
     )
     assert next_action_response.status_code == HTTPStatus.OK
@@ -435,6 +523,7 @@ _MODE_WEAK_INPUT_CASES = {
 )
 def test_weak_input_fixture_is_reachable_end_to_end(
     app: Any,
+    request_platform_api,
     session_factory: SessionFactory,
     mode: str,
     start_input: dict[str, Any],
@@ -446,15 +535,16 @@ def test_weak_input_fixture_is_reachable_end_to_end(
     )["response_json"]
 
     started = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "POST",
             f"/v1/products/client_update_writer/scenarios/{scenario_id}/start",
             json={
                 "frontend_id": "web_mirror",
-                "guest_id": "guest_client_update_writer",
+                "guest_id": GUEST_ID,
                 "input": start_input,
             },
+            request_id=REQUEST_ID,
         )
     ).json()
 
@@ -474,10 +564,11 @@ def test_weak_input_fixture_is_reachable_end_to_end(
     assert processed.result_artifact_id is not None
 
     result_response = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "GET",
             f"/v1/results/{processed.result_artifact_id}",
+            request_id=REQUEST_ID,
         )
     )
     assert result_response.status_code == HTTPStatus.OK

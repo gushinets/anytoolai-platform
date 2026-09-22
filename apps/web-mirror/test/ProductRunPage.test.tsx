@@ -260,6 +260,161 @@ describe("ProductRunPage", () => {
     expect(JSON.parse(nextActionCall?.init.body as string)).toEqual({ checkpoint_id: "checkpoint_1" });
   });
 
+  it("writes to the clipboard before recording the copy_result activation, exactly once per copy", async () => {
+    const order: string[] = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: vi.fn(() => {
+          order.push("clipboard_write");
+          return Promise.resolve();
+        }),
+      },
+    });
+    const { client, calls } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.NEXT_ACTION]: [
+        () => {
+          order.push("next_action_recorded");
+          return sessionResponse({ status: "completed" });
+        },
+      ],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+    // "Copied" no longer waits on the activation record settling (see the dedicated test below),
+    // so this waits for the record explicitly before asserting ordering.
+    await waitFor(() => expect(calls.some((call) => call.key === ROUTES.NEXT_ACTION)).toBe(true));
+
+    expect(order).toEqual(["clipboard_write", "next_action_recorded"]);
+    expect(calls.filter((call) => call.key === ROUTES.NEXT_ACTION)).toHaveLength(1);
+  });
+
+  it("shows Copied as soon as the clipboard write succeeds, without waiting for the copy_result activation record", async () => {
+    // Code review finding: handleCopy used to await the whole copy-and-record call before
+    // resolving, so "Copied" only appeared once the (network-bound) activation record had also
+    // settled -- a regression from the previous fire-and-forget UX. The activation record is left
+    // deliberately pending here to prove the UI no longer waits on it.
+    const { client, calls, resolveDeferred } = makeClientWithDeferredRoute(happyPathRoutes(), ROUTES.NEXT_ACTION);
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+    // The record request has been sent, but hasn't resolved yet -- "Copied" already showed anyway.
+    expect(calls.some((call) => call.key === ROUTES.NEXT_ACTION)).toBe(true);
+
+    resolveDeferred(sessionResponse({ status: "completed" }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
+  });
+
+  describe("a copy that outlives the page", () => {
+    // Code review finding [P2]: the copy_result activation was tied to the page's own mount-level
+    // AbortSignal. Unmounting (a mode switch, or just navigating away) right after clicking Copy
+    // therefore cancelled it -- before it was sent if the clipboard write was still pending, or
+    // mid-flight otherwise -- even though the text had already reached the clipboard, losing the
+    // journey's required `copy_result` for the user's own successful copy. `init.signal` is the
+    // client's per-request signal, aborted by an external abort, so it is what tells these apart.
+    function nextActionCall(calls: Array<{ key: string; init: RequestInit }>) {
+      return calls.find((call) => call.key === ROUTES.NEXT_ACTION);
+    }
+
+    it("still sends copy_result when the page unmounts while the clipboard write is pending", async () => {
+      let resolveClipboard!: () => void;
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: vi.fn(() => new Promise<void>((resolve) => (resolveClipboard = resolve))) },
+      });
+      const { client, calls } = makeClient({
+        ...happyPathRoutes(),
+        [ROUTES.NEXT_ACTION]: [sessionResponse({ status: "completed" })],
+      });
+
+      const view = renderPage({ client });
+      await waitForForm();
+      fillValidForm();
+      submit();
+      await waitForResult();
+
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      view.unmount();
+      resolveClipboard();
+      await waitFor(() => expect(nextActionCall(calls)).toBeTruthy());
+
+      expect(nextActionCall(calls)!.init.signal?.aborted).toBe(false);
+    });
+
+    it("does not cancel an in-flight copy_result when the page unmounts", async () => {
+      const { client, calls, resolveDeferred } = makeClientWithDeferredRoute(happyPathRoutes(), ROUTES.NEXT_ACTION);
+
+      const view = renderPage({ client });
+      await waitForForm();
+      fillValidForm();
+      submit();
+      await waitForResult();
+
+      fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+      await waitFor(() => expect(nextActionCall(calls)).toBeTruthy());
+      view.unmount();
+      resolveDeferred(sessionResponse({ status: "completed" }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(nextActionCall(calls)!.init.signal?.aborted).toBe(false);
+    });
+  });
+
+  it("disables the Copy button for the duration of a copy, so a fast double-click can't fire two activations", async () => {
+    // Code review finding: handleCopy had no debounce/in-flight guard.
+    const { client, calls, resolveDeferred } = makeClientWithDeferredRoute(happyPathRoutes(), ROUTES.NEXT_ACTION);
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+
+    const copyButton = screen.getByRole("button", { name: "Copy" });
+    fireEvent.click(copyButton);
+    // The button disables itself (and relabels to "Copying…") the instant the first click's
+    // handler runs -- this second click must be a no-op, not a second activation.
+    fireEvent.click(copyButton);
+
+    resolveDeferred(sessionResponse({ status: "completed" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+    expect(calls.filter((call) => call.key === ROUTES.NEXT_ACTION)).toHaveLength(1);
+  });
+
+  it("treats an unavailable clipboard API as a failed copy, recording no activation", async () => {
+    // Code review finding: this exact rejection path (writeToClipboard's own "Clipboard API
+    // unavailable" branch) had lost all test coverage when ResultView stopped implementing the
+    // clipboard write itself.
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+    const { client, calls } = makeClient(happyPathRoutes());
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not copy to clipboard/i));
+    expect(calls.some((call) => call.key === ROUTES.NEXT_ACTION)).toBe(false);
+  });
+
   it("enters a quota-exhausted state from the advisory quota check, with no form and no scenario started", async () => {
     const { client, calls } = makeClient({
       ...bootRoutes(),
@@ -596,9 +751,12 @@ describe("ProductRunPage", () => {
   });
 
   it("submits freshly edited values, with a new Idempotency-Key, instead of silently replaying stale ones after a retryable failure", async () => {
+    // Code review finding [P1]: a definite 4xx (never an ambiguous 5xx/network/timeout) is what
+    // makes this edit safe -- the backend rejected the request before ever creating a session, so
+    // there's nothing to reattach to and no risk a fresh submit doubles up a run.
     const { client, calls } = makeClient({
       ...happyPathRoutes(),
-      [ROUTES.START]: [errorResponse(500, "internal_error"), startResponse()],
+      [ROUTES.START]: [errorResponse(422, "scenario_input_invalid"), startResponse()],
     });
 
     renderPage({ client });
@@ -607,7 +765,8 @@ describe("ProductRunPage", () => {
     submit();
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start test product/i));
 
-    // The form stays editable in this phase -- an edit made here must actually reach the backend.
+    // The form re-enables in this phase -- an edit made here must actually reach the backend.
+    await waitFor(() => expect((screen.getByLabelText("Text") as HTMLInputElement).disabled).toBe(false));
     fireEvent.change(screen.getByLabelText("Text"), { target: { value: "Edited input text." } });
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
@@ -819,5 +978,239 @@ describe("ProductRunPage", () => {
     // guest_id: null.
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
     expect(calls.filter((call) => call.key === ROUTES.START)).toHaveLength(1);
+  });
+
+  it("retries runtime config on a later mount sharing the same client, instead of caching a failed fetch forever", async () => {
+    // Code review finding: the runtime-config cache used to store the raw pending promise
+    // unconditionally; since getRuntimeConfig() resolves {ok: false} rather than rejecting on a
+    // network failure, that failure got remembered forever, permanently boot-erroring every later
+    // mount for the same (client, productId) -- e.g. every mode in Client Update Writer's mode
+    // switcher, which remounts ProductRunPage on switch while reusing the same client.
+    const { client } = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [errorResponse(500, "internal_error"), runtimeConfigResponse(TEST_PRODUCT_IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(TEST_PRODUCT_IDS)],
+    });
+
+    const first = renderPage({ client });
+    await waitFor(() =>
+      expect(screen.getByText("Test Product is unavailable right now. Please reload the page.")).toBeTruthy(),
+    );
+    first.unmount();
+
+    renderPage({ client });
+    await waitForForm();
+  });
+
+  it("dedupes product_viewed/form_started across remounts sharing the same client and productId", async () => {
+    // Code review finding: productViewedFiredRef/formStartedRef were per-component-instance refs,
+    // so a remount (e.g. Client Update Writer's key={modeId} mode switch) reset them and could
+    // refire these top-of-funnel events once per mode instead of once per real visit.
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(TEST_PRODUCT_IDS), runtimeConfigResponse(TEST_PRODUCT_IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(TEST_PRODUCT_IDS), quotaResponse(TEST_PRODUCT_IDS)],
+    });
+
+    const first = render(
+      <ProductRunPage definition={testProductDefinition} client={client} onEvent={(event) => events.push(event)} />,
+    );
+    await waitForForm();
+    fillValidForm();
+    first.unmount();
+
+    render(
+      <ProductRunPage definition={testProductDefinition} client={client} onEvent={(event) => events.push(event)} />,
+    );
+    await waitForForm();
+    fillValidForm();
+
+    expect(events.filter((event) => event.type === "product_viewed")).toHaveLength(1);
+    expect(events.filter((event) => event.type === "form_started")).toHaveLength(1);
+  });
+
+  it("refires product_viewed/form_started on a remount with a new visitId, even sharing the same client", async () => {
+    // Code review finding [P1]: the (client, productId)-only dedupe above lives for as long as the
+    // client instance does, not for one visit -- apps/web-mirror's own route wrapper keeps one
+    // client across a client-side navigation between products, so a genuine A -> B -> A revisit to
+    // the same product shares that client and silently dropped these events on the second visit.
+    // `visitId` (minted fresh per landing by that route wrapper) fixes this: a new visitId here
+    // must refire both events, proving the dedupe is scoped to the visit, not the client.
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(TEST_PRODUCT_IDS), runtimeConfigResponse(TEST_PRODUCT_IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(TEST_PRODUCT_IDS), quotaResponse(TEST_PRODUCT_IDS)],
+    });
+
+    const first = render(
+      <ProductRunPage
+        definition={testProductDefinition}
+        client={client}
+        visitId="visit-1"
+        onEvent={(event) => events.push(event)}
+      />,
+    );
+    await waitForForm();
+    fillValidForm();
+    first.unmount();
+
+    render(
+      <ProductRunPage
+        definition={testProductDefinition}
+        client={client}
+        visitId="visit-2"
+        onEvent={(event) => events.push(event)}
+      />,
+    );
+    await waitForForm();
+    fillValidForm();
+
+    expect(events.filter((event) => event.type === "product_viewed")).toHaveLength(2);
+    expect(events.filter((event) => event.type === "form_started")).toHaveLength(2);
+  });
+
+  it("does not refire product_viewed/form_started across a remount sharing the same visitId (a mode switch)", async () => {
+    // The other half of the visitId fix: Client Update Writer's mode switcher passes the *same*
+    // visitId to every mode's ProductRunPage mount, so switching modes must still dedupe exactly
+    // like the plain (client, productId) case did.
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClient({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(TEST_PRODUCT_IDS), runtimeConfigResponse(TEST_PRODUCT_IDS)],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse(), guestIdentityResponse()],
+      [ROUTES.QUOTA]: [quotaResponse(TEST_PRODUCT_IDS), quotaResponse(TEST_PRODUCT_IDS)],
+    });
+
+    const first = render(
+      <ProductRunPage
+        definition={testProductDefinition}
+        client={client}
+        visitId="shared-visit"
+        onEvent={(event) => events.push(event)}
+      />,
+    );
+    await waitForForm();
+    fillValidForm();
+    first.unmount();
+
+    render(
+      <ProductRunPage
+        definition={testProductDefinition}
+        client={client}
+        visitId="shared-visit"
+        onEvent={(event) => events.push(event)}
+      />,
+    );
+    await waitForForm();
+    fillValidForm();
+
+    expect(events.filter((event) => event.type === "product_viewed")).toHaveLength(1);
+    expect(events.filter((event) => event.type === "form_started")).toHaveLength(1);
+  });
+
+  it("reuses one in-memory guest identity across remounts against the same client when localStorage is unavailable", async () => {
+    // Code review finding [P2]: the in-memory fallback storage was created per mount, so every
+    // remount (a multi-mode product's mode switch, or navigating between products on one client)
+    // minted a brand-new guest. It now lives per client, like localStorage would for the page.
+    const { client, calls } = makeClient({
+      ...bootRoutes(),
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse("guest_A"), guestIdentityResponse("guest_B")],
+    });
+    const storageSpy = vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+      throw new DOMException("denied", "SecurityError");
+    });
+    try {
+      const first = renderPage({ client });
+      await waitForForm();
+      first.unmount();
+      renderPage({ client });
+      await waitForForm();
+
+      expect(calls.filter((call) => call.key === ROUTES.GUEST_IDENTITY)).toHaveLength(1);
+    } finally {
+      cleanup();
+      storageSpy.mockRestore();
+    }
+  });
+
+  it("reports busy true from submit through a settled result, and false again after", async () => {
+    // Code review finding [P1]: a multi-mode product needs to know when it's safe to remount
+    // (switch mode) without abandoning an in-flight run -- this is the shared-runtime contract a
+    // multi-mode caller (Client Update Writer) disables its own mode switch on.
+    const busyStates: boolean[] = [];
+    const { client } = makeClient(happyPathRoutes());
+
+    renderPage({ client, onBusyChange: (busy) => busyStates.push(busy) });
+    await waitForForm();
+    fillValidForm();
+
+    expect(busyStates).toEqual([false]);
+    submit();
+    await waitForResult();
+
+    expect(busyStates).toEqual([false, true, false]);
+  });
+
+  it("reports busy true through a result-fetch-error, and false again once the retry succeeds", async () => {
+    // Code review finding [P1]: result-fetch-error means the scenario session already completed
+    // and consumed its quota unit -- only the follow-up result GET failed. A multi-mode caller must
+    // not be told it's safe to remount (destroying the only handle on that already-paid-for result)
+    // just because the phase isn't "submitting"/"running"/an ambiguous "retryable-error".
+    const busyStates: boolean[] = [];
+    const { client } = makeClient({
+      ...bootRoutes(),
+      [ROUTES.START]: [startResponse()],
+      [ROUTES.SESSION]: [sessionResponse()],
+      [ROUTES.RESULT]: [errorResponse(500, "internal_error"), resultResponse(TEST_PRODUCT_IDS)],
+    });
+
+    renderPage({ client, onBusyChange: (busy) => busyStates.push(busy) });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitFor(() =>
+      expect(screen.getByText("Your result is ready, but we couldn't load it. Please try again.")).toBeTruthy(),
+    );
+    expect(busyStates.at(-1)).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitForResult();
+
+    expect(busyStates.at(-1)).toBe(false);
+  });
+
+  it("stays busy through an ambiguous /start failure, but not through a deterministic one", async () => {
+    // Code review finding [P1]: only a genuinely ambiguous /start failure (network/timeout/5xx) may
+    // have already created a session server-side before the response was lost -- a definite 4xx
+    // (e.g. scenario_input_invalid) never did, so treating it the same way over-blocks the form and
+    // mode switch on a failure that's actually safe to abandon and resubmit.
+    const ambiguousBusyStates: boolean[] = [];
+    const { client: ambiguousClient } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [errorResponse(500, "internal_error"), startResponse()],
+    });
+    renderPage({ client: ambiguousClient, onBusyChange: (busy) => ambiguousBusyStates.push(busy) });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start test product/i));
+    expect(ambiguousBusyStates.at(-1)).toBe(true);
+    expect((screen.getByLabelText("Text") as HTMLInputElement).disabled).toBe(true);
+
+    cleanup();
+
+    const deterministicBusyStates: boolean[] = [];
+    const { client: deterministicClient } = makeClient({
+      ...happyPathRoutes(),
+      [ROUTES.START]: [errorResponse(422, "scenario_input_invalid"), startResponse()],
+    });
+    renderPage({ client: deterministicClient, onBusyChange: (busy) => deterministicBusyStates.push(busy) });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not start test product/i));
+    expect(deterministicBusyStates.at(-1)).toBe(false);
+    expect((screen.getByLabelText("Text") as HTMLInputElement).disabled).toBe(false);
   });
 });
