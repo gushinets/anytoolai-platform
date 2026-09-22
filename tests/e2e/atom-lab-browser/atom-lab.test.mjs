@@ -790,6 +790,127 @@ test("an immediate-current refresh bounds its catalog reload and re-enables Refr
   assert.match(elements.get("model-catalog-warning").textContent, /истекло/);
 });
 
+test("a stalled catalog refresh POST is aborted and leaves the last-good catalog usable", async () => {
+  const {document, elements} = createFakeDocument();
+  const atom = await catalogAtom("A01");
+  const currentCatalog = {
+    items: [{model_id: "gpt", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+    snapshot_id: "snapshot-current",
+    last_success_at: "2026-09-22T00:00:00Z",
+    stale: false,
+    refresh_status: "current",
+    error: null,
+  };
+  const scheduled = new Map();
+  let nextTimerId = 0;
+  let markRefreshStarted;
+  const refreshStarted = new Promise((resolve) => { markRefreshStarted = resolve; });
+  let aborted = false;
+  bootstrapAtomLab({
+    document,
+    catalogRefreshTimeoutMs: 1_000,
+    fetchImpl: (url, options = {}) => {
+      if (url.endsWith("/atoms")) return Promise.resolve({ok: true, status: 200, async json() { return [atom]; }});
+      if (url.endsWith("/refresh")) {
+        markRefreshStarted();
+        return new Promise((resolve, reject) => options.signal.addEventListener("abort", () => {
+          aborted = true;
+          const error = new Error("aborted");
+          error.name = "AbortError";
+          reject(error);
+        }, {once: true}));
+      }
+      return Promise.resolve({ok: true, status: 200, async json() { return currentCatalog; }});
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback, delay) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, {callback, delay});
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  const refreshing = elements.get("refresh-models").click();
+  await refreshStarted;
+
+  assert.equal(elements.get("refresh-models").disabled, true);
+  const [timeoutId, timeout] = scheduled.entries().next().value;
+  assert.equal(timeout.delay, 1_000);
+  scheduled.delete(timeoutId);
+  timeout.callback();
+  await refreshing;
+
+  assert.equal(aborted, true);
+  assert.equal(scheduled.size, 0);
+  assert.equal(elements.get("refresh-models").disabled, false);
+  assert.equal(elements.get("model-select").value, "gpt");
+  assert.equal(elements.get("run-button").disabled, false);
+  assert.match(elements.get("model-catalog-warning").textContent, /истекло/);
+});
+
+test("bfcache resume reloads a current catalog interrupted after refresh acceptance", async () => {
+  const {document, elements} = createFakeDocument();
+  const lifecycleTarget = new FakeLifecycleTarget();
+  const atom = await catalogAtom("A01");
+  const model = (modelId) => ({model_id: modelId, compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}});
+  const initialCatalog = {
+    items: [model("gpt-old")],
+    snapshot_id: "snapshot-old",
+    last_success_at: "2026-09-21T00:00:00Z",
+    stale: false,
+    refresh_status: "current",
+    error: null,
+  };
+  const refreshedCatalog = {
+    ...initialCatalog,
+    items: [model("gpt-old"), model("gpt-new")],
+    snapshot_id: "snapshot-new",
+    last_success_at: "2026-09-22T00:00:00Z",
+  };
+  let modelReads = 0;
+  let markReloadStarted;
+  const reloadStarted = new Promise((resolve) => { markReloadStarted = resolve; });
+  let interrupted = false;
+  bootstrapAtomLab({
+    document,
+    lifecycleTarget,
+    fetchImpl: (url, options = {}) => {
+      if (url.endsWith("/atoms")) return Promise.resolve({ok: true, status: 200, async json() { return [atom]; }});
+      if (url.endsWith("/refresh")) return Promise.resolve({ok: true, status: 202, async json() { return refreshedCatalog; }});
+      modelReads += 1;
+      if (modelReads === 1) return Promise.resolve({ok: true, status: 200, async json() { return initialCatalog; }});
+      if (modelReads === 2) {
+        markReloadStarted();
+        return new Promise((resolve, reject) => options.signal.addEventListener("abort", () => {
+          interrupted = true;
+          const error = new Error("aborted");
+          error.name = "AbortError";
+          reject(error);
+        }, {once: true}));
+      }
+      return Promise.resolve({ok: true, status: 200, async json() { return refreshedCatalog; }});
+    },
+    confirmImpl: () => true,
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  const refreshing = elements.get("refresh-models").click();
+  await reloadStarted;
+
+  await lifecycleTarget.dispatch("pagehide", {persisted: true});
+  await refreshing;
+  assert.equal(interrupted, true);
+  assert.equal(modelReads, 2);
+
+  await lifecycleTarget.dispatch("pageshow", {persisted: true});
+  assert.equal(modelReads, 3);
+  assert.equal(elements.get("model-select").value, "gpt-old");
+  assert.equal(elements.get("model-select").children.some(({value}) => value === "gpt-new"), true);
+  assert.equal(elements.get("model-catalog-warning").textContent, "");
+});
+
 test("a current refresh reloads the catalog without silently replacing a removed selection", async () => {
   const {document, elements} = createFakeDocument();
   const atom = await catalogAtom("A01");

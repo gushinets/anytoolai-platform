@@ -353,6 +353,7 @@ test("model capabilities, stale state, and refresh are explicit", async ({page})
   }});
 
   await expect(page.locator("#model-catalog-warning")).toContainText("устарел");
+  await expect(page.locator("#model-catalog-warning")).toContainText("2026-09-19T10:00:00Z");
   await expect(page.locator("#model-select option")).toHaveCount(5);
   await expect(page.locator('#model-select option[value="gpt-unknown-compatibility"]')).toBeDisabled();
   await expect(page.locator('#model-select option[value="gpt-unknown-compatibility"]')).toContainText("совместимость неизвестна");
@@ -750,7 +751,7 @@ test("final invalid output is diagnostics, never a successful result", async ({p
       run_id: "run-invalid", status: "failed",
       snapshot: {atom_id: "A05", input: A05.example_input, prompt: A05.prompt, model_id: "openai/gpt-supported", reasoning_effort: "low"},
       runtime_ids: {scenario_session_id: "session-invalid", job_id: "job-invalid", action_run_id: "action-invalid", artifact_id: null}, result: null,
-      diagnostics: {error_code: "structured_output_validation_failed", duration_ms: 500, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: "low", response_model_id: null, validation_attempts: 2, transport_attempts: 2, physical_calls: 2, succeeded_first_attempt: null, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [{artifact_id: "debug-1", error_code: "structured_output_validation_failed", raw_output_text: "<script id=bad>boom()</script>", truncated: false, redacted: true}], debug_artifacts_truncated: false},
+      diagnostics: {error_code: "structured_output_validation_failed", duration_ms: 500, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: "low", response_model_id: null, validation_attempts: 2, transport_attempts: 2, physical_calls: 2, succeeded_first_attempt: null, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [{artifact_id: "debug-1", error_code: "structured_output_validation_failed", raw_output_text: "<script id=bad>boom()</script>", truncated: true, redacted: true}], debug_artifacts_truncated: false},
       created_at: "2026-09-20T10:00:00Z", started_at: "2026-09-20T10:00:00Z", finished_at: "2026-09-20T10:00:01Z",
     })});
   });
@@ -762,6 +763,7 @@ test("final invalid output is diagnostics, never a successful result", async ({p
 
   await expect(page.locator("#invalid-response")).toBeVisible();
   await expect(page.locator("#invalid-response")).toContainText("structured_output_validation_failed");
+  await expect(page.locator("#invalid-response")).toContainText("Сырой ответ обрезан");
   await expect(page.locator("#invalid-response-raw")).toContainText("<script id=bad>");
   await expect(page.locator("#result-section")).toBeHidden();
   await expect(page.locator("#bad")).toHaveCount(0);
@@ -797,6 +799,29 @@ test("admission rejection keeps the draft, hides transport retry, and a new laun
 
   expect(keys).toHaveLength(2);
   expect(keys[0]).not.toBe(keys[1]);
+});
+
+test("prompt admission errors stay visible and identify the prompt editor", async ({page}) => {
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+    await route.fulfill({status: 422, contentType: "application/json", body: JSON.stringify({
+      error: {
+        code: "input_invalid",
+        message: "Prompt validation failed.",
+        field_errors: [{path: "prompt", message: "Prompt must not be blank."}],
+      },
+      request_id: "request-prompt-error",
+    })});
+  });
+  await unlockAtom(page, "A05");
+  await page.locator("#fill-example").click();
+  await page.locator("#prompt-tab").click();
+  await page.locator("#prompt-editor").fill("");
+  await page.locator("#run-button").click();
+
+  await expect(page.locator("#prompt-panel")).toBeVisible();
+  await expect(page.locator("#validation-errors")).toContainText("Prompt must not be blank.");
+  await expect(page.locator("#prompt-editor")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#prompt-editor")).toHaveAttribute("aria-describedby", /.+/);
 });
 
 test("corrected accepted submission clears authoritative admission field errors", async ({page}) => {
@@ -1038,6 +1063,46 @@ test("run detail with conflicting accepted runtime identity fails closed", async
   await expect(page.locator("#run-diagnostics")).not.toContainText("session-b");
   await expect(page.locator("#run-diagnostics")).not.toContainText("job-b");
 });
+
+for (const key of ["action_run_id", "artifact_id"]) {
+  test(`run detail enforces fill-once ${key}`, async ({page}) => {
+    let reads = 0;
+    await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+      await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({
+        run_id: `run-fill-once-${key}`, scenario_session_id: "session-fill-once", job_id: "job-fill-once", status: "running",
+      })});
+    });
+    await page.route(`http://atom-lab.test/v1/atom-lab/runs/run-fill-once-${key}`, async (route) => {
+      reads += 1;
+      const runtimeIds = {
+        scenario_session_id: "session-fill-once",
+        job_id: "job-fill-once",
+        action_run_id: key === "action_run_id" ? `action-${reads === 1 ? "a" : "b"}` : "action-stable",
+        artifact_id: key === "artifact_id" ? `artifact-${reads === 1 ? "a" : "b"}` : null,
+      };
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({
+        run_id: `run-fill-once-${key}`, status: "running",
+        snapshot: {atom_id: "A05", input: A05.example_input, prompt: A05.prompt, model_id: "openai/gpt-supported", reasoning_effort: null},
+        runtime_ids: runtimeIds,
+        result: null,
+        diagnostics: {error_code: null, duration_ms: null, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: null, response_model_id: null, validation_attempts: 0, transport_attempts: 0, physical_calls: 0, succeeded_first_attempt: null, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
+        created_at: "2026-09-22T00:00:00Z", started_at: "2026-09-22T00:00:00Z", finished_at: null,
+      })});
+    });
+    await unlockAtom(page, "A05");
+    await page.locator("#fill-example").click();
+    await page.locator("#run-button").click();
+
+    const acceptedId = key === "action_run_id" ? "action-a" : "artifact-a";
+    const conflictingId = key === "action_run_id" ? "action-b" : "artifact-b";
+    await expect(page.locator("#run-diagnostics")).toContainText(acceptedId);
+    await expect(page.locator("#run-state")).toContainText("Некорректный ответ API");
+    await expect(page.locator("#retry-read")).toBeVisible();
+    await expect(page.locator("#run-diagnostics")).toContainText(acceptedId);
+    await expect(page.locator("#run-diagnostics")).not.toContainText(conflictingId);
+    expect(reads).toBe(2);
+  });
+}
 
 for (const status of [422, 429]) {
   test(`malformed ${status} admission rejection releases the frozen submission`, async ({page}) => {

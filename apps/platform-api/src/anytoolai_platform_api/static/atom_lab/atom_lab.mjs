@@ -1148,6 +1148,7 @@ export function bootstrapAtomLab({
   nowImpl = () => Date.now(),
   pollTimeoutMs = RUN_POLL_TIMEOUT_MS,
   catalogLoadTimeoutMs = 30_000,
+  catalogRefreshTimeoutMs = 30_000,
   submissionTimeoutMs = 30_000,
   idempotencyKeyFactory = () => globalThis.crypto?.randomUUID?.()
     ?? `run-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -1180,6 +1181,9 @@ export function bootstrapAtomLab({
   let runPollTimer = null;
   let activeModelCatalogAbortController = null;
   let activeModelCatalogReadTimeoutId = null;
+  let activeModelRefreshAbortController = null;
+  let activeModelRefreshTimeoutId = null;
+  let modelCatalogReloadPending = false;
   let activeRunAbortController = null;
   let activeSubmissionAbortController = null;
   let admissionErrors = [];
@@ -1202,10 +1206,13 @@ export function bootstrapAtomLab({
   ) ?? null;
 
   const renderModelCatalogWarning = (selectionInvalidated = false) => {
+    const lastSuccess = modelCatalog?.stale && modelCatalog.last_success_at
+      ? ` Последнее успешное обновление: ${modelCatalog.last_success_at}.`
+      : "";
     nodes["model-catalog-warning"].textContent = selectionInvalidated
-      ? "Выбранная модель больше недоступна. Выберите модель заново."
+      ? `Выбранная модель больше недоступна. Выберите модель заново.${lastSuccess}`
       : modelCatalog?.stale
-        ? `Каталог моделей устарел.${modelCatalog.error ? ` ${modelCatalog.error}` : ""}`
+        ? `Каталог моделей устарел.${lastSuccess}${modelCatalog.error ? ` ${modelCatalog.error}` : ""}`
         : "";
   };
 
@@ -1404,6 +1411,13 @@ export function bootstrapAtomLab({
     modelCatalogPollTimer = scheduleImpl(pollModelCatalog, RUN_POLL_INTERVAL_MS);
   };
 
+  const reloadCurrentModelCatalog = async () => {
+    modelCatalogReloadPending = true;
+    const loaded = await loadModels();
+    if (loaded !== null) modelCatalogReloadPending = false;
+    return loaded;
+  };
+
   const displayAcceptedSubmission = (submission) => {
     nodes["submitted-snapshot"].textContent = JSON.stringify(submission.snapshot, null, 2);
     nodes["run-metadata"].textContent = "";
@@ -1461,7 +1475,11 @@ export function bootstrapAtomLab({
     const invalid = detail.status === "failed" && Boolean(debugArtifact);
     nodes["invalid-response"].hidden = !invalid;
     if (invalid) {
-      nodes["invalid-response-code"].textContent = diagnostics.error_code ?? "invalid_response";
+      const truncation = debugArtifact.truncated ? "Сырой ответ обрезан." : "";
+      nodes["invalid-response-code"].textContent = [
+        diagnostics.error_code ?? "invalid_response",
+        truncation,
+      ].filter(Boolean).join(" · ");
       nodes["invalid-response-raw"].textContent = debugArtifact.raw_output_text ?? "Сырой ответ недоступен.";
     }
     submission.detailLoaded = true;
@@ -1552,8 +1570,9 @@ export function bootstrapAtomLab({
       const matchesSubmission = detail
         && detail.diagnostics.requested_model_id === submission.snapshot.model_id
         && detail.diagnostics.requested_reasoning_effort === submission.snapshot.reasoning_effort
-        && ["scenario_session_id", "job_id"].every((key) => (
-          detail.runtime_ids[key] === null
+        && ["scenario_session_id", "job_id", "action_run_id", "artifact_id"].every((key) => (
+          submission.runtimeIds[key] === null
+          || detail.runtime_ids[key] === null
           || detail.runtime_ids[key] === submission.runtimeIds[key]
         ));
       if (!matchesSubmission) {
@@ -1637,9 +1656,12 @@ export function bootstrapAtomLab({
               ? "model-select"
               : path === "reasoning_effort"
                 ? "reasoning-effort"
-                : undefined,
+                : path === "prompt"
+                  ? "prompt-editor"
+                  : undefined,
           }));
         renderValidation(document, nodes["validation-errors"], session, admissionErrors);
+        if (admissionErrors.some(({path}) => path === "prompt")) showInputTab(false);
         nodes["run-state"].textContent = `${code}: ${error?.message ?? safeApiMessage(payload, "Запуск не принят.")} Черновик сохранён.`;
         activeSubmission = null;
         return;
@@ -1807,15 +1829,27 @@ export function bootstrapAtomLab({
   });
   nodes["refresh-models"].addEventListener("click", async () => {
     nodes["refresh-models"].disabled = true;
+    const controller = new AbortControllerImpl();
+    let timedOut = false;
+    activeModelRefreshAbortController = controller;
+    const timeoutId = scheduleImpl(() => {
+      timedOut = true;
+      controller.abort();
+    }, catalogRefreshTimeoutMs);
+    activeModelRefreshTimeoutId = timeoutId;
     try {
       const response = await fetchImpl("/v1/atom-lab/models/refresh", {
         method: "POST",
         headers: {[ACCESS_HEADER]: accessCode},
+        signal: controller.signal,
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(safeApiMessage(payload, "Не удалось запросить обновление."));
       const refresh = parseModelRefresh(payload);
       if (!refresh) throw new Error("Обновление каталога вернуло некорректный ответ.");
+      cancelScheduleImpl(timeoutId);
+      if (activeModelRefreshAbortController === controller) activeModelRefreshAbortController = null;
+      if (activeModelRefreshTimeoutId === timeoutId) activeModelRefreshTimeoutId = null;
       modelCatalogReadGeneration += 1;
       modelCatalogRefreshStatus = refresh.refresh_status;
       modelCatalog = modelCatalog ? {...modelCatalog, ...refresh} : modelCatalog;
@@ -1824,14 +1858,20 @@ export function bootstrapAtomLab({
         nodes["model-catalog-warning"].textContent = "Каталог устарел; обновление запрошено.";
         startModelCatalogPolling();
       } else {
-        await loadModels();
+        await reloadCurrentModelCatalog();
       }
     } catch (error) {
+      if (error?.name === "AbortError" && (destroyed || paused)) return;
       nodes["model-catalog-warning"].textContent = error instanceof Error
-        ? error.message
+        ? timedOut
+          ? "Время ожидания обновления каталога истекло."
+          : error.message
         : "Не удалось запросить обновление.";
     } finally {
-      nodes["refresh-models"].disabled = false;
+      cancelScheduleImpl(timeoutId);
+      if (activeModelRefreshAbortController === controller) activeModelRefreshAbortController = null;
+      if (activeModelRefreshTimeoutId === timeoutId) activeModelRefreshTimeoutId = null;
+      if (!destroyed) nodes["refresh-models"].disabled = false;
     }
   });
   nodes["run-button"].addEventListener("click", () => submitRun());
@@ -1866,6 +1906,10 @@ export function bootstrapAtomLab({
   const pause = () => {
     paused = true;
     stopModelCatalogPolling();
+    if (activeModelRefreshTimeoutId !== null) cancelScheduleImpl(activeModelRefreshTimeoutId);
+    activeModelRefreshTimeoutId = null;
+    activeModelRefreshAbortController?.abort();
+    activeModelRefreshAbortController = null;
     if (runPollTimer !== null) cancelScheduleImpl(runPollTimer);
     runPollTimer = null;
     activeRunAbortController?.abort();
@@ -1876,15 +1920,18 @@ export function bootstrapAtomLab({
   const resume = () => {
     if (destroyed || !paused) return undefined;
     paused = false;
+    const catalogReload = modelCatalogReloadPending ? reloadCurrentModelCatalog() : null;
     if (["pending", "running"].includes(modelCatalogRefreshStatus)) {
       startModelCatalogPolling();
     }
+    let runReload = null;
     if (activeSubmission?.runId && !activeSubmission.terminal) {
       activeSubmission.pollStartedAt = nowImpl();
       activeSubmission.pollFailureCount = 0;
-      return pollRun(activeSubmission);
+      runReload = pollRun(activeSubmission);
     }
-    return undefined;
+    if (catalogReload && runReload) return Promise.all([catalogReload, runReload]);
+    return catalogReload ?? runReload ?? undefined;
   };
   const handlePageHide = (event) => {
     if (event?.persisted) {
