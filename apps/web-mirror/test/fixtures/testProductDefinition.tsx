@@ -47,6 +47,7 @@ export const testProductDefinition: ProductDefinition<TestProductValues, string>
   copy: {
     description: "Describe the test run.",
     submit: "Run",
+    startAnother: "Start another run",
     running: "Running…",
     runFailed: "Something went wrong. Please try again.",
     quotaRemaining: (remaining, limit) => `${remaining} of ${limit} runs remaining.`,

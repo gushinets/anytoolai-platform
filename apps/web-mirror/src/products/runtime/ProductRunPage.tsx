@@ -718,6 +718,27 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     });
   }
 
+  function handleStartAnother() {
+    if (phase.kind !== "result" || guestId === undefined) {
+      return;
+    }
+    setValues(definition.emptyValues);
+    setFieldErrors({});
+    setPendingStart(null);
+    activeScenarioSessionIdRef.current = null;
+    setPhase({ kind: "idle" });
+
+    getQuota(client, { productId, guestId, scenarioId }).then((quotaResult) => {
+      if (controllerRef.current?.signal.aborted || !quotaResult.ok) {
+        return;
+      }
+      setQuota(quotaResult.value);
+      if (quotaResult.value.exhausted) {
+        setPhase((prev) => (prev.kind === "idle" ? { kind: "quota-exhausted" } : prev));
+      }
+    }, _noop);
+  }
+
   function updateField<K extends keyof V>(field: K, value: V[K]) {
     // Gated on a resolved guestId too, the same way submitCurrentValues() already gates
     // form_submitted: a boot-time createGuestIdentity() failure (not just the guest-identity-
@@ -760,7 +781,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   let mainContent: ReactNode;
   switch (phase.kind) {
     case "result":
-      mainContent = <Result result={phase.result} onCopy={handleCopy} />;
+      mainContent = (
+        <div className={styles.resultStack}>
+          <Result result={phase.result} onCopy={handleCopy} />
+          <Button className={styles.resultAction} variant="secondary" onClick={handleStartAnother}>
+            {definition.copy.startAnother}
+          </Button>
+        </div>
+      );
       break;
     case "quota-exhausted":
       mainContent = <ErrorState message={`You've used all your ${definition.title} runs for now.`} />;

@@ -123,6 +123,7 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> =
   copy: {
     description: "Turn a client brief and your relevant strengths into a proposal ready to send.",
     submit: "Generate proposal",
+    startAnother: "Create another proposal",
     running: "Generating your proposal…",
     runFailed: "Something went wrong generating your proposal. Please try again.",
     quotaRemaining: (remaining, limit) => `${remaining} of ${limit} proposals remaining.`,

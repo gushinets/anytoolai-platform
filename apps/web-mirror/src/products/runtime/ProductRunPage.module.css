@@ -33,6 +33,15 @@
   padding: 24px;
 }
 
+.resultStack {
+  display: grid;
+  gap: 16px;
+}
+
+.resultAction {
+  justify-self: start;
+}
+
 .form {
   display: grid;
   gap: 24px;

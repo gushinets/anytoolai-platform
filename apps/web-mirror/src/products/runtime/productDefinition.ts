@@ -95,6 +95,7 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
   copy: {
     description: string;
     submit: string;
+    startAnother: string;
     running: string;
     runFailed: string;
     quotaRemaining: (remaining: number, limit: number) => string;

@@ -90,7 +90,7 @@ def test_quota_policy_ref_resolves_to_the_declared_lifetime_product_quota() -> N
     assert policy["unit"] == "scenario_run"
     assert policy["period"] == "lifetime"
     assert policy["dimension"] == "product"
-    assert isinstance(policy["limit_count"], int) and policy["limit_count"] > 0
+    assert policy["limit_count"] == 10
 
 
 def test_renderer_contract_pins_the_canonical_copy_ready_field_to_a06_text() -> None:

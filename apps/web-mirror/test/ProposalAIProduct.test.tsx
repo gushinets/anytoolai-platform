@@ -35,7 +35,7 @@ function renderReady() {
   const routed = makeClient({
     [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(IDS)],
     [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
-    [ROUTES.QUOTA]: [quotaResponse(IDS)],
+    [ROUTES.QUOTA]: [quotaResponse(IDS, { limit_count: 10, remaining_count: 10 })],
     [ROUTES.START]: [startResponse()],
     [ROUTES.SESSION]: [sessionResponse()],
     [ROUTES.RESULT]: [resultResponse(IDS, { output: { text: PROPOSAL_TEXT } })],
@@ -52,7 +52,7 @@ describe("ProposalAI product definition", () => {
 
     await waitFor(() => expect(screen.getByRole("heading", { name: "ProposalAI" })).toBeTruthy());
     expect(screen.getByRole("button", { name: "Generate proposal" })).toBeTruthy();
-    expect(screen.getByText("3 of 3 proposals remaining.")).toBeTruthy();
+    expect(screen.getByText("10 of 10 proposals remaining.")).toBeTruthy();
     expect(
       screen.getByText("Turn a client brief and your relevant strengths into a proposal ready to send."),
     ).toBeTruthy();
@@ -129,6 +129,7 @@ describe("ProposalAI product definition", () => {
     fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: "Frontend freelancer." } });
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
     await waitFor(() => expect(screen.getByText(PROPOSAL_TEXT)).toBeTruthy());
+    expect(screen.getByRole("button", { name: "Create another proposal" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
 
