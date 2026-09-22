@@ -442,6 +442,22 @@ describe("ProductRunPage", () => {
     expect(calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(2);
   });
 
+  it("does not add a repeat action to products that do not define one", async () => {
+    const { client } = makeClient(happyPathRoutes());
+    const definition = {
+      ...testProductDefinition,
+      copy: { ...testProductDefinition.copy, startAnother: undefined },
+    };
+
+    render(<ProductRunPage definition={definition} client={client} />);
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+
+    expect(screen.queryByRole("button", { name: "Start another run" })).toBeNull();
+  });
+
   it("enters a quota-exhausted state from the advisory quota check, with no form and no scenario started", async () => {
     const { client, calls } = makeClient({
       ...bootRoutes(),

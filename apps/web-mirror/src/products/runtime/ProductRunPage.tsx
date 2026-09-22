@@ -784,9 +784,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       mainContent = (
         <div className={styles.resultStack}>
           <Result result={phase.result} onCopy={handleCopy} />
-          <Button className={styles.resultAction} variant="secondary" onClick={handleStartAnother}>
-            {definition.copy.startAnother}
-          </Button>
+          {definition.copy.startAnother ? (
+            <Button className={styles.resultAction} variant="secondary" onClick={handleStartAnother}>
+              {definition.copy.startAnother}
+            </Button>
+          ) : null}
         </div>
       );
       break;
