@@ -53,6 +53,13 @@ describe("ProposalAI product definition", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: "ProposalAI" })).toBeTruthy());
     expect(screen.getByRole("button", { name: "Generate proposal" })).toBeTruthy();
     expect(screen.getByText("3 of 3 proposals remaining.")).toBeTruthy();
+    expect(
+      screen.getByText("Turn a client brief and your relevant strengths into a proposal ready to send."),
+    ).toBeTruthy();
+    expect(screen.getByPlaceholderText("Paste the client's task, brief, or job post.")).toBeTruthy();
+    expect(
+      screen.getByPlaceholderText("Describe the experience and strengths that make you a good fit."),
+    ).toBeTruthy();
     expect(screen.getByRole("radiogroup", { name: "Proposal style" })).toBeTruthy();
     expect((screen.getByRole("radio", { name: "Warm & personable" }) as HTMLInputElement).checked).toBe(true);
     expect(screen.queryByLabelText(/Language/)).toBeNull();
@@ -67,6 +74,18 @@ describe("ProposalAI product definition", () => {
 
     expect(await screen.findByText("Task description is required.")).toBeTruthy();
     expect(screen.getByText("Your positioning must not start or end with whitespace.")).toBeTruthy();
+    const taskField = screen.getByLabelText("Describe the task");
+    const positioningField = screen.getByLabelText("Your positioning");
+    expect(taskField.getAttribute("aria-describedby")).toBe("proposal-ai-task-help proposal-ai-task-error");
+    expect(positioningField.getAttribute("aria-describedby")).toBe(
+      "proposal-ai-positioning-help proposal-ai-positioning-error",
+    );
+    for (const id of taskField.getAttribute("aria-describedby")!.split(" ")) {
+      expect(document.getElementById(id)).toBeTruthy();
+    }
+    for (const id of positioningField.getAttribute("aria-describedby")!.split(" ")) {
+      expect(document.getElementById(id)).toBeTruthy();
+    }
     expect(calls.some((call) => call.key === ROUTES.START)).toBe(false);
   });
 

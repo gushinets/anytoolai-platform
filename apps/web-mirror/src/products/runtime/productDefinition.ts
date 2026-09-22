@@ -93,7 +93,7 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
   Fields: ComponentType<ProductFieldsProps<V>>;
   Result: ComponentType<ProductResultProps<R>>;
   copy: {
-    description?: string;
+    description: string;
     submit: string;
     running: string;
     runFailed: string;

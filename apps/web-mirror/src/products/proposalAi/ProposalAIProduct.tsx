@@ -7,6 +7,7 @@ import { ResultView } from "../../components/ResultView";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import { collectFieldErrors, requiredTrimmedFieldError } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductRunEvent } from "../runtime/productDefinition";
+import styles from "./ProposalAIProduct.module.css";
 
 const TONE_OPTIONS = [
   { value: "warm", label: "Warm & personable" },
@@ -31,42 +32,69 @@ function validate(values: ProposalAIValues): Partial<Record<keyof ProposalAIValu
 function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsProps<ProposalAIValues>) {
   return (
     <>
-      <label htmlFor="proposal-ai-task-text">Describe the task</label>
-      <TextArea
-        id="proposal-ai-task-text"
-        value={values.taskText}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("taskText", event.target.value)}
-        disabled={disabled}
-        aria-invalid={Boolean(errors.taskText)}
-      />
-      {errors.taskText ? <p role="alert">{errors.taskText}</p> : null}
+      <div className={styles.fieldGroup}>
+        <label htmlFor="proposal-ai-task-text">Describe the task</label>
+        <TextArea
+          id="proposal-ai-task-text"
+          className={styles.taskTextArea}
+          value={values.taskText}
+          placeholder="Paste the client's task, brief, or job post."
+          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("taskText", event.target.value)}
+          disabled={disabled}
+          aria-invalid={Boolean(errors.taskText)}
+          aria-describedby={`proposal-ai-task-help${errors.taskText ? " proposal-ai-task-error" : ""}`}
+        />
+        <p id="proposal-ai-task-help" className={styles.help}>
+          Include the goal, deliverables, constraints, and timeline when available.
+        </p>
+        {errors.taskText ? (
+          <p id="proposal-ai-task-error" className={styles.error} role="alert">
+            {errors.taskText}
+          </p>
+        ) : null}
+      </div>
 
-      <label htmlFor="proposal-ai-positioning">Your positioning</label>
-      <TextArea
-        id="proposal-ai-positioning"
-        value={values.freelancerPositioning}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("freelancerPositioning", event.target.value)}
-        disabled={disabled}
-        aria-invalid={Boolean(errors.freelancerPositioning)}
-      />
-      {errors.freelancerPositioning ? <p role="alert">{errors.freelancerPositioning}</p> : null}
+      <div className={styles.fieldGroup}>
+        <label htmlFor="proposal-ai-positioning">Your positioning</label>
+        <TextArea
+          id="proposal-ai-positioning"
+          className={styles.positioningTextArea}
+          value={values.freelancerPositioning}
+          placeholder="Describe the experience and strengths that make you a good fit."
+          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("freelancerPositioning", event.target.value)}
+          disabled={disabled}
+          aria-invalid={Boolean(errors.freelancerPositioning)}
+          aria-describedby={`proposal-ai-positioning-help${errors.freelancerPositioning ? " proposal-ai-positioning-error" : ""}`}
+        />
+        <p id="proposal-ai-positioning-help" className={styles.help}>
+          Use only claims you can stand behind—the proposal will not invent experience.
+        </p>
+        {errors.freelancerPositioning ? (
+          <p id="proposal-ai-positioning-error" className={styles.error} role="alert">
+            {errors.freelancerPositioning}
+          </p>
+        ) : null}
+      </div>
 
-      <fieldset role="radiogroup">
-        <legend>Proposal style</legend>
-        {TONE_OPTIONS.map((option) => (
-          <label key={option.value} htmlFor={`proposal-ai-tone-${option.value}`}>
-            <input
-              id={`proposal-ai-tone-${option.value}`}
-              type="radio"
-              name="proposal-ai-tone"
-              value={option.value}
-              checked={values.tone === option.value}
-              onChange={() => onChange("tone", option.value)}
-              disabled={disabled}
-            />
-            {option.label}
-          </label>
-        ))}
+      <fieldset className={styles.toneGroup} role="radiogroup">
+        <legend className={styles.legend}>Proposal style</legend>
+        <div className={styles.toneOptions}>
+          {TONE_OPTIONS.map((option) => (
+            <label className={styles.toneOption} key={option.value} htmlFor={`proposal-ai-tone-${option.value}`}>
+              <input
+                className={styles.radio}
+                id={`proposal-ai-tone-${option.value}`}
+                type="radio"
+                name="proposal-ai-tone"
+                value={option.value}
+                checked={values.tone === option.value}
+                onChange={() => onChange("tone", option.value)}
+                disabled={disabled}
+              />
+              {option.label}
+            </label>
+          ))}
+        </div>
       </fieldset>
     </>
   );
@@ -93,6 +121,7 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> =
   Fields: ProposalAIFields,
   Result: ({ result, onCopy }) => <ResultView text={result} onCopy={onCopy} />,
   copy: {
+    description: "Turn a client brief and your relevant strengths into a proposal ready to send.",
     submit: "Generate proposal",
     running: "Generating your proposal…",
     runFailed: "Something went wrong generating your proposal. Please try again.",
