@@ -83,7 +83,14 @@ test.describe("ProposalAI web product", () => {
   }) => {
     await page.goto(PRODUCT_URL);
     await expect(page.locator("h1")).toHaveText("ProposalAI");
+    await expect(
+      page.getByText("Turn a client brief and your relevant strengths into a proposal ready to send."),
+    ).toBeVisible();
     await expect(page.getByText("3 of 3 proposals remaining.")).toBeVisible();
+    await expect(page.getByRole("radiogroup", { name: "Proposal style" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "Warm & personable" })).toBeChecked();
+    await expect(page.getByRole("textbox", { name: /Language/i })).toHaveCount(0);
+    await expect(page.getByRole("combobox", { name: /Language/i })).toHaveCount(0);
 
     const nextActionRequests: string[] = [];
     page.on("request", (request) => {
