@@ -448,6 +448,43 @@ test("catalog refresh requires explicit effort reselection when the selected eff
   await expect(page.locator("#run-button")).toBeEnabled();
 });
 
+for (const reasoningSupported of [false, null]) {
+  const mode = reasoningSupported === false ? "unsupported" : "unknown";
+  test(`catalog refresh allows explicit no-effort recovery when reasoning becomes ${mode}`, async ({page}) => {
+    let refreshed = false;
+    await page.route("http://atom-lab.test/v1/atom-lab/models/refresh", async (route) => {
+      refreshed = true;
+      await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({
+        snapshot_id: `catalog-snapshot-reasoning-${mode}`,
+        last_success_at: "2026-09-22T00:00:00Z",
+        stale: false,
+        refresh_status: "current",
+        error: null,
+      })});
+    });
+    await unlockAtom(page, "A05", {models: () => refreshed ? {
+      ...MODEL_CATALOG,
+      items: MODEL_CATALOG.items.map((item) => item.model_id === "gpt-supported"
+        ? {...item, reasoning_supported: reasoningSupported, allowed_reasoning_efforts: null}
+        : item),
+      stale: false,
+    } : MODEL_CATALOG});
+    await page.locator("#fill-example").click();
+    await page.locator("#model-select").selectOption("gpt-supported");
+    await page.locator("#reasoning-effort").selectOption("high");
+
+    await page.locator("#refresh-models").click();
+
+    await expect(page.locator("#reasoning-effort")).toBeEnabled();
+    await expect(page.locator("#reasoning-effort")).toHaveValue("high");
+    await expect(page.locator("#run-button")).toBeDisabled();
+
+    await page.locator("#reasoning-effort").selectOption("");
+    await expect(page.locator("#reasoning-effort")).toBeDisabled();
+    await expect(page.locator("#run-button")).toBeEnabled();
+  });
+}
+
 test("one accepted submission survives draft edits and renders safe result diagnostics", async ({page}) => {
   let posts = 0;
   let reads = 0;
@@ -904,6 +941,27 @@ test("succeeded run without a result fails closed as an invalid API response", a
   await expect(page.locator("#retry-read")).toBeVisible();
   await expect(page.locator("#result-section")).toBeHidden();
   await expect(page.locator("#run-button")).toBeDisabled();
+});
+
+test("malformed successful run detail fails closed without automatic reconnect", async ({page}) => {
+  let reads = 0;
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+    await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({
+      run_id: "run-malformed-detail", scenario_session_id: "session-malformed-detail", job_id: "job-malformed-detail", status: "running",
+    })});
+  });
+  await page.route("http://atom-lab.test/v1/atom-lab/runs/run-malformed-detail", async (route) => {
+    reads += 1;
+    await route.fulfill({status: 200, contentType: "text/html", body: "<not-json>"});
+  });
+  await unlockAtom(page, "A05");
+  await page.locator("#fill-example").click();
+  await page.locator("#run-button").click();
+
+  await expect(page.locator("#run-state")).toContainText("Некорректный ответ API");
+  await expect(page.locator("#retry-read")).toBeVisible();
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  expect(reads).toBe(1);
 });
 
 for (const mismatch of [

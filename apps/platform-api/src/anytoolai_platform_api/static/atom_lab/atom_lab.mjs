@@ -1147,6 +1147,7 @@ export function bootstrapAtomLab({
   lifecycleTarget = globalThis,
   nowImpl = () => Date.now(),
   pollTimeoutMs = RUN_POLL_TIMEOUT_MS,
+  catalogLoadTimeoutMs = 30_000,
   submissionTimeoutMs = 30_000,
   idempotencyKeyFactory = () => globalThis.crypto?.randomUUID?.()
     ?? `run-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -1247,7 +1248,8 @@ export function bootstrapAtomLab({
       nodes["reasoning-effort"].append(invalidated);
     }
     nodes["reasoning-effort"].value = effortRemainsAllowed || preferredEffort ? preferredEffort : "";
-    nodes["reasoning-effort"].disabled = option?.reasoningMode !== "supported";
+    nodes["reasoning-effort"].disabled = option?.reasoningMode !== "supported"
+      && !(preferredEffort && !effortRemainsAllowed);
     nodes["reasoning-help"].textContent = option ? modelReasonText(option) : "Выберите модель.";
     if (preferredEffort && !effortRemainsAllowed) {
       nodes["reasoning-help"].textContent = "Выбранный reasoning effort больше не поддерживается. Выберите effort заново.";
@@ -1288,7 +1290,7 @@ export function bootstrapAtomLab({
     renderReasoning(previousModelId && selectedModelId === previousModelId ? previousReasoningEffort : "");
   };
 
-  const loadModels = async ({timeoutMs = null} = {}) => {
+  const loadModels = async ({timeoutMs = catalogLoadTimeoutMs} = {}) => {
     const generation = modelCatalogReadGeneration + 1;
     modelCatalogReadGeneration = generation;
     const controller = timeoutMs === null ? null : new AbortControllerImpl();
@@ -1321,14 +1323,16 @@ export function bootstrapAtomLab({
     } catch (error) {
       if (generation !== modelCatalogReadGeneration) return null;
       if (error?.name === "AbortError" && (destroyed || paused)) return null;
-      if (error?.name === "AbortError" && timedOut) return "timed_out";
-      const message = error instanceof Error
+      const readTimedOut = error?.name === "AbortError" && timedOut;
+      const message = readTimedOut
+        ? "Время ожидания каталога моделей истекло."
+        : error instanceof Error
         ? error.message
         : "Каталог моделей недоступен.";
       if (modelCatalog) {
         modelCatalog = {...modelCatalog, stale: true, error: message};
         renderModelCatalog();
-        return false;
+        return readTimedOut ? "timed_out" : false;
       }
       modelCatalog = null;
       modelOptions = [];
@@ -1337,7 +1341,7 @@ export function bootstrapAtomLab({
       nodes["reasoning-effort"].disabled = true;
       nodes["run-button"].disabled = true;
       nodes["model-catalog-warning"].textContent = message;
-      return false;
+      return readTimedOut ? "timed_out" : false;
     } finally {
       if (timeoutId !== null) cancelScheduleImpl(timeoutId);
       if (activeModelCatalogAbortController === controller) activeModelCatalogAbortController = null;
@@ -1501,9 +1505,12 @@ export function bootstrapAtomLab({
         headers: {[ACCESS_HEADER]: accessCode},
         signal: controller.signal,
       });
-      const payload = response.ok
-        ? await response.json()
-        : await response.json().catch(() => null);
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+      }
       return {response, payload, timedOut: false};
     } catch (error) {
       if (destroyed && error?.name === "AbortError") return {cancelled: true};
@@ -1794,6 +1801,7 @@ export function bootstrapAtomLab({
   });
   nodes["reasoning-effort"].addEventListener("change", () => {
     const option = selectedModelOption();
+    nodes["reasoning-effort"].disabled = option?.reasoningMode !== "supported";
     nodes["reasoning-help"].textContent = option ? modelReasonText(option) : "Выберите модель.";
     updateRunButton();
   });
