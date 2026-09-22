@@ -1,8 +1,10 @@
 "use client";
 
+import { generateIdempotencyKey } from "@anytoolai/ce-kit";
 import { notFound } from "next/navigation";
 import { use, useMemo } from "react";
 import { getPlatformApiClient } from "../../../lib/apiClient";
+import { ProductPageShell } from "../../../products/ProductPageShell";
 import { getRegisteredProduct } from "../../../products/registry";
 import { getClientStorage } from "../../../products/runtime/clientStorage";
 import { createProductRunEventTracker } from "../../../products/runtime/productRunEventTracking";
@@ -29,13 +31,16 @@ export default function ProductPage({ params }: ProductPageProps) {
   // one real landing on this product instead of the client's whole lifetime (code review finding).
   // `productId` is a dependency purely to force recomputation on that change; the callback itself
   // has no use for its value.
+  // Code review finding: bare `crypto.randomUUID()` throws on plain HTTP off localhost (no secure
+  // context, so `window.crypto.randomUUID` is undefined) -- reuses ce-kit's already-guarded
+  // generator (its "idempotency key" name is about its other caller; the value itself is just a
+  // random UUID) instead of duplicating its `crypto.getRandomValues`/`Math.random` fallback here.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const visitId = useMemo(() => crypto.randomUUID(), [productId]);
+  const visitId = useMemo(() => generateIdempotencyKey(), [productId]);
 
   if (!product) {
     notFound();
   }
 
-  const { Component } = product;
-  return <Component key={productId} client={client} onEvent={onEvent} visitId={visitId} />;
+  return <ProductPageShell key={productId} product={product} client={client} onEvent={onEvent} visitId={visitId} />;
 }

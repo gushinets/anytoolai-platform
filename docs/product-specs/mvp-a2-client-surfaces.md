@@ -49,6 +49,9 @@ Required routes:
 
 The host composes shared product-run behavior with product-owned definitions. Shared runtime must not
 import individual products or contain Freelancer semantics. The composition layer may import both.
+Product pages are localized (`en fr it de es ru pt`) by one host-level locale mechanism and language
+selector applied to every registered product; translations are product-owned and the UI locale is
+independent of generated-content language. See `docs/architecture/frontend-boundaries.md` "Web i18n".
 No new frontend package or generic page builder is required before another application needs the
 same proven runtime.
 
