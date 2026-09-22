@@ -2,7 +2,7 @@
 
 import type { ChangeEvent } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
-import { TextArea } from "@anytoolai/shared-ui";
+import { TextArea as CanonicalTextArea } from "@anytoolai/shared-ui";
 import { ResultView } from "../../components/ResultView";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import { collectFieldErrors, requiredTrimmedFieldError } from "../runtime/fieldValidation";
@@ -34,7 +34,7 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
     <>
       <div className={styles.fieldGroup}>
         <label htmlFor="proposal-ai-task-text">Describe the task</label>
-        <TextArea
+        <CanonicalTextArea
           id="proposal-ai-task-text"
           className={styles.taskTextArea}
           value={values.taskText}
@@ -56,7 +56,7 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
 
       <div className={styles.fieldGroup}>
         <label htmlFor="proposal-ai-positioning">Your positioning</label>
-        <TextArea
+        <CanonicalTextArea
           id="proposal-ai-positioning"
           className={styles.positioningTextArea}
           value={values.freelancerPositioning}
