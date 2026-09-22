@@ -2,35 +2,29 @@
 
 import type { ChangeEvent } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
-import { Input, TextArea } from "@anytoolai/shared-ui";
+import { TextArea } from "@anytoolai/shared-ui";
 import { ResultView } from "../../components/ResultView";
 import { ProductRunPage } from "../runtime/ProductRunPage";
 import { collectFieldErrors, requiredTrimmedFieldError } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductRunEvent } from "../runtime/productDefinition";
-import { ToneSelect, type Tone } from "../shared/tone";
+
+const TONE_OPTIONS = [
+  { value: "warm", label: "Warm & personable" },
+  { value: "neutral", label: "Clear & professional" },
+  { value: "firm", label: "Confident & direct" },
+] as const;
+type Tone = (typeof TONE_OPTIONS)[number]["value"];
 
 export type ProposalAIValues = {
   taskText: string;
   freelancerPositioning: string;
-  tone: Tone | "";
-  language: string;
+  tone: Tone;
 };
-
-// Mirrors generate_input.schema.json's `language` pattern -- checked structurally below instead
-// of transcribing that schema's equivalent (but harder to read) regex. Backend validation stays
-// authoritative either way.
-const LANGUAGE_PATTERN = /^[a-z]{2}(-[A-Z]{2})?$/;
 
 function validate(values: ProposalAIValues): Partial<Record<keyof ProposalAIValues, string>> {
   return collectFieldErrors<ProposalAIValues>([
     ["taskText", requiredTrimmedFieldError(values.taskText, "Task description", 4000)],
     ["freelancerPositioning", requiredTrimmedFieldError(values.freelancerPositioning, "Your positioning", 4000)],
-    [
-      "language",
-      values.language && !LANGUAGE_PATTERN.test(values.language)
-        ? 'Language must look like "en" or "en-US".'
-        : undefined,
-    ],
   ]);
 }
 
@@ -57,24 +51,23 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
       />
       {errors.freelancerPositioning ? <p role="alert">{errors.freelancerPositioning}</p> : null}
 
-      <label htmlFor="proposal-ai-tone">Tone (optional)</label>
-      <ToneSelect
-        id="proposal-ai-tone"
-        value={values.tone}
-        onChange={(tone) => onChange("tone", tone)}
-        disabled={disabled}
-        placeholderLabel="Default"
-      />
-
-      <label htmlFor="proposal-ai-language">Language (optional)</label>
-      <Input
-        id="proposal-ai-language"
-        value={values.language}
-        onChange={(event: ChangeEvent<HTMLInputElement>) => onChange("language", event.target.value)}
-        disabled={disabled}
-        aria-invalid={Boolean(errors.language)}
-      />
-      {errors.language ? <p role="alert">{errors.language}</p> : null}
+      <fieldset role="radiogroup">
+        <legend>Proposal style</legend>
+        {TONE_OPTIONS.map((option) => (
+          <label key={option.value} htmlFor={`proposal-ai-tone-${option.value}`}>
+            <input
+              id={`proposal-ai-tone-${option.value}`}
+              type="radio"
+              name="proposal-ai-tone"
+              value={option.value}
+              checked={values.tone === option.value}
+              onChange={() => onChange("tone", option.value)}
+              disabled={disabled}
+            />
+            {option.label}
+          </label>
+        ))}
+      </fieldset>
     </>
   );
 }
@@ -89,13 +82,12 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> =
   productId: "proposal_ai",
   scenarioId: "proposal_ai.generate_v1",
   title: "ProposalAI",
-  emptyValues: { taskText: "", freelancerPositioning: "", tone: "", language: "" },
+  emptyValues: { taskText: "", freelancerPositioning: "", tone: "warm" },
   validate,
   toInput: (values) => ({
     task_text: values.taskText,
     freelancer_positioning: values.freelancerPositioning,
-    ...(values.tone ? { tone: values.tone } : {}),
-    ...(values.language ? { language: values.language } : {}),
+    tone: values.tone,
   }),
   extractResult: (output) => (typeof output.text === "string" ? output.text : null),
   Fields: ProposalAIFields,
