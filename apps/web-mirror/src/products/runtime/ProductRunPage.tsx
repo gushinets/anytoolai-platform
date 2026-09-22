@@ -799,9 +799,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       mainContent = (
         <div className={styles.resultStack}>
           <Result result={phase.result} onCopy={handleCopy} />
-          {definition.copy.startAnother ? (
+          {definition.hasStartAnother ? (
             <Button className={styles.resultAction} variant="secondary" onClick={handleStartAnother}>
-              {definition.copy.startAnother}
+              {tp(`${definition.messageScope}.startAnother`)}
             </Button>
           ) : null}
         </div>
@@ -827,7 +827,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         <Card className={styles.formCard}>
           <form
             ref={formRef}
-            aria-label={`${definition.title} form`}
+            aria-label={`${title} form`}
             className={styles.form}
             noValidate
             onSubmit={handleSubmit}
@@ -836,16 +836,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
             <div className={styles.footer}>
               <Button type="submit" loading={busy} disabled={identityUnavailable}>
                 {phase.kind === "submitting"
-                  ? "Starting…"
+                  ? th("starting")
                   : phase.kind === "running"
-                    ? "Generating…"
-                    : definition.copy.submit}
+                    ? th("generating")
+                    : tp(`${definition.messageScope}.submit`)}
               </Button>
               <div className={styles.statusRegion}>
-                {phase.kind === "running" ? <p role="status">{definition.copy.running}</p> : null}
-                {identityUnavailable ? (
-                  <p role="alert">We couldn&apos;t verify your identity. Please reload the page and try again.</p>
-                ) : null}
+                {phase.kind === "running" ? <p role="status">{tp(`${definition.messageScope}.running`)}</p> : null}
+                {identityUnavailable ? <p role="alert">{th("identityUnavailable")}</p> : null}
               </div>
             </div>
           </form>
@@ -860,11 +858,11 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     <main className="page-container">
       <div className={styles.content}>
         <header className={styles.header}>
-          <h1>{definition.title}</h1>
-          {definition.copy.description ? <p className={styles.description}>{definition.copy.description}</p> : null}
+          <h1>{title}</h1>
+          {definition.hasDescription ? <p className={styles.description}>{tp("description")}</p> : null}
           {quota ? (
             <p className={styles.quota} aria-live="polite">
-              {definition.copy.quotaRemaining(quota.remainingCount, quota.limitCount)}
+              {tp("quotaRemaining", { remaining: quota.remainingCount, limit: quota.limitCount })}
             </p>
           ) : null}
         </header>

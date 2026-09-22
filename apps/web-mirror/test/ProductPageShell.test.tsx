@@ -122,8 +122,11 @@ describe("ProductPageShell locale rendering", () => {
     expect(await screen.findByRole("button", { name: messages.generate.submit })).toBeTruthy();
     expect(screen.getByLabelText(messages.fields.taskText)).toBeTruthy();
     expect(screen.getByLabelText(messages.fields.freelancerPositioning)).toBeTruthy();
-    expect(screen.getByLabelText(messages.fields.tone)).toBeTruthy();
-    expect(screen.getByLabelText(messages.fields.language)).toBeTruthy();
+    expect(screen.getByText(messages.fields.toneLegend)).toBeTruthy();
+    expect(screen.getByLabelText(messages.toneOptions.warm)).toBeTruthy();
+    expect(screen.getByLabelText(messages.toneOptions.neutral)).toBeTruthy();
+    expect(screen.getByLabelText(messages.toneOptions.firm)).toBeTruthy();
+    expect(screen.getByText(messages.description)).toBeTruthy();
     expect(screen.getByRole("heading", { name: messages.title })).toBeTruthy();
     expect(document.documentElement.lang).toBe(locale);
     expect(selector().value).toBe(locale);
@@ -311,25 +314,22 @@ describe("UI locale is independent of scenario input and state", () => {
     };
   }
 
-  it("keeps entered values, and never touches the output-language field, when the UI locale changes (and back)", async () => {
+  it("keeps entered values when the UI locale changes (and back) -- ProposalAI's web UI has no output-language field to leak into", async () => {
+    // ANY-521 removed the language input from ProposalAI's web UI entirely (output language now
+    // derives from task_text); independence from UI locale holds trivially since there is no
+    // UI-locale-adjacent field left to touch. toInput() never reading the UI locale is what the
+    // other ProposalAI tests (wire values, translated labels) already prove indirectly.
     const { calls } = renderShell(registered("proposal_ai"), happyRoutes(PROPOSAL_IDS));
     const en = PROPOSAL_AI_MESSAGES.en.fields;
     const ru = PROPOSAL_AI_MESSAGES.ru.fields;
     await screen.findByLabelText(en.taskText);
     fireEvent.change(screen.getByLabelText(en.taskText), { target: { value: "Build a landing page." } });
     fireEvent.change(screen.getByLabelText(en.freelancerPositioning), { target: { value: "Frontend freelancer." } });
-    fireEvent.change(screen.getByLabelText(en.language), { target: { value: "fr" } });
 
     switchTo("ru");
 
     expect(valueOf(screen.getByLabelText(ru.taskText))).toBe("Build a landing page.");
     expect(valueOf(screen.getByLabelText(ru.freelancerPositioning))).toBe("Frontend freelancer.");
-    expect(valueOf(screen.getByLabelText(ru.language))).toBe("fr");
-
-    // ... and the reverse: changing the output language does not change the UI locale.
-    fireEvent.change(screen.getByLabelText(ru.language), { target: { value: "de-DE" } });
-    expect(selector().value).toBe("ru");
-    expect(document.documentElement.lang).toBe("ru");
 
     switchTo("en");
     fireEvent.click(screen.getByRole("button", { name: PROPOSAL_AI_MESSAGES.en.generate.submit }));
@@ -337,33 +337,29 @@ describe("UI locale is independent of scenario input and state", () => {
     expect(startInput(calls)).toEqual({
       task_text: "Build a landing page.",
       freelancer_positioning: "Frontend freelancer.",
-      language: "de-DE",
+      tone: "warm",
     });
   });
 
-  it("sends the untranslated wire value for a tone chosen while the labels are translated", async () => {
+  it("sends the untranslated wire value for a tone chosen while its label is translated", async () => {
     const { calls } = renderShell(registered("proposal_ai"), happyRoutes(PROPOSAL_IDS));
     await screen.findByLabelText(PROPOSAL_AI_MESSAGES.en.fields.taskText);
     switchTo("ru");
-    const tone = screen.getByLabelText(PROPOSAL_AI_MESSAGES.ru.fields.tone) as HTMLSelectElement;
+    const ru = PROPOSAL_AI_MESSAGES.ru;
+    const warmRadio = screen.getByLabelText(ru.toneOptions.warm) as HTMLInputElement;
+    const neutralRadio = screen.getByLabelText(ru.toneOptions.neutral) as HTMLInputElement;
+    const firmRadio = screen.getByLabelText(ru.toneOptions.firm) as HTMLInputElement;
 
-    expect([...tone.options].map((option) => option.value)).toEqual(["", "neutral", "warm", "firm"]);
-    expect([...tone.options].map((option) => option.textContent)).toEqual([
-      PROPOSAL_AI_MESSAGES.ru.fields.tonePlaceholder,
-      PROPOSAL_AI_MESSAGES.ru.tone.neutral,
-      PROPOSAL_AI_MESSAGES.ru.tone.warm,
-      PROPOSAL_AI_MESSAGES.ru.tone.firm,
-    ]);
+    expect([warmRadio.value, neutralRadio.value, firmRadio.value]).toEqual(["warm", "neutral", "firm"]);
+    expect(warmRadio.checked).toBe(true); // emptyValues.tone defaults to "warm"
 
-    fireEvent.change(screen.getByLabelText(PROPOSAL_AI_MESSAGES.ru.fields.taskText), { target: { value: "Task" } });
-    fireEvent.change(screen.getByLabelText(PROPOSAL_AI_MESSAGES.ru.fields.freelancerPositioning), {
-      target: { value: "Me" },
-    });
-    fireEvent.change(tone, { target: { value: "warm" } });
-    fireEvent.click(screen.getByRole("button", { name: PROPOSAL_AI_MESSAGES.ru.generate.submit }));
+    fireEvent.change(screen.getByLabelText(ru.fields.taskText), { target: { value: "Task" } });
+    fireEvent.change(screen.getByLabelText(ru.fields.freelancerPositioning), { target: { value: "Me" } });
+    fireEvent.click(firmRadio);
+    fireEvent.click(screen.getByRole("button", { name: ru.generate.submit }));
 
     await waitFor(() => expect(screen.getByText("Generated.")).toBeTruthy());
-    expect(startInput(calls).tone).toBe("warm");
+    expect(startInput(calls).tone).toBe("firm");
   });
 
   it("keeps Client Update Writer's selected mode, its values and the mode wire values across a switch", async () => {

@@ -89,8 +89,11 @@ test.describe("ProposalAI web product", () => {
     await expect(page.getByText("10 of 10 proposals remaining.")).toBeVisible();
     await expect(page.getByRole("radiogroup", { name: "Proposal style" })).toBeVisible();
     await expect(page.getByRole("radio", { name: "Warm & personable" })).toBeChecked();
-    await expect(page.getByRole("textbox", { name: /Language/i })).toHaveCount(0);
-    await expect(page.getByRole("combobox", { name: /Language/i })).toHaveCount(0);
+    // Scoped to <main>: the UI language switcher (outside <main>, above ProductRunPage) is itself
+    // an accessibly-named "Language" combobox, so an unscoped query would match it, not prove the
+    // removed output-language field's absence.
+    await expect(page.locator("main").getByRole("textbox", { name: /Language/i })).toHaveCount(0);
+    await expect(page.locator("main").getByRole("combobox", { name: /Language/i })).toHaveCount(0);
 
     const nextActionRequests: string[] = [];
     page.on("request", (request) => {
@@ -271,13 +274,19 @@ test.describe("ProposalAI web product", () => {
     expect(secondGuestId).toBe(firstGuestId);
   });
 
-  test("language switch: the UI changes and persists across reload, entered values stay, and the output-language field is untouched", async ({
+  test("language switch: the UI changes and persists across reload, entered values and tone stay", async ({
     page,
   }) => {
+    // ANY-521 dropped the UI-visible language field entirely (output language now derives from
+    // task_text), so UI-locale independence from generated-content language holds trivially here --
+    // this only proves entered form state (text + the radio-group tone choice) survives a switch.
     await page.goto(PRODUCT_URL);
     await expect(page.getByRole("button", { name: "Generate proposal" })).toBeVisible();
     await page.locator("#proposal-ai-task-text").fill("Write a landing page hero section for a bakery.");
-    await page.locator("#proposal-ai-language").fill("de");
+    // The card-style tone radio visually hides the native input under its own <label> (CSS
+    // `.toneOption:has(.radio:checked)`), so clicking the label -- the real click target -- rather
+    // than .check()-ing the covered input directly.
+    await page.locator('label[for="proposal-ai-tone-firm"]').click();
 
     await page.locator("#ui-language").selectOption("ru");
 
@@ -287,7 +296,7 @@ test.describe("ProposalAI web product", () => {
     await expect(page.getByRole("button", { name: "Generate proposal" })).toHaveCount(0);
     await expect(page.locator("h1")).toHaveText("ProposalAI");
     await expect(page.locator("#proposal-ai-task-text")).toHaveValue("Write a landing page hero section for a bakery.");
-    await expect(page.locator("#proposal-ai-language")).toHaveValue("de");
+    await expect(page.locator("#proposal-ai-tone-firm")).toBeChecked();
 
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("lang", "ru");

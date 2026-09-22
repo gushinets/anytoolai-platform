@@ -76,8 +76,8 @@ describe("ProposalAI product definition", () => {
     fireEvent.change(screen.getByLabelText("Your positioning"), { target: { value: " padded " } });
     fireEvent.click(screen.getByRole("button", { name: "Generate proposal" }));
 
-    expect(await screen.findByText("Task description is required.")).toBeTruthy();
-    expect(screen.getByText("Your positioning must not start or end with whitespace.")).toBeTruthy();
+    expect(await screen.findByText("Task description: required.")).toBeTruthy();
+    expect(screen.getByText("Your positioning: no leading or trailing whitespace.")).toBeTruthy();
     const taskField = screen.getByLabelText("Describe the task");
     const positioningField = screen.getByLabelText("Your positioning");
     expect(taskField.getAttribute("aria-describedby")).toBe("proposal-ai-task-help proposal-ai-task-error");

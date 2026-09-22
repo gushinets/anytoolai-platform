@@ -2,7 +2,7 @@
 
 import type { ChangeEvent } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
-import { Input, TextArea as CanonicalTextArea } from "@anytoolai/shared-ui";
+import { TextArea as CanonicalTextArea } from "@anytoolai/shared-ui";
 import { FieldErrorMessage } from "../../components/FieldErrorMessage";
 import { ResultView } from "../../components/ResultView";
 import { useProductT } from "../../i18n";
@@ -11,12 +11,11 @@ import { collectFieldErrors, requiredTrimmedFieldError, type FieldError } from "
 import type { ProductDefinition, ProductFieldsProps, ProductRunEvent } from "../runtime/productDefinition";
 import styles from "./ProposalAIProduct.module.css";
 
-const TONE_OPTIONS = [
-  { value: "warm", label: "Warm & personable" },
-  { value: "neutral", label: "Clear & professional" },
-  { value: "firm", label: "Confident & direct" },
-] as const;
-type Tone = (typeof TONE_OPTIONS)[number]["value"];
+// ANY-521's own product-owned tone UI (three visible radio choices, not the shared `ToneSelect`
+// dropdown -- its exec-plan explicitly rules out "a speculative shared RadioGroup abstraction for
+// one product"). Values stay the untranslated wire enum; labels come from `toneOptions.<value>`.
+const TONE_VALUES = ["warm", "neutral", "firm"] as const;
+type Tone = (typeof TONE_VALUES)[number];
 
 export type ProposalAIValues = {
   taskText: string;
@@ -28,12 +27,6 @@ function validate(values: ProposalAIValues): Partial<Record<keyof ProposalAIValu
   return collectFieldErrors<ProposalAIValues>([
     ["taskText", requiredTrimmedFieldError(values.taskText, 4000)],
     ["freelancerPositioning", requiredTrimmedFieldError(values.freelancerPositioning, 4000)],
-    [
-      "language",
-      values.language && !LANGUAGE_PATTERN.test(values.language)
-        ? { code: "product", key: "validation.languageFormat" }
-        : undefined,
-    ],
   ]);
 }
 
@@ -42,65 +35,67 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
   return (
     <>
       <div className={styles.fieldGroup}>
-        <label htmlFor="proposal-ai-task-text">Describe the task</label>
+        <label htmlFor="proposal-ai-task-text">{t("fields.taskText")}</label>
         <CanonicalTextArea
           id="proposal-ai-task-text"
           className={styles.taskTextArea}
           value={values.taskText}
-          placeholder="Paste the client's task, brief, or job post."
+          placeholder={t("fields.taskTextPlaceholder")}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("taskText", event.target.value)}
           disabled={disabled}
           aria-invalid={Boolean(errors.taskText)}
           aria-describedby={`proposal-ai-task-help${errors.taskText ? " proposal-ai-task-error" : ""}`}
         />
         <p id="proposal-ai-task-help" className={styles.help}>
-          Include the goal, deliverables, constraints, and timeline when available.
+          {t("fields.taskTextHelp")}
         </p>
-        {errors.taskText ? (
-          <p id="proposal-ai-task-error" className={styles.error} role="alert">
-            {errors.taskText}
-          </p>
-        ) : null}
+        <FieldErrorMessage
+          id="proposal-ai-task-error"
+          className={styles.error}
+          error={errors.taskText}
+          label={t("fieldNames.taskText")}
+        />
       </div>
 
       <div className={styles.fieldGroup}>
-        <label htmlFor="proposal-ai-positioning">Your positioning</label>
+        <label htmlFor="proposal-ai-positioning">{t("fields.freelancerPositioning")}</label>
         <CanonicalTextArea
           id="proposal-ai-positioning"
           className={styles.positioningTextArea}
           value={values.freelancerPositioning}
-          placeholder="Describe the experience and strengths that make you a good fit."
+          placeholder={t("fields.freelancerPositioningPlaceholder")}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("freelancerPositioning", event.target.value)}
           disabled={disabled}
           aria-invalid={Boolean(errors.freelancerPositioning)}
           aria-describedby={`proposal-ai-positioning-help${errors.freelancerPositioning ? " proposal-ai-positioning-error" : ""}`}
         />
         <p id="proposal-ai-positioning-help" className={styles.help}>
-          Use only claims you can stand behind—the proposal will not invent experience.
+          {t("fields.freelancerPositioningHelp")}
         </p>
-        {errors.freelancerPositioning ? (
-          <p id="proposal-ai-positioning-error" className={styles.error} role="alert">
-            {errors.freelancerPositioning}
-          </p>
-        ) : null}
+        <FieldErrorMessage
+          id="proposal-ai-positioning-error"
+          className={styles.error}
+          error={errors.freelancerPositioning}
+          label={t("fieldNames.freelancerPositioning")}
+        />
       </div>
 
       <fieldset className={styles.toneGroup} role="radiogroup">
-        <legend className={styles.legend}>Proposal style</legend>
+        <legend className={styles.legend}>{t("fields.toneLegend")}</legend>
         <div className={styles.toneOptions}>
-          {TONE_OPTIONS.map((option) => (
-            <label className={styles.toneOption} key={option.value} htmlFor={`proposal-ai-tone-${option.value}`}>
+          {TONE_VALUES.map((value) => (
+            <label className={styles.toneOption} key={value} htmlFor={`proposal-ai-tone-${value}`}>
               <input
                 className={styles.radio}
-                id={`proposal-ai-tone-${option.value}`}
+                id={`proposal-ai-tone-${value}`}
                 type="radio"
                 name="proposal-ai-tone"
-                value={option.value}
-                checked={values.tone === option.value}
-                onChange={() => onChange("tone", option.value)}
+                value={value}
+                checked={values.tone === value}
+                onChange={() => onChange("tone", value)}
                 disabled={disabled}
               />
-              {option.label}
+              {t(`toneOptions.${value}`)}
             </label>
           ))}
         </div>
@@ -113,12 +108,15 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
  * ProposalAI's product meaning, and nothing else: its fields and their validation, the mapping to
  * `proposal_ai.generate_input_v1`, the canonical field `renderer_contract.yaml` pins (`text` --
  * angle/rationale/model/provider are excluded on purpose and never reach the renderer), the
- * `copy_result` activation, and its message scope (the copy itself is in `messages/`). Everything else is the shared `ProductRunPage`.
+ * `copy_result` activation, and its message scope (the copy itself is in `messages/`). Everything
+ * else is the shared `ProductRunPage`.
  */
 export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> = {
   productId: "proposal_ai",
   scenarioId: "proposal_ai.generate_v1",
-  title: "ProposalAI",
+  messageScope: "generate",
+  hasDescription: true,
+  hasStartAnother: true,
   emptyValues: { taskText: "", freelancerPositioning: "", tone: "warm" },
   validate,
   toInput: (values) => ({
@@ -129,14 +127,6 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> =
   extractResult: (output) => (typeof output.text === "string" ? output.text : null),
   Fields: ProposalAIFields,
   Result: ({ result, onCopy }) => <ResultView text={result} onCopy={onCopy} />,
-  copy: {
-    description: "Turn a client brief and your relevant strengths into a proposal ready to send.",
-    submit: "Generate proposal",
-    startAnother: "Create another proposal",
-    running: "Generating your proposal…",
-    runFailed: "Something went wrong generating your proposal. Please try again.",
-    quotaRemaining: (remaining, limit) => `${remaining} of ${limit} proposals remaining.`,
-  },
 };
 
 export type ProposalAIProductProps = {

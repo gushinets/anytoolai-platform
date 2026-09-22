@@ -85,7 +85,7 @@ python scripts/agent/runner.py full-check           # + backend baseline + produ
 python scripts/agent/runner.py validate-architecture
 python scripts/agent/runner.py validate-docs
 python scripts/agent/runner.py generate-docs --check
-pnpm --filter @anytoolai/web-mirror test            # 220 tests, incl. i18n.test.ts, ProductPageShell.test.tsx
+pnpm --filter @anytoolai/web-mirror test            # 223 tests, incl. i18n.test.ts, ProductPageShell.test.tsx
 python scripts/agent/runner.py dev-up
 python scripts/agent/runner.py proposal-ai-smoke          # 8/8, incl. the new language-switch scenario
 python scripts/agent/runner.py client-update-writer-smoke # 3/3, English default unaffected
@@ -127,3 +127,35 @@ Five rounds of full re-review on top of the initial PR, each fixed before the ne
 5. Zero blockers -- one P3: the `storage` listener matched on `key` alone, but `storage` also fires
    for `sessionStorage` (including from a same-origin iframe's own writes); now also checks
    `event.storageArea === window.localStorage`, the only Storage object this module touches.
+
+## `main` merge reconciliation (ANY-521, PR #140)
+
+A second merge of `main` (after PR #140, "Improve ProposalAI form and repeat-run flow") landed a
+real ProposalAI redesign -- new CSS-module layout, help text under each field, the tone UI switched
+from the shared `ToneSelect` dropdown to three product-owned radio cards with descriptive labels
+("Warm & personable" etc.), the `language` field removed from the web UI entirely (output language
+now derives from `task_text`), and a "start another run" action after a completed run -- and its
+conflict resolution reintroduced the pre-i18n `title`/`copy` shape (the same class of regression as
+the first `main` merge) across `ProposalAIProduct.tsx`, `ProductRunPage.tsx`, `productDefinition.ts`
+and three test files. Reconciled onto the `messageScope` model:
+
+- `ProductDefinition` gained two optional behavioral flags -- `hasDescription`/`hasStartAnother` --
+  instead of ANY-521's own optional `copy.description`/`copy.startAnother` strings, so those two
+  new concepts stay behavior-only in the definition; their actual text is `description` and
+  `<messageScope>.startAnother` in the product's own messages.
+- ProposalAI's own messages gained `description`, `fields.taskTextPlaceholder/Help`,
+  `fields.freelancerPositioningPlaceholder/Help`, `fields.toneLegend`, `toneOptions.{warm,neutral,firm}`
+  (ProposalAI's own descriptive tone labels, distinct from the shared `toneMessages` bundle CUW still
+  uses) and `generate.startAnother`, translated for all seven locales; dropped `fields.tone`,
+  `fields.tonePlaceholder`, `fields.language`, `fieldNames.language` and `validation.languageFormat`
+  (the field they described no longer exists).
+- `FieldErrorMessage` gained optional `id`/`className` passthrough props so ANY-521's
+  `aria-describedby`-wired error `<p>` markup didn't need a second, duplicate error-to-text
+  implementation.
+- The one live browser check this surfaced: `dev-up`'s `docker compose up -d` does not rebuild
+  images on its own, so ANY-521's backend quota-limit change (3 -> 10) silently kept running the
+  stale image until an explicit `--build` (with the runtime's own dynamic port env vars --
+  omitting them binds the compose file's default port instead and the smoke run can't connect at
+  all). Two of the touched E2E assertions were also genuinely wrong: the language-switcher
+  combobox (itself named "Language") needed excluding via `main` scoping, and the CSS card-style
+  tone radio needs its `<label>` clicked, not the visually-covered native input.

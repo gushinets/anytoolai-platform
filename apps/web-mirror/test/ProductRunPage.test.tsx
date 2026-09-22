@@ -239,7 +239,7 @@ describe("ProductRunPage", () => {
 
     submit();
 
-    expect(await screen.findAllByText("Text is required.")).toHaveLength(1);
+    expect(await screen.findAllByText("Text: required.")).toHaveLength(1);
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Text")));
     expect(calls.some((call) => call.key === ROUTES.START)).toBe(false);
   });
@@ -452,10 +452,7 @@ describe("ProductRunPage", () => {
 
   it("does not add a repeat action to products that do not define one", async () => {
     const { client } = makeClient(happyPathRoutes());
-    const definition = {
-      ...testProductDefinition,
-      copy: { ...testProductDefinition.copy, startAnother: undefined },
-    };
+    const definition = { ...testProductDefinition, hasStartAnother: false };
 
     render(<ProductRunPage definition={definition} client={client} />);
     await waitForForm();

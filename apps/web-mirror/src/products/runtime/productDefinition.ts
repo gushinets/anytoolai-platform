@@ -85,11 +85,18 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
   scenarioId: string;
   /**
    * Where this definition's run copy lives in the product's own message namespace: the runtime
-   * reads `<messageScope>.submit|running|runFailed`, plus the namespace-wide `title` and
-   * `quotaRemaining({remaining, limit})`. Localized presentation comes from the i18n layer
-   * (`apps/web-mirror/src/i18n`), never from the definition, so it holds behavior only.
+   * reads `<messageScope>.submit|running|runFailed` (plus `<messageScope>.startAnother` when
+   * `hasStartAnother` is set), and the namespace-wide `title`/`quotaRemaining({remaining, limit})`
+   * (plus `description` when `hasDescription` is set). Localized presentation comes from the i18n
+   * layer (`apps/web-mirror/src/i18n`), never from the definition, so it holds behavior only.
    */
   messageScope: string;
+  /** Whether `ProductRunPage` renders a product description under the title, resolved from the
+   * product's own `description` message key. Optional -- most products have none. */
+  hasDescription?: boolean;
+  /** Whether `ProductRunPage` renders a "start another run" action once a run completes, resolved
+   * from `<messageScope>.startAnother`. Optional -- most products have none. */
+  hasStartAnother?: boolean;
   emptyValues: V;
   /** Client-side, for immediate feedback only -- the backend's schema stays authoritative. */
   validate: (values: V) => Partial<Record<keyof V, FieldError>>;
@@ -99,12 +106,4 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
   extractResult: (output: Record<string, unknown>) => R | null;
   Fields: ComponentType<ProductFieldsProps<V>>;
   Result: ComponentType<ProductResultProps<R>>;
-  copy: {
-    description?: string;
-    submit: string;
-    startAnother?: string;
-    running: string;
-    runFailed: string;
-    quotaRemaining: (remaining: number, limit: number) => string;
-  };
 };

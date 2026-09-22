@@ -7,9 +7,15 @@ import type { ProductDefinition, ProductFieldsProps } from "../../src/products/r
 /** The test-only product's English messages (product-owned in a real product). */
 export const TEST_PRODUCT_MESSAGES_EN = {
   title: "Test Product",
+  description: "Describe the test run.",
   quotaRemaining: "{remaining} of {limit} runs remaining.",
   fields: { text: "Text" },
-  run: { submit: "Run", running: "Running…", runFailed: "Something went wrong. Please try again." },
+  run: {
+    submit: "Run",
+    running: "Running…",
+    runFailed: "Something went wrong. Please try again.",
+    startAnother: "Start another run",
+  },
 };
 
 export type TestProductValues = { text: string };
@@ -30,11 +36,7 @@ function TestProductFields({ values, errors, disabled, onChange }: ProductFields
         aria-describedby={errors.text ? "test-product-text-help test-product-text-error" : "test-product-text-help"}
       />
       <p id="test-product-text-help">Enter the text to process.</p>
-      {errors.text ? (
-        <p id="test-product-text-error" role="alert">
-          {errors.text}
-        </p>
-      ) : null}
+      <FieldErrorMessage id="test-product-text-error" error={errors.text} label={t("fields.text")} />
     </>
   );
 }
@@ -44,23 +46,21 @@ function TestProductFields({ values, errors, disabled, onChange }: ProductFields
  * runtime suite runs against this, so it proves the runtime with no real product's meaning in
  * the loop. Deliberately not registered in `src/products/registry.ts` (registry.test.tsx proves
  * that) -- it must never become a production product.
+ *
+ * `hasDescription`/`hasStartAnother` are both set so the shared runtime's optional description/
+ * repeat-run paths (ANY-521) are exercised by the product-neutral `ProductRunPage.test.tsx` suite
+ * too, not only by ProposalAI's own tests.
  */
 export const testProductDefinition: ProductDefinition<TestProductValues, string> = {
   productId: TEST_PRODUCT_IDS.productId,
   scenarioId: TEST_PRODUCT_IDS.scenarioId,
   messageScope: "run",
+  hasDescription: true,
+  hasStartAnother: true,
   emptyValues: { text: "" },
   validate: (values) => (values.text.trim().length === 0 ? { text: { code: "required" } } : {}),
   toInput: (values) => ({ text: values.text }),
   extractResult: (output) => (typeof output.text === "string" ? output.text : null),
   Fields: TestProductFields,
   Result: ({ result, onCopy }) => <ResultView text={result} onCopy={onCopy} />,
-  copy: {
-    description: "Describe the test run.",
-    submit: "Run",
-    startAnother: "Start another run",
-    running: "Running…",
-    runFailed: "Something went wrong. Please try again.",
-    quotaRemaining: (remaining, limit) => `${remaining} of ${limit} runs remaining.`,
-  },
 };
