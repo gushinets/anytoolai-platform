@@ -673,7 +673,7 @@ function button(document, label, onClick) {
   return node;
 }
 
-function renderValidation(document, container, session, admissionErrors = []) {
+function clearValidationPresentation(document, container, session) {
   for (const [controlId, previous] of session.validationAttributes ?? []) {
     const control = document.getElementById?.(controlId);
     if (!control) continue;
@@ -684,6 +684,10 @@ function renderValidation(document, container, session, admissionErrors = []) {
   }
   session.validationAttributes = new Map();
   container.replaceChildren();
+}
+
+function renderValidation(document, container, session, admissionErrors = []) {
+  clearValidationPresentation(document, container, session);
   const errors = [...validateDraft(session), ...admissionErrors];
   if (errors.length === 0) return;
   const heading = document.createElement("p");
@@ -1173,6 +1177,8 @@ export function bootstrapAtomLab({
   let modelCatalogPollStartedAt = null;
   let modelCatalogPollFailures = 0;
   let runPollTimer = null;
+  let activeModelCatalogAbortController = null;
+  let activeModelCatalogReadTimeoutId = null;
   let activeRunAbortController = null;
   let activeSubmissionAbortController = null;
   let admissionErrors = [];
@@ -1180,16 +1186,27 @@ export function bootstrapAtomLab({
   let destroyed = false;
 
   const updateRunButton = () => {
-    const hasSelectableModel = modelOptions.some((option) => option.selectable);
+    const option = selectedModelOption();
+    const effort = nodes["reasoning-effort"].value;
+    const hasValidSelection = Boolean(option?.selectable)
+      && (effort === "" || option.allowedEfforts.includes(effort));
     const submissionBlocksNewRun = Boolean(activeSubmission && (
       !activeSubmission.runId || !activeSubmission.terminal
     ));
-    nodes["run-button"].disabled = submitInFlight || !hasSelectableModel || submissionBlocksNewRun;
+    nodes["run-button"].disabled = submitInFlight || !hasValidSelection || submissionBlocksNewRun;
   };
 
   const selectedModelOption = () => modelOptions.find(
     (option) => option.modelId === nodes["model-select"].value,
   ) ?? null;
+
+  const renderModelCatalogWarning = (selectionInvalidated = false) => {
+    nodes["model-catalog-warning"].textContent = selectionInvalidated
+      ? "Выбранная модель больше недоступна. Выберите модель заново."
+      : modelCatalog?.stale
+        ? `Каталог моделей устарел.${modelCatalog.error ? ` ${modelCatalog.error}` : ""}`
+        : "";
+  };
 
   const admissionErrorAppliesToDraft = (path, submission) => {
     if (session.atom.atom_id !== submission.body.atom_id) return false;
@@ -1221,11 +1238,21 @@ export function bootstrapAtomLab({
       item.textContent = effort;
       nodes["reasoning-effort"].append(item);
     }
-    nodes["reasoning-effort"].value = option?.allowedEfforts.includes(preferredEffort)
-      ? preferredEffort
-      : "";
+    const effortRemainsAllowed = option?.allowedEfforts.includes(preferredEffort);
+    if (preferredEffort && !effortRemainsAllowed) {
+      const invalidated = document.createElement("option");
+      invalidated.value = preferredEffort;
+      invalidated.textContent = `${preferredEffort} — больше не поддерживается`;
+      invalidated.disabled = true;
+      nodes["reasoning-effort"].append(invalidated);
+    }
+    nodes["reasoning-effort"].value = effortRemainsAllowed || preferredEffort ? preferredEffort : "";
     nodes["reasoning-effort"].disabled = option?.reasoningMode !== "supported";
     nodes["reasoning-help"].textContent = option ? modelReasonText(option) : "Выберите модель.";
+    if (preferredEffort && !effortRemainsAllowed) {
+      nodes["reasoning-help"].textContent = "Выбранный reasoning effort больше не поддерживается. Выберите effort заново.";
+    }
+    updateRunButton();
   };
 
   const renderModelCatalog = () => {
@@ -1243,24 +1270,41 @@ export function bootstrapAtomLab({
       nodes["model-select"].append(item);
     }
     const first = modelOptions.find((option) => option.selectable);
-    const selected = modelOptions.find(
-      (option) => option.selectable && option.modelId === previousModelId,
-    ) ?? first;
-    nodes["model-select"].value = selected?.modelId ?? "";
+    const previous = modelOptions.find((option) => option.modelId === previousModelId);
+    const previousRemainsSelectable = previous?.selectable === true;
+    const selectionInvalidated = Boolean(previousModelId) && !previousRemainsSelectable;
+    if (selectionInvalidated && !previous) {
+      const invalidated = document.createElement("option");
+      invalidated.value = previousModelId;
+      invalidated.textContent = `${previousModelId} — больше не доступна`;
+      invalidated.disabled = true;
+      nodes["model-select"].append(invalidated);
+    }
+    const selected = previousRemainsSelectable ? previous : selectionInvalidated ? null : first;
+    const selectedModelId = selected?.modelId ?? (selectionInvalidated ? previousModelId : "");
+    nodes["model-select"].value = selectedModelId;
     nodes["model-select"].disabled = !first;
-    nodes["model-catalog-warning"].textContent = modelCatalog?.stale
-      ? `Каталог моделей устарел.${modelCatalog.error ? ` ${modelCatalog.error}` : ""}`
-      : "";
-    renderReasoning(selected?.modelId === previousModelId ? previousReasoningEffort : "");
-    updateRunButton();
+    renderModelCatalogWarning(selectionInvalidated);
+    renderReasoning(previousModelId && selectedModelId === previousModelId ? previousReasoningEffort : "");
   };
 
-  const loadModels = async () => {
+  const loadModels = async ({timeoutMs = null} = {}) => {
     const generation = modelCatalogReadGeneration + 1;
     modelCatalogReadGeneration = generation;
+    const controller = timeoutMs === null ? null : new AbortControllerImpl();
+    let timedOut = false;
+    const timeoutId = controller === null ? null : scheduleImpl(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+    if (controller) {
+      activeModelCatalogAbortController = controller;
+      activeModelCatalogReadTimeoutId = timeoutId;
+    }
     try {
       const response = await fetchImpl("/v1/atom-lab/models", {
         headers: {[ACCESS_HEADER]: accessCode},
+        ...(controller ? {signal: controller.signal} : {}),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(safeApiMessage(payload, "Каталог моделей недоступен."));
@@ -1276,6 +1320,8 @@ export function bootstrapAtomLab({
       return true;
     } catch (error) {
       if (generation !== modelCatalogReadGeneration) return null;
+      if (error?.name === "AbortError" && (destroyed || paused)) return null;
+      if (error?.name === "AbortError" && timedOut) return "timed_out";
       const message = error instanceof Error
         ? error.message
         : "Каталог моделей недоступен.";
@@ -1292,11 +1338,19 @@ export function bootstrapAtomLab({
       nodes["run-button"].disabled = true;
       nodes["model-catalog-warning"].textContent = message;
       return false;
+    } finally {
+      if (timeoutId !== null) cancelScheduleImpl(timeoutId);
+      if (activeModelCatalogAbortController === controller) activeModelCatalogAbortController = null;
+      if (activeModelCatalogReadTimeoutId === timeoutId) activeModelCatalogReadTimeoutId = null;
     }
   };
 
   const stopModelCatalogPolling = () => {
     if (modelCatalogPollTimer !== null) cancelScheduleImpl(modelCatalogPollTimer);
+    if (activeModelCatalogReadTimeoutId !== null) cancelScheduleImpl(activeModelCatalogReadTimeoutId);
+    activeModelCatalogReadTimeoutId = null;
+    activeModelCatalogAbortController?.abort();
+    activeModelCatalogAbortController = null;
     modelCatalogPollTimer = null;
     modelCatalogPollStartedAt = null;
     modelCatalogPollFailures = 0;
@@ -1310,8 +1364,14 @@ export function bootstrapAtomLab({
       stopModelCatalogPolling();
       return;
     }
-    const loaded = await loadModels();
+    const remainingBeforeRead = pollTimeoutMs - (nowImpl() - modelCatalogPollStartedAt);
+    const loaded = await loadModels({timeoutMs: remainingBeforeRead});
     if (loaded === null) return;
+    if (loaded === "timed_out") {
+      nodes["model-catalog-warning"].textContent = "Время ожидания обновления каталога истекло.";
+      stopModelCatalogPolling();
+      return;
+    }
     if (destroyed || paused || (loaded && !["pending", "running"].includes(modelCatalog?.refresh_status))) {
       stopModelCatalogPolling();
       return;
@@ -1441,7 +1501,9 @@ export function bootstrapAtomLab({
         headers: {[ACCESS_HEADER]: accessCode},
         signal: controller.signal,
       });
-      const payload = await response.json().catch(() => null);
+      const payload = response.ok
+        ? await response.json()
+        : await response.json().catch(() => null);
       return {response, payload, timedOut: false};
     } catch (error) {
       if (destroyed && error?.name === "AbortError") return {cancelled: true};
@@ -1482,7 +1544,11 @@ export function bootstrapAtomLab({
       const detail = parseRunDetail(payload, submission.runId);
       const matchesSubmission = detail
         && detail.diagnostics.requested_model_id === submission.snapshot.model_id
-        && detail.diagnostics.requested_reasoning_effort === submission.snapshot.reasoning_effort;
+        && detail.diagnostics.requested_reasoning_effort === submission.snapshot.reasoning_effort
+        && ["scenario_session_id", "job_id"].every((key) => (
+          detail.runtime_ids[key] === null
+          || detail.runtime_ids[key] === submission.runtimeIds[key]
+        ));
       if (!matchesSubmission) {
         nodes["run-state"].textContent = "Некорректный ответ API. Запуск сохранён для повторного чтения.";
         nodes["retry-read"].hidden = false;
@@ -1543,13 +1609,15 @@ export function bootstrapAtomLab({
         body: JSON.stringify(submission.body),
         signal: controller.signal,
       });
-      const payload = await response.json();
+      if (!response.ok && RETRYABLE_SUBMISSION_STATUSES.has(response.status)) {
+        nodes["run-state"].textContent = "Результат отправки неизвестен. Повторите тот же submission безопасно.";
+        nodes["retry-submit"].hidden = false;
+        return;
+      }
+      const payload = response.ok
+        ? await response.json()
+        : await response.json().catch(() => null);
       if (!response.ok) {
-        if (RETRYABLE_SUBMISSION_STATUSES.has(response.status)) {
-          nodes["run-state"].textContent = "Результат отправки неизвестен. Повторите тот же submission безопасно.";
-          nodes["retry-submit"].hidden = false;
-          return;
-        }
         const error = parseAtomLabError(payload);
         const code = error?.code ?? "request_failed";
         admissionErrors = (error?.fieldErrors ?? [])
@@ -1653,6 +1721,7 @@ export function bootstrapAtomLab({
 
   const selectAtom = (atom) => {
     if (session?.dirty && !confirmImpl(DIRTY_WARNING)) return;
+    if (session) clearValidationPresentation(document, nodes["validation-errors"], session);
     selectedAtomId = atom.atom_id;
     session = createDraftSession(atom);
     admissionErrors = [];
@@ -1719,7 +1788,15 @@ export function bootstrapAtomLab({
     session.prompt = nodes["prompt-editor"].value;
     updateDraftState();
   });
-  nodes["model-select"].addEventListener("change", renderReasoning);
+  nodes["model-select"].addEventListener("change", () => {
+    renderModelCatalogWarning();
+    renderReasoning();
+  });
+  nodes["reasoning-effort"].addEventListener("change", () => {
+    const option = selectedModelOption();
+    nodes["reasoning-help"].textContent = option ? modelReasonText(option) : "Выберите модель.";
+    updateRunButton();
+  });
   nodes["refresh-models"].addEventListener("click", async () => {
     nodes["refresh-models"].disabled = true;
     try {

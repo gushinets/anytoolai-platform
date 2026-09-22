@@ -379,6 +379,75 @@ test("model capabilities, stale state, and refresh are explicit", async ({page})
   await expect(page.locator("#reasoning-effort")).toHaveValue("high");
 });
 
+test("catalog refresh requires explicit model reselection when the selected model disappears", async ({page}) => {
+  let refreshed = false;
+  await page.route("http://atom-lab.test/v1/atom-lab/models/refresh", async (route) => {
+    refreshed = true;
+    await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({
+      snapshot_id: "catalog-snapshot-removed-model",
+      last_success_at: "2026-09-22T00:00:00Z",
+      stale: false,
+      refresh_status: "current",
+      error: null,
+    })});
+  });
+  await unlockAtom(page, "A05", {models: () => refreshed ? {
+    ...MODEL_CATALOG,
+    items: MODEL_CATALOG.items.filter(({model_id: modelId}) => modelId !== "gpt-supported"),
+    stale: false,
+  } : MODEL_CATALOG});
+  await page.locator("#fill-example").click();
+  await page.locator("#model-select").selectOption("gpt-supported");
+  await page.locator("#reasoning-effort").selectOption("high");
+
+  await page.locator("#refresh-models").click();
+
+  await expect(page.locator("#model-select")).toHaveValue("gpt-supported");
+  await expect(page.locator('#model-select option[value="gpt-supported"]')).toBeDisabled();
+  await expect(page.locator("#model-catalog-warning")).toContainText("Выберите модель заново");
+  await expect(page.locator("#run-button")).toBeDisabled();
+
+  await page.locator("#model-select").selectOption("gpt-no-reasoning");
+  await expect(page.locator("#model-catalog-warning")).toBeEmpty();
+  await expect(page.locator("#run-button")).toBeEnabled();
+});
+
+test("catalog refresh requires explicit effort reselection when the selected effort disappears", async ({page}) => {
+  let refreshed = false;
+  await page.route("http://atom-lab.test/v1/atom-lab/models/refresh", async (route) => {
+    refreshed = true;
+    await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({
+      snapshot_id: "catalog-snapshot-removed-effort",
+      last_success_at: "2026-09-22T00:00:00Z",
+      stale: false,
+      refresh_status: "current",
+      error: null,
+    })});
+  });
+  await unlockAtom(page, "A05", {models: () => refreshed ? {
+    ...MODEL_CATALOG,
+    items: MODEL_CATALOG.items.map((item) => item.model_id === "gpt-supported"
+      ? {...item, allowed_reasoning_efforts: ["low"]}
+      : item),
+    stale: false,
+  } : MODEL_CATALOG});
+  await page.locator("#fill-example").click();
+  await page.locator("#model-select").selectOption("gpt-supported");
+  await page.locator("#reasoning-effort").selectOption("high");
+
+  await page.locator("#refresh-models").click();
+
+  await expect(page.locator("#model-select")).toHaveValue("gpt-supported");
+  await expect(page.locator("#reasoning-effort")).toHaveValue("high");
+  await expect(page.locator('#reasoning-effort option[value="high"]')).toBeDisabled();
+  await expect(page.locator("#reasoning-help")).toContainText("Выберите effort заново");
+  await expect(page.locator("#run-button")).toBeDisabled();
+
+  await page.locator("#reasoning-effort").selectOption("low");
+  await expect(page.locator("#reasoning-help")).not.toContainText("Выберите effort заново");
+  await expect(page.locator("#run-button")).toBeEnabled();
+});
+
 test("one accepted submission survives draft edits and renders safe result diagnostics", async ({page}) => {
   let posts = 0;
   let reads = 0;
@@ -551,12 +620,14 @@ test("network submission retry reuses the idempotency key and polling reconnects
   await page.getByLabel("context").fill("");
   modelAvailable = false;
   await page.locator("#refresh-models").click();
-  await expect(page.locator('#model-select option[value="gpt-supported"]')).toHaveCount(0);
+  await expect(page.locator('#model-select option[value="gpt-supported"]')).toBeDisabled();
   await page.locator("#retry-submit").click();
   await expect(page.locator("#run-button")).toBeDisabled();
   await expect(page.locator("#run-state")).toContainText("Переподключение… Запуск принят; текущее состояние временно неизвестно.");
   await expect(page.locator("#run-button")).toBeDisabled();
   await expect(page.locator("#run-state")).toContainText("Завершён");
+  await expect(page.locator("#run-button")).toBeDisabled();
+  await page.locator("#model-select").selectOption("gpt-no-reasoning");
   await expect(page.locator("#run-button")).toBeEnabled();
 
   expect(keys).toHaveLength(2);
@@ -740,6 +811,42 @@ test("corrected accepted submission clears authoritative admission field errors"
   expect(submissions).toBe(2);
 });
 
+test("atom navigation clears validation-owned ARIA state from global model controls", async ({page}) => {
+  page.on("dialog", (dialog) => dialog.accept());
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+    await route.fulfill({status: 422, contentType: "application/json", body: JSON.stringify({
+      error: {
+        code: "reasoning_not_allowed",
+        message: "The selected configuration is no longer allowed.",
+        field_errors: [
+          {path: "model_id", message: "Selected model is unavailable."},
+          {path: "reasoning_effort", message: "Selected reasoning is unavailable."},
+        ],
+      },
+      request_id: "request-navigation-errors",
+    })});
+  });
+  await unlockAtom(page, "A05");
+  await page.locator("#fill-example").click();
+  await page.locator("#model-select").selectOption("gpt-supported");
+  await page.locator("#reasoning-effort").selectOption("high");
+  await page.locator("#run-button").click();
+
+  await expect(page.locator("#model-select")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#reasoning-effort")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#model-select")).toHaveAttribute("aria-describedby", /.+/);
+  await expect(page.locator("#reasoning-effort")).toHaveAttribute("aria-describedby", /.+/);
+
+  await page.getByRole("button", {name: /A06/}).click();
+
+  await expect(page.locator("#validation-errors")).not.toContainText("Selected model is unavailable.");
+  await expect(page.locator("#validation-errors")).not.toContainText("Selected reasoning is unavailable.");
+  await expect(page.locator("#model-select")).not.toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#reasoning-effort")).not.toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#model-select")).not.toHaveAttribute("aria-describedby", /.+/);
+  await expect(page.locator("#reasoning-effort")).not.toHaveAttribute("aria-describedby", /.+/);
+});
+
 test("delayed admission errors do not invalidate a newer draft selection", async ({page}) => {
   let releaseRejection;
   let markRequestStarted;
@@ -842,6 +949,54 @@ for (const mismatch of [
     await expect(page.locator("#run-metadata")).toHaveText("");
     await expect(page.locator("#submitted-snapshot")).toContainText("openai/gpt-supported");
     await expect(page.locator("#run-button")).toBeDisabled();
+  });
+}
+
+test("run detail with conflicting accepted runtime identity fails closed", async ({page}) => {
+  await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+    await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({
+      run_id: "run-identity", scenario_session_id: "session-a", job_id: "job-a", status: "running",
+    })});
+  });
+  await page.route("http://atom-lab.test/v1/atom-lab/runs/run-identity", async (route) => {
+    await route.fulfill({contentType: "application/json", body: JSON.stringify({
+      run_id: "run-identity", status: "running",
+      snapshot: {atom_id: "A05", input: A05.example_input, prompt: A05.prompt, model_id: "openai/gpt-supported", reasoning_effort: null},
+      runtime_ids: {scenario_session_id: "session-b", job_id: "job-b", action_run_id: "action-b", artifact_id: null},
+      result: null,
+      diagnostics: {error_code: null, duration_ms: null, requested_model_id: "openai/gpt-supported", requested_reasoning_effort: null, response_model_id: null, validation_attempts: 0, transport_attempts: 0, physical_calls: 0, succeeded_first_attempt: null, provider_calls: [], provider_calls_truncated: false, debug_artifacts: [], debug_artifacts_truncated: false},
+      created_at: "2026-09-22T00:00:00Z", started_at: "2026-09-22T00:00:00Z", finished_at: null,
+    })});
+  });
+  await unlockAtom(page, "A05");
+  await page.locator("#fill-example").click();
+  await page.locator("#run-button").click();
+
+  await expect(page.locator("#run-state")).toContainText("Некорректный ответ API");
+  await expect(page.locator("#retry-read")).toBeVisible();
+  await expect(page.locator("#run-metadata")).toHaveText("");
+  await expect(page.locator("#run-diagnostics")).toContainText('"scenario_session_id": "session-a"');
+  await expect(page.locator("#run-diagnostics")).toContainText('"job_id": "job-a"');
+  await expect(page.locator("#run-diagnostics")).not.toContainText("session-b");
+  await expect(page.locator("#run-diagnostics")).not.toContainText("job-b");
+});
+
+for (const status of [422, 429]) {
+  test(`malformed ${status} admission rejection releases the frozen submission`, async ({page}) => {
+    let submissions = 0;
+    await page.route("http://atom-lab.test/v1/atom-lab/runs", async (route) => {
+      submissions += 1;
+      await route.fulfill({status, contentType: "text/html", body: "<not-json>"});
+    });
+    await unlockAtom(page, "A05");
+    await page.locator("#fill-example").click();
+    await page.locator("#run-button").click();
+
+    await expect(page.locator("#run-state")).toContainText("request_failed");
+    await expect(page.locator("#retry-submit")).toBeHidden();
+    await expect(page.locator("#run-button")).toBeEnabled();
+    await page.locator("#run-button").click();
+    await expect.poll(() => submissions).toBe(2);
   });
 }
 

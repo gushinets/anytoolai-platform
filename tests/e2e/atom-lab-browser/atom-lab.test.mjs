@@ -559,7 +559,10 @@ test("catalog polling backs off repeated read failures and resets after recovery
     await poll();
   }
 
-  assert.deepEqual(scheduledDelays, [250, 250, 500, 1_000, 2_000, 4_000, 4_000, 250, 250]);
+  assert.deepEqual(
+    scheduledDelays.filter((delay) => delay <= 4_000),
+    [250, 250, 500, 1_000, 2_000, 4_000, 4_000, 250, 250],
+  );
   assert.equal(elements.get("model-catalog-warning").textContent, "");
 });
 
@@ -619,7 +622,71 @@ test("catalog polling checks its deadline before I/O and caps delay to the remai
   assert.match(elements.get("model-catalog-warning").textContent, /истекло/);
 });
 
-test("a current refresh response reloads and renders the latest catalog immediately", async () => {
+test("an in-flight catalog read is aborted at the polling deadline and a later refresh can restart", async () => {
+  const {document, elements} = createFakeDocument();
+  const atom = await catalogAtom("A01");
+  const currentCatalog = {
+    items: [{model_id: "gpt", compatibility: "compatible", reason: "confirmed_openai_text_gpt", reasoning_supported: false, allowed_reasoning_efforts: null, provenance: {}}],
+    snapshot_id: "snapshot-current",
+    last_success_at: "2026-09-22T00:00:00Z",
+    stale: false,
+    refresh_status: "current",
+    error: null,
+  };
+  const pendingRefresh = {...currentCatalog, stale: true, refresh_status: "pending"};
+  const scheduled = new Map();
+  let nextTimerId = 0;
+  let now = 0;
+  let modelReads = 0;
+  let aborted = false;
+  bootstrapAtomLab({
+    document,
+    nowImpl: () => now,
+    pollTimeoutMs: 1_000,
+    fetchImpl: (url, options = {}) => {
+      if (url.endsWith("/atoms")) return Promise.resolve({ok: true, status: 200, async json() { return [atom]; }});
+      if (url.endsWith("/refresh")) return Promise.resolve({ok: true, status: 202, async json() { return pendingRefresh; }});
+      modelReads += 1;
+      if (modelReads === 1) return Promise.resolve({ok: true, status: 200, async json() { return currentCatalog; }});
+      return new Promise((resolve, reject) => {
+        options.signal.addEventListener("abort", () => {
+          aborted = true;
+          reject(new DOMException("Aborted", "AbortError"));
+        }, {once: true});
+      });
+    },
+    confirmImpl: () => true,
+    scheduleImpl(callback, delay) {
+      nextTimerId += 1;
+      scheduled.set(nextTimerId, {callback, delay});
+      return nextTimerId;
+    },
+    cancelScheduleImpl: (timerId) => scheduled.delete(timerId),
+  });
+  elements.get("access-code").value = "secret";
+  await elements.get("access-form").dispatch("submit");
+  await elements.get("refresh-models").click();
+
+  const [pollTimerId, pollTimer] = scheduled.entries().next().value;
+  scheduled.delete(pollTimerId);
+  now = 250;
+  const polling = pollTimer.callback();
+  const [deadlineTimerId, deadlineTimer] = scheduled.entries().next().value;
+  assert.equal(deadlineTimer.delay, 750);
+  scheduled.delete(deadlineTimerId);
+  now = 1_000;
+  deadlineTimer.callback();
+  await polling;
+
+  assert.equal(aborted, true);
+  assert.equal(scheduled.size, 0);
+  assert.match(elements.get("model-catalog-warning").textContent, /истекло/);
+
+  await elements.get("refresh-models").click();
+  assert.equal(scheduled.size, 1);
+});
+
+test("a current refresh reloads the catalog without silently replacing a removed selection", async () => {
   const {document, elements} = createFakeDocument();
   const atom = await catalogAtom("A01");
   const staleCatalog = {
@@ -662,8 +729,9 @@ test("a current refresh response reloads and renders the latest catalog immediat
 
   await elements.get("refresh-models").click();
   assert.equal(modelReads, 2);
-  assert.equal(elements.get("model-select").value, "gpt-new");
-  assert.equal(elements.get("model-catalog-warning").textContent, "");
+  assert.equal(elements.get("model-select").value, "gpt-old");
+  assert.match(elements.get("model-catalog-warning").textContent, /Выберите модель заново/);
+  assert.equal(elements.get("run-button").disabled, true);
 });
 
 test("a superseded catalog read cannot overwrite a newer current refresh", async () => {
@@ -690,7 +758,7 @@ test("a superseded catalog read cannot overwrite a newer current refresh", async
         refreshes += 1;
         const refresh = refreshes === 1
           ? catalogFor("gpt-initial", "pending")
-          : catalogFor("gpt-new", "current");
+          : catalogFor("gpt-initial", "current");
         return Promise.resolve({ok: true, status: 202, async json() {
           return {
             snapshot_id: refresh.snapshot_id,
@@ -704,7 +772,7 @@ test("a superseded catalog read cannot overwrite a newer current refresh", async
       modelReads += 1;
       if (modelReads === 1) return Promise.resolve({ok: true, status: 200, async json() { return catalogFor("gpt-initial", "current"); }});
       if (modelReads === 2) return new Promise((resolve) => { resolveOldRead = resolve; });
-      return Promise.resolve({ok: true, status: 200, async json() { return catalogFor("gpt-new", "current"); }});
+      return Promise.resolve({ok: true, status: 200, async json() { return catalogFor("gpt-initial", "current"); }});
     },
     confirmImpl: () => true,
     scheduleImpl(callback) {
@@ -724,12 +792,12 @@ test("a superseded catalog read cannot overwrite a newer current refresh", async
   assert.equal(typeof resolveOldRead, "function");
 
   await elements.get("refresh-models").click();
-  assert.equal(elements.get("model-select").value, "gpt-new");
+  assert.equal(elements.get("model-select").value, "gpt-initial");
   assert.equal(elements.get("model-catalog-warning").textContent, "");
 
   resolveOldRead({ok: true, status: 200, async json() { return catalogFor("gpt-stale", "pending"); }});
   await oldPolling;
-  assert.equal(elements.get("model-select").value, "gpt-new");
+  assert.equal(elements.get("model-select").value, "gpt-initial");
   assert.equal(elements.get("model-catalog-warning").textContent, "");
   assert.equal(scheduled.size, 0);
 });
