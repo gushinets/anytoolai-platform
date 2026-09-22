@@ -401,11 +401,15 @@ const result = await nextAction(client, {
 `copyResultAndRecordActivation(client, { text, scenarioSessionId, checkpointId, writeToClipboard })`
 is the shared copy-button contract (ANY-17): it completes the clipboard write **first**, and only
 then records exactly one `copy_result` next-action for that call (producing
-`client.next_action_clicked(copy_result)` on the backend). A failed clipboard write records nothing;
-a failed activation request never revokes a copy that already succeeded, so a product page keeps
-showing "Copied" from `copied: true` regardless of `activation.ok`. The clipboard write is injected
-(`writeToClipboard`) rather than called directly, so a host can use `navigator.clipboard.writeText`,
-an `execCommand` fallback, or a native bridge without CE-kit knowing about it.
+`client.next_action_clicked(copy_result)` on the backend) -- when `checkpointId` is non-null. A
+completed session may legitimately have no active checkpoint (`checkpointId: null`); the copy still
+succeeds, but nothing is recorded and `activation` is `null`. A failed clipboard write records
+nothing; a failed activation request never revokes a copy that already succeeded, so a product page
+keeps showing "Copied" from `copied: true` regardless of `activation?.ok`. The clipboard write is
+injected (`writeToClipboard`) rather than called directly, so a host can use
+`navigator.clipboard.writeText`, an `execCommand` fallback, or a native bridge without CE-kit
+knowing about it. The optional `onCopied` callback fires the instant the clipboard write succeeds,
+before the activation request starts, so a UI can show "Copied" without waiting on that round-trip.
 
 ```ts
 import { copyResultAndRecordActivation } from "@anytoolai/ce-kit";
@@ -417,7 +421,7 @@ const outcome = await copyResultAndRecordActivation(client, {
   writeToClipboard: (text) => navigator.clipboard.writeText(text),
 });
 if (outcome.copied) {
-  showCopied(); // even if outcome.activation.ok is false -- analytics may undercount, never block
+  showCopied(); // even if outcome.activation?.ok is false (or activation is null) -- analytics may undercount, never block
 }
 ```
 

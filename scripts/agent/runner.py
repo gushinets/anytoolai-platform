@@ -890,6 +890,14 @@ PROPOSAL_AI_SMOKE_REPORT_PATH = (
     ROOT / "tests" / "e2e" / "proposal-ai-smoke" / "playwright-report.json"
 )
 
+CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV = (
+    "ANYTOOLAI_CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT"
+)
+CLIENT_UPDATE_WRITER_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "client-update-writer-smoke"
+CLIENT_UPDATE_WRITER_SMOKE_REPORT_PATH = (
+    ROOT / "tests" / "e2e" / "client-update-writer-smoke" / "playwright-report.json"
+)
+
 
 def _client_handoff_smoke_web_mirror_port() -> int:
     return _port_override(CLIENT_HANDOFF_SMOKE_WEB_MIRROR_PORT_ENV, 3000)
@@ -897,6 +905,10 @@ def _client_handoff_smoke_web_mirror_port() -> int:
 
 def _proposal_ai_smoke_web_mirror_port() -> int:
     return _port_override(PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV, 3100)
+
+
+def _client_update_writer_smoke_web_mirror_port() -> int:
+    return _port_override(CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV, 3200)
 
 
 def _terminate_process_group(process: subprocess.Popen) -> None:
@@ -1133,6 +1145,51 @@ def proposal_ai_smoke() -> int:
     )
 
 
+def client_update_writer_smoke() -> int:
+    """ANY-414 (code review finding): builds and serves web-mirror against the running dev-up
+    platform-api, then runs the Playwright browser-evidence smoke (tests/e2e/client-update-writer-
+    smoke) that proves the Client Update Writer web vertical end to end in a real (headless, no
+    extension involved) Chromium -- product page -> shared client -> scenario session -> job/worker
+    -> deterministic fake-provider workflow (ANY-227) -> canonical result -> copy activation, plus
+    client-side validation and weak-input coverage. Same shape as proposal_ai_smoke() (its own
+    docstring covers the shared requirements/rationale in full); Update mode is this product's one
+    representative mode here, mirroring proposal-ai-smoke's own single-scenario scope -- the other
+    two modes' meaning is already proven end to end at the backend-pipeline level by
+    apps/platform-api/tests/test_client_update_writer_bundle.py.
+    """
+    try:
+        identity = runtime_identity()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
+
+    web_mirror_port = _client_update_writer_smoke_web_mirror_port()
+    if not _check_ports_available(
+        "CUS001",
+        [("web-mirror", web_mirror_port, CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV, None)],
+    ):
+        return 1
+    web_mirror_url = f"http://localhost:{web_mirror_port}"
+
+    env = runner_env()
+    env["PLATFORM_API_BASE_URL"] = identity.api_url
+
+    build_command = ["pnpm", "--filter", "@anytoolai/web-mirror", "build"]
+    build_exit = run_with_env(build_command, env)
+    if build_exit != 0:
+        return build_exit
+
+    return _serve_web_mirror_and_run_smoke(
+        web_mirror_port=web_mirror_port,
+        env=env,
+        readiness_error_code="CUS002",
+        smoke_extra_env={"WEB_MIRROR_BASE_URL": web_mirror_url, "DATABASE_URL": identity.database_url},
+        smoke_pnpm_filter="@anytoolai/client-update-writer-smoke",
+        report_path=CLIENT_UPDATE_WRITER_SMOKE_REPORT_PATH,
+        evidence_root=CLIENT_UPDATE_WRITER_SMOKE_EVIDENCE_ROOT,
+    )
+
+
 def _prod_compose_command(*args: str) -> list[str]:
     env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
     return _docker_compose_command(
@@ -1259,6 +1316,7 @@ COMMANDS = {
     "live-canary": live_canary,
     "client-handoff-smoke": client_handoff_smoke,
     "proposal-ai-smoke": proposal_ai_smoke,
+    "client-update-writer-smoke": client_update_writer_smoke,
     "prod-up": prod_up,
     "prod-ready": prod_ready,
     "prod-status": prod_status,

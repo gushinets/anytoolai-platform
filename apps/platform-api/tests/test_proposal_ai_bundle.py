@@ -17,13 +17,8 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-import httpx
 import pytest
 import sqlalchemy as sa
-from anytoolai_platform_api.bootstrap import RuntimeStorageDependencies
-from anytoolai_platform_api.main import create_app
-from anytoolai_platform_core.identity.models import GuestIdentityRecord
-from anytoolai_platform_core.identity.repository import GuestIdentityRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.providers.models import ProviderResponse, ResolvedProviderRequest
 from anytoolai_platform_core.storage.db import provider_calls_table
@@ -36,47 +31,22 @@ CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
 GUEST_ID = "guest_proposal_ai_test"
 
-# `session_factory` (SQLite-backed) comes from apps/platform-api/tests/conftest.py -- shared with
-# test_demo_api.py, the only other suite that needs the same SQLite-backed setup.
+# `session_factory`/`platform_api_app_factory`/`request_platform_api` (SQLite-backed) come from
+# apps/platform-api/tests/conftest.py -- shared with test_demo_api.py and
+# test_client_update_writer_bundle.py (ANY-414 code review finding: this file's own `app` fixture
+# and `_request()` helper used to be duplicated verbatim into that file).
 
 
 @pytest.fixture
-def app(session_factory: SessionFactory):
-    with transaction_boundary(session_factory) as session:
-        GuestIdentityRepository(session).create(
-            GuestIdentityRecord(id=GUEST_ID, tenant_id="anytoolai", region="default")
-        )
-    application = create_app(config_root=CONFIG_ROOT)
-    application.state.runtime = replace(
-        application.state.runtime,
-        storage=RuntimeStorageDependencies(session_factory=session_factory),
-    )
-    return application
-
-
-async def _request(
-    app: Any,
-    method: str,
-    path: str,
-    *,
-    json: Any | None = None,
-    request_id: str = "req_proposal_ai_test",
-) -> httpx.Response:
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-        return await client.request(
-            method,
-            path,
-            json=json,
-            headers={"X-Request-ID": request_id},
-        )
+def app(platform_api_app_factory):
+    return platform_api_app_factory(guest_id=GUEST_ID)
 
 
 def _start(
-    app: Any, *, input_payload: dict[str, Any], request_id: str = "req_start"
+    app: Any, request_platform_api, *, input_payload: dict[str, Any], request_id: str = "req_start"
 ) -> dict[str, Any]:
     response = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "POST",
             "/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
@@ -129,10 +99,12 @@ def _provider_call_count(session_factory: SessionFactory, *, job_id: str) -> int
 
 def test_proposal_ai_happy_path_invokes_a06_once_and_produces_canonical_artifact(
     app: Any,
+    request_platform_api,
     session_factory: SessionFactory,
 ) -> None:
     started = _start(
         app,
+        request_platform_api,
         input_payload={
             "task_text": "Build a 5-page marketing site for a local bakery within two weeks.",
             "freelancer_positioning": (
@@ -152,7 +124,7 @@ def test_proposal_ai_happy_path_invokes_a06_once_and_produces_canonical_artifact
     assert _provider_call_count(session_factory, job_id=started["job_id"]) == 1
 
     session_response = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "GET",
             f"/v1/scenario-sessions/{started['scenario_session_id']}",
@@ -163,7 +135,7 @@ def test_proposal_ai_happy_path_invokes_a06_once_and_produces_canonical_artifact
     assert session_response.json()["allowed_next_actions"] == ["copy_result"]
 
     result_response = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "GET",
             f"/v1/results/{processed.result_artifact_id}",
@@ -181,6 +153,7 @@ def test_proposal_ai_happy_path_invokes_a06_once_and_produces_canonical_artifact
 
 def test_proposal_ai_resolves_through_the_bare_default_worker_provider_adapters(
     app: Any,
+    request_platform_api,
     session_factory: SessionFactory,
 ) -> None:
     """Code review finding: every other test here builds its worker through `_build_worker`,
@@ -199,6 +172,7 @@ def test_proposal_ai_resolves_through_the_bare_default_worker_provider_adapters(
     production entrypoint uses -- resolves ProposalAI's fixture with no special-casing at all."""
     _start(
         app,
+        request_platform_api,
         input_payload={
             "task_text": "Build a 5-page marketing site for a local bakery within two weeks.",
             "freelancer_positioning": (
@@ -219,6 +193,7 @@ def test_proposal_ai_resolves_through_the_bare_default_worker_provider_adapters(
 
 def test_proposal_ai_weak_but_non_empty_input_still_passes_schema_and_completes(
     app: Any,
+    request_platform_api,
     session_factory: SessionFactory,
 ) -> None:
     """Proves the *schema* accepts a vague-but-non-empty task/positioning pair and the workflow
@@ -228,6 +203,7 @@ def test_proposal_ai_weak_but_non_empty_input_still_passes_schema_and_completes(
     a run that actually exercises `.weak_input.json`)."""
     started = _start(
         app,
+        request_platform_api,
         input_payload={
             "task_text": "Need some help with a website.",
             "freelancer_positioning": "I build websites.",
@@ -246,6 +222,7 @@ def test_proposal_ai_weak_but_non_empty_input_still_passes_schema_and_completes(
 
 def test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_artifact(
     app: Any,
+    request_platform_api,
     session_factory: SessionFactory,
 ) -> None:
     """Code review finding: the real pipeline can never select the weak-input fixture on its own
@@ -261,6 +238,7 @@ def test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_
 
     _start(
         app,
+        request_platform_api,
         input_payload={
             "task_text": "Need some help with a website.",
             "freelancer_positioning": "I build websites.",
@@ -283,7 +261,7 @@ def test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_
     assert processed.result_artifact_id is not None
 
     result_response = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "GET",
             f"/v1/results/{processed.result_artifact_id}",
@@ -308,10 +286,11 @@ def test_proposal_ai_weak_input_end_to_end_produces_the_checked_in_weak_fixture_
 )
 def test_proposal_ai_rejects_invalid_required_field_values_before_provider_execution(
     app: Any,
+    request_platform_api,
     session_factory: SessionFactory,
     invalid_input: dict[str, Any],
 ) -> None:
-    started = _start(app, input_payload=invalid_input, request_id="req_start_invalid")
+    started = _start(app, request_platform_api, input_payload=invalid_input, request_id="req_start_invalid")
 
     worker = _build_worker(app, session_factory)
     processed = asyncio.run(worker.process_next_job())
