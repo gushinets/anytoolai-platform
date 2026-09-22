@@ -1,12 +1,18 @@
 import type { ComponentType } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
+import type { ProductMessagesByLocale } from "../i18n";
 import { ClientUpdateWriterProduct } from "./clientUpdateWriter/ClientUpdateWriterProduct";
+import { CLIENT_UPDATE_WRITER_MESSAGES } from "./clientUpdateWriter/messages";
 import { ProposalAIProduct } from "./proposalAi/ProposalAIProduct";
+import { PROPOSAL_AI_MESSAGES } from "./proposalAi/messages";
 import type { ProductRunEvent } from "./runtime/productDefinition";
 
 export type RegisteredProduct = {
   productId: string;
   enabled: boolean;
+  /** This product's own translations for every UI locale. The page shell supplies the language
+   * selector and locale state, so a product only needs to provide messages. */
+  messages: ProductMessagesByLocale;
   Component: ComponentType<{
     client: PlatformApiClient;
     onEvent?: (event: ProductRunEvent) => void;
@@ -21,11 +27,22 @@ export type RegisteredProduct = {
  * (`docs/architecture/frontend-boundaries.md`): the one place allowed to import both the shared
  * runtime and individual products. The shared runtime itself never imports a product. */
 const PRODUCTS: readonly RegisteredProduct[] = [
-  { productId: "proposal_ai", enabled: true, Component: ProposalAIProduct },
-  { productId: "client_update_writer", enabled: true, Component: ClientUpdateWriterProduct },
+  { productId: "proposal_ai", enabled: true, messages: PROPOSAL_AI_MESSAGES, Component: ProposalAIProduct },
+  {
+    productId: "client_update_writer",
+    enabled: true,
+    messages: CLIENT_UPDATE_WRITER_MESSAGES,
+    Component: ClientUpdateWriterProduct,
+  },
 ];
 
 export function getRegisteredProduct(productId: string): RegisteredProduct | null {
   const product = PRODUCTS.find((candidate) => candidate.productId === productId);
   return product && product.enabled ? product : null;
+}
+
+/** Every registered product, enabled or not -- lets tests (translation completeness) cover a newly
+ * registered product without naming it. */
+export function listRegisteredProducts(): readonly RegisteredProduct[] {
+  return PRODUCTS;
 }

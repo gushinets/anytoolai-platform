@@ -1,0 +1,99 @@
+"use client";
+
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { IntlProvider, useTranslations } from "use-intl";
+import { DEFAULT_LOCALE, type Locale } from "./locales";
+import { readStoredLocale, writeStoredLocale } from "./localeStorage";
+import { HOST_MESSAGES } from "./messages";
+import { mergeMessages, type MessageTree } from "./messageTypes";
+import { resolveLocale } from "./resolveLocale";
+
+/** Every locale of the current product's own messages (its registry entry supplies these). */
+export type ProductMessagesByLocale = Record<Locale, MessageTree>;
+
+type LocaleContextValue = { locale: Locale; setLocale: (locale: Locale) => void };
+const LocaleContext = createContext<LocaleContextValue | null>(null);
+
+// SSR has no DOM: `useLayoutEffect` only upgrades to pre-paint timing in a browser (same pattern as
+// `ProductRunPage`).
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+// Fails loudly in tests / dev; in production a missing key is logged and the key path is shown
+// rather than crashing the page.
+function onError(error: Error): void {
+  if (process.env.NODE_ENV !== "production") {
+    throw error;
+  }
+  console.error(error);
+}
+
+/**
+ * Host-owned locale state for one product page. Server and first client render use English; the
+ * layout effect then applies the stored/browser locale before first paint. The tree below is never
+ * remounted on a locale change (no `key={locale}`), so form values and run state survive a switch.
+ */
+export function LocaleProvider({
+  productMessages,
+  children,
+}: {
+  productMessages: ProductMessagesByLocale;
+  children: ReactNode;
+}) {
+  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
+
+  useIsomorphicLayoutEffect(() => {
+    setLocaleState(resolveLocale({ stored: readStoredLocale(), browserLanguages: navigator.languages }));
+  }, []);
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
+
+  const messages = useMemo(
+    // English underneath every locale: a key missing from a locale falls back to English.
+    () => ({
+      host: mergeMessages(HOST_MESSAGES[DEFAULT_LOCALE], HOST_MESSAGES[locale]),
+      product: mergeMessages(productMessages[DEFAULT_LOCALE], productMessages[locale]),
+    }),
+    [locale, productMessages],
+  );
+  const value = useMemo<LocaleContextValue>(
+    () => ({
+      locale,
+      setLocale: (next) => {
+        writeStoredLocale(next);
+        setLocaleState(next);
+      },
+    }),
+    [locale],
+  );
+
+  return (
+    <LocaleContext.Provider value={value}>
+      <IntlProvider locale={locale} messages={messages} onError={onError}>
+        {children}
+      </IntlProvider>
+    </LocaleContext.Provider>
+  );
+}
+
+export function useLocale(): LocaleContextValue {
+  const value = useContext(LocaleContext);
+  if (!value) {
+    throw new Error("useLocale must be used inside <LocaleProvider>.");
+  }
+  return value;
+}
+
+/** The app-owned translate function: products and the shared runtime depend on this shape, not on
+ * `use-intl`. Keys are dotted paths inside the namespace. */
+export type Translate = (key: string, values?: Record<string, string | number>) => string;
+
+/** Generic runtime/result/error/validation/tone messages owned by the shared host. */
+export function useHostT(): Translate {
+  return useTranslations("host");
+}
+
+/** The current product's own messages (field labels, mode names, submit/running/failure copy). */
+export function useProductT(): Translate {
+  return useTranslations("product");
+}

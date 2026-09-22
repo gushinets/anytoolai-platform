@@ -263,6 +263,30 @@ test.describe("ProposalAI web product", () => {
     expect(secondGuestId).toBe(firstGuestId);
   });
 
+  test("language switch: the UI changes and persists across reload, entered values stay, and the output-language field is untouched", async ({
+    page,
+  }) => {
+    await page.goto(PRODUCT_URL);
+    await expect(page.getByRole("button", { name: "Generate proposal" })).toBeVisible();
+    await page.locator("#proposal-ai-task-text").fill("Write a landing page hero section for a bakery.");
+    await page.locator("#proposal-ai-language").fill("de");
+
+    await page.locator("#ui-language").selectOption("ru");
+
+    // The Russian submit label is asserted by the visible selector state and the document language,
+    // not by re-typing translated copy here (the vitest suite owns per-locale copy).
+    await expect(page.locator("html")).toHaveAttribute("lang", "ru");
+    await expect(page.getByRole("button", { name: "Generate proposal" })).toHaveCount(0);
+    await expect(page.locator("h1")).toHaveText("ProposalAI");
+    await expect(page.locator("#proposal-ai-task-text")).toHaveValue("Write a landing page hero section for a bakery.");
+    await expect(page.locator("#proposal-ai-language")).toHaveValue("de");
+
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("lang", "ru");
+    await expect(page.locator("#ui-language")).toHaveValue("ru");
+    await expect(page.getByRole("button", { name: "Generate proposal" })).toHaveCount(0);
+  });
+
   test("quota: advisory display reflects consumption, and the next genuinely new start is authoritatively rejected", async ({
     page,
   }) => {

@@ -3,9 +3,11 @@
 import type { ChangeEvent } from "react";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import { Input, TextArea } from "@anytoolai/shared-ui";
+import { FieldErrorMessage } from "../../components/FieldErrorMessage";
 import { ResultView } from "../../components/ResultView";
+import { useProductT } from "../../i18n";
 import { ProductRunPage } from "../runtime/ProductRunPage";
-import { collectFieldErrors, requiredTrimmedFieldError } from "../runtime/fieldValidation";
+import { collectFieldErrors, requiredTrimmedFieldError, type FieldError } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductRunEvent } from "../runtime/productDefinition";
 import { ToneSelect, type Tone } from "../shared/tone";
 
@@ -21,23 +23,24 @@ export type ProposalAIValues = {
 // authoritative either way.
 const LANGUAGE_PATTERN = /^[a-z]{2}(-[A-Z]{2})?$/;
 
-function validate(values: ProposalAIValues): Partial<Record<keyof ProposalAIValues, string>> {
+function validate(values: ProposalAIValues): Partial<Record<keyof ProposalAIValues, FieldError>> {
   return collectFieldErrors<ProposalAIValues>([
-    ["taskText", requiredTrimmedFieldError(values.taskText, "Task description", 4000)],
-    ["freelancerPositioning", requiredTrimmedFieldError(values.freelancerPositioning, "Your positioning", 4000)],
+    ["taskText", requiredTrimmedFieldError(values.taskText, 4000)],
+    ["freelancerPositioning", requiredTrimmedFieldError(values.freelancerPositioning, 4000)],
     [
       "language",
       values.language && !LANGUAGE_PATTERN.test(values.language)
-        ? 'Language must look like "en" or "en-US".'
+        ? { code: "product", key: "validation.languageFormat" }
         : undefined,
     ],
   ]);
 }
 
 function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsProps<ProposalAIValues>) {
+  const t = useProductT();
   return (
     <>
-      <label htmlFor="proposal-ai-task-text">Describe the task</label>
+      <label htmlFor="proposal-ai-task-text">{t("fields.taskText")}</label>
       <TextArea
         id="proposal-ai-task-text"
         value={values.taskText}
@@ -45,9 +48,9 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
         disabled={disabled}
         aria-invalid={Boolean(errors.taskText)}
       />
-      {errors.taskText ? <p role="alert">{errors.taskText}</p> : null}
+      <FieldErrorMessage error={errors.taskText} label={t("fieldNames.taskText")} />
 
-      <label htmlFor="proposal-ai-positioning">Your positioning</label>
+      <label htmlFor="proposal-ai-positioning">{t("fields.freelancerPositioning")}</label>
       <TextArea
         id="proposal-ai-positioning"
         value={values.freelancerPositioning}
@@ -55,18 +58,18 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
         disabled={disabled}
         aria-invalid={Boolean(errors.freelancerPositioning)}
       />
-      {errors.freelancerPositioning ? <p role="alert">{errors.freelancerPositioning}</p> : null}
+      <FieldErrorMessage error={errors.freelancerPositioning} label={t("fieldNames.freelancerPositioning")} />
 
-      <label htmlFor="proposal-ai-tone">Tone (optional)</label>
+      <label htmlFor="proposal-ai-tone">{t("fields.tone")}</label>
       <ToneSelect
         id="proposal-ai-tone"
         value={values.tone}
         onChange={(tone) => onChange("tone", tone)}
         disabled={disabled}
-        placeholderLabel="Default"
+        placeholderLabel={t("fields.tonePlaceholder")}
       />
 
-      <label htmlFor="proposal-ai-language">Language (optional)</label>
+      <label htmlFor="proposal-ai-language">{t("fields.language")}</label>
       <Input
         id="proposal-ai-language"
         value={values.language}
@@ -74,7 +77,7 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
         disabled={disabled}
         aria-invalid={Boolean(errors.language)}
       />
-      {errors.language ? <p role="alert">{errors.language}</p> : null}
+      <FieldErrorMessage error={errors.language} label={t("fields.language")} />
     </>
   );
 }
@@ -83,12 +86,12 @@ function ProposalAIFields({ values, errors, disabled, onChange }: ProductFieldsP
  * ProposalAI's product meaning, and nothing else: its fields and their validation, the mapping to
  * `proposal_ai.generate_input_v1`, the canonical field `renderer_contract.yaml` pins (`text` --
  * angle/rationale/model/provider are excluded on purpose and never reach the renderer), the
- * `copy_result` activation, and its copy. Everything else is the shared `ProductRunPage`.
+ * `copy_result` activation, and its message scope (the copy itself is in `messages/`). Everything else is the shared `ProductRunPage`.
  */
 export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> = {
   productId: "proposal_ai",
   scenarioId: "proposal_ai.generate_v1",
-  title: "ProposalAI",
+  messageScope: "generate",
   emptyValues: { taskText: "", freelancerPositioning: "", tone: "", language: "" },
   validate,
   toInput: (values) => ({
@@ -100,12 +103,6 @@ export const proposalAiDefinition: ProductDefinition<ProposalAIValues, string> =
   extractResult: (output) => (typeof output.text === "string" ? output.text : null),
   Fields: ProposalAIFields,
   Result: ({ result, onCopy }) => <ResultView text={result} onCopy={onCopy} />,
-  copy: {
-    submit: "Generate proposal",
-    running: "Generating your proposal…",
-    runFailed: "Something went wrong generating your proposal. Please try again.",
-    quotaRemaining: (remaining, limit) => `${remaining} of ${limit} proposals remaining.`,
-  },
 };
 
 export type ProposalAIProductProps = {

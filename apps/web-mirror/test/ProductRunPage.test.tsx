@@ -2,7 +2,7 @@
 // "One test-only definition proves registration, form submission, scenario polling, canonical
 // result rendering, next-action callback, retry, and quota/error behavior") -- no real product's
 // meaning is in the loop here. ProposalAI's own meaning is covered in ProposalAIProduct.test.tsx.
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProductRunPage, type ProductRunPageProps } from "../src/products/runtime/ProductRunPage";
@@ -24,10 +24,18 @@ import {
   startResponse,
   type RouteQueues,
 } from "./fixtures/platformResponses";
-import { TEST_PRODUCT_IDS, testProductDefinition, type TestProductValues } from "./fixtures/testProductDefinition";
+import {
+  TEST_PRODUCT_IDS,
+  TEST_PRODUCT_MESSAGES_EN,
+  testProductDefinition,
+  type TestProductValues,
+} from "./fixtures/testProductDefinition";
+import { englishForAllLocales, makeRender } from "./support/renderWithI18n";
+const render = makeRender(englishForAllLocales(TEST_PRODUCT_MESSAGES_EN));
+
 
 const ROUTES = routesFor(TEST_PRODUCT_IDS);
-const RUN_FAILED = testProductDefinition.copy.runFailed;
+const RUN_FAILED = TEST_PRODUCT_MESSAGES_EN.run.runFailed;
 
 afterEach(() => {
   cleanup();

@@ -3,6 +3,7 @@
 import { notFound } from "next/navigation";
 import { use, useMemo } from "react";
 import { getPlatformApiClient } from "../../../lib/apiClient";
+import { ProductPageShell } from "../../../products/ProductPageShell";
 import { getRegisteredProduct } from "../../../products/registry";
 import { getClientStorage } from "../../../products/runtime/clientStorage";
 import { createProductRunEventTracker } from "../../../products/runtime/productRunEventTracking";
@@ -36,6 +37,5 @@ export default function ProductPage({ params }: ProductPageProps) {
     notFound();
   }
 
-  const { Component } = product;
-  return <Component key={productId} client={client} onEvent={onEvent} visitId={visitId} />;
+  return <ProductPageShell key={productId} product={product} client={client} onEvent={onEvent} visitId={visitId} />;
 }

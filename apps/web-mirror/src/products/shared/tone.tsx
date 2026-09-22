@@ -2,6 +2,7 @@
 
 import type { ChangeEvent } from "react";
 import { Select } from "@anytoolai/shared-ui";
+import { useHostT } from "../../i18n";
 
 // Product vocabulary shared by the products whose input schemas declare this `tone` enum, so it
 // lives here (shared across products) and not in `products/runtime/`, which must hold no product
@@ -18,7 +19,8 @@ export function isTone(value: string): value is Tone {
 
 /**
  * The `<select>` + option list every product's own tone field wraps in its own `<label>`/error
- * markup. Each product still owns its label text, placeholder option, and (optional) validation
+ * markup. Option *labels* are localized (host `tone.*` messages) while each option's `value` stays the
+ * untranslated wire value. Each product still owns its label text, placeholder option, and (optional) validation
  * error around this, since ProposalAI's tone is optional with no error state and Client Update
  * Writer's is required with one -- only the genuinely identical part is shared.
  */
@@ -37,6 +39,7 @@ export function ToneSelect({
   placeholderLabel: string;
   ariaInvalid?: boolean;
 }) {
+  const t = useHostT();
   return (
     <Select
       id={id}
@@ -50,7 +53,7 @@ export function ToneSelect({
       <option value="">{placeholderLabel}</option>
       {TONE_OPTIONS.map((tone) => (
         <option key={tone} value={tone}>
-          {tone}
+          {t(`tone.${tone}`)}
         </option>
       ))}
     </Select>

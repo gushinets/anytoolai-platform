@@ -119,6 +119,70 @@ A15 ownership and delivery slices:
   CE-kit. Component/browser tests cover this over Vitest + Testing Library; a real running
   dev-server route is ANY-224's job.
 
+## Web i18n (ANY-519)
+
+`apps/web-mirror` localizes product-page UI. The mechanism is host-owned; the words are
+product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported only from there).
+
+- **Supported locales:** `en fr it de es ru pt` (BCP 47 base tags; generic `pt`, no `pt-BR`/`pt-PT`).
+  Display names are endonyms and are never translated.
+- **Resolution order:** persisted explicit choice, then `navigator.languages` (first supported base
+  language; `de-AT`/`pt-BR`/`fr-CA` map to `de`/`pt`/`fr`), then `en`. Resolved client-side before
+  first paint; server and first client render use `en`. There are no locale-prefixed routes and no
+  server-side `Accept-Language` resolution.
+- **Fallback:** English underneath every locale (deep merge in `LocaleProvider`), so a missing key
+  shows English rather than a key path. Non-English message files are typed
+  `Shape<typeof en>`, so a missing or extra key fails typecheck; `test/i18n.test.ts` additionally
+  checks key parity, ICU placeholders and syntax for the host and every registered product.
+- **Persistence:** localStorage key `anytoolai.ui_locale`, written only on an explicit choice (an
+  auto-resolved locale is not persisted, so a changed browser language keeps being respected).
+  Read synchronously, unlike ce-kit's async storage adapter, to avoid a flash of English. The
+  document `<html lang>` follows the effective locale.
+- **Selector:** one `LanguageSwitcher`, rendered by `ProductPageShell` around every registered
+  product on `/products/{productId}`. A product never renders its own selector. Changing locale
+  never remounts the product (no `key={locale}`), so form values, run state and the selected
+  Client Update Writer mode survive.
+- **Ownership:** the host owns locale resolution/persistence/provider/selector and the `host`
+  namespace (runtime, result, error, validation, tone vocabulary). Each product owns its `product`
+  namespace: title, field labels, validation field names, mode names, submit/running/failure and
+  quota copy, supplied through `RegisteredProduct.messages`. `ProductDefinition` describes behavior
+  only; it names its copy with `messageScope` and carries no English literals.
+- **Validation:** shared validators return structured `FieldError` data (`required`,
+  `outer_whitespace`, `max_length`, `product`), never prose; `FieldErrorMessage` renders it in the
+  current locale. Backend schema validation stays authoritative.
+- **UI locale is not the generated-content language.** Changing the UI locale never changes
+  ProposalAI `language`, Client Update Writer `constraints.language` or any future output-language
+  input, and changing those never changes the UI locale. Nothing derives one from the other.
+- **Wire values stay untranslated.** Closed-set values (`neutral|warm|firm`, mode ids, enums,
+  statuses) are sent to the backend as-is; only visible labels are translated. Prompts, schemas and
+  backend product config never depend on UI locale.
+- **`@anytoolai/shared-ui` and `@anytoolai/ce-kit` stay localization-agnostic:** they take text via
+  props/children and never import the host i18n layer. (`shared-ui`'s `CopyButton` still has English
+  literals; web-mirror does not use it, and adopting it means passing labels.)
+- **Shared runtime errors** keep a closed reason, not finished text (`Phase.retryable-error.reason`),
+  so an error already on screen re-localizes on a locale switch.
+
+### Recipe: translations for a new web product
+
+1. Create `products/<name>/messages/en.ts` (English is the semantic source: `title`,
+   `quotaRemaining` with `{remaining}`/`{limit}`, per-scope `submit`/`running`/`runFailed`, `fields`,
+   `fieldNames`, and any product validation keys).
+2. Add `fr it de es ru pt` files typed `Shape<typeof en>`; use the typographic apostrophe `’` (a
+   plain `'` before `{` starts ICU quoting); keep placeholders and plural categories.
+3. Export `Record<Locale, Shape<typeof en>>` from `messages/index.ts`.
+4. Register the product with `messages` in `products/registry.ts`. The page shell supplies the
+   provider and language selector; the completeness tests cover the new product automatically.
+5. In the product, read text with `useProductT()`, render field errors with `FieldErrorMessage`, and
+   set `messageScope` on each `ProductDefinition`. Never read the UI locale in `toInput`.
+
+### Recipe: add a locale
+
+1. Add it to `LOCALE_NAMES` in `i18n/locales.ts` (endonym).
+2. TypeScript then requires an entry in `HOST_MESSAGES` and in every product's messages record:
+   add `i18n/messages/<code>.ts` and `products/*/messages/<code>.ts`, typed `Shape<typeof en>`.
+3. Run `pnpm --filter @anytoolai/web-mirror test`; the parity, placeholder and ICU-syntax checks
+   fail on any gap. No product runtime change is needed.
+
 ## A12/A13 public scenario runtime contract
 
 The A12/A13 public runtime surface is:

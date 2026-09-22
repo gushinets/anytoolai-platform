@@ -4,7 +4,7 @@
 // `append_after_blank_line`), and the mode switcher. The shared runtime behavior every mode rides
 // on (polling, retry, quota, copy-activation ordering, event callbacks) is proven once in
 // ProductRunPage.test.tsx -- not re-proven per mode here.
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProductRunPage } from "../src/products/runtime/ProductRunPage";
 import type { ProductRunEvent } from "../src/products/runtime/productDefinition";
@@ -27,6 +27,10 @@ import {
   sessionResponse,
   startResponse,
 } from "./fixtures/platformResponses";
+import { CLIENT_UPDATE_WRITER_MESSAGES } from "../src/products/clientUpdateWriter/messages";
+import { makeRender } from "./support/renderWithI18n";
+
+const render = makeRender(CLIENT_UPDATE_WRITER_MESSAGES);
 
 /** `getByText`'s default matcher collapses whitespace (including the composed result's blank-line
  * separator) to a single space -- this matches against each element's raw `textContent` instead,
