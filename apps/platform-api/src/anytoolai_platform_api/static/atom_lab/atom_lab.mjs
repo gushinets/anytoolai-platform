@@ -2078,16 +2078,24 @@ export function bootstrapAtomLab({
         || !isNonEmptyString(created.created_at)) {
         throw new Error("Сохранение пресета вернуло некорректный ответ.");
       }
-      await loadPresets();
-      const summary = presetItems.find((item) => item.preset_id === created.preset_id) ?? {
+      if (!updating) await loadPresets();
+      const currentSummary = presetItems.find((item) => item.preset_id === created.preset_id)
+        ?? (selectedPresetSummary?.preset_id === created.preset_id ? selectedPresetSummary : null);
+      const summary = {
+        ...currentSummary,
         preset_id: created.preset_id,
         latest_version: created.version,
         name: payload.name,
         description: payload.description,
         atom_id: payload.atom_id,
-        created_at: created.created_at,
+        created_at: currentSummary?.created_at ?? created.created_at,
         updated_at: created.created_at,
       };
+      if (presetItems.some((item) => item.preset_id === created.preset_id)) {
+        presetItems = presetItems.map((item) => item.preset_id === created.preset_id ? summary : item);
+      } else {
+        presetItems = [summary, ...presetItems];
+      }
       const readBack = await openPreset(summary, created.version, {force: true});
       if (readBack) {
         nodes["preset-state"].textContent = `Сохранена неизменяемая версия ${created.version}.`;
@@ -2766,6 +2774,10 @@ export function bootstrapAtomLab({
       if (!presetEditorActive) startNewPreset({clearSessionPreset: false});
     } finally {
       setPresetLibraryLoading(false);
+      if (presetEditorActive) {
+        syncFixedFieldAvailability();
+        renderPresetState();
+      }
     }
   });
   nodes["history-button"].addEventListener("click", async () => {
@@ -2833,7 +2845,7 @@ export function bootstrapAtomLab({
     presetOpenInFlight = true;
     updatePresetEditorDisabled();
     nodes["preset-error"].textContent = "";
-    let latestPage = null;
+    let latestPage;
     try {
       latestPage = await fetchPresetVersions(recovery.summary.preset_id);
     } catch (error) {
@@ -2841,6 +2853,7 @@ export function bootstrapAtomLab({
       nodes["preset-error"].textContent = error instanceof Error
         ? `Не удалось получить актуальную версию: ${error.message}`
         : "Не удалось получить актуальную версию.";
+      return;
     } finally {
       presetOpenInFlight = false;
       updatePresetEditorDisabled();

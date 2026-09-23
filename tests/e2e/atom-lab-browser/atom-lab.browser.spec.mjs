@@ -1440,15 +1440,16 @@ test("preset conflict disables stale recovery when the latest-version read fails
     }
     if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions` && request.method() === "GET") {
       versionReads += 1;
-      if (versionReads > 1) {
+      if (versionReads > 2) {
         await route.fulfill({status: 503, contentType: "application/json", body: JSON.stringify({
           error: {code: "temporary_failure", message: "Версии недоступны.", field_errors: []},
           request_id: "request-latest-failed",
         })});
         return;
       }
+      const version = versionReads === 1 ? 1 : 2;
       await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
-        preset_id: stored.preset_id, version: 1, name: stored.name, description: stored.description,
+        preset_id: stored.preset_id, version, name: stored.name, description: stored.description,
         atom_id: stored.atom_id, created_at: stored.created_at,
       }], next_cursor: null})});
       return;
@@ -1485,10 +1486,15 @@ test("preset conflict disables stale recovery when the latest-version read fails
   await expect(page.locator("#preset-name")).toHaveValue("Мой локальный черновик");
   await expect(page.locator("#prompt-editor")).toHaveValue("Локальный промпт не потерять");
   await expect(page.locator("#open-latest-preset")).toBeVisible();
-  await expect(page.locator("#open-latest-preset")).toBeDisabled();
-  await expect(page.locator("#preset-error")).toContainText("Не удалось получить актуальную версию");
+  await expect(page.locator("#open-latest-preset")).toBeEnabled();
   await expect(page.locator("#save-as-new-preset")).toBeVisible();
   expect(listReads).toBe(1);
+
+  await page.locator("#open-latest-preset").click();
+  await expect(page.locator("#open-latest-preset")).toBeDisabled();
+  await expect(page.locator("#preset-error")).toContainText("Не удалось получить актуальную версию: Версии недоступны");
+  await expect(page.locator("#preset-name")).toHaveValue("Мой локальный черновик");
+  await expect(page.locator("#prompt-editor")).toHaveValue("Локальный промпт не потерять");
 
   await page.getByRole("button", {name: /A05/}).click();
   await expect(page.locator("#atom-title")).toContainText("A05");
@@ -1514,8 +1520,14 @@ test("preset conflict opens the directly resolved latest version from a later li
     ...latest, name: "Самая новая серверная версия", prompt: "Самый новый промпт",
     version: 3, created_at: "2026-09-23T09:12:00Z",
   };
+  const saved = {
+    ...newest, name: "Сохранённая поздняя версия",
+    version: 4, created_at: "2026-09-23T09:13:00Z",
+  };
   let listReads = 0;
   let versionReads = 0;
+  let versionPosts = 0;
+  let savedCommitted = false;
   let confirmations = 0;
   page.on("dialog", async (dialog) => {
     confirmations += 1;
@@ -1544,7 +1556,9 @@ test("preset conflict opens the directly resolved latest version from a later li
     }
     if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions` && request.method() === "GET") {
       versionReads += 1;
-      const visible = versionReads === 1 ? stored : versionReads === 2 ? latest : newest;
+      const visible = savedCommitted
+        ? saved
+        : versionReads === 1 ? stored : versionReads === 2 ? latest : newest;
       await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
         preset_id: visible.preset_id, version: visible.version, name: visible.name,
         description: visible.description, atom_id: visible.atom_id, created_at: visible.created_at,
@@ -1563,7 +1577,19 @@ test("preset conflict opens the directly resolved latest version from a later li
       await route.fulfill({contentType: "application/json", body: JSON.stringify(newest)});
       return;
     }
+    if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions/4`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(saved)});
+      return;
+    }
     if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions` && request.method() === "POST") {
+      versionPosts += 1;
+      if (versionPosts > 1) {
+        savedCommitted = true;
+        await route.fulfill({status: 201, contentType: "application/json", body: JSON.stringify({
+          preset_id: stored.preset_id, version: saved.version, created_at: saved.created_at,
+        })});
+        return;
+      }
       await route.fulfill({status: 409, contentType: "application/json", body: JSON.stringify({
         error: {code: "preset_version_conflict", message: "Уже есть новая версия.", field_errors: []},
         request_id: "request-direct-latest",
@@ -1588,6 +1614,13 @@ test("preset conflict opens the directly resolved latest version from a later li
   await expect(page.locator("#prompt-editor")).toHaveValue(newest.prompt);
   await expect(page.getByRole("button", {name: /Самая новая серверная версия/})).toContainText("v3");
   expect(confirmations).toBe(1);
+  expect(listReads).toBe(2);
+
+  await page.locator("#preset-name").fill(saved.name);
+  await page.locator("#save-preset").click();
+  await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия 4");
+  await expect(page.getByRole("button", {name: new RegExp(saved.name)})).toContainText("v4");
+  await expect(page.getByRole("button", {name: new RegExp(saved.name)})).toHaveAttribute("aria-current", "true");
   expect(listReads).toBe(2);
 });
 
@@ -1905,9 +1938,12 @@ test("fixed fields are selectable only while their values exist in the preset in
   await page.locator("#json-editor").fill(JSON.stringify({...A06.example_input, audience: "Команда"}));
   await expect(page.locator("#fixed-fields").getByLabel("audience")).toBeEnabled();
   await page.locator("#fixed-fields").getByLabel("audience").check();
+  await page.locator("#close-presets").click();
   await page.locator("#json-editor").fill(JSON.stringify(A06.example_input));
+  await page.locator("#presets-button").click();
   await expect(page.locator("#fixed-fields").getByLabel("audience")).toBeDisabled();
   await expect(page.locator("#fixed-fields").getByLabel("audience")).not.toBeChecked();
+  await expect(page.locator("#preset-state")).not.toHaveText("Загрузка пресетов…");
 });
 
 test("accepted run immediately marks an open saved preset as a changed draft", async ({page}) => {
@@ -1959,6 +1995,9 @@ test("accepted run immediately marks an open saved preset as a changed draft", a
   await unlockAtom(page, "A06");
   await page.locator("#presets-button").click();
   await page.locator("#preset-list button").click();
+  await expect(page.locator("#preset-state")).toContainText("Открыта сохранённая версия");
+  await page.locator("#close-presets").click();
+  await page.locator("#presets-button").click();
   await expect(page.locator("#preset-state")).toContainText("Открыта сохранённая версия");
   await page.locator("#run-button").click();
   await expect(page.locator("#preset-state")).toContainText("Есть несохранённый черновик");
