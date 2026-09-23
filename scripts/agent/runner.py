@@ -898,6 +898,12 @@ CLIENT_UPDATE_WRITER_SMOKE_REPORT_PATH = (
     ROOT / "tests" / "e2e" / "client-update-writer-smoke" / "playwright-report.json"
 )
 
+BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV = "ANYTOOLAI_BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT"
+BRIEF_DECODER_SMOKE_EVIDENCE_ROOT = ROOT / ".agent" / "brief-decoder-smoke"
+BRIEF_DECODER_SMOKE_REPORT_PATH = (
+    ROOT / "tests" / "e2e" / "brief-decoder-smoke" / "playwright-report.json"
+)
+
 
 def _client_handoff_smoke_web_mirror_port() -> int:
     return _port_override(CLIENT_HANDOFF_SMOKE_WEB_MIRROR_PORT_ENV, 3000)
@@ -909,6 +915,10 @@ def _proposal_ai_smoke_web_mirror_port() -> int:
 
 def _client_update_writer_smoke_web_mirror_port() -> int:
     return _port_override(CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV, 3200)
+
+
+def _brief_decoder_smoke_web_mirror_port() -> int:
+    return _port_override(BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV, 3300)
 
 
 def _terminate_process_group(process: subprocess.Popen) -> None:
@@ -1190,6 +1200,44 @@ def client_update_writer_smoke() -> int:
     )
 
 
+def brief_decoder_smoke() -> int:
+    """ANY-248: builds and serves web-mirror against the running dev-up platform-api, then runs the
+    Playwright browser-evidence smoke (tests/e2e/brief-decoder-smoke) for the Brief Decoder web
+    vertical: happy-path runtime correlation, validation, weak input, zero-question result,
+    terminal error and quota. Same shape as client_update_writer_smoke().
+    """
+    try:
+        identity = runtime_identity()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
+
+    web_mirror_port = _brief_decoder_smoke_web_mirror_port()
+    if not _check_ports_available(
+        "BDS001",
+        [("web-mirror", web_mirror_port, BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV, None)],
+    ):
+        return 1
+    web_mirror_url = f"http://localhost:{web_mirror_port}"
+
+    env = runner_env()
+    env["PLATFORM_API_BASE_URL"] = identity.api_url
+
+    build_exit = run_with_env(["pnpm", "--filter", "@anytoolai/web-mirror", "build"], env)
+    if build_exit != 0:
+        return build_exit
+
+    return _serve_web_mirror_and_run_smoke(
+        web_mirror_port=web_mirror_port,
+        env=env,
+        readiness_error_code="BDS002",
+        smoke_extra_env={"WEB_MIRROR_BASE_URL": web_mirror_url, "DATABASE_URL": identity.database_url},
+        smoke_pnpm_filter="@anytoolai/brief-decoder-smoke",
+        report_path=BRIEF_DECODER_SMOKE_REPORT_PATH,
+        evidence_root=BRIEF_DECODER_SMOKE_EVIDENCE_ROOT,
+    )
+
+
 def _prod_compose_command(*args: str) -> list[str]:
     env_file = PROD_ENV_FILE if PROD_ENV_FILE.is_file() else None
     return _docker_compose_command(
@@ -1317,6 +1365,7 @@ COMMANDS = {
     "client-handoff-smoke": client_handoff_smoke,
     "proposal-ai-smoke": proposal_ai_smoke,
     "client-update-writer-smoke": client_update_writer_smoke,
+    "brief-decoder-smoke": brief_decoder_smoke,
     "prod-up": prod_up,
     "prod-ready": prod_ready,
     "prod-status": prod_status,

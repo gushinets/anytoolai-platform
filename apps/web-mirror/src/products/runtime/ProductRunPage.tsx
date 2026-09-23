@@ -609,7 +609,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     resultFetchSettledRef.current = true;
     setPhase({ kind: "result", scenarioSessionId, checkpointId, result: extracted });
-    emitEvent(onEventRef.current, { type: "scenario_completed", scenarioSessionId, guestId });
+    if (definition.emitsResultViewed?.(extracted) ?? true) {
+      emitEvent(onEventRef.current, { type: "scenario_completed", scenarioSessionId, guestId });
+    }
   }
 
   // Shared by handleSubmit/handleRetry: both begin a (new or reused) prepared start the same way.

@@ -702,6 +702,25 @@ describe("ProductRunPage", () => {
     expect(serialized).not.toContain(RESULT_TEXT);
   });
 
+  it.each([
+    ["is left unset", undefined, 1],
+    ["returns true", () => true, 1],
+    ["returns false", () => false, 0],
+  ])("emits scenario_completed per emitsResultViewed when it %s, and still renders the result", async (_name, hook, expected) => {
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClient(happyPathRoutes());
+    const definition = { ...testProductDefinition, emitsResultViewed: hook };
+
+    render(<ProductRunPage definition={definition} client={client} onEvent={(event) => events.push(event)} />);
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+
+    expect(events.filter((event) => event.type === "scenario_completed")).toHaveLength(expected);
+    expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
+  });
+
   it("emits copy_activated even when the completed session has no checkpoint id, only skipping the next-action call", async () => {
     const events: ProductRunEvent[] = [];
     const { client, calls } = makeClient({

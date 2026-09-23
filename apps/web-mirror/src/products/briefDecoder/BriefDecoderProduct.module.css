@@ -1,0 +1,55 @@
+.fieldGroup {
+  display: grid;
+  gap: 8px;
+}
+
+.help,
+.error {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.help {
+  color: var(--color-text-secondary);
+}
+
+.error {
+  color: var(--color-error);
+}
+
+.briefTextArea {
+  min-height: 200px;
+  resize: none;
+}
+
+.result {
+  display: grid;
+  gap: 16px;
+}
+
+.section {
+  display: grid;
+  gap: 8px;
+}
+
+.section h2,
+.section h3 {
+  margin: 0;
+}
+
+.list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+}
+
+.label {
+  font-weight: 600;
+}
+
+.meta {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}

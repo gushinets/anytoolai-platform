@@ -104,6 +104,13 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
   toInput: (values: V) => Record<string, unknown>;
   /** Frontend-safe canonical output -> the product's result; null means unusable. */
   extractResult: (output: Record<string, unknown>) => R | null;
+  /**
+   * Whether a completed run's result counts as "viewed" for analytics (`web.result_viewed`).
+   * Optional, default true: most products activate on any rendered result. A product whose
+   * activation is narrower (Brief Decoder: a non-empty clarifying-question list) returns false
+   * to suppress only the event -- the run still moves to the result state and renders.
+   */
+  emitsResultViewed?: (result: R) => boolean;
   Fields: ComponentType<ProductFieldsProps<V>>;
   Result: ComponentType<ProductResultProps<R>>;
 };

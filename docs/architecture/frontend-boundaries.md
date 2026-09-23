@@ -119,6 +119,17 @@ A15 ownership and delivery slices:
   CE-kit. Component/browser tests cover this over Vitest + Testing Library; a real running
   dev-server route is ANY-224's job.
 
+## Result activation and composite renderers (ANY-248)
+
+`ProductDefinition.emitsResultViewed?(result)` is the one optional hook for a product whose
+"viewed" activation is narrower than "any completed result". Default is true (ProposalAI and Client
+Update Writer are unchanged); returning false suppresses only the `web.result_viewed` event, never
+the result state or rendering. It exists because the client-event property allowlist cannot carry a
+question count and Platform Core is not changed for a product. Brief Decoder's `R` is a composite
+object (`brief`, `issues`, `questions`, `document`) rendered by product-owned markup; only its
+copy-ready `document` goes through the shared `ResultView`, using a product-side
+`composeCopyText` that implements `renderer_contract.yaml`'s `canonical_field_composition`.
+
 ## Web i18n (ANY-519)
 
 `apps/web-mirror` localizes product-page UI. The mechanism is host-owned; the words are
