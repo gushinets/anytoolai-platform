@@ -1363,9 +1363,10 @@ test("run, immutable preset versions, export, reload, and history restore form o
   await page.locator("#preset-name").fill("Рабочий пресет");
   await page.locator("#preset-description").fill("Проверка версий");
   await page.locator("#fixed-fields").getByLabel("context").check();
-  await page.locator("#save-preset").click();
+  await page.locator("#save-preset").dblclick();
   await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия 1");
   await expect(page.locator("#preset-error")).toHaveText("");
+  expect(presetWrites).toHaveLength(1);
 
   await page.locator("#close-presets").click();
   await page.locator("#prompt-editor").fill("Промпт версии два");
@@ -1377,11 +1378,23 @@ test("run, immutable preset versions, export, reload, and history restore form o
   await page.locator("#export-preset").click();
   await expect(page.locator("#preset-export")).toContainText('"version": 1');
   await expect(page.locator("#preset-export-download")).toHaveAttribute("download", "atom-lab-preset-library-v1.json");
+  await page.locator("#preset-version-select").selectOption("2");
+  await expect(page.locator("#prompt-editor")).toHaveValue("Промпт версии два");
+  await expect(page.locator("#preset-export")).toBeHidden();
+  await expect(page.locator("#preset-export-download")).toBeHidden();
 
   expect(versions).toHaveLength(2);
   expect(versions[0].prompt).toBe("Промпт версии один");
   expect(versions[1].prompt).toBe("Промпт версии два");
   expect(presetWrites[0].source_run_id).toBe(detail.run_id);
+
+  await page.locator("#close-presets").click();
+  await page.locator("#history-button").click();
+  await page.locator("#history-list button").click();
+  await page.locator("#restore-history").click();
+  await page.locator("#presets-button").click();
+  await expect(page.locator("#save-preset")).toHaveText("Сохранить новый");
+  await expect(page.locator("#preset-version-select option")).toHaveCount(0);
 
   await page.reload();
   await page.locator("#access-code").fill("secret");
@@ -1468,6 +1481,72 @@ test("preset conflict and save failure keep the local draft intact", async ({pag
   await expect(page.locator("#save-preset")).toHaveText("Сохранить новый");
 });
 
+test("preset selection commits atomically across stale responses and failed reads", async ({page}) => {
+  const stored = (id, name) => ({
+    name, description: `${name} description`, atom_id: "A06",
+    base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
+    prompt: `${name} prompt`, prompt_ref: A06.prompt_ref,
+    model_id: "openai/gpt-supported", reasoning_effort: "high", fixed_fields: ["context"],
+    example_input: A06.example_input, source_run_id: null,
+    preset_id: id, version: 1, created_at: "2026-09-23T09:15:00Z",
+  });
+  const presets = [stored("preset-a", "Preset A"), stored("preset-b", "Preset B"), stored("preset-c", "Preset C")];
+  let savePath = null;
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const request = route.request();
+    const {pathname} = new URL(request.url());
+    if (pathname === "/v1/atom-lab/presets" && request.method() === "GET") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: presets.map((item) => ({
+        preset_id: item.preset_id, latest_version: 1, name: item.name, description: item.description,
+        atom_id: item.atom_id, created_at: item.created_at, updated_at: item.created_at,
+      })), next_cursor: null})});
+      return;
+    }
+    const match = pathname.match(/^\/v1\/atom-lab\/presets\/(preset-[abc])\/versions(?:\/(\d+))?$/);
+    if (match && request.method() === "GET") {
+      const item = presets.find((candidate) => candidate.preset_id === match[1]);
+      if (item.preset_id === "preset-c") {
+        await route.fulfill({status: 503, contentType: "application/json", body: JSON.stringify({
+          error: {code: "temporary_failure", message: "Версия временно недоступна.", field_errors: []},
+          request_id: "request-c",
+        })});
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, item.preset_id === "preset-a" ? 200 : 20));
+      const body = match[2] ? item : {items: [{
+        preset_id: item.preset_id, version: 1, name: item.name, description: item.description,
+        atom_id: item.atom_id, created_at: item.created_at,
+      }], next_cursor: null};
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(body)});
+      return;
+    }
+    if (match && request.method() === "POST") {
+      savePath = pathname;
+      await route.abort();
+      return;
+    }
+    await route.fallback();
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#presets-button").click();
+  const presetButtons = page.locator("#preset-list button");
+  await presetButtons.nth(0).click();
+  await presetButtons.nth(1).dispatchEvent("click");
+  await expect(page.locator("#preset-name")).toHaveValue("Preset B");
+  await page.waitForTimeout(250);
+  await expect(page.locator("#preset-name")).toHaveValue("Preset B");
+  await expect(presetButtons.nth(1)).toHaveAttribute("aria-current", "true");
+
+  await presetButtons.nth(2).click();
+  await expect(page.locator("#preset-error")).toContainText("Версия временно недоступна");
+  await expect(page.locator("#preset-name")).toHaveValue("Preset B");
+  await expect(presetButtons.nth(1)).toHaveAttribute("aria-current", "true");
+  await page.locator("#preset-name").fill("Preset B edited");
+  await page.locator("#save-preset").click();
+  await expect.poll(() => savePath).toBe("/v1/atom-lab/presets/preset-b/versions");
+});
+
 test("historical preset provenance stays read-only until explicit adaptation", async ({page}) => {
   const stored = {
     name: "Исторический пресет", description: "Старый контракт", atom_id: "A06",
@@ -1545,6 +1624,14 @@ test("new preset metadata participates in discard protection and atom changes cl
   await expect(page.locator("#preset-version-select option")).toHaveCount(0);
   await expect(page.locator("#save-preset")).toHaveText("Сохранить новый");
   await expect(page.locator("#preset-state")).toContainText("Нет несохранённых изменений");
+
+  await expect(page.locator("#preset-name")).toBeEnabled();
+  await expect(page.locator("#fixed-fields").getByLabel("issues")).toBeVisible();
+  await page.locator("#preset-name").fill("Новый после смены атома");
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page.getByRole("button", {name: /A06/}).click();
+  await expect(page.locator("#atom-title")).toContainText("A05");
+  await expect(page.locator("#preset-name")).toHaveValue("Новый после смены атома");
 });
 
 test("history keeps running and crash-failed snapshots readable without silent migration", async ({page}) => {
@@ -1564,13 +1651,16 @@ test("history keeps running and crash-failed snapshots readable without silent m
   };
   failed.snapshot.action.config_id = "config.a06.retired";
   failed.snapshot.prompt.ref = "prompt.a06.retired";
+  failed.snapshot.preset = {id: "preset-retired", version: 1};
   failed.snapshot.provider.model_id = "openai/gpt-retired";
   let runPosts = 0;
+  let adaptedRunBody = null;
   await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
     const request = route.request();
     const {pathname} = new URL(request.url());
     if (pathname === "/v1/atom-lab/runs" && request.method() === "POST") {
       runPosts += 1;
+      adaptedRunBody = request.postDataJSON();
       await route.abort();
       return;
     }
@@ -1602,7 +1692,11 @@ test("history keeps running and crash-failed snapshots readable without silent m
   await expect(page.locator("#prompt-editor")).toHaveValue("Старый промпт");
   await expect(page.locator("#model-catalog-warning")).toContainText("модель недоступна");
   await expect(page.locator("#run-button")).toBeDisabled();
-  expect(runPosts).toBe(0);
+  await page.locator("#model-select").selectOption("gpt-supported");
+  await page.locator("#reasoning-effort").selectOption("high");
+  await page.locator("#run-button").click();
+  await expect.poll(() => runPosts).toBe(1);
+  expect(adaptedRunBody.preset_ref).toBeNull();
 });
 
 test("saving from history uses the selected snapshot instead of the unrelated editor draft", async ({page}) => {

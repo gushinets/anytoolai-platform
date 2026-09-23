@@ -1361,7 +1361,11 @@ export function bootstrapAtomLab({
   let presetDraftBaseline = null;
   let presetEditorActive = false;
   let presetLibraryLoading = false;
+  let presetOpenInFlight = false;
+  let presetOpenGeneration = 0;
   let presetReadOnly = false;
+  let presetSaveInFlight = false;
+  let presetExportGeneration = 0;
   let historyItems = [];
   let historyCursor = null;
   let selectedHistoryDetail = null;
@@ -1764,6 +1768,7 @@ export function bootstrapAtomLab({
       nodes["preset-list"].append(item);
     }
     nodes["load-more-presets"].hidden = presetCursor === null;
+    updatePresetEditorDisabled();
   };
 
   const loadPresets = async ({append = false} = {}) => {
@@ -1781,12 +1786,25 @@ export function bootstrapAtomLab({
   };
 
   const updatePresetEditorDisabled = () => {
-    const editorLocked = presetLibraryLoading || presetReadOnly;
+    const operationLocked = presetLibraryLoading || presetOpenInFlight || presetSaveInFlight;
+    const editorLocked = operationLocked || presetReadOnly || !presetEditorActive;
     for (const id of ["preset-name", "preset-description", "save-preset"]) nodes[id].disabled = editorLocked;
-    nodes["preset-version-select"].disabled = presetLibraryLoading;
-    nodes["new-preset"].disabled = presetLibraryLoading;
-    nodes["adapt-preset"].disabled = presetLibraryLoading || !presetReadOnly;
+    for (const id of ["preset-version-select", "new-preset", "save-as-new-preset", "open-latest-preset", "load-more-versions"]) {
+      nodes[id].disabled = operationLocked;
+    }
+    nodes["export-preset"].disabled = operationLocked || selectedPresetVersion === null;
+    nodes["adapt-preset"].disabled = operationLocked || !presetReadOnly;
+    for (const buttonNode of nodes["preset-list"].querySelectorAll("button")) buttonNode.disabled = operationLocked;
     for (const input of nodes["fixed-fields"].querySelectorAll("input")) input.disabled = editorLocked;
+  };
+
+  const clearPresetExport = () => {
+    presetExportGeneration += 1;
+    nodes["preset-export"].textContent = "";
+    nodes["preset-export"].hidden = true;
+    nodes["preset-export-download"].href = "";
+    nodes["preset-export-download"].download = "";
+    nodes["preset-export-download"].hidden = true;
   };
 
   const setPresetLibraryLoading = (loading) => {
@@ -1803,22 +1821,26 @@ export function bootstrapAtomLab({
     updatePresetEditorDisabled();
   };
 
-  const loadPresetVersion = async (presetId, version) => {
+  const fetchPresetVersion = async (presetId, version) => {
     const parsed = parsePresetVersion(
       await protectedJson(`/v1/atom-lab/presets/${encodeURIComponent(presetId)}/versions/${version}`),
       presetId,
       version,
     );
     if (!parsed) throw new Error("Версия пресета вернула некорректный ответ.");
+    return parsed;
+  };
+
+  const commitPresetVersion = (parsed) => {
+    const {preset_id: presetId, version} = parsed;
     selectedPresetVersion = cloneJson(parsed);
     presetEditorActive = true;
     presetSourceOverride = null;
     nodes["preset-name"].value = parsed.name;
     nodes["preset-description"].value = parsed.description;
     nodes["preset-version-select"].value = String(version);
-    nodes["export-preset"].disabled = false;
     nodes["preset-conflict"].hidden = true;
-    nodes["preset-export"].hidden = true;
+    clearPresetExport();
     const atom = catalog.find((item) => item.atom_id === parsed.atom_id);
     if (!presetContractMatchesAtom(parsed, atom)) {
       presetDraftBaseline = null;
@@ -1837,7 +1859,7 @@ export function bootstrapAtomLab({
     renderPresetState();
   };
 
-  const loadPresetVersions = async (presetId, {append = false} = {}) => {
+  const fetchPresetVersions = async (presetId, {append = false} = {}) => {
     const query = append && presetVersionsCursor
       ? `?cursor=${encodeURIComponent(presetVersionsCursor)}`
       : "";
@@ -1845,6 +1867,10 @@ export function bootstrapAtomLab({
       `/v1/atom-lab/presets/${encodeURIComponent(presetId)}/versions${query}`,
     ));
     if (!parsed) throw new Error("Список версий вернул некорректный ответ.");
+    return parsed;
+  };
+
+  const commitPresetVersions = (parsed, {append = false} = {}) => {
     presetVersions = append ? [...presetVersions, ...parsed.items] : parsed.items;
     presetVersionsCursor = parsed.next_cursor;
     const selectedValue = nodes["preset-version-select"].value;
@@ -1859,32 +1885,58 @@ export function bootstrapAtomLab({
     nodes["load-more-versions"].hidden = presetVersionsCursor === null;
   };
 
-  const openPreset = async (preset, preferredVersion = preset.latest_version, {force = false} = {}) => {
+  const loadPresetVersions = async (presetId, {append = false} = {}) => {
+    commitPresetVersions(await fetchPresetVersions(presetId, {append}), {append});
+  };
+
+  const openPreset = async (
+    preset,
+    preferredVersion = preset.latest_version,
+    {force = false, refreshVersions = true} = {},
+  ) => {
+    if (presetSaveInFlight && !force) return;
     if (!force && hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
+    const generation = ++presetOpenGeneration;
+    presetOpenInFlight = true;
+    clearPresetExport();
+    updatePresetEditorDisabled();
     nodes["preset-error"].textContent = "";
-    selectedPresetSummary = preset;
-    renderPresetList();
+    nodes["preset-state"].textContent = "Загрузка версии пресета…";
     try {
-      await loadPresetVersions(preset.preset_id);
-      await loadPresetVersion(preset.preset_id, preferredVersion);
+      const [versionsPage, version] = await Promise.all([
+        refreshVersions ? fetchPresetVersions(preset.preset_id) : Promise.resolve(null),
+        fetchPresetVersion(preset.preset_id, preferredVersion),
+      ]);
+      if (generation !== presetOpenGeneration) return;
+      if (versionsPage) commitPresetVersions(versionsPage);
+      selectedPresetSummary = preset;
+      commitPresetVersion(version);
+      renderPresetList();
     } catch (error) {
+      if (generation !== presetOpenGeneration) return;
+      if (selectedPresetVersion) nodes["preset-version-select"].value = String(selectedPresetVersion.version);
       nodes["preset-error"].textContent = error instanceof Error ? error.message : "Не удалось открыть пресет.";
+      renderPresetState();
+    } finally {
+      if (generation === presetOpenGeneration) {
+        presetOpenInFlight = false;
+        updatePresetEditorDisabled();
+      }
     }
   };
 
-  const startNewPreset = ({fromHistory = null, activate = true} = {}) => {
+  const startNewPreset = ({fromHistory = null, activate = true, clearSessionPreset = true} = {}) => {
     setPresetReadOnly(false);
     presetEditorActive = activate;
     selectedPresetSummary = null;
     selectedPresetVersion = null;
     presetSourceOverride = fromHistory;
-    session.presetRef = null;
+    if (clearSessionPreset) session.presetRef = null;
     nodes["preset-name"].value = fromHistory ? `Запуск ${fromHistory.sourceRunId}` : "";
     nodes["preset-description"].value = "";
     nodes["preset-version-select"].replaceChildren();
     nodes["load-more-versions"].hidden = true;
-    nodes["export-preset"].disabled = true;
-    nodes["preset-export"].hidden = true;
+    clearPresetExport();
     nodes["preset-conflict"].hidden = true;
     if (activate) renderFixedFields([]);
     else nodes["fixed-fields"].replaceChildren();
@@ -1899,7 +1951,9 @@ export function bootstrapAtomLab({
   };
 
   const savePreset = async ({forceNew = false} = {}) => {
-    if (presetLibraryLoading || presetReadOnly) return;
+    if (presetLibraryLoading || presetOpenInFlight || presetReadOnly || presetSaveInFlight) return;
+    presetSaveInFlight = true;
+    updatePresetEditorDisabled();
     nodes["preset-error"].textContent = "";
     const payload = currentPresetPayload();
     const updating = Boolean(selectedPresetVersion) && !forceNew;
@@ -1929,6 +1983,9 @@ export function bootstrapAtomLab({
       }
       nodes["preset-error"].textContent = `${error instanceof Error ? error.message : "Не удалось сохранить пресет."} Значения черновика сохранены.`;
       renderPresetState();
+    } finally {
+      presetSaveInFlight = false;
+      updatePresetEditorDisabled();
     }
   };
 
@@ -2348,7 +2405,7 @@ export function bootstrapAtomLab({
     nodes["prompt-editor"].value = session.prompt;
     renderNavigation();
     renderEditor();
-    if (!preservePreset) startNewPreset({activate: false});
+    if (!preservePreset) startNewPreset({activate: !nodes["presets-panel"].hidden});
   };
 
   const showInputTab = (showInput) => {
@@ -2486,13 +2543,13 @@ export function bootstrapAtomLab({
     updateDraftState();
   });
   nodes["presets-button"].addEventListener("click", async () => {
-    if (presetLibraryLoading) return;
+    if (presetLibraryLoading || presetOpenInFlight || presetSaveInFlight) return;
     nodes["history-panel"].hidden = true;
     nodes["presets-panel"].hidden = false;
     setPresetLibraryLoading(true);
     try {
       if (presetItems.length === 0) await loadPresets();
-      if (!presetEditorActive) startNewPreset();
+      if (!presetEditorActive) startNewPreset({clearSessionPreset: false});
     } finally {
       setPresetLibraryLoading(false);
     }
@@ -2506,32 +2563,31 @@ export function bootstrapAtomLab({
   nodes["close-history"].addEventListener("click", () => { nodes["history-panel"].hidden = true; });
   nodes["load-more-presets"].addEventListener("click", () => loadPresets({append: true}));
   nodes["load-more-versions"].addEventListener("click", () => {
-    if (!selectedPresetSummary) return;
+    if (!selectedPresetSummary || presetOpenInFlight || presetSaveInFlight) return;
     loadPresetVersions(selectedPresetSummary.preset_id, {append: true})
       .catch((error) => { nodes["preset-error"].textContent = error.message; });
   });
   nodes["load-more-history"].addEventListener("click", () => loadHistory({append: true}));
   nodes["new-preset"].addEventListener("click", () => {
-    if (presetLibraryLoading) return;
+    if (presetLibraryLoading || presetOpenInFlight || presetSaveInFlight) return;
     if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     startNewPreset();
   });
   nodes["preset-name"].addEventListener("input", renderPresetState);
   nodes["preset-description"].addEventListener("input", renderPresetState);
   nodes["preset-version-select"].addEventListener("change", () => {
-    if (!selectedPresetSummary) return;
+    if (!selectedPresetSummary || presetOpenInFlight || presetSaveInFlight) return;
     const nextVersion = Number(nodes["preset-version-select"].value);
     if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) {
       nodes["preset-version-select"].value = String(selectedPresetVersion.version);
       return;
     }
-    loadPresetVersion(selectedPresetSummary.preset_id, nextVersion)
-      .catch((error) => { nodes["preset-error"].textContent = error.message; });
+    openPreset(selectedPresetSummary, nextVersion, {force: true, refreshVersions: false});
   });
   nodes["save-preset"].addEventListener("click", () => savePreset());
   nodes["save-as-new-preset"].addEventListener("click", () => savePreset({forceNew: true}));
   nodes["adapt-preset"].addEventListener("click", () => {
-    if (!presetReadOnly || !selectedPresetVersion) return;
+    if (!presetReadOnly || !selectedPresetVersion || presetOpenInFlight || presetSaveInFlight) return;
     const historical = cloneJson(selectedPresetVersion);
     const atom = catalog.find((item) => item.atom_id === historical.atom_id);
     if (!atom || !applyConfigurationToEditor(historical)) {
@@ -2549,7 +2605,7 @@ export function bootstrapAtomLab({
     renderFixedFields(historical.fixed_fields.filter((field) => allowedFields.has(field)));
     nodes["preset-version-select"].replaceChildren();
     nodes["load-more-versions"].hidden = true;
-    nodes["export-preset"].disabled = true;
+    clearPresetExport();
     presetDraftBaseline = presetFingerprint({
       ...currentPresetPayload(),
       name: "",
@@ -2561,12 +2617,14 @@ export function bootstrapAtomLab({
   });
   nodes["open-latest-preset"].addEventListener("click", async () => {
     const latest = presetItems.find((item) => item.preset_id === selectedPresetVersion?.preset_id);
-    if (!latest || hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
+    if (!latest || presetOpenInFlight || presetSaveInFlight || (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING))) return;
     await openPreset(latest, latest.latest_version);
   });
   nodes["export-preset"].addEventListener("click", async () => {
-    if (!selectedPresetVersion) return;
+    if (!selectedPresetVersion || presetOpenInFlight || presetSaveInFlight) return;
     nodes["preset-error"].textContent = "";
+    clearPresetExport();
+    const generation = presetExportGeneration;
     try {
       const {preset_id: presetId, version} = selectedPresetVersion;
       const parsed = parsePresetExport(
@@ -2575,6 +2633,7 @@ export function bootstrapAtomLab({
         version,
       );
       if (!parsed) throw new Error("Экспорт вернул некорректный ответ.");
+      if (generation !== presetExportGeneration) return;
       const text = JSON.stringify(parsed, null, 2);
       nodes["preset-export"].textContent = text;
       nodes["preset-export"].hidden = false;
@@ -2582,6 +2641,7 @@ export function bootstrapAtomLab({
       nodes["preset-export-download"].download = `atom-lab-${presetId}-v${version}.json`;
       nodes["preset-export-download"].hidden = false;
     } catch (error) {
+      if (generation !== presetExportGeneration) return;
       nodes["preset-error"].textContent = error instanceof Error ? error.message : "Не удалось экспортировать версию.";
     }
   });
@@ -2593,16 +2653,26 @@ export function bootstrapAtomLab({
       nodes["history-error"].textContent = "Исторический снимок нельзя восстановить автоматически.";
       return;
     }
+    const compatible = currentContractMatchesHistory(selectedHistoryDetail);
     const preset = selectedHistoryDetail.snapshot.preset;
-    applyConfigurationToEditor(configuration, {
-      presetRef: isRecord(preset) && isNonEmptyString(preset.id) && isPositiveInteger(preset.version)
+    const restoredPresetRef = compatible
+      && isRecord(preset) && isNonEmptyString(preset.id) && isPositiveInteger(preset.version)
         ? {preset_id: preset.id, version: preset.version}
-        : null,
+        : null;
+    if (!applyConfigurationToEditor(configuration, {
+      presetRef: restoredPresetRef,
       sourceRunId: selectedHistoryDetail.run_id,
       restored: true,
-    });
+    })) {
+      nodes["history-error"].textContent = "Исторический снимок нельзя восстановить автоматически.";
+      return;
+    }
+    startNewPreset({activate: false});
+    session.presetRef = restoredPresetRef;
     nodes["history-panel"].hidden = true;
-    nodes.status.textContent = "Снимок восстановлен как черновик. Для запуска нажмите «Запустить атом».";
+    nodes.status.textContent = compatible
+      ? "Снимок восстановлен как черновик. Для запуска нажмите «Запустить атом»."
+      : "Снимок явно адаптирован к текущему контракту без ссылки на устаревший пресет.";
   });
   nodes["save-history-preset"].addEventListener("click", () => {
     if (!selectedHistoryDetail) return;
