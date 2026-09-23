@@ -164,7 +164,14 @@
           },
           "category": {
             "type": "string",
-            "minLength": 1
+            "enum": [
+              "missing_information",
+              "ambiguity",
+              "scope_risk",
+              "timeline_risk",
+              "budget_risk",
+              "contradiction"
+            ]
           },
           "source_issue_index": {
             "type": "integer",
@@ -186,52 +193,15 @@
       "properties": {
         "sections": {
           "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "pattern": "\\S"
-              },
-              "title": {
-                "type": "string",
-                "minLength": 1,
-                "pattern": "\\S"
-              },
-              "content": {
-                "type": "string",
-                "minLength": 1,
-                "pattern": "\\S"
-              },
-              "metadata": {
-                "type": "object",
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "heading",
-                      "paragraph",
-                      "list",
-                      "table",
-                      "note"
-                    ]
-                  }
-                },
-                "required": [
-                  "kind"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "required": [
-              "id",
-              "title",
-              "content"
-            ],
-            "additionalProperties": false
-          }
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            { "$ref": "#/$defs/overviewSection" },
+            { "$ref": "#/$defs/keyDetailsSection" },
+            { "$ref": "#/$defs/gapsSection" },
+            { "$ref": "#/$defs/nextStepsSection" }
+          ],
+          "items": false
         },
         "summary": {
           "type": "string",
@@ -252,5 +222,62 @@
     "questions",
     "document"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "overviewSection": {
+      "type": "object",
+      "properties": {
+        "id": { "const": "overview" },
+        "title": { "const": "Project overview" },
+        "content": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "metadata": { "$ref": "#/$defs/sectionMetadata" }
+      },
+      "required": ["id", "title", "content"],
+      "additionalProperties": false
+    },
+    "keyDetailsSection": {
+      "type": "object",
+      "properties": {
+        "id": { "const": "key-details" },
+        "title": { "const": "Key details" },
+        "content": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "metadata": { "$ref": "#/$defs/sectionMetadata" }
+      },
+      "required": ["id", "title", "content"],
+      "additionalProperties": false
+    },
+    "gapsSection": {
+      "type": "object",
+      "properties": {
+        "id": { "const": "gaps" },
+        "title": { "const": "Gaps and risks" },
+        "content": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "metadata": { "$ref": "#/$defs/sectionMetadata" }
+      },
+      "required": ["id", "title", "content"],
+      "additionalProperties": false
+    },
+    "nextStepsSection": {
+      "type": "object",
+      "properties": {
+        "id": { "const": "next-steps" },
+        "title": { "const": "Questions to ask" },
+        "content": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "metadata": { "$ref": "#/$defs/sectionMetadata" }
+      },
+      "required": ["id", "title", "content"],
+      "additionalProperties": false
+    },
+    "sectionMetadata": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["heading", "paragraph", "list", "table", "note"]
+        }
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    }
+  }
 }

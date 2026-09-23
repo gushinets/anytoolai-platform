@@ -123,6 +123,9 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 | 2026-09-21 | Config tree, fixtures, wiring and both test suites written; new tests green | Code review |
 | 2026-09-22 | Round #1 code review: fixed 10 of 14 findings (see below); re-ran quick-check/full-check, both green | Code review round #2 |
 | 2026-09-23 | Round #2 code review: fixed 5 of 7 findings (dedup onto shared test helpers, see below); re-ran quick-check/full-check, both green | Open PR |
+| 2026-09-23 | PR #141 opened; description filled in from the template | Address PR inline comments |
+| 2026-09-23 | Fixed a PR inline comment: `generate_summary.v1.md`'s `next-steps` instruction claimed "work can start" for any empty `data.questions`, regardless of `data.issues`/`data.brief.missing_fields`; moved the readiness claim to `summary` and made it depend on all three. Updated the `.no_issues` fixture's `next-steps` text to match | Code review round #3 |
+| 2026-09-23 | Round #3 code review (self-review, posted as blocking inline PR comments): fixed all 3 findings (see below); re-ran quick-check/full-check, both green | Address remaining review, re-request review |
 
 ## Code review round #1 (2026-09-21)
 
@@ -223,6 +226,32 @@ per-product):
    now the second of three products to inherit this platform gap after ProposalAI/ANY-227.
    Unchanged conclusion: needs a `ScenarioRuntimeService.start_session` ordering fix, out of scope
    here.
+
+## Code review round #3 (2026-09-23, self-review posted as blocking PR inline comments)
+
+3 blocking findings, all confirmed against current code and fixed:
+
+1. `decode_output_v1`'s `questions[].category` was an open string (`minLength: 1`), not closed
+   over the A04/A05 taxonomy, even though `generate_questions.v1.md` requires it to reuse the
+   referenced issue's category and the A05 cross-validator never checks it. Closed it to the same
+   6-value enum as `issues[].category`, and extended
+   `test_config_owned_literals_agree_with_the_output_schema` to pin it against the workflow's
+   taxonomy literal (not just `issues[].category`).
+2. `document.sections` accepted any array of >=1 arbitrarily-shaped sections, even though
+   `generate_summary.v1.md` mandates exactly 4 sections with fixed ids/titles/order and A10 has
+   no cross-validator. Narrowed it with `prefixItems` (4 fixed per-position `$defs` entries, each
+   pinning `id`/`title` via `const`) plus `minItems: 4`/`maxItems: 4`/`items: false` -- this
+   package's first use of `$ref`/`$defs`/`prefixItems`, verified directly against jsonschema
+   4.26 (this repo's version) before committing: same-document `#/$defs/...` refs resolve with a
+   plain `jsonschema.validate()` call, no `$schema` declaration needed. Added mutation cases
+   (arbitrary section id, a missing section, reordered sections) to
+   `test_output_schema_accepts_the_fixtures_and_rejects_open_shapes`.
+3. The `.no_issues` A10 fixture still claimed "ready to start work" even though its own run's A01
+   fixture has a non-empty `missing_fields` (`target_audience`) -- directly contradicting the
+   round-#3-adjacent prompt fix (readiness requires "no issues *and* nothing missing"). Rewrote
+   the fixture's `summary` to state the brief is not fully ready and name the missing field, and
+   added an assertion in `test_no_issues_skips_question_generation_and_still_produces_a_consistent_document`
+   that the summary names the missing field and doesn't claim unqualified readiness.
 
 ## Open questions
 

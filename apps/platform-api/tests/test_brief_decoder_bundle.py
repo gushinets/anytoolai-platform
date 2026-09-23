@@ -180,6 +180,10 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
         mutate(candidate)
         return candidate
 
+    def _swap_first_two_sections(candidate: dict[str, Any]) -> None:
+        sections = candidate["document"]["sections"]
+        sections[0], sections[1] = sections[1], sections[0]
+
     invalid_outputs = {
         "unknown_top_level_key": mutated(lambda o: o.update(extra=1)),
         "missing_part": mutated(lambda o: o.pop("document")),
@@ -190,7 +194,18 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
         "unknown_missing_field": mutated(lambda o: o["brief"]["missing_fields"].append("invented")),
         "category_outside_taxonomy": mutated(lambda o: o["issues"][0].update(category="other")),
         "unknown_question_key": mutated(lambda o: o["questions"][0].update(extra=1)),
+        "question_category_outside_taxonomy": mutated(
+            lambda o: o["questions"][0].update(category="other")
+        ),
         "empty_document": mutated(lambda o: o["document"].update(sections=[])),
+        # Code review finding (me #1): document.sections must be exactly the product's own four
+        # sections, in order, with fixed ids/titles -- not an open-ended array A10 has no
+        # cross-validator for.
+        "document_section_with_arbitrary_id": mutated(
+            lambda o: o["document"]["sections"][0].update(id="random", title="Random")
+        ),
+        "document_missing_a_section": mutated(lambda o: o["document"]["sections"].pop()),
+        "document_sections_reordered": mutated(_swap_first_two_sections),
     }
     validator = jsonschema.validators.validator_for(schema)(schema)
     for name, candidate in invalid_outputs.items():
@@ -377,6 +392,15 @@ def test_no_issues_skips_question_generation_and_still_produces_a_consistent_doc
     happy_document_text = json.dumps(_fixture(SUMMARY))
     no_issues_document_text = json.dumps(output["document"])
     assert no_issues_document_text != happy_document_text
+
+    # Code review finding (me #1): this run's own A01 fixture still has a non-empty
+    # `missing_fields` (target_audience) -- per generate_summary.v1.md, readiness only follows
+    # from "no issues *and* nothing missing", so an empty `issues`/`questions` pair alone must
+    # not make the summary claim the brief is ready.
+    assert output["brief"]["missing_fields"] == ["target_audience"]
+    summary = output["document"]["summary"].lower()
+    assert "target audience" in summary
+    assert "not fully ready" in summary or "not ready" in summary
 
 
 @pytest.mark.parametrize("brief_text", ["", "   ", " padded "], ids=["empty", "blank", "untrimmed"])

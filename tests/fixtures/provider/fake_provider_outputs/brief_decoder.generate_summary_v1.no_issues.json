@@ -25,7 +25,7 @@
         "content": "No clarifying questions were generated for this brief."
       }
     ],
-    "summary": "The brief is clear and ready to start work; the only open point is who the site is for, which does not block getting started."
+    "summary": "The brief has no detected issues, but it is not fully ready to start: the target audience is still missing and should be confirmed first."
   },
   "input_tokens": 240,
   "output_tokens": 90,

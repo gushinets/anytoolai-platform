@@ -217,6 +217,10 @@ def test_config_owned_literals_agree_with_the_output_schema() -> None:
     assert set(schema["brief"]["properties"]["missing_fields"]["items"]["enum"]) == set(field_names)
     assert set(schema["brief"]["properties"]["confidence"]["properties"]) == set(field_names)
     assert set(schema["issues"]["items"]["properties"]["category"]["enum"]) == set(taxonomy)
+    # Code review finding (me #1): A05's questions[].category reuses its source issue's
+    # category (generate_questions.v1.md) -- it must be closed over the same taxonomy, not left
+    # an open string the A05 cross-validator never checks.
+    assert set(schema["questions"]["items"]["properties"]["category"]["enum"]) == set(taxonomy)
     assert _literal(steps["extract"]["input_mapping"]["strict"]) is False
 
     for field in fields:
