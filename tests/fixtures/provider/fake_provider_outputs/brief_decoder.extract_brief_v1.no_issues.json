@@ -1,0 +1,35 @@
+{
+  "response_json": {
+    "values": {
+      "project_goal": "Build a website for our small bakery so customers can browse the menu and place cake orders online",
+      "deliverables": [
+        "menu page",
+        "online order form with checkout",
+        "contact page"
+      ],
+      "deadline": "2026-11-02",
+      "budget": "$3,000, already approved",
+      "target_audience": "local families and small offices in our town who order celebration cakes for birthdays and other events",
+      "constraints": [
+        "checkout goes through a third-party payment processor, not a custom payment system",
+        "clean and minimal style using our existing logo colors of navy and cream"
+      ]
+    },
+    "missing_fields": [],
+    "confidence": {
+      "project_goal": 0.95,
+      "deliverables": 0.95,
+      "deadline": 0.95,
+      "budget": 0.9,
+      "target_audience": 0.9,
+      "constraints": 0.85
+    }
+  },
+  "input_tokens": 220,
+  "output_tokens": 110,
+  "latency_ms": 15,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.extract_brief_v1.no_issues"
+  }
+}

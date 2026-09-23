@@ -1,0 +1,40 @@
+{
+  "response_json": {
+    "sections": [
+      {
+        "id": "overview",
+        "title": "Project overview",
+        "content": "A bakery wants a website that lets customers browse the menu and place cake orders online, for local families and small offices in town who order celebration cakes for birthdays and other events."
+      },
+      {
+        "id": "key-details",
+        "title": "Key details",
+        "content": "Deliverables: menu page, online order form with checkout, contact page. Deadline: 2026-11-02. Budget: $3,000, already approved. Constraints: checkout goes through a third-party payment processor rather than a custom payment system; style is clean and minimal using the existing navy and cream logo colors.",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "gaps",
+        "title": "Gaps and risks",
+        "content": "No issues were found in the brief, and nothing requested is missing."
+      },
+      {
+        "id": "next-steps",
+        "title": "Questions to ask",
+        "content": "No clarifying questions were generated for this brief.",
+        "metadata": {
+          "kind": "list"
+        }
+      }
+    ],
+    "summary": "The brief has no detected issues and no missing information; it is ready to start work."
+  },
+  "input_tokens": 245,
+  "output_tokens": 100,
+  "latency_ms": 15,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.generate_summary_v1.no_issues"
+  }
+}

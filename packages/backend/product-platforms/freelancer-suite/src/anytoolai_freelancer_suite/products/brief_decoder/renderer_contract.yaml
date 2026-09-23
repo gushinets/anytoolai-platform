@@ -1,0 +1,43 @@
+renderer_contract:
+  scenario_id: brief_decoder.decode_v1
+  output_schema_ref: brief_decoder.decode_output_v1
+  # The result is one composed object with four parts. apps/web-mirror (ANY-248) renders them in
+  # this order; this file pins the contract that renderer is built against, not the renderer.
+  parts:
+    - part_id: brief
+      field: brief
+      description: >-
+        Structured brief: `values` (facts the brief states) next to `missing_fields` (facts it
+        does not state). Optional `confidence` is per-field and is not shown as a copy target.
+    - part_id: issues
+      field: issues
+      description: >-
+        Risks and gaps, each with `category`, `severity`, `description` and optional `evidence`.
+        An empty list is valid and renders as "no issues found".
+    - part_id: clarifying_questions
+      field: questions
+      description: >-
+        Questions to send the client, in the given (priority) order, each tied to its issue by
+        `source_issue_index`. An empty list is valid and renders as "no clarifying questions were
+        generated" -- this is not a readiness claim: an empty `questions` list does not mean the
+        brief is complete or fit to start (see the artifact's own `issues` and
+        `brief.missing_fields`, not this part alone). Only `summary_document` makes a readiness
+        call, and it must weigh all three signals, not the empty question list alone. An empty
+        list is also not an activation (activation = first rendering of a non-empty question
+        list).
+    - part_id: summary_document
+      field: document
+      description: >-
+        Ordered `sections` (id, title, content) followed by `summary`. This is the copy-ready part.
+  canonical_field: document
+  # `document` is an object ({sections[], summary}), not a single string -- unlike sibling
+  # contracts' `canonical_field`, copying it needs a serialization rule, not verbatim use.
+  canonical_field_composition: >-
+    For each entry in `document.sections`, in array order, emit the section's `title` as a
+    heading line followed by its `content` as one paragraph; separate sections by one blank
+    line. After the last section, emit one more blank line followed by `document.summary` as
+    the closing paragraph. `metadata.kind` (when present) is a rendering hint only (e.g. render
+    a `list`-kind section's content as a bulleted list if it already reads as one item per
+    line) and never changes which fields are included.
+  next_action: copy_result
+  excluded_fields: []

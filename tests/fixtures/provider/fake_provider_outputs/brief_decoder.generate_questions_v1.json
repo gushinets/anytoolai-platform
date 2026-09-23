@@ -1,0 +1,34 @@
+{
+  "response_json": {
+    "questions": [
+      {
+        "question": "What is the exact date the website needs to be live?",
+        "rationale": "The holiday season has no fixed date, so the schedule cannot be planned without one.",
+        "priority": "high",
+        "category": "timeline_risk",
+        "source_issue_index": 1
+      },
+      {
+        "question": "Could you share one or two websites whose look you like, and say what feels modern and what feels traditional about them?",
+        "rationale": "Examples turn a vague style wish into a concrete design direction.",
+        "priority": "medium",
+        "category": "ambiguity",
+        "source_issue_index": 0
+      },
+      {
+        "question": "Should customers pay on the website, or only send an order that you confirm and charge yourself?",
+        "rationale": "Taking payments online changes the scope, the budget and the launch effort.",
+        "priority": "medium",
+        "category": "scope_risk",
+        "source_issue_index": 2
+      }
+    ]
+  },
+  "input_tokens": 240,
+  "output_tokens": 130,
+  "latency_ms": 15,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.generate_questions_v1"
+  }
+}

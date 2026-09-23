@@ -1,0 +1,24 @@
+{
+  "response_json": {
+    "values": {
+      "project_goal": "A website"
+    },
+    "missing_fields": [
+      "deliverables",
+      "deadline",
+      "budget",
+      "target_audience",
+      "constraints"
+    ],
+    "confidence": {
+      "project_goal": 0.4
+    }
+  },
+  "input_tokens": 60,
+  "output_tokens": 40,
+  "latency_ms": 8,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.extract_brief_v1.weak_input"
+  }
+}

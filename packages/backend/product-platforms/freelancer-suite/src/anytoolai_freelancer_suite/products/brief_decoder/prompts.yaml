@@ -1,0 +1,21 @@
+prompts:
+  - prompt_ref: brief_decoder.extract_brief.v1
+    version: 1
+    template_path: prompts/extract_brief.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.extract_output_v1
+  - prompt_ref: brief_decoder.detect_issues.v1
+    version: 1
+    template_path: prompts/detect_issues.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.issue_detection_output_v1
+  - prompt_ref: brief_decoder.generate_questions.v1
+    version: 1
+    template_path: prompts/generate_questions.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.generate_questions_output_v1
+  - prompt_ref: brief_decoder.generate_summary.v1
+    version: 1
+    template_path: prompts/generate_summary.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.generate_document_output_v1

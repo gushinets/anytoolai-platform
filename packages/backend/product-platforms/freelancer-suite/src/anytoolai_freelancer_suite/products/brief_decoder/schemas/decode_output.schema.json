@@ -1,0 +1,660 @@
+{
+  "type": "object",
+  "properties": {
+    "brief": {
+      "type": "object",
+      "properties": {
+        "values": {
+          "type": "object",
+          "properties": {
+            "project_goal": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            "deliverables": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            },
+            "deadline": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            "budget": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            "target_audience": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            "constraints": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "missing_fields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "project_goal",
+              "deliverables",
+              "deadline",
+              "budget",
+              "target_audience",
+              "constraints"
+            ]
+          }
+        },
+        "confidence": {
+          "type": "object",
+          "properties": {
+            "project_goal": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "deliverables": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "deadline": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "budget": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "target_audience": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "constraints": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "values",
+        "missing_fields"
+      ],
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "project_goal"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "project_goal"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "project_goal"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "project_goal"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "deliverables"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "deliverables"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "deliverables"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "deliverables"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "deadline"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "deadline"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "deadline"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "deadline"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "budget"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "budget"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "budget"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "budget"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "target_audience"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "target_audience"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "target_audience"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "target_audience"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "constraints"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "constraints"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "constraints"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "constraints"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "project_goal"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "project_goal"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "deliverables"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "deliverables"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "deadline"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "deadline"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "budget"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "budget"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "target_audience"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "target_audience"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "constraints"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "constraints"
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "missing_information",
+              "ambiguity",
+              "scope_risk",
+              "timeline_risk",
+              "budget_risk",
+              "contradiction"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "category",
+          "description",
+          "severity"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "questions": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "missing_information",
+              "ambiguity",
+              "scope_risk",
+              "timeline_risk",
+              "budget_risk",
+              "contradiction"
+            ]
+          },
+          "source_issue_index": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "question",
+          "rationale",
+          "priority",
+          "category",
+          "source_issue_index"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "document": {
+      "type": "object",
+      "properties": {
+        "sections": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            { "$ref": "#/$defs/overviewSection" },
+            { "$ref": "#/$defs/keyDetailsSection" },
+            { "$ref": "#/$defs/gapsSection" },
+            { "$ref": "#/$defs/nextStepsSection" }
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "sections",
+        "summary"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "brief",
+    "issues",
+    "questions",
+    "document"
+  ],
+  "additionalProperties": false,
+  "if": { "properties": { "issues": { "maxItems": 0 } } },
+  "then": { "properties": { "questions": { "maxItems": 0 } } },
+  "$defs": {
+    "overviewSection": {
+      "type": "object",
+      "properties": {
+        "id": { "const": "overview" },
+        "title": { "const": "Project overview" },
+        "content": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "metadata": { "$ref": "#/$defs/sectionMetadata" }
+      },
+      "required": ["id", "title", "content"],
+      "additionalProperties": false
+    },
+    "keyDetailsSection": {
+      "type": "object",
+      "properties": {
+        "id": { "const": "key-details" },
+        "title": { "const": "Key details" },
+        "content": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "metadata": { "$ref": "#/$defs/listSectionMetadata" }
+      },
+      "required": ["id", "title", "content", "metadata"],
+      "additionalProperties": false
+    },
+    "gapsSection": {
+      "type": "object",
+      "properties": {
+        "id": { "const": "gaps" },
+        "title": { "const": "Gaps and risks" },
+        "content": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "metadata": { "$ref": "#/$defs/sectionMetadata" }
+      },
+      "required": ["id", "title", "content"],
+      "additionalProperties": false
+    },
+    "nextStepsSection": {
+      "type": "object",
+      "properties": {
+        "id": { "const": "next-steps" },
+        "title": { "const": "Questions to ask" },
+        "content": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "metadata": { "$ref": "#/$defs/listSectionMetadata" }
+      },
+      "required": ["id", "title", "content", "metadata"],
+      "additionalProperties": false
+    },
+    "sectionMetadata": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["heading", "paragraph", "list", "table", "note"]
+        }
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    },
+    "listSectionMetadata": {
+      "type": "object",
+      "properties": {
+        "kind": { "const": "list" }
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    }
+  }
+}
