@@ -4,7 +4,7 @@
       {
         "id": "overview",
         "title": "Project overview",
-        "content": "A bakery wants a new website that lets customers order cakes online."
+        "content": "A bakery wants a new website that lets customers order cakes online, aimed at local families and small offices ordering celebration cakes."
       },
       {
         "id": "key-details",
@@ -17,7 +17,7 @@
       {
         "id": "gaps",
         "title": "Gaps and risks",
-        "content": "No risks or issues were found in the brief. The only gap is that the target audience is not stated."
+        "content": "No risks or issues were found in the brief, and every requested detail is stated."
       },
       {
         "id": "next-steps",
@@ -25,7 +25,7 @@
         "content": "No clarifying questions were generated for this brief."
       }
     ],
-    "summary": "The brief has no detected issues, but it is not fully ready to start: the target audience is still missing and should be confirmed first."
+    "summary": "The brief has no detected issues and no missing information; it is ready to start work."
   },
   "input_tokens": 240,
   "output_tokens": 90,

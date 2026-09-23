@@ -7,7 +7,7 @@
 - Created: 2026-09-21
 - Last updated: 2026-09-23
 - Review date: 2026-09-28
-- Next action: address round #5 self-review (see below), re-run validation, re-request review.
+- Next action: update PR description for round #6, re-request review.
 - Blocker: none
 
 ## Goal
@@ -129,7 +129,8 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 | 2026-09-23 | Fixed a PR inline comment: `generate_summary.v1.md`'s `next-steps` instruction claimed "work can start" for any empty `data.questions`, regardless of `data.issues`/`data.brief.missing_fields`; moved the readiness claim to `summary` and made it depend on all three. Updated the `.no_issues` fixture's `next-steps` text to match | Code review round #3 |
 | 2026-09-23 | Round #3 code review (self-review, posted as blocking inline PR comments): fixed all 3 findings (see below); re-ran quick-check/full-check, both green | Code review round #4 |
 | 2026-09-23 | Round #4 code review (self-review): fixed the 1 blocker and the 1 documentation finding (see below); re-ran quick-check/full-check, both green | Update PR description, code review round #5 |
-| 2026-09-23 | Round #5 code review (self-review): 0 blockers; fixed 2 non-blocking documentation findings (see below); re-ran quick-check/full-check, both green | Update PR description, re-request review |
+| 2026-09-23 | Round #5 code review (self-review): 0 blockers; fixed 2 non-blocking documentation findings (see below); re-ran quick-check/full-check, both green | Code review round #6 |
+| 2026-09-23 | Round #6 code review (self-review): fixed 2 blockers (no_issues fixture set genuinely inconsistent; A05 prompt overclaimed an unenforced invariant) plus reaffirmed one out-of-scope gap as follow-up debt; re-ran targeted tests, all green | Update PR description, re-request review |
 
 ## Code review round #1 (2026-09-21)
 
@@ -290,6 +291,39 @@ non-blocking findings, both fixed:
    and the PR description still said "Two rounds of code review fixes" with four (now five)
    rounds recorded here. Fixed both.
 
+## Code review round #6 (2026-09-23, self-review)
+
+2 blockers, both confirmed against current code and fixed:
+
+1. The `.no_issues` end-to-end scenario reused the happy path's A01 fixture, which still has
+   `missing_fields: ["target_audience"]`. That made the deterministic path certify "no A04
+   issues, no A05 questions, but a known gap (`target_audience`) that nothing generated a
+   question for" -- and `detect_issues.v1.md`'s own taxonomy includes `missing_information`,
+   which the same source text plausibly should have surfaced as an A04 issue if it were truly
+   the clean-brief scenario this path is meant to exercise. Added a dedicated
+   `brief_decoder.extract_brief_v1.no_issues.json` with `missing_fields: []` and rewrote the
+   `.no_issues` A10 fixture to match a genuinely complete, ready brief; the end-to-end test now
+   redirects all three steps (`extract`, `detect_issues`, `generate_summary`) to their
+   `.no_issues` fixtures and asserts the readiness claim the other way (ready, not "not ready").
+2. `generate_questions.v1.md` stated as unconditional rules that `priority` follows the
+   referenced issue's `severity` and `category` reuses its `category` -- but the shared A05
+   cross-validator (`platform-actions`, out of scope to change here) only checks
+   `source_issue_index` bounds, `max_questions`, valid `priority`/`category` values, and
+   ordering; it never compares a question's `priority`/`category` against its referenced issue's.
+   A schema-valid output that violates the stated correspondence would still become a canonical
+   artifact. Softened the prompt to `kernel_demo.generate_clarifying_questions.v1.md`'s own
+   precedent wording -- a guideline with an explicit "unless materially different" escape hatch,
+   not an unenforceable strict claim -- rather than expanding shared A05 validation, which this
+   ticket's non-goals exclude.
+
+Reaffirmed as a real, out-of-scope architectural gap the review also raised: if any
+`brief.missing_fields` makes the summary claim "not ready" (round #3's own rule), the product has
+no way to turn that specific gap into an actionable clarifying question -- A05 only ever derives
+`questions` from A04's `issues`, never from A01's `missing_fields`. Wiring A01's missing fields
+into A05 (e.g. synthesizing pseudo-issues before the guard) would be a real workflow-topology
+change beyond this ticket's declared workflow (`A01 + A04 -> A05`, composed through A10) and its
+non-goals; noted as follow-up debt below rather than done unilaterally.
+
 ## Open questions
 
 None blocking. The input/field/taxonomy choices in decision 3 are product decisions a reviewer may
@@ -311,3 +345,9 @@ want to change; they drive the output schema and all ten fixtures.
   `test_proposal_ai_bundle.py`) are not migrated to the new shared
   `tests/support/fake_provider_recording.RecordingProviderAdapter`; only this ticket's own test
   uses it so far (round #2 finding #3).
+- No product-level way to turn an A01 `missing_fields` gap into an actionable A05 clarifying
+  question -- `questions` is derived only from A04's `issues`. A brief can be "not ready" per
+  `generate_summary.v1.md`'s own rule with nothing in `questions` addressing why. Fixing this
+  would change the workflow's own topology (e.g. synthesizing pseudo-issues from
+  `missing_fields` ahead of the A05 guard) beyond this ticket's declared `A01 + A04 -> A05`
+  shape; out of scope here (round #6 finding).

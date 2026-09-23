@@ -166,7 +166,7 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
     for suffix in ("", ".weak_input"):
         jsonschema.validate(_expected_output(suffix), schema)
     no_issues_output = {
-        "brief": _fixture(EXTRACT),
+        "brief": _fixture(EXTRACT + ".no_issues"),
         "issues": [],
         "questions": [],
         "document": _fixture(SUMMARY + ".no_issues"),
@@ -376,16 +376,27 @@ def test_no_issues_skips_question_generation_and_still_produces_a_consistent_doc
 
     Code review finding (round #1 xhigh #3): the document must come from a fixture that is
     itself consistent with an empty `issues`/`questions` pair (not the happy-path document,
-    which narrates 3 issues and 3 questions that don't exist in this run's artifact)."""
+    which narrates 3 issues and 3 questions that don't exist in this run's artifact).
+
+    Code review finding (me #4): this scenario must be a genuinely complete brief, not just an
+    A04-clean one -- reusing the happy path's A01 fixture (`missing_fields: ["target_audience"]`)
+    here meant the run certified "no issues, no questions, but a known gap nothing can ask about"
+    (A05 only ever derives from A04's `issues`, never from A01's `missing_fields`), while
+    `detect_issues.v1.md` itself lists `missing_information` as a taxonomy category A04 should
+    have caught in the same source text. A dedicated `.no_issues` A01 fixture with
+    `missing_fields: []` makes the whole scenario -- extraction, detection, and summary --
+    consistent: a brief that is complete *and* clean, with no unresolved gap left unaddressed."""
     adapter = RecordingProviderAdapter(
-        FIXTURE_ROOT, variants={DETECT: ".no_issues", SUMMARY: ".no_issues"}
+        FIXTURE_ROOT,
+        variants={EXTRACT: ".no_issues", DETECT: ".no_issues", SUMMARY: ".no_issues"},
     )
     _, output = _run_to_result(app, request_platform_api, session_factory, BRIEF_TEXT, adapter)
 
     assert tuple(call.action_config_id for call in adapter.calls) == (EXTRACT, DETECT, SUMMARY)
     assert output["issues"] == []
     assert output["questions"] == []
-    assert output["brief"] == _fixture(EXTRACT)
+    assert output["brief"] == _fixture(EXTRACT + ".no_issues")
+    assert output["brief"]["missing_fields"] == []
     assert output["document"] == _fixture(SUMMARY + ".no_issues")
     # The empty-issues document must not narrate the happy path's issues/questions, which do not
     # exist in this run's artifact.
@@ -393,14 +404,11 @@ def test_no_issues_skips_question_generation_and_still_produces_a_consistent_doc
     no_issues_document_text = json.dumps(output["document"])
     assert no_issues_document_text != happy_document_text
 
-    # Code review finding (me #1): this run's own A01 fixture still has a non-empty
-    # `missing_fields` (target_audience) -- per generate_summary.v1.md, readiness only follows
-    # from "no issues *and* nothing missing", so an empty `issues`/`questions` pair alone must
-    # not make the summary claim the brief is ready.
-    assert output["brief"]["missing_fields"] == ["target_audience"]
+    # A brief with no issues and nothing missing is the one case generate_summary.v1.md's
+    # readiness rule actually allows to claim the brief is ready.
     summary = output["document"]["summary"].lower()
-    assert "target audience" in summary
-    assert "not fully ready" in summary or "not ready" in summary
+    assert "ready" in summary
+    assert "not ready" not in summary and "not fully ready" not in summary
 
 
 @pytest.mark.parametrize("brief_text", ["", "   ", " padded "], ids=["empty", "blank", "untrimmed"])
