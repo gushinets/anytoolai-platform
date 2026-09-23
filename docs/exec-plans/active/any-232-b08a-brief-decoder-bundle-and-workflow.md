@@ -5,9 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-09-21
-- Last updated: 2026-09-21
+- Last updated: 2026-09-23
 - Review date: 2026-09-28
-- Next action: open the PR (validation green).
+- Next action: address round #4 self-review (see below), re-run validation, re-request review.
 - Blocker: none
 
 ## Goal
@@ -24,7 +24,8 @@ through A10, using only generic atoms -- no Platform Core changes, no product Py
   product, scenario, frontend, workflow, action-config, prompt, schema, quota and renderer-contract
   config.
 - `FreelancerSuiteBundle.config_roots()` wiring; README and `add-product-recipe.md` root counts.
-- Deterministic fake-provider fixtures: happy path, weak input, and an empty-issues A04 variant.
+- Deterministic fake-provider fixtures: happy path, weak input, and empty-issues variants for A04
+  and A10 (ten fixtures total; see "Implementation steps").
 - Tests in `apps/platform-api/tests` (quick-check) and `freelancer-suite/tests` (full-check).
 
 ### Out of scope
@@ -94,7 +95,8 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 - [x] Exec plan (this file).
 - [x] Product config tree.
 - [x] `FreelancerSuiteBundle.config_roots()` wiring + README / recipe root counts.
-- [x] Nine fixtures (4 happy, 4 weak, 1 empty-issues A04).
+- [x] Ten fixtures (4 happy, 4 weak, 2 empty-issues variants: A04's `detect_issues` and A10's
+      `generate_summary`, added in round #3 to fix a readiness-claim contradiction).
 - [x] Tests: `apps/platform-api/tests/test_brief_decoder_bundle.py`,
       `freelancer-suite/tests/test_brief_decoder_product.py`.
 - [x] Verification (below).
@@ -125,7 +127,8 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 | 2026-09-23 | Round #2 code review: fixed 5 of 7 findings (dedup onto shared test helpers, see below); re-ran quick-check/full-check, both green | Open PR |
 | 2026-09-23 | PR #141 opened; description filled in from the template | Address PR inline comments |
 | 2026-09-23 | Fixed a PR inline comment: `generate_summary.v1.md`'s `next-steps` instruction claimed "work can start" for any empty `data.questions`, regardless of `data.issues`/`data.brief.missing_fields`; moved the readiness claim to `summary` and made it depend on all three. Updated the `.no_issues` fixture's `next-steps` text to match | Code review round #3 |
-| 2026-09-23 | Round #3 code review (self-review, posted as blocking inline PR comments): fixed all 3 findings (see below); re-ran quick-check/full-check, both green | Address remaining review, re-request review |
+| 2026-09-23 | Round #3 code review (self-review, posted as blocking inline PR comments): fixed all 3 findings (see below); re-ran quick-check/full-check, both green | Code review round #4 |
+| 2026-09-23 | Round #4 code review (self-review): fixed the 1 blocker and the 1 documentation finding (see below); re-ran quick-check/full-check, both green | Update PR description, re-request review |
 
 ## Code review round #1 (2026-09-21)
 
@@ -253,10 +256,29 @@ per-product):
    added an assertion in `test_no_issues_skips_question_generation_and_still_produces_a_consistent_document`
    that the summary names the missing field and doesn't claim unqualified readiness.
 
+## Code review round #4 (2026-09-23, self-review posted here per request instead of GitHub)
+
+1 blocker, confirmed and fixed; 1 non-blocking documentation finding, also fixed:
+
+1. **Blocker.** `renderer_contract.yaml`'s `clarifying_questions` part still described an empty
+   `questions` list as "no clarification needed" -- a readiness claim directly contradicting
+   `generate_summary.v1.md`'s own rule (round #3 fix: empty `questions` alone never implies
+   readiness) and the deterministic `.no_issues` fixture, which pairs an empty `questions` list
+   with a summary that says the brief is *not* ready. Reworded the part's description to a
+   neutral "no clarifying questions were generated" and made explicit that only
+   `summary_document` makes a readiness call, weighing `data.issues`,
+   `data.brief.missing_fields`, and `data.questions` together. Added an assertion to
+   `test_renderer_contract_agrees_with_workflow_and_scenario` pinning that the
+   `clarifying_questions` part never says "no clarification needed" again.
+2. **Non-blocking.** The fixture count in this plan and the PR description still said "nine"
+   after round #3 added a second `.no_issues` variant (bringing the total to ten); this plan's
+   `Status` header was also stale (`Last updated`, `Next action`). Fixed both here; the PR
+   description is updated separately.
+
 ## Open questions
 
 None blocking. The input/field/taxonomy choices in decision 3 are product decisions a reviewer may
-want to change; they drive the output schema and all nine fixtures.
+want to change; they drive the output schema and all ten fixtures.
 
 ## Follow-up debt
 

@@ -321,6 +321,16 @@ def test_renderer_contract_agrees_with_workflow_and_scenario() -> None:
     # not a single string like sibling products' `text` -- pin that a serialization rule exists.
     assert contract["canonical_field_composition"].strip()
 
+    # Code review finding (me #2): the `clarifying_questions` part used to describe an empty
+    # `questions` list as "no clarification needed" -- a readiness claim that contradicts
+    # generate_summary.v1.md's own rule (empty `questions` alone never implies the brief is
+    # ready) and the deterministic `.no_issues` fixture, which pairs empty `questions` with a
+    # not-ready summary.
+    (questions_part,) = (
+        part for part in contract["parts"] if part["part_id"] == "clarifying_questions"
+    )
+    assert "no clarification needed" not in questions_part["description"].lower()
+
 
 @pytest.mark.parametrize(
     "fixture_path", sorted(FIXTURE_ROOT.glob("brief_decoder.*.json")), ids=lambda p: p.stem

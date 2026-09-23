@@ -18,8 +18,12 @@ renderer_contract:
       field: questions
       description: >-
         Questions to send the client, in the given (priority) order, each tied to its issue by
-        `source_issue_index`. An empty list is valid: it renders as "no clarification needed" and
-        is not an activation (activation = first rendering of a non-empty question list).
+        `source_issue_index`. An empty list is valid and renders as "no clarifying questions were
+        generated" -- this is not a readiness claim: an empty `questions` list does not mean the
+        brief is complete or fit to start (see `data.issues` and `data.brief.missing_fields`).
+        Only `summary_document` makes a readiness call, and it must weigh all three signals, not
+        the empty question list alone. An empty list is also not an activation (activation =
+        first rendering of a non-empty question list).
     - part_id: summary_document
       field: document
       description: >-
