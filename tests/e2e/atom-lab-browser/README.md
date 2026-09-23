@@ -4,7 +4,10 @@ The fast Node tests execute the production Atom Lab module against a minimal DOM
 Playwright suite exercises the same assets in Chromium, including computed visibility, form
 controls, focus transfer, a 375-pixel layout, backend model-capability states, idempotent run
 submission, protected polling/reconnection, immutable submitted snapshots, terminal diagnostics,
-and safe rendering of successful and contract-invalid provider output.
+safe rendering of successful and contract-invalid provider output, immutable preset versioning,
+optimistic-save conflict recovery, concrete-version export, paginated shared history, and explicit
+snapshot restoration without a provider call. History checks include running and crash-failed jobs,
+nullable runtime IDs, validation-retry success, and unavailable historical model/contract states.
 
 Run locally from the repository root:
 

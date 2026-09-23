@@ -3,12 +3,12 @@
 ## Status
 
 - State: active
-- Phase: AL07/ANY-465 implemented and verified on feature/ANY-465
+- Phase: AL08/ANY-466 implemented and verified on feature/ANY-466
 - Owner: mixed
 - Created: 2026-09-09
-- Last updated: 2026-09-21
+- Last updated: 2026-09-23
 - Review date: 2026-09-16
-- Next action: Review and commit ANY-465, then continue with AL08/ANY-466.
+- Next action: Review and commit ANY-466, then continue with AL09/ANY-467.
 - Blocker: none for development; operator configuration required before rollout.
 - Linear project: [Atom Lab](https://linear.app/paveldik/project/atom-lab-e1efc95ce888)
 - Milestone: Atom Lab v1
@@ -368,7 +368,7 @@ Acceptance: Browser scenarios success/validation correction/final invalid/provid
 
 ### AL08 — [ANY-466](https://linear.app/paveldik/issue/ANY-466/atom-lab-presety-eksport-i-vosstanovlenie-istorii-v-ui): Atom Lab: пресеты, экспорт и восстановление истории в UI
 
-- [ ] Implement and verify.
+- [x] Implement and verify.
 - Depends on: ANY-463, ANY-465.
 - Files/areas: `static/atom_lab/`; `browser/API integration tests`.
 
@@ -378,9 +378,30 @@ Acceptance: Browser test полного пути input+prompt -> run -> save v1 
 
 ### Уточнения после аудита
 
-- [ ] Использовать `preset_id/version/base_version`, version-list endpoint и export format из ANY-463; history snapshot/runtime IDs/error envelope из ANY-462. Раскрытие старой версии не заменяет её автоматически latest.
-- [ ] Восстановление заполняет `model_id/reasoning_effort` и полный snapshot input; требует отдельного клика «Запустить». Сохранение из history получает source_run_id выбранного запуска, а изменения после восстановления остаются draft.
-- [ ] Проверить историю crash-failed job, nullable action/artifact IDs, success-after-validation-retry и конфликт сохранения с сохранением локального draft. При несовместимости текущего контракта исторический snapshot остаётся доступен для чтения; адаптация только явным действием.
+- [x] Использовать `preset_id/version/base_version`, version-list endpoint и export format из ANY-463; history snapshot/runtime IDs/error envelope из ANY-462. Раскрытие старой версии не заменяет её автоматически latest.
+- [x] Восстановление заполняет `model_id/reasoning_effort` и полный snapshot input; требует отдельного клика «Запустить». Сохранение из history получает source_run_id выбранного запуска, а изменения после восстановления остаются draft.
+- [x] Проверить историю crash-failed job, nullable action/artifact IDs, success-after-validation-retry и конфликт сохранения с сохранением локального draft. При несовместимости текущего контракта исторический snapshot остаётся доступен для чтения; адаптация только явным действием.
+
+Implementation slices:
+
+- [x] **Slice 1 — strict browser contracts and workspace state.** Add exact parsers for paginated
+  preset/version/history responses, immutable preset detail/export and historical run detail. Track
+  selected saved version, source run, fixed top-level fields and draft-vs-saved state without
+  weakening the existing run-admission parsers.
+- [x] **Slice 2 — preset library and optimistic saves.** Add the protected paginated library,
+  version picker, create/new-version forms, top-level fixed-field controls and concrete-version
+  export. Preserve all local values on API failures; on `preset_version_conflict`, keep the draft
+  and offer explicit latest-version reload or save-as-new-preset actions.
+- [x] **Slice 3 — durable history and explicit restore.** Add protected paginated run summaries and
+  detail reopening for queued/running/failed/succeeded states. Restore the exact snapshot input,
+  prompt, model and reasoning only after an explicit user action, never submit automatically, and
+  carry the selected `source_run_id` when saving that restored snapshot.
+- [x] **Slice 4 — browser acceptance and repository validation.** Cover the complete
+  run -> preset v1 -> v2 -> reopen v1 -> export -> reload -> history restore journey, immutable
+  versions, nullable runtime IDs, validation-retry success, crash failure, no provider-call increase
+  on restore, protected requests, conflict/error draft retention, dirty navigation and inaccessible
+  historical model/contract states. Run focused Node/Chromium checks, lint, quick-check and the
+  broader applicable repository gates.
 
 
 ### AL09 — [ANY-467](https://linear.app/paveldik/issue/ANY-467/atom-lab-v1-priyomka-vseh-11-atomov-i-regressiya-production-puti): Atom Lab v1: приёмка всех 11 атомов и регрессия production пути
@@ -487,6 +508,7 @@ Acceptance: Compose smoke: migrations, API/worker ready, assets доступны
 | 2026-09-22 | Addressed the next two PR #138 catalog findings: polling now checks its deadline before I/O and caps every scheduled delay to the remaining budget; a `current` refresh response stops polling and immediately reloads/renders the latest catalog items. Added deterministic deadline-budget and immediate-current regressions and verified 41 Node tests, 28 Chromium journeys, ESLint, `git diff --check`, and canonical `quick-check` (1864 passed). | Review and commit the three-file remediation, then reply to both review threads. |
 | 2026-09-22 | Addressed the next two PR #138 findings: superseded catalog reads can no longer overwrite a newer refresh result, and protected run details whose requested model or reasoning effort conflicts with the frozen submission fail closed. Added deterministic regressions and verified 42 Node tests, 30 Chromium journeys, ESLint, `git diff --check`, and canonical `quick-check` (1864 passed). | Review and commit the four-file remediation, then reply to both review threads. |
 | 2026-09-22 | Addressed the next five PR #138 findings: protected accepted runtime identity, bounded and abortable in-flight catalog reads, restored validation-owned ARIA state before atom navigation, classified malformed confirmed admission rejections before safe body decoding, and required explicit reselection when refresh invalidates a model or effort. Verified 43 Node tests, 36 Chromium journeys, ESLint, `git diff --check`, and canonical `quick-check` (1864 passed). | Review and commit the four-file remediation, then reply to the five review threads. |
+| 2026-09-23 | Implemented AL08/ANY-466: protected paginated preset/history UI, immutable version selection, optimistic version saves with conflict-preserved drafts, exact version export, source-run provenance, fixed top-level controls, durable run detail reopening and explicit snapshot restore/adaptation without submission. Added strict browser parsers plus full v1/v2/export/reload/restore, conflict, exact save-from-history provenance, validation-retry, running/crash-failed, nullable-ID and unavailable model/contract Chromium coverage. Verified 51 Node tests, 47 Chromium journeys, ESLint, focused API/storage tests and canonical `quick-check` (1864 passed). `frontend-check` passed install/lint/typecheck and the Atom Lab package, then failed only in the unrelated web-mirror suite under local Node 26 because jsdom exposes no `window.localStorage`, matching the existing AL07 environment note. | Review and commit ANY-466, then continue with AL09/ANY-467. |
 | 2026-09-22 | Addressed the next three PR #138 findings: reasoning capability loss now keeps the invalid effort blocking while allowing an explicit no-effort recovery; malformed successful run-detail bodies fail closed without automatic reconnect; and every catalog read, including initial and immediate-current refresh loads, has an abortable deadline. Verified 45 Node tests, 39 Chromium journeys, ESLint, `git diff --check`, and canonical `quick-check` (1864 passed). | Review and commit the four-file remediation, then reply to the three review threads. |
 | 2026-09-22 | Addressed the next six PR #138 findings: refresh POST is deadline-bounded and cancelled on lifecycle teardown; bfcache resume completes an interrupted current-catalog reload; prompt admission errors are visible and bound to the prompt editor; action/artifact runtime IDs are fill-once; stale warnings include last-success time; and truncated invalid raw output is explicitly marked. Verified 47 Node tests, 42 Chromium journeys, ESLint, `git diff --check`, and canonical `quick-check` (1864 passed). | Review and commit the five-file remediation, then reply to the six review threads. |
 | 2026-09-22 | Addressed the next three PR #138 findings: refresh and polling failures now retain stale wording and last-success context; initial catalog loads interrupted by bfcache resume automatically; and authoritative admission field errors retire immediately when their owning prompt, input, model, or effort changes. Verified 48 Node tests, 43 Chromium journeys, ESLint, `git diff --check`, and canonical `quick-check` (1864 passed). | Review and commit the four-file remediation, then reply to the three review threads. |
