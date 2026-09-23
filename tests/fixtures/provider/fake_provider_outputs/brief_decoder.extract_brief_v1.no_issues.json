@@ -1,31 +1,32 @@
 {
   "response_json": {
     "values": {
-      "project_goal": "Let customers order cakes online",
+      "project_goal": "Let customers browse the menu and place cake orders online",
       "deliverables": [
         "menu page",
-        "order form",
+        "online order form with checkout",
         "contact page"
       ],
-      "deadline": "before the holiday season",
-      "budget": "around $3,000",
-      "target_audience": "local families and small offices ordering celebration cakes",
+      "deadline": "2026-11-02",
+      "budget": "$3,000, already approved",
+      "target_audience": "local families and small offices in our town who order celebration cakes for birthdays and other events",
       "constraints": [
-        "should look modern but also traditional"
+        "checkout goes through a third-party payment processor, not a custom payment system",
+        "clean and minimal style using our existing logo colors of navy and cream"
       ]
     },
     "missing_fields": [],
     "confidence": {
-      "project_goal": 0.9,
-      "deliverables": 0.9,
-      "deadline": 0.7,
-      "budget": 0.8,
-      "target_audience": 0.75,
-      "constraints": 0.6
+      "project_goal": 0.95,
+      "deliverables": 0.95,
+      "deadline": 0.95,
+      "budget": 0.9,
+      "target_audience": 0.9,
+      "constraints": 0.85
     }
   },
-  "input_tokens": 215,
-  "output_tokens": 104,
+  "input_tokens": 220,
+  "output_tokens": 110,
   "latency_ms": 15,
   "estimated_cost": 0.0,
   "metadata": {

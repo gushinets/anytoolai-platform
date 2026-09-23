@@ -241,9 +241,9 @@
         "id": { "const": "key-details" },
         "title": { "const": "Key details" },
         "content": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "metadata": { "$ref": "#/$defs/sectionMetadata" }
+        "metadata": { "$ref": "#/$defs/listSectionMetadata" }
       },
-      "required": ["id", "title", "content"],
+      "required": ["id", "title", "content", "metadata"],
       "additionalProperties": false
     },
     "gapsSection": {
@@ -263,9 +263,9 @@
         "id": { "const": "next-steps" },
         "title": { "const": "Questions to ask" },
         "content": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "metadata": { "$ref": "#/$defs/sectionMetadata" }
+        "metadata": { "$ref": "#/$defs/listSectionMetadata" }
       },
-      "required": ["id", "title", "content"],
+      "required": ["id", "title", "content", "metadata"],
       "additionalProperties": false
     },
     "sectionMetadata": {
@@ -275,6 +275,14 @@
           "type": "string",
           "enum": ["heading", "paragraph", "list", "table", "note"]
         }
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    },
+    "listSectionMetadata": {
+      "type": "object",
+      "properties": {
+        "kind": { "const": "list" }
       },
       "required": ["kind"],
       "additionalProperties": false

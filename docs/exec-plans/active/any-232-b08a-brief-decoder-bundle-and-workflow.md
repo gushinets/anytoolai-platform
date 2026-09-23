@@ -7,7 +7,7 @@
 - Created: 2026-09-21
 - Last updated: 2026-09-23
 - Review date: 2026-09-28
-- Next action: update PR description for round #6, re-request review.
+- Next action: update PR description for round #7, re-request review.
 - Blocker: none
 
 ## Goal
@@ -24,8 +24,8 @@ through A10, using only generic atoms -- no Platform Core changes, no product Py
   product, scenario, frontend, workflow, action-config, prompt, schema, quota and renderer-contract
   config.
 - `FreelancerSuiteBundle.config_roots()` wiring; README and `add-product-recipe.md` root counts.
-- Deterministic fake-provider fixtures: happy path, weak input, and empty-issues variants for A04
-  and A10 (ten fixtures total; see "Implementation steps").
+- Deterministic fake-provider fixtures: happy path, weak input, and empty-issues variants for A01,
+  A04 and A10 (eleven fixtures total; see "Implementation steps").
 - Tests in `apps/platform-api/tests` (quick-check) and `freelancer-suite/tests` (full-check).
 
 ### Out of scope
@@ -95,8 +95,9 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 - [x] Exec plan (this file).
 - [x] Product config tree.
 - [x] `FreelancerSuiteBundle.config_roots()` wiring + README / recipe root counts.
-- [x] Ten fixtures (4 happy, 4 weak, 2 empty-issues variants: A04's `detect_issues` and A10's
-      `generate_summary`, added in round #3 to fix a readiness-claim contradiction).
+- [x] Eleven fixtures (4 happy, 4 weak, 3 empty-issues variants: A01's `extract_brief`, A04's
+      `detect_issues`, and A10's `generate_summary`, grounded in a dedicated clean-brief input --
+      see round #3 and round #6 below).
 - [x] Tests: `apps/platform-api/tests/test_brief_decoder_bundle.py`,
       `freelancer-suite/tests/test_brief_decoder_product.py`.
 - [x] Verification (below).
@@ -117,6 +118,7 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 | 2026-09-21 | Guard A05 with `when` + seeded `questions: []` | A05 input requires >= 1 issue; precedent `detect_questions_v1` |
 | 2026-09-21 | Composed per-key `workflow_output` | Delivers all four renderer parts; fallback is A10-only output |
 | 2026-09-22 | Round #1 code review fixes (10 of 14 findings; #5 documented as inherited) | See review round below |
+| 2026-09-23 | Root-caused the no_issues scenario instead of re-patching a 3rd time: the actual problem across rounds #3/#6 was reusing `BRIEF_TEXT` for a "clean brief" scenario the happy-path fixtures already contradict, not any single fixture's content | Added `CLEAN_BRIEF_TEXT` (round #7); each prior round had fixed a real but narrower symptom |
 
 ## Progress log
 
@@ -130,7 +132,8 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 | 2026-09-23 | Round #3 code review (self-review, posted as blocking inline PR comments): fixed all 3 findings (see below); re-ran quick-check/full-check, both green | Code review round #4 |
 | 2026-09-23 | Round #4 code review (self-review): fixed the 1 blocker and the 1 documentation finding (see below); re-ran quick-check/full-check, both green | Update PR description, code review round #5 |
 | 2026-09-23 | Round #5 code review (self-review): 0 blockers; fixed 2 non-blocking documentation findings (see below); re-ran quick-check/full-check, both green | Code review round #6 |
-| 2026-09-23 | Round #6 code review (self-review): fixed 2 blockers (no_issues fixture set genuinely inconsistent; A05 prompt overclaimed an unenforced invariant) plus reaffirmed one out-of-scope gap as follow-up debt; re-ran targeted tests, all green | Update PR description, re-request review |
+| 2026-09-23 | Round #6 code review (self-review): fixed 2 blockers (no_issues fixture set genuinely inconsistent; A05 prompt overclaimed an unenforced invariant) plus reaffirmed one out-of-scope gap as follow-up debt; re-ran targeted tests, all green | Update PR description, code review round #7 |
+| 2026-09-23 | Round #7 code review (self-review): round #6's no_issues fix was still ungrounded (ran against BRIEF_TEXT, not a clean-brief input); added CLEAN_BRIEF_TEXT and fixed the missing metadata.kind=list requirement; re-ran quick-check/full-check, both green | Update PR description, re-request review |
 
 ## Code review round #1 (2026-09-21)
 
@@ -324,10 +327,35 @@ into A05 (e.g. synthesizing pseudo-issues before the guard) would be a real work
 change beyond this ticket's declared workflow (`A01 + A04 -> A05`, composed through A10) and its
 non-goals; noted as follow-up debt below rather than done unilaterally.
 
+## Code review round #7 (2026-09-23, self-review)
+
+2 blockers, both confirmed against current code and fixed -- root-caused this time rather than
+patched again (see decision log):
+
+1. Round #6's `.no_issues` fixture fix was itself only half the fix: the end-to-end test still
+   sent `BRIEF_TEXT` -- the same ambiguous, target-audience-free text the happy-path A04 fixture
+   already flags with 3 issues (ambiguity, timeline risk, scope risk) for this exact input -- to
+   a scenario whose A01/A04/A10 fixtures claim a clean, complete brief. The fixtures were
+   internally consistent with each other but not grounded in what was actually sent; nothing
+   stopped the fake-provider path from proving only that mutually exclusive results can be
+   returned for the same input, not that a clean brief behaves correctly. Added `CLEAN_BRIEF_TEXT`,
+   a dedicated brief that states every A01 field explicitly and closes every ambiguity/scope/
+   timeline/budget question `BRIEF_TEXT` leaves open, rewrote the `.no_issues` A01/A10 fixtures to
+   be a faithful extraction of it, and asserted the resolved `source_text` payload against it
+   (mirroring the happy-path test's own input-payload assertions).
+2. `generate_summary.v1.md` unconditionally requires `metadata.kind = list` on `key-details` and
+   `next-steps`, but `decode_output_v1` left `metadata` optional on every section and, when
+   present, open to any of 5 `kind` values -- a canonical artifact with `next-steps` missing
+   `metadata` entirely, or `key-details.metadata.kind = "table"`, would validate. The `.no_issues`
+   A10 fixture's own `next-steps` section was missing `metadata` altogether, an instance of
+   exactly this gap. Added a dedicated `listSectionMetadata` `$defs` entry (`kind: const "list"`,
+   required) and made `metadata` required on both `keyDetailsSection` and `nextStepsSection`.
+   Fixed the fixture and added 4 mutation tests (missing/wrong-kind on each of the two sections).
+
 ## Open questions
 
 None blocking. The input/field/taxonomy choices in decision 3 are product decisions a reviewer may
-want to change; they drive the output schema and all ten fixtures.
+want to change; they drive the output schema and all eleven fixtures.
 
 ## Follow-up debt
 

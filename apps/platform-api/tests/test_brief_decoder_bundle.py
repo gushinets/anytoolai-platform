@@ -58,6 +58,23 @@ BRIEF_TEXT = (
     "season. Budget is around $3,000. Should look modern but also traditional."
 )
 WEAK_BRIEF_TEXT = "Need a website. Make it nice."
+# Code review finding (me #5): the no_issues test used to send the ambiguous BRIEF_TEXT above --
+# the same text the happy-path A04 fixture already flags with 3 issues -- to a scenario whose
+# fixtures claim a clean, complete brief. A dedicated, genuinely unambiguous text is required for
+# the no_issues fixtures (extract_brief_v1.no_issues.json et al.) to be a faithful A01/A04
+# extraction rather than a self-consistent but ungrounded fabrication: it states every A01 field
+# explicitly, closes the ambiguity/scope questions BRIEF_TEXT leaves open, and gives a concrete
+# deadline and an already-approved budget.
+CLEAN_BRIEF_TEXT = (
+    "We are a small bakery. We want a website so customers can browse our menu and place cake "
+    "orders online; checkout will go through a third-party payment processor, so we are not "
+    "building our own payment system. Deliverables: a menu page, an online order form with "
+    "checkout, and a contact page. The website must launch by 2026-11-02, in time for the "
+    "holiday season. The budget is a fixed $3,000, already approved. The target audience is "
+    "local families and small offices in our town who order celebration cakes for birthdays "
+    "and other events. Style: clean and minimal, using our existing logo colors of navy and "
+    "cream; no other design direction is needed."
+)
 
 
 def _fixture(key: str) -> dict[str, Any]:
@@ -206,6 +223,21 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
         ),
         "document_missing_a_section": mutated(lambda o: o["document"]["sections"].pop()),
         "document_sections_reordered": mutated(_swap_first_two_sections),
+        # Code review finding (me #5): generate_summary.v1.md requires metadata.kind = "list" on
+        # key-details and next-steps unconditionally -- the schema used to leave metadata
+        # optional and, when present, open to any of the 5 kind values.
+        "key_details_missing_metadata": mutated(
+            lambda o: o["document"]["sections"][1].pop("metadata")
+        ),
+        "key_details_wrong_kind": mutated(
+            lambda o: o["document"]["sections"][1].update(metadata={"kind": "table"})
+        ),
+        "next_steps_missing_metadata": mutated(
+            lambda o: o["document"]["sections"][3].pop("metadata")
+        ),
+        "next_steps_wrong_kind": mutated(
+            lambda o: o["document"]["sections"][3].update(metadata={"kind": "note"})
+        ),
     }
     validator = jsonschema.validators.validator_for(schema)(schema)
     for name, candidate in invalid_outputs.items():
@@ -383,16 +415,27 @@ def test_no_issues_skips_question_generation_and_still_produces_a_consistent_doc
     here meant the run certified "no issues, no questions, but a known gap nothing can ask about"
     (A05 only ever derives from A04's `issues`, never from A01's `missing_fields`), while
     `detect_issues.v1.md` itself lists `missing_information` as a taxonomy category A04 should
-    have caught in the same source text. A dedicated `.no_issues` A01 fixture with
-    `missing_fields: []` makes the whole scenario -- extraction, detection, and summary --
-    consistent: a brief that is complete *and* clean, with no unresolved gap left unaddressed."""
+    have caught in the same source text.
+
+    Code review finding (me #5): fixing that by adding a `.no_issues` A01 fixture wasn't enough
+    on its own -- it still ran against `BRIEF_TEXT`, the same ambiguous text the happy-path A04
+    fixture already flags with 3 issues for this exact input, so the fixtures were self-consistent
+    but not grounded in what was actually sent. Uses `CLEAN_BRIEF_TEXT` instead, a dedicated brief
+    that states every A01 field explicitly and closes the ambiguity/scope gaps `BRIEF_TEXT` leaves
+    open, and asserts the resolved `source_text` payload matches it (mirroring the happy-path
+    test's own input-payload assertions)."""
     adapter = RecordingProviderAdapter(
         FIXTURE_ROOT,
         variants={EXTRACT: ".no_issues", DETECT: ".no_issues", SUMMARY: ".no_issues"},
     )
-    _, output = _run_to_result(app, request_platform_api, session_factory, BRIEF_TEXT, adapter)
+    _, output = _run_to_result(
+        app, request_platform_api, session_factory, CLEAN_BRIEF_TEXT, adapter
+    )
 
     assert tuple(call.action_config_id for call in adapter.calls) == (EXTRACT, DETECT, SUMMARY)
+    extract_input, detect_input, _ = (adapter.input_payload(i) for i in range(3))
+    assert extract_input["source_text"] == CLEAN_BRIEF_TEXT
+    assert detect_input["source_text"] == CLEAN_BRIEF_TEXT
     assert output["issues"] == []
     assert output["questions"] == []
     assert output["brief"] == _fixture(EXTRACT + ".no_issues")
