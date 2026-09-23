@@ -7,7 +7,7 @@
 - Created: 2026-09-21
 - Last updated: 2026-09-23
 - Review date: 2026-09-28
-- Next action: address round #4 self-review (see below), re-run validation, re-request review.
+- Next action: address round #5 self-review (see below), re-run validation, re-request review.
 - Blocker: none
 
 ## Goal
@@ -128,7 +128,8 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 | 2026-09-23 | PR #141 opened; description filled in from the template | Address PR inline comments |
 | 2026-09-23 | Fixed a PR inline comment: `generate_summary.v1.md`'s `next-steps` instruction claimed "work can start" for any empty `data.questions`, regardless of `data.issues`/`data.brief.missing_fields`; moved the readiness claim to `summary` and made it depend on all three. Updated the `.no_issues` fixture's `next-steps` text to match | Code review round #3 |
 | 2026-09-23 | Round #3 code review (self-review, posted as blocking inline PR comments): fixed all 3 findings (see below); re-ran quick-check/full-check, both green | Code review round #4 |
-| 2026-09-23 | Round #4 code review (self-review): fixed the 1 blocker and the 1 documentation finding (see below); re-ran quick-check/full-check, both green | Update PR description, re-request review |
+| 2026-09-23 | Round #4 code review (self-review): fixed the 1 blocker and the 1 documentation finding (see below); re-ran quick-check/full-check, both green | Update PR description, code review round #5 |
+| 2026-09-23 | Round #5 code review (self-review): 0 blockers; fixed 2 non-blocking documentation findings (see below); re-ran quick-check/full-check, both green | Update PR description, re-request review |
 
 ## Code review round #1 (2026-09-21)
 
@@ -274,6 +275,20 @@ per-product):
    after round #3 added a second `.no_issues` variant (bringing the total to ten); this plan's
    `Status` header was also stale (`Last updated`, `Next action`). Fixed both here; the PR
    description is updated separately.
+
+## Code review round #5 (2026-09-23, self-review)
+
+0 blockers; the round #4 fix held up under a full re-review of the whole product contract. 2
+non-blocking findings, both fixed:
+
+1. `renderer_contract.yaml`'s `clarifying_questions` part pointed readers at `data.issues` and
+   `data.brief.missing_fields` -- A10's own *input* paths (`generate_summary.v1.md`'s `data.*`),
+   not the paths this contract actually describes (the final composed artifact's `issues` and
+   `brief.missing_fields`). Confusing for whoever builds the ANY-248 renderer against this file,
+   though nothing in code reads this prose. Reworded to the artifact's own paths.
+2. This plan's `Status.Next action` still said "round #4" after round #4 was already addressed,
+   and the PR description still said "Two rounds of code review fixes" with four (now five)
+   rounds recorded here. Fixed both.
 
 ## Open questions
 
