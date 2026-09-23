@@ -268,6 +268,59 @@ def test_a01_field_invariants_hold_for_every_configured_field(state: str) -> Non
         assert not validator.is_valid(output(brief)), (state, name)
 
 
+# Human-readable stem each A01 field must be reported under in the `gaps` section. Keyed by every
+# field so the check below can't silently skip a new one.
+_GAPS_KEYWORD = {
+    "project_goal": "goal",
+    "deliverables": "deliverables",
+    "deadline": "deadline",
+    "budget": "budget",
+    "target_audience": "audience",
+    "constraints": "constraint",
+}
+# Connective/label words an overview or key-details section may use that carry no project fact.
+_NON_FACT_WORDS = {
+    "lets", "that", "wants", "brief", "clien", "detai", "furth", "gives", "found", "were",
+    "budge", "const", "deadl", "deliv", "rathe", "than", "deliverables", "constraints",
+}
+_SUMMARY_FIXTURES = {  # A10 fixture suffix -> matching A01 fixture suffix
+    "": "",
+    ".weak_input": ".weak_input",
+    ".no_issues": ".no_issues",
+}
+
+
+_MIN_WORD_LEN = 4  # shorter words are articles/prepositions, not facts
+
+
+def _stems(text: str) -> set[str]:
+    return {w[:5] for w in re.findall(r"[a-z0-9]+", text.lower()) if len(w) >= _MIN_WORD_LEN}
+
+
+@pytest.mark.parametrize(("summary_suffix", "extract_suffix"), _SUMMARY_FIXTURES.items())
+def test_summary_fixtures_obey_the_a10_prompt(summary_suffix: str, extract_suffix: str) -> None:
+    """generate_summary.v1.md: built from `data` only (never invent facts) and `gaps` names every
+    `data.brief.missing_fields` entry. The fixtures are the deterministic evidence for those
+    rules, so they are checked against the A01 fixture that feeds the same run (code review:
+    the overview named a "bakery" and "new website" that no A01 value carried, and the weak
+    fixture never reported `constraints` missing)."""
+    assert set(_GAPS_KEYWORD) == {
+        f["name"] for f in _literal(_steps()["extract"]["input_mapping"]["fields"])
+    }
+    brief = _fixture_response("brief_decoder.extract_brief_v1" + extract_suffix)
+    sections = {
+        s["id"]: s["content"]
+        for s in _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)["sections"]
+    }
+
+    grounded = _stems(json.dumps(brief["values"])) | _NON_FACT_WORDS
+    for section_id in ("overview", "key-details"):
+        ungrounded = _stems(sections[section_id]) - {w[:5] for w in grounded}
+        assert not ungrounded, (section_id, sorted(ungrounded))
+    for name in brief["missing_fields"]:
+        assert _GAPS_KEYWORD[name] in sections["gaps"].lower(), name
+
+
 def test_schemas_are_closed() -> None:
     def assert_closed(node: Any, where: str) -> None:
         if isinstance(node, dict):
