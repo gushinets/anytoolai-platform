@@ -55,8 +55,10 @@ def test_submitted_payload_equals_snapshot_and_action_runner_input(app, monkeypa
 class _FinalAnswerAdapter:
     def __init__(self, output):
         self.output = output
+        self.requests = []
 
     async def complete(self, request):
+        self.requests.append(request)
         return ProviderResponse(
             provider_policy_ref=request.provider_policy_ref,
             provider=request.provider,
@@ -76,11 +78,10 @@ def test_http_worker_terminal_history_and_idempotent_replay(app, success):
     accepted = _post(app, submitted)
     assert accepted.status_code == HTTPStatus.ACCEPTED
     run_id = accepted.json()["run_id"]
+    adapter = _FinalAnswerAdapter(json.dumps(expected) if success else "invalid final answer")
     worker = build_worker(
         session_factory=_factory(app), config_registry=app.state.runtime.config_registry,
-        provider_adapters={"litellm": _FinalAnswerAdapter(
-            json.dumps(expected) if success else "invalid final answer",
-        )},
+        provider_adapters={"litellm": adapter},
     )
     try:
         asyncio.run(worker.process_next_job())
@@ -98,6 +99,18 @@ def test_http_worker_terminal_history_and_idempotent_replay(app, success):
     assert _get(app, "/" + run_id).json() == detail.json()
     assert _get(app, "/" + run_id, access=None).status_code == HTTPStatus.UNAUTHORIZED
     assert len(_get(app).json()["items"]) == 1
+    assert adapter.requests
+    assert all(request.model == submitted["model_id"] for request in adapter.requests)
+    assert all(
+        request.reasoning_effort.value == submitted["reasoning_effort"]
+        for request in adapter.requests
+    )
+    expected_prompt = (
+        submitted["prompt"]
+        + "\n\nInput payload:\n"
+        + json.dumps(submitted["input"], sort_keys=True)
+    )
+    assert all(request.prompt == expected_prompt for request in adapter.requests)
     if success:
         assert detail.json()["result"] == expected
         assert detail.json()["diagnostics"]["succeeded_first_attempt"] is True
