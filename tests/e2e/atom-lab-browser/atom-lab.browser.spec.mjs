@@ -1460,6 +1460,91 @@ test("preset conflict and save failure keep the local draft intact", async ({pag
   await expect(page.locator("#prompt-editor")).toHaveValue("Локальный промпт не потерять");
   await expect(page.locator("#open-latest-preset")).toBeVisible();
   await expect(page.locator("#save-as-new-preset")).toBeVisible();
+
+  await page.getByRole("button", {name: /A05/}).click();
+  await expect(page.locator("#atom-title")).toContainText("A05");
+  await expect(page.locator("#preset-name")).toHaveValue("");
+  await expect(page.locator("#preset-version-select option")).toHaveCount(0);
+  await expect(page.locator("#save-preset")).toHaveText("Сохранить новый");
+});
+
+test("historical preset provenance stays read-only until explicit adaptation", async ({page}) => {
+  const stored = {
+    name: "Исторический пресет", description: "Старый контракт", atom_id: "A06",
+    base_action_config_id: "config.a06.retired", schema_refs: A06.schema_refs,
+    prompt: "Исторический промпт", prompt_ref: "prompt.a06.retired",
+    model_id: "openai/gpt-supported", reasoning_effort: "high", fixed_fields: ["context"],
+    example_input: A06.example_input, source_run_id: null,
+    preset_id: "preset-retired", version: 1, created_at: "2026-09-23T09:30:00Z",
+  };
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const request = route.request();
+    const {pathname} = new URL(request.url());
+    if (pathname === "/v1/atom-lab/presets" && request.method() === "GET") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: stored.preset_id, latest_version: 1, name: stored.name,
+        description: stored.description, atom_id: stored.atom_id,
+        created_at: stored.created_at, updated_at: stored.created_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: stored.preset_id, version: 1, name: stored.name, description: stored.description,
+        atom_id: stored.atom_id, created_at: stored.created_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions/1`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(stored)});
+      return;
+    }
+    await route.fallback();
+  });
+
+  await unlockAtom(page, "A06");
+  const originalPrompt = await page.locator("#prompt-editor").inputValue();
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-list button").click();
+
+  await expect(page.locator("#preset-compatibility")).toBeVisible();
+  await expect(page.locator("#preset-readonly")).toContainText("config.a06.retired");
+  await expect(page.locator("#preset-readonly")).toContainText("prompt.a06.retired");
+  await expect(page.locator("#preset-name")).toBeDisabled();
+  await expect(page.locator("#save-preset")).toBeDisabled();
+  await expect(page.locator("#prompt-editor")).toHaveValue(originalPrompt);
+
+  await page.locator("#adapt-preset").click();
+  await expect(page.locator("#preset-compatibility")).toBeHidden();
+  await expect(page.locator("#preset-name")).toBeEnabled();
+  await expect(page.locator("#preset-name")).toHaveValue(stored.name);
+  await expect(page.locator("#prompt-editor")).toHaveValue(stored.prompt);
+  await expect(page.locator("#preset-state")).toContainText("Есть несохранённый черновик");
+  await expect(page.locator("#save-preset")).toHaveText("Сохранить новый");
+});
+
+test("new preset metadata participates in discard protection and atom changes clear its association", async ({page}) => {
+  await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
+    await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
+  });
+  await unlockAtom(page, "A06");
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-name").fill("Несохранённый пресет");
+  await page.locator("#preset-description").fill("Не потерять metadata");
+  await page.locator("#fixed-fields").getByLabel("context").check();
+
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page.getByRole("button", {name: /A05/}).click();
+  await expect(page.locator("#atom-title")).toContainText("A06");
+  await expect(page.locator("#preset-name")).toHaveValue("Несохранённый пресет");
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", {name: /A05/}).click();
+  await expect(page.locator("#atom-title")).toContainText("A05");
+  await expect(page.locator("#preset-name")).toHaveValue("");
+  await expect(page.locator("#preset-version-select option")).toHaveCount(0);
+  await expect(page.locator("#save-preset")).toHaveText("Сохранить новый");
+  await expect(page.locator("#preset-state")).toContainText("Нет несохранённых изменений");
 });
 
 test("history keeps running and crash-failed snapshots readable without silent migration", async ({page}) => {
@@ -1477,7 +1562,8 @@ test("history keeps running and crash-failed snapshots readable without silent m
     physical_calls: 1,
     succeeded_first_attempt: null,
   };
-  failed.snapshot.schemas.input.ref = "retired.input.schema";
+  failed.snapshot.action.config_id = "config.a06.retired";
+  failed.snapshot.prompt.ref = "prompt.a06.retired";
   failed.snapshot.provider.model_id = "openai/gpt-retired";
   let runPosts = 0;
   await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
@@ -1577,8 +1663,14 @@ test("saving from history uses the selected snapshot instead of the unrelated ed
   await expect.poll(() => savedBody).not.toBeNull();
 
   expect(savedBody.atom_id).toBe("A06");
+  expect(savedBody.base_action_config_id).toBe(detail.snapshot.action.config_id);
+  expect(savedBody.schema_refs).toEqual({
+    input: {schema_ref: detail.snapshot.schemas.input.ref, version: detail.snapshot.schemas.input.version},
+    output: {schema_ref: detail.snapshot.schemas.output.ref, version: detail.snapshot.schemas.output.version},
+  });
   expect(savedBody.example_input).toEqual(detail.snapshot.input);
   expect(savedBody.prompt).toBe(detail.snapshot.prompt.content);
+  expect(savedBody.prompt_ref).toBe(detail.snapshot.prompt.ref);
   expect(savedBody.model_id).toBe(detail.snapshot.provider.model_id);
   expect(savedBody.reasoning_effort).toBe(detail.snapshot.provider.reasoning_effort);
   expect(savedBody.source_run_id).toBe(detail.run_id);

@@ -69,7 +69,12 @@
                     <button id="save-as-new-preset" type="button">Сохранить отдельным пресетом</button>
                   </div>
                 </div>
+                <div id="preset-compatibility" class="warning" role="alert" hidden>
+                  <p>Сохранённая версия использует исторический контракт и доступна только для чтения.</p>
+                  <button id="adapt-preset" type="button">Адаптировать к текущему контракту</button>
+                </div>
                 <p id="preset-error" class="error" role="alert"></p>
+                <pre id="preset-readonly" hidden></pre>
                 <a id="preset-export-download" hidden>Скачать JSON</a>
                 <pre id="preset-export" hidden></pre>
               </section>
