@@ -1366,9 +1366,18 @@ export function bootstrapAtomLab({
   let presetReadOnly = false;
   let presetSaveInFlight = false;
   let presetExportGeneration = 0;
+  let presetListLoadGeneration = 0;
+  let presetListLoadInFlight = false;
+  let presetVersionPageGeneration = 0;
+  let presetVersionPageInFlight = false;
   let historyItems = [];
   let historyCursor = null;
+  let historyListLoadGeneration = 0;
+  let historyListLoadInFlight = false;
   let selectedHistoryDetail = null;
+  let selectedHistoryCompatible = false;
+  let historyOpenGeneration = 0;
+  let historyOpenInFlight = false;
   let restoredHistoryDraft = false;
   let presetSourceOverride = null;
   let paused = false;
@@ -1772,29 +1781,50 @@ export function bootstrapAtomLab({
   };
 
   const loadPresets = async ({append = false} = {}) => {
+    if (append && presetListLoadInFlight) return false;
+    const generation = ++presetListLoadGeneration;
+    const cursor = append ? presetCursor : null;
+    presetListLoadInFlight = true;
+    updatePresetEditorDisabled();
     nodes["preset-error"].textContent = "";
     try {
-      const query = append && presetCursor ? `?cursor=${encodeURIComponent(presetCursor)}` : "";
+      const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
       const parsed = parsePresetList(await protectedJson(`/v1/atom-lab/presets${query}`));
       if (!parsed) throw new Error("Список пресетов вернул некорректный ответ.");
+      if (generation !== presetListLoadGeneration) return false;
       presetItems = append ? [...presetItems, ...parsed.items] : parsed.items;
       presetCursor = parsed.next_cursor;
       renderPresetList();
+      return true;
     } catch (error) {
+      if (generation !== presetListLoadGeneration) return false;
       nodes["preset-error"].textContent = error instanceof Error ? error.message : "Не удалось загрузить пресеты.";
+      return false;
+    } finally {
+      if (generation === presetListLoadGeneration) {
+        presetListLoadInFlight = false;
+        updatePresetEditorDisabled();
+      }
     }
   };
 
   const updatePresetEditorDisabled = () => {
     const operationLocked = presetLibraryLoading || presetOpenInFlight || presetSaveInFlight;
+    const versionControlsLocked = operationLocked || presetVersionPageInFlight;
     const editorLocked = operationLocked || presetReadOnly || !presetEditorActive;
+    const draftLocked = presetOpenInFlight || presetSaveInFlight;
+    nodes.workspace.inert = draftLocked;
+    nodes.workspace.setAttribute("aria-busy", String(draftLocked));
     for (const id of ["preset-name", "preset-description", "save-preset"]) nodes[id].disabled = editorLocked;
     for (const id of ["preset-version-select", "new-preset", "save-as-new-preset", "open-latest-preset", "load-more-versions"]) {
-      nodes[id].disabled = operationLocked;
+      nodes[id].disabled = versionControlsLocked;
     }
     nodes["export-preset"].disabled = operationLocked || selectedPresetVersion === null;
     nodes["adapt-preset"].disabled = operationLocked || !presetReadOnly;
-    for (const buttonNode of nodes["preset-list"].querySelectorAll("button")) buttonNode.disabled = operationLocked;
+    nodes["load-more-presets"].disabled = operationLocked || presetListLoadInFlight;
+    for (const buttonNode of nodes["preset-list"].querySelectorAll("button")) {
+      buttonNode.disabled = operationLocked || presetListLoadInFlight;
+    }
     for (const input of nodes["fixed-fields"].querySelectorAll("input")) input.disabled = editorLocked;
   };
 
@@ -1859,10 +1889,8 @@ export function bootstrapAtomLab({
     renderPresetState();
   };
 
-  const fetchPresetVersions = async (presetId, {append = false} = {}) => {
-    const query = append && presetVersionsCursor
-      ? `?cursor=${encodeURIComponent(presetVersionsCursor)}`
-      : "";
+  const fetchPresetVersions = async (presetId, {cursor = null} = {}) => {
+    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
     const parsed = parsePresetVersionList(await protectedJson(
       `/v1/atom-lab/presets/${encodeURIComponent(presetId)}/versions${query}`,
     ));
@@ -1885,8 +1913,25 @@ export function bootstrapAtomLab({
     nodes["load-more-versions"].hidden = presetVersionsCursor === null;
   };
 
-  const loadPresetVersions = async (presetId, {append = false} = {}) => {
-    commitPresetVersions(await fetchPresetVersions(presetId, {append}), {append});
+  const loadMorePresetVersions = async () => {
+    if (!selectedPresetSummary || presetVersionPageInFlight || presetVersionsCursor === null) return;
+    const presetId = selectedPresetSummary.preset_id;
+    const cursor = presetVersionsCursor;
+    const generation = ++presetVersionPageGeneration;
+    presetVersionPageInFlight = true;
+    updatePresetEditorDisabled();
+    try {
+      const parsed = await fetchPresetVersions(presetId, {cursor});
+      if (generation !== presetVersionPageGeneration || selectedPresetSummary?.preset_id !== presetId) return;
+      commitPresetVersions(parsed, {append: true});
+    } catch (error) {
+      if (generation === presetVersionPageGeneration) nodes["preset-error"].textContent = error.message;
+    } finally {
+      if (generation === presetVersionPageGeneration) {
+        presetVersionPageInFlight = false;
+        updatePresetEditorDisabled();
+      }
+    }
   };
 
   const openPreset = async (
@@ -1894,9 +1939,11 @@ export function bootstrapAtomLab({
     preferredVersion = preset.latest_version,
     {force = false, refreshVersions = true} = {},
   ) => {
-    if (presetSaveInFlight && !force) return;
-    if (!force && hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
+    if (presetSaveInFlight && !force) return false;
+    if (!force && hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return false;
     const generation = ++presetOpenGeneration;
+    presetVersionPageGeneration += 1;
+    presetVersionPageInFlight = false;
     presetOpenInFlight = true;
     clearPresetExport();
     updatePresetEditorDisabled();
@@ -1907,16 +1954,18 @@ export function bootstrapAtomLab({
         refreshVersions ? fetchPresetVersions(preset.preset_id) : Promise.resolve(null),
         fetchPresetVersion(preset.preset_id, preferredVersion),
       ]);
-      if (generation !== presetOpenGeneration) return;
+      if (generation !== presetOpenGeneration) return false;
       if (versionsPage) commitPresetVersions(versionsPage);
       selectedPresetSummary = preset;
       commitPresetVersion(version);
       renderPresetList();
+      return true;
     } catch (error) {
-      if (generation !== presetOpenGeneration) return;
+      if (generation !== presetOpenGeneration) return false;
       if (selectedPresetVersion) nodes["preset-version-select"].value = String(selectedPresetVersion.version);
       nodes["preset-error"].textContent = error instanceof Error ? error.message : "Не удалось открыть пресет.";
       renderPresetState();
+      return false;
     } finally {
       if (generation === presetOpenGeneration) {
         presetOpenInFlight = false;
@@ -1963,7 +2012,8 @@ export function bootstrapAtomLab({
     const body = updating ? {...payload, base_version: selectedPresetVersion.version} : payload;
     try {
       const created = await protectedJson(url, {method: "POST", body: JSON.stringify(body)});
-      if (!isRecord(created) || !isNonEmptyString(created.preset_id) || !isPositiveInteger(created.version)) {
+      if (!isRecord(created) || !isNonEmptyString(created.preset_id) || !isPositiveInteger(created.version)
+        || !isNonEmptyString(created.created_at)) {
         throw new Error("Сохранение пресета вернуло некорректный ответ.");
       }
       await loadPresets();
@@ -1973,9 +2023,36 @@ export function bootstrapAtomLab({
         name: payload.name,
         description: payload.description,
         atom_id: payload.atom_id,
+        created_at: created.created_at,
+        updated_at: created.created_at,
       };
-      await openPreset(summary, created.version, {force: true});
-      nodes["preset-state"].textContent = `Сохранена неизменяемая версия ${created.version}.`;
+      const readBack = await openPreset(summary, created.version, {force: true});
+      if (readBack) {
+        nodes["preset-state"].textContent = `Сохранена неизменяемая версия ${created.version}.`;
+      } else {
+        const localVersion = {
+          ...cloneJson(payload),
+          preset_id: created.preset_id,
+          version: created.version,
+          created_at: created.created_at,
+        };
+        if (!presetItems.some((item) => item.preset_id === created.preset_id)) {
+          presetItems = [summary, ...presetItems];
+        }
+        selectedPresetSummary = summary;
+        commitPresetVersions({items: [{
+          preset_id: created.preset_id,
+          version: created.version,
+          name: payload.name,
+          description: payload.description,
+          atom_id: payload.atom_id,
+          created_at: created.created_at,
+        }], next_cursor: null});
+        commitPresetVersion(localVersion);
+        renderPresetList();
+        nodes["preset-state"].textContent = `Версия ${created.version} сохранена; повторное чтение не удалось.`;
+        nodes["preset-error"].textContent = "Сохранение завершено, но сервер не вернул сохранённую версию при повторном чтении. Повторный Save обновит эту identity.";
+      }
     } catch (error) {
       if (error?.code === "preset_version_conflict") {
         nodes["preset-conflict"].hidden = false;
@@ -2000,19 +2077,34 @@ export function bootstrapAtomLab({
       nodes["history-list"].append(item);
     }
     nodes["load-more-history"].hidden = historyCursor === null;
+    updateHistoryControls();
   };
 
   const loadHistory = async ({append = false} = {}) => {
+    if (append && historyListLoadInFlight) return false;
+    const generation = ++historyListLoadGeneration;
+    const cursor = append ? historyCursor : null;
+    historyListLoadInFlight = true;
+    updateHistoryControls();
     nodes["history-error"].textContent = "";
     try {
-      const query = append && historyCursor ? `?cursor=${encodeURIComponent(historyCursor)}` : "";
+      const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
       const parsed = parseRunList(await protectedJson(`/v1/atom-lab/runs${query}`));
       if (!parsed) throw new Error("История вернула некорректный ответ.");
+      if (generation !== historyListLoadGeneration) return false;
       historyItems = append ? [...historyItems, ...parsed.items] : parsed.items;
       historyCursor = parsed.next_cursor;
       renderHistoryList();
+      return true;
     } catch (error) {
+      if (generation !== historyListLoadGeneration) return false;
       nodes["history-error"].textContent = error instanceof Error ? error.message : "Не удалось загрузить историю.";
+      return false;
+    } finally {
+      if (generation === historyListLoadGeneration) {
+        historyListLoadInFlight = false;
+        updateHistoryControls();
+      }
     }
   };
 
@@ -2027,15 +2119,30 @@ export function bootstrapAtomLab({
     return presetContractMatchesAtom(configuration, atom);
   };
 
+  const updateHistoryControls = () => {
+    const listLocked = historyListLoadInFlight || historyOpenInFlight;
+    for (const buttonNode of nodes["history-list"].querySelectorAll("button")) buttonNode.disabled = listLocked;
+    nodes["load-more-history"].disabled = listLocked;
+    nodes["restore-history"].disabled = historyOpenInFlight || selectedHistoryDetail === null;
+    nodes["save-history-preset"].disabled = historyOpenInFlight
+      || selectedHistoryDetail === null
+      || !selectedHistoryCompatible;
+  };
+
   const openHistoryRun = async (runId) => {
+    const generation = ++historyOpenGeneration;
+    historyOpenInFlight = true;
+    updateHistoryControls();
     nodes["history-error"].textContent = "";
     try {
       const parsed = parseRunDetail(await protectedJson(`/v1/atom-lab/runs/${encodeURIComponent(runId)}`), runId);
       if (!parsed) throw new Error("Снимок запуска вернул некорректный ответ.");
+      if (generation !== historyOpenGeneration) return;
       selectedHistoryDetail = cloneJson(parsed);
-      renderHistoryList();
       nodes["history-detail"].textContent = JSON.stringify(parsed, null, 2);
       const compatible = currentContractMatchesHistory(parsed);
+      selectedHistoryCompatible = compatible;
+      renderHistoryList();
       const modelId = parsed.snapshot.provider?.model_id;
       const rawModelId = modelId?.startsWith("openai/") ? modelId.slice("openai/".length) : modelId;
       const modelAvailable = modelOptions.some((item) => item.modelId === rawModelId && item.selectable);
@@ -2045,10 +2152,14 @@ export function bootstrapAtomLab({
           ? "Историческая модель недоступна. Снимок можно восстановить, но перед запуском нужно явно выбрать модель."
           : "";
       nodes["restore-history"].textContent = compatible ? "Восстановить настройки" : "Адаптировать к текущему контракту";
-      nodes["restore-history"].disabled = false;
-      nodes["save-history-preset"].disabled = !compatible;
     } catch (error) {
+      if (generation !== historyOpenGeneration) return;
       nodes["history-error"].textContent = error instanceof Error ? error.message : "Не удалось открыть запуск.";
+    } finally {
+      if (generation === historyOpenGeneration) {
+        historyOpenInFlight = false;
+        updateHistoryControls();
+      }
     }
   };
 
@@ -2562,11 +2673,7 @@ export function bootstrapAtomLab({
   nodes["close-presets"].addEventListener("click", () => { nodes["presets-panel"].hidden = true; });
   nodes["close-history"].addEventListener("click", () => { nodes["history-panel"].hidden = true; });
   nodes["load-more-presets"].addEventListener("click", () => loadPresets({append: true}));
-  nodes["load-more-versions"].addEventListener("click", () => {
-    if (!selectedPresetSummary || presetOpenInFlight || presetSaveInFlight) return;
-    loadPresetVersions(selectedPresetSummary.preset_id, {append: true})
-      .catch((error) => { nodes["preset-error"].textContent = error.message; });
-  });
+  nodes["load-more-versions"].addEventListener("click", () => loadMorePresetVersions());
   nodes["load-more-history"].addEventListener("click", () => loadHistory({append: true}));
   nodes["new-preset"].addEventListener("click", () => {
     if (presetLibraryLoading || presetOpenInFlight || presetSaveInFlight) return;
@@ -2588,6 +2695,7 @@ export function bootstrapAtomLab({
   nodes["save-as-new-preset"].addEventListener("click", () => savePreset({forceNew: true}));
   nodes["adapt-preset"].addEventListener("click", () => {
     if (!presetReadOnly || !selectedPresetVersion || presetOpenInFlight || presetSaveInFlight) return;
+    if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     const historical = cloneJson(selectedPresetVersion);
     const atom = catalog.find((item) => item.atom_id === historical.atom_id);
     if (!atom || !applyConfigurationToEditor(historical)) {
@@ -2646,7 +2754,7 @@ export function bootstrapAtomLab({
     }
   });
   nodes["restore-history"].addEventListener("click", () => {
-    if (!selectedHistoryDetail) return;
+    if (!selectedHistoryDetail || historyOpenInFlight) return;
     if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     const configuration = historyConfiguration(selectedHistoryDetail);
     if (!isRecord(configuration.input) || !isNonEmptyString(configuration.prompt) || !isNonEmptyString(configuration.model_id)) {
@@ -2661,7 +2769,7 @@ export function bootstrapAtomLab({
         : null;
     if (!applyConfigurationToEditor(configuration, {
       presetRef: restoredPresetRef,
-      sourceRunId: selectedHistoryDetail.run_id,
+      sourceRunId: compatible ? selectedHistoryDetail.run_id : null,
       restored: true,
     })) {
       nodes["history-error"].textContent = "Исторический снимок нельзя восстановить автоматически.";
@@ -2675,7 +2783,7 @@ export function bootstrapAtomLab({
       : "Снимок явно адаптирован к текущему контракту без ссылки на устаревший пресет.";
   });
   nodes["save-history-preset"].addEventListener("click", () => {
-    if (!selectedHistoryDetail) return;
+    if (!selectedHistoryDetail || historyOpenInFlight) return;
     if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     const configuration = historyConfiguration(selectedHistoryDetail);
     const atom = catalog.find((item) => item.atom_id === configuration.atom_id);

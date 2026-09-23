@@ -1312,6 +1312,7 @@ test("run, immutable preset versions, export, reload, and history restore form o
       const body = request.postDataJSON();
       presetWrites.push(body);
       versions.push({...body, preset_id: "preset-library", version: 1, created_at: "2026-09-23T08:01:00Z"});
+      await new Promise((resolve) => setTimeout(resolve, 150));
       await route.fulfill({status: 201, contentType: "application/json", body: JSON.stringify({preset_id: "preset-library", version: 1, created_at: versions[0].created_at})});
       return;
     }
@@ -1364,7 +1365,10 @@ test("run, immutable preset versions, export, reload, and history restore form o
   await page.locator("#preset-description").fill("Проверка версий");
   await page.locator("#fixed-fields").getByLabel("context").check();
   await page.locator("#save-preset").dblclick();
+  await expect(page.locator("#workspace")).toHaveAttribute("aria-busy", "true");
+  expect(await page.locator("#workspace").evaluate((node) => node.inert)).toBe(true);
   await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия 1");
+  await expect(page.locator("#workspace")).toHaveAttribute("aria-busy", "false");
   await expect(page.locator("#preset-error")).toHaveText("");
   expect(presetWrites).toHaveLength(1);
 
@@ -1492,9 +1496,10 @@ test("preset selection commits atomically across stale responses and failed read
   });
   const presets = [stored("preset-a", "Preset A"), stored("preset-b", "Preset B"), stored("preset-c", "Preset C")];
   let savePath = null;
+  let versionPageReads = 0;
   await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
     const request = route.request();
-    const {pathname} = new URL(request.url());
+    const {pathname, searchParams} = new URL(request.url());
     if (pathname === "/v1/atom-lab/presets" && request.method() === "GET") {
       await route.fulfill({contentType: "application/json", body: JSON.stringify({items: presets.map((item) => ({
         preset_id: item.preset_id, latest_version: 1, name: item.name, description: item.description,
@@ -1505,6 +1510,15 @@ test("preset selection commits atomically across stale responses and failed read
     const match = pathname.match(/^\/v1\/atom-lab\/presets\/(preset-[abc])\/versions(?:\/(\d+))?$/);
     if (match && request.method() === "GET") {
       const item = presets.find((candidate) => candidate.preset_id === match[1]);
+      if (item.preset_id === "preset-b" && searchParams.get("cursor") === "more-b") {
+        versionPageReads += 1;
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+          preset_id: item.preset_id, version: 2, name: item.name, description: item.description,
+          atom_id: item.atom_id, created_at: "2026-09-23T09:16:00Z",
+        }], next_cursor: null})});
+        return;
+      }
       if (item.preset_id === "preset-c") {
         await route.fulfill({status: 503, contentType: "application/json", body: JSON.stringify({
           error: {code: "temporary_failure", message: "Версия временно недоступна.", field_errors: []},
@@ -1516,7 +1530,7 @@ test("preset selection commits atomically across stale responses and failed read
       const body = match[2] ? item : {items: [{
         preset_id: item.preset_id, version: 1, name: item.name, description: item.description,
         atom_id: item.atom_id, created_at: item.created_at,
-      }], next_cursor: null};
+      }], next_cursor: item.preset_id === "preset-b" ? "more-b" : null};
       await route.fulfill({contentType: "application/json", body: JSON.stringify(body)});
       return;
     }
@@ -1532,16 +1546,23 @@ test("preset selection commits atomically across stale responses and failed read
   await page.locator("#presets-button").click();
   const presetButtons = page.locator("#preset-list button");
   await presetButtons.nth(0).click();
+  await expect(page.locator("#workspace")).toHaveAttribute("aria-busy", "true");
+  expect(await page.locator("#workspace").evaluate((node) => node.inert)).toBe(true);
   await presetButtons.nth(1).dispatchEvent("click");
   await expect(page.locator("#preset-name")).toHaveValue("Preset B");
   await page.waitForTimeout(250);
   await expect(page.locator("#preset-name")).toHaveValue("Preset B");
   await expect(presetButtons.nth(1)).toHaveAttribute("aria-current", "true");
 
+  await page.locator("#load-more-versions").dispatchEvent("click");
+  await page.locator("#load-more-versions").dispatchEvent("click");
+  await expect.poll(() => versionPageReads).toBe(1);
   await presetButtons.nth(2).click();
   await expect(page.locator("#preset-error")).toContainText("Версия временно недоступна");
   await expect(page.locator("#preset-name")).toHaveValue("Preset B");
   await expect(presetButtons.nth(1)).toHaveAttribute("aria-current", "true");
+  await page.waitForTimeout(250);
+  await expect(page.locator("#preset-version-select option")).toHaveCount(1);
   await page.locator("#preset-name").fill("Preset B edited");
   await page.locator("#save-preset").click();
   await expect.poll(() => savePath).toBe("/v1/atom-lab/presets/preset-b/versions");
@@ -1593,6 +1614,13 @@ test("historical preset provenance stays read-only until explicit adaptation", a
   await expect(page.locator("#save-preset")).toBeDisabled();
   await expect(page.locator("#prompt-editor")).toHaveValue(originalPrompt);
 
+  await page.locator("#prompt-tab").click();
+  await page.locator("#prompt-editor").fill("Текущий несохранённый draft");
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page.locator("#adapt-preset").click();
+  await expect(page.locator("#preset-compatibility")).toBeVisible();
+  await expect(page.locator("#prompt-editor")).toHaveValue("Текущий несохранённый draft");
+  page.once("dialog", (dialog) => dialog.accept());
   await page.locator("#adapt-preset").click();
   await expect(page.locator("#preset-compatibility")).toBeHidden();
   await expect(page.locator("#preset-name")).toBeEnabled();
@@ -1600,6 +1628,57 @@ test("historical preset provenance stays read-only until explicit adaptation", a
   await expect(page.locator("#prompt-editor")).toHaveValue(stored.prompt);
   await expect(page.locator("#preset-state")).toContainText("Есть несохранённый черновик");
   await expect(page.locator("#save-preset")).toHaveText("Сохранить новый");
+});
+
+test("successful preset write keeps its identity when readback fails", async ({page}) => {
+  let created = false;
+  let createPosts = 0;
+  let versionPosts = 0;
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const request = route.request();
+    const {pathname} = new URL(request.url());
+    if (pathname === "/v1/atom-lab/presets" && request.method() === "GET") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: created ? [{
+        preset_id: "preset-readback", latest_version: 1, name: "Readback preset",
+        description: "Readback failure", atom_id: "A06",
+        created_at: "2026-09-23T09:45:00Z", updated_at: "2026-09-23T09:45:00Z",
+      }] : [], next_cursor: null})});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets" && request.method() === "POST") {
+      createPosts += 1;
+      created = true;
+      await route.fulfill({status: 201, contentType: "application/json", body: JSON.stringify({
+        preset_id: "preset-readback", version: 1, created_at: "2026-09-23T09:45:00Z",
+      })});
+      return;
+    }
+    if (pathname.startsWith("/v1/atom-lab/presets/preset-readback/versions") && request.method() === "GET") {
+      await route.fulfill({status: 503, contentType: "application/json", body: JSON.stringify({
+        error: {code: "temporary_failure", message: "Readback недоступен.", field_errors: []},
+        request_id: "request-readback",
+      })});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets/preset-readback/versions" && request.method() === "POST") {
+      versionPosts += 1;
+      await route.abort();
+      return;
+    }
+    await route.fallback();
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-name").fill("Readback preset");
+  await page.locator("#preset-description").fill("Readback failure");
+  await page.locator("#save-preset").click();
+  await expect(page.locator("#preset-state")).toContainText("повторное чтение не удалось");
+  await expect(page.locator("#preset-error")).toContainText("Сохранение завершено");
+  await expect(page.locator("#save-preset")).toHaveText("Сохранить новую версию");
+  await page.locator("#save-preset").click();
+  await expect.poll(() => versionPosts).toBe(1);
+  expect(createPosts).toBe(1);
 });
 
 test("new preset metadata participates in discard protection and atom changes clear its association", async ({page}) => {
@@ -1634,6 +1713,42 @@ test("new preset metadata participates in discard protection and atom changes cl
   await expect(page.locator("#preset-name")).toHaveValue("Новый после смены атома");
 });
 
+test("history detail keeps the last selected snapshot across out-of-order responses", async ({page}) => {
+  const slow = historyDetail({runId: "run-history-slow", prompt: "Медленный snapshot"});
+  const fast = historyDetail({runId: "run-history-fast", prompt: "Последний выбранный snapshot"});
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const {pathname} = new URL(route.request().url());
+    if (pathname === "/v1/atom-lab/runs") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [slow, fast].map((item) => ({
+        run_id: item.run_id, status: item.status, atom_id: item.snapshot.atom_id,
+        model_id: item.snapshot.provider.model_id, preset_id: null, preset_version: null,
+        created_at: item.created_at, started_at: item.started_at, finished_at: item.finished_at,
+      })), next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/runs/${slow.run_id}` || pathname === `/v1/atom-lab/runs/${fast.run_id}`) {
+      const detail = pathname.endsWith(slow.run_id) ? slow : fast;
+      await new Promise((resolve) => setTimeout(resolve, detail === slow ? 200 : 20));
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(detail)});
+      return;
+    }
+    await route.fallback();
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#history-button").click();
+  const historyButtons = page.locator("#history-list button");
+  await historyButtons.nth(0).click();
+  await expect(page.locator("#restore-history")).toBeDisabled();
+  await historyButtons.nth(1).dispatchEvent("click");
+  await expect(page.locator("#history-detail")).toContainText("Последний выбранный snapshot");
+  await page.waitForTimeout(250);
+  await expect(page.locator("#history-detail")).toContainText("Последний выбранный snapshot");
+  await expect(historyButtons.nth(1)).toHaveAttribute("aria-current", "true");
+  await page.locator("#restore-history").click();
+  await expect(page.locator("#prompt-editor")).toHaveValue("Последний выбранный snapshot");
+});
+
 test("history keeps running and crash-failed snapshots readable without silent migration", async ({page}) => {
   page.on("dialog", (dialog) => dialog.accept());
   const failed = historyDetail({runId: "run-crash", prompt: "Старый промпт"});
@@ -1655,6 +1770,7 @@ test("history keeps running and crash-failed snapshots readable without silent m
   failed.snapshot.provider.model_id = "openai/gpt-retired";
   let runPosts = 0;
   let adaptedRunBody = null;
+  let adaptedPresetBody = null;
   await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
     const request = route.request();
     const {pathname} = new URL(request.url());
@@ -1673,6 +1789,15 @@ test("history keeps running and crash-failed snapshots readable without silent m
     }
     if (pathname === `/v1/atom-lab/runs/${failed.run_id}`) {
       await route.fulfill({contentType: "application/json", body: JSON.stringify(failed)});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets" && request.method() === "GET") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets" && request.method() === "POST") {
+      adaptedPresetBody = request.postDataJSON();
+      await route.abort();
       return;
     }
     await route.fallback();
@@ -1697,6 +1822,11 @@ test("history keeps running and crash-failed snapshots readable without silent m
   await page.locator("#run-button").click();
   await expect.poll(() => runPosts).toBe(1);
   expect(adaptedRunBody.preset_ref).toBeNull();
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-name").fill("Адаптированный пресет");
+  await page.locator("#save-preset").click();
+  await expect.poll(() => adaptedPresetBody).not.toBeNull();
+  expect(adaptedPresetBody.source_run_id).toBeNull();
 });
 
 test("saving from history uses the selected snapshot instead of the unrelated editor draft", async ({page}) => {
