@@ -7,7 +7,7 @@
 - Created: 2026-09-21
 - Last updated: 2026-09-23
 - Review date: 2026-09-28
-- Next action: update PR description for round #7, re-request review.
+- Next action: re-request review; merge once approved.
 - Blocker: none
 
 ## Goal
@@ -134,6 +134,7 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 | 2026-09-23 | Round #5 code review (self-review): 0 blockers; fixed 2 non-blocking documentation findings (see below); re-ran quick-check/full-check, both green | Code review round #6 |
 | 2026-09-23 | Round #6 code review (self-review): fixed 2 blockers (no_issues fixture set genuinely inconsistent; A05 prompt overclaimed an unenforced invariant) plus reaffirmed one out-of-scope gap as follow-up debt; re-ran targeted tests, all green | Update PR description, code review round #7 |
 | 2026-09-23 | Round #7 code review (self-review): round #6's no_issues fix was still ungrounded (ran against BRIEF_TEXT, not a clean-brief input); added CLEAN_BRIEF_TEXT and fixed the missing metadata.kind=list requirement; re-ran quick-check/full-check, both green | Update PR description, re-request review |
+| 2026-09-23 | Round #8 code review (self-review): 2 blockers (whitespace-only canonical strings; A05 prompt's one-per-issue overclaim) fixed with a sweep of every prompt claim vs. real enforcement; re-ran quick-check/full-check, both green | Re-request review |
 
 ## Code review round #1 (2026-09-21)
 
@@ -351,6 +352,28 @@ patched again (see decision log):
    exactly this gap. Added a dedicated `listSectionMetadata` `$defs` entry (`kind: const "list"`,
    required) and made `metadata` required on both `keyDetailsSection` and `nextStepsSection`.
    Fixed the fixture and added 4 mutation tests (missing/wrong-kind on each of the two sections).
+
+## Code review round #8 (2026-09-23, self-review)
+
+2 blockers, both confirmed and fixed; the second was the same class as round #6's, so this round
+swept *every* prompt rule against what the runtime actually enforces instead of fixing only the
+reported line:
+
+1. Free-form canonical strings (`brief.values` strings and array items, `issues[].description`/
+   `evidence`, `questions[].question`/`rationale`) were `minLength: 1` only, so a whitespace-only
+   value validated -- A01/A04/A05 and their validators don't reject it either. Added
+   `pattern: "\\S"` to all 10 (A10 strings already had it) plus 6 whitespace mutation tests, and
+   `extract_brief.v1.md` now says "empty or whitespace-only".
+2. `generate_questions.v1.md` promised "one [question] per actionable entry in `issues`", but the
+   shared A05 cross-validator checks neither uniqueness of `source_issue_index` nor coverage --
+   its own kernel test accepts the same index twice. Softened to guidance ("prefer one per
+   actionable issue... not a guarantee"). Sweep result: every other structural rule in the four
+   prompts (taxonomy membership, missing-vs-present fields, question count/order, exactly four
+   sections with fixed ids, `metadata.kind = list`) is enforced by an atom validator or this
+   product's schema; the remainder is behavioral guidance (tone, no invention), not a
+   structural claim.
+
+Also made `Status.Next action` round-agnostic so it stops going stale every round.
 
 ## Open questions
 

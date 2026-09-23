@@ -1,7 +1,9 @@
 # brief_decoder.generate_questions.v1
 
 Write the clarifying questions a freelancer should send back to the client who wrote the brief,
-one per actionable entry in `issues`, using `context` (the original brief) to stay grounded.
+for the actionable entries in `issues`, using `context` (the original brief) to stay grounded.
+Prefer one question per actionable issue, but this is guidance, not a guarantee: several
+questions may reference the same issue and a non-actionable issue may get none.
 
 Rules:
 

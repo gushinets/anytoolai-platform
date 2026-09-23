@@ -9,9 +9,9 @@ Rules:
 - Each requested field must either have a correctly typed value in `values`, keyed by the field's
   `name`, or be omitted from `values` and have its `name` listed in `missing_fields` instead. Never
   guess or fabricate a value: a brief that does not state a budget has no `budget`, and a
-  placeholder such as "TBD" or "unknown" is not an extracted value. An empty string is not an
-  extracted value either -- if you find nothing for a text field, omit it and list it in
-  `missing_fields`, the same as if it were never mentioned.
+  placeholder such as "TBD" or "unknown" is not an extracted value. An empty or
+  whitespace-only string is not an extracted value either -- if you find nothing for a text field,
+  omit it and list it in `missing_fields`, the same as if it were never mentioned.
 - Copy `deadline` and `budget` the way the brief words them (for example "end of Q3", "around
   $2k"); do not normalize or convert them.
 - List `deliverables` and `constraints` as separate short items, one per array entry. An empty

@@ -226,6 +226,20 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
         # Code review finding (me #5): generate_summary.v1.md requires metadata.kind = "list" on
         # key-details and next-steps unconditionally -- the schema used to leave metadata
         # optional and, when present, open to any of the 5 kind values.
+        # Code review finding (me #6): free-form canonical strings were `minLength: 1` only, so a
+        # whitespace-only value passed -- A01/A04/A05 and their validators don't reject it either.
+        "whitespace_brief_value": mutated(lambda o: o["brief"]["values"].update(budget="   ")),
+        "whitespace_deliverable_item": mutated(
+            lambda o: o["brief"]["values"].update(deliverables=[" "])
+        ),
+        "whitespace_issue_description": mutated(
+            lambda o: o["issues"][0].update(description=" ")
+        ),
+        "whitespace_issue_evidence": mutated(lambda o: o["issues"][0].update(evidence="\n")),
+        "whitespace_question": mutated(lambda o: o["questions"][0].update(question="  ")),
+        "whitespace_question_rationale": mutated(
+            lambda o: o["questions"][0].update(rationale=" ")
+        ),
         "key_details_missing_metadata": mutated(
             lambda o: o["document"]["sections"][1].pop("metadata")
         ),
