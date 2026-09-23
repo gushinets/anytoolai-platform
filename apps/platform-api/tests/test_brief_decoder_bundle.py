@@ -9,14 +9,15 @@
    of failing on its `minItems: 1` input) -- with per-step input-payload assertions so a swapped
    mapping, prompt_ref, or step order fails here, not just a wrong final artifact.
 
-Same SQLite harness as test_client_update_writer_bundle.py (`session_factory` from conftest.py).
+`session_factory`/`platform_api_app_factory`/`request_platform_api` (SQLite-backed) come from
+apps/platform-api/tests/conftest.py, shared with test_proposal_ai_bundle.py and
+test_client_update_writer_bundle.py.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
@@ -25,12 +26,8 @@ import httpx
 import jsonschema
 import pytest
 import sqlalchemy as sa
-from anytoolai_platform_api.bootstrap import RuntimeStorageDependencies, build_runtime
-from anytoolai_platform_api.main import create_app
-from anytoolai_platform_core.identity.models import GuestIdentityRecord
-from anytoolai_platform_core.identity.repository import GuestIdentityRepository
+from anytoolai_platform_api.bootstrap import build_runtime
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
-from anytoolai_platform_core.providers.models import ProviderResponse, ResolvedProviderRequest
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
 from anytoolai_platform_core.storage.db import event_log_table, provider_calls_table
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
@@ -38,9 +35,12 @@ from anytoolai_platform_core.structured_output.schemas import normalize_schema_m
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_worker.composition import build_worker
 
+from tests.support.fake_provider_recording import RecordingProviderAdapter
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPO_ROOT / "configs" / "kernel"
 FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_outputs"
+GUEST_ID = "guest_brief_decoder"
 
 SCENARIO_ID = "brief_decoder.decode_v1"
 INPUT_SCHEMA_REF = "brief_decoder.decode_input_v1"
@@ -64,47 +64,15 @@ def _fixture(key: str) -> dict[str, Any]:
     return json.loads((FIXTURE_ROOT / f"{key}.json").read_text(encoding="utf-8"))["response_json"]
 
 
-def _expected_output(suffix: str = "", *, questions: bool = True) -> dict[str, Any]:
+def _expected_output(suffix: str = "") -> dict[str, Any]:
     """The composed workflow output the fixtures must produce: brief = A01 output whole, issues =
-    A04's `issues`, questions = A05's `questions` (or [] when A05 is skipped), document = A10."""
+    A04's `issues`, questions = A05's `questions`, document = A10."""
     return {
         "brief": _fixture(EXTRACT + suffix),
         "issues": _fixture(DETECT + suffix)["issues"],
-        "questions": _fixture(QUESTIONS + suffix)["questions"] if questions else [],
+        "questions": _fixture(QUESTIONS + suffix)["questions"],
         "document": _fixture(SUMMARY + suffix),
     }
-
-
-class _RecordingProviderAdapter(FakeProviderAdapter):
-    """Records each provider call's step_id/action_config_id/prompt_ref and the input payload
-    actually resolved for it (parsed back out of `request.prompt`, which the structured_llm
-    executor renders as `<template>\\n\\nInput payload:\\n<json.dumps(input_payload)>` --
-    see StructuredLlmActionExecutor._render_prompt). This is what lets a test assert not just
-    the call *sequence* but that each step actually received the right data -- a swapped mapping
-    (e.g. detect_issues reading a fixed string instead of scenario.input.brief_text, or A10
-    dropping data.brief.missing_fields) changes the recorded payload even when every fixture's
-    output still validates and the step-order tuple still matches. Can also redirect chosen
-    calls to a fixture variant: `variants` maps action_config_id -> fixture-key suffix, e.g.
-    ".weak_input". Test-only; FakeProviderAdapter alone only ever resolves a call's own
-    action_config_id."""
-
-    def __init__(self, fixture_root: Path, variants: dict[str, str] | None = None) -> None:
-        super().__init__(fixture_root)
-        self.variants = variants or {}
-        self.calls: list[ResolvedProviderRequest] = []
-
-    async def complete(self, request: ResolvedProviderRequest) -> ProviderResponse:
-        self.calls.append(request)
-        suffix = self.variants.get(request.action_config_id)
-        if suffix is not None:
-            request = replace(request, fixture_key=f"{request.action_config_id}{suffix}")
-        return await super().complete(request)
-
-    def input_payload(self, index: int) -> dict[str, Any]:
-        prompt = self.calls[index].prompt
-        _, _, payload_json = prompt.partition("\n\nInput payload:\n")
-        assert payload_json, f"call {index} rendered no input payload: {prompt!r}"
-        return json.loads(payload_json)
 
 
 def test_brief_decoder_loads_through_the_real_default_bundle_set() -> None:
@@ -230,40 +198,22 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
 
 
 @pytest.fixture
-def app(session_factory: SessionFactory):
-    with transaction_boundary(session_factory) as session:
-        GuestIdentityRepository(session).create(
-            GuestIdentityRecord(id="guest_brief_decoder", tenant_id="anytoolai", region="default")
-        )
-    application = create_app(config_root=CONFIG_ROOT)
-    application.state.runtime = replace(
-        application.state.runtime,
-        storage=RuntimeStorageDependencies(session_factory=session_factory),
-    )
-    return application
+def app(platform_api_app_factory):
+    return platform_api_app_factory(guest_id=GUEST_ID)
 
 
-async def _request(
-    app: Any, method: str, path: str, *, json: Any | None = None
-) -> httpx.Response:
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-        return await client.request(
-            method, path, json=json, headers={"X-Request-ID": "req_brief_decoder_test"}
-        )
-
-
-def _start(app: Any, brief_text: str) -> httpx.Response:
+def _start(app: Any, request_platform_api, brief_text: str) -> httpx.Response:
     return asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "POST",
             f"/v1/products/brief_decoder/scenarios/{SCENARIO_ID}/start",
             json={
                 "frontend_id": "web_mirror",
-                "guest_id": "guest_brief_decoder",
+                "guest_id": GUEST_ID,
                 "input": {"brief_text": brief_text},
             },
+            request_id="req_brief_decoder_start",
         )
     )
 
@@ -290,11 +240,12 @@ def _provider_call_count(session_factory: SessionFactory, *, job_id: str) -> int
 
 def _run_to_result(
     app: Any,
+    request_platform_api,
     session_factory: SessionFactory,
     brief_text: str,
     adapter: FakeProviderAdapter,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    started = _start(app, brief_text).json()
+    started = _start(app, request_platform_api, brief_text).json()
     processed = _run_worker(session_factory, adapter)
     assert processed is not None
     assert processed.id == started["job_id"]
@@ -305,13 +256,25 @@ def _run_to_result(
     assert processed.result_artifact_id is not None
 
     session_body = asyncio.run(
-        _request(app, "GET", f"/v1/scenario-sessions/{started['scenario_session_id']}")
+        request_platform_api(
+            app,
+            "GET",
+            f"/v1/scenario-sessions/{started['scenario_session_id']}",
+            request_id="req_brief_decoder_session",
+        )
     ).json()
     assert session_body["status"] == "completed"
     assert session_body["current_checkpoint_id"] == RESULT_READY_CHECKPOINT_ID
     assert session_body["allowed_next_actions"] == ["copy_result"]
 
-    result = asyncio.run(_request(app, "GET", f"/v1/results/{processed.result_artifact_id}"))
+    result = asyncio.run(
+        request_platform_api(
+            app,
+            "GET",
+            f"/v1/results/{processed.result_artifact_id}",
+            request_id="req_brief_decoder_result",
+        )
+    )
     assert result.status_code == HTTPStatus.OK
     body = result.json()
     assert body["schema_ref"] == OUTPUT_SCHEMA_REF
@@ -319,10 +282,12 @@ def _run_to_result(
 
 
 def test_happy_path_composes_the_four_step_result(
-    app: Any, session_factory: SessionFactory
+    app: Any, request_platform_api, session_factory: SessionFactory
 ) -> None:
-    adapter = _RecordingProviderAdapter(FIXTURE_ROOT)
-    started, output = _run_to_result(app, session_factory, BRIEF_TEXT, adapter)
+    adapter = RecordingProviderAdapter(FIXTURE_ROOT)
+    started, output = _run_to_result(
+        app, request_platform_api, session_factory, BRIEF_TEXT, adapter
+    )
 
     assert tuple(call.action_config_id for call in adapter.calls) == STEP_ORDER
     assert tuple(call.step_id for call in adapter.calls) == (
@@ -333,9 +298,9 @@ def test_happy_path_composes_the_four_step_result(
     )
     assert output == _expected_output()
 
-    # Code review finding (xhigh #2): the call sequence alone doesn't prove each step received
-    # the *right* data -- a mapping swapped between steps could still leave every fixture output
-    # valid. Assert the resolved input payload per step instead of only the fixture outputs.
+    # Code review finding (round #1 xhigh #2): the call sequence alone doesn't prove each step
+    # received the *right* data -- a mapping swapped between steps could still leave every
+    # fixture output valid. Assert the resolved input payload per step instead.
     extract_input, detect_input, questions_input, document_input = (
         adapter.input_payload(i) for i in range(4)
     )
@@ -351,11 +316,12 @@ def test_happy_path_composes_the_four_step_result(
 
     # The one next action this product allows is recorded through the generic endpoint.
     response = asyncio.run(
-        _request(
+        request_platform_api(
             app,
             "POST",
             f"/v1/scenario-sessions/{started['scenario_session_id']}/next-actions/copy_result",
             json={"checkpoint_id": RESULT_READY_CHECKPOINT_ID},
+            request_id="req_brief_decoder_next_action",
         )
     )
     assert response.status_code == HTTPStatus.OK
@@ -373,12 +339,14 @@ def test_happy_path_composes_the_four_step_result(
 
 
 def test_weak_input_fixtures_are_reachable_end_to_end(
-    app: Any, session_factory: SessionFactory
+    app: Any, request_platform_api, session_factory: SessionFactory
 ) -> None:
-    adapter = _RecordingProviderAdapter(
+    adapter = RecordingProviderAdapter(
         FIXTURE_ROOT, variants={step: ".weak_input" for step in STEP_ORDER}
     )
-    _, output = _run_to_result(app, session_factory, WEAK_BRIEF_TEXT, adapter)
+    _, output = _run_to_result(
+        app, request_platform_api, session_factory, WEAK_BRIEF_TEXT, adapter
+    )
 
     assert tuple(call.action_config_id for call in adapter.calls) == STEP_ORDER
     assert output == _expected_output(".weak_input")
@@ -386,18 +354,18 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
 
 
 def test_no_issues_skips_question_generation_and_still_produces_a_consistent_document(
-    app: Any, session_factory: SessionFactory
+    app: Any, request_platform_api, session_factory: SessionFactory
 ) -> None:
     """A04's `issues` may be empty but A05's input requires at least one: the `when` guard on
     the questions step must skip it (not fail the run) and leave the seeded `questions: []`.
 
-    Code review finding (xhigh #3): the document must come from a fixture that is itself
-    consistent with an empty `issues`/`questions` pair (not the happy-path document, which
-    narrates 3 issues and 3 questions that don't exist in this run's artifact)."""
-    adapter = _RecordingProviderAdapter(
+    Code review finding (round #1 xhigh #3): the document must come from a fixture that is
+    itself consistent with an empty `issues`/`questions` pair (not the happy-path document,
+    which narrates 3 issues and 3 questions that don't exist in this run's artifact)."""
+    adapter = RecordingProviderAdapter(
         FIXTURE_ROOT, variants={DETECT: ".no_issues", SUMMARY: ".no_issues"}
     )
-    _, output = _run_to_result(app, session_factory, BRIEF_TEXT, adapter)
+    _, output = _run_to_result(app, request_platform_api, session_factory, BRIEF_TEXT, adapter)
 
     assert tuple(call.action_config_id for call in adapter.calls) == (EXTRACT, DETECT, SUMMARY)
     assert output["issues"] == []
@@ -405,7 +373,7 @@ def test_no_issues_skips_question_generation_and_still_produces_a_consistent_doc
     assert output["brief"] == _fixture(EXTRACT)
     assert output["document"] == _fixture(SUMMARY + ".no_issues")
     # The empty-issues document must not narrate the happy path's issues/questions, which do not
-    # exist in this run's artifact (code review finding xhigh #3).
+    # exist in this run's artifact.
     happy_document_text = json.dumps(_fixture(SUMMARY))
     no_issues_document_text = json.dumps(output["document"])
     assert no_issues_document_text != happy_document_text
@@ -413,11 +381,11 @@ def test_no_issues_skips_question_generation_and_still_produces_a_consistent_doc
 
 @pytest.mark.parametrize("brief_text", ["", "   ", " padded "], ids=["empty", "blank", "untrimmed"])
 def test_invalid_brief_text_fails_the_job_before_any_provider_call(
-    app: Any, session_factory: SessionFactory, brief_text: str
+    app: Any, request_platform_api, session_factory: SessionFactory, brief_text: str
 ) -> None:
-    started = _start(app, brief_text).json()
+    started = _start(app, request_platform_api, brief_text).json()
 
-    adapter = _RecordingProviderAdapter(FIXTURE_ROOT)
+    adapter = RecordingProviderAdapter(FIXTURE_ROOT)
     processed = _run_worker(session_factory, adapter)
 
     assert processed is not None

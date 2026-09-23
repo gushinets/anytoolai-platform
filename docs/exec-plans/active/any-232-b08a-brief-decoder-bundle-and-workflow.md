@@ -121,7 +121,8 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 | Date | Progress | Next |
 |---|---|---|
 | 2026-09-21 | Config tree, fixtures, wiring and both test suites written; new tests green | Code review |
-| 2026-09-22 | Round #1 code review: fixed 10 of 14 findings (see below); re-ran quick-check/full-check, both green | Open PR |
+| 2026-09-22 | Round #1 code review: fixed 10 of 14 findings (see below); re-ran quick-check/full-check, both green | Code review round #2 |
+| 2026-09-23 | Round #2 code review: fixed 5 of 7 findings (dedup onto shared test helpers, see below); re-ran quick-check/full-check, both green | Open PR |
 
 ## Code review round #1 (2026-09-21)
 
@@ -182,6 +183,47 @@ Documented as an accepted, inherited platform gap, not fixed here:
    mapping-DSL change"). `apps/web-mirror` (ANY-248, out of scope here) can still add
    client-side trimming to avoid triggering it in practice.
 
+## Code review round #2 (2026-09-23)
+
+No correctness bugs -- reuse/altitude/dead-code findings only, all re-verified before fixing.
+
+Fixed (reopened drift already closed once for ANY-227/ANY-414's own sibling files):
+
+1. `test_brief_decoder_bundle.py` had its own local `app` fixture and hand-rolled `_request`
+   helper -- a third independent copy of exactly what `conftest.py` already extracted into
+   `platform_api_app_factory`/`request_platform_api` once `test_proposal_ai_bundle.py` and
+   `test_client_update_writer_bundle.py` duplicated it. Migrated to the shared fixtures.
+2. `test_brief_decoder_product.py` reimplemented `_load_validate_architecture_module()`/
+   `FORBIDDEN_TOKENS`/`_load_yaml()` instead of loading the shared `_test_support.py` ANY-414
+   already extracted for the same reason. Migrated to it.
+3. `_RecordingProviderAdapter` was a fourth independent `FakeProviderAdapter` subclass,
+   overlapping three pre-existing ones (`test_composite_workflow_matrix.py`'s pure recorder,
+   `test_client_update_writer_bundle.py`'s force-every-call-to-`.weak_input`,
+   `test_proposal_ai_bundle.py`'s force-one-fixed-key). Added `tests/support/fake_provider_recording.py`'s
+   `RecordingProviderAdapter`, a strict generalization of all three (recording plus an optional
+   per-`action_config_id` fixture-key-suffix map), and migrated this file to it. The three
+   pre-existing call sites are *not* migrated -- out of scope for this ticket, left as follow-up
+   debt below.
+6. `_KERNEL_DRIFT_CASES` + `_resolve()` were generic path-tuple machinery for exactly 3 fixed
+   comparisons. Inlined into 3 explicit calls to a shared `_assert_same_shape()` helper.
+7. `_expected_output()`'s `questions: bool = True` parameter was dead code (nothing ever passed
+   `questions=False`; the no-issues test already built its expected output inline). Removed.
+
+Reaffirmed as already-documented, already-accepted platform debt (not re-fixed; a second
+occurrence, strengthening the signal to fix once at the platform/contract level rather than
+per-product):
+
+4. The A04-\>A05 `when`-guard is a product-level workaround for a real atom-contract mismatch
+   (A04's own output allows empty `issues`; A05's own input requires `minItems: 1`).
+   `kernel_demo.composite_analyze_and_clarify_v1` has the same unguarded gap (see this plan's
+   earlier risk notes and follow-up debt) -- worth fixing once at the A05 contract level (e.g.
+   `minItems: 0`) instead of every composing product re-deriving the same guard. Out of scope for
+   a single product ticket.
+5. Guest quota consumed before input-schema validation (round #1 finding #5) -- Brief Decoder is
+   now the second of three products to inherit this platform gap after ProposalAI/ANY-227.
+   Unchanged conclusion: needs a `ScenarioRuntimeService.start_session` ordering fix, out of scope
+   here.
+
 ## Open questions
 
 None blocking. The input/field/taxonomy choices in decision 3 are product decisions a reviewer may
@@ -192,5 +234,14 @@ want to change; they drive the output schema and all nine fixtures.
 - `kernel_demo.composite_analyze_and_clarify_v1` has the same missing empty-issues guard; not
   fixed here (out of scope).
 - Brief Decoder -> Acceptance Builder handoff is ANY-26.
-- Guest quota consumed before input validation (round #1 finding #5 above) -- inherited platform
-  gap, same as ProposalAI's; needs a Platform Core fix, out of scope for any product ticket.
+- Guest quota consumed before input validation (round #1 finding #5) -- inherited platform gap,
+  same as ProposalAI's; needs a Platform Core fix, out of scope for any product ticket. Brief
+  Decoder is now the second product to inherit it (round #2 finding #5).
+- A04's empty-`issues` output vs. A05's `minItems: 1` input is a real atom-contract mismatch that
+  every composing workflow (`kernel_demo`, now Brief Decoder) re-derives its own `when`-guard
+  around; worth fixing once at the A05 contract level (round #2 finding #4).
+- The three pre-existing `FakeProviderAdapter` test subclasses
+  (`test_composite_workflow_matrix.py`, `test_client_update_writer_bundle.py`,
+  `test_proposal_ai_bundle.py`) are not migrated to the new shared
+  `tests/support/fake_provider_recording.RecordingProviderAdapter`; only this ticket's own test
+  uses it so far (round #2 finding #3).

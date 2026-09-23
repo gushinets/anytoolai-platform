@@ -45,21 +45,22 @@ FIXTURE_KERNEL_SCHEMAS = {
 }
 
 
-def _load_validate_architecture_module() -> Any:
-    # validate_architecture.py is pure stdlib, so loading it stays within ATAI007/ATAI008.
-    path = REPO_ROOT / "scripts" / "agent" / "validate_architecture.py"
-    spec = importlib.util.spec_from_file_location("validate_architecture_module", path)
+def _load_test_support_module() -> Any:
+    # Dynamic-load by explicit path, same pattern test_client_update_writer_product.py and
+    # test_proposal_ai_product.py already use for this shared module (round #2 code review,
+    # finding #2: this file used to duplicate _load_validate_architecture_module()/
+    # FORBIDDEN_TOKENS/_load_yaml() verbatim instead of loading _test_support.py like its
+    # siblings already do).
+    path = Path(__file__).resolve().parent / "_test_support.py"
+    spec = importlib.util.spec_from_file_location("freelancer_suite_test_support", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-FORBIDDEN_TOKENS = tuple(_load_validate_architecture_module().LLM_PROVIDER_IMPORTS) + (
-    "gpt-",
-    "claude-",
-    "gemini-",
-)
+_test_support = _load_test_support_module()
+FORBIDDEN_TOKENS = _test_support.FORBIDDEN_PROVIDER_TERMS
 
 
 def _forbidden_token_pattern(token: str) -> re.Pattern[str]:
@@ -69,7 +70,7 @@ def _forbidden_token_pattern(token: str) -> re.Pattern[str]:
 
 
 def _load_yaml(relative_path: str) -> dict[str, Any]:
-    return yaml.safe_load((PRODUCT_DIR / relative_path).read_text(encoding="utf-8"))
+    return _test_support.load_yaml(PRODUCT_DIR, relative_path)
 
 
 def _load_schema(schema_ref: str) -> dict[str, Any]:
@@ -193,8 +194,8 @@ def test_a05_is_guarded_and_a10_reads_its_output_optionally() -> None:
 
 
 # A01 field-spec `type` -> the JSON-schema shape decode_output_v1 must declare for that field in
-# `brief.values`. Code review finding (xhigh #8): a names-only comparison would miss e.g.
-# `target_audience` silently changing from `string` to `array_of_strings` in the literal.
+# `brief.values`. Code review finding (round #1, finding #8): a names-only comparison would miss
+# e.g. `target_audience` silently changing from `string` to `array_of_strings` in the literal.
 _A01_TYPE_TO_JSON_SCHEMA_TYPE = {
     "string": {"type": "string"},
     "array_of_strings": {"type": "array", "items": {"type": "string"}},
@@ -244,7 +245,7 @@ def test_schemas_are_closed() -> None:
 
 
 def test_quota_policy_ref_resolves_to_the_declared_lifetime_product_quota() -> None:
-    """Mirrors proposal_ai's own quota test (code review finding xhigh #6): nothing previously
+    """Mirrors proposal_ai's own quota test (round #1 code review, finding #6): nothing previously
     checked that `product.yaml`'s `quota_policy_ref` actually resolves to a real, sane policy --
     a typo'd ref or e.g. `limit_count: 300`/`dimension: scenario` would have passed every other
     test here."""
@@ -261,38 +262,39 @@ def test_quota_policy_ref_resolves_to_the_declared_lifetime_product_quota() -> N
     assert isinstance(policy["limit_count"], int) and policy["limit_count"] > 0
 
 
-# The properties/required a locally-inlined copy of a kernel atom-output schema must keep in sync
-# with the kernel original it was copied from, since cross-file `$ref` isn't supported (code
-# review finding xhigh #9). `category`'s `enum` is deliberately narrower than the kernel's plain
-# string (our taxonomy is a subset), so it is excluded from the equality check below.
-_KERNEL_DRIFT_CASES = [
-    # (our schema property path, kernel schema_ref, kernel property path)
-    (("issues", "items"), "kernel.schemas.issue_detection_output_v1", ("issues", "items")),
-    (("questions", "items"), "kernel.schemas.generate_questions_output_v1", ("questions", "items")),
-    (("document",), "kernel.schemas.generate_document_output_v1", ()),
-]
-
-
-def _resolve(schema: dict[str, Any], path: tuple[str, ...]) -> dict[str, Any]:
-    node = schema
-    for key in path:
-        node = node["properties"][key] if key != "items" else node["items"]
-    return node
+def _assert_same_shape(ours: dict[str, Any], kernel: dict[str, Any], where: str) -> None:
+    """A locally-inlined copy of a kernel atom-output schema must keep its properties, required
+    set, and per-property types in sync with the kernel original it was copied from, since
+    cross-file `$ref` isn't supported. `category`'s `enum` is deliberately narrower than the
+    kernel's plain string (our taxonomy is a subset), so it is excluded from the check."""
+    assert set(ours.get("properties", {})) == set(kernel.get("properties", {})), where
+    assert set(ours.get("required", [])) == set(kernel.get("required", [])), where
+    for name, kernel_property in kernel.get("properties", {}).items():
+        if name == "category":
+            continue  # intentionally narrowed to our own taxonomy subset
+        assert ours["properties"][name]["type"] == kernel_property["type"], (where, name)
 
 
 def test_inlined_kernel_atom_output_copies_stay_in_sync_with_the_kernel_schemas() -> None:
-    output_schema = _load_schema("brief_decoder.decode_output_v1")
+    output_schema = _load_schema("brief_decoder.decode_output_v1")["properties"]
 
-    for our_path, kernel_ref, kernel_path in _KERNEL_DRIFT_CASES:
-        ours = _resolve(output_schema, our_path)
-        kernel = _resolve(_load_schema(kernel_ref), kernel_path)
-
-        assert set(ours.get("properties", {})) == set(kernel.get("properties", {})), our_path
-        assert set(ours.get("required", [])) == set(kernel.get("required", [])), our_path
-        for name, kernel_property in kernel.get("properties", {}).items():
-            if name == "category":
-                continue  # intentionally narrowed to our own taxonomy subset
-            assert ours["properties"][name]["type"] == kernel_property["type"], (our_path, name)
+    _assert_same_shape(
+        output_schema["issues"]["items"],
+        _load_schema("kernel.schemas.issue_detection_output_v1")["properties"]["issues"]["items"],
+        "issues.items",
+    )
+    _assert_same_shape(
+        output_schema["questions"]["items"],
+        _load_schema("kernel.schemas.generate_questions_output_v1")["properties"]["questions"][
+            "items"
+        ],
+        "questions.items",
+    )
+    _assert_same_shape(
+        output_schema["document"],
+        _load_schema("kernel.schemas.generate_document_output_v1"),
+        "document",
+    )
 
 
 def test_renderer_contract_agrees_with_workflow_and_scenario() -> None:
@@ -311,8 +313,8 @@ def test_renderer_contract_agrees_with_workflow_and_scenario() -> None:
     ]
     assert {part["field"] for part in contract["parts"]} == set(output_schema["properties"])
     assert contract["canonical_field"] in output_schema["properties"]
-    # Code review finding (xhigh #10): `canonical_field` (`document`) is an object, not a single
-    # string like sibling products' `text` -- pin that a serialization rule for it exists.
+    # Code review finding (round #1, finding #10): `canonical_field` (`document`) is an object,
+    # not a single string like sibling products' `text` -- pin that a serialization rule exists.
     assert contract["canonical_field_composition"].strip()
 
 
