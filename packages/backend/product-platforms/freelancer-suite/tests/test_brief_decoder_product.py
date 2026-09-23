@@ -222,6 +222,11 @@ def test_config_owned_literals_agree_with_the_output_schema() -> None:
     # an open string the A05 cross-validator never checks.
     assert set(schema["questions"]["items"]["properties"]["category"]["enum"]) == set(taxonomy)
     assert _literal(steps["extract"]["input_mapping"]["strict"]) is False
+    # Code review finding (me #7): the canonical schema's question cap must equal what A05 is
+    # actually asked for -- it was 10 while every valid run is capped at 5, so a 6-10 question
+    # artifact validated although no run of this workflow can produce one.
+    max_questions = _literal(steps["generate_questions"]["input_mapping"]["max_questions"])
+    assert schema["questions"]["maxItems"] == max_questions
 
     for field in fields:
         expected_shape = _A01_TYPE_TO_JSON_SCHEMA_TYPE[field["type"]]

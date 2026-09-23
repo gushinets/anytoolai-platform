@@ -135,6 +135,7 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 | 2026-09-23 | Round #6 code review (self-review): fixed 2 blockers (no_issues fixture set genuinely inconsistent; A05 prompt overclaimed an unenforced invariant) plus reaffirmed one out-of-scope gap as follow-up debt; re-ran targeted tests, all green | Update PR description, code review round #7 |
 | 2026-09-23 | Round #7 code review (self-review): round #6's no_issues fix was still ungrounded (ran against BRIEF_TEXT, not a clean-brief input); added CLEAN_BRIEF_TEXT and fixed the missing metadata.kind=list requirement; re-ran quick-check/full-check, both green | Update PR description, re-request review |
 | 2026-09-23 | Round #8 code review (self-review): 2 blockers (whitespace-only canonical strings; A05 prompt's one-per-issue overclaim) fixed with a sweep of every prompt claim vs. real enforcement; re-ran quick-check/full-check, both green | Re-request review |
+| 2026-09-23 | Round #9 code review (self-review): 1 blocker (`questions.maxItems: 10` vs the real cap of 5) fixed and pinned to the workflow; re-ran quick-check/full-check, both green | Re-request review |
 
 ## Code review round #1 (2026-09-21)
 
@@ -374,6 +375,18 @@ reported line:
    structural claim.
 
 Also made `Status.Next action` round-agnostic so it stops going stale every round.
+
+## Code review round #9 (2026-09-23, self-review)
+
+1 blocker, confirmed and fixed: `decode_output_v1`'s `questions.maxItems` was 10 (copied from the
+kernel A05 output schema's own ceiling), but this workflow never passed `max_questions`, so A05's
+cross-validator capped every run at its default of 5 -- a 6-10 question artifact validated
+against the canonical schema although no run can produce one (and stored results are re-validated
+against this schema, not A05's validator). Set `maxItems: 5`, made the cap explicit in the
+workflow (`max_questions: literal:5`) instead of relying on A05's implicit default, and added a
+config test tying the schema's `maxItems` to that literal plus a 6-question mutation test and a
+resolved-payload assertion. Sweep of the remaining numeric bounds: `sections` (exactly 4) and
+`brief_text` (`maxLength` 8000) are product-owned and consistent; nothing else is capped.
 
 ## Open questions
 

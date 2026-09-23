@@ -34,6 +34,9 @@ workflows:
           issues: steps.detect_issues.output.issues
           context: scenario.input.brief_text
           target_audience: 'literal:"the client who wrote the brief"'
+          # Explicit (not A05's implicit default) so decode_output_v1's questions.maxItems can be
+          # pinned to it by a test.
+          max_questions: 'literal:5'
         output_mapping:
           context.workflow_output.questions: steps.generate_questions.output.questions
       - step_id: generate_document

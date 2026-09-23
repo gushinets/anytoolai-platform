@@ -51,6 +51,7 @@ DETECT = "brief_decoder.detect_issues_v1"
 QUESTIONS = "brief_decoder.generate_questions_v1"
 SUMMARY = "brief_decoder.generate_summary_v1"
 STEP_ORDER = (EXTRACT, DETECT, QUESTIONS, SUMMARY)
+MAX_QUESTIONS = 5  # workflows.yaml passes it to A05 explicitly; decode_output_v1 caps at it
 
 BRIEF_TEXT = (
     "We are a small bakery and need a new website. Goal: let customers order cakes online. It "
@@ -214,6 +215,9 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
         "question_category_outside_taxonomy": mutated(
             lambda o: o["questions"][0].update(category="other")
         ),
+        "too_many_questions": mutated(
+            lambda o: o.update(questions=[o["questions"][0]] * (MAX_QUESTIONS + 1))
+        ),
         "empty_document": mutated(lambda o: o["document"].update(sections=[])),
         # Code review finding (me #1): document.sections must be exactly the product's own four
         # sections, in order, with fixed ids/titles -- not an open-ended array A10 has no
@@ -371,6 +375,7 @@ def test_happy_path_composes_the_four_step_result(
     detected_issues = _fixture(DETECT)["issues"]
     assert questions_input["issues"] == detected_issues
     assert questions_input["context"] == BRIEF_TEXT
+    assert questions_input["max_questions"] == MAX_QUESTIONS
     assert document_input["data"]["brief"] == _fixture(EXTRACT)
     assert document_input["data"]["issues"] == detected_issues
     assert document_input["data"]["questions"] == _fixture(QUESTIONS)["questions"]

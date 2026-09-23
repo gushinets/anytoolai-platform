@@ -150,7 +150,7 @@
     },
     "questions": {
       "type": "array",
-      "maxItems": 10,
+      "maxItems": 5,
       "items": {
         "type": "object",
         "properties": {
