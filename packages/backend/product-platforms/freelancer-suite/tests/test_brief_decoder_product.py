@@ -278,10 +278,14 @@ _GAPS_KEYWORD = {
     "target_audience": "audience",
     "constraints": "constraint",
 }
-# Connective/label words an overview or key-details section may use that carry no project fact.
+# Words a section may use that carry no project fact. Deliberately per-section: `overview` is
+# only allowed to state present facts (generate_summary.v1.md: "do not mention absent ones
+# here"), so it gets no words for talking about the brief or missing details -- allowing them
+# there once masked an "the brief gives no further detail" violation. `key-details` may label
+# fields and say that none were found.
 _NON_FACT_WORDS = {
-    "lets", "that", "wants", "brief", "clien", "detai", "furth", "gives", "found", "were",
-    "budge", "const", "deadl", "deliv", "rathe", "than", "deliverables", "constraints",
+    "overview": {"lets", "that", "wants", "clien"},
+    "key-details": {"deliv", "deadl", "budge", "const", "rathe", "than", "brief", "found", "were"},
 }
 _SUMMARY_FIXTURES = {  # A10 fixture suffix -> matching A01 fixture suffix
     "": "",
@@ -313,9 +317,8 @@ def test_summary_fixtures_obey_the_a10_prompt(summary_suffix: str, extract_suffi
         for s in _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)["sections"]
     }
 
-    grounded = _stems(json.dumps(brief["values"])) | _NON_FACT_WORDS
-    for section_id in ("overview", "key-details"):
-        ungrounded = _stems(sections[section_id]) - {w[:5] for w in grounded}
+    for section_id, allowed in _NON_FACT_WORDS.items():
+        ungrounded = _stems(sections[section_id]) - _stems(json.dumps(brief["values"])) - allowed
         assert not ungrounded, (section_id, sorted(ungrounded))
     for name in brief["missing_fields"]:
         assert _GAPS_KEYWORD[name] in sections["gaps"].lower(), name

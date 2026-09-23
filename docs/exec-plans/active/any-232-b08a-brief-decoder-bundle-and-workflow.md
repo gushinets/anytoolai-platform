@@ -138,6 +138,7 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 | 2026-09-23 | Round #9 code review (self-review): 1 blocker (`questions.maxItems: 10` vs the real cap of 5) fixed and pinned to the workflow; re-ran quick-check/full-check, both green | Re-request review |
 | 2026-09-23 | Round #10 code review (self-review): 1 blocker (canonical schema weaker than A01's cross-validator) + 1 minor doc finding fixed via a full atom-validator-vs-schema sweep; re-ran quick-check/full-check, both green | Re-request review |
 | 2026-09-23 | Team-lead review #1: 2 blocking A10-fixture/prompt violations fixed and pinned by a fixture-vs-prompt test; re-ran quick-check/full-check, both green | Re-request review |
+| 2026-09-24 | Round #11 code review (self-review): weak overview stated absent data and my own test allowlist masked it; fixed both; re-ran quick-check/full-check, both green | Re-request review |
 
 ## Code review round #1 (2026-09-21)
 
@@ -439,6 +440,20 @@ asserted to cover every configured A01 field), and every content word of `overvi
 is a heuristic (5-character stems), not proof of groundedness, but it catches exactly the class
 found here; `gaps`/`summary` are not word-checked because they legitimately paraphrase A04
 issues and A05 questions.
+
+## Code review round #11 (2026-09-24, self-review)
+
+1 blocker, confirmed: the weak-input `overview` said "the brief gives no further detail", which
+`generate_summary.v1.md` forbids ("write only facts that are present; do not mention absent ones
+here"). It slipped through because the grounding test added for the team-lead review shared one
+allowlist across sections that included `brief`/`gives`/`furth`/`detai` -- I widened the allowlist
+to make the fixture pass instead of questioning the fixture. Fixed the fixture (`The client wants
+a website.`) and split the allowlist per section: `overview` gets only `lets`/`that`/`wants`/
+`clien`; `key-details` (which may label fields and say none were found) keeps its own. Verified
+the old overview text is flagged (`brief`, `gives`, `furth`, `detai`).
+
+The `compose-smoke-dev` failure on the previous head was a Docker Hub 502 fetching a base image
+token, unrelated to this PR; a new push re-runs it.
 
 ## Open questions
 
