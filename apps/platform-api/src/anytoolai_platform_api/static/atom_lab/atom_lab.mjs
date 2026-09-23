@@ -1316,6 +1316,7 @@ export function bootstrapAtomLab({
   let presetVersions = [];
   let presetVersionsCursor = null;
   let presetDraftBaseline = null;
+  let presetLibraryLoading = false;
   let historyItems = [];
   let historyCursor = null;
   let selectedHistoryDetail = null;
@@ -1724,6 +1725,15 @@ export function bootstrapAtomLab({
     }
   };
 
+  const setPresetLibraryLoading = (loading) => {
+    presetLibraryLoading = loading;
+    for (const id of ["preset-name", "preset-description", "preset-version-select", "new-preset", "save-preset"]) {
+      nodes[id].disabled = loading;
+    }
+    for (const input of nodes["fixed-fields"].querySelectorAll("input")) input.disabled = loading;
+    if (loading) nodes["preset-state"].textContent = "Загрузка пресетов…";
+  };
+
   const loadPresetVersion = async (presetId, version) => {
     const parsed = parsePresetVersion(
       await protectedJson(`/v1/atom-lab/presets/${encodeURIComponent(presetId)}/versions/${version}`),
@@ -1801,6 +1811,7 @@ export function bootstrapAtomLab({
   };
 
   const savePreset = async ({forceNew = false} = {}) => {
+    if (presetLibraryLoading) return;
     nodes["preset-error"].textContent = "";
     const payload = currentPresetPayload();
     const updating = Boolean(selectedPresetVersion) && !forceNew;
@@ -2392,11 +2403,17 @@ export function bootstrapAtomLab({
     updateDraftState();
   });
   nodes["presets-button"].addEventListener("click", async () => {
+    if (presetLibraryLoading) return;
     if ((session?.dirty || restoredHistoryDraft) && !confirmImpl(DIRTY_WARNING)) return;
     nodes["history-panel"].hidden = true;
     nodes["presets-panel"].hidden = false;
-    if (presetItems.length === 0) await loadPresets();
-    if (!selectedPresetVersion && !presetSourceOverride) startNewPreset();
+    setPresetLibraryLoading(true);
+    try {
+      if (presetItems.length === 0) await loadPresets();
+      if (!selectedPresetVersion && !presetSourceOverride) startNewPreset();
+    } finally {
+      setPresetLibraryLoading(false);
+    }
   });
   nodes["history-button"].addEventListener("click", async () => {
     if ((session?.dirty || restoredHistoryDraft) && !confirmImpl(DIRTY_WARNING)) return;
@@ -2414,6 +2431,7 @@ export function bootstrapAtomLab({
   });
   nodes["load-more-history"].addEventListener("click", () => loadHistory({append: true}));
   nodes["new-preset"].addEventListener("click", () => {
+    if (presetLibraryLoading) return;
     if (presetDraftBaseline !== null && presetFingerprint(currentPresetPayload()) !== presetDraftBaseline
       && !confirmImpl(DIRTY_WARNING)) return;
     startNewPreset();

@@ -1265,6 +1265,7 @@ test("run, immutable preset versions, export, reload, and history restore form o
   page.on("dialog", (dialog) => dialog.accept());
   const versions = [];
   const presetWrites = [];
+  let presetListReads = 0;
   let runPosts = 0;
   const detail = historyDetail();
 
@@ -1295,6 +1296,8 @@ test("run, immutable preset versions, export, reload, and history restore form o
       return;
     }
     if (pathname === "/v1/atom-lab/presets" && method === "GET") {
+      presetListReads += 1;
+      if (presetListReads === 1) await new Promise((resolve) => setTimeout(resolve, 150));
       await route.fulfill({contentType: "application/json", body: JSON.stringify({
         items: versions.length === 0 ? [] : [{
           preset_id: "preset-library", latest_version: versions.length,
@@ -1354,6 +1357,9 @@ test("run, immutable preset versions, export, reload, and history restore form o
   await expect(page.locator("#run-state")).toContainText("Завершён");
 
   await page.locator("#presets-button").click();
+  await expect(page.locator("#preset-name")).toBeDisabled();
+  await expect(page.locator("#preset-state")).toHaveText("Загрузка пресетов…");
+  await expect(page.locator("#preset-name")).toBeEnabled();
   await page.locator("#preset-name").fill("Рабочий пресет");
   await page.locator("#preset-description").fill("Проверка версий");
   await page.locator("#fixed-fields").getByLabel("context").check();
