@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import type { FieldError } from "./fieldValidation";
 
 /** Shared by every exhaustive `switch` over a discriminated union in this runtime (`Phase["kind"]`
  * in `ProductRunPage.tsx`, `ProductRunEvent["type"]` in `productRunEventTracking.ts`) --
@@ -39,7 +40,7 @@ export type ProductRunEvent =
 
 export type ProductFieldsProps<V> = {
   values: V;
-  errors: Partial<Record<keyof V, string>>;
+  errors: Partial<Record<keyof V, FieldError>>;
   /** True while a run is active; the product disables its own inputs. */
   disabled: boolean;
   onChange: <K extends keyof V>(field: K, value: V[K]) => void;
@@ -82,22 +83,27 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
    * product actually means to run.
    */
   scenarioId: string;
-  title: string;
+  /**
+   * Where this definition's run copy lives in the product's own message namespace: the runtime
+   * reads `<messageScope>.submit|running|runFailed` (plus `<messageScope>.startAnother` when
+   * `hasStartAnother` is set), and the namespace-wide `title`/`quotaRemaining({remaining, limit})`
+   * (plus `description` when `hasDescription` is set). Localized presentation comes from the i18n
+   * layer (`apps/web-mirror/src/i18n`), never from the definition, so it holds behavior only.
+   */
+  messageScope: string;
+  /** Whether `ProductRunPage` renders a product description under the title, resolved from the
+   * product's own `description` message key. Optional -- most products have none. */
+  hasDescription?: boolean;
+  /** Whether `ProductRunPage` renders a "start another run" action once a run completes, resolved
+   * from `<messageScope>.startAnother`. Optional -- most products have none. */
+  hasStartAnother?: boolean;
   emptyValues: V;
   /** Client-side, for immediate feedback only -- the backend's schema stays authoritative. */
-  validate: (values: V) => Partial<Record<keyof V, string>>;
+  validate: (values: V) => Partial<Record<keyof V, FieldError>>;
   /** Form values -> the scenario-start `input` payload (the product's own input schema shape). */
   toInput: (values: V) => Record<string, unknown>;
   /** Frontend-safe canonical output -> the product's result; null means unusable. */
   extractResult: (output: Record<string, unknown>) => R | null;
   Fields: ComponentType<ProductFieldsProps<V>>;
   Result: ComponentType<ProductResultProps<R>>;
-  copy: {
-    description?: string;
-    submit: string;
-    startAnother?: string;
-    running: string;
-    runFailed: string;
-    quotaRemaining: (remaining: number, limit: number) => string;
-  };
 };

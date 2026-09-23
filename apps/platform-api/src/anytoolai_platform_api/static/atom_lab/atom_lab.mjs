@@ -1,5 +1,23 @@
 const ACCESS_HEADER = "X-Atom-Lab-Access-Code";
 const DIRTY_WARNING = "Несохранённые изменения будут потеряны. Продолжить?";
+const RUN_POLL_INTERVAL_MS = 250;
+const RUN_POLL_MAX_BACKOFF_MS = 4_000;
+const RUN_POLL_TIMEOUT_MS = 90_000;
+const RETRYABLE_SUBMISSION_STATUSES = new Set([408, 425, 500, 502, 503, 504]);
+const TERMINAL_RUN_STATUSES = new Set(["succeeded", "failed", "expired", "cancelled"]);
+const RUN_STATUSES = new Set(["queued", "running", ...TERMINAL_RUN_STATUSES]);
+const PROVIDER_CALL_STATUSES = new Set(["created", "running", "succeeded", "failed", "timed_out"]);
+const REASONING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+const MODEL_COMPATIBILITIES = new Set(["compatible", "unknown", "unsupported"]);
+const MODEL_REASONS = new Set([
+  "override_compatible",
+  "override_unknown",
+  "override_unsupported",
+  "litellm_metadata_missing",
+  "litellm_compatibility_incomplete",
+  "confirmed_openai_text_gpt",
+]);
+const MODEL_REFRESH_STATUSES = new Set(["current", "pending", "running"]);
 
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
@@ -7,6 +25,17 @@ function cloneJson(value) {
 
 function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function retryAfterDelayMs(value, nowMs) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (/^\d+$/.test(normalized)) {
+    const delay = Number(normalized) * 1_000;
+    return Number.isSafeInteger(delay) ? delay : null;
+  }
+  const retryAt = Date.parse(normalized);
+  return Number.isFinite(retryAt) ? Math.max(0, retryAt - nowMs) : null;
 }
 
 function schemaTypes(schema) {
@@ -141,6 +170,197 @@ export function createDraftSession(atom) {
 
 export function getDraftPayload(session) {
   return cloneJson(session.payload);
+}
+
+export function describeModelOption(model) {
+  let reasoningMode = "unknown";
+  if (model.reasoning_supported === false) reasoningMode = "unsupported";
+  else if (
+    model.reasoning_supported === true
+    && Array.isArray(model.allowed_reasoning_efforts)
+  ) reasoningMode = "supported";
+  return {
+    modelId: model.model_id,
+    selectable: model.compatibility === "compatible",
+    compatibility: model.compatibility,
+    reason: model.reason,
+    reasoningMode,
+    allowedEfforts: Array.isArray(model.allowed_reasoning_efforts)
+      ? [...model.allowed_reasoning_efforts]
+      : [],
+  };
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isNonEmptyString(value) {
+  return typeof value === "string" && value.length > 0;
+}
+
+function isNullableString(value) {
+  return value === null || typeof value === "string";
+}
+
+function isNonNegativeInteger(value) {
+  return Number.isInteger(value) && value >= 0;
+}
+
+function isNullableBoolean(value) {
+  return value === null || typeof value === "boolean";
+}
+
+function isNullableReasoningEffort(value) {
+  return value === null || REASONING_EFFORTS.has(value);
+}
+
+function isStringMap(value) {
+  return isRecord(value) && Object.values(value).every((item) => typeof item === "string");
+}
+
+function isModelCatalogItem(value) {
+  return isRecord(value)
+    && isNonEmptyString(value.model_id)
+    && MODEL_COMPATIBILITIES.has(value.compatibility)
+    && MODEL_REASONS.has(value.reason)
+    && isNullableBoolean(value.reasoning_supported)
+    && (value.allowed_reasoning_efforts === null
+      || (Array.isArray(value.allowed_reasoning_efforts)
+        && value.allowed_reasoning_efforts.every((effort) => REASONING_EFFORTS.has(effort))))
+    && isRecord(value.provenance)
+    && Object.values(value.provenance).every(isStringMap);
+}
+
+function parseModelCatalog(value) {
+  if (
+    !isRecord(value)
+    || !Array.isArray(value.items)
+    || !value.items.every(isModelCatalogItem)
+    || !isNullableString(value.snapshot_id)
+    || !isNullableString(value.last_success_at)
+    || typeof value.stale !== "boolean"
+    || !MODEL_REFRESH_STATUSES.has(value.refresh_status)
+    || !isNullableString(value.error)
+  ) return null;
+  return value;
+}
+
+function parseModelRefresh(value) {
+  if (
+    !isRecord(value)
+    || !isNullableString(value.snapshot_id)
+    || !isNullableString(value.last_success_at)
+    || typeof value.stale !== "boolean"
+    || !MODEL_REFRESH_STATUSES.has(value.refresh_status)
+    || !isNullableString(value.error)
+  ) return null;
+  return value;
+}
+
+function isProviderCallDiagnostic(value) {
+  return isRecord(value)
+    && isNonEmptyString(value.provider_call_id)
+    && isNonEmptyString(value.action_run_id)
+    && PROVIDER_CALL_STATUSES.has(value.status)
+    && isNonNegativeInteger(value.semantic_attempt_index)
+    && isNonNegativeInteger(value.transport_attempt_index)
+    && isNonNegativeInteger(value.physical_call_index)
+    && isNullableString(value.response_model_id)
+    && isNullableString(value.error_code)
+    && isNonNegativeInteger(value.latency_ms);
+}
+
+function isDebugArtifact(value) {
+  return isRecord(value)
+    && isNonEmptyString(value.artifact_id)
+    && isNullableString(value.error_code)
+    && isNullableString(value.raw_output_text)
+    && typeof value.truncated === "boolean"
+    && typeof value.redacted === "boolean";
+}
+
+export function pollingTimedOut(startedAt, now, timeoutMs) {
+  return now - startedAt >= timeoutMs;
+}
+
+export function parseAcceptedRun(value) {
+  if (
+    !isRecord(value)
+    || !isNonEmptyString(value.run_id)
+    || !isNonEmptyString(value.scenario_session_id)
+    || !isNonEmptyString(value.job_id)
+    || !RUN_STATUSES.has(value.status)
+  ) return null;
+  return {
+    run_id: value.run_id,
+    scenario_session_id: value.scenario_session_id,
+    job_id: value.job_id,
+    status: value.status,
+  };
+}
+
+export function parseRunDetail(value, expectedRunId) {
+  const diagnostics = value?.diagnostics;
+  const runtimeIds = value?.runtime_ids;
+  if (
+    !isRecord(value)
+    || value.run_id !== expectedRunId
+    || !RUN_STATUSES.has(value.status)
+    || !isRecord(value.snapshot)
+    || !isRecord(runtimeIds)
+    || !isNullableString(runtimeIds.scenario_session_id)
+    || !isNullableString(runtimeIds.job_id)
+    || !isNullableString(runtimeIds.action_run_id)
+    || !isNullableString(runtimeIds.artifact_id)
+    || !isRecord(diagnostics)
+    || (value.result !== null && !isRecord(value.result) && !Array.isArray(value.result))
+    || ((value.status === "succeeded") !== (value.result !== null))
+    || !isNonEmptyString(value.created_at)
+    || !isNullableString(value.started_at)
+    || !isNullableString(value.finished_at)
+    || !isNullableString(diagnostics.error_code)
+    || !(diagnostics.duration_ms === null
+      || (typeof diagnostics.duration_ms === "number" && diagnostics.duration_ms >= 0))
+    || !isNonEmptyString(diagnostics.requested_model_id)
+    || !isNullableReasoningEffort(diagnostics.requested_reasoning_effort)
+    || !isNullableString(diagnostics.response_model_id)
+    || !isNonNegativeInteger(diagnostics.validation_attempts)
+    || !isNonNegativeInteger(diagnostics.transport_attempts)
+    || !isNonNegativeInteger(diagnostics.physical_calls)
+    || !isNullableBoolean(diagnostics.succeeded_first_attempt)
+    || !Array.isArray(diagnostics.provider_calls)
+    || !diagnostics.provider_calls.every(isProviderCallDiagnostic)
+    || typeof diagnostics.provider_calls_truncated !== "boolean"
+    || !Array.isArray(diagnostics.debug_artifacts)
+    || !diagnostics.debug_artifacts.every(isDebugArtifact)
+    || typeof diagnostics.debug_artifacts_truncated !== "boolean"
+  ) return null;
+  return {
+    run_id: value.run_id,
+    status: value.status,
+    snapshot: value.snapshot,
+    runtime_ids: value.runtime_ids,
+    result: value.result,
+    diagnostics: value.diagnostics,
+  };
+}
+
+export function createRunSubmission(session, {modelId, reasoningEffort, idempotencyKey}) {
+  const input = getDraftPayload(session);
+  const addressedModelId = modelId.startsWith("openai/") ? modelId : `openai/${modelId}`;
+  const snapshot = {
+    atom_id: session.atom.atom_id,
+    input,
+    prompt: session.prompt,
+    model_id: addressedModelId,
+    reasoning_effort: reasoningEffort,
+  };
+  return {
+    idempotencyKey,
+    snapshot: cloneJson(snapshot),
+    body: {...cloneJson(snapshot), preset_ref: null},
+  };
 }
 
 function clearInputErrorsAtOrBelow(session, path) {
@@ -453,7 +673,7 @@ function button(document, label, onClick) {
   return node;
 }
 
-function renderValidation(document, container, session) {
+function clearValidationPresentation(document, container, session) {
   for (const [controlId, previous] of session.validationAttributes ?? []) {
     const control = document.getElementById?.(controlId);
     if (!control) continue;
@@ -464,7 +684,11 @@ function renderValidation(document, container, session) {
   }
   session.validationAttributes = new Map();
   container.replaceChildren();
-  const errors = validateDraft(session);
+}
+
+function renderValidation(document, container, session, admissionErrors = []) {
+  clearValidationPresentation(document, container, session);
+  const errors = [...validateDraft(session), ...admissionErrors];
   if (errors.length === 0) return;
   const heading = document.createElement("p");
   heading.textContent = "Исправьте поля:";
@@ -474,7 +698,7 @@ function renderValidation(document, container, session) {
     const errorId = controlIdForKey(error.key ?? error.path, "error");
     item.id = errorId;
     const control = typeof document.getElementById === "function"
-      ? document.getElementById(controlIdForKey(error.key ?? error.path))
+      ? document.getElementById(error.controlId ?? controlIdForKey(error.key ?? error.path))
         ?? document.getElementById(controlIdForKey(error.key ?? error.path, "type"))
         ?? document.getElementById(controlIdForKey(error.key ?? error.path, "add"))
         ?? document.getElementById(controlIdForKey(error.key ?? error.path, "add-item"))
@@ -849,24 +1073,669 @@ function requiredNode(document, selector) {
   return node;
 }
 
-export function bootstrapAtomLab({document, fetchImpl, confirmImpl}) {
+function safeApiMessage(payload, fallback) {
+  return typeof payload?.error?.message === "string" ? payload.error.message : fallback;
+}
+
+function parseAtomLabError(payload) {
+  if (
+    !isRecord(payload)
+    || !isRecord(payload.error)
+    || !isNonEmptyString(payload.error.code)
+    || !isNonEmptyString(payload.error.message)
+    || !Array.isArray(payload.error.field_errors)
+    || !payload.error.field_errors.every((fieldError) => (
+      isRecord(fieldError)
+      && isNonEmptyString(fieldError.path)
+      && isNonEmptyString(fieldError.message)
+    ))
+  ) return null;
+  return {
+    code: payload.error.code,
+    message: payload.error.message,
+    fieldErrors: payload.error.field_errors,
+  };
+}
+
+function runStatusLabel(status) {
+  return {
+    queued: "Ожидает запуска",
+    running: "Выполняется",
+    succeeded: "Завершён",
+    failed: "Ошибка",
+    expired: "Истёк",
+    cancelled: "Отменён",
+  }[status] ?? "Неизвестное состояние";
+}
+
+function renderReadableResult(document, container, value) {
+  container.replaceChildren();
+  if (value === null || typeof value !== "object") {
+    const text = document.createElement("p");
+    text.textContent = value === null ? "null" : String(value);
+    container.append(text);
+    return;
+  }
+  const list = document.createElement("dl");
+  for (const [key, item] of Object.entries(value)) {
+    const term = document.createElement("dt");
+    term.textContent = key;
+    const description = document.createElement("dd");
+    description.textContent = typeof item === "string" ? item : JSON.stringify(item, null, 2);
+    list.append(term, description);
+  }
+  container.append(list);
+}
+
+function modelReasonText(option) {
+  if (option.reasoningMode === "unsupported") {
+    return "Эта модель не поддерживает reasoning для текущего пути.";
+  }
+  if (option.reasoningMode === "unknown") {
+    return "Поддерживаемые уровни reasoning неизвестны; запуск будет без effort.";
+  }
+  return "Доступны только подтверждённые каталогом уровни reasoning.";
+}
+
+export function bootstrapAtomLab({
+  document,
+  fetchImpl,
+  confirmImpl,
+  scheduleImpl = (callback, delay) => globalThis.setTimeout(callback, delay),
+  cancelScheduleImpl = (id) => globalThis.clearTimeout(id),
+  AbortControllerImpl = globalThis.AbortController,
+  lifecycleTarget = globalThis,
+  nowImpl = () => Date.now(),
+  pollTimeoutMs = RUN_POLL_TIMEOUT_MS,
+  catalogLoadTimeoutMs = 30_000,
+  catalogRefreshTimeoutMs = 30_000,
+  submissionTimeoutMs = 30_000,
+  idempotencyKeyFactory = () => globalThis.crypto?.randomUUID?.()
+    ?? `run-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+}) {
   const nodes = Object.fromEntries([
     "access-form", "access-code", "access-panel", "workspace", "status", "atom-navigation",
     "atom-title", "atom-action-type", "atom-description", "atom-transformation", "input-schema",
     "output-schema", "input-tab", "prompt-tab", "input-panel", "prompt-panel", "form-mode",
     "json-mode", "input-editor", "json-panel", "json-editor", "json-error", "prompt-editor",
     "fill-example", "reset-prompt", "draft-state", "validation-errors", "presets-button",
-    "history-button",
+    "history-button", "model-select", "reasoning-effort", "reasoning-help",
+    "model-catalog-warning", "refresh-models", "run-button", "retry-submit", "retry-read", "run-state",
+    "submitted-snapshot", "result-section", "result-readable", "result-json",
+    "invalid-response", "invalid-response-code", "invalid-response-raw", "run-metadata",
+    "run-diagnostics",
   ].map((id) => [id, requiredNode(document, `#${id}`)]));
   let accessCode = "";
   let catalog = [];
   let session = null;
   let selectedAtomId = null;
+  let modelCatalog = null;
+  let modelCatalogRefreshStatus = null;
+  let modelCatalogReadGeneration = 0;
+  let modelOptions = [];
+  let activeSubmission = null;
+  let submitInFlight = false;
+  let modelCatalogPollTimer = null;
+  let modelCatalogPollStartedAt = null;
+  let modelCatalogPollFailures = 0;
+  let runPollTimer = null;
+  let activeModelCatalogAbortController = null;
+  let activeModelCatalogReadTimeoutId = null;
+  let activeModelRefreshAbortController = null;
+  let activeModelRefreshTimeoutId = null;
+  let modelCatalogReloadPending = false;
+  let activeRunAbortController = null;
+  let activeSubmissionAbortController = null;
+  let admissionErrors = [];
+  let paused = false;
+  let destroyed = false;
+
+  const updateRunButton = () => {
+    const option = selectedModelOption();
+    const effort = nodes["reasoning-effort"].value;
+    const hasValidSelection = Boolean(option?.selectable)
+      && (effort === "" || option.allowedEfforts.includes(effort));
+    const submissionBlocksNewRun = Boolean(activeSubmission && (
+      !activeSubmission.runId || !activeSubmission.terminal
+    ));
+    nodes["run-button"].disabled = submitInFlight || !hasValidSelection || submissionBlocksNewRun;
+  };
+
+  const selectedModelOption = () => modelOptions.find(
+    (option) => option.modelId === nodes["model-select"].value,
+  ) ?? null;
+
+  const renderModelCatalogWarning = (selectionInvalidated = false) => {
+    const lastSuccess = modelCatalog?.stale && modelCatalog.last_success_at
+      ? ` Последнее успешное обновление: ${modelCatalog.last_success_at}.`
+      : "";
+    nodes["model-catalog-warning"].textContent = selectionInvalidated
+      ? `Выбранная модель больше недоступна. Выберите модель заново.${lastSuccess}`
+      : modelCatalog?.stale
+        ? `Каталог моделей устарел.${lastSuccess}${modelCatalog.error ? ` ${modelCatalog.error}` : ""}`
+        : "";
+  };
+
+  const showModelCatalogFailure = (message) => {
+    if (!modelCatalog) {
+      nodes["model-catalog-warning"].textContent = message;
+      return;
+    }
+    modelCatalog = {...modelCatalog, stale: true, error: message};
+    const selectionInvalidated = Boolean(nodes["model-select"].value)
+      && selectedModelOption()?.selectable !== true;
+    renderModelCatalogWarning(selectionInvalidated);
+  };
+
+  const admissionErrorAppliesToDraft = (path, submission) => {
+    if (session.atom.atom_id !== submission.body.atom_id) return false;
+    if (path === "model_id") {
+      const modelId = nodes["model-select"].value;
+      const addressedModelId = modelId.startsWith("openai/") ? modelId : `openai/${modelId}`;
+      return addressedModelId === submission.body.model_id;
+    }
+    if (path === "reasoning_effort") {
+      return (nodes["reasoning-effort"].value || null) === submission.body.reasoning_effort;
+    }
+    if (path === "input" || path.startsWith("input.") || path.startsWith("input[")) {
+      return sameJson(getDraftPayload(session), submission.body.input);
+    }
+    if (path === "prompt") return session.prompt === submission.body.prompt;
+    return false;
+  };
+
+  const refreshAdmissionValidation = () => {
+    if (!session) return;
+    admissionErrors = admissionErrors.filter(({path, submission}) => (
+      submission && admissionErrorAppliesToDraft(path, submission)
+    ));
+    renderValidation(document, nodes["validation-errors"], session, admissionErrors);
+  };
+
+  const renderReasoning = (preferredEffort = "") => {
+    const option = selectedModelOption();
+    nodes["reasoning-effort"].replaceChildren();
+    const none = document.createElement("option");
+    none.value = "";
+    none.textContent = "Без запрошенного effort";
+    nodes["reasoning-effort"].append(none);
+    for (const effort of option?.allowedEfforts ?? []) {
+      const item = document.createElement("option");
+      item.value = effort;
+      item.textContent = effort;
+      nodes["reasoning-effort"].append(item);
+    }
+    const effortRemainsAllowed = option?.allowedEfforts.includes(preferredEffort);
+    if (preferredEffort && !effortRemainsAllowed) {
+      const invalidated = document.createElement("option");
+      invalidated.value = preferredEffort;
+      invalidated.textContent = `${preferredEffort} — больше не поддерживается`;
+      invalidated.disabled = true;
+      nodes["reasoning-effort"].append(invalidated);
+    }
+    nodes["reasoning-effort"].value = effortRemainsAllowed || preferredEffort ? preferredEffort : "";
+    nodes["reasoning-effort"].disabled = option?.reasoningMode !== "supported"
+      && !(preferredEffort && !effortRemainsAllowed);
+    nodes["reasoning-help"].textContent = option ? modelReasonText(option) : "Выберите модель.";
+    if (preferredEffort && !effortRemainsAllowed) {
+      nodes["reasoning-help"].textContent = "Выбранный reasoning effort больше не поддерживается. Выберите effort заново.";
+    }
+    updateRunButton();
+    refreshAdmissionValidation();
+  };
+
+  const renderModelCatalog = () => {
+    const previousModelId = nodes["model-select"].value;
+    const previousReasoningEffort = nodes["reasoning-effort"].value;
+    nodes["model-select"].replaceChildren();
+    for (const option of modelOptions) {
+      const item = document.createElement("option");
+      item.value = option.modelId;
+      item.textContent = option.selectable ? option.modelId
+        : option.compatibility === "unknown"
+          ? `${option.modelId} — совместимость неизвестна (${option.reason})`
+          : `${option.modelId} — не поддерживается (${option.reason})`;
+      item.disabled = !option.selectable;
+      nodes["model-select"].append(item);
+    }
+    const first = modelOptions.find((option) => option.selectable);
+    const previous = modelOptions.find((option) => option.modelId === previousModelId);
+    const previousRemainsSelectable = previous?.selectable === true;
+    const selectionInvalidated = Boolean(previousModelId) && !previousRemainsSelectable;
+    if (selectionInvalidated && !previous) {
+      const invalidated = document.createElement("option");
+      invalidated.value = previousModelId;
+      invalidated.textContent = `${previousModelId} — больше не доступна`;
+      invalidated.disabled = true;
+      nodes["model-select"].append(invalidated);
+    }
+    const selected = previousRemainsSelectable ? previous : selectionInvalidated ? null : first;
+    const selectedModelId = selected?.modelId ?? (selectionInvalidated ? previousModelId : "");
+    nodes["model-select"].value = selectedModelId;
+    nodes["model-select"].disabled = !first;
+    renderModelCatalogWarning(selectionInvalidated);
+    renderReasoning(previousModelId && selectedModelId === previousModelId ? previousReasoningEffort : "");
+  };
+
+  const loadModels = async ({timeoutMs = catalogLoadTimeoutMs} = {}) => {
+    const generation = modelCatalogReadGeneration + 1;
+    modelCatalogReadGeneration = generation;
+    const controller = timeoutMs === null ? null : new AbortControllerImpl();
+    let timedOut = false;
+    const timeoutId = controller === null ? null : scheduleImpl(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+    if (controller) {
+      activeModelCatalogAbortController = controller;
+      activeModelCatalogReadTimeoutId = timeoutId;
+    }
+    try {
+      const response = await fetchImpl("/v1/atom-lab/models", {
+        headers: {[ACCESS_HEADER]: accessCode},
+        ...(controller ? {signal: controller.signal} : {}),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(safeApiMessage(payload, "Каталог моделей недоступен."));
+      const parsedCatalog = parseModelCatalog(payload);
+      if (!parsedCatalog) {
+        throw new Error("Каталог моделей вернул некорректный ответ.");
+      }
+      if (generation !== modelCatalogReadGeneration) return null;
+      modelCatalog = parsedCatalog;
+      modelCatalogRefreshStatus = parsedCatalog.refresh_status;
+      modelOptions = parsedCatalog.items.map(describeModelOption);
+      renderModelCatalog();
+      return true;
+    } catch (error) {
+      if (generation !== modelCatalogReadGeneration) return null;
+      if (error?.name === "AbortError" && (destroyed || paused)) return null;
+      const readTimedOut = error?.name === "AbortError" && timedOut;
+      const message = readTimedOut
+        ? "Время ожидания каталога моделей истекло."
+        : error instanceof Error
+        ? error.message
+        : "Каталог моделей недоступен.";
+      if (modelCatalog) {
+        modelCatalog = {...modelCatalog, stale: true, error: message};
+        renderModelCatalog();
+        return readTimedOut ? "timed_out" : false;
+      }
+      modelCatalog = null;
+      modelOptions = [];
+      nodes["model-select"].replaceChildren();
+      nodes["model-select"].disabled = true;
+      nodes["reasoning-effort"].disabled = true;
+      nodes["run-button"].disabled = true;
+      nodes["model-catalog-warning"].textContent = message;
+      return readTimedOut ? "timed_out" : false;
+    } finally {
+      if (timeoutId !== null) cancelScheduleImpl(timeoutId);
+      if (activeModelCatalogAbortController === controller) activeModelCatalogAbortController = null;
+      if (activeModelCatalogReadTimeoutId === timeoutId) activeModelCatalogReadTimeoutId = null;
+    }
+  };
+
+  const stopModelCatalogPolling = ({preserveDeadline = false} = {}) => {
+    if (modelCatalogPollTimer !== null) cancelScheduleImpl(modelCatalogPollTimer);
+    if (activeModelCatalogReadTimeoutId !== null) cancelScheduleImpl(activeModelCatalogReadTimeoutId);
+    activeModelCatalogReadTimeoutId = null;
+    activeModelCatalogAbortController?.abort();
+    activeModelCatalogAbortController = null;
+    modelCatalogPollTimer = null;
+    if (!preserveDeadline) modelCatalogPollStartedAt = null;
+    modelCatalogPollFailures = 0;
+  };
+
+  const pollModelCatalog = async () => {
+    modelCatalogPollTimer = null;
+    if (destroyed || paused) return;
+    if (pollingTimedOut(modelCatalogPollStartedAt, nowImpl(), pollTimeoutMs)) {
+      showModelCatalogFailure("Время ожидания обновления каталога истекло.");
+      stopModelCatalogPolling();
+      return;
+    }
+    const remainingBeforeRead = pollTimeoutMs - (nowImpl() - modelCatalogPollStartedAt);
+    const loaded = await loadModels({timeoutMs: remainingBeforeRead});
+    if (loaded === null) return;
+    if (loaded === "timed_out") {
+      stopModelCatalogPolling();
+      return;
+    }
+    if (destroyed || paused || (loaded && !["pending", "running"].includes(modelCatalog?.refresh_status))) {
+      stopModelCatalogPolling();
+      return;
+    }
+    if (pollingTimedOut(modelCatalogPollStartedAt, nowImpl(), pollTimeoutMs)) {
+      showModelCatalogFailure("Время ожидания обновления каталога истекло.");
+      stopModelCatalogPolling();
+      return;
+    }
+    modelCatalogPollFailures = loaded ? 0 : modelCatalogPollFailures + 1;
+    const remaining = pollTimeoutMs - (nowImpl() - modelCatalogPollStartedAt);
+    const desiredDelay = loaded
+      ? RUN_POLL_INTERVAL_MS
+      : Math.min(
+        RUN_POLL_INTERVAL_MS * (2 ** Math.min(modelCatalogPollFailures - 1, 30)),
+        RUN_POLL_MAX_BACKOFF_MS,
+      );
+    const delay = Math.min(desiredDelay, remaining);
+    if (modelCatalogPollTimer !== null) cancelScheduleImpl(modelCatalogPollTimer);
+    modelCatalogPollTimer = scheduleImpl(pollModelCatalog, delay);
+  };
+
+  const startModelCatalogPolling = () => {
+    if (destroyed || paused || modelCatalogPollTimer !== null) return;
+    if (modelCatalogPollStartedAt === null) modelCatalogPollStartedAt = nowImpl();
+    const remaining = Math.max(0, pollTimeoutMs - (nowImpl() - modelCatalogPollStartedAt));
+    modelCatalogPollTimer = scheduleImpl(
+      pollModelCatalog,
+      Math.min(RUN_POLL_INTERVAL_MS, remaining),
+    );
+  };
+
+  const reloadCurrentModelCatalog = async () => {
+    modelCatalogReloadPending = true;
+    const loaded = await loadModels();
+    if (loaded !== null) modelCatalogReloadPending = false;
+    return loaded;
+  };
+
+  const displayAcceptedSubmission = (submission) => {
+    nodes["submitted-snapshot"].textContent = JSON.stringify(submission.snapshot, null, 2);
+    nodes["run-metadata"].textContent = "";
+    nodes["run-diagnostics"].textContent = JSON.stringify({
+      run_id: submission.runId,
+      ...submission.runtimeIds,
+      provider_call_ids: [],
+      error_code: null,
+    }, null, 2);
+    nodes["result-section"].hidden = true;
+    nodes["result-readable"].replaceChildren();
+    nodes["result-json"].textContent = "";
+    nodes["invalid-response"].hidden = true;
+    nodes["invalid-response-code"].textContent = "";
+    nodes["invalid-response-raw"].textContent = "";
+  };
+
+  const renderRunDetail = (detail, submission) => {
+    if (activeSubmission !== submission) return;
+    nodes["run-state"].textContent = runStatusLabel(detail.status);
+    const diagnostics = detail.diagnostics ?? {};
+    const requestedEffort = diagnostics.requested_reasoning_effort ?? "не запрошен";
+    const responseModel = diagnostics.response_model_id ?? "неизвестна";
+    const duration = diagnostics.duration_ms === null || diagnostics.duration_ms === undefined
+      ? "—"
+      : `${diagnostics.duration_ms} мс`;
+    nodes["run-metadata"].textContent = [
+      `Длительность: ${duration}`,
+      `Запрошенная модель: ${diagnostics.requested_model_id ?? activeSubmission.snapshot.model_id}`,
+      `Модель в ответе: ${responseModel}`,
+      `Запрошенный reasoning: ${requestedEffort}`,
+      `Validation attempts: ${diagnostics.validation_attempts ?? 0}`,
+      `Transport attempts: ${diagnostics.transport_attempts ?? 0}`,
+      `Physical calls: ${diagnostics.physical_calls ?? 0}`,
+    ].join("\n");
+    submission.runtimeIds = {
+      ...submission.runtimeIds,
+      ...Object.fromEntries(
+        Object.entries(detail.runtime_ids).filter(([, value]) => value !== null),
+      ),
+    };
+    nodes["run-diagnostics"].textContent = JSON.stringify({
+      run_id: detail.run_id,
+      ...submission.runtimeIds,
+      provider_call_ids: (diagnostics.provider_calls ?? []).map((call) => call.provider_call_id),
+      error_code: diagnostics.error_code ?? null,
+    }, null, 2);
+    const succeeded = detail.status === "succeeded" && detail.result !== null;
+    nodes["result-section"].hidden = !succeeded;
+    if (succeeded) {
+      renderReadableResult(document, nodes["result-readable"], detail.result);
+      nodes["result-json"].textContent = JSON.stringify(detail.result, null, 2);
+    }
+    const debugArtifact = (diagnostics.debug_artifacts ?? [])[0];
+    const invalid = detail.status === "failed" && Boolean(debugArtifact);
+    nodes["invalid-response"].hidden = !invalid;
+    if (invalid) {
+      const truncation = debugArtifact.truncated ? "Сырой ответ обрезан." : "";
+      nodes["invalid-response-code"].textContent = [
+        diagnostics.error_code ?? "invalid_response",
+        truncation,
+      ].filter(Boolean).join(" · ");
+      nodes["invalid-response-raw"].textContent = debugArtifact.raw_output_text ?? "Сырой ответ недоступен.";
+    }
+    submission.detailLoaded = true;
+    submission.terminal = TERMINAL_RUN_STATUSES.has(detail.status);
+    nodes["retry-read"].hidden = true;
+    updateRunButton();
+  };
+
+  const scheduleNextPoll = (submission, {retryable = false, retryAfterMs = null} = {}) => {
+    if (destroyed || paused) return;
+    const remaining = pollTimeoutMs - (nowImpl() - submission.pollStartedAt);
+    if (remaining <= 0) {
+      nodes["run-state"].textContent = "Время ожидания в браузере истекло. Backend job не отменён.";
+      nodes["retry-read"].hidden = false;
+      return;
+    }
+    if (retryable) submission.pollFailureCount = (submission.pollFailureCount ?? 0) + 1;
+    const backoff = retryable
+      ? Math.min(
+        RUN_POLL_INTERVAL_MS * (2 ** Math.min(submission.pollFailureCount - 1, 30)),
+        RUN_POLL_MAX_BACKOFF_MS,
+      )
+      : RUN_POLL_INTERVAL_MS;
+    const delay = Math.min(Math.max(backoff, retryAfterMs ?? 0), remaining);
+    if (runPollTimer !== null) cancelScheduleImpl(runPollTimer);
+    runPollTimer = scheduleImpl(() => {
+      runPollTimer = null;
+      return pollRun(submission);
+    }, delay);
+  };
+
+  const fetchRunBeforeDeadline = async (submission) => {
+    if (destroyed || paused) return {cancelled: true};
+    const remaining = pollTimeoutMs - (nowImpl() - submission.pollStartedAt);
+    if (remaining <= 0) return {timedOut: true};
+    const controller = new AbortControllerImpl();
+    activeRunAbortController = controller;
+    const timeoutId = scheduleImpl(() => controller.abort(), remaining);
+    try {
+      const response = await fetchImpl(`/v1/atom-lab/runs/${submission.runId}`, {
+        headers: {[ACCESS_HEADER]: accessCode},
+        signal: controller.signal,
+      });
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+      }
+      return {response, payload, timedOut: false};
+    } catch (error) {
+      if (destroyed && error?.name === "AbortError") return {cancelled: true};
+      if (error?.name === "AbortError") return {timedOut: true};
+      throw error;
+    } finally {
+      cancelScheduleImpl(timeoutId);
+      if (activeRunAbortController === controller) activeRunAbortController = null;
+    }
+  };
+
+  const pollRun = async (submission = activeSubmission) => {
+    if (destroyed || paused || !submission?.runId || activeSubmission !== submission) return;
+    nodes["retry-read"].hidden = true;
+    try {
+      const {response, payload, timedOut, cancelled} = await fetchRunBeforeDeadline(submission);
+      if (destroyed || paused || cancelled || activeSubmission !== submission) return;
+      if (timedOut) {
+        nodes["run-state"].textContent = "Время ожидания в браузере истекло. Backend job не отменён.";
+        nodes["retry-read"].hidden = false;
+        return;
+      }
+      if (!response.ok) {
+        const retryable = [408, 425, 429, 500, 502, 503, 504].includes(response.status);
+        if (retryable) {
+          const retryAfterMs = response.status === 429
+            ? retryAfterDelayMs(response.headers?.get?.("Retry-After"), nowImpl())
+            : null;
+          nodes["run-state"].textContent = "Переподключение… Запуск принят; текущее состояние временно неизвестно.";
+          scheduleNextPoll(submission, {retryable: true, retryAfterMs});
+          return;
+        }
+        const code = typeof payload?.error?.code === "string" ? payload.error.code : "request_failed";
+        nodes["run-state"].textContent = `${code}: ${safeApiMessage(payload, "Не удалось прочитать запуск.")}`;
+        nodes["retry-read"].hidden = false;
+        return;
+      }
+      const detail = parseRunDetail(payload, submission.runId);
+      const matchesSubmission = detail
+        && detail.diagnostics.requested_model_id === submission.snapshot.model_id
+        && detail.diagnostics.requested_reasoning_effort === submission.snapshot.reasoning_effort
+        && ["scenario_session_id", "job_id", "action_run_id", "artifact_id"].every((key) => (
+          submission.runtimeIds[key] === null
+          || detail.runtime_ids[key] === null
+          || detail.runtime_ids[key] === submission.runtimeIds[key]
+        ));
+      if (!matchesSubmission) {
+        nodes["run-state"].textContent = "Некорректный ответ API. Запуск сохранён для повторного чтения.";
+        nodes["retry-read"].hidden = false;
+        return;
+      }
+      submission.pollFailureCount = 0;
+      renderRunDetail(detail, submission);
+      if (!TERMINAL_RUN_STATUSES.has(detail.status)) {
+        scheduleNextPoll(submission);
+      }
+    } catch {
+      if (destroyed || paused || activeSubmission !== submission) return;
+      nodes["run-state"].textContent = "Переподключение… Запуск принят; текущее состояние временно неизвестно.";
+      scheduleNextPoll(submission, {retryable: true});
+    }
+  };
+
+  const submitRun = async ({retry = false} = {}) => {
+    if (destroyed || paused || submitInFlight || !session) return;
+    const pendingReplay = retry && activeSubmission && !activeSubmission.runId;
+    if (!pendingReplay) {
+      admissionErrors = [];
+      renderValidation(document, nodes["validation-errors"], session, admissionErrors);
+      const errors = validateDraft(session);
+      if (errors.length > 0) {
+        renderValidation(document, nodes["validation-errors"], session, admissionErrors);
+        nodes["run-state"].textContent = "Исправьте входные данные перед запуском.";
+        return;
+      }
+      const option = selectedModelOption();
+      if (!option?.selectable) {
+        nodes["run-state"].textContent = "Выберите доступную модель.";
+        return;
+      }
+      activeSubmission = createRunSubmission(session, {
+        modelId: option.modelId,
+        reasoningEffort: nodes["reasoning-effort"].value || null,
+        idempotencyKey: idempotencyKeyFactory(),
+      });
+    }
+    const submission = activeSubmission;
+    submitInFlight = true;
+    nodes["run-button"].disabled = true;
+    nodes["retry-submit"].hidden = true;
+    nodes["retry-read"].hidden = true;
+    nodes["run-state"].textContent = "Отправка запуска…";
+    const controller = new AbortControllerImpl();
+    activeSubmissionAbortController = controller;
+    const timeoutId = scheduleImpl(() => controller.abort(), submissionTimeoutMs);
+    try {
+      const response = await fetchImpl("/v1/atom-lab/runs", {
+        method: "POST",
+        headers: {
+          [ACCESS_HEADER]: accessCode,
+          "Content-Type": "application/json",
+          "Idempotency-Key": submission.idempotencyKey,
+        },
+        body: JSON.stringify(submission.body),
+        signal: controller.signal,
+      });
+      if (!response.ok && RETRYABLE_SUBMISSION_STATUSES.has(response.status)) {
+        nodes["run-state"].textContent = "Результат отправки неизвестен. Повторите тот же submission безопасно.";
+        nodes["retry-submit"].hidden = false;
+        return;
+      }
+      const payload = response.ok
+        ? await response.json()
+        : await response.json().catch(() => null);
+      if (!response.ok) {
+        const error = parseAtomLabError(payload);
+        const code = error?.code ?? "request_failed";
+        admissionErrors = (error?.fieldErrors ?? [])
+          .filter(({path}) => admissionErrorAppliesToDraft(path, submission))
+          .map(({path, message}) => ({
+            path,
+            message,
+            submission,
+            key: `admission:${path}`,
+            controlId: path === "model_id"
+              ? "model-select"
+              : path === "reasoning_effort"
+                ? "reasoning-effort"
+                : path === "prompt"
+                  ? "prompt-editor"
+                  : undefined,
+          }));
+        renderValidation(document, nodes["validation-errors"], session, admissionErrors);
+        if (admissionErrors.some(({path}) => path === "prompt")) showInputTab(false);
+        nodes["run-state"].textContent = `${code}: ${error?.message ?? safeApiMessage(payload, "Запуск не принят.")} Черновик сохранён.`;
+        activeSubmission = null;
+        return;
+      }
+      const accepted = parseAcceptedRun(payload);
+      if (!accepted) {
+        nodes["run-state"].textContent = "Некорректный ответ API после отправки. Повторите тот же submission безопасно.";
+        nodes["retry-submit"].hidden = false;
+        return;
+      }
+      admissionErrors = [];
+      renderValidation(document, nodes["validation-errors"], session, admissionErrors);
+      submission.runId = accepted.run_id;
+      submission.runtimeIds = {
+        scenario_session_id: accepted.scenario_session_id,
+        job_id: accepted.job_id,
+        action_run_id: null,
+        artifact_id: null,
+      };
+      submission.detailLoaded = false;
+      submission.terminal = false;
+      submission.pollStartedAt = nowImpl();
+      submission.pollFailureCount = 0;
+      displayAcceptedSubmission(submission);
+      nodes["run-state"].textContent = runStatusLabel(accepted.status);
+      if (runPollTimer !== null) cancelScheduleImpl(runPollTimer);
+      runPollTimer = scheduleImpl(() => {
+        runPollTimer = null;
+        return pollRun(submission);
+      }, 0);
+    } catch (error) {
+      if (destroyed) return;
+      nodes["run-state"].textContent = error?.name === "AbortError"
+        ? "Результат отправки неизвестен. Повторите тот же submission безопасно."
+        : error instanceof Error
+          ? `${error.message} Черновик сохранён.`
+          : "Сетевая ошибка. Черновик сохранён.";
+      nodes["retry-submit"].hidden = false;
+    } finally {
+      cancelScheduleImpl(timeoutId);
+      if (activeSubmissionAbortController === controller) activeSubmissionAbortController = null;
+      submitInFlight = false;
+      updateRunButton();
+    }
+  };
 
   const updateDraftState = () => {
     if (!session) return;
     nodes["draft-state"].textContent = session.dirty ? "Есть несохранённые правки." : "Черновик без изменений.";
-    renderValidation(document, nodes["validation-errors"], session);
+    refreshAdmissionValidation();
   };
 
   const renderEditor = (replaceFields = true, focusId = null) => {
@@ -905,8 +1774,10 @@ export function bootstrapAtomLab({document, fetchImpl, confirmImpl}) {
 
   const selectAtom = (atom) => {
     if (session?.dirty && !confirmImpl(DIRTY_WARNING)) return;
+    if (session) clearValidationPresentation(document, nodes["validation-errors"], session);
     selectedAtomId = atom.atom_id;
     session = createDraftSession(atom);
+    admissionErrors = [];
     nodes["atom-title"].textContent = `${atom.atom_id} · ${atom.action_type}`;
     nodes["atom-action-type"].textContent = atom.action_type;
     nodes["atom-description"].textContent = atom.description;
@@ -939,6 +1810,7 @@ export function bootstrapAtomLab({document, fetchImpl, confirmImpl}) {
       nodes.workspace.hidden = false;
       nodes.status.textContent = `Доступно атомов: ${catalog.length}.`;
       selectAtom(catalog[0]);
+      await reloadCurrentModelCatalog();
     } catch (error) {
       accessCode = "";
       nodes["access-panel"].hidden = false;
@@ -969,6 +1841,75 @@ export function bootstrapAtomLab({document, fetchImpl, confirmImpl}) {
     session.prompt = nodes["prompt-editor"].value;
     updateDraftState();
   });
+  nodes["model-select"].addEventListener("change", () => {
+    renderModelCatalogWarning();
+    renderReasoning();
+  });
+  nodes["reasoning-effort"].addEventListener("change", () => {
+    const option = selectedModelOption();
+    nodes["reasoning-effort"].disabled = option?.reasoningMode !== "supported";
+    nodes["reasoning-help"].textContent = option ? modelReasonText(option) : "Выберите модель.";
+    updateRunButton();
+    refreshAdmissionValidation();
+  });
+  nodes["refresh-models"].addEventListener("click", async () => {
+    nodes["refresh-models"].disabled = true;
+    const controller = new AbortControllerImpl();
+    let timedOut = false;
+    activeModelRefreshAbortController = controller;
+    const timeoutId = scheduleImpl(() => {
+      timedOut = true;
+      controller.abort();
+    }, catalogRefreshTimeoutMs);
+    activeModelRefreshTimeoutId = timeoutId;
+    try {
+      const response = await fetchImpl("/v1/atom-lab/models/refresh", {
+        method: "POST",
+        headers: {[ACCESS_HEADER]: accessCode},
+        signal: controller.signal,
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(safeApiMessage(payload, "Не удалось запросить обновление."));
+      const refresh = parseModelRefresh(payload);
+      if (!refresh) throw new Error("Обновление каталога вернуло некорректный ответ.");
+      cancelScheduleImpl(timeoutId);
+      if (activeModelRefreshAbortController === controller) activeModelRefreshAbortController = null;
+      if (activeModelRefreshTimeoutId === timeoutId) activeModelRefreshTimeoutId = null;
+      modelCatalogReadGeneration += 1;
+      modelCatalogRefreshStatus = refresh.refresh_status;
+      modelCatalog = modelCatalog ? {...modelCatalog, ...refresh} : modelCatalog;
+      stopModelCatalogPolling();
+      if (["pending", "running"].includes(refresh.refresh_status)) {
+        nodes["model-catalog-warning"].textContent = "Каталог устарел; обновление запрошено.";
+        startModelCatalogPolling();
+      } else {
+        await reloadCurrentModelCatalog();
+      }
+    } catch (error) {
+      if (error?.name === "AbortError" && (destroyed || paused)) return;
+      const message = error instanceof Error
+        ? timedOut
+          ? "Время ожидания обновления каталога истекло."
+          : error.message
+        : "Не удалось запросить обновление.";
+      showModelCatalogFailure(message);
+    } finally {
+      cancelScheduleImpl(timeoutId);
+      if (activeModelRefreshAbortController === controller) activeModelRefreshAbortController = null;
+      if (activeModelRefreshTimeoutId === timeoutId) activeModelRefreshTimeoutId = null;
+      if (!destroyed) nodes["refresh-models"].disabled = false;
+    }
+  });
+  nodes["run-button"].addEventListener("click", () => submitRun());
+  nodes["retry-submit"].addEventListener("click", () => submitRun({retry: true}));
+  nodes["retry-read"].addEventListener("click", () => {
+    nodes["retry-read"].hidden = true;
+    if (activeSubmission) {
+      activeSubmission.pollStartedAt = nowImpl();
+      activeSubmission.pollFailureCount = 0;
+    }
+    pollRun(activeSubmission);
+  });
   nodes["fill-example"].addEventListener("click", () => {
     if (session.dirty && !confirmImpl(DIRTY_WARNING)) return;
     replaceWithExample(session);
@@ -988,7 +1929,52 @@ export function bootstrapAtomLab({document, fetchImpl, confirmImpl}) {
   }
 
   showInputTab(true);
-  return {getSession: () => session};
+  const pause = () => {
+    paused = true;
+    stopModelCatalogPolling({preserveDeadline: !destroyed});
+    if (activeModelRefreshTimeoutId !== null) cancelScheduleImpl(activeModelRefreshTimeoutId);
+    activeModelRefreshTimeoutId = null;
+    activeModelRefreshAbortController?.abort();
+    activeModelRefreshAbortController = null;
+    if (runPollTimer !== null) cancelScheduleImpl(runPollTimer);
+    runPollTimer = null;
+    activeRunAbortController?.abort();
+    activeRunAbortController = null;
+    activeSubmissionAbortController?.abort();
+    activeSubmissionAbortController = null;
+  };
+  const resume = () => {
+    if (destroyed || !paused) return undefined;
+    paused = false;
+    const catalogReload = modelCatalogReloadPending ? reloadCurrentModelCatalog() : null;
+    if (["pending", "running"].includes(modelCatalogRefreshStatus)) {
+      startModelCatalogPolling();
+    }
+    let runReload = null;
+    if (activeSubmission?.runId && !activeSubmission.terminal) {
+      activeSubmission.pollFailureCount = 0;
+      runReload = pollRun(activeSubmission);
+    }
+    if (catalogReload && runReload) return Promise.all([catalogReload, runReload]);
+    return catalogReload ?? runReload ?? undefined;
+  };
+  const handlePageHide = (event) => {
+    if (event?.persisted) {
+      pause();
+      return;
+    }
+    destroy();
+  };
+  const handlePageShow = (event) => event?.persisted ? resume() : undefined;
+  const destroy = () => {
+    destroyed = true;
+    pause();
+    lifecycleTarget.removeEventListener?.("pagehide", handlePageHide);
+    lifecycleTarget.removeEventListener?.("pageshow", handlePageShow);
+  };
+  lifecycleTarget.addEventListener?.("pagehide", handlePageHide);
+  lifecycleTarget.addEventListener?.("pageshow", handlePageShow);
+  return {getSession: () => session, getActiveSubmission: () => activeSubmission, destroy};
 }
 
 if (typeof document !== "undefined" && document.querySelector("#access-form")) {

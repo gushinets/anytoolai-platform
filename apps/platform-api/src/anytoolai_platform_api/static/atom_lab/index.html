@@ -70,18 +70,52 @@
                   <textarea id="json-editor" rows="18" spellcheck="false"></textarea>
                   <p id="json-error" class="error" role="alert"></p>
                 </div>
-                <div id="validation-errors" class="validation-errors" aria-live="polite"></div>
               </section>
               <section id="prompt-panel" role="tabpanel" aria-labelledby="prompt-tab" hidden>
                 <label for="prompt-editor">Инструкция конфигурации</label>
                 <textarea id="prompt-editor" rows="18"></textarea>
                 <button id="reset-prompt" type="button">Восстановить исходный промпт</button>
               </section>
+              <div id="validation-errors" class="validation-errors" aria-live="polite"></div>
               <p id="draft-state" class="draft-state" aria-live="polite"></p>
             </div>
-            <aside id="result-placeholder" class="card result-card" aria-label="Результат запуска">
-              <h2>Результат выбранного запуска</h2>
-              <p>Запуск и результат появятся в следующем этапе. Изменения черновика не заменяют состояние результата.</p>
+            <aside id="result-placeholder" class="card result-card" aria-label="Запуск и результат">
+              <h2>Запуск</h2>
+              <div class="run-controls">
+                <label for="model-select">GPT-модель</label>
+                <select id="model-select"></select>
+                <label for="reasoning-effort">Reasoning effort</label>
+                <select id="reasoning-effort"></select>
+                <p id="reasoning-help" class="help-text"></p>
+                <p id="model-catalog-warning" class="warning" role="status"></p>
+                <button id="refresh-models" type="button">Обновить каталог</button>
+                <button id="run-button" class="primary-action" type="button">Запустить атом</button>
+                <button id="retry-submit" type="button" hidden>Повторить отправку</button>
+                <button id="retry-read" type="button" hidden>Повторить чтение запуска</button>
+              </div>
+              <p id="run-state" class="run-state" role="status" aria-live="polite">Запуск ещё не создан.</p>
+              <section aria-labelledby="submitted-snapshot-title">
+                <h3 id="submitted-snapshot-title">Конфигурация принятого запуска</h3>
+                <pre id="submitted-snapshot">—</pre>
+              </section>
+              <section id="result-section" aria-labelledby="result-title" hidden>
+                <h3 id="result-title">Результат</h3>
+                <div id="result-readable" class="readable-result"></div>
+                <details><summary>JSON результата</summary><pre id="result-json"></pre></details>
+              </section>
+              <section id="invalid-response" class="invalid-response" aria-labelledby="invalid-response-title" hidden>
+                <h3 id="invalid-response-title">Ответ не прошёл контракт</h3>
+                <p id="invalid-response-code"></p>
+                <pre id="invalid-response-raw"></pre>
+              </section>
+              <section aria-labelledby="run-metadata-title">
+                <h3 id="run-metadata-title">Метаданные</h3>
+                <div id="run-metadata">—</div>
+              </section>
+              <details>
+                <summary>Диагностика и ID</summary>
+                <pre id="run-diagnostics">—</pre>
+              </details>
             </aside>
           </section>
         </div>
