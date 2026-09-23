@@ -2111,6 +2111,7 @@ test("preset and history parsers fail closed around immutable and paginated cont
     preset_id: "preset-1", latest_version: 2, name: "Набор", description: "Описание",
     atom_id: "A01", created_at: "2026-09-23T00:00:00Z", updated_at: "2026-09-23T01:00:00Z",
   }], next_cursor: "next"}));
+  assert.equal(parsePresetList({items: [], next_cursor: ""}), null);
   assert.equal(parsePresetList({items: [], next_cursor: 1}), null);
   assert.equal(parsePresetList({items: [{
     preset_id: "preset-1", latest_version: 2, name: "Набор", description: "Описание",
@@ -2120,6 +2121,16 @@ test("preset and history parsers fail closed around immutable and paginated cont
     preset_id: "preset-1", version: 1, name: "Набор", description: "Описание",
     atom_id: "A01", created_at: "2026-09-23T00:00:00Z",
   }], next_cursor: null}));
+  assert.equal(parseRunList({items: [{
+    run_id: "run-1", status: "failed", atom_id: "A01", model_id: "openai/gpt-5",
+    preset_id: null, preset_version: 2, created_at: "2026-09-23T00:00:00Z",
+    started_at: null, finished_at: "2026-09-23T00:01:00Z",
+  }], next_cursor: null}), null);
+  assert.equal(parseRunList({items: [{
+    run_id: "run-1", status: "failed", atom_id: "A01", model_id: "openai/gpt-5",
+    preset_id: "preset-1", preset_version: null, created_at: "2026-09-23T00:00:00Z",
+    started_at: null, finished_at: "2026-09-23T00:01:00Z",
+  }], next_cursor: null}), null);
   assert.ok(parsePresetExport({format_version: 1, preset_id: "preset-1", version: 1, configuration}, "preset-1", 1));
   assert.equal(parsePresetExport({format_version: 2, preset_id: "preset-1", version: 1, configuration}, "preset-1", 1), null);
   assert.ok(parseRunList({items: [{
