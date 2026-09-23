@@ -1,0 +1,31 @@
+{
+  "response_json": {
+    "issues": [
+      {
+        "category": "ambiguity",
+        "description": "\"Modern but also traditional\" can be read several ways and gives no usable design direction.",
+        "severity": "medium",
+        "evidence": "Should look modern but also traditional."
+      },
+      {
+        "category": "timeline_risk",
+        "description": "\"Before the holiday season\" gives no concrete launch date.",
+        "severity": "high",
+        "evidence": "We want it live before the holiday season."
+      },
+      {
+        "category": "scope_risk",
+        "description": "Online cake ordering may imply payment processing and order management, which the brief does not mention.",
+        "severity": "medium",
+        "evidence": "Let customers order cakes online."
+      }
+    ]
+  },
+  "input_tokens": 230,
+  "output_tokens": 120,
+  "latency_ms": 16,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.detect_issues_v1"
+  }
+}

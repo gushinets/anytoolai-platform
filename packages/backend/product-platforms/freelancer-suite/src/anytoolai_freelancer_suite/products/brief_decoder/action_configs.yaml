@@ -1,0 +1,20 @@
+action_configs:
+  - action_config_id: brief_decoder.extract_brief_v1
+    action_type: text.extract_structured_fields
+    prompt_ref: brief_decoder.extract_brief.v1
+    provider_policy_ref: default_fake_provider_v1
+
+  - action_config_id: brief_decoder.detect_issues_v1
+    action_type: text.detect_issues_by_taxonomy
+    prompt_ref: brief_decoder.detect_issues.v1
+    provider_policy_ref: default_fake_provider_v1
+
+  - action_config_id: brief_decoder.generate_questions_v1
+    action_type: text.generate_clarifying_questions
+    prompt_ref: brief_decoder.generate_questions.v1
+    provider_policy_ref: default_fake_provider_v1
+
+  - action_config_id: brief_decoder.generate_summary_v1
+    action_type: document.generate_from_template
+    prompt_ref: brief_decoder.generate_summary.v1
+    provider_policy_ref: default_fake_provider_v1

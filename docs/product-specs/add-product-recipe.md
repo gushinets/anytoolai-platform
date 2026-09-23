@@ -19,9 +19,9 @@ must stay inside, and `tests/architecture/` for the tests that enforce it.
    string, and never dependent on the caller's current working directory. See
    `packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/bundle.py`
    for the class shape (it imports nothing from `platform-core`, `platform-actions`, or
-   `platform-api`); as of `ANY-413`/Client Update Writer it returns two product roots
-   (`ANY-227`/ProposalAI and `ANY-413`/Client Update Writer), and each further product issue adds
-   its own entry to the list.
+   `platform-api`); as of `ANY-232`/Brief Decoder it returns three product roots
+   (`ANY-227`/ProposalAI, `ANY-413`/Client Update Writer and `ANY-232`/Brief Decoder), and each
+   further product issue adds its own entry to the list.
 2. **Config roots.** Under the bundle's `products/<product_name>/` config root, add the
    product's `product.yaml`, `frontends.yaml`, `action_configs.yaml`, `workflows.yaml`,
    `scenarios.yaml`, `prompts.yaml`, `schemas.yaml`, and any product-scoped
@@ -75,11 +75,15 @@ must stay inside, and `tests/architecture/` for the tests that enforce it.
      provider gateway → `FakeProviderAdapter`) never sets `ResolvedProviderRequest.fixture_key`;
      it always falls back to `action_config_id`, so an unmodified run can only ever select the
      happy-path fixture for a given `action_config_id`. To prove the weak-input fixture is
-     genuinely reachable (not just schema-valid in isolation), add a test-only
-     `FakeProviderAdapter` subclass that forces `fixture_key` on the resolved request before
-     delegating to the real adapter, confined to the product's own test file — see
-     `_FixedFixtureProviderAdapter` in
-     `apps/platform-api/tests/test_proposal_ai_bundle.py` for the worked example.
+     genuinely reachable (not just schema-valid in isolation), use the shared
+     `tests/support/fake_provider_recording.RecordingProviderAdapter`
+     (`RecordingProviderAdapter(FIXTURE_ROOT, variants={action_config_id: ".weak_input"})`): it
+     redirects the chosen action configs to a fixture-key variant before delegating to the real
+     adapter and records every resolved request. See
+     `apps/platform-api/tests/test_brief_decoder_bundle.py` for the worked example. Only write a
+     product-local `FakeProviderAdapter` subclass (like `_FixedFixtureProviderAdapter` in
+     `apps/platform-api/tests/test_proposal_ai_bundle.py`) if the shared helper genuinely does not
+     cover the scenario.
 8. **Chrome Extension (optional).** The bundle contract does not require a dedicated CE
    (`ANY-32`); the shared web mirror (`apps/web-mirror`) is the default client surface for a new
    product's web pages and result renderers. If the product still needs a standalone CE, build it

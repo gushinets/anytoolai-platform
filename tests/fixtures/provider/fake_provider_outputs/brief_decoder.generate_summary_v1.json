@@ -1,0 +1,40 @@
+{
+  "response_json": {
+    "sections": [
+      {
+        "id": "overview",
+        "title": "Project overview",
+        "content": "A bakery wants a new website that lets customers order cakes online."
+      },
+      {
+        "id": "key-details",
+        "title": "Key details",
+        "content": "Deliverables: menu page, order form, contact page. Deadline: before the holiday season. Budget: around $3,000. Constraint: the look should be modern but also traditional.",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "gaps",
+        "title": "Gaps and risks",
+        "content": "The launch date is not concrete, the desired style is ambiguous, and online ordering may imply payment handling that the brief does not cover. The target audience is not stated."
+      },
+      {
+        "id": "next-steps",
+        "title": "Questions to ask",
+        "content": "What is the exact launch date? Which example websites show the desired look? Should customers pay online or only send orders?",
+        "metadata": {
+          "kind": "list"
+        }
+      }
+    ],
+    "summary": "The brief is workable but not ready to start: confirm the exact launch date first, then the style direction and whether payments are online."
+  },
+  "input_tokens": 300,
+  "output_tokens": 160,
+  "latency_ms": 20,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.generate_summary_v1"
+  }
+}

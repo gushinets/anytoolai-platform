@@ -1,0 +1,6 @@
+product_id: brief_decoder
+product_platform: freelancer_suite
+display_name: Brief Decoder
+scenarios:
+  - brief_decoder.decode_v1
+quota_policy_ref: brief_decoder.guest_quota_v1
