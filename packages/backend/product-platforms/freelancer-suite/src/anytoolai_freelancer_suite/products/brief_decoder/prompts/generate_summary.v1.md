@@ -17,10 +17,15 @@ Produce exactly these `sections`, in this order, with these `id`s:
 3. `gaps` ("Gaps and risks"): the `data.issues` in plain sentences, plus the `data.brief.missing_fields`
    by name. If there are no issues and nothing is missing, say the brief is clear and complete.
 4. `next-steps` ("Questions to ask"): the `data.questions` as a list (`metadata.kind` = `list`).
-   If there are none, say no clarification is needed and work can start.
+   If there are none, say that no clarifying questions were generated -- do not claim work can
+   start here; an empty question list only means nothing needed asking, not that the brief is
+   complete. Readiness is `summary`'s call, not this section's.
 
 `summary` is one short paragraph with the bottom line: whether the brief is ready to start work and
-what is the most important thing to resolve first. It is not a list of section titles.
+what is the most important thing to resolve first. Base the readiness claim on all three of
+`data.issues`, `data.brief.missing_fields`, and `data.questions` together -- an empty
+`data.questions` alone never implies the brief is ready; only "no issues and nothing missing"
+does. It is not a list of section titles.
 
 Rules:
 
