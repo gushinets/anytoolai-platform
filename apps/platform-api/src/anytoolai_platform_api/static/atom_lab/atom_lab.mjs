@@ -1309,6 +1309,7 @@ export function bootstrapAtomLab({
   catalogLoadTimeoutMs = 30_000,
   catalogRefreshTimeoutMs = 30_000,
   submissionTimeoutMs = 30_000,
+  protectedRequestTimeoutMs = 30_000,
   idempotencyKeyFactory = () => globalThis.crypto?.randomUUID?.()
     ?? `run-${Date.now()}-${Math.random().toString(16).slice(2)}`,
 }) {
@@ -1373,6 +1374,7 @@ export function bootstrapAtomLab({
   let presetVersionPageGeneration = 0;
   let presetVersionPageInFlight = false;
   let conflictLatestPreset = null;
+  let presetSaveOutcomeUnknown = false;
   let historyItems = [];
   let historyCursor = null;
   let historyListLoadGeneration = 0;
@@ -1650,25 +1652,49 @@ export function bootstrapAtomLab({
     return loaded;
   };
 
-  const protectedJson = async (url, options = {}) => {
-    const response = await fetchImpl(url, {
-      ...options,
-      headers: {
-        [ACCESS_HEADER]: accessCode,
-        ...(options.body === undefined ? {} : {"Content-Type": "application/json"}),
-        ...(options.headers ?? {}),
-      },
-    });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) {
-      const error = parseAtomLabError(payload);
-      const failure = new Error(error?.message ?? safeApiMessage(payload, "Операция не выполнена."));
-      failure.code = error?.code ?? "request_failed";
-      failure.status = response.status;
-      failure.fieldErrors = error?.fieldErrors ?? [];
+  const protectedJson = async (url, requestOptions = {}) => {
+    const {timeoutMs = protectedRequestTimeoutMs, ...options} = requestOptions;
+    const controller = new AbortControllerImpl();
+    let timedOut = false;
+    const timeoutId = scheduleImpl(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+    try {
+      const response = await fetchImpl(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          [ACCESS_HEADER]: accessCode,
+          ...(options.body === undefined ? {} : {"Content-Type": "application/json"}),
+          ...(options.headers ?? {}),
+        },
+      });
+      const payload = await response.json().catch((error) => {
+        if (error?.name === "AbortError") throw error;
+        return null;
+      });
+      if (!response.ok) {
+        const error = parseAtomLabError(payload);
+        const failure = new Error(error?.message ?? safeApiMessage(payload, "Операция не выполнена."));
+        failure.code = error?.code ?? "request_failed";
+        failure.status = response.status;
+        failure.fieldErrors = error?.fieldErrors ?? [];
+        throw failure;
+      }
+      return payload;
+    } catch (error) {
+      if (error?.name !== "AbortError" || !timedOut) throw error;
+      const writeOutcomeUnknown = options.method === "POST";
+      const failure = new Error(writeOutcomeUnknown
+        ? "Время ожидания истекло; сервер мог сохранить изменения."
+        : "Время ожидания ответа истекло.");
+      failure.code = writeOutcomeUnknown ? "request_outcome_unknown" : "request_timeout";
+      failure.outcomeUnknown = writeOutcomeUnknown;
       throw failure;
+    } finally {
+      cancelScheduleImpl(timeoutId);
     }
-    return payload;
   };
 
   const topLevelFields = () => Object.keys(
@@ -1679,6 +1705,18 @@ export function bootstrapAtomLab({
     .filter((input) => input.checked)
     .map((input) => input.value);
 
+  const fixedFieldInput = () => presetSourceOverride?.input ?? getDraftPayload(session);
+
+  const syncFixedFieldAvailability = () => {
+    const inputPayload = fixedFieldInput();
+    for (const input of nodes["fixed-fields"].querySelectorAll("input")) {
+      const available = isRecord(inputPayload) && Object.hasOwn(inputPayload, input.value);
+      input.dataset.available = String(available);
+      if (!available) input.checked = false;
+    }
+    updatePresetEditorDisabled();
+  };
+
   const renderFixedFields = (fixedFields = []) => {
     nodes["fixed-fields"].replaceChildren();
     const selected = new Set(fixedFields);
@@ -1687,7 +1725,10 @@ export function bootstrapAtomLab({
       const input = document.createElement("input");
       input.type = "checkbox";
       input.value = field;
-      input.checked = selected.has(field);
+      const available = isRecord(fixedFieldInput()) && Object.hasOwn(fixedFieldInput(), field);
+      input.dataset.available = String(available);
+      input.checked = available && selected.has(field);
+      input.disabled = !available;
       input.addEventListener("change", () => renderPresetState());
       const caption = document.createElement("span");
       caption.textContent = field;
@@ -1819,9 +1860,11 @@ export function bootstrapAtomLab({
     nodes.workspace.inert = draftLocked;
     nodes.workspace.setAttribute("aria-busy", String(draftLocked));
     for (const id of ["preset-name", "preset-description", "save-preset"]) nodes[id].disabled = editorLocked;
-    for (const id of ["preset-version-select", "new-preset", "save-as-new-preset", "load-more-versions"]) {
+    for (const id of ["preset-version-select", "new-preset", "load-more-versions"]) {
       nodes[id].disabled = versionControlsLocked;
     }
+    nodes["save-preset"].disabled = editorLocked || presetSaveOutcomeUnknown;
+    nodes["save-as-new-preset"].disabled = versionControlsLocked || presetSaveOutcomeUnknown;
     nodes["open-latest-preset"].disabled = versionControlsLocked || conflictLatestPreset === null;
     nodes["export-preset"].disabled = operationLocked || selectedPresetVersion === null;
     nodes["adapt-preset"].disabled = operationLocked || !presetReadOnly;
@@ -1829,7 +1872,9 @@ export function bootstrapAtomLab({
     for (const buttonNode of nodes["preset-list"].querySelectorAll("button")) {
       buttonNode.disabled = operationLocked || presetListLoadInFlight;
     }
-    for (const input of nodes["fixed-fields"].querySelectorAll("input")) input.disabled = editorLocked;
+    for (const input of nodes["fixed-fields"].querySelectorAll("input")) {
+      input.disabled = editorLocked || input.dataset.available !== "true";
+    }
   };
 
   const clearPresetExport = () => {
@@ -1868,6 +1913,7 @@ export function bootstrapAtomLab({
   const commitPresetVersion = (parsed) => {
     const {preset_id: presetId, version} = parsed;
     selectedPresetVersion = cloneJson(parsed);
+    presetSaveOutcomeUnknown = false;
     presetEditorActive = true;
     presetSourceOverride = null;
     nodes["preset-name"].value = parsed.name;
@@ -1942,7 +1988,7 @@ export function bootstrapAtomLab({
   const openPreset = async (
     preset,
     preferredVersion = preset.latest_version,
-    {force = false, refreshVersions = true} = {},
+    {force = false, refreshVersions = true, versionsPageOverride = null} = {},
   ) => {
     if (presetSaveInFlight && !force) return false;
     if (!force && hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return false;
@@ -1956,7 +2002,9 @@ export function bootstrapAtomLab({
     nodes["preset-state"].textContent = "Загрузка версии пресета…";
     try {
       const [versionsPage, version] = await Promise.all([
-        refreshVersions ? fetchPresetVersions(preset.preset_id) : Promise.resolve(null),
+        refreshVersions
+          ? fetchPresetVersions(preset.preset_id)
+          : Promise.resolve(versionsPageOverride),
         fetchPresetVersion(preset.preset_id, preferredVersion),
       ]);
       if (generation !== presetOpenGeneration) return false;
@@ -1985,6 +2033,7 @@ export function bootstrapAtomLab({
     selectedPresetSummary = null;
     selectedPresetVersion = null;
     presetSourceOverride = fromHistory;
+    presetSaveOutcomeUnknown = false;
     if (clearSessionPreset) session.presetRef = null;
     nodes["preset-name"].value = fromHistory ? `Запуск ${fromHistory.sourceRunId}` : "";
     nodes["preset-description"].value = "";
@@ -2006,7 +2055,8 @@ export function bootstrapAtomLab({
   };
 
   const savePreset = async ({forceNew = false} = {}) => {
-    if (presetLibraryLoading || presetOpenInFlight || presetReadOnly || presetSaveInFlight) return;
+    if (presetLibraryLoading || presetOpenInFlight || presetReadOnly || presetSaveInFlight
+      || presetSaveOutcomeUnknown) return;
     if (!presetSourceOverride && validateDraft(session).length > 0) {
       renderValidation(document, nodes["validation-errors"], session, admissionErrors);
       showInputTab(true);
@@ -2066,6 +2116,14 @@ export function bootstrapAtomLab({
         nodes["preset-error"].textContent = "Сохранение завершено, но сервер не вернул сохранённую версию при повторном чтении. Повторный Save обновит эту identity.";
       }
     } catch (error) {
+      if (error?.code === "request_outcome_unknown") {
+        presetSaveOutcomeUnknown = true;
+        nodes["preset-error"].textContent = updating
+          ? "Результат сохранения неизвестен: сервер мог создать новую версию. Не повторяйте Save; заново откройте пресет и проверьте список версий."
+          : "Результат создания неизвестен: сервер мог создать пресет. Не повторяйте Save; перезагрузите страницу и проверьте библиотеку.";
+        renderPresetState();
+        return;
+      }
       if (error?.code === "preset_version_conflict") {
         conflictLatestPreset = null;
         nodes["preset-conflict"].hidden = false;
@@ -2505,7 +2563,10 @@ export function bootstrapAtomLab({
         ? `Открыта сохранённая версия ${session.presetRef.version}.`
         : "Черновик без изменений.";
     refreshAdmissionValidation();
-    if (!nodes["presets-panel"].hidden) renderPresetState();
+    if (!nodes["presets-panel"].hidden) {
+      syncFixedFieldAvailability();
+      renderPresetState();
+    }
   };
 
   const renderEditor = (replaceFields = true, focusId = null) => {
@@ -2766,9 +2827,45 @@ export function bootstrapAtomLab({
     renderPresetState();
   });
   nodes["open-latest-preset"].addEventListener("click", async () => {
-    const latest = conflictLatestPreset;
-    if (!latest || presetOpenInFlight || presetSaveInFlight) return;
-    await openPreset(latest.summary, latest.version);
+    const recovery = conflictLatestPreset;
+    if (!recovery || presetOpenInFlight || presetSaveInFlight) return;
+    if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
+    presetOpenInFlight = true;
+    updatePresetEditorDisabled();
+    nodes["preset-error"].textContent = "";
+    let latestPage = null;
+    try {
+      latestPage = await fetchPresetVersions(recovery.summary.preset_id);
+    } catch (error) {
+      conflictLatestPreset = null;
+      nodes["preset-error"].textContent = error instanceof Error
+        ? `Не удалось получить актуальную версию: ${error.message}`
+        : "Не удалось получить актуальную версию.";
+    } finally {
+      presetOpenInFlight = false;
+      updatePresetEditorDisabled();
+    }
+    const latest = latestPage?.items[0];
+    if (!latest || !selectedPresetVersion || latest.version <= selectedPresetVersion.version) {
+      conflictLatestPreset = null;
+      nodes["preset-error"].textContent = "Сервер не вернул более новую актуальную версию. Обновите библиотеку вручную.";
+      updatePresetEditorDisabled();
+      return;
+    }
+    const summary = {
+      ...recovery.summary,
+      latest_version: latest.version,
+      name: latest.name,
+      description: latest.description,
+      atom_id: latest.atom_id,
+      updated_at: latest.created_at,
+    };
+    presetItems = presetItems.map((item) => item.preset_id === summary.preset_id ? summary : item);
+    await openPreset(summary, latest.version, {
+      force: true,
+      refreshVersions: false,
+      versionsPageOverride: latestPage,
+    });
   });
   nodes["export-preset"].addEventListener("click", async () => {
     if (!selectedPresetVersion || presetOpenInFlight || presetSaveInFlight) return;
