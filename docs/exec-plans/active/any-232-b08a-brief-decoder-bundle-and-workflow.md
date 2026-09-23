@@ -136,6 +136,7 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 | 2026-09-23 | Round #7 code review (self-review): round #6's no_issues fix was still ungrounded (ran against BRIEF_TEXT, not a clean-brief input); added CLEAN_BRIEF_TEXT and fixed the missing metadata.kind=list requirement; re-ran quick-check/full-check, both green | Update PR description, re-request review |
 | 2026-09-23 | Round #8 code review (self-review): 2 blockers (whitespace-only canonical strings; A05 prompt's one-per-issue overclaim) fixed with a sweep of every prompt claim vs. real enforcement; re-ran quick-check/full-check, both green | Re-request review |
 | 2026-09-23 | Round #9 code review (self-review): 1 blocker (`questions.maxItems: 10` vs the real cap of 5) fixed and pinned to the workflow; re-ran quick-check/full-check, both green | Re-request review |
+| 2026-09-23 | Round #10 code review (self-review): 1 blocker (canonical schema weaker than A01's cross-validator) + 1 minor doc finding fixed via a full atom-validator-vs-schema sweep; re-ran quick-check/full-check, both green | Re-request review |
 
 ## Code review round #1 (2026-09-21)
 
@@ -387,6 +388,34 @@ workflow (`max_questions: literal:5`) instead of relying on A05's implicit defau
 config test tying the schema's `maxItems` to that literal plus a 6-question mutation test and a
 resolved-payload assertion. Sweep of the remaining numeric bounds: `sections` (exactly 4) and
 `brief_text` (`maxLength` 8000) are product-owned and consistent; nothing else is capped.
+
+## Code review round #10 (2026-09-23, self-review)
+
+1 blocker + 1 minor, both confirmed and fixed. The blocker is the same class as round #9
+(canonical schema looser than the runtime contract; stored results are re-validated against the
+workflow output schema only, never by an atom's cross-validator), so this round swept *every*
+atom cross-validator against the schema instead of fixing only the reported one:
+
+1. **A01** (`ExtractStructuredFieldsCrossValidator`): the schema enforced field names/types but not
+   the invariants the validator rejects -- a field both in `values` and `missing_fields`, a
+   duplicate `missing_fields` entry, a field in neither, `confidence` for an unpopulated field.
+   Added `uniqueItems` on `missing_fields`, a per-field `oneOf` (exactly one of "in `values`" /
+   "named in `missing_fields`") and a per-field `if/then` (`confidence.<f>` requires
+   `values.<f>`). Five mutation tests, plus a behavioral test that derives the field list from
+   the workflow's own A01 `fields` literal so a new field can't skip these rules.
+2. **A04**: category membership already enforced by the taxonomy enum. Nothing to add.
+3. **A05**: `max_questions` fixed in round #9. Newly expressible: no issues means no questions
+   (`if issues.maxItems 0 then questions.maxItems 0`), added with a mutation test. Not
+   expressible in JSON Schema and left to the atom validator at run time (documented limit):
+   `source_issue_index < len(issues)` and the priority/index ordering -- both compare across
+   array elements/lengths.
+4. **A10**: no validator; the product schema itself is the contract (four fixed sections,
+   `metadata.kind = list`, non-blank strings).
+
+Minor: `docs/product-specs/add-product-recipe.md` still told every new product to write its own
+test-only `FakeProviderAdapter` subclass, contradicting the shared
+`tests/support/fake_provider_recording.RecordingProviderAdapter` this PR adds (round #2).
+Updated the recipe to point at the shared helper first.
 
 ## Open questions
 

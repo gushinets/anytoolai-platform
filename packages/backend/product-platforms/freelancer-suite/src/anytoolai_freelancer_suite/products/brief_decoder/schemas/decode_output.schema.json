@@ -50,6 +50,7 @@
         },
         "missing_fields": {
           "type": "array",
+          "uniqueItems": true,
           "items": {
             "type": "string",
             "enum": [
@@ -102,6 +103,362 @@
       "required": [
         "values",
         "missing_fields"
+      ],
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "project_goal"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "project_goal"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "project_goal"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "project_goal"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "deliverables"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "deliverables"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "deliverables"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "deliverables"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "deadline"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "deadline"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "deadline"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "deadline"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "budget"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "budget"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "budget"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "budget"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "target_audience"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "target_audience"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "target_audience"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "target_audience"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "constraints"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "constraints"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "constraints"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "constraints"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "project_goal"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "project_goal"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "deliverables"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "deliverables"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "deadline"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "deadline"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "budget"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "budget"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "target_audience"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "target_audience"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "constraints"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "constraints"
+                ]
+              }
+            }
+          }
+        }
       ],
       "additionalProperties": false
     },
@@ -233,6 +590,8 @@
     "document"
   ],
   "additionalProperties": false,
+  "if": { "properties": { "issues": { "maxItems": 0 } } },
+  "then": { "properties": { "questions": { "maxItems": 0 } } },
   "$defs": {
     "overviewSection": {
       "type": "object",

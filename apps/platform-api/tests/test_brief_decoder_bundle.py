@@ -215,6 +215,21 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
         "question_category_outside_taxonomy": mutated(
             lambda o: o["questions"][0].update(category="other")
         ),
+        # Code review finding (me #8): stored results are re-validated against this schema only,
+        # not A01's/A05's cross-validators, so their invariants must hold here too.
+        "field_both_present_and_missing": mutated(
+            lambda o: o["brief"]["missing_fields"].append("budget")
+        ),
+        "duplicate_missing_field": mutated(
+            lambda o: o["brief"]["missing_fields"].append("target_audience")
+        ),
+        "field_absent_from_values_and_missing_fields": mutated(
+            lambda o: o["brief"].update(missing_fields=[])
+        ),
+        "confidence_for_unpopulated_field": mutated(
+            lambda o: o["brief"]["confidence"].update(target_audience=0.5)
+        ),
+        "questions_without_issues": mutated(lambda o: o.update(issues=[])),
         "too_many_questions": mutated(
             lambda o: o.update(questions=[o["questions"][0]] * (MAX_QUESTIONS + 1))
         ),

@@ -238,6 +238,36 @@ def test_config_owned_literals_agree_with_the_output_schema() -> None:
             )
 
 
+@pytest.mark.parametrize("state", ["present_and_missing", "absent_from_both", "confidence_only"])
+def test_a01_field_invariants_hold_for_every_configured_field(state: str) -> None:
+    """The canonical schema must reject what A01's cross-validator rejects (a field both present
+    and missing, in neither, or carrying confidence without a value), for *every* field in the
+    workflow's own A01 field list -- derived from it, so a new field can't silently skip them."""
+    fields = [f["name"] for f in _literal(_steps()["extract"]["input_mapping"]["fields"])]
+    schema = _load_schema("brief_decoder.decode_output_v1")
+    validator = jsonschema.validators.validator_for(schema)(schema)
+    complete = json.loads(
+        (FIXTURE_ROOT / "brief_decoder.extract_brief_v1.no_issues.json").read_text("utf-8")
+    )["response_json"]
+    document = _fixture_response("brief_decoder.generate_summary_v1.no_issues")
+
+    def output(brief: dict[str, Any]) -> dict[str, Any]:
+        return {"brief": brief, "issues": [], "questions": [], "document": document}
+
+    assert validator.is_valid(output(complete))  # control: every field present, none missing
+    for name in fields:
+        brief = json.loads(json.dumps(complete))
+        if state == "present_and_missing":
+            brief["missing_fields"] = [name]
+        elif state == "absent_from_both":
+            del brief["values"][name]
+            brief["confidence"].pop(name, None)
+        else:
+            del brief["values"][name]
+            brief["missing_fields"] = [name]
+        assert not validator.is_valid(output(brief)), (state, name)
+
+
 def test_schemas_are_closed() -> None:
     def assert_closed(node: Any, where: str) -> None:
         if isinstance(node, dict):
