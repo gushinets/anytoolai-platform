@@ -19,7 +19,11 @@ const MODEL_REASONS = new Set([
 ]);
 const MODEL_REFRESH_STATUSES = new Set(["current", "pending", "running"]);
 const ATOM_IDS = new Set(["A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08", "A09", "A10", "A11"]);
-const PROMPT_REFERENCE_FIELD = ["prompt", "ref"].join("_");
+const CONFIRMED_PRESET_PREWRITE_FAILURE_CODES = new Set([
+  "atom_lab_catalog_unavailable",
+  "atom_lab_unavailable",
+  "runtime_storage_unavailable",
+]);
 
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
@@ -395,7 +399,7 @@ export function presetContractMatchesAtom(configuration, atom) {
     && isRecord(atom)
     && configuration.atom_id === atom.atom_id
     && configuration.base_action_config_id === atom.base_action_config_id
-    && configuration[PROMPT_REFERENCE_FIELD] === atom[PROMPT_REFERENCE_FIELD]
+    && configuration.prompt_ref === atom.prompt_ref
     && isSchemaReference(configuredSchemas?.input)
     && isSchemaReference(configuredSchemas?.output)
     && configuredSchemas.input.schema_ref === currentSchemas?.input?.schema_ref
@@ -415,7 +419,7 @@ function historyPresetConfiguration(detail) {
       output: {schema_ref: snapshot.schemas?.output?.ref, version: snapshot.schemas?.output?.version},
     },
     prompt: snapshot.prompt?.content,
-    [PROMPT_REFERENCE_FIELD]: snapshot.prompt?.ref,
+    prompt_ref: snapshot.prompt?.ref,
     model_id: snapshot.provider?.model_id,
     reasoning_effort: snapshot.provider?.reasoning_effort ?? null,
     example_input: snapshot.input,
@@ -438,7 +442,7 @@ export function parsePresetVersion(value, expectedPresetId = null, expectedVersi
     || !isSchemaReference(value.schema_refs.input)
     || !isSchemaReference(value.schema_refs.output)
     || !isNonEmptyString(value.prompt)
-    || !isNonEmptyString(value[PROMPT_REFERENCE_FIELD])
+    || !isNonEmptyString(value.prompt_ref)
     || !isNonEmptyString(value.model_id)
     || !isNullableReasoningEffort(value.reasoning_effort)
     || !Array.isArray(value.fixed_fields)
@@ -1519,6 +1523,7 @@ export function bootstrapAtomLab({
       invalidated.value = previousModelId;
       invalidated.textContent = `${previousModelId} — больше не доступна`;
       invalidated.disabled = true;
+      invalidated.dataset.modelUnavailablePlaceholder = "true";
       nodes["model-select"].append(invalidated);
     }
     const selected = previousRemainsSelectable ? previous : selectionInvalidated ? null : first;
@@ -1694,11 +1699,14 @@ export function bootstrapAtomLab({
       return payload;
     } catch (error) {
       if (error?.code === "request_outcome_unknown") throw error;
+      const confirmedPreWriteFailure = error?.status === 503
+        && CONFIRMED_PRESET_PREWRITE_FAILURE_CODES.has(error.code);
       if (options.method === "POST" && (
         timedOut
         || response === null
         || response.ok
-        || (Number.isInteger(error?.status) && error.status >= 500 && error.status <= 599)
+        || (Number.isInteger(error?.status) && error.status >= 500 && error.status <= 599
+          && !confirmedPreWriteFailure)
       )) {
         throw unknownWriteOutcome();
       }
@@ -1767,7 +1775,7 @@ export function bootstrapAtomLab({
       base_action_config_id: source?.base_action_config_id ?? atom.base_action_config_id,
       schema_refs: cloneJson(source?.schema_refs ?? atom.schema_refs),
       prompt: source?.prompt ?? session.prompt,
-      [PROMPT_REFERENCE_FIELD]: source?.[PROMPT_REFERENCE_FIELD] ?? atom[PROMPT_REFERENCE_FIELD],
+      prompt_ref: source?.prompt_ref ?? atom.prompt_ref,
       model_id: source?.modelId ?? addressedModelId(nodes["model-select"].value),
       reasoning_effort: source
         ? (source.reasoningEffort ?? null)
@@ -1796,6 +1804,10 @@ export function bootstrapAtomLab({
   };
 
   const applyModelSelection = (modelId, reasoningEffort) => {
+    for (const placeholder of nodes["model-select"].querySelectorAll("option[data-model-unavailable-placeholder]")) {
+      placeholder.remove();
+    }
+    renderModelCatalogWarning();
     const raw = modelId.startsWith("openai/") ? modelId.slice("openai/".length) : modelId;
     const option = modelOptions.find((item) => item.modelId === raw || addressedModelId(item.modelId) === modelId);
     const value = option?.modelId ?? raw;
@@ -1804,6 +1816,7 @@ export function bootstrapAtomLab({
       unavailable.value = value;
       unavailable.textContent = `${modelId} — недоступна`;
       unavailable.disabled = true;
+      unavailable.dataset.modelUnavailablePlaceholder = "true";
       nodes["model-select"].append(unavailable);
     }
     nodes["model-select"].value = value;
@@ -1957,11 +1970,11 @@ export function bootstrapAtomLab({
     return parsed;
   };
 
-  const commitPresetVersion = (parsed) => {
+  const commitPresetVersion = (parsed, {applyToEditor = true} = {}) => {
     const {preset_id: presetId, version} = parsed;
     selectedPresetVersion = cloneJson(parsed);
     presetEditorActive = true;
-    presetSourceOverride = null;
+    if (applyToEditor) presetSourceOverride = null;
     nodes["preset-name"].value = parsed.name;
     nodes["preset-description"].value = parsed.description;
     nodes["preset-version-select"].value = String(version);
@@ -1977,10 +1990,12 @@ export function bootstrapAtomLab({
       return;
     }
     setPresetReadOnly(false);
-    applyConfigurationToEditor(parsed, {
-      presetRef: {preset_id: presetId, version},
-      sourceRunId: parsed.source_run_id,
-    });
+    if (applyToEditor) {
+      applyConfigurationToEditor(parsed, {
+        presetRef: {preset_id: presetId, version},
+        sourceRunId: parsed.source_run_id,
+      });
+    }
     renderFixedFields(parsed.fixed_fields);
     presetDraftBaseline = presetFingerprint(currentPresetPayload());
     renderPresetState();
@@ -2034,7 +2049,7 @@ export function bootstrapAtomLab({
   const openPreset = async (
     preset,
     preferredVersion = null,
-    {force = false, refreshVersions = true, versionsPageOverride = null} = {},
+    {force = false, refreshVersions = true, versionsPageOverride = null, applyToEditor = true} = {},
   ) => {
     if (presetSaveInFlight && !force) return false;
     if (!force && hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return false;
@@ -2083,7 +2098,7 @@ export function bootstrapAtomLab({
         presetSaveOutcomeUnknown = null;
         setPresetError();
       }
-      commitPresetVersion(version);
+      commitPresetVersion(version, {applyToEditor});
       renderPresetList();
       return true;
     } catch (error) {
@@ -2146,6 +2161,7 @@ export function bootstrapAtomLab({
       ? `/v1/atom-lab/presets/${encodeURIComponent(selectedPresetVersion.preset_id)}/versions`
       : "/v1/atom-lab/presets";
     const body = updating ? {...payload, base_version: selectedPresetVersion.version} : payload;
+    const preserveEditor = presetSourceOverride !== null;
     try {
       const created = await protectedJson(url, {method: "POST", body: JSON.stringify(body)});
       if (!isRecord(created) || !isNonEmptyString(created.preset_id) || !isPositiveInteger(created.version)
@@ -2172,7 +2188,10 @@ export function bootstrapAtomLab({
       } else {
         presetItems = [summary, ...presetItems];
       }
-      const readBack = await openPreset(summary, created.version, {force: true});
+      const readBack = await openPreset(summary, created.version, {
+        force: true,
+        applyToEditor: !preserveEditor,
+      });
       if (readBack) {
         nodes["preset-state"].textContent = `Сохранена неизменяемая версия ${created.version}.`;
       } else {
@@ -2194,7 +2213,7 @@ export function bootstrapAtomLab({
           atom_id: payload.atom_id,
           created_at: created.created_at,
         }], next_cursor: null});
-        commitPresetVersion(localVersion);
+        commitPresetVersion(localVersion, {applyToEditor: !preserveEditor});
         renderPresetList();
         nodes["preset-state"].textContent = `Версия ${created.version} сохранена; повторное чтение не удалось.`;
         setPresetError("Сохранение завершено, но сервер не вернул сохранённую версию при повторном чтении. Повторный Save обновит эту identity.");
@@ -2739,11 +2758,15 @@ export function bootstrapAtomLab({
       nodes.workspace.hidden = false;
       nodes.status.textContent = `Доступно атомов: ${catalog.length}.`;
       selectAtom(catalog[0]);
+      nodes["presets-button"].disabled = false;
+      nodes["history-button"].disabled = false;
       await reloadCurrentModelCatalog();
     } catch (error) {
       accessCode = "";
       nodes["access-panel"].hidden = false;
       nodes.workspace.hidden = true;
+      nodes["presets-button"].disabled = true;
+      nodes["history-button"].disabled = true;
       nodes.status.textContent = error instanceof Error ? error.message : "Не удалось открыть каталог.";
       nodes["access-code"].focus();
     }
@@ -2847,13 +2870,14 @@ export function bootstrapAtomLab({
     renderEditor();
   });
   nodes["reset-prompt"].addEventListener("click", () => {
-    if (session.prompt !== session.basePrompt && !confirmImpl(DIRTY_WARNING)) return;
+    if (session.prompt === session.basePrompt) return;
+    if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     resetPrompt(session);
     nodes["prompt-editor"].value = session.prompt;
     updateDraftState();
   });
   nodes["presets-button"].addEventListener("click", async () => {
-    if (presetLibraryLoading || presetOpenInFlight || presetSaveInFlight) return;
+    if (!session || presetLibraryLoading || presetOpenInFlight || presetSaveInFlight) return;
     nodes["history-panel"].hidden = true;
     nodes["presets-panel"].hidden = false;
     setPresetLibraryLoading(true);
@@ -2869,6 +2893,7 @@ export function bootstrapAtomLab({
     }
   });
   nodes["history-button"].addEventListener("click", async () => {
+    if (!session) return;
     nodes["presets-panel"].hidden = true;
     nodes["history-panel"].hidden = false;
     await loadHistory();
@@ -3037,7 +3062,7 @@ export function bootstrapAtomLab({
       schema_refs: cloneJson(configuration.schema_refs),
       input: cloneJson(configuration.input),
       prompt: configuration.prompt,
-      [PROMPT_REFERENCE_FIELD]: configuration[PROMPT_REFERENCE_FIELD],
+      prompt_ref: configuration.prompt_ref,
       modelId: configuration.model_id,
       reasoningEffort: configuration.reasoning_effort,
       sourceRunId: selectedHistoryDetail.run_id,

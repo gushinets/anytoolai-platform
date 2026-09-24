@@ -148,6 +148,24 @@ async function importJson(page, payload) {
   await page.locator("#form-mode").click();
 }
 
+test("preset and history libraries stay inert before access is unlocked", async ({page}) => {
+  let protectedReads = 0;
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (pathname === "/v1/atom-lab/presets" || pathname === "/v1/atom-lab/runs") protectedReads += 1;
+  });
+  await openLab(page);
+
+  await expect(page.locator("#presets-button")).toBeDisabled();
+  await expect(page.locator("#history-button")).toBeDisabled();
+  await page.locator("#presets-button").dispatchEvent("click");
+  await page.locator("#history-button").dispatchEvent("click");
+
+  await expect(page.locator("#presets-panel")).toBeHidden();
+  await expect(page.locator("#history-panel")).toBeHidden();
+  expect(protectedReads).toBe(0);
+});
+
 test("protected shell, dynamic values, invalid types, numbers, focus, and narrow layout work in Chromium", async ({page}) => {
   await page.setViewportSize({width: 375, height: 900});
   page.on("dialog", (dialog) => dialog.accept());
@@ -1884,6 +1902,129 @@ test("preset identity opens the fresh latest version while explicit version sele
   expect(detailReads).toEqual([2, 1]);
 });
 
+test("reset prompt warns only when the open preset already has unsaved changes", async ({page}) => {
+  const stored = {
+    name: "Preset with custom prompt", description: "Reset guard", atom_id: "A06",
+    base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
+    prompt: "Сохранённый пользовательский промпт", prompt_ref: A06.prompt_ref,
+    model_id: "openai/gpt-supported", reasoning_effort: "high", fixed_fields: [],
+    example_input: A06.example_input, source_run_id: null,
+    preset_id: "preset-reset-guard", version: 1, created_at: "2026-09-24T08:00:00Z",
+  };
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const {pathname} = new URL(route.request().url());
+    if (pathname === "/v1/atom-lab/presets") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: stored.preset_id, latest_version: 1, name: stored.name,
+        description: stored.description, atom_id: stored.atom_id,
+        created_at: stored.created_at, updated_at: stored.created_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: stored.preset_id, version: 1, name: stored.name, description: stored.description,
+        atom_id: stored.atom_id, created_at: stored.created_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions/1`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(stored)});
+      return;
+    }
+    await route.fallback();
+  });
+
+  let dialogs = 0;
+  page.on("dialog", (dialog) => {
+    dialogs += 1;
+    dialog.accept();
+  });
+  await unlockAtom(page, "A06");
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-list button").click();
+  await page.locator("#prompt-tab").click();
+
+  await page.locator("#reset-prompt").click();
+  await expect(page.locator("#prompt-editor")).toHaveValue(A06.prompt);
+  expect(dialogs).toBe(0);
+
+  await page.locator("#prompt-editor").fill("Ещё одно несохранённое изменение");
+  await page.locator("#reset-prompt").click();
+  await expect(page.locator("#prompt-editor")).toHaveValue(A06.prompt);
+  expect(dialogs).toBe(1);
+});
+
+test("opening presets replaces unavailable model placeholders and restores the catalog warning", async ({page}) => {
+  let refreshed = false;
+  const stored = (presetId, name, modelId, createdAt) => ({
+    name, description: "Model selection state", atom_id: "A06",
+    base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
+    prompt: A06.prompt, prompt_ref: A06.prompt_ref,
+    model_id: modelId, reasoning_effort: "high", fixed_fields: [],
+    example_input: A06.example_input, source_run_id: null,
+    preset_id: presetId, version: 1, created_at: createdAt,
+  });
+  const unavailable = stored("preset-missing-model", "Missing model", "openai/gpt-retired", "2026-09-24T08:10:00Z");
+  const available = stored("preset-current-model", "Current model", "openai/gpt-supported", "2026-09-24T08:09:00Z");
+  const presets = [unavailable, available];
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const request = route.request();
+    const {pathname} = new URL(request.url());
+    if (pathname === "/v1/atom-lab/models/refresh" && request.method() === "POST") {
+      refreshed = true;
+      await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({
+        ...MODEL_CATALOG,
+        stale: false,
+        refresh_status: "current",
+      })});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: presets.map((item) => ({
+        preset_id: item.preset_id, latest_version: 1, name: item.name,
+        description: item.description, atom_id: item.atom_id,
+        created_at: item.created_at, updated_at: item.created_at,
+      })), next_cursor: null})});
+      return;
+    }
+    const matched = presets.find((item) => pathname.startsWith(`/v1/atom-lab/presets/${item.preset_id}/versions`));
+    if (matched && pathname.endsWith("/versions")) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: matched.preset_id, version: 1, name: matched.name,
+        description: matched.description, atom_id: matched.atom_id, created_at: matched.created_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (matched && pathname.endsWith("/versions/1")) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(matched)});
+      return;
+    }
+    await route.fallback();
+  });
+
+  await unlockAtom(page, "A06", {models: () => refreshed ? {
+    ...MODEL_CATALOG,
+    stale: false,
+    refresh_status: "current",
+  } : MODEL_CATALOG});
+  await page.locator("#presets-button").click();
+  await page.getByRole("button", {name: /Missing model/}).click();
+  await expect(page.locator("#model-select option", {hasText: "gpt-retired — недоступна"})).toHaveCount(1);
+  await expect(page.locator("#model-catalog-warning")).toContainText("Сохранённая модель недоступна");
+
+  await page.getByRole("button", {name: /Missing model/}).click();
+  await expect(page.locator("#model-select option", {hasText: "gpt-retired — недоступна"})).toHaveCount(1);
+
+  await page.locator("#refresh-models").click();
+  await expect.poll(() => refreshed).toBe(true);
+  await expect(page.locator('#model-select option[value="gpt-retired"]')).toHaveCount(1);
+  await page.getByRole("button", {name: /Current model/}).click();
+  await expect(page.locator("#model-select")).toHaveValue("gpt-supported");
+  await expect(page.locator('#model-select option[value="gpt-retired"]')).toHaveCount(0);
+  await expect(page.locator("#model-catalog-warning")).toBeEmpty();
+});
+
 test("reopening presets refreshes shared identities without dropping loaded later pages", async ({page}) => {
   const summary = (presetId, name, createdAt) => ({
     preset_id: presetId,
@@ -2260,7 +2401,14 @@ test("gateway failure after a committed preset write blocks blind duplicate save
     if (route.request().method() === "POST") {
       posts += 1;
       committed = true;
-      await route.fulfill({status: 502, contentType: "text/html", body: "Bad Gateway"});
+      await route.fulfill({status: 502, contentType: "application/json", body: JSON.stringify({
+        error: {
+          code: "atom_lab_catalog_unavailable",
+          message: "Bad Gateway after an uncertain upstream outcome.",
+          field_errors: [],
+        },
+        request_id: "request-gateway-1",
+      })});
       return;
     }
     await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
@@ -2276,6 +2424,38 @@ test("gateway failure after a committed preset write blocks blind duplicate save
   await expect(page.locator("#save-preset")).toBeDisabled();
   await expect(page.locator("#save-as-new-preset")).toBeDisabled();
   expect({committed, posts}).toEqual({committed: true, posts: 1});
+});
+
+test("structured pre-write preset failure keeps the draft retryable", async ({page}) => {
+  let posts = 0;
+  await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
+    if (route.request().method() === "POST") {
+      posts += 1;
+      await route.fulfill({status: 503, contentType: "application/json", body: JSON.stringify({
+        error: {
+          code: "atom_lab_catalog_unavailable",
+          message: "Каталог Atom Lab недоступен.",
+          field_errors: [],
+        },
+        request_id: `request-pre-write-${posts}`,
+      })});
+      return;
+    }
+    await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#fill-example").click();
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-name").fill("Retryable pre-write draft");
+  await page.locator("#save-preset").click();
+
+  await expect(page.locator("#preset-error")).toContainText("Каталог Atom Lab недоступен");
+  await expect(page.locator("#preset-name")).toHaveValue("Retryable pre-write draft");
+  await expect(page.locator("#save-preset")).toBeEnabled();
+  await expect(page.locator("#new-preset")).toBeEnabled();
+  await page.locator("#save-preset").click();
+  await expect.poll(() => posts).toBe(2);
 });
 
 test("malformed successful preset response blocks blind duplicate saves", async ({page}) => {
@@ -2962,14 +3142,14 @@ test("saving from history uses the selected snapshot instead of the unrelated ed
   await page.locator("#save-history-preset").click();
   await expect(page.locator("#fixed-fields").getByLabel("objective")).toBeVisible();
   await page.locator("#close-presets").click();
-  await page.locator("#run-button").click();
-  await expect.poll(() => runBody).not.toBeNull();
-  expect(runBody.preset_ref).toEqual({preset_id: editorPreset.preset_id, version: 1});
+  await page.locator("#prompt-tab").click();
+  await page.locator("#prompt-editor").fill("Несохранённый A05 prompt");
   await page.locator("#presets-button").click();
   await page.locator("#preset-name").fill("Из выбранной истории");
   await page.locator("#preset-description").fill("Не из текущего A05 draft");
   await page.locator("#save-preset").click();
   await expect.poll(() => savedBody).not.toBeNull();
+  await expect(page.locator("#preset-state")).toContainText("Сохранена неизменяемая версия 1");
 
   expect(savedBody.atom_id).toBe("A06");
   expect(savedBody.base_action_config_id).toBe(detail.snapshot.action.config_id);
@@ -2983,4 +3163,13 @@ test("saving from history uses the selected snapshot instead of the unrelated ed
   expect(savedBody.model_id).toBe(detail.snapshot.provider.model_id);
   expect(savedBody.reasoning_effort).toBe(detail.snapshot.provider.reasoning_effort);
   expect(savedBody.source_run_id).toBe(detail.run_id);
+
+  await expect(page.locator("#atom-title")).toContainText("A05");
+  await expect(page.locator("#prompt-editor")).toHaveValue("Несохранённый A05 prompt");
+  await page.locator("#close-presets").click();
+  await page.locator("#run-button").click();
+  await expect.poll(() => runBody).not.toBeNull();
+  expect(runBody.atom_id).toBe("A05");
+  expect(runBody.prompt).toBe("Несохранённый A05 prompt");
+  expect(runBody.preset_ref).toEqual({preset_id: editorPreset.preset_id, version: 1});
 });
