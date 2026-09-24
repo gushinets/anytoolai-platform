@@ -40,6 +40,24 @@ const HANDOFF_STATUS_IS_TERMINAL: Record<HandoffStatus, boolean> = {
   failed: true,
 };
 
+// User-facing copy for the wire enum. Exhaustive over HandoffStatus so a new status fails typecheck
+// here instead of leaking its raw value into the UI. `consumed` means the accepted handoff already
+// created its target session, which is one "Accepted" outcome from the user's side.
+const HANDOFF_STATUS_LABEL: Record<HandoffStatus, string> = {
+  created: "Waiting for your decision",
+  viewed: "Waiting for your decision",
+  accepted: "Accepted",
+  consumed: "Accepted",
+  declined: "Declined",
+  expired: "Expired",
+  failed: "Failed",
+};
+
+function formatExpiry(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
 function isTerminalHandoffStatus(status: HandoffStatus): boolean {
   return HANDOFF_STATUS_IS_TERMINAL[status];
 }
@@ -235,9 +253,11 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
         <dt>To</dt>
         <dd>{preview.targetProductDisplayName}</dd>
         <dt>Expires</dt>
-        <dd>{preview.expiresAt}</dd>
+        <dd>
+          <time dateTime={preview.expiresAt}>{formatExpiry(preview.expiresAt)}</time>
+        </dd>
         <dt>Status</dt>
-        <dd>{preview.status}</dd>
+        <dd>{HANDOFF_STATUS_LABEL[preview.status]}</dd>
         {Object.entries(preview.preview).map(([key, value]) => (
           <div key={key} className={styles.entry}>
             <dt>{key}</dt>

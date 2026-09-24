@@ -71,6 +71,10 @@ h1 {
   font-size: 44px;
 }
 
+a {
+  color: var(--color-accent);
+}
+
 /* SKILL.md's "Label" role: DM Sans, 600 weight (12px here: 10-11px is below the 12px readable minimum) -- ProposalAIFields's <label> elements
  * were rendering as unstyled browser-default text (same as body), which both looks wrong and
  * technically falls under Bundle 3's "unapproved system-font replacement" prohibition. */

@@ -248,6 +248,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const tp = useProductT();
   const title = tp("title");
   const inProductShell = useContext(ProductShellContext);
+  // Inside ProductPageShell the shell owns the one <main> (heading, product controls such as a
+  // mode selector, and this run content share it); standalone, this page is its own landmark.
+  const Root = inProductShell ? "div" : "main";
 
   // Always-current `onEvent` behind a ref, refreshed after every render. Used by every
   // emitEvent() call site below, not just the mount effect: `handleSubmit`/`handleRetry`/
@@ -778,22 +781,22 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   if (boot.kind === "loading") {
     return (
-      <main className={inProductShell ? undefined : "page-container"}>
+      <Root className={inProductShell ? undefined : "page-container"}>
         <div className={styles.content}>
           {inProductShell ? null : <div className={styles.utilityRow}><LanguageSwitcher /></div>}
           <p role="status">{th("loading", { product: title })}</p>
         </div>
-      </main>
+      </Root>
     );
   }
   if (boot.kind === "boot-error") {
     return (
-      <main className={inProductShell ? undefined : "page-container"}>
+      <Root className={inProductShell ? undefined : "page-container"}>
         <div className={styles.content}>
           {inProductShell ? null : <div className={styles.utilityRow}><LanguageSwitcher /></div>}
           <ErrorState message={th("unavailable", { product: title })} />
         </div>
-      </main>
+      </Root>
     );
   }
 
@@ -863,7 +866,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   return (
-    <main className={inProductShell ? undefined : "page-container"}>
+    <Root className={inProductShell ? undefined : "page-container"}>
       <div className={styles.content}>
         <header className={styles.header}>
           {inProductShell ? null : (
@@ -909,7 +912,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
         />
       ) : null}
       </div>
-    </main>
+    </Root>
   );
 }
 

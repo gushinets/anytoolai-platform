@@ -39,7 +39,7 @@ function ProductPageContent({ Component, client, onEvent, visitId }: Pick<Regist
 }) {
   const t = useProductT();
   return (
-    <div className={styles.shell}>
+    <main className={styles.shell}>
       <header className={styles.titleRow}>
         <h1>{t("title")}</h1>
         <LanguageSwitcher />
@@ -49,6 +49,6 @@ function ProductPageContent({ Component, client, onEvent, visitId }: Pick<Regist
       <ProductShellContext.Provider value={true}>
         <Component client={client} onEvent={onEvent} visitId={visitId} />
       </ProductShellContext.Provider>
-    </div>
+    </main>
   );
 }

@@ -1,7 +1,7 @@
 // The host-level locale behavior a user sees on `/products/{productId}`: one selector for every
 // registered product, locale resolution/persistence, and -- the point of the ticket -- UI locale
 // staying independent of scenario input (incl. the output-language field) and of form/run state.
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LOCALES, type Locale } from "../src/i18n";
 import { LOCALE_STORAGE_KEY, resetUnpersistedLocaleForTests } from "../src/i18n/localeStorage";
@@ -383,6 +383,16 @@ describe("UI locale is independent of scenario input and state", () => {
 
     await waitFor(() => expect(screen.getByText("Generated.")).toBeTruthy());
     expect(startInput(calls).tone).toBe("firm");
+  });
+
+  it("puts the heading and Client Update Writer's mode selector inside the one main landmark", async () => {
+    renderShell(registered("client_update_writer"), bootRoutes(CUW_IDS));
+    await screen.findByLabelText(CLIENT_UPDATE_WRITER_MESSAGES.en.fields.progressNotes);
+
+    const main = screen.getByRole("main");
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(within(main).getByRole("heading", { level: 1 })).toBeTruthy();
+    expect(within(main).getAllByRole("radio")).toHaveLength(3);
   });
 
   it("keeps Client Update Writer's selected mode, its values and the mode wire values across a switch", async () => {
