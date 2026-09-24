@@ -54,8 +54,9 @@ function ToneField({
           disabled={disabled}
           placeholderLabel={t("fields.tonePlaceholder")}
           ariaInvalid={Boolean(error)}
+          ariaDescribedBy={error ? "client-update-writer-tone-error" : undefined}
         />
-        <FieldErrorMessage className={styles.error} error={error} label={t("fieldNames.tone")} />
+        <FieldErrorMessage id="client-update-writer-tone-error" className={styles.error} error={error} label={t("fieldNames.tone")} />
       </div>
     </>
   );
@@ -111,8 +112,9 @@ function UpdateFields({ values, errors, disabled, onChange }: ProductFieldsProps
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("progressNotes", event.target.value)}
           disabled={disabled}
           aria-invalid={Boolean(errors.progressNotes)}
+          aria-describedby={errors.progressNotes ? "client-update-writer-progress-notes-error" : undefined}
         />
-        <FieldErrorMessage className={styles.error} error={errors.progressNotes} label={t("fieldNames.progressNotes")} />
+        <FieldErrorMessage id="client-update-writer-progress-notes-error" className={styles.error} error={errors.progressNotes} label={t("fieldNames.progressNotes")} />
       </div>
       <ToneField value={values.tone} error={errors.tone} disabled={disabled} onChange={(tone) => onChange("tone", tone)} />
     </>
@@ -155,8 +157,9 @@ function ReplyDraftFields({ values, errors, disabled, onChange }: ProductFieldsP
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("clientMessage", event.target.value)}
           disabled={disabled}
           aria-invalid={Boolean(errors.clientMessage)}
+          aria-describedby={errors.clientMessage ? "client-update-writer-client-message-error" : undefined}
         />
-        <FieldErrorMessage className={styles.error} error={errors.clientMessage} label={t("fieldNames.clientMessage")} />
+        <FieldErrorMessage id="client-update-writer-client-message-error" className={styles.error} error={errors.clientMessage} label={t("fieldNames.clientMessage")} />
       </div>
 
       <div className={styles.fieldGroup}>
@@ -167,8 +170,9 @@ function ReplyDraftFields({ values, errors, disabled, onChange }: ProductFieldsP
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("replyGoal", event.target.value)}
           disabled={disabled}
           aria-invalid={Boolean(errors.replyGoal)}
+          aria-describedby={errors.replyGoal ? "client-update-writer-reply-goal-error" : undefined}
         />
-        <FieldErrorMessage className={styles.error} error={errors.replyGoal} label={t("fieldNames.replyGoal")} />
+        <FieldErrorMessage id="client-update-writer-reply-goal-error" className={styles.error} error={errors.replyGoal} label={t("fieldNames.replyGoal")} />
       </div>
       <ToneField value={values.tone} error={errors.tone} disabled={disabled} onChange={(tone) => onChange("tone", tone)} />
     </>
@@ -212,8 +216,9 @@ function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFie
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("billingNotes", event.target.value)}
           disabled={disabled}
           aria-invalid={Boolean(errors.billingNotes)}
+          aria-describedby={errors.billingNotes ? "client-update-writer-billing-notes-error" : undefined}
         />
-        <FieldErrorMessage className={styles.error} error={errors.billingNotes} label={t("fieldNames.billingNotes")} />
+        <FieldErrorMessage id="client-update-writer-billing-notes-error" className={styles.error} error={errors.billingNotes} label={t("fieldNames.billingNotes")} />
       </div>
 
       <div className={styles.fieldGroup}>
@@ -224,8 +229,9 @@ function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFie
           onChange={(event: ChangeEvent<HTMLInputElement>) => onChange("billingAmount", event.target.value)}
           disabled={disabled}
           aria-invalid={Boolean(errors.billingAmount)}
+          aria-describedby={errors.billingAmount ? "client-update-writer-billing-amount-error" : undefined}
         />
-        <FieldErrorMessage className={styles.error} error={errors.billingAmount} label={t("fieldNames.billingAmount")} />
+        <FieldErrorMessage id="client-update-writer-billing-amount-error" className={styles.error} error={errors.billingAmount} label={t("fieldNames.billingAmount")} />
       </div>
 
       <div className={styles.fieldGroup}>
@@ -236,8 +242,9 @@ function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFie
           onChange={(event: ChangeEvent<HTMLInputElement>) => onChange("billingDueDate", event.target.value)}
           disabled={disabled}
           aria-invalid={Boolean(errors.billingDueDate)}
+          aria-describedby={errors.billingDueDate ? "client-update-writer-billing-due-date-error" : undefined}
         />
-        <FieldErrorMessage className={styles.error} error={errors.billingDueDate} label={t("fieldNames.billingDueDate")} />
+        <FieldErrorMessage id="client-update-writer-billing-due-date-error" className={styles.error} error={errors.billingDueDate} label={t("fieldNames.billingDueDate")} />
       </div>
       <ToneField value={values.tone} error={errors.tone} disabled={disabled} onChange={(tone) => onChange("tone", tone)} />
     </>

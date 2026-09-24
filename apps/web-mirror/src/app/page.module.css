@@ -18,7 +18,8 @@
 
 .title {
   margin: 0;
-  font-size: clamp(44px, 8vw, 72px);
+  /* Bundle 3's Display role: Cabinet Grotesk 900 at 44-56px (layout.test.ts pins the pairing). */
+  font-size: clamp(44px, 6vw, 56px);
   line-height: 1.02;
   /* Bundle 3's gradientHeadline token; the plain colour is the fallback if clipping is unsupported. */
   color: var(--color-accent);
@@ -67,9 +68,14 @@
 }
 
 .name {
+  /* Bundle 3's Section role is Cabinet Grotesk 800, which Fontshare does not deliver reliably
+   * (see layout.tsx), and 900 at a Section size would break the weight/size pairing. Card titles
+   * therefore use the approved body face instead of a mismatched heading role. */
   margin: 0;
-  font-size: 28px;
-  line-height: 1.1;
+  font-family: var(--font-body, ui-sans-serif), var(--font-cyrillic, system-ui), sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 /* The heading's link stretches over the whole card, so the card is one target and one tab stop. */
