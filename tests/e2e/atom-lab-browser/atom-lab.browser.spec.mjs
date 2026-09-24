@@ -1810,6 +1810,31 @@ test("transport loss after a committed preset write blocks blind duplicate saves
   });
 });
 
+test("gateway failure after a committed preset write blocks blind duplicate saves", async ({page}) => {
+  let committed = false;
+  let posts = 0;
+  await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
+    if (route.request().method() === "POST") {
+      posts += 1;
+      committed = true;
+      await route.fulfill({status: 502, contentType: "text/html", body: "Bad Gateway"});
+      return;
+    }
+    await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#fill-example").click();
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-name").fill("Commit за gateway");
+  await page.locator("#save-preset").click();
+
+  await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
+  await expect(page.locator("#save-preset")).toBeDisabled();
+  await expect(page.locator("#save-as-new-preset")).toBeDisabled();
+  expect({committed, posts}).toEqual({committed: true, posts: 1});
+});
+
 test("malformed successful preset response blocks blind duplicate saves", async ({page}) => {
   let posts = 0;
   await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
@@ -2056,6 +2081,59 @@ test("fixed fields are selectable only while their values exist in the preset in
   await expect(page.locator("#fixed-fields").getByLabel("audience")).toBeDisabled();
   await expect(page.locator("#fixed-fields").getByLabel("audience")).not.toBeChecked();
   await expect(page.locator("#preset-state")).not.toHaveText("Загрузка пресетов…");
+});
+
+test("fill example protects preset-only fixed-field changes", async ({page}) => {
+  const stored = {
+    name: "Preset-only draft", description: "Dirty fixed field", atom_id: "A06",
+    base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
+    prompt: A06.prompt, prompt_ref: A06.prompt_ref,
+    model_id: "openai/gpt-supported", reasoning_effort: "high", fixed_fields: [],
+    example_input: {...A06.example_input, audience: "Команда"}, source_run_id: null,
+    preset_id: "preset-fixed-dirty", version: 1, created_at: "2026-09-24T06:00:00Z",
+  };
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const request = route.request();
+    const {pathname} = new URL(request.url());
+    if (pathname === "/v1/atom-lab/presets" && request.method() === "GET") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: stored.preset_id, latest_version: stored.version, name: stored.name,
+        description: stored.description, atom_id: stored.atom_id,
+        created_at: stored.created_at, updated_at: stored.created_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: stored.preset_id, version: stored.version, name: stored.name,
+        description: stored.description, atom_id: stored.atom_id, created_at: stored.created_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions/1`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(stored)});
+      return;
+    }
+    await route.fallback();
+  });
+  let confirmations = 0;
+  page.on("dialog", async (dialog) => {
+    confirmations += 1;
+    await dialog.dismiss();
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-list button").click();
+  await page.locator("#fixed-fields").getByLabel("audience").check();
+  await expect(page.locator("#preset-state")).toContainText("Есть несохранённый черновик");
+
+  await page.locator("#fill-example").click();
+
+  expect(confirmations).toBe(1);
+  await expect(page.locator("#fixed-fields").getByLabel("audience")).toBeChecked();
+  await page.locator("#json-mode").click();
+  await expect(page.locator("#json-editor")).toHaveValue(/"audience": "Команда"/);
 });
 
 test("accepted run immediately marks an open saved preset as a changed draft", async ({page}) => {

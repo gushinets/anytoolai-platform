@@ -1692,10 +1692,16 @@ export function bootstrapAtomLab({
       }
       return payload;
     } catch (error) {
-      if (error?.code === "request_outcome_unknown" || error?.status !== undefined) throw error;
-      if (options.method === "POST" && (timedOut || response === null || response.ok)) {
+      if (error?.code === "request_outcome_unknown") throw error;
+      if (options.method === "POST" && (
+        timedOut
+        || response === null
+        || response.ok
+        || (Number.isInteger(error?.status) && error.status >= 500 && error.status <= 599)
+      )) {
         throw unknownWriteOutcome();
       }
+      if (error?.status !== undefined) throw error;
       if (error?.name !== "AbortError" || !timedOut) throw error;
       const failure = new Error("Время ожидания ответа истекло.");
       failure.code = "request_timeout";
@@ -2767,7 +2773,7 @@ export function bootstrapAtomLab({
     pollRun(activeSubmission);
   });
   nodes["fill-example"].addEventListener("click", () => {
-    if (session.dirty && !confirmImpl(DIRTY_WARNING)) return;
+    if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     replaceWithExample(session);
     renderEditor();
   });
