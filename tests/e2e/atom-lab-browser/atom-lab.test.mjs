@@ -2120,7 +2120,11 @@ test("preset and history parsers fail closed around immutable and paginated cont
   assert.ok(parsePresetVersionList({items: [{
     preset_id: "preset-1", version: 1, name: "Набор", description: "Описание",
     atom_id: "A01", created_at: "2026-09-23T00:00:00Z",
-  }], next_cursor: null}));
+  }], next_cursor: null}, "preset-1"));
+  assert.equal(parsePresetVersionList({items: [{
+    preset_id: "preset-other", version: 1, name: "Чужой набор", description: "Описание",
+    atom_id: "A01", created_at: "2026-09-23T00:00:00Z",
+  }], next_cursor: null}, "preset-1"), null);
   assert.equal(parseRunList({items: [{
     run_id: "run-1", status: "failed", atom_id: "A01", model_id: "openai/gpt-5",
     preset_id: null, preset_version: 2, created_at: "2026-09-23T00:00:00Z",

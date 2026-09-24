@@ -465,8 +465,9 @@ export function parsePresetList(value) {
   return parsePage(value, isPresetSummary);
 }
 
-export function parsePresetVersionList(value) {
-  return parsePage(value, isPresetVersionSummary);
+export function parsePresetVersionList(value, expectedPresetId = null) {
+  return parsePage(value, (item) => isPresetVersionSummary(item)
+    && (expectedPresetId === null || item.preset_id === expectedPresetId));
 }
 
 function isRunSummary(value) {
@@ -1961,7 +1962,7 @@ export function bootstrapAtomLab({
     const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
     const parsed = parsePresetVersionList(await protectedJson(
       `/v1/atom-lab/presets/${encodeURIComponent(presetId)}/versions${query}`,
-    ));
+    ), presetId);
     if (!parsed) throw new Error("Список версий вернул некорректный ответ.");
     return parsed;
   };
@@ -2106,6 +2107,8 @@ export function bootstrapAtomLab({
     nodes["preset-error"].textContent = "";
     const payload = currentPresetPayload();
     const updating = Boolean(selectedPresetVersion) && !forceNew;
+    const expectedPresetId = updating ? selectedPresetVersion.preset_id : null;
+    const expectedVersion = updating ? selectedPresetVersion.version + 1 : 1;
     const url = updating
       ? `/v1/atom-lab/presets/${encodeURIComponent(selectedPresetVersion.preset_id)}/versions`
       : "/v1/atom-lab/presets";
@@ -2113,7 +2116,9 @@ export function bootstrapAtomLab({
     try {
       const created = await protectedJson(url, {method: "POST", body: JSON.stringify(body)});
       if (!isRecord(created) || !isNonEmptyString(created.preset_id) || !isPositiveInteger(created.version)
-        || !isNonEmptyString(created.created_at)) {
+        || !isNonEmptyString(created.created_at)
+        || created.version !== expectedVersion
+        || (expectedPresetId !== null && created.preset_id !== expectedPresetId)) {
         throw unknownWriteOutcome();
       }
       if (!updating) await loadPresets();

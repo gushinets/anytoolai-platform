@@ -102,7 +102,7 @@ function historyDetail({
     result: {summary: "Готово"},
     diagnostics: {
       error_code: null, duration_ms: 900, requested_model_id: "openai/gpt-supported",
-      requested_reasoning_effort: "high", response_model_id: "gpt-supported",
+      requested_reasoning_effort: reasoningEffort, response_model_id: "gpt-supported",
       validation_attempts: 2, transport_attempts: 1, physical_calls: 1,
       succeeded_first_attempt: false, provider_calls: [], provider_calls_truncated: false,
       debug_artifacts: [], debug_artifacts_truncated: false,
@@ -1947,6 +1947,94 @@ test("invalid successful preset response blocks blind duplicate saves", async ({
   await expect(page.locator("#save-as-new-preset")).toBeDisabled();
   expect(posts).toBe(1);
 });
+
+test("new preset response with a non-initial version blocks blind duplicate saves", async ({page}) => {
+  let posts = 0;
+  await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
+    if (route.request().method() === "POST") {
+      posts += 1;
+      await route.fulfill({status: 201, contentType: "application/json", body: JSON.stringify({
+        preset_id: "preset-wrong-create-version",
+        version: 2,
+        created_at: "2026-09-24T12:00:00Z",
+      })});
+      return;
+    }
+    await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#fill-example").click();
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-name").fill("Неверная первая версия");
+  await page.locator("#save-preset").click();
+
+  await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
+  await expect(page.locator("#save-preset")).toBeDisabled();
+  await expect(page.locator("#save-as-new-preset")).toBeDisabled();
+  expect(posts).toBe(1);
+});
+
+for (const responseCase of [
+  {name: "another identity", presetId: "preset-other", version: 2},
+  {name: "a non-consecutive version", presetId: "preset-update-contract", version: 3},
+]) {
+  test(`preset version response for ${responseCase.name} blocks blind duplicate saves`, async ({page}) => {
+    const stored = {
+      name: "Версия до обновления", description: "Проверка write receipt", atom_id: "A06",
+      base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
+      prompt: A06.prompt, prompt_ref: A06.prompt_ref,
+      model_id: "openai/gpt-supported", reasoning_effort: "high", fixed_fields: [],
+      example_input: A06.example_input, source_run_id: null,
+      preset_id: "preset-update-contract", version: 1, created_at: "2026-09-24T11:00:00Z",
+    };
+    let posts = 0;
+    await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+      const request = route.request();
+      const {pathname} = new URL(request.url());
+      if (pathname === "/v1/atom-lab/presets") {
+        await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+          preset_id: stored.preset_id, latest_version: 1, name: stored.name,
+          description: stored.description, atom_id: stored.atom_id,
+          created_at: stored.created_at, updated_at: stored.created_at,
+        }], next_cursor: null})});
+        return;
+      }
+      if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions` && request.method() === "POST") {
+        posts += 1;
+        await route.fulfill({status: 201, contentType: "application/json", body: JSON.stringify({
+          preset_id: responseCase.presetId,
+          version: responseCase.version,
+          created_at: "2026-09-24T12:00:00Z",
+        })});
+        return;
+      }
+      if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions`) {
+        await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+          preset_id: stored.preset_id, version: 1, name: stored.name, description: stored.description,
+          atom_id: stored.atom_id, created_at: stored.created_at,
+        }], next_cursor: null})});
+        return;
+      }
+      if (pathname === `/v1/atom-lab/presets/${stored.preset_id}/versions/1`) {
+        await route.fulfill({contentType: "application/json", body: JSON.stringify(stored)});
+        return;
+      }
+      await route.fallback();
+    });
+
+    await unlockAtom(page, "A06");
+    await page.locator("#presets-button").click();
+    await page.locator("#preset-list button").click();
+    await page.locator("#preset-description").fill(`Изменение: ${responseCase.name}`);
+    await page.locator("#save-preset").click();
+
+    await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
+    await expect(page.locator("#save-preset")).toBeDisabled();
+    await expect(page.locator("#save-as-new-preset")).toBeDisabled();
+    expect(posts).toBe(1);
+  });
+}
 
 test("preset save exposes backend field errors without losing the draft", async ({page}) => {
   await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
