@@ -7,12 +7,12 @@ export const pt: Shape<typeof en> = {
   open: "Abrir",
   cards: {
     proposal_ai: {
-      blurb: "Transforme o briefing de um cliente e os seus pontos fortes numa proposta pronta a enviar.",
-      sample: "Olá Dana, terei muito gosto em ajudar com o redesign da sua landing page. Duas rondas de revisões, entrega em três semanas. Vamos marcar uma chamada rápida para confirmar o âmbito.",
+      blurb: "Transforme o briefing de um cliente e seus pontos fortes em uma proposta pronta para enviar.",
+      sample: "Olá Dana, ficarei feliz em ajudar com o redesign da sua landing page. Duas rodadas de revisões, entrega em três semanas. Vamos marcar uma ligação rápida para confirmar o escopo.",
     },
     client_update_writer: {
-      blurb: "Escreva uma atualização de progresso, uma resposta a uma mensagem do cliente ou um pedido de adiantamento, no tom que escolher.",
-      sample: "Atualização rápida: o redesign da página inicial está concluído e pronto para revisão até sexta-feira. Sem bloqueios por agora.",
+      blurb: "Escreva uma atualização de progresso, uma resposta a uma mensagem do cliente ou um pedido de adiantamento, no tom que você escolher.",
+      sample: "Atualização rápida: o redesign da página inicial está concluído e pronto para revisão até sexta-feira. Sem bloqueios por enquanto.",
       tags: {
         update: "Atualização",
         replyDraft: "Rascunho de resposta",

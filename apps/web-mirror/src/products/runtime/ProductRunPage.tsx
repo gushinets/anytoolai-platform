@@ -247,7 +247,8 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const th = useHostT();
   const tp = useProductT();
   const title = tp("title");
-  const inProductShell = useContext(ProductShellContext);
+  const shell = useContext(ProductShellContext);
+  const inProductShell = shell !== null;
   // Inside ProductPageShell the shell owns the one <main> (heading, product controls such as a
   // mode selector, and this run content share it); standalone, this page is its own landmark.
   const Root = inProductShell ? "div" : "main";
@@ -350,6 +351,12 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   useIsomorphicLayoutEffect(() => {
     onBusyChangeRef.current?.(busy);
   }, [busy]);
+  // The shell's "All tools" warning follows the same `busy`; on unmount it must not keep claiming a
+  // run is in flight (e.g. a mode switch remounts this page).
+  useIsomorphicLayoutEffect(() => {
+    shell?.reportBusy(busy);
+  }, [busy, shell]);
+  useIsomorphicLayoutEffect(() => () => shell?.reportBusy(false), [shell]);
 
   const productId = definition.productId;
   const scenarioId = definition.scenarioId;

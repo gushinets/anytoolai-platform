@@ -16,6 +16,7 @@ import {
   type CapturedCall,
   guestIdentityResponse,
   makeClientCapturingRequests,
+  makeClientWithDeferredRoute,
   quotaResponse,
   resultResponse,
   routesFor,
@@ -485,5 +486,51 @@ describe("a newly registered product gets the language selector without implemen
     expect(screen.getByText(HOST_MESSAGES.it.validation.required.replace("{field}", "Text"))).toBeTruthy();
     expect(document.documentElement.lang).toBe("it");
     expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("it");
+  });
+});
+
+describe("All tools link", () => {
+  const en = PROPOSAL_AI_MESSAGES.en;
+  const host = HOST_MESSAGES.en.nav;
+
+  function renderProposal() {
+    const routes = routesFor(PROPOSAL_IDS);
+    const { client, resolveDeferred } = makeClientWithDeferredRoute(bootRoutes(PROPOSAL_IDS), routes.START);
+    render(<ProductPageShell product={registered("proposal_ai")} client={client} />);
+    return { resolveDeferred };
+  }
+
+  it("links back to the tool list from a navigation landmark, with no warning while idle", async () => {
+    renderProposal();
+    await screen.findByRole("button", { name: en.generate.submit });
+
+    const link = within(screen.getByRole("navigation", { name: host.label })).getByRole("link", { name: /All tools/ });
+    expect(link.getAttribute("href")).toBe("/");
+    expect(link.getAttribute("aria-describedby")).toBeNull();
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("warns that leaving loses the result while a run is in flight, dismissable with Escape", async () => {
+    renderProposal();
+    fireEvent.change(await screen.findByLabelText(en.fields.taskText), { target: { value: "Redesign our landing page" } });
+    fireEvent.change(screen.getByLabelText(en.fields.freelancerPositioning), { target: { value: "Product designer" } });
+    fireEvent.click(screen.getByRole("button", { name: en.generate.submit }));
+
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip.textContent).toBe(host.runInProgress);
+    const link = screen.getByRole("link", { name: /All tools/ });
+    expect(link.getAttribute("aria-describedby")).toBe(tooltip.id);
+
+    fireEvent.keyDown(link, { key: "Escape" });
+    expect(link.parentElement?.hasAttribute("data-dismissed")).toBe(true);
+    fireEvent.blur(link);
+    expect(link.parentElement?.hasAttribute("data-dismissed")).toBe(false);
+  });
+
+  it("has translated copy in every locale", () => {
+    for (const locale of LOCALES) {
+      expect(HOST_MESSAGES[locale].nav.allTools.trim(), locale).not.toBe("");
+      expect(HOST_MESSAGES[locale].nav.runInProgress.trim(), locale).not.toBe("");
+    }
   });
 });

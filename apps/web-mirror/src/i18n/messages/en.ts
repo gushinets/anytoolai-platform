@@ -3,6 +3,11 @@
 // use the typographic ’ everywhere so a placeholder is never swallowed by ICU quoting.
 export const en = {
   language: { label: "Language" },
+  nav: {
+    label: "Tools",
+    allTools: "All tools",
+    runInProgress: "A run is in progress. If you leave now, you won’t see the result and the quota won’t be restored.",
+  },
   loading: "Loading {product}…",
   unavailable: "{product} is unavailable right now. Please reload the page.",
   quotaExhausted: "You've used all your {product} runs for now.",
