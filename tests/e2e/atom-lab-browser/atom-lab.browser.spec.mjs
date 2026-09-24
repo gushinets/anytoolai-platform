@@ -713,6 +713,119 @@ test("network submission retry reuses the idempotency key and polling reconnects
   expect(reads).toBe(2);
 });
 
+test("a delayed accepted run never attaches its source id to a newly selected draft", async ({page}) => {
+  page.on("dialog", (dialog) => dialog.accept());
+  let runBody = null;
+  let presetBody = null;
+  const detail = historyDetail({runId: "run-delayed-owner"});
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const request = route.request();
+    const {pathname} = new URL(request.url());
+    if (pathname === "/v1/atom-lab/runs" && request.method() === "POST") {
+      runBody = request.postDataJSON();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({
+        run_id: detail.run_id,
+        scenario_session_id: detail.runtime_ids.scenario_session_id,
+        job_id: detail.runtime_ids.job_id,
+        status: detail.status,
+      })});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/runs/${detail.run_id}`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(detail)});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets" && request.method() === "POST") {
+      presetBody = request.postDataJSON();
+      await route.abort("connectionfailed");
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
+      return;
+    }
+    await route.fallback();
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#fill-example").click();
+  await page.locator("#run-button").click();
+  await page.getByRole("button", {name: /A05/}).click();
+  await expect(page.locator("#atom-title")).toContainText("A05");
+  await expect(page.locator("#run-diagnostics")).toContainText(detail.run_id);
+
+  await page.locator("#fill-example").click();
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-name").fill("A05 после чужого запуска");
+  await page.locator("#save-preset").click();
+  await expect.poll(() => presetBody).not.toBeNull();
+
+  expect(runBody.atom_id).toBe("A06");
+  expect(presetBody.atom_id).toBe("A05");
+  expect(presetBody.source_run_id).toBeNull();
+});
+
+test("an idempotent run retry keeps its original draft ownership after navigation", async ({page}) => {
+  page.on("dialog", (dialog) => dialog.accept());
+  const runBodies = [];
+  let presetBody = null;
+  const detail = historyDetail({runId: "run-retry-owner"});
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const request = route.request();
+    const {pathname} = new URL(request.url());
+    if (pathname === "/v1/atom-lab/runs" && request.method() === "POST") {
+      runBodies.push(request.postDataJSON());
+      if (runBodies.length === 1) {
+        await route.abort("connectionfailed");
+        return;
+      }
+      await route.fulfill({status: 202, contentType: "application/json", body: JSON.stringify({
+        run_id: detail.run_id,
+        scenario_session_id: detail.runtime_ids.scenario_session_id,
+        job_id: detail.runtime_ids.job_id,
+        status: detail.status,
+      })});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/runs/${detail.run_id}`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(detail)});
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets" && request.method() === "POST") {
+      presetBody = request.postDataJSON();
+      await route.abort("connectionfailed");
+      return;
+    }
+    if (pathname === "/v1/atom-lab/presets") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
+      return;
+    }
+    await route.fallback();
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#fill-example").click();
+  await page.locator("#run-button").click();
+  await expect(page.locator("#retry-submit")).toBeVisible();
+  await page.getByRole("button", {name: /A05/}).click();
+  await expect(page.locator("#atom-title")).toContainText("A05");
+  await page.locator("#retry-submit").click();
+  await expect(page.locator("#run-diagnostics")).toContainText(detail.run_id);
+
+  await page.locator("#fill-example").click();
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-name").fill("A05 после retry чужого запуска");
+  await page.locator("#save-preset").click();
+  await expect.poll(() => presetBody).not.toBeNull();
+
+  expect(runBodies).toHaveLength(2);
+  expect(runBodies[1]).toEqual(runBodies[0]);
+  expect(runBodies[0].atom_id).toBe("A06");
+  expect(presetBody.atom_id).toBe("A05");
+  expect(presetBody.source_run_id).toBeNull();
+});
+
 test("retryable HTTP submission responses preserve the frozen replay", async ({page}) => {
   const keys = [];
   const bodies = [];

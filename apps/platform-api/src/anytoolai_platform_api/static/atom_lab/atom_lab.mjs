@@ -2508,11 +2508,14 @@ export function bootstrapAtomLab({
         nodes["run-state"].textContent = "Выберите доступную модель.";
         return;
       }
-      activeSubmission = createRunSubmission(session, {
-        modelId: option.modelId,
-        reasoningEffort: nodes["reasoning-effort"].value || null,
-        idempotencyKey: idempotencyKeyFactory(),
-      });
+      activeSubmission = {
+        ...createRunSubmission(session, {
+          modelId: option.modelId,
+          reasoningEffort: nodes["reasoning-effort"].value || null,
+          idempotencyKey: idempotencyKeyFactory(),
+        }),
+        ownerSession: session,
+      };
     }
     const submission = activeSubmission;
     submitInFlight = true;
@@ -2575,8 +2578,10 @@ export function bootstrapAtomLab({
       admissionErrors = [];
       renderValidation(document, nodes["validation-errors"], session, admissionErrors);
       submission.runId = accepted.run_id;
-      session.sourceRunId = accepted.run_id;
-      renderPresetState();
+      if (session === submission.ownerSession) {
+        submission.ownerSession.sourceRunId = accepted.run_id;
+        renderPresetState();
+      }
       submission.runtimeIds = {
         scenario_session_id: accepted.scenario_session_id,
         job_id: accepted.job_id,
