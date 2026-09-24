@@ -875,6 +875,15 @@ def live_canary() -> int:
             file=sys.stderr,
         )
         return 2
+    if (
+        os.environ.get("ANYTOOLAI_LIVE_CANARY_SURFACE", "production").strip() == "atom-lab"
+        and not os.environ.get("ANYTOOLAI_ATOM_LAB_ACCESS_CODE", "").strip()
+    ):
+        print(
+            "LIVE013: Atom Lab live-canary requires ANYTOOLAI_ATOM_LAB_ACCESS_CODE.",
+            file=sys.stderr,
+        )
+        return 2
     return _run_proof_script("scripts/agent/live_canary.py", "ANYTOOLAI_LIVE_CANARY_DATABASE_URL")
 
 

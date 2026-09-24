@@ -11,6 +11,10 @@ import sys
 from pathlib import Path
 
 import pytest
+from anytoolai_platform_actions.structured_llm.cross_validation import build_input_validators
+from anytoolai_platform_api.atom_lab.catalog import build_atom_catalog
+from anytoolai_platform_core.config.loader import ConfigLoader
+from jsonschema import validate as validate_json_schema
 
 from tests.module_loading import load_cached_module
 from tests.test_atoms_proof import load_atoms_proof_module
@@ -56,6 +60,582 @@ def test_live_atom_cases_has_eleven_entries_matching_atom_smoke_cases_action_typ
     for _action_type, live_scenario_id, _input in module.LIVE_ATOM_CASES:
         assert live_scenario_id not in fake_scenario_ids
         assert "live" in live_scenario_id
+
+
+def test_atom_lab_cases_cover_all_eleven_atoms_with_non_smoke_inputs() -> None:
+    """ANY-467: the live Lab matrix must exercise submitted values, not smoke literals."""
+    module = load_live_canary_module()
+
+    assert [case.atom_id for case in module.ATOM_LAB_CASES] == [
+        f"A{index:02d}" for index in range(1, 12)
+    ]
+    serialized_inputs = {
+        json.dumps(case.input_payload, sort_keys=True) for case in module.ATOM_LAB_CASES
+    }
+    assert len(serialized_inputs) == 11
+    smoke_inputs = [
+        input_payload
+        for _label, _scenario_id, input_payload in module.atoms_proof.ATOM_SMOKE_CASES
+    ]
+    assert all(case.input_payload not in smoke_inputs for case in module.ATOM_LAB_CASES)
+    registry = ConfigLoader(Path(__file__).resolve().parents[1] / "configs" / "kernel").load()
+    catalog = {item.atom_id: item for item in build_atom_catalog(registry)}
+    validators = build_input_validators(registry.action_definitions)
+    for case in module.ATOM_LAB_CASES:
+        atom = catalog[case.atom_id]
+        validate_json_schema(instance=case.input_payload, schema=atom.input_schema)
+        validator = validators.get(atom.action_type)
+        if validator is not None:
+            validator.validate(input_payload=case.input_payload)
+
+
+def test_select_atom_lab_model_uses_requested_compatible_model_and_supported_efforts() -> None:
+    """ANY-467: model/reasoning evidence must come from the protected catalog."""
+    module = load_live_canary_module()
+    catalog = {
+        "items": [
+            {
+                "model_id": "openai/gpt-5.4-mini",
+                "compatibility": "compatible",
+                "reasoning_supported": True,
+                "allowed_reasoning_efforts": ["low", "high"],
+            },
+            {
+                "model_id": "openai/gpt-5.4",
+                "compatibility": "unknown",
+                "reasoning_supported": None,
+                "allowed_reasoning_efforts": None,
+            },
+        ]
+    }
+
+    selected = module._select_atom_lab_model(catalog, requested_model_id="openai/gpt-5.4-mini")
+
+    assert selected == ("openai/gpt-5.4-mini", ("low", "high"))
+
+
+def test_select_atom_lab_model_prefers_reasoning_capable_model_when_not_pinned() -> None:
+    module = load_live_canary_module()
+    catalog = {
+        "items": [
+            {
+                "model_id": "openai/gpt-plain", "compatibility": "compatible",
+                "reasoning_supported": False, "allowed_reasoning_efforts": None,
+            },
+            {
+                "model_id": "openai/gpt-reasoning", "compatibility": "compatible",
+                "reasoning_supported": True, "allowed_reasoning_efforts": ["medium"],
+            },
+        ]
+    }
+
+    assert module._select_atom_lab_model(catalog, requested_model_id=None) == (
+        "openai/gpt-reasoning", ("medium",),
+    )
+
+
+def test_select_atom_lab_model_addresses_raw_catalog_id_for_run_admission() -> None:
+    """The catalog exposes `gpt-*`; protected run admission requires `openai/gpt-*`."""
+    module = load_live_canary_module()
+    catalog = {
+        "items": [{
+            "model_id": "gpt-5.4-mini", "compatibility": "compatible",
+            "reasoning_supported": True, "allowed_reasoning_efforts": ["high"],
+        }]
+    }
+
+    assert module._select_atom_lab_model(
+        catalog, requested_model_id="openai/gpt-5.4-mini",
+    ) == ("openai/gpt-5.4-mini", ("high",))
+
+
+def test_run_atom_lab_case_replays_idempotently_and_records_verified_evidence(monkeypatch) -> None:
+    """ANY-467: one Lab case proves protected HTTP, immutable snapshot and ledger reuse."""
+    module = load_live_canary_module()
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+    details = iter(
+        [
+            {
+                "run_id": "run-1",
+                "status": "running",
+                "snapshot": {
+                    "atom_id": "A01",
+                    "input": {"source_text": "acceptance", "fields": [], "strict": False},
+                    "prompt": {
+                        "ref": "atom_lab.A01.live",
+                        "version": "1",
+                        "base": "Repository prompt",
+                        "content": "Use the requested language.",
+                    },
+                    "provider": {
+                        "policy_ref": "atom_lab.direct",
+                        "policy": {"provider": "openai"},
+                        "model_id": "openai/gpt-5.4-mini",
+                        "reasoning_effort": "high",
+                        "capability_snapshot_id": "catalog-snapshot-1",
+                        "capability_provenance": {"source": "provider"},
+                    },
+                    "preset": {"id": None, "version": None},
+                },
+                "runtime_ids": {
+                    "scenario_session_id": "session-1",
+                    "job_id": "job-1",
+                    "action_run_id": None,
+                    "artifact_id": None,
+                },
+                "result": None,
+                "diagnostics": {
+                    "requested_model_id": "openai/gpt-5.4-mini",
+                    "requested_reasoning_effort": "high",
+                    "response_model_id": None,
+                },
+                "created_at": "2026-09-24T10:00:00Z",
+                "finished_at": None,
+            },
+            {
+                "run_id": "run-1",
+                "status": "succeeded",
+                "snapshot": {
+                    "atom_id": "A01",
+                    "input": {"source_text": "acceptance", "fields": [], "strict": False},
+                    "prompt": {
+                        "ref": "atom_lab.A01.live",
+                        "version": "1",
+                        "base": "Repository prompt",
+                        "content": "Use the requested language.",
+                    },
+                    "provider": {
+                        "policy_ref": "atom_lab.direct",
+                        "policy": {"provider": "openai"},
+                        "model_id": "openai/gpt-5.4-mini",
+                        "reasoning_effort": "high",
+                        "capability_snapshot_id": "catalog-snapshot-1",
+                        "capability_provenance": {"source": "provider"},
+                    },
+                    "preset": {"id": None, "version": None},
+                },
+                "runtime_ids": {
+                    "scenario_session_id": "session-1",
+                    "job_id": "job-1",
+                    "action_run_id": "action-1",
+                    "artifact_id": "artifact-1",
+                },
+                "result": {"values": {"marker": "acceptance"}},
+                "diagnostics": {
+                    "requested_model_id": "openai/gpt-5.4-mini",
+                    "requested_reasoning_effort": "high",
+                    "response_model_id": "gpt-5.4-mini-2026-09-01",
+                },
+                "created_at": "2026-09-24T10:00:00Z",
+                "finished_at": "2026-09-24T10:00:02Z",
+            },
+        ]
+    )
+
+    def fake_request(url, *, method="GET", payload=None, timeout=5.0, extra_headers=None):
+        calls.append((url, method, payload, extra_headers))
+        if method == "POST":
+            return {
+                "run_id": "run-1",
+                "scenario_session_id": "session-1",
+                "job_id": "job-1",
+                "status": (
+                    "queued"
+                    if len([call for call in calls if call[1] == "POST"]) == 1
+                    else "succeeded"
+                ),
+            }
+        return next(details)
+
+    checked = {}
+
+    def fake_check_ledger(engine, **kwargs):
+        checked.update(kwargs)
+        return module.EvidenceCase(
+            label=kwargs["label"], scenario_id=kwargs["scenario_id"], kind=kwargs["kind"],
+            status="pass", session_id=kwargs["scenario_session_id"], job_id="job-1",
+            error_code=None, error_message=None, steps=(), result_artifact_id="artifact-1",
+        )
+
+    monkeypatch.setattr(module.atoms_proof.smoke, "_http_json_request", fake_request)
+    monkeypatch.setattr(module.atoms_proof, "_check_ledger", fake_check_ledger)
+    monkeypatch.setattr(module.time, "sleep", lambda _seconds: None)
+
+    case = module._run_atom_lab_case(
+        "http://api", object(),
+        case=module.AtomLabCase(
+            atom_id="A01",
+            input_payload={"source_text": "acceptance", "fields": [], "strict": False},
+        ),
+        prompt="Use the requested language.", model_id="openai/gpt-5.4-mini",
+        reasoning_effort="high", access_code="lab-secret", timeout=3.0,
+    )
+
+    assert case.status == "pass"
+    assert case.run_id == "run-1"
+    assert case.action_run_id == "action-1"
+    assert case.artifact_id == "artifact-1"
+    assert case.requested_model_id == "openai/gpt-5.4-mini"
+    assert case.response_model_id == "gpt-5.4-mini-2026-09-01"
+    assert case.reasoning_effort == "high"
+    assert case.input_valid is True
+    assert case.result_valid is True
+    assert case.finished_at == "2026-09-24T10:00:02Z"
+    assert checked["scenario_session_id"] == "session-1"
+    posts = [call for call in calls if call[1] == "POST"]
+    assert len(posts) == 2
+    assert posts[0][2] == posts[1][2]
+    assert posts[0][3] == posts[1][3]
+    assert posts[0][3]["X-Atom-Lab-Access-Code"] == "lab-secret"
+    assert posts[0][3]["Idempotency-Key"].startswith("any-467-A01-")
+
+
+def test_atom_lab_http_failure_marks_cost_unknown_when_ledger_recovery_fails(
+    monkeypatch,
+) -> None:
+    """ANY-467: a post-admission failure must not let the cumulative cost cap fail open."""
+    module = load_live_canary_module()
+    responses = iter([
+        {
+            "run_id": "run-1", "scenario_session_id": "session-1",
+            "job_id": "job-1", "status": "queued",
+        },
+        {"run_id": "run-1", "status": "failed"},
+    ])
+    monkeypatch.setattr(
+        module.atoms_proof.smoke,
+        "_http_json_request",
+        lambda *args, **kwargs: next(responses),
+    )
+    monkeypatch.setattr(
+        module.atoms_proof, "_known_steps_for_session", lambda engine, session_id: None,
+    )
+
+    result = module._run_atom_lab_case(
+        "http://api", object(),
+        case=module.AtomLabCase(
+            atom_id="A01",
+            input_payload={"source_text": "acceptance", "fields": [], "strict": False},
+        ),
+        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        access_code="lab-secret", timeout=1.0,
+    )
+
+    assert result.status == "fail"
+    assert result.error_code == "LIVE022"
+    assert result.session_id == "session-1"
+    assert result.cost_unknown is True
+
+
+def test_atom_lab_ambiguous_admission_replays_once_then_fails_cost_closed(monkeypatch) -> None:
+    """ANY-467: a lost POST response may have spent money, so replay safely or abort the matrix."""
+    module = load_live_canary_module()
+    calls: list[tuple[dict, dict]] = []
+
+    def fail_request(url, *, payload, extra_headers, **kwargs):
+        calls.append((payload, extra_headers))
+        raise OSError("connection lost after write")
+
+    monkeypatch.setattr(module.atoms_proof.smoke, "_http_json_request", fail_request)
+
+    result = module._run_atom_lab_case(
+        "http://api", object(),
+        case=module.AtomLabCase(
+            atom_id="A01",
+            input_payload={"source_text": "acceptance", "fields": [], "strict": False},
+        ),
+        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        access_code="lab-secret", timeout=1.0,
+    )
+
+    assert result.status == "fail"
+    assert result.error_code == "LIVE020"
+    assert result.cost_unknown is True
+    assert len(calls) == 2
+    assert calls[0] == calls[1]
+
+
+def test_atom_lab_blank_admission_ids_replay_once_then_fail_cost_closed(monkeypatch) -> None:
+    """ANY-467: blank accepted IDs are not valid evidence and admission remains ambiguous."""
+    module = load_live_canary_module()
+    calls = 0
+
+    def blank_response(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return {
+            "run_id": "", "scenario_session_id": "session-1",
+            "job_id": "job-1", "status": "queued",
+        }
+
+    monkeypatch.setattr(module.atoms_proof.smoke, "_http_json_request", blank_response)
+
+    result = module._run_atom_lab_case(
+        "http://api", object(),
+        case=module.AtomLabCase(
+            atom_id="A01",
+            input_payload={"source_text": "acceptance", "fields": [], "strict": False},
+        ),
+        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        access_code="lab-secret", timeout=1.0,
+    )
+
+    assert result.status == "fail"
+    assert result.error_code == "LIVE020"
+    assert result.cost_unknown is True
+    assert calls == 2
+
+
+@pytest.mark.parametrize(
+    ("response_model_id", "finished_at", "action_run_id", "artifact_id"),
+    [
+        (None, "2026-09-24T10:00:02Z", "action-1", "artifact-1"),
+        ("gpt-5.4-2026-09-01", None, "action-1", "artifact-1"),
+        ("gpt-5.4-2026-09-01", "2026-09-24T10:00:02Z", "", "artifact-1"),
+        ("gpt-5.4-2026-09-01", "2026-09-24T10:00:02Z", "action-1", " "),
+    ],
+)
+def test_atom_lab_success_requires_actual_model_and_completion_date(
+    monkeypatch, response_model_id, finished_at, action_run_id, artifact_id,
+) -> None:
+    """ANY-467 evidence cannot accept a live result without its actual model and date."""
+    module = load_live_canary_module()
+    responses = iter([
+        {
+            "run_id": "run-1", "scenario_session_id": "session-1",
+            "job_id": "job-1", "status": "queued",
+        },
+        {
+            "run_id": "run-1", "status": "succeeded",
+            "snapshot": {
+                "atom_id": "A01",
+                "input": {"source_text": "acceptance", "fields": [], "strict": False},
+                "prompt": {"content": "Prompt"},
+                "provider": {
+                    "model_id": "openai/gpt-5.4-mini", "reasoning_effort": None,
+                },
+                "preset": {"id": None, "version": None},
+            },
+            "runtime_ids": {
+                "scenario_session_id": "session-1", "job_id": "job-1",
+                "action_run_id": action_run_id, "artifact_id": artifact_id,
+            },
+            "result": {"values": {"marker": "acceptance"}},
+            "diagnostics": {
+                "requested_model_id": "openai/gpt-5.4-mini",
+                "requested_reasoning_effort": None,
+                "response_model_id": response_model_id,
+            },
+            "finished_at": finished_at,
+        },
+    ])
+    monkeypatch.setattr(
+        module.atoms_proof.smoke,
+        "_http_json_request",
+        lambda *args, **kwargs: next(responses),
+    )
+    monkeypatch.setattr(
+        module.atoms_proof, "_known_steps_for_session", lambda *args: (),
+    )
+
+    result = module._run_atom_lab_case(
+        "http://api", object(),
+        case=module.AtomLabCase(
+            atom_id="A01",
+            input_payload={"source_text": "acceptance", "fields": [], "strict": False},
+        ),
+        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        access_code="lab-secret", timeout=1.0,
+    )
+
+    assert result.status == "fail"
+    assert result.input_valid is True
+
+
+@pytest.mark.parametrize("replay_outcome", ["mismatch", "response_lost"])
+def test_atom_lab_idempotency_mismatch_fails_cost_closed(monkeypatch, replay_outcome) -> None:
+    """ANY-467: an unproven replay may have launched a second paid execution."""
+    module = load_live_canary_module()
+    responses = iter([
+        {
+            "run_id": "run-1", "scenario_session_id": "session-1",
+            "job_id": "job-1", "status": "queued",
+        },
+        {
+            "run_id": "run-1", "status": "succeeded",
+            "snapshot": {
+                "atom_id": "A01",
+                "input": {"source_text": "acceptance", "fields": [], "strict": False},
+                "prompt": {"content": "Prompt"},
+                "provider": {
+                    "model_id": "openai/gpt-5.4-mini", "reasoning_effort": None,
+                },
+                "preset": {"id": None, "version": None},
+            },
+            "runtime_ids": {
+                "scenario_session_id": "session-1", "job_id": "job-1",
+                "action_run_id": "action-1", "artifact_id": "artifact-1",
+            },
+            "result": {"values": {"marker": "acceptance"}},
+            "diagnostics": {
+                "requested_model_id": "openai/gpt-5.4-mini",
+                "requested_reasoning_effort": None,
+                "response_model_id": "gpt-5.4-2026-09-01",
+            },
+            "finished_at": "2026-09-24T10:00:02Z",
+        },
+        {
+            "run_id": "run-2", "scenario_session_id": "session-2",
+            "job_id": "job-2", "status": "queued",
+        },
+    ])
+    call_count = 0
+
+    def fake_request(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 3 and replay_outcome == "response_lost":
+            raise OSError("replay response lost after write")
+        return next(responses)
+
+    monkeypatch.setattr(module.atoms_proof.smoke, "_http_json_request", fake_request)
+    monkeypatch.setattr(
+        module.atoms_proof, "_known_steps_for_session", lambda *args: (),
+    )
+
+    result = module._run_atom_lab_case(
+        "http://api", object(),
+        case=module.AtomLabCase(
+            atom_id="A01",
+            input_payload={"source_text": "acceptance", "fields": [], "strict": False},
+        ),
+        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        access_code="lab-secret", timeout=1.0,
+    )
+
+    assert result.status == "fail"
+    assert result.error_code == "LIVE028"
+    assert result.cost_unknown is True
+
+
+@pytest.mark.parametrize("poll_outcome", ["read_error", "deadline"])
+def test_atom_lab_nonterminal_poll_loss_fails_cost_closed(monkeypatch, poll_outcome) -> None:
+    """ANY-467: an admitted job can start billing after an empty point-in-time ledger read."""
+    module = load_live_canary_module()
+    accepted = {
+        "run_id": "run-1", "scenario_session_id": "session-1",
+        "job_id": "job-1", "status": "queued",
+    }
+
+    def fake_request(url, *, method="GET", **kwargs):
+        if method == "POST":
+            return accepted
+        raise OSError("poll response lost")
+
+    monkeypatch.setattr(module.atoms_proof.smoke, "_http_json_request", fake_request)
+    monkeypatch.setattr(
+        module.atoms_proof, "_known_steps_for_session", lambda *args: (),
+    )
+
+    result = module._run_atom_lab_case(
+        "http://api", object(),
+        case=module.AtomLabCase(
+            atom_id="A01",
+            input_payload={"source_text": "acceptance", "fields": [], "strict": False},
+        ),
+        prompt="Prompt", model_id="openai/gpt-5.4-mini", reasoning_effort=None,
+        access_code="lab-secret", timeout=0.0 if poll_outcome == "deadline" else 1.0,
+    )
+
+    assert result.status == "fail"
+    assert result.error_code == ("LIVE023" if poll_outcome == "deadline" else "LIVE021")
+    assert result.cost_unknown is True
+
+
+def test_run_atom_lab_reuses_catalog_prompts_and_adds_supported_reasoning_combinations(
+    monkeypatch,
+) -> None:
+    """ANY-467: the existing canary runs 11 Lab atoms plus catalog-supported effort smokes."""
+    module = load_live_canary_module()
+    requested: list[tuple[str, str, str | None]] = []
+
+    def fake_request(url, **kwargs):
+        if url.endswith("/atoms"):
+            return {
+                "items": [
+                    {"atom_id": case.atom_id, "prompt": f"live prompt {case.atom_id}"}
+                    for case in module.ATOM_LAB_CASES
+                ]
+            }
+        if url.endswith("/models"):
+            return {
+                "items": [{
+                    "model_id": "gpt-5.4-mini", "compatibility": "compatible",
+                    "reasoning_supported": True,
+                    "allowed_reasoning_efforts": ["low", "high"],
+                }]
+            }
+        raise AssertionError(url)
+
+    def fake_case(api_url, engine, *, case, prompt, model_id, reasoning_effort, **kwargs):
+        requested.append((case.atom_id, prompt, reasoning_effort))
+        return module.EvidenceCase(
+            label=case.label or case.atom_id, scenario_id=f"atom-lab.{case.atom_id}",
+            kind=case.kind, status="pass", session_id="session", job_id="job",
+            error_code=None, error_message=None, steps=(), requested_model_id=model_id,
+            reasoning_effort=reasoning_effort, input_valid=True, result_valid=True,
+        )
+
+    monkeypatch.setattr(module.atoms_proof.smoke, "_http_json_request", fake_request)
+    monkeypatch.setattr(module, "_run_atom_lab_case", fake_case)
+    monkeypatch.setattr(
+        module.atoms_proof, "_build_engine", lambda database_url, **kwargs: _FakeEngine()
+    )
+
+    cases, exit_code = module.run_atom_lab(
+        "http://api", "postgresql://unused", timeout=1.0, max_total_cost_usd=1.0,
+        access_code="lab-secret", requested_model_id=None,
+    )
+
+    assert exit_code == 0
+    assert len(cases) == 13
+    assert requested[:11] == [
+        (case.atom_id, f"live prompt {case.atom_id}", None)
+        for case in module.ATOM_LAB_CASES
+    ]
+    assert requested[11:] == [
+        ("A01", "live prompt A01", "low"),
+        ("A01", "live prompt A01", "high"),
+    ]
+    assert [case.kind for case in cases[11:]] == ["reasoning", "reasoning"]
+
+
+def test_main_routes_atom_lab_surface_to_existing_canary_and_separate_evidence_root(
+    monkeypatch,
+) -> None:
+    module = load_live_canary_module()
+    monkeypatch.setenv(_TEST_DATABASE_URL_ENV, "postgresql://u:p@127.0.0.1:5432/db")
+    monkeypatch.setenv(module.LIVE_CANARY_SURFACE_ENV_VAR, module.ATOM_LAB_SURFACE)
+    monkeypatch.setenv(module.ATOM_LAB_ACCESS_CODE_ENV_VAR, "lab-secret")
+    monkeypatch.setenv(module.ATOM_LAB_MODEL_ID_ENV_VAR, "openai/gpt-5.4-mini")
+    captured: dict = {}
+
+    def fake_run_atom_lab(*args, **kwargs):
+        captured.update(kwargs)
+        return [], 0
+
+    def fake_write(cases, exit_code, **kwargs):
+        captured["output_root"] = kwargs["output_root"]
+        return Path("evidence.json")
+
+    monkeypatch.setattr(module, "run_atom_lab", fake_run_atom_lab)
+    monkeypatch.setattr(module.atoms_proof, "write_evidence_report", fake_write)
+    monkeypatch.setattr(sys, "argv", _TEST_MAIN_ARGV)
+
+    assert module.main() == 0
+    assert captured["access_code"] == "lab-secret"
+    assert captured["requested_model_id"] == "openai/gpt-5.4-mini"
+    assert captured["output_root"].as_posix().endswith(".agent/live-canary/atom-lab")
 
 
 def test_live_composite_cases_has_three_entries_matching_composite_smoke_cases_workflow_ids() -> None:
@@ -504,6 +1084,24 @@ def test_write_evidence_report_round_trips_composite_kind_with_multiple_steps(tm
         assert step["output_tokens"] == 5 * index
         assert step["total_tokens"] == 15 * index
         assert step["estimated_cost"] == 0.001 * index
+
+
+def test_write_evidence_report_counts_atom_lab_reasoning_combinations(tmp_path) -> None:
+    module = load_live_canary_module()
+    reasoning = module.EvidenceCase(
+        label="A01-reasoning-high", scenario_id="atom-lab.A01-reasoning-high",
+        kind="reasoning", status="pass", session_id="session", job_id="job",
+        error_code=None, error_message=None, steps=(), requested_model_id="openai/gpt-5.4-mini",
+        reasoning_effort="high", input_valid=True, result_valid=True,
+    )
+
+    path = module.atoms_proof.write_evidence_report(
+        [reasoning], exit_code=0, output_root=tmp_path,
+    )
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["reasoning_passed"] == 1
+    assert payload["reasoning_total"] == 1
 
 
 def test_live_atom_cases_reports_live007_on_missing_scenario_id_mapping(monkeypatch) -> None:

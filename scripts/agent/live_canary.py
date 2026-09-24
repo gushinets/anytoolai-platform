@@ -20,7 +20,11 @@ from __future__ import annotations
 import math
 import os
 import sys
+import time
+import uuid
+from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -58,6 +62,409 @@ DEFAULT_MAX_TOTAL_COST_USD = 0.50
 _LIVE_PROVIDER_MAX_CALLS_PER_ACTION = 4
 
 LIVE_CANARY_TOKEN_ENV_VAR = "ANYTOOLAI_LIVE_CANARY_TOKEN"
+ATOM_LAB_ACCESS_CODE_ENV_VAR = "ANYTOOLAI_ATOM_LAB_ACCESS_CODE"
+ATOM_LAB_MODEL_ID_ENV_VAR = "ANYTOOLAI_ATOM_LAB_MODEL_ID"
+LIVE_CANARY_SURFACE_ENV_VAR = "ANYTOOLAI_LIVE_CANARY_SURFACE"
+PRODUCTION_SURFACE = "production"
+ATOM_LAB_SURFACE = "atom-lab"
+
+
+@dataclass(frozen=True)
+class AtomLabCase:
+    atom_id: str
+    input_payload: dict[str, Any]
+    label: str | None = None
+    kind: str = "atom"
+
+
+# Deliberately distinct from the deterministic smoke literals. These values exercise the full
+# laboratory passthrough while remaining valid against the repo-owned A01-A11 input contracts.
+ATOM_LAB_CASES: tuple[AtomLabCase, ...] = (
+    AtomLabCase("A01", {
+        "source_text": "Acceptance A01: delivery is 17 October and costs 91500 EUR.",
+        "fields": [
+            {
+                "name": "delivery_date", "type": "date", "description": "Delivery date",
+                "required": True,
+            },
+            {"name": "price_eur", "type": "number", "description": "Price", "required": False},
+        ],
+        "strict": False,
+    }),
+    AtomLabCase("A02", {
+        "text_a": "Acceptance A02: audited prototype in nine days.",
+        "text_b": "The brief requires the prototype within twelve days.",
+        "rubric": [{"id": "deadline", "description": "Meets the deadline", "weight": 3}],
+    }),
+    AtomLabCase("A03", {
+        "text": "Acceptance A03: every milestone names an owner and verification step.",
+        "axes": [
+            {"id": "ownership", "description": "Explicit owners", "weight": 2},
+            {"id": "verification", "description": "Acceptance checks", "weight": 4},
+        ],
+    }),
+    AtomLabCase("A04", {
+        "source_text": "Acceptance A04: approver and rollback plan are missing.",
+        "context": "Release readiness review",
+        "taxonomy": ["approval", "rollback"],
+    }),
+    AtomLabCase("A05", {
+        "issues": [{
+            "category": "ownership", "description": "No approver is named.",
+            "severity": "medium", "evidence": "The approval field is blank.",
+        }],
+        "context": "Acceptance A05 launch decision", "target_audience": "Release manager",
+        "max_questions": 2,
+    }),
+    AtomLabCase("A06", {
+        "context": {"product": "Acceptance A06", "saved_hours_per_week": 11},
+        "objective": "Secure approval for a measurement pilot", "audience": "Operations lead",
+        "angle": "Measure saved time before rollout",
+        "constraints": {"tone": "firm", "length": 640, "language": "en-GB", "format": "plain_text"},
+    }),
+    AtomLabCase("A07", {
+        "situation": "Acceptance A07: customer asks whether the audit can start Tuesday.",
+        "intent": "Confirm availability and request repository access", "tone": "neutral",
+        "constraints": {"language": "en", "max_length": 420, "output_format": "markdown"},
+    }),
+    AtomLabCase("A08", {
+        "source_text": "Acceptance A08: We can probably deliver something soon.",
+        "gap": "Replace ambiguity with a measurable delivery commitment", "style": "bold",
+    }),
+    AtomLabCase("A09", {
+        "signals": [
+            {"id": "evidence", "label": "Acceptance evidence", "value": "three verified pilots"},
+            {"id": "risk", "label": "Delivery risk", "value": 0},
+        ],
+        "objective": "Select the strongest acceptance argument", "options": ["speed", "proof"],
+    }),
+    AtomLabCase("A10", {
+        "template_ref": "acceptance_summary_v1",
+        "data": {"project": "Acceptance A10", "approved": False, "variance": 0, "notes": None},
+    }),
+    AtomLabCase("A11", {
+        "subject_text": "Acceptance A11 pilot delivered in nine days.",
+        "reference_text": "The brief requires delivery within twelve days.",
+        "categories": ["match", "gap"],
+        "criteria": [{"id": "deadline", "description": "Delivery deadline"}],
+    }),
+)
+
+
+def _select_atom_lab_model(
+    catalog: dict[str, Any], *, requested_model_id: str | None
+) -> tuple[str, tuple[str, ...]]:
+    compatible = [
+        item for item in catalog.get("items", [])
+        if isinstance(item, dict) and item.get("compatibility") == "compatible"
+    ]
+    requested_raw = (
+        requested_model_id.removeprefix("openai/") if requested_model_id is not None else None
+    )
+    selected = next(
+        (
+            item for item in compatible
+            if isinstance(item.get("model_id"), str)
+            and item["model_id"].removeprefix("openai/") == requested_raw
+        ),
+        None,
+    ) if requested_model_id else next(
+        (
+            item for item in compatible
+            if item.get("reasoning_supported") is True
+            and isinstance(item.get("allowed_reasoning_efforts"), list)
+            and item["allowed_reasoning_efforts"]
+        ),
+        compatible[0] if compatible else None,
+    )
+    if selected is None:
+        raise ValueError("requested Atom Lab model is absent or not compatible")
+    model_id = selected.get("model_id")
+    if not isinstance(model_id, str) or not model_id:
+        raise ValueError("compatible Atom Lab model has no model_id")
+    model_id = model_id if model_id.startswith("openai/") else f"openai/{model_id}"
+    efforts = selected.get("allowed_reasoning_efforts")
+    if selected.get("reasoning_supported") is not True or efforts is None:
+        return model_id, ()
+    if not isinstance(efforts, list) or any(not isinstance(effort, str) for effort in efforts):
+        raise ValueError("Atom Lab model has malformed reasoning capabilities")
+    return model_id, tuple(efforts)
+
+
+def _run_atom_lab_case(
+    api_url: str,
+    engine: Any,
+    *,
+    case: AtomLabCase,
+    prompt: str,
+    model_id: str,
+    reasoning_effort: str | None,
+    access_code: str,
+    timeout: float,
+) -> EvidenceCase:
+    label = case.label or case.atom_id
+    scenario_id = f"atom-lab.{label}"
+    payload = {
+        "atom_id": case.atom_id,
+        "input": case.input_payload,
+        "prompt": prompt,
+        "model_id": model_id,
+        "reasoning_effort": reasoning_effort,
+        "preset_ref": None,
+    }
+    idempotency_key = f"any-467-{case.atom_id}-{uuid.uuid4().hex}"
+    headers = {
+        "X-Atom-Lab-Access-Code": access_code,
+        "Idempotency-Key": idempotency_key,
+    }
+    run_id = session_id = job_id = None
+
+    def failure(code: str, *, ambiguous_cost: bool = False) -> EvidenceCase:
+        known_steps = (
+            atoms_proof._known_steps_for_session(engine, session_id)
+            if session_id is not None
+            else ()
+        )
+        return replace(
+            atoms_proof._fail(
+                label=label, scenario_id=scenario_id, kind=case.kind,
+                session_id=session_id, job_id=job_id, error_code=code,
+                error_message=f"{code}: Atom Lab acceptance case {case.atom_id} failed",
+                steps=known_steps or (),
+                cost_unknown=(
+                    ambiguous_cost or (session_id is not None and known_steps is None)
+                ),
+            ),
+            run_id=run_id,
+            requested_model_id=model_id,
+            reasoning_effort=reasoning_effort,
+            input_valid=session_id is not None,
+            result_valid=False,
+        )
+
+    for admission_attempt in range(2):
+        try:
+            accepted = atoms_proof.smoke._http_json_request(
+                f"{api_url}/v1/atom-lab/runs", method="POST", payload=payload,
+                extra_headers=headers,
+            )
+            accepted_ids = (
+                accepted["run_id"], accepted["scenario_session_id"], accepted["job_id"]
+            )
+            if any(
+                not isinstance(accepted_id, str) or not accepted_id.strip()
+                for accepted_id in accepted_ids
+            ):
+                raise ValueError("Atom Lab admission returned a blank runtime ID")
+            run_id, session_id, job_id = accepted_ids
+            break
+        except (OSError, KeyError, ValueError, TypeError, AttributeError):
+            if admission_attempt == 1:
+                # Either POST may have committed before its response was lost. The identical
+                # idempotency key makes one recovery replay safe; if both responses are
+                # ambiguous, stop the entire costed matrix instead of assuming $0 spend.
+                return failure("LIVE020", ambiguous_cost=True)
+
+    deadline = time.monotonic() + timeout
+    detail: dict[str, Any] | None = None
+    while time.monotonic() < deadline:
+        try:
+            detail = atoms_proof.smoke._http_json_request(
+                f"{api_url}/v1/atom-lab/runs/{run_id}",
+                extra_headers={"X-Atom-Lab-Access-Code": access_code},
+            )
+        except (OSError, KeyError, ValueError, TypeError, AttributeError):
+            return failure("LIVE021", ambiguous_cost=True)
+        status = detail.get("status")
+        if status == "succeeded":
+            break
+        if status in {"failed", "expired", "cancelled"}:
+            return failure("LIVE022")
+        time.sleep(0.25)
+    else:
+        return failure("LIVE023", ambiguous_cost=True)
+
+    assert detail is not None
+    snapshot = detail.get("snapshot")
+    runtime_ids = detail.get("runtime_ids")
+    diagnostics = detail.get("diagnostics")
+    prompt_snapshot = snapshot.get("prompt") if isinstance(snapshot, dict) else None
+    provider_snapshot = snapshot.get("provider") if isinstance(snapshot, dict) else None
+    if (
+        detail.get("run_id") != run_id
+        or not isinstance(snapshot, dict)
+        or snapshot.get("atom_id") != case.atom_id
+        or snapshot.get("input") != case.input_payload
+        or not isinstance(prompt_snapshot, dict)
+        or prompt_snapshot.get("content") != prompt
+        or not isinstance(provider_snapshot, dict)
+        or provider_snapshot.get("model_id") != model_id
+        or provider_snapshot.get("reasoning_effort") != reasoning_effort
+        or snapshot.get("preset") != {"id": None, "version": None}
+    ):
+        return failure("LIVE024")
+    if not isinstance(runtime_ids, dict) or (
+        runtime_ids.get("scenario_session_id") != session_id
+        or runtime_ids.get("job_id") != job_id
+        or not isinstance(runtime_ids.get("action_run_id"), str)
+        or not runtime_ids["action_run_id"].strip()
+        or not isinstance(runtime_ids.get("artifact_id"), str)
+        or not runtime_ids["artifact_id"].strip()
+    ):
+        return failure("LIVE025")
+    if not isinstance(diagnostics, dict) or (
+        diagnostics.get("requested_model_id") != model_id
+        or diagnostics.get("requested_reasoning_effort") != reasoning_effort
+        or not isinstance(diagnostics.get("response_model_id"), str)
+        or not diagnostics["response_model_id"].strip()
+    ):
+        return failure("LIVE026")
+    result = detail.get("result")
+    if not isinstance(result, (dict, list)):
+        return failure("LIVE027")
+    finished_at = detail.get("finished_at")
+    if not isinstance(finished_at, str) or not finished_at.strip():
+        return failure("LIVE030")
+    try:
+        replay = atoms_proof.smoke._http_json_request(
+            f"{api_url}/v1/atom-lab/runs", method="POST", payload=payload,
+            extra_headers=headers,
+        )
+    except (OSError, KeyError, ValueError, TypeError, AttributeError):
+        return failure("LIVE028", ambiguous_cost=True)
+    if (
+        replay.get("run_id") != run_id
+        or replay.get("scenario_session_id") != session_id
+        or replay.get("job_id") != job_id
+    ):
+        return failure("LIVE028", ambiguous_cost=True)
+
+    ledger = atoms_proof._check_ledger(
+        engine, label=label, scenario_id=scenario_id, kind=case.kind,
+        scenario_session_id=session_id,
+        max_provider_calls_per_action=_LIVE_PROVIDER_MAX_CALLS_PER_ACTION,
+    )
+    return replace(
+        ledger,
+        run_id=run_id,
+        action_run_id=runtime_ids["action_run_id"],
+        artifact_id=runtime_ids["artifact_id"],
+        requested_model_id=model_id,
+        response_model_id=diagnostics.get("response_model_id"),
+        reasoning_effort=reasoning_effort,
+        input_valid=True,
+        result_valid=True,
+        finished_at=finished_at,
+    )
+
+
+def run_atom_lab(
+    api_url: str,
+    database_url: str,
+    timeout: float,
+    *,
+    max_total_cost_usd: float,
+    access_code: str,
+    requested_model_id: str | None,
+    decode_database_name: bool = False,
+) -> tuple[list[EvidenceCase], int]:
+    """Run ANY-467 on the protected Lab surface while reusing atoms-proof ledger checks."""
+    headers = {"X-Atom-Lab-Access-Code": access_code}
+    try:
+        catalog = atoms_proof.smoke._http_json_request(
+            f"{api_url}/v1/atom-lab/atoms", extra_headers=headers
+        )
+        models = atoms_proof.smoke._http_json_request(
+            f"{api_url}/v1/atom-lab/models", extra_headers=headers
+        )
+        model_id, efforts = _select_atom_lab_model(
+            models, requested_model_id=requested_model_id
+        )
+        prompt_by_atom = {
+            item["atom_id"]: item["prompt"]
+            for item in catalog["items"]
+            if isinstance(item, dict)
+            and isinstance(item.get("atom_id"), str)
+            and isinstance(item.get("prompt"), str)
+            and item["prompt"].strip()
+        }
+        if set(prompt_by_atom) != {case.atom_id for case in ATOM_LAB_CASES}:
+            raise ValueError("Atom Lab catalog does not contain exactly A01-A11 prompts")
+        if not efforts:
+            raise ValueError("selected Atom Lab model has no confirmed reasoning effort")
+        engine = atoms_proof._build_engine(
+            database_url, decode_database_name=decode_database_name
+        )
+    except (OSError, KeyError, ValueError, TypeError, AttributeError, RuntimeError) as exc:
+        print(f"LIVE029: Atom Lab acceptance setup failed: {type(exc).__name__}", file=sys.stderr)
+        return [], 1
+
+    queue = list(ATOM_LAB_CASES)
+    base = ATOM_LAB_CASES[0]
+    queue.extend(
+        AtomLabCase(
+            atom_id=base.atom_id,
+            input_payload=base.input_payload,
+            label=f"{base.atom_id}-reasoning-{effort}",
+            kind="reasoning",
+        )
+        for effort in efforts
+    )
+    cases: list[EvidenceCase] = []
+    aborted = False
+    try:
+        for index, case in enumerate(queue):
+            effort = None if index < len(ATOM_LAB_CASES) else efforts[index - len(ATOM_LAB_CASES)]
+            result = _run_atom_lab_case(
+                api_url,
+                engine,
+                case=case,
+                prompt=prompt_by_atom[case.atom_id],
+                model_id=model_id,
+                reasoning_effort=effort,
+                access_code=access_code,
+                timeout=timeout,
+            )
+            cases.append(result)
+            if result.status == "pass":
+                print(f"PASS {result.label}: {result.scenario_id} (session {result.session_id})")
+            else:
+                print(
+                    f"FAIL {result.label}: {result.scenario_id} -> {result.error_code}",
+                    file=sys.stderr,
+                )
+            if result.cost_unknown or _cumulative_estimated_cost(cases) > max_total_cost_usd:
+                aborted = True
+                code = "LIVE012" if result.cost_unknown else "LIVE001"
+                for skipped in queue[index + 1:]:
+                    skipped_label = skipped.label or skipped.atom_id
+                    cases.append(atoms_proof._fail(
+                        label=skipped_label,
+                        scenario_id=f"atom-lab.{skipped_label}",
+                        kind=skipped.kind,
+                        session_id=None,
+                        job_id=None,
+                        error_code=code,
+                        error_message=f"{code}: skipped after cost-safety abort",
+                    ))
+                break
+    finally:
+        engine.dispose()
+
+    atom_passed = sum(
+        1 for case in cases if case.kind == "atom" and case.status == "pass"
+    )
+    reasoning_passed = sum(
+        1 for case in cases if case.kind == "reasoning" and case.status == "pass"
+    )
+    print(f"{atom_passed}/{len(ATOM_LAB_CASES)} Atom Lab live atoms passed")
+    print(f"{reasoning_passed}/{len(efforts)} Atom Lab reasoning combinations passed")
+    exit_code = 0 if (
+        atom_passed == len(ATOM_LAB_CASES)
+        and reasoning_passed == len(efforts)
+        and not aborted
+    ) else 1
+    return cases, exit_code
 
 
 def _positive_finite_cost(raw: str) -> float:
@@ -450,6 +857,39 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
+
+    surface = os.environ.get(LIVE_CANARY_SURFACE_ENV_VAR, PRODUCTION_SURFACE).strip()
+    if surface not in {PRODUCTION_SURFACE, ATOM_LAB_SURFACE}:
+        print(
+            f"LIVE014: {LIVE_CANARY_SURFACE_ENV_VAR} must be {PRODUCTION_SURFACE!r} or "
+            f"{ATOM_LAB_SURFACE!r}",
+            file=sys.stderr,
+        )
+        return 2
+    if surface == ATOM_LAB_SURFACE:
+        access_code = os.environ.get(ATOM_LAB_ACCESS_CODE_ENV_VAR, "").strip()
+        if not access_code:
+            print(
+                f"LIVE013: Atom Lab live canary requires {ATOM_LAB_ACCESS_CODE_ENV_VAR}",
+                file=sys.stderr,
+            )
+            return 2
+        cases, exit_code = run_atom_lab(
+            args.api_url.rstrip("/"),
+            database_url,
+            args.timeout,
+            max_total_cost_usd=args.max_total_cost_usd,
+            access_code=access_code,
+            requested_model_id=os.environ.get(ATOM_LAB_MODEL_ID_ENV_VAR) or None,
+            decode_database_name=args.database_url_is_percent_encoded,
+        )
+        report_path = atoms_proof.write_evidence_report(
+            cases,
+            exit_code,
+            output_root=REPO_ROOT / ".agent" / "live-canary" / "atom-lab",
+        )
+        print(f"Evidence report: {report_path}")
+        return exit_code
 
     coverage_error = atoms_proof.smoke._atom_coverage_error(
         LIVE_ATOM_CASES, labels=_LIVE_ATOM_COVERAGE_LABELS
