@@ -268,13 +268,28 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
       {state.kind === "consent" ? (
         <>
           <div className={styles.actions}>
-            <Button onClick={handleAccept} disabled={state.pending !== null || guestId === undefined}>
+            <Button
+              onClick={handleAccept}
+              loading={state.pending === "accept"}
+              disabled={state.pending !== null || guestId === undefined}
+            >
               Accept
             </Button>
-            <Button variant="secondary" onClick={handleDecline} disabled={state.pending !== null}>
+            <Button
+              variant="secondary"
+              onClick={handleDecline}
+              loading={state.pending === "decline"}
+              disabled={state.pending !== null}
+            >
               Decline
             </Button>
           </div>
+          {/* The spinner is decorative (see Spinner), so the in-flight state is also announced. */}
+          {state.pending ? (
+            <p role="status" className={styles.status}>
+              {state.pending === "accept" ? "Accepting…" : "Declining…"}
+            </p>
+          ) : null}
           {/* Decline stays available: it needs no guest attribution, unlike Accept. */}
           {guestId === undefined ? (
             <Toast variant="error">We couldn't verify your identity. Please reload the page and try again.</Toast>

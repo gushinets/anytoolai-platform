@@ -7,6 +7,7 @@ import { makeRoutedFetchClient } from "@anytoolai/ce-kit/test/testUtils/routedFe
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HandoffConsent } from "../src/components/HandoffConsent";
+import { makeClientWithDeferredRoute } from "./fixtures/platformResponses";
 
 afterEach(() => {
   cleanup();
@@ -476,4 +477,32 @@ describe("HandoffConsent", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not be completed/i));
     expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy();
   });
+
+  it.each([
+    ["accept", "Accept", "Decline", "Accepting…", ACCEPT_ROUTE],
+    ["decline", "Decline", "Accept", "Declining…", DECLINE_ROUTE],
+  ])(
+    "shows the %s request as busy and announces it while it is in flight",
+    async (_kind, clicked, other, statusText, route) => {
+      const { client, resolveDeferred } = makeClientWithDeferredRoute(
+        { [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())], [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()] },
+        route,
+      );
+      render(<HandoffConsent client={client} handoffToken="token_abc" />);
+      const button = (await screen.findByRole("button", { name: clicked })) as HTMLButtonElement;
+      await waitFor(() => expect(button.disabled).toBe(false));
+
+      fireEvent.click(button);
+
+      await waitFor(() => expect(button.getAttribute("aria-busy")).toBe("true"));
+      expect(button.disabled).toBe(true);
+      const otherButton = screen.getByRole("button", { name: other }) as HTMLButtonElement;
+      expect(otherButton.disabled).toBe(true);
+      expect(otherButton.getAttribute("aria-busy")).toBeNull();
+      expect(screen.getByRole("status").textContent).toBe(statusText);
+
+      resolveDeferred(jsonResponse(200, previewPayload({ status: clicked === "Accept" ? "accepted" : "declined" })));
+      await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    },
+  );
 });

@@ -38,6 +38,11 @@
   display: contents;
 }
 
+.status {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

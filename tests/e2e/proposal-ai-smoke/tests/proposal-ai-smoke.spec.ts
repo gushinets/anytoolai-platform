@@ -263,15 +263,19 @@ test.describe("ProposalAI web product", () => {
   });
 
   test("guest identity persists across reload instead of minting a new one", async ({ page }) => {
+    // The <h1> is server-rendered and says nothing about the identity bootstrap; the form only
+    // appears once the guest identity and runtime config have loaded, so that is the readiness signal.
+    const submit = page.getByRole("button", { name: "Generate proposal" });
+    const readGuestId = () => page.evaluate(() => window.localStorage.getItem("anytoolai.guest_id"));
+
     await page.goto(PRODUCT_URL);
-    await expect(page.locator("h1")).toHaveText("ProposalAI");
-    const firstGuestId = await page.evaluate(() => window.localStorage.getItem("anytoolai.guest_id"));
-    expect(firstGuestId).toBeTruthy();
+    await expect(submit).toBeVisible();
+    await expect.poll(readGuestId).toBeTruthy();
+    const firstGuestId = await readGuestId();
 
     await page.reload();
-    await expect(page.locator("h1")).toHaveText("ProposalAI");
-    const secondGuestId = await page.evaluate(() => window.localStorage.getItem("anytoolai.guest_id"));
-    expect(secondGuestId).toBe(firstGuestId);
+    await expect(submit).toBeVisible();
+    expect(await readGuestId()).toBe(firstGuestId);
   });
 
   test("route titles: the product page and both kinds of 404 name themselves in the document title", async ({ page }) => {
