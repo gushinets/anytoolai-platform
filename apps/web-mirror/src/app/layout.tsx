@@ -1,7 +1,7 @@
 import "@anytoolai/shared-ui/src/tokens.css";
 import { DM_Mono, DM_Sans, Noto_Sans } from "next/font/google";
 
-const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-body", fallback: ["Noto Sans"], adjustFontFallback: false });
+const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-body", adjustFontFallback: false });
 // DM Sans has no Cyrillic subset; load only Noto Sans Cyrillic so Russian UI text uses a real font.
 const cyrillic = Noto_Sans({ subsets: ["cyrillic"], variable: "--font-cyrillic" });
 const dmMono = DM_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono" });

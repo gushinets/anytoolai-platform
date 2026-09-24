@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Button, Card } from "@anytoolai/shared-ui";
 import {
   copyResultAndRecordActivation,
@@ -23,6 +23,7 @@ import { ErrorState } from "../../components/ErrorState";
 import { LanguageSwitcher, useHostT, useProductT } from "../../i18n";
 import { getClientStorage } from "./clientStorage";
 import type { FieldError } from "./fieldValidation";
+import { ProductShellContext } from "./ProductShellContext";
 import { assertNever, type ProductDefinition, type ProductRunEvent } from "./productDefinition";
 import styles from "./ProductRunPage.module.css";
 
@@ -246,6 +247,7 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const th = useHostT();
   const tp = useProductT();
   const title = tp("title");
+  const inProductShell = useContext(ProductShellContext);
 
   // Always-current `onEvent` behind a ref, refreshed after every render. Used by every
   // emitEvent() call site below, not just the mount effect: `handleSubmit`/`handleRetry`/
@@ -776,9 +778,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
 
   if (boot.kind === "loading") {
     return (
-      <main className="page-container">
+      <main className={inProductShell ? undefined : "page-container"}>
         <div className={styles.content}>
-          <div className={styles.utilityRow}><LanguageSwitcher /></div>
+          {inProductShell ? null : <div className={styles.utilityRow}><LanguageSwitcher /></div>}
           <p role="status">{th("loading", { product: title })}</p>
         </div>
       </main>
@@ -786,9 +788,9 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
   if (boot.kind === "boot-error") {
     return (
-      <main className="page-container">
+      <main className={inProductShell ? undefined : "page-container"}>
         <div className={styles.content}>
-          <div className={styles.utilityRow}><LanguageSwitcher /></div>
+          {inProductShell ? null : <div className={styles.utilityRow}><LanguageSwitcher /></div>}
           <ErrorState message={th("unavailable", { product: title })} />
         </div>
       </main>
@@ -861,13 +863,15 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   }
 
   return (
-    <main className="page-container">
+    <main className={inProductShell ? undefined : "page-container"}>
       <div className={styles.content}>
         <header className={styles.header}>
-          <div className={styles.titleRow}>
-            <h1>{title}</h1>
-            <LanguageSwitcher />
-          </div>
+          {inProductShell ? null : (
+            <div className={styles.titleRow}>
+              <h1>{title}</h1>
+              <LanguageSwitcher />
+            </div>
+          )}
           {definition.hasDescription ? <p className={styles.description}>{tp("description")}</p> : null}
           {quota ? (
             <p className={styles.quota} aria-live="polite">

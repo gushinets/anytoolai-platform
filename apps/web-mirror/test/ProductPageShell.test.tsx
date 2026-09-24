@@ -158,6 +158,7 @@ describe("ProductPageShell locale rendering", () => {
 
   it("lists every supported locale under its own name in one selector", async () => {
     renderShell(registered("proposal_ai"), bootRoutes(PROPOSAL_IDS));
+    expect(screen.getAllByRole("combobox", { name: "Language" })).toHaveLength(1);
     expect([...selector().options].map((option) => option.textContent)).toEqual([
       "English",
       "Français",
@@ -167,6 +168,16 @@ describe("ProductPageShell locale rendering", () => {
       "Русский",
       "Português",
     ]);
+  });
+
+  it("supplies the selector even when a registered component does not use ProductRunPage", () => {
+    renderShell({ ...registered("proposal_ai"), Component: () => <p>Independent product</p> }, {});
+
+    expect(screen.getByText("Independent product")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "ProposalAI" })).toBeTruthy();
+    expect(selector()).toBeTruthy();
+    switchTo("ru");
+    expect(screen.getByLabelText("Язык")).toBeTruthy();
   });
 
   it("re-localizes the submit form's accessible name on a locale switch", async () => {

@@ -29,6 +29,6 @@ Place the product title on the left and the compact UI-language selector on the 
 
 ## Result
 
-- Shared `ProductRunPage` now places the title and `LanguageSwitcher` in one flex row. Narrow screens wrap the selector to the right below the title without horizontal overflow.
+- `ProductPageShell` now places the title and `LanguageSwitcher` in one flex row for every registered product. Narrow screens wrap the selector to the right below the title without horizontal overflow.
 - Loading and boot-error states retain one selector.
 - Web build, lint, 224 tests, and docs validation passed. The rebuilt page is running on port 3100 and was visually checked in the browser.

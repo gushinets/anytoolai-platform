@@ -6,7 +6,7 @@ import { useHostT, useLocale } from "./LocaleProvider";
 import { LOCALE_NAMES, LOCALES, isLocale } from "./locales";
 import styles from "./LanguageSwitcher.module.css";
 
-/** The one language selector; rendered by the shared product runtime. */
+/** The one language selector; rendered by the host page shell. */
 export function LanguageSwitcher() {
   const { locale, setLocale } = useLocale();
   const t = useHostT();
