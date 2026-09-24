@@ -1,7 +1,7 @@
 {
   "response_json": {
     "values": {
-      "project_goal": "Let customers browse the menu and place cake orders online",
+      "project_goal": "Build a website for our small bakery so customers can browse the menu and place cake orders online",
       "deliverables": [
         "menu page",
         "online order form with checkout",

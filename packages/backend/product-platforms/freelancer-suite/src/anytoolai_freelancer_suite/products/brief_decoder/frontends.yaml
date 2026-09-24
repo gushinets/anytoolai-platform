@@ -1,5 +1,5 @@
 # Metadata only: ScenarioRuntimeService.start_session rejects any scenario start unless the
-# product has an enabled frontend. The apps/web-mirror page is apps/web-mirror/src/products/briefDecoder (ANY-248); no Chrome
+# product has an enabled frontend. The apps/web-mirror page itself is ANY-248; no Chrome
 # Extension entry (ANY-240 is optional).
 frontends:
   - frontend_id: web_mirror

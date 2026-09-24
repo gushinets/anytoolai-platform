@@ -4,7 +4,7 @@
       {
         "id": "overview",
         "title": "Project overview",
-        "content": "The client wants a website; the brief gives no further detail."
+        "content": "The client wants a website."
       },
       {
         "id": "key-details",
@@ -17,7 +17,7 @@
       {
         "id": "gaps",
         "title": "Gaps and risks",
-        "content": "Deliverables, deadline, budget and audience are all missing, and the style request is ambiguous."
+        "content": "Deliverables, deadline, budget, target audience and constraints are all missing, and the style request is ambiguous."
       },
       {
         "id": "next-steps",

@@ -5,7 +5,7 @@
 - State: active
 - Owner: agent
 - Created: 2026-09-21
-- Last updated: 2026-09-23
+- Last updated: 2026-09-24
 - Review date: 2026-09-28
 - Next action: re-request review; merge once approved.
 - Blocker: none
@@ -137,6 +137,8 @@ Core/atom/mapping-DSL change, custom backend endpoints.
 | 2026-09-23 | Round #8 code review (self-review): 2 blockers (whitespace-only canonical strings; A05 prompt's one-per-issue overclaim) fixed with a sweep of every prompt claim vs. real enforcement; re-ran quick-check/full-check, both green | Re-request review |
 | 2026-09-23 | Round #9 code review (self-review): 1 blocker (`questions.maxItems: 10` vs the real cap of 5) fixed and pinned to the workflow; re-ran quick-check/full-check, both green | Re-request review |
 | 2026-09-23 | Round #10 code review (self-review): 1 blocker (canonical schema weaker than A01's cross-validator) + 1 minor doc finding fixed via a full atom-validator-vs-schema sweep; re-ran quick-check/full-check, both green | Re-request review |
+| 2026-09-23 | Team-lead review #1: 2 blocking A10-fixture/prompt violations fixed and pinned by a fixture-vs-prompt test; re-ran quick-check/full-check, both green | Re-request review |
+| 2026-09-24 | Round #11 code review (self-review): weak overview stated absent data and my own test allowlist masked it; fixed both; re-ran quick-check/full-check, both green | Re-request review |
 
 ## Code review round #1 (2026-09-21)
 
@@ -416,6 +418,42 @@ Minor: `docs/product-specs/add-product-recipe.md` still told every new product t
 test-only `FakeProviderAdapter` subclass, contradicting the shared
 `tests/support/fake_provider_recording.RecordingProviderAdapter` this PR adds (round #2).
 Updated the recipe to point at the shared helper first.
+
+## Team-lead review #1 (2026-09-23)
+
+2 blockers, both confirmed. The A10 fixtures are the deterministic evidence for the prompt's
+rules, yet nothing checked them against those rules -- only against the schema -- which is why
+two violations survived ten review rounds:
+
+1. The happy and `.no_issues` overviews said "A bakery ... new website", but the A10 step only
+   receives `data` (A01 values, issues, questions) and `project_goal` carried neither fact,
+   violating "built from `data` only, never invent facts". Kept the summaries and moved the
+   context into the A01 fixtures' `project_goal` (a faithful extraction of the input text,
+   which does say "small bakery" and "new website").
+2. The weak-input `gaps` section omitted `constraints`, one of the five `missing_fields`,
+   although the prompt requires every `data.brief.missing_fields` entry to be named. Added it.
+
+Added `test_summary_fixtures_obey_the_a10_prompt` (freelancer-suite, full-check): for each of the
+three A10 fixtures, its A01 fixture's `missing_fields` must each appear in `gaps` (keyword table
+asserted to cover every configured A01 field), and every content word of `overview`/
+`key-details` must occur in that A01 fixture's `values` or a small connective-word allowlist. It
+is a heuristic (5-character stems), not proof of groundedness, but it catches exactly the class
+found here; `gaps`/`summary` are not word-checked because they legitimately paraphrase A04
+issues and A05 questions.
+
+## Code review round #11 (2026-09-24, self-review)
+
+1 blocker, confirmed: the weak-input `overview` said "the brief gives no further detail", which
+`generate_summary.v1.md` forbids ("write only facts that are present; do not mention absent ones
+here"). It slipped through because the grounding test added for the team-lead review shared one
+allowlist across sections that included `brief`/`gives`/`furth`/`detai` -- I widened the allowlist
+to make the fixture pass instead of questioning the fixture. Fixed the fixture (`The client wants
+a website.`) and split the allowlist per section: `overview` gets only `lets`/`that`/`wants`/
+`clien`; `key-details` (which may label fields and say none were found) keeps its own. Verified
+the old overview text is flagged (`brief`, `gives`, `furth`, `detai`).
+
+The `compose-smoke-dev` failure on the previous head was a Docker Hub 502 fetching a base image
+token, unrelated to this PR; a new push re-runs it.
 
 ## Open questions
 
