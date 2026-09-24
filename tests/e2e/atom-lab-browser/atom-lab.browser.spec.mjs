@@ -1778,6 +1778,118 @@ test("stalled preset writes report an ambiguous outcome and block blind duplicat
   await expect(page.locator("#save-as-new-preset")).toBeDisabled();
 });
 
+test("transport loss after a committed preset write blocks blind duplicate saves", async ({page}) => {
+  await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
+    await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#fill-example").click();
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-name").fill("Потерянный ответ");
+  await page.evaluate(() => {
+    const originalFetch = globalThis.fetch;
+    globalThis.__presetTransportState = {committed: false, posts: 0};
+    globalThis.fetch = (url, options = {}) => {
+      if (String(url).endsWith("/v1/atom-lab/presets") && options.method === "POST") {
+        globalThis.__presetTransportState.posts += 1;
+        globalThis.__presetTransportState.committed = true;
+        return Promise.reject(new TypeError("Failed to fetch after commit"));
+      }
+      return originalFetch(url, options);
+    };
+  });
+
+  await page.locator("#save-preset").click();
+  await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
+  await expect(page.locator("#save-preset")).toBeDisabled();
+  await expect(page.locator("#save-as-new-preset")).toBeDisabled();
+  await expect.poll(() => page.evaluate(() => globalThis.__presetTransportState)).toEqual({
+    committed: true,
+    posts: 1,
+  });
+});
+
+test("malformed successful preset response blocks blind duplicate saves", async ({page}) => {
+  let posts = 0;
+  await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
+    if (route.request().method() === "POST") {
+      posts += 1;
+      await route.fulfill({status: 201, contentType: "application/json", body: "{"});
+      return;
+    }
+    await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#fill-example").click();
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-name").fill("Повреждённый ответ");
+  await page.locator("#save-preset").click();
+
+  await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
+  await expect(page.locator("#save-preset")).toBeDisabled();
+  await expect(page.locator("#save-as-new-preset")).toBeDisabled();
+  expect(posts).toBe(1);
+});
+
+test("invalid successful preset response blocks blind duplicate saves", async ({page}) => {
+  let posts = 0;
+  await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
+    if (route.request().method() === "POST") {
+      posts += 1;
+      await route.fulfill({status: 201, contentType: "application/json", body: JSON.stringify({
+        preset_id: "preset-committed-with-invalid-envelope",
+        version: 1,
+      })});
+      return;
+    }
+    await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#fill-example").click();
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-name").fill("Неполный успешный ответ");
+  await page.locator("#save-preset").click();
+
+  await expect(page.locator("#preset-error")).toContainText("Не повторяйте Save");
+  await expect(page.locator("#save-preset")).toBeDisabled();
+  await expect(page.locator("#save-as-new-preset")).toBeDisabled();
+  expect(posts).toBe(1);
+});
+
+test("preset save exposes backend field errors without losing the draft", async ({page}) => {
+  await page.route("http://atom-lab.test/v1/atom-lab/presets", async (route) => {
+    if (route.request().method() === "POST") {
+      await route.fulfill({status: 422, contentType: "application/json", body: JSON.stringify({
+        error: {
+          code: "preset_contract_invalid",
+          message: "Конфигурация пресета не соответствует контракту атома.",
+          field_errors: [
+            {path: "name", message: "Имя не может состоять только из пробелов."},
+            {path: "fixed_fields.0", message: "Значение отсутствует в example_input."},
+          ],
+        },
+        request_id: "request-preset-fields",
+      })});
+      return;
+    }
+    await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [], next_cursor: null})});
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#fill-example").click();
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-name").fill("   ");
+  await page.locator("#save-preset").click();
+
+  await expect(page.locator("#preset-error")).toContainText("name: Имя не может состоять только из пробелов.");
+  await expect(page.locator("#preset-error")).toContainText("fixed_fields.0: Значение отсутствует в example_input.");
+  await expect(page.locator("#preset-name")).toHaveValue("   ");
+  await expect(page.locator("#save-preset")).toBeEnabled();
+});
+
 test("historical preset provenance stays read-only until explicit adaptation", async ({page}) => {
   const stored = {
     name: "Исторический пресет", description: "Старый контракт", atom_id: "A06",

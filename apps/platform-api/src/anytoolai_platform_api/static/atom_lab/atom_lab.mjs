@@ -1652,16 +1652,24 @@ export function bootstrapAtomLab({
     return loaded;
   };
 
+  const unknownWriteOutcome = () => {
+    const failure = new Error("Сервер мог сохранить изменения, но подтверждение не получено.");
+    failure.code = "request_outcome_unknown";
+    failure.outcomeUnknown = true;
+    return failure;
+  };
+
   const protectedJson = async (url, requestOptions = {}) => {
     const {timeoutMs = protectedRequestTimeoutMs, ...options} = requestOptions;
     const controller = new AbortControllerImpl();
     let timedOut = false;
+    let response = null;
     const timeoutId = scheduleImpl(() => {
       timedOut = true;
       controller.abort();
     }, timeoutMs);
     try {
-      const response = await fetchImpl(url, {
+      response = await fetchImpl(url, {
         ...options,
         signal: controller.signal,
         headers: {
@@ -1684,13 +1692,14 @@ export function bootstrapAtomLab({
       }
       return payload;
     } catch (error) {
+      if (error?.code === "request_outcome_unknown" || error?.status !== undefined) throw error;
+      if (options.method === "POST" && (timedOut || response === null || response.ok)) {
+        throw unknownWriteOutcome();
+      }
       if (error?.name !== "AbortError" || !timedOut) throw error;
-      const writeOutcomeUnknown = options.method === "POST";
-      const failure = new Error(writeOutcomeUnknown
-        ? "Время ожидания истекло; сервер мог сохранить изменения."
-        : "Время ожидания ответа истекло.");
-      failure.code = writeOutcomeUnknown ? "request_outcome_unknown" : "request_timeout";
-      failure.outcomeUnknown = writeOutcomeUnknown;
+      const failure = new Error("Время ожидания ответа истекло.");
+      failure.code = "request_timeout";
+      failure.outcomeUnknown = false;
       throw failure;
     } finally {
       cancelScheduleImpl(timeoutId);
@@ -2076,7 +2085,7 @@ export function bootstrapAtomLab({
       const created = await protectedJson(url, {method: "POST", body: JSON.stringify(body)});
       if (!isRecord(created) || !isNonEmptyString(created.preset_id) || !isPositiveInteger(created.version)
         || !isNonEmptyString(created.created_at)) {
-        throw new Error("Сохранение пресета вернуло некорректный ответ.");
+        throw unknownWriteOutcome();
       }
       if (!updating) await loadPresets();
       const currentSummary = presetItems.find((item) => item.preset_id === created.preset_id)
@@ -2165,7 +2174,11 @@ export function bootstrapAtomLab({
           return;
         }
       }
-      nodes["preset-error"].textContent = `${error instanceof Error ? error.message : "Не удалось сохранить пресет."} Значения черновика сохранены.`;
+      const fieldErrors = Array.isArray(error?.fieldErrors)
+        ? error.fieldErrors.map(({path, message}) => `${path}: ${message}`).join("; ")
+        : "";
+      const details = fieldErrors ? ` Поля: ${fieldErrors}.` : "";
+      nodes["preset-error"].textContent = `${error instanceof Error ? error.message : "Не удалось сохранить пресет."}${details} Значения черновика сохранены.`;
       renderPresetState();
     } finally {
       presetSaveInFlight = false;
