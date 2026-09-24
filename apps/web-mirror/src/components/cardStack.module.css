@@ -1,0 +1,18 @@
+/* Vertical rhythm for ResultView / ErrorState cards, which otherwise stack their children flush. */
+.stack {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+}
+
+.stack > p {
+  max-width: 70ch;
+  margin: 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.stack > [role="alert"],
+.stack > [role="status"] {
+  justify-self: stretch;
+}

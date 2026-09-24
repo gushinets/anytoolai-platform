@@ -4,6 +4,11 @@ import type { en } from "./en";
 
 export const ru: Shape<typeof en> = {
   language: { label: "Язык" },
+  nav: {
+    label: "Инструменты",
+    allTools: "Все инструменты",
+    runInProgress: "Запуск ещё выполняется. Если уйти сейчас, вы не увидите результат, а квота не вернётся.",
+  },
   loading: "Загрузка {product}…",
   unavailable: "{product} сейчас недоступен. Обновите страницу.",
   quotaExhausted: "Лимит использования {product} исчерпан.",

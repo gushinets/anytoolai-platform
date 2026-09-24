@@ -7,6 +7,7 @@ import { makeRoutedFetchClient } from "@anytoolai/ce-kit/test/testUtils/routedFe
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HandoffConsent } from "../src/components/HandoffConsent";
+import { makeClientWithDeferredRoute } from "./fixtures/platformResponses";
 
 afterEach(() => {
   cleanup();
@@ -160,7 +161,7 @@ describe("HandoffConsent", () => {
     const declineButton = screen.getByRole("button", { name: "Decline" }) as HTMLButtonElement;
     expect(declineButton.disabled).toBe(false);
     fireEvent.click(declineButton);
-    await waitFor(() => expect(screen.getByText("declined")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Declined")).toBeTruthy());
   });
 
   it("still resolves a guest identity and allows Accept when window.localStorage itself throws (storage-denied sandboxes)", async () => {
@@ -181,7 +182,7 @@ describe("HandoffConsent", () => {
       expect(acceptButton.disabled).toBe(false);
       fireEvent.click(acceptButton);
 
-      await waitFor(() => expect(screen.getByText("accepted")).toBeTruthy());
+      await waitFor(() => expect(screen.getByText("Accepted")).toBeTruthy());
       const acceptCall = calls.find((call) => call.key === ACCEPT_ROUTE);
       expect(JSON.parse(acceptCall?.init.body as string)).toEqual({ guest_id: "guest_ephemeral" });
     });
@@ -232,7 +233,7 @@ describe("HandoffConsent", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Accept" }));
 
-      await waitFor(() => expect(screen.getByText("accepted")).toBeTruthy());
+      await waitFor(() => expect(screen.getByText("Accepted")).toBeTruthy());
       const acceptCalls = calls.filter((call) => call.key === ACCEPT_ROUTE);
       expect(JSON.parse(acceptCalls[1]?.init.body as string)).toEqual({ guest_id: "guest_fresh" });
     } finally {
@@ -256,9 +257,15 @@ describe("HandoffConsent", () => {
     expect(calls.filter((call) => call.key === GUEST_IDENTITY_ROUTE)).toHaveLength(1);
   });
 
-  it.each(["accepted", "declined", "consumed", "expired", "failed"])(
+  it.each([
+    ["accepted", "Accepted"],
+    ["declined", "Declined"],
+    ["consumed", "Accepted"],
+    ["expired", "Expired"],
+    ["failed", "Failed"],
+  ])(
     "renders the %s terminal state directly from the initial GET, with no action buttons",
-    async (status) => {
+    async (status, label) => {
       const { client } = makeRoutedClient({
         [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload({ status }))],
         [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()],
@@ -266,7 +273,7 @@ describe("HandoffConsent", () => {
 
       render(<HandoffConsent client={client} handoffToken="token_abc" />);
 
-      await waitFor(() => expect(screen.getByText(status)).toBeTruthy());
+      await waitFor(() => expect(screen.getByText(label)).toBeTruthy());
       expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Decline" })).toBeNull();
     },
@@ -296,7 +303,7 @@ describe("HandoffConsent", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
 
-    await waitFor(() => expect(screen.getByText("accepted")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Accepted")).toBeTruthy());
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
     const acceptCall = calls.find((call) => call.key === ACCEPT_ROUTE);
     expect(acceptCall).toBeTruthy();
@@ -327,7 +334,7 @@ describe("HandoffConsent", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
 
-    await waitFor(() => expect(screen.getByText("consumed")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Accepted")).toBeTruthy());
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
   });
 
@@ -343,7 +350,7 @@ describe("HandoffConsent", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Decline" }));
 
-    await waitFor(() => expect(screen.getByText("declined")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Declined")).toBeTruthy());
   });
 
   it("on a stale accept that races an already-consumed token, refetches and renders the authoritative terminal state instead of retrying", async () => {
@@ -358,7 +365,7 @@ describe("HandoffConsent", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
 
-    await waitFor(() => expect(screen.getByText("consumed")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Accepted")).toBeTruthy());
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
     expect(calls.filter((call) => call.key === PREVIEW_ROUTE)).toHaveLength(2);
   });
@@ -375,7 +382,7 @@ describe("HandoffConsent", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
 
-    await waitFor(() => expect(screen.getByText("expired")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Expired")).toBeTruthy());
   });
 
   it("on an accept that fails because the source session vanished, refetches and renders the resulting failed terminal state", async () => {
@@ -390,7 +397,7 @@ describe("HandoffConsent", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
 
-    await waitFor(() => expect(screen.getByText("failed")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Failed")).toBeTruthy());
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
   });
 
@@ -434,7 +441,7 @@ describe("HandoffConsent", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
 
-    await waitFor(() => expect(screen.getByText("accepted")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Accepted")).toBeTruthy());
     const acceptCalls = calls.filter((call) => call.key === ACCEPT_ROUTE);
     expect(acceptCalls).toHaveLength(2);
     expect(JSON.parse(acceptCalls[1]?.init.body as string)).toEqual({ guest_id: "guest_fresh" });
@@ -470,4 +477,32 @@ describe("HandoffConsent", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not be completed/i));
     expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy();
   });
+
+  it.each([
+    ["accept", "Accept", "Decline", "Accepting…", ACCEPT_ROUTE],
+    ["decline", "Decline", "Accept", "Declining…", DECLINE_ROUTE],
+  ])(
+    "shows the %s request as busy and announces it while it is in flight",
+    async (_kind, clicked, other, statusText, route) => {
+      const { client, resolveDeferred } = makeClientWithDeferredRoute(
+        { [PREVIEW_ROUTE]: [jsonResponse(200, previewPayload())], [GUEST_IDENTITY_ROUTE]: [guestIdentityResponse()] },
+        route,
+      );
+      render(<HandoffConsent client={client} handoffToken="token_abc" />);
+      const button = (await screen.findByRole("button", { name: clicked })) as HTMLButtonElement;
+      await waitFor(() => expect(button.disabled).toBe(false));
+
+      fireEvent.click(button);
+
+      await waitFor(() => expect(button.getAttribute("aria-busy")).toBe("true"));
+      expect(button.disabled).toBe(true);
+      const otherButton = screen.getByRole("button", { name: other }) as HTMLButtonElement;
+      expect(otherButton.disabled).toBe(true);
+      expect(otherButton.getAttribute("aria-busy")).toBeNull();
+      expect(screen.getByRole("status").textContent).toBe(statusText);
+
+      resolveDeferred(jsonResponse(200, previewPayload({ status: clicked === "Accept" ? "accepted" : "declined" })));
+      await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    },
+  );
 });

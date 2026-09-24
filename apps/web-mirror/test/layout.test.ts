@@ -131,4 +131,20 @@ describe("layout.tsx's fonts stay in sync with tokens.json's typography", () => 
     expect(size).toBeGreaterThanOrEqual(sizeRange[0]);
     expect(size).toBeLessThanOrEqual(sizeRange[1]);
   });
+
+  it("keeps the home page's headings inside the Bundle 3 roles (Display size for the h1, no mismatched Cabinet weight on the card title)", () => {
+    const css = readFileSync("src/app/page.module.css", "utf-8");
+    const [min, max] = HEADING_ROLE_SIZE_RANGES[900] as [number, number];
+    const clamp = css.match(/\.title\s*\{[^}]*?font-size:\s*clamp\((\d+)px,[^,]+,\s*(\d+)px\)/);
+    if (!clamp) {
+      throw new Error("page.module.css's .title has no px-bounded font-size clamp()");
+    }
+    expect(Number(clamp[1])).toBeGreaterThanOrEqual(min);
+    expect(Number(clamp[2])).toBeLessThanOrEqual(max);
+
+    // The global h1/h2/h3 rule pins Cabinet Grotesk at 900, so a card-title size outside the Display
+    // range must switch to the body face (or it would pair 900 with a Section size).
+    const name = css.match(/\.name\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(name).toContain("var(--font-body");
+  });
 });

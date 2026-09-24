@@ -4,6 +4,7 @@
   justify-content: center;
   gap: 8px;
   border-radius: var(--radius-button);
+  min-height: 44px;
   padding: 10px 20px;
   font: inherit;
   font-weight: 600;
