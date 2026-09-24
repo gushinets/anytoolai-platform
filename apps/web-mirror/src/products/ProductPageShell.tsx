@@ -2,7 +2,7 @@
 
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import Link from "next/link";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { LanguageSwitcher, LocaleProvider, useHostT, useProductT } from "../i18n";
 import type { RegisteredProduct } from "./registry";
 import type { ProductRunEvent } from "./runtime/productDefinition";
@@ -64,16 +64,26 @@ function ProductPageContent({ Component, client, onEvent, visitId }: Pick<Regist
   );
 }
 
-/** Back to the tool list. Leaving mid-run is allowed, so instead of blocking it warns (on hover and
- * keyboard focus, Escape dismisses) that the run keeps going without the user seeing its result. */
+/** Back to the tool list. Leaving mid-run is allowed, so instead of blocking it warns that the run
+ * keeps going without the user seeing its result: on hover and keyboard focus (Escape dismisses),
+ * and on touch -- where a tap would otherwise navigate in the same gesture -- the first tap reveals
+ * the warning and only the next tap leaves. */
 function AllToolsLink({ busy }: { busy: boolean }) {
   const th = useHostT();
   const tipId = useId();
   const [dismissed, setDismissed] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const lastPointerType = useRef("");
+  useEffect(() => {
+    if (!busy) {
+      setRevealed(false);
+    }
+  }, [busy]);
   return (
     <span
       className={styles.linkWrap}
       data-dismissed={dismissed || undefined}
+      data-revealed={revealed || undefined}
       onMouseLeave={() => setDismissed(false)}
       onBlur={() => setDismissed(false)}
       onKeyDown={(event) => {
@@ -82,7 +92,24 @@ function AllToolsLink({ busy }: { busy: boolean }) {
         }
       }}
     >
-      <Link href="/" className={styles.allTools} aria-describedby={busy ? tipId : undefined}>
+      <Link
+        href="/"
+        className={styles.allTools}
+        aria-describedby={busy ? tipId : undefined}
+        onPointerDown={(event) => {
+          lastPointerType.current = event.pointerType;
+        }}
+        // A touch fires touchstart too; this also covers engines that skip the pointer type.
+        onTouchStart={() => {
+          lastPointerType.current = "touch";
+        }}
+        onClick={(event) => {
+          if (busy && lastPointerType.current === "touch" && !revealed) {
+            event.preventDefault();
+            setRevealed(true);
+          }
+        }}
+      >
         <span aria-hidden="true">‹</span> {th("nav.allTools")}
       </Link>
       {busy ? (

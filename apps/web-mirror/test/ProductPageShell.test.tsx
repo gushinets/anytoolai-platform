@@ -527,6 +527,23 @@ describe("All tools link", () => {
     expect(link.parentElement?.hasAttribute("data-dismissed")).toBe(false);
   });
 
+  it("reveals the warning on the first touch tap while a run is in flight, instead of leaving in that tap", async () => {
+    renderProposal();
+    fireEvent.change(await screen.findByLabelText(en.fields.taskText), { target: { value: "Redesign our landing page" } });
+    fireEvent.change(screen.getByLabelText(en.fields.freelancerPositioning), { target: { value: "Product designer" } });
+    fireEvent.click(screen.getByRole("button", { name: en.generate.submit }));
+    const link = await screen.findByRole("link", { name: /All tools/ });
+    const wrap = link.parentElement as HTMLElement;
+
+    // A mouse click does not need the reveal: hovering already showed the warning.
+    fireEvent.click(link);
+    expect(wrap.hasAttribute("data-revealed")).toBe(false);
+
+    fireEvent.touchStart(link);
+    fireEvent.click(link);
+    expect(wrap.hasAttribute("data-revealed")).toBe(true);
+  });
+
   it("has translated copy in every locale", () => {
     for (const locale of LOCALES) {
       expect(HOST_MESSAGES[locale].nav.allTools.trim(), locale).not.toBe("");

@@ -132,7 +132,7 @@
   padding: 16px 18px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
-  background: rgba(15, 12, 41, 0.45);
+  background: var(--color-background);
   color: var(--color-text);
   font-size: 15px;
   line-height: 1.6;

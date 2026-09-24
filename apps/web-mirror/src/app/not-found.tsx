@@ -1,3 +1,5 @@
+export const metadata = { title: "Page not found" };
+
 import Link from "next/link";
 
 export default function NotFound() {

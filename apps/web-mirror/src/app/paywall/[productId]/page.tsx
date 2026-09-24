@@ -1,3 +1,5 @@
+export const metadata = { title: "Paywall" };
+
 export default function PaywallPage() {
   return (
     <main className="page-container">

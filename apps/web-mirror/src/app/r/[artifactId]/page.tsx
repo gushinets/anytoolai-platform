@@ -1,3 +1,5 @@
+export const metadata = { title: "Result" };
+
 export default function ArtifactPage() {
   return (
     <main className="page-container">

@@ -63,7 +63,8 @@
 }
 
 .linkWrap:hover .tooltip,
-.linkWrap:focus-within .tooltip {
+.linkWrap:focus-within .tooltip,
+.linkWrap[data-revealed] .tooltip {
   visibility: visible;
   opacity: 1;
 }
