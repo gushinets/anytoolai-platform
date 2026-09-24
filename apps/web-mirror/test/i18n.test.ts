@@ -204,6 +204,14 @@ describe("translation resources", () => {
     }
   });
 
+  it("provide a nonempty title for every registered product in every locale", () => {
+    for (const product of listRegisteredProducts()) {
+      for (const locale of LOCALES) {
+        expect(product.messages[locale].title.trim(), `${product.productId}/${locale}/title`).not.toBe("");
+      }
+    }
+  });
+
   it("keep every ICU placeholder of the English message, and leave none empty", () => {
     for (const bundle of bundles()) {
       const english = flatten(bundle.byLocale.en);
