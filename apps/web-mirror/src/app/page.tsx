@@ -58,10 +58,9 @@ function HomeContent() {
                   </ul>
                 ) : null}
                 {tags ? (
-                  <p className={styles.sample} aria-hidden="true">
-                    {t(`cards.${product.productId}.sample`)}
-                  </p>
+                  <p className={styles.sample}>{t(`cards.${product.productId}.sample`)}</p>
                 ) : null}
+                {/* Hidden from assistive tech only because the heading link already says it. */}
                 <span className={styles.cta} aria-hidden="true">
                   {t("open")}
                 </span>
