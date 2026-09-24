@@ -1,7 +1,9 @@
 import "@anytoolai/shared-ui/src/tokens.css";
-import { DM_Mono, DM_Sans } from "next/font/google";
+import { DM_Mono, DM_Sans, Noto_Sans } from "next/font/google";
 
-const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-body" });
+const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-body", fallback: ["Noto Sans"], adjustFontFallback: false });
+// DM Sans has no Cyrillic subset; load only Noto Sans Cyrillic so Russian UI text uses a real font.
+const cyrillic = Noto_Sans({ subsets: ["cyrillic"], variable: "--font-cyrillic" });
 const dmMono = DM_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono" });
 
 // Cabinet Grotesk (headline) isn't a Google Font, and its ITF Free Font License permits
@@ -18,7 +20,7 @@ const CABINET_GROTESK_CSS_URL = "https://api.fontshare.com/v2/css?f[]=cabinet-gr
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${dmMono.variable}`}>
+    <html lang="en" className={`${dmSans.variable} ${cyrillic.variable} ${dmMono.variable}`}>
       <head>
         <link rel="preconnect" href="https://api.fontshare.com" />
         <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="anonymous" />

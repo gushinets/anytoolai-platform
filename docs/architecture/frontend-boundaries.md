@@ -138,7 +138,7 @@ product-owned. Code: `apps/web-mirror/src/i18n/` (library `use-intl`, imported o
   auto-resolved locale is not persisted, so a changed browser language keeps being respected).
   Read synchronously, unlike ce-kit's async storage adapter, to avoid a flash of English. The
   document `<html lang>` follows the effective locale.
-- **Selector:** one `LanguageSwitcher`, rendered by `ProductPageShell` around every registered
+- **Selector:** one `LanguageSwitcher`, rendered in the shared `ProductRunPage` header for every registered
   product on `/products/{productId}`. A product never renders its own selector. Changing locale
   never remounts the product (no `key={locale}`), so form values, run state and the selected
   Client Update Writer mode survive.

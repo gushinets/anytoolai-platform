@@ -4,13 +4,14 @@ import type { ChangeEvent } from "react";
 import { Select } from "@anytoolai/shared-ui";
 import { useHostT, useLocale } from "./LocaleProvider";
 import { LOCALE_NAMES, LOCALES, isLocale } from "./locales";
+import styles from "./LanguageSwitcher.module.css";
 
-/** The one language selector; rendered by `ProductPageShell` so no product implements its own. */
+/** The one language selector; rendered by the shared product runtime. */
 export function LanguageSwitcher() {
   const { locale, setLocale } = useLocale();
   const t = useHostT();
   return (
-    <div className="page-container">
+    <div className={styles.control}>
       <label htmlFor="ui-language">{t("language.label")}</label>
       <Select
         id="ui-language"

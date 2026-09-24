@@ -20,7 +20,7 @@ import {
   type QuotaState,
 } from "@anytoolai/ce-kit";
 import { ErrorState } from "../../components/ErrorState";
-import { useHostT, useProductT } from "../../i18n";
+import { LanguageSwitcher, useHostT, useProductT } from "../../i18n";
 import { getClientStorage } from "./clientStorage";
 import type { FieldError } from "./fieldValidation";
 import { assertNever, type ProductDefinition, type ProductRunEvent } from "./productDefinition";
@@ -777,14 +777,20 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   if (boot.kind === "loading") {
     return (
       <main className="page-container">
-        <p role="status">{th("loading", { product: title })}</p>
+        <div className={styles.content}>
+          <div className={styles.utilityRow}><LanguageSwitcher /></div>
+          <p role="status">{th("loading", { product: title })}</p>
+        </div>
       </main>
     );
   }
   if (boot.kind === "boot-error") {
     return (
       <main className="page-container">
-        <ErrorState message={th("unavailable", { product: title })} />
+        <div className={styles.content}>
+          <div className={styles.utilityRow}><LanguageSwitcher /></div>
+          <ErrorState message={th("unavailable", { product: title })} />
+        </div>
       </main>
     );
   }
@@ -858,7 +864,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     <main className="page-container">
       <div className={styles.content}>
         <header className={styles.header}>
-          <h1>{title}</h1>
+          <div className={styles.titleRow}>
+            <h1>{title}</h1>
+            <LanguageSwitcher />
+          </div>
           {definition.hasDescription ? <p className={styles.description}>{tp("description")}</p> : null}
           {quota ? (
             <p className={styles.quota} aria-live="polite">

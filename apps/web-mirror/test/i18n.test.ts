@@ -16,6 +16,7 @@ import {
 import { HOST_MESSAGES } from "../src/i18n/messages";
 import { mergeMessages, type MessageTree } from "../src/i18n/messageTypes";
 import { resolveLocale } from "../src/i18n/resolveLocale";
+import { PROPOSAL_AI_MESSAGES } from "../src/products/proposalAi/messages";
 import { listRegisteredProducts } from "../src/products/registry";
 
 describe("readStoredLocale / writeStoredLocale (staleness on a failed write)", () => {
@@ -256,6 +257,13 @@ describe("translation resources", () => {
     expect(format("en", 1)).toBe("F: 1 character maximum.");
     expect(format("en", 5)).toBe("F: 5 characters maximum.");
     expect(new Set([1, 2, 5].map((count) => format("ru", count))).size).toBe(3);
+  });
+
+  it("uses natural Russian word forms in the Proposal AI quota", () => {
+    const translate = createTranslator({ locale: "ru", messages: { product: PROPOSAL_AI_MESSAGES.ru }, namespace: "product" });
+    expect(translate("quotaRemaining", { remaining: 1, limit: 10 })).toBe("Осталось 1 предложение из 10.");
+    expect(translate("quotaRemaining", { remaining: 2, limit: 10 })).toBe("Осталось 2 предложения из 10.");
+    expect(translate("quotaRemaining", { remaining: 5, limit: 10 })).toBe("Осталось 5 предложений из 10.");
   });
 
   it("show each locale under its own untranslated name in the selector", () => {

@@ -41,7 +41,8 @@
   --radius-pill: 999px;
 }
 
-/* --font-body/--font-mono are set by next/font/google on <html> in layout.tsx (DM Sans/DM Mono);
+/* --font-body/--font-mono are set by next/font/google on <html> in layout.tsx (DM Sans with
+ * Noto Sans for Cyrillic / DM Mono);
  * the var() fallback here only covers a consumer that never wires next/font at all. */
 body {
   font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif);
