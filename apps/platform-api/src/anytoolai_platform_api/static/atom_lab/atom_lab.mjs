@@ -1842,10 +1842,12 @@ export function bootstrapAtomLab({
     updatePresetEditorDisabled();
   };
 
-  const loadPresets = async ({append = false} = {}) => {
+  const loadPresets = async ({append = false, merge = false} = {}) => {
     if (append && presetListLoadInFlight) return false;
     const generation = ++presetListLoadGeneration;
     const cursor = append ? presetCursor : null;
+    const previousItems = presetItems;
+    const previousCursor = presetCursor;
     presetListLoadInFlight = true;
     updatePresetEditorDisabled();
     nodes["preset-error"].textContent = "";
@@ -1854,8 +1856,20 @@ export function bootstrapAtomLab({
       const parsed = parsePresetList(await protectedJson(`/v1/atom-lab/presets${query}`));
       if (!parsed) throw new Error("Список пресетов вернул некорректный ответ.");
       if (generation !== presetListLoadGeneration) return false;
-      presetItems = append ? [...presetItems, ...parsed.items] : parsed.items;
-      presetCursor = parsed.next_cursor;
+      if (append) {
+        presetItems = [...presetItems, ...parsed.items];
+        presetCursor = parsed.next_cursor;
+      } else if (merge && previousItems.length > 0) {
+        const refreshedIds = new Set(parsed.items.map((item) => item.preset_id));
+        presetItems = [
+          ...parsed.items,
+          ...previousItems.filter((item) => !refreshedIds.has(item.preset_id)),
+        ];
+        presetCursor = previousCursor;
+      } else {
+        presetItems = parsed.items;
+        presetCursor = parsed.next_cursor;
+      }
       renderPresetList();
       return true;
     } catch (error) {
@@ -1878,9 +1892,10 @@ export function bootstrapAtomLab({
     nodes.workspace.inert = draftLocked;
     nodes.workspace.setAttribute("aria-busy", String(draftLocked));
     for (const id of ["preset-name", "preset-description", "save-preset"]) nodes[id].disabled = editorLocked;
-    for (const id of ["preset-version-select", "new-preset", "load-more-versions"]) {
+    for (const id of ["preset-version-select", "load-more-versions"]) {
       nodes[id].disabled = versionControlsLocked;
     }
+    nodes["new-preset"].disabled = versionControlsLocked || presetSaveOutcomeUnknown;
     nodes["save-preset"].disabled = editorLocked || presetSaveOutcomeUnknown;
     nodes["save-as-new-preset"].disabled = versionControlsLocked || presetSaveOutcomeUnknown;
     nodes["open-latest-preset"].disabled = versionControlsLocked || conflictLatestPreset === null;
@@ -2822,7 +2837,7 @@ export function bootstrapAtomLab({
     nodes["presets-panel"].hidden = false;
     setPresetLibraryLoading(true);
     try {
-      if (presetItems.length === 0) await loadPresets();
+      await loadPresets({merge: presetItems.length > 0});
       if (!presetEditorActive) startNewPreset({clearSessionPreset: false});
     } finally {
       setPresetLibraryLoading(false);
@@ -2843,7 +2858,7 @@ export function bootstrapAtomLab({
   nodes["load-more-versions"].addEventListener("click", () => loadMorePresetVersions());
   nodes["load-more-history"].addEventListener("click", () => loadHistory({append: true}));
   nodes["new-preset"].addEventListener("click", () => {
-    if (presetLibraryLoading || presetOpenInFlight || presetSaveInFlight) return;
+    if (presetLibraryLoading || presetOpenInFlight || presetSaveInFlight || presetSaveOutcomeUnknown) return;
     if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     startNewPreset();
   });

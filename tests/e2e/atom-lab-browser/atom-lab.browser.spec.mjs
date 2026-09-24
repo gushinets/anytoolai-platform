@@ -1884,6 +1884,51 @@ test("preset identity opens the fresh latest version while explicit version sele
   expect(detailReads).toEqual([2, 1]);
 });
 
+test("reopening presets refreshes shared identities without dropping loaded later pages", async ({page}) => {
+  const summary = (presetId, name, createdAt) => ({
+    preset_id: presetId,
+    latest_version: 1,
+    name,
+    description: `${name} description`,
+    atom_id: "A06",
+    created_at: createdAt,
+    updated_at: createdAt,
+  });
+  const first = summary("preset-first", "Первый пресет", "2026-09-24T09:00:00Z");
+  const later = summary("preset-later", "Пресет с поздней страницы", "2026-09-24T08:00:00Z");
+  const shared = summary("preset-shared-new", "Новый командный пресет", "2026-09-24T10:00:00Z");
+  let firstPageReads = 0;
+  await page.route("http://atom-lab.test/v1/atom-lab/presets**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get("cursor") === "older-page") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({
+        items: [later], next_cursor: null,
+      })});
+      return;
+    }
+    firstPageReads += 1;
+    await route.fulfill({contentType: "application/json", body: JSON.stringify({
+      items: firstPageReads === 1 ? [first] : [shared],
+      next_cursor: "older-page",
+    })});
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#presets-button").click();
+  await page.locator("#load-more-presets").click();
+  await expect(page.locator("#preset-list button")).toHaveCount(2);
+  await page.locator("#close-presets").click();
+
+  await page.locator("#presets-button").click();
+
+  await expect(page.getByRole("button", {name: /Новый командный пресет/})).toBeVisible();
+  await expect(page.getByRole("button", {name: /Первый пресет/})).toBeVisible();
+  await expect(page.getByRole("button", {name: /Пресет с поздней страницы/})).toBeVisible();
+  await expect(page.locator("#preset-list button")).toHaveCount(3);
+  await expect(page.locator("#load-more-presets")).toBeHidden();
+  expect(firstPageReads).toBe(2);
+});
+
 test("stalled preset reads release the locked workspace at the browser deadline", async ({page}) => {
   const stored = {
     name: "Deadline preset", description: "Read timeout", atom_id: "A06",
@@ -1953,6 +1998,10 @@ test("stalled preset writes report an ambiguous outcome and block blind duplicat
   await expect(page.locator("#workspace")).toHaveAttribute("aria-busy", "false");
   await expect(page.locator("#save-preset")).toBeDisabled();
   await expect(page.locator("#save-as-new-preset")).toBeDisabled();
+  await expect(page.locator("#new-preset")).toBeDisabled();
+  await page.locator("#new-preset").dispatchEvent("click");
+  await expect(page.locator("#preset-name")).toHaveValue("Неизвестный результат");
+  await expect(page.locator("#save-preset")).toBeDisabled();
 });
 
 test("transport loss after a committed preset write blocks blind duplicate saves", async ({page}) => {
