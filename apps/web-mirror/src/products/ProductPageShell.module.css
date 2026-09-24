@@ -4,6 +4,12 @@
   padding: 40px 20px;
 }
 
+@media (max-width: 520px) {
+  .shell {
+    padding: 24px 16px;
+  }
+}
+
 .titleRow {
   width: min(100%, 820px);
   margin: 0 auto;

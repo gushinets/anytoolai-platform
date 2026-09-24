@@ -16,6 +16,7 @@ import {
 } from "../runtime/fieldValidation";
 import type { ProductDefinition, ProductFieldsProps, ProductResultProps, ProductRunEvent } from "../runtime/productDefinition";
 import { ToneSelect, type Tone } from "../shared/tone";
+import styles from "./ClientUpdateWriterProduct.module.css";
 
 const PRODUCT_ID = "client_update_writer";
 
@@ -44,16 +45,18 @@ function ToneField({
   const t = useProductT();
   return (
     <>
-      <label htmlFor="client-update-writer-tone">{t("fields.tone")}</label>
-      <ToneSelect
-        id="client-update-writer-tone"
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-        placeholderLabel={t("fields.tonePlaceholder")}
-        ariaInvalid={Boolean(error)}
-      />
-      <FieldErrorMessage error={error} label={t("fieldNames.tone")} />
+      <div className={styles.fieldGroup}>
+        <label htmlFor="client-update-writer-tone">{t("fields.tone")}</label>
+        <ToneSelect
+          id="client-update-writer-tone"
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          placeholderLabel={t("fields.tonePlaceholder")}
+          ariaInvalid={Boolean(error)}
+        />
+        <FieldErrorMessage className={styles.error} error={error} label={t("fieldNames.tone")} />
+      </div>
     </>
   );
 }
@@ -100,15 +103,17 @@ function UpdateFields({ values, errors, disabled, onChange }: ProductFieldsProps
   const t = useProductT();
   return (
     <>
-      <label htmlFor="client-update-writer-progress-notes">{t("fields.progressNotes")}</label>
-      <TextArea
-        id="client-update-writer-progress-notes"
-        value={values.progressNotes}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("progressNotes", event.target.value)}
-        disabled={disabled}
-        aria-invalid={Boolean(errors.progressNotes)}
-      />
-      <FieldErrorMessage error={errors.progressNotes} label={t("fieldNames.progressNotes")} />
+      <div className={styles.fieldGroup}>
+        <label htmlFor="client-update-writer-progress-notes">{t("fields.progressNotes")}</label>
+        <TextArea
+          id="client-update-writer-progress-notes"
+          value={values.progressNotes}
+          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("progressNotes", event.target.value)}
+          disabled={disabled}
+          aria-invalid={Boolean(errors.progressNotes)}
+        />
+        <FieldErrorMessage className={styles.error} error={errors.progressNotes} label={t("fieldNames.progressNotes")} />
+      </div>
       <ToneField value={values.tone} error={errors.tone} disabled={disabled} onChange={(tone) => onChange("tone", tone)} />
     </>
   );
@@ -142,25 +147,29 @@ function ReplyDraftFields({ values, errors, disabled, onChange }: ProductFieldsP
   const t = useProductT();
   return (
     <>
-      <label htmlFor="client-update-writer-client-message">{t("fields.clientMessage")}</label>
-      <TextArea
-        id="client-update-writer-client-message"
-        value={values.clientMessage}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("clientMessage", event.target.value)}
-        disabled={disabled}
-        aria-invalid={Boolean(errors.clientMessage)}
-      />
-      <FieldErrorMessage error={errors.clientMessage} label={t("fieldNames.clientMessage")} />
+      <div className={styles.fieldGroup}>
+        <label htmlFor="client-update-writer-client-message">{t("fields.clientMessage")}</label>
+        <TextArea
+          id="client-update-writer-client-message"
+          value={values.clientMessage}
+          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("clientMessage", event.target.value)}
+          disabled={disabled}
+          aria-invalid={Boolean(errors.clientMessage)}
+        />
+        <FieldErrorMessage className={styles.error} error={errors.clientMessage} label={t("fieldNames.clientMessage")} />
+      </div>
 
-      <label htmlFor="client-update-writer-reply-goal">{t("fields.replyGoal")}</label>
-      <TextArea
-        id="client-update-writer-reply-goal"
-        value={values.replyGoal}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("replyGoal", event.target.value)}
-        disabled={disabled}
-        aria-invalid={Boolean(errors.replyGoal)}
-      />
-      <FieldErrorMessage error={errors.replyGoal} label={t("fieldNames.replyGoal")} />
+      <div className={styles.fieldGroup}>
+        <label htmlFor="client-update-writer-reply-goal">{t("fields.replyGoal")}</label>
+        <TextArea
+          id="client-update-writer-reply-goal"
+          value={values.replyGoal}
+          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("replyGoal", event.target.value)}
+          disabled={disabled}
+          aria-invalid={Boolean(errors.replyGoal)}
+        />
+        <FieldErrorMessage className={styles.error} error={errors.replyGoal} label={t("fieldNames.replyGoal")} />
+      </div>
       <ToneField value={values.tone} error={errors.tone} disabled={disabled} onChange={(tone) => onChange("tone", tone)} />
     </>
   );
@@ -195,35 +204,41 @@ function PrepaidRequestFields({ values, errors, disabled, onChange }: ProductFie
   const t = useProductT();
   return (
     <>
-      <label htmlFor="client-update-writer-billing-notes">{t("fields.billingNotes")}</label>
-      <TextArea
-        id="client-update-writer-billing-notes"
-        value={values.billingNotes}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("billingNotes", event.target.value)}
-        disabled={disabled}
-        aria-invalid={Boolean(errors.billingNotes)}
-      />
-      <FieldErrorMessage error={errors.billingNotes} label={t("fieldNames.billingNotes")} />
+      <div className={styles.fieldGroup}>
+        <label htmlFor="client-update-writer-billing-notes">{t("fields.billingNotes")}</label>
+        <TextArea
+          id="client-update-writer-billing-notes"
+          value={values.billingNotes}
+          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange("billingNotes", event.target.value)}
+          disabled={disabled}
+          aria-invalid={Boolean(errors.billingNotes)}
+        />
+        <FieldErrorMessage className={styles.error} error={errors.billingNotes} label={t("fieldNames.billingNotes")} />
+      </div>
 
-      <label htmlFor="client-update-writer-billing-amount">{t("fields.billingAmount")}</label>
-      <Input
-        id="client-update-writer-billing-amount"
-        value={values.billingAmount}
-        onChange={(event: ChangeEvent<HTMLInputElement>) => onChange("billingAmount", event.target.value)}
-        disabled={disabled}
-        aria-invalid={Boolean(errors.billingAmount)}
-      />
-      <FieldErrorMessage error={errors.billingAmount} label={t("fieldNames.billingAmount")} />
+      <div className={styles.fieldGroup}>
+        <label htmlFor="client-update-writer-billing-amount">{t("fields.billingAmount")}</label>
+        <Input
+          id="client-update-writer-billing-amount"
+          value={values.billingAmount}
+          onChange={(event: ChangeEvent<HTMLInputElement>) => onChange("billingAmount", event.target.value)}
+          disabled={disabled}
+          aria-invalid={Boolean(errors.billingAmount)}
+        />
+        <FieldErrorMessage className={styles.error} error={errors.billingAmount} label={t("fieldNames.billingAmount")} />
+      </div>
 
-      <label htmlFor="client-update-writer-billing-due-date">{t("fields.billingDueDate")}</label>
-      <Input
-        id="client-update-writer-billing-due-date"
-        value={values.billingDueDate}
-        onChange={(event: ChangeEvent<HTMLInputElement>) => onChange("billingDueDate", event.target.value)}
-        disabled={disabled}
-        aria-invalid={Boolean(errors.billingDueDate)}
-      />
-      <FieldErrorMessage error={errors.billingDueDate} label={t("fieldNames.billingDueDate")} />
+      <div className={styles.fieldGroup}>
+        <label htmlFor="client-update-writer-billing-due-date">{t("fields.billingDueDate")}</label>
+        <Input
+          id="client-update-writer-billing-due-date"
+          value={values.billingDueDate}
+          onChange={(event: ChangeEvent<HTMLInputElement>) => onChange("billingDueDate", event.target.value)}
+          disabled={disabled}
+          aria-invalid={Boolean(errors.billingDueDate)}
+        />
+        <FieldErrorMessage className={styles.error} error={errors.billingDueDate} label={t("fieldNames.billingDueDate")} />
+      </div>
       <ToneField value={values.tone} error={errors.tone} disabled={disabled} onChange={(tone) => onChange("tone", tone)} />
     </>
   );
@@ -306,21 +321,24 @@ export function ClientUpdateWriterProduct({ client, onEvent, visitId }: ClientUp
 
   return (
     <>
-      <fieldset>
-        <legend>{t("modes.legend")}</legend>
-        {MODE_IDS.map((id) => (
-          <label key={id}>
-            <input
-              type="radio"
-              name="client-update-writer-mode"
-              value={id}
-              checked={id === modeId}
-              disabled={busy}
-              onChange={() => handleModeChange(id)}
-            />
-            {t(`modes.${id}`)}
-          </label>
-        ))}
+      <fieldset className={styles.modeGroup}>
+        <legend className={styles.legend}>{t("modes.legend")}</legend>
+        <div className={styles.modeOptions}>
+          {MODE_IDS.map((id) => (
+            <label key={id} className={styles.modeOption}>
+              <input
+                className={styles.radio}
+                type="radio"
+                name="client-update-writer-mode"
+                value={id}
+                checked={id === modeId}
+                disabled={busy}
+                onChange={() => handleModeChange(id)}
+              />
+              {t(`modes.${id}`)}
+            </label>
+          ))}
+        </div>
       </fieldset>
       <ProductRunPage
         key={modeId}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Button, Card, Toast } from "@anytoolai/shared-ui";
 import {
   acceptHandoff,
   createInMemoryAsyncStorage,
@@ -18,6 +19,7 @@ import {
   type PlatformApiError,
   type PlatformApiResult,
 } from "@anytoolai/ce-kit";
+import styles from "./HandoffConsent.module.css";
 
 export type HandoffConsentProps = {
   client: PlatformApiClient;
@@ -200,26 +202,34 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
   }
 
   if (state.kind === "loading") {
-    return <p role="status">Loading handoff…</p>;
+    return (
+      <HandoffShell>
+        <p role="status">Loading handoff…</p>
+      </HandoffShell>
+    );
   }
   if (state.kind === "not-found") {
-    return <p role="alert">This handoff link is not valid.</p>;
+    return (
+      <HandoffShell>
+        <Toast variant="error">This handoff link is not valid.</Toast>
+      </HandoffShell>
+    );
   }
   if (state.kind === "safe-error") {
     return (
-      <>
-        <p role="alert">Something went wrong loading this handoff. Please try again.</p>
-        <button type="button" onClick={retryAfterSafeError}>
+      <HandoffShell>
+        <Toast variant="error">Something went wrong loading this handoff. Please try again.</Toast>
+        <Button variant="secondary" onClick={retryAfterSafeError}>
           Try again
-        </button>
-      </>
+        </Button>
+      </HandoffShell>
     );
   }
 
   const { preview } = state;
   return (
-    <main>
-      <dl>
+    <HandoffShell>
+      <dl className={styles.details}>
         <dt>From</dt>
         <dd>{preview.sourceProductDisplayName}</dd>
         <dt>To</dt>
@@ -229,7 +239,7 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
         <dt>Status</dt>
         <dd>{preview.status}</dd>
         {Object.entries(preview.preview).map(([key, value]) => (
-          <div key={key}>
+          <div key={key} className={styles.entry}>
             <dt>{key}</dt>
             <dd>{typeof value === "string" ? value : JSON.stringify(value)}</dd>
           </div>
@@ -237,19 +247,32 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
       </dl>
       {state.kind === "consent" ? (
         <>
-          <button type="button" onClick={handleAccept} disabled={state.pending !== null || guestId === undefined}>
-            Accept
-          </button>
-          <button type="button" onClick={handleDecline} disabled={state.pending !== null}>
-            Decline
-          </button>
+          <div className={styles.actions}>
+            <Button onClick={handleAccept} disabled={state.pending !== null || guestId === undefined}>
+              Accept
+            </Button>
+            <Button variant="secondary" onClick={handleDecline} disabled={state.pending !== null}>
+              Decline
+            </Button>
+          </div>
           {/* Decline stays available: it needs no guest attribution, unlike Accept. */}
           {guestId === undefined ? (
-            <p role="alert">We couldn't verify your identity. Please reload the page and try again.</p>
+            <Toast variant="error">We couldn't verify your identity. Please reload the page and try again.</Toast>
           ) : null}
-          {state.actionError ? <p role="alert">{state.actionError}</p> : null}
+          {state.actionError ? <Toast variant="error">{state.actionError}</Toast> : null}
         </>
       ) : null}
+    </HandoffShell>
+  );
+}
+
+function HandoffShell({ children }: { children: ReactNode }) {
+  return (
+    <main className={`page-container ${styles.page}`}>
+      <Card className={styles.card}>
+        <h1 className={styles.title}>Review handoff</h1>
+        {children}
+      </Card>
     </main>
   );
 }
