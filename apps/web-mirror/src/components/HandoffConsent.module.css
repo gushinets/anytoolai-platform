@@ -18,12 +18,13 @@
 
 .details {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-columns: fit-content(40%) minmax(0, 1fr);
   gap: 10px 20px;
   margin: 0;
 }
 
 .details dt {
+  overflow-wrap: anywhere;
   color: var(--color-text-secondary);
   font-size: 13px;
 }
