@@ -1375,7 +1375,7 @@ export function bootstrapAtomLab({
   let presetVersionPageGeneration = 0;
   let presetVersionPageInFlight = false;
   let conflictLatestPreset = null;
-  let presetSaveOutcomeUnknown = false;
+  let presetSaveOutcomeUnknown = null;
   let historyItems = [];
   let historyCursor = null;
   let historyListLoadGeneration = 0;
@@ -1842,6 +1842,17 @@ export function bootstrapAtomLab({
     updatePresetEditorDisabled();
   };
 
+  const presetSaveOutcomeUnknownMessage = () => presetSaveOutcomeUnknown?.kind === "update"
+    ? "Результат сохранения неизвестен: сервер мог создать новую версию. Не повторяйте Save; заново откройте этот пресет и проверьте список версий."
+    : "Результат создания неизвестен: сервер мог создать пресет. Не повторяйте Save; перезагрузите страницу и проверьте библиотеку.";
+
+  const setPresetError = (message = "") => {
+    const outcomeMessage = presetSaveOutcomeUnknown ? presetSaveOutcomeUnknownMessage() : "";
+    nodes["preset-error"].textContent = outcomeMessage && message
+      ? `${outcomeMessage} ${message}`
+      : outcomeMessage || message;
+  };
+
   const loadPresets = async ({append = false, merge = false} = {}) => {
     if (append && presetListLoadInFlight) return false;
     const generation = ++presetListLoadGeneration;
@@ -1850,7 +1861,7 @@ export function bootstrapAtomLab({
     const previousCursor = presetCursor;
     presetListLoadInFlight = true;
     updatePresetEditorDisabled();
-    nodes["preset-error"].textContent = "";
+    setPresetError();
     try {
       const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
       const parsed = parsePresetList(await protectedJson(`/v1/atom-lab/presets${query}`));
@@ -1859,7 +1870,10 @@ export function bootstrapAtomLab({
       if (append) {
         presetItems = [...presetItems, ...parsed.items];
         presetCursor = parsed.next_cursor;
-      } else if (merge && previousItems.length > 0) {
+      } else if (merge && previousItems.length > 0
+        && parsed.items.some((item) => previousItems.some(
+          (previousItem) => previousItem.preset_id === item.preset_id,
+        ))) {
         const refreshedIds = new Set(parsed.items.map((item) => item.preset_id));
         presetItems = [
           ...parsed.items,
@@ -1874,7 +1888,7 @@ export function bootstrapAtomLab({
       return true;
     } catch (error) {
       if (generation !== presetListLoadGeneration) return false;
-      nodes["preset-error"].textContent = error instanceof Error ? error.message : "Не удалось загрузить пресеты.";
+      setPresetError(error instanceof Error ? error.message : "Не удалось загрузить пресеты.");
       return false;
     } finally {
       if (generation === presetListLoadGeneration) {
@@ -1946,7 +1960,6 @@ export function bootstrapAtomLab({
   const commitPresetVersion = (parsed) => {
     const {preset_id: presetId, version} = parsed;
     selectedPresetVersion = cloneJson(parsed);
-    presetSaveOutcomeUnknown = false;
     presetEditorActive = true;
     presetSourceOverride = null;
     nodes["preset-name"].value = parsed.name;
@@ -2009,7 +2022,7 @@ export function bootstrapAtomLab({
       if (generation !== presetVersionPageGeneration || selectedPresetSummary?.preset_id !== presetId) return;
       commitPresetVersions(parsed, {append: true});
     } catch (error) {
-      if (generation === presetVersionPageGeneration) nodes["preset-error"].textContent = error.message;
+      if (generation === presetVersionPageGeneration) setPresetError(error.message);
     } finally {
       if (generation === presetVersionPageGeneration) {
         presetVersionPageInFlight = false;
@@ -2031,7 +2044,7 @@ export function bootstrapAtomLab({
     presetOpenInFlight = true;
     clearPresetExport();
     updatePresetEditorDisabled();
-    nodes["preset-error"].textContent = "";
+    setPresetError();
     nodes["preset-state"].textContent = "Загрузка версии пресета…";
     try {
       let versionsPage;
@@ -2064,13 +2077,19 @@ export function bootstrapAtomLab({
       } : preset;
       presetItems = presetItems.map((item) => item.preset_id === summary.preset_id ? summary : item);
       selectedPresetSummary = summary;
+      if (preferredVersion === null
+        && presetSaveOutcomeUnknown?.kind === "update"
+        && presetSaveOutcomeUnknown.presetId === preset.preset_id) {
+        presetSaveOutcomeUnknown = null;
+        setPresetError();
+      }
       commitPresetVersion(version);
       renderPresetList();
       return true;
     } catch (error) {
       if (generation !== presetOpenGeneration) return false;
       if (selectedPresetVersion) nodes["preset-version-select"].value = String(selectedPresetVersion.version);
-      nodes["preset-error"].textContent = error instanceof Error ? error.message : "Не удалось открыть пресет.";
+      setPresetError(error instanceof Error ? error.message : "Не удалось открыть пресет.");
       renderPresetState();
       return false;
     } finally {
@@ -2087,7 +2106,6 @@ export function bootstrapAtomLab({
     selectedPresetSummary = null;
     selectedPresetVersion = null;
     presetSourceOverride = fromHistory;
-    presetSaveOutcomeUnknown = false;
     if (clearSessionPreset) session.presetRef = null;
     nodes["preset-name"].value = fromHistory ? `Запуск ${fromHistory.sourceRunId}` : "";
     nodes["preset-description"].value = "";
@@ -2114,12 +2132,12 @@ export function bootstrapAtomLab({
     if (!presetSourceOverride && validateDraft(session).length > 0) {
       renderValidation(document, nodes["validation-errors"], session, admissionErrors);
       showInputTab(true);
-      nodes["preset-error"].textContent = "Исправьте входные данные перед сохранением пресета.";
+      setPresetError("Исправьте входные данные перед сохранением пресета.");
       return;
     }
     presetSaveInFlight = true;
     updatePresetEditorDisabled();
-    nodes["preset-error"].textContent = "";
+    setPresetError();
     const payload = currentPresetPayload();
     const updating = Boolean(selectedPresetVersion) && !forceNew;
     const expectedPresetId = updating ? selectedPresetVersion.preset_id : null;
@@ -2179,14 +2197,17 @@ export function bootstrapAtomLab({
         commitPresetVersion(localVersion);
         renderPresetList();
         nodes["preset-state"].textContent = `Версия ${created.version} сохранена; повторное чтение не удалось.`;
-        nodes["preset-error"].textContent = "Сохранение завершено, но сервер не вернул сохранённую версию при повторном чтении. Повторный Save обновит эту identity.";
+        setPresetError("Сохранение завершено, но сервер не вернул сохранённую версию при повторном чтении. Повторный Save обновит эту identity.");
       }
     } catch (error) {
       if (error?.code === "request_outcome_unknown") {
-        presetSaveOutcomeUnknown = true;
-        nodes["preset-error"].textContent = updating
-          ? "Результат сохранения неизвестен: сервер мог создать новую версию. Не повторяйте Save; заново откройте пресет и проверьте список версий."
-          : "Результат создания неизвестен: сервер мог создать пресет. Не повторяйте Save; перезагрузите страницу и проверьте библиотеку.";
+        presetSaveOutcomeUnknown = {
+          kind: updating ? "update" : "create",
+          presetId: expectedPresetId,
+        };
+        conflictLatestPreset = null;
+        nodes["preset-conflict"].hidden = true;
+        setPresetError();
         renderPresetState();
         return;
       }
@@ -2218,7 +2239,7 @@ export function bootstrapAtomLab({
           // The recovery action stays disabled when latest-version refresh is unavailable.
         }
         if (conflictLatestPreset === null) {
-          nodes["preset-error"].textContent = "Конфликт сохранения. Не удалось получить актуальную версию; повторите загрузку пресета вручную. Значения черновика сохранены.";
+          setPresetError("Конфликт сохранения. Не удалось получить актуальную версию; повторите загрузку пресета вручную. Значения черновика сохранены.");
           renderPresetState();
           return;
         }
@@ -2227,7 +2248,7 @@ export function bootstrapAtomLab({
         ? error.fieldErrors.map(({path, message}) => `${path}: ${message}`).join("; ")
         : "";
       const details = fieldErrors ? ` Поля: ${fieldErrors}.` : "";
-      nodes["preset-error"].textContent = `${error instanceof Error ? error.message : "Не удалось сохранить пресет."}${details} Значения черновика сохранены.`;
+      setPresetError(`${error instanceof Error ? error.message : "Не удалось сохранить пресет."}${details} Значения черновика сохранены.`);
       renderPresetState();
     } finally {
       presetSaveInFlight = false;
@@ -2881,7 +2902,7 @@ export function bootstrapAtomLab({
     const historical = cloneJson(selectedPresetVersion);
     const atom = catalog.find((item) => item.atom_id === historical.atom_id);
     if (!atom || !applyConfigurationToEditor(historical)) {
-      nodes["preset-error"].textContent = "Историческую версию нельзя адаптировать автоматически.";
+      setPresetError("Историческую версию нельзя адаптировать автоматически.");
       return;
     }
     selectedPresetSummary = null;
@@ -2911,15 +2932,15 @@ export function bootstrapAtomLab({
     if (hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return;
     presetOpenInFlight = true;
     updatePresetEditorDisabled();
-    nodes["preset-error"].textContent = "";
+    setPresetError();
     let latestPage;
     try {
       latestPage = await fetchPresetVersions(recovery.summary.preset_id);
     } catch (error) {
       conflictLatestPreset = null;
-      nodes["preset-error"].textContent = error instanceof Error
+      setPresetError(error instanceof Error
         ? `Не удалось получить актуальную версию: ${error.message}`
-        : "Не удалось получить актуальную версию.";
+        : "Не удалось получить актуальную версию.");
       return;
     } finally {
       presetOpenInFlight = false;
@@ -2928,7 +2949,7 @@ export function bootstrapAtomLab({
     const latest = latestPage?.items[0];
     if (!latest || !selectedPresetVersion || latest.version <= selectedPresetVersion.version) {
       conflictLatestPreset = null;
-      nodes["preset-error"].textContent = "Сервер не вернул более новую актуальную версию. Обновите библиотеку вручную.";
+      setPresetError("Сервер не вернул более новую актуальную версию. Обновите библиотеку вручную.");
       updatePresetEditorDisabled();
       return;
     }
@@ -2949,7 +2970,7 @@ export function bootstrapAtomLab({
   });
   nodes["export-preset"].addEventListener("click", async () => {
     if (!selectedPresetVersion || presetOpenInFlight || presetSaveInFlight) return;
-    nodes["preset-error"].textContent = "";
+    setPresetError();
     clearPresetExport();
     const generation = presetExportGeneration;
     try {
@@ -2969,7 +2990,7 @@ export function bootstrapAtomLab({
       nodes["preset-export-download"].hidden = false;
     } catch (error) {
       if (generation !== presetExportGeneration) return;
-      nodes["preset-error"].textContent = error instanceof Error ? error.message : "Не удалось экспортировать версию.";
+      setPresetError(error instanceof Error ? error.message : "Не удалось экспортировать версию.");
     }
   });
   nodes["restore-history"].addEventListener("click", () => {
