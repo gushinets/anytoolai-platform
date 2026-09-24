@@ -10,9 +10,6 @@ export const de: Shape<typeof en> = {
     briefTextPlaceholder: "Fügen Sie das Briefing, die Anfrage oder die Stellenanzeige des Kunden ein.",
     briefTextHelp: "Fügen Sie das Briefing unverändert ein. Ein ausführlicheres Briefing ergibt genauere Fragen.",
   },
-  fieldNames: {
-    briefText: "Kunden-Briefing",
-  },
   decode: {
     submit: "Briefing analysieren",
     running: "Ihr Briefing wird analysiert…",
@@ -24,10 +21,10 @@ export const de: Shape<typeof en> = {
     notProvided: "Nicht angegeben",
     issues: "Probleme",
     noIssues: "Keine Probleme gefunden.",
-    evidence: "Beleg",
+    evidence: "Beleg: {text}",
     questions: "{count, plural, one {# Rückfrage} other {# Rückfragen}}",
     noQuestions: "Es wurden keine Rückfragen erzeugt.",
-    rationale: "Warum fragen",
+    rationale: "Warum fragen: {text}",
     document: "Zusammenfassung",
   },
   briefFields: {

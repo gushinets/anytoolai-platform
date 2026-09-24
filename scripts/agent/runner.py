@@ -946,7 +946,7 @@ def _terminate_process_group(process: subprocess.Popen) -> None:
 
 
 def _write_smoke_evidence(exit_code: int, *, report_path: Path, evidence_root: Path) -> Path:
-    """Shared by client_handoff_smoke()/proposal_ai_smoke(): mirrors atoms_proof.py's
+    """Shared by every web-mirror smoke command (client_handoff_smoke() and the per-product ones): mirrors atoms_proof.py's
     write_evidence_report() shape (generated_at/all_passed plus the raw detail) -- the raw detail
     here is Playwright's own JSON reporter output, not a hand-rolled case list, since the smoke's
     actual pass/fail granularity already lives in that report."""
@@ -976,7 +976,7 @@ def _serve_web_mirror_and_run_smoke(
     report_path: Path,
     evidence_root: Path,
 ) -> int:
-    """Shared tail for client_handoff_smoke()/proposal_ai_smoke(), once each has built its own
+    """Shared tail for every web-mirror smoke command, once each has built its own
     web-mirror (and any product-specific extra artifact, e.g. the extension): serve the already-
     built web-mirror, wait for it to become ready, run the given Playwright smoke package, write
     its evidence, and always tear the server down -- whichever of the two calls this, one fix here
@@ -1051,7 +1051,11 @@ def client_handoff_smoke() -> int:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
 
-    web_mirror_port = _client_handoff_smoke_web_mirror_port()
+    try:
+        web_mirror_port = _client_handoff_smoke_web_mirror_port()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
     if not _check_ports_available(
         "CHS001",
         [
@@ -1124,7 +1128,11 @@ def proposal_ai_smoke() -> int:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
 
-    web_mirror_port = _proposal_ai_smoke_web_mirror_port()
+    try:
+        web_mirror_port = _proposal_ai_smoke_web_mirror_port()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
     if not _check_ports_available(
         "PAS001",
         [("web-mirror", web_mirror_port, PROPOSAL_AI_SMOKE_WEB_MIRROR_PORT_ENV, None)],
@@ -1173,7 +1181,11 @@ def client_update_writer_smoke() -> int:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
 
-    web_mirror_port = _client_update_writer_smoke_web_mirror_port()
+    try:
+        web_mirror_port = _client_update_writer_smoke_web_mirror_port()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
     if not _check_ports_available(
         "CUS001",
         [("web-mirror", web_mirror_port, CLIENT_UPDATE_WRITER_SMOKE_WEB_MIRROR_PORT_ENV, None)],
@@ -1212,7 +1224,11 @@ def brief_decoder_smoke() -> int:
         print(f"DEV001: {exc}", file=sys.stderr)
         return 2
 
-    web_mirror_port = _brief_decoder_smoke_web_mirror_port()
+    try:
+        web_mirror_port = _brief_decoder_smoke_web_mirror_port()
+    except ValueError as exc:
+        print(f"DEV001: {exc}", file=sys.stderr)
+        return 2
     if not _check_ports_available(
         "BDS001",
         [("web-mirror", web_mirror_port, BRIEF_DECODER_SMOKE_WEB_MIRROR_PORT_ENV, None)],

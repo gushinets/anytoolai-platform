@@ -5,10 +5,16 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { briefDecoderDefinition } from "../src/products/briefDecoder/BriefDecoderProduct";
-import { composeCopyText, extractBriefDecoderResult } from "../src/products/briefDecoder/briefDecoderResult";
+import { BriefDecoderProduct, briefDecoderDefinition } from "../src/products/briefDecoder/BriefDecoderProduct";
+import {
+  BRIEF_FIELDS,
+  ISSUE_CATEGORIES,
+  LEVELS,
+  composeCopyText,
+  extractBriefDecoderResult,
+} from "../src/products/briefDecoder/parseBriefDecoder";
 import { BRIEF_DECODER_MESSAGES } from "../src/products/briefDecoder/messages";
 import { ProductRunPage } from "../src/products/runtime/ProductRunPage";
 import type { ProductRunEvent } from "../src/products/runtime/productDefinition";
@@ -28,10 +34,25 @@ import { makeRender } from "./support/renderWithI18n";
 const render = makeRender(BRIEF_DECODER_MESSAGES);
 const IDS = { productId: "brief_decoder", scenarioId: "brief_decoder.decode_v1" } as const;
 const ROUTES = routesFor(IDS);
-const FIXTURE_ROOT = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../../tests/fixtures/provider/fake_provider_outputs",
+const HERE = dirname(fileURLToPath(import.meta.url));
+const FIXTURE_ROOT = resolve(HERE, "../../../tests/fixtures/provider/fake_provider_outputs");
+const SCHEMA_ROOT = resolve(
+  HERE,
+  "../../../packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas",
 );
+
+type EnumProp = { enum: string[] };
+type OutputSchema = {
+  properties: {
+    brief: { properties: { values: { properties: Record<string, unknown> } } };
+    issues: { items: { properties: { category: EnumProp; severity: EnumProp } } };
+    questions: { items: { properties: { category: EnumProp; priority: EnumProp } } };
+  };
+};
+type InputSchema = { properties: { brief_text: { maxLength: number } } };
+function schema<T>(name: string): T {
+  return JSON.parse(readFileSync(resolve(SCHEMA_ROOT, name), "utf8")) as T;
+}
 
 function fixture(action: string, suffix: string): Record<string, unknown> {
   const text = readFileSync(resolve(FIXTURE_ROOT, `brief_decoder.${action}_v1${suffix}.json`), "utf8");
@@ -91,14 +112,41 @@ describe("Brief Decoder definition", () => {
     expect(briefDecoderDefinition.toInput({ briefText: "abc" })).toEqual({ brief_text: "abc" });
   });
 
-  it("validates like the input schema: required, no outer whitespace, 8000 code points", () => {
+  it("copies the schema's enums and brief_text length limit (drift guard)", () => {
+    const output = schema<OutputSchema>("decode_output.schema.json");
+    const issue = output.properties.issues.items.properties;
+    const question = output.properties.questions.items.properties;
+    expect([...BRIEF_FIELDS]).toEqual(Object.keys(output.properties.brief.properties.values.properties));
+    expect([...ISSUE_CATEGORIES]).toEqual(issue.category.enum);
+    expect([...LEVELS]).toEqual(issue.severity.enum);
+    expect([...LEVELS]).toEqual(question.priority.enum);
+    expect(question.category.enum).toEqual(issue.category.enum);
+
+    const max = schema<InputSchema>("decode_input.schema.json").properties.brief_text.maxLength;
     const validate = (briefText: string) => briefDecoderDefinition.validate({ briefText }).briefText;
-    expect(validate("")).toBeDefined();
-    expect(validate("   ")).toBeDefined();
-    expect(validate("brief\n")).toBeDefined();
-    expect(validate("a".repeat(8000))).toBeUndefined();
-    expect(validate("a".repeat(8001))).toBeDefined();
-    expect(validate("😀".repeat(8000))).toBeUndefined();
+    expect(validate("a".repeat(max))).toBeUndefined();
+    expect(validate("a".repeat(max + 1))).toEqual({ code: "max_length", maxLength: max });
+    expect(validate("😀".repeat(max))).toBeUndefined();
+  });
+
+  it("requires a non-blank brief and trims outer whitespace the way the backend pattern does", () => {
+    const validate = (briefText: string) => briefDecoderDefinition.validate({ briefText }).briefText;
+    const toInput = (briefText: string) => briefDecoderDefinition.toInput({ briefText });
+    for (const blank of ["", "   ", "\n", "\u0085", "\u001f \u3000"]) {
+      expect(validate(blank)).toEqual({ code: "required" });
+    }
+    // A pasted trailing newline is trimmed, not rejected.
+    expect(validate("brief\n")).toBeUndefined();
+    expect(toInput("  brief text\n")).toEqual({ brief_text: "brief text" });
+    // Python `\s` matches U+0085 and U+001C-U+001F (JS trim() does not) ...
+    for (const edge of ["\u0085", "\u001c", "\u001f"]) {
+      expect(toInput(`brief${edge}`)).toEqual({ brief_text: "brief" });
+      expect(toInput(`${edge}brief`)).toEqual({ brief_text: "brief" });
+    }
+    // ... and does not match U+FEFF (JS trim() does), which the backend accepts as content.
+    expect(toInput("\ufeffbrief\ufeff")).toEqual({ brief_text: "\ufeffbrief\ufeff" });
+    // Inner whitespace is untouched.
+    expect(toInput("a\n\nb")).toEqual({ brief_text: "a\n\nb" });
   });
 
   it("extracts the composed fixtures and rejects unusable shapes", () => {
@@ -110,7 +158,11 @@ describe("Brief Decoder definition", () => {
     expect(extractBriefDecoderResult({ ...good, document: { sections: [] } })).toBeNull();
     expect(extractBriefDecoderResult({ ...good, issues: [{ category: "x", severity: "low", description: "d" }] })).toBeNull();
     expect(extractBriefDecoderResult({ ...good, questions: [{ question: "q", rationale: "r", priority: "urgent" }] })).toBeNull();
-    expect(extractBriefDecoderResult({ ...good, brief: { values: {}, missing_fields: ["colour"] } })).toBeNull();
+    expect(extractBriefDecoderResult({ ...good, issues: [{ category: "ambiguity", severity: "low", description: "d", evidence: 3 }] })).toBeNull();
+    expect(extractBriefDecoderResult({ ...good, questions: [{ question: "q", rationale: "r", priority: "low" }] })).toBeNull();
+    expect(extractBriefDecoderResult({ ...good, brief: { values: { budget: 5 } } })).toBeNull();
+    // missing_fields is not rendered, so its absence must not discard an otherwise usable result.
+    expect(extractBriefDecoderResult({ ...good, brief: { values: { project_goal: "g" } } })).not.toBeNull();
     expect(extractBriefDecoderResult({})).toBeNull();
   });
 
@@ -159,8 +211,26 @@ describe("Brief Decoder page", () => {
       `${expected.questions.length} clarifying questions`,
       "Summary document",
     ]);
-    expect(screen.getAllByRole("listitem").length).toBeGreaterThan(expected.questions.length);
-    expect(completedEvents(events)).toHaveLength(1);
+    expect(screen.getAllByRole("listitem").length).toBeGreaterThan(0);
+    const list = document.querySelector("ol")!;
+    expect(list.querySelectorAll(":scope > li")).toHaveLength(expected.questions.length);
+    const LABEL = { low: "Low", medium: "Medium", high: "High" } as const;
+    for (const issue of expected.issues) {
+      expect(screen.getAllByText(issue.description).length).toBeGreaterThan(0);
+      if (issue.evidence) {
+        expect(screen.getAllByText(`Evidence: ${issue.evidence}`).length).toBeGreaterThan(0);
+      }
+      expect(screen.getAllByText(new RegExp(`· ${LABEL[issue.severity]} severity$`)).length).toBeGreaterThan(0);
+    }
+    for (const question of expected.questions) {
+      expect(within(list).getByText(question.question)).toBeTruthy();
+      expect(within(list).getByText(new RegExp(`^Why ask: ${question.rationale.slice(0, 30)}.* · .+ · ${LABEL[question.priority]} priority$`))).toBeTruthy();
+    }
+    const missing = BRIEF_FIELDS.filter((field) => expected.brief.values[field] === undefined);
+    expect(screen.queryAllByText("Not provided")).toHaveLength(missing.length);
+    expect(completedEvents(events)).toEqual([
+      { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1", resultViewed: true },
+    ]);
 
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
@@ -176,18 +246,30 @@ describe("Brief Decoder page", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: /clarifying questions/ })).toBeTruthy());
     expect(screen.getByRole("heading", { name: "4 clarifying questions" })).toBeTruthy();
     expect(screen.queryByText("No clarifying questions were generated.")).toBeNull();
-    expect(completedEvents(events)).toHaveLength(1);
+    expect(completedEvents(events).map((event) => (event as { resultViewed: boolean }).resultViewed)).toEqual([true]);
   });
 
-  it("renders both empty states for no issues, makes no readiness claim, emits no result_viewed, and still copies", async () => {
+  it("renders both empty states for no issues, reports resultViewed false, and still copies", async () => {
     const events: ProductRunEvent[] = [];
     await decode(routes(composedOutput(".no_issues")), events);
     await waitFor(() => expect(screen.getByText("No issues found.")).toBeTruthy());
     expect(screen.getByText("No clarifying questions were generated.")).toBeTruthy();
-    expect(completedEvents(events)).toHaveLength(0);
+    expect(completedEvents(events)).toEqual([
+      { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1", resultViewed: false },
+    ]);
+    // The empty question list must not read as a readiness claim; the rationale/priority chrome is absent.
+    expect(document.querySelector("ol")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
+  });
+
+  it("the exported wrapper wires onEvent and visitId into the shared runtime", async () => {
+    const events: ProductRunEvent[] = [];
+    const { client } = makeClient(routes(composedOutput("")));
+    render(<BriefDecoderProduct client={client} onEvent={(event) => events.push(event)} visitId="visit_1" />);
+    await waitFor(() => expect(screen.getByLabelText("Client brief")).toBeTruthy());
+    expect(events).toEqual([{ type: "product_viewed", guestId: "guest_1" }]);
   });
 
   it("shows the run-failed text and no result when the session fails", async () => {

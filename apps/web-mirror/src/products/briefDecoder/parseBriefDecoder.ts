@@ -1,6 +1,7 @@
 // Brief Decoder's canonical result (`brief_decoder.decode_output_v1`) as the page consumes it.
 // The backend schema stays authoritative: this only checks the shapes and closed sets the renderer
-// indexes into, not the 4-section tuple or `questions.maxItems`.
+// indexes into, not the 4-section tuple or `questions.maxItems`. `BRIEF_FIELDS`/`LEVELS`/
+// `ISSUE_CATEGORIES` are copies of the schema's enums, pinned by test/BriefDecoderProduct.test.tsx.
 
 export const BRIEF_FIELDS = ["project_goal", "deliverables", "deadline", "budget", "target_audience", "constraints"] as const;
 export const LEVELS = ["low", "medium", "high"] as const;
@@ -13,14 +14,15 @@ export const ISSUE_CATEGORIES = [
   "contradiction",
 ] as const;
 
-export type BriefField = (typeof BRIEF_FIELDS)[number];
-export type Level = (typeof LEVELS)[number];
+type BriefField = (typeof BRIEF_FIELDS)[number];
+type Level = (typeof LEVELS)[number];
 export type IssueCategory = (typeof ISSUE_CATEGORIES)[number];
 
 export type BriefIssue = { category: IssueCategory; severity: Level; description: string; evidence?: string };
-export type ClarifyingQuestion = { question: string; rationale: string; priority: Level };
+export type ClarifyingQuestion = { question: string; rationale: string; priority: Level; category: IssueCategory };
 export type BriefDecoderResult = {
-  brief: { values: Partial<Record<BriefField, string | string[]>>; missingFields: BriefField[] };
+  // Fields the brief does not state are simply absent from `values` (rendered as "not provided").
+  brief: { values: Partial<Record<BriefField, string | string[]>> };
   issues: BriefIssue[];
   questions: ClarifyingQuestion[];
   document: { sections: { title: string; content: string }[]; summary: string };
@@ -58,16 +60,12 @@ function toIssue(item: unknown): BriefIssue | null {
     !isRecord(item) ||
     !isOneOf(ISSUE_CATEGORIES, item.category) ||
     !isOneOf(LEVELS, item.severity) ||
-    typeof item.description !== "string"
+    typeof item.description !== "string" ||
+    (item.evidence !== undefined && typeof item.evidence !== "string")
   ) {
     return null;
   }
-  return {
-    category: item.category,
-    severity: item.severity,
-    description: item.description,
-    evidence: typeof item.evidence === "string" ? item.evidence : undefined,
-  };
+  return { category: item.category, severity: item.severity, description: item.description, evidence: item.evidence };
 }
 
 function toQuestion(item: unknown): ClarifyingQuestion | null {
@@ -75,11 +73,12 @@ function toQuestion(item: unknown): ClarifyingQuestion | null {
     !isRecord(item) ||
     typeof item.question !== "string" ||
     typeof item.rationale !== "string" ||
-    !isOneOf(LEVELS, item.priority)
+    !isOneOf(LEVELS, item.priority) ||
+    !isOneOf(ISSUE_CATEGORIES, item.category)
   ) {
     return null;
   }
-  return { question: item.question, rationale: item.rationale, priority: item.priority };
+  return { question: item.question, rationale: item.rationale, priority: item.priority, category: item.category };
 }
 
 function toSection(item: unknown): { title: string; content: string } | null {
@@ -104,10 +103,6 @@ export function extractBriefDecoderResult(output: Record<string, unknown>): Brie
     }
     values[field] = value;
   }
-  const missingFields = brief.missing_fields;
-  if (!Array.isArray(missingFields) || !missingFields.every((field) => isOneOf(BRIEF_FIELDS, field))) {
-    return null;
-  }
   const issues = mapAll(output.issues, toIssue);
   const questions = mapAll(output.questions, toQuestion);
   const sections = mapAll(document.sections, toSection);
@@ -115,11 +110,22 @@ export function extractBriefDecoderResult(output: Record<string, unknown>): Brie
     return null;
   }
   return {
-    brief: { values, missingFields: missingFields },
+    brief: { values },
     issues,
     questions,
     document: { sections, summary: document.summary },
   };
+}
+
+/** Python `re` `\s` (the backend's `brief_text` pattern) for a str: Unicode White_Space-ish set plus
+ * U+001C-U+001F and U+0085, and *not* U+FEFF. JS `trim()` differs on exactly those code points, so
+ * the client must not use it for this field. */
+const BACKEND_WHITESPACE = "\\t\\n\\v\\f\\r \\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
+const OUTER_BACKEND_WHITESPACE = new RegExp(`^[${BACKEND_WHITESPACE}]+|[${BACKEND_WHITESPACE}]+$`, "g");
+
+/** The brief exactly as the backend accepts it: outer whitespace removed, inner text untouched. */
+export function trimBriefText(value: string): string {
+  return value.replace(OUTER_BACKEND_WHITESPACE, "");
 }
 
 /** `renderer_contract.yaml`'s `canonical_field_composition`: each section as a title line then its

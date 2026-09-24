@@ -35,7 +35,9 @@ export type ProductRunEvent =
   | { type: "product_viewed"; guestId: string | undefined }
   | { type: "form_started"; guestId: string | undefined }
   | { type: "form_submitted"; guestId: string | undefined }
-  | { type: "scenario_completed"; scenarioSessionId: string; guestId: string | undefined }
+  // `resultViewed` is false only when the product's `emitsResultViewed` says this completed result
+  // does not count as a "viewed" activation; the run itself still completed.
+  | { type: "scenario_completed"; scenarioSessionId: string; guestId: string | undefined; resultViewed: boolean }
   | { type: "copy_activated"; scenarioSessionId: string; guestId: string | undefined };
 
 export type ProductFieldsProps<V> = {
@@ -105,10 +107,11 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
   /** Frontend-safe canonical output -> the product's result; null means unusable. */
   extractResult: (output: Record<string, unknown>) => R | null;
   /**
-   * Whether a completed run's result counts as "viewed" for analytics (`web.result_viewed`).
-   * Optional, default true: most products activate on any rendered result. A product whose
-   * activation is narrower (Brief Decoder: a non-empty clarifying-question list) returns false
-   * to suppress only the event -- the run still moves to the result state and renders.
+   * Whether a completed run's result counts as "viewed" (`web.result_viewed`). Optional, default
+   * true. A product whose viewed-activation is narrower than "a result rendered" (Brief Decoder: a
+   * non-empty clarifying-question list) returns false; the run still completes and renders, the
+   * `scenario_completed` event still fires with `resultViewed: false`, and only the client-events
+   * tracker skips `web.result_viewed`. A throwing hook counts as false.
    */
   emitsResultViewed?: (result: R) => boolean;
   Fields: ComponentType<ProductFieldsProps<V>>;

@@ -10,9 +10,6 @@ export const ru: Shape<typeof en> = {
     briefTextPlaceholder: "Вставьте бриф, запрос или описание вакансии от клиента.",
     briefTextHelp: "Вставьте бриф как есть. Чем подробнее бриф, тем точнее вопросы.",
   },
-  fieldNames: {
-    briefText: "Бриф клиента",
-  },
   decode: {
     submit: "Разобрать бриф",
     running: "Разбираем ваш бриф…",
@@ -24,10 +21,10 @@ export const ru: Shape<typeof en> = {
     notProvided: "Не указано",
     issues: "Проблемы",
     noIssues: "Проблем не найдено.",
-    evidence: "Основание",
+    evidence: "Основание: {text}",
     questions: "{count, plural, one {# уточняющий вопрос} few {# уточняющих вопроса} many {# уточняющих вопросов} other {# уточняющего вопроса}}",
     noQuestions: "Уточняющие вопросы не сформированы.",
-    rationale: "Зачем спрашивать",
+    rationale: "Зачем спрашивать: {text}",
     document: "Итоговый документ",
   },
   briefFields: {

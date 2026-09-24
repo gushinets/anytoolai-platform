@@ -99,9 +99,11 @@ Other taxonomy groups remain part of the platform contract even when their concr
 slice lands later.
 
 `web.result_viewed` is emitted once per completed result the page renders, unless the product's
-`ProductDefinition.emitsResultViewed(result)` returns false. Brief Decoder (ANY-248) uses that hook
-so the event means "a non-empty clarifying-question list was rendered"; a zero-question run still
-renders and the backend still records `scenario.completed`, but no `web.result_viewed` is sent.
+`ProductDefinition.emitsResultViewed(result)` returns false (the shared runtime still emits its
+`scenario_completed` run event, with `resultViewed: false`; only the client-events tracker skips
+the `web.*` event). Brief Decoder (ANY-248) uses that hook so the event means "a non-empty
+clarifying-question list was rendered"; a zero-question run still renders and the backend still
+records `scenario.completed`, but no `web.result_viewed` is sent.
 
 For A13, `quota.consumed` is emitted only for backend-accepted scenario starts. `quota.exhausted`
 is emitted when the backend rejects a scenario start because the configured guest quota dimension is

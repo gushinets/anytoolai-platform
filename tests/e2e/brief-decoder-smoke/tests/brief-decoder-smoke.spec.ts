@@ -28,6 +28,13 @@ const RESULT_ROUTE_PATTERN = /\/v1\/results\/([^/?]+)/;
 const SESSION_ROUTE_PATTERN = /\/v1\/scenario-sessions\/[^/?]+$/;
 const COPY_NEXT_ACTION_PATTERN = /\/scenario-sessions\/[^/]+\/next-actions\/copy_result$/;
 const QUOTA_ROUTE_PATTERN = /\/v1\/products\/brief_decoder\/quota/;
+const CLIENT_EVENTS_ROUTE_PATTERN = /\/v1\/client-events$/;
+const PRODUCT_DIR = join(
+  import.meta.dirname,
+  "../../../../packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder",
+);
+// The guest quota this test exhausts, read from the product's own config instead of a second copy.
+const GUEST_QUOTA_LIMIT = Number(/limit_count:\s*(\d+)/.exec(readFileSync(join(PRODUCT_DIR, "quotas.yaml"), "utf8"))![1]);
 
 const BRIEF = "Need a website for my bakery by the holidays, modern but traditional.";
 const ACTION_CONFIG_IDS = [
@@ -95,9 +102,12 @@ function trackRun(page: Page): { sessionId: () => string; resultArtifactId: () =
   page.on("response", (response) => {
     const url = response.url();
     if (response.request().method() === "POST" && START_ROUTE_PATTERN.test(url)) {
-      void response.json().then((body: { scenario_session_id: string }) => {
-        sessionId = body.scenario_session_id;
-      });
+      void response
+        .json()
+        .then((body: { scenario_session_id: string }) => {
+          sessionId = body.scenario_session_id;
+        })
+        .catch(() => undefined); // a failed start has no session; the assertions below then fail on the empty id
     }
     const resultMatch = response.request().method() === "GET" ? RESULT_ROUTE_PATTERN.exec(url) : null;
     if (resultMatch) {
@@ -110,6 +120,17 @@ function trackRun(page: Page): { sessionId: () => string; resultArtifactId: () =
 async function submitBrief(page: Page): Promise<void> {
   await page.locator("#brief-decoder-brief-text").fill(BRIEF);
   await page.getByRole("button", { name: "Decode brief" }).click();
+}
+
+/** Client-event types the browser POSTed, from the request bodies (deterministic: no waiting). */
+function trackClientEvents(page: Page): string[] {
+  const eventTypes: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && CLIENT_EVENTS_ROUTE_PATTERN.test(request.url())) {
+      eventTypes.push((request.postDataJSON() as { event_type: string }).event_type);
+    }
+  });
+  return eventTypes;
 }
 
 /** Real run; only the canonical result body is replaced with `output` (see file header). */
@@ -222,6 +243,7 @@ test.describe("Brief Decoder web product", () => {
     page,
   }) => {
     const run = trackRun(page);
+    const clientEvents = trackClientEvents(page);
     const output = composedOutput(".no_issues");
     await overrideResult(page, output);
     await page.goto(PRODUCT_URL);
@@ -231,15 +253,34 @@ test.describe("Brief Decoder web product", () => {
     await expect(page.getByText("No clarifying questions were generated.")).toBeVisible();
     await expect(page.locator("ol > li")).toHaveCount(0);
 
-    // The backend records completion; the browser must not have reported a "viewed" activation.
+    // The backend records completion; the browser must not report a "viewed" activation.
     await expect.poll(() => countEvents("scenario.completed", run.sessionId()), { timeout: 10_000 }).toBe(1);
-    // ponytail: fixed grace period for the fire-and-forget client event; upgrade to an ack hook if flaky.
-    await page.waitForTimeout(1_500);
-    expect(await countEvents("web.result_viewed", run.sessionId())).toBe(0);
 
     await page.getByRole("button", { name: "Copy" }).click();
     await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(composeCopyText(output.document));
+    // Fence, not a sleep: the copy activation is recorded after the result rendered, so a
+    // web.result_viewed POST (sent at render) would already have been issued by now.
+    await expect.poll(() => countEvents("client.next_action_clicked", run.sessionId()), { timeout: 5_000 }).toBe(1);
+    expect(clientEvents).toContain("web.form_submitted");
+    expect(clientEvents).not.toContain("web.result_viewed");
+    expect(await countEvents("web.result_viewed", run.sessionId())).toBe(0);
+  });
+
+  test("mobile: a long unbroken token in the result does not widen the page", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
+    const output = composedOutput("");
+    const longUrl = `https://example.com/${"a".repeat(200)}`;
+    output.issues = [{ category: "ambiguity", severity: "low", description: "Long link", evidence: longUrl }];
+    await overrideResult(page, output);
+    await page.goto(PRODUCT_URL);
+    await submitBrief(page);
+    await expect(page.getByText(`Evidence: ${longUrl}`)).toBeVisible({ timeout: 60_000 });
+    const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
   });
 
   test("terminal error: a failed session shows the run-failed text, keeps the brief, offers no copy", async ({
@@ -269,7 +310,7 @@ test.describe("Brief Decoder web product", () => {
     // start reaches the authoritative 429 from the real backend.
     await page.route(QUOTA_ROUTE_PATTERN, (route) => route.abort());
     await page.goto(PRODUCT_URL);
-    for (let run = 1; run <= 3; run += 1) {
+    for (let run = 1; run <= GUEST_QUOTA_LIMIT; run += 1) {
       await submitBrief(page);
       await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 60_000 });
       await page.getByRole("button", { name: "Decode another brief" }).click();

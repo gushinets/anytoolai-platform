@@ -7,9 +7,6 @@ export const en = {
     briefTextPlaceholder: "Paste the client’s brief, request, or job post.",
     briefTextHelp: "Paste the brief as written. Longer briefs give more precise questions.",
   },
-  fieldNames: {
-    briefText: "Client brief",
-  },
   decode: {
     submit: "Decode brief",
     running: "Decoding your brief…",
@@ -21,10 +18,10 @@ export const en = {
     notProvided: "Not provided",
     issues: "Issues",
     noIssues: "No issues found.",
-    evidence: "Evidence",
+    evidence: "Evidence: {text}",
     questions: "{count, plural, one {# clarifying question} other {# clarifying questions}}",
     noQuestions: "No clarifying questions were generated.",
-    rationale: "Why ask",
+    rationale: "Why ask: {text}",
     document: "Summary document",
   },
   briefFields: {

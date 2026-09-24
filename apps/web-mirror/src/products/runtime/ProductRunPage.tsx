@@ -609,9 +609,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
     }
     resultFetchSettledRef.current = true;
     setPhase({ kind: "result", scenarioSessionId, checkpointId, result: extracted });
-    if (definition.emitsResultViewed?.(extracted) ?? true) {
-      emitEvent(onEventRef.current, { type: "scenario_completed", scenarioSessionId, guestId });
+    let resultViewed: boolean;
+    try {
+      resultViewed = definition.emitsResultViewed?.(extracted) ?? true;
+    } catch {
+      // A product hook must not break the page (ANY-453: analytics failure is non-blocking).
+      resultViewed = false;
     }
+    emitEvent(onEventRef.current, { type: "scenario_completed", scenarioSessionId, guestId, resultViewed });
   }
 
   // Shared by handleSubmit/handleRetry: both begin a (new or reused) prepared start the same way.

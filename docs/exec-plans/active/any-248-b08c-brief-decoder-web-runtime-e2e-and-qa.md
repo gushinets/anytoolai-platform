@@ -5,9 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-09-23
-- Last updated: 2026-09-23
+- Last updated: 2026-09-25
 - Review date: 2026-09-30
-- Next action: run full-check, review, then rebase onto main once ANY-232 (PR #141) merges.
+- Next action: push and open the PR; ANY-232 (PR #141) is already merged into main.
 - Blocker: none
 
 ## Goal
@@ -53,8 +53,10 @@ browser run, a shared e2e helper package.
 
 1. **Activation hook.** The spec activates Brief Decoder on a non-empty question list, but the shared
    runtime emitted `web.result_viewed` for every completed result and the client-event property
-   allowlist cannot carry a count (a Platform Core change, forbidden here). An optional
-   `emitsResultViewed(result)` (default true) gates only the event. Rejected: a `mode` vocabulary in
+   allowlist has no question-count property (adding one is a Platform Core change, forbidden here).
+   An optional `emitsResultViewed(result)` (default true) is reported on `scenario_completed` as
+   `resultViewed`; only the client-events tracker skips `web.result_viewed` when it is false, and a
+   throwing hook counts as false. Rejected: a `mode` vocabulary in
    a new `analytics.yaml` (misuses `mode`, adds backend config). Consequence: zero-question runs are
    absent from the `web.result_viewed` funnel; the backend still records completion.
 2. **Fixtures are the single source of truth.** Vitest and the smoke compose results from the
@@ -64,11 +66,15 @@ browser run, a shared e2e helper package.
    the fixtures; the worker-to-artifact half is proven by backend pytest.
 4. **Weak input** produces a full, activating result (4 questions). The documented safe outcomes are
    the zero-question result (explicit empty states, no readiness claim) and a failed session.
-5. **Extract is lenient.** `extractBriefDecoderResult` checks shapes and closed sets only, not the
-   4-section tuple or `maxItems: 5`, so a review change to the ANY-232 schema needs no edit here.
-6. **Smoke scope.** Retry, guest-id persistence and language switching are shared-runtime behavior
+5. **Extract checks shapes and closed sets only**, not the 4-section tuple or `maxItems: 5`, and does
+   not need `brief.missing_fields` (not rendered). The enums and the `brief_text` limit are copies
+   of the schemas, pinned by a drift test in `BriefDecoderProduct.test.tsx`.
+6. **`brief_text` is trimmed, not rejected**, using the backend pattern's whitespace (Python `\s`,
+   which differs from JS `trim()` on U+0085, U+001C-U+001F and U+FEFF); `toInput` sends the
+   validated value.
+7. **Smoke scope.** Retry, guest-id persistence and language switching are shared-runtime behavior
    already proven elsewhere and are not repeated. Helpers are copied a third time per precedent;
-   a shared e2e support package is recorded debt.
+   a shared e2e support package is recorded as TD-014.
 
 ## Implementation steps
 
@@ -76,8 +82,9 @@ browser run, a shared e2e helper package.
 - [x] Product definition, renderer, messages, registry, Vitest
 - [x] Playwright smoke package, runner command, workflow (6 tests pass against dev-up)
 - [x] Docs
-- [ ] full-check, validate-docs, validate-architecture
-- [ ] Rebase onto main after ANY-232 merges
+- [x] full-check, validate-docs, validate-architecture
+- [x] Merge of main after ANY-232 (PR #141) landed; re-verified
+- [x] Code review findings addressed (see tech-debt TD-014..TD-016 for what was deferred)
 
 ## Validation
 
@@ -93,7 +100,5 @@ python scripts/agent/runner.py dev-down
 
 ## Risks
 
-- Stacked on unmerged ANY-232; output-schema review changes force a rebase.
 - Severity/priority/category translations need native-speaker review.
-- The smoke's zero-question `result_viewed == 0` check uses a fixed 1.5 s grace period.
 - Each smoke run makes 4 fake provider calls; the quota test does 3 real runs.

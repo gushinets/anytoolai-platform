@@ -325,7 +325,7 @@ describe("Client Update Writer product definitions", () => {
       { type: "product_viewed", guestId: "guest_1" },
       { type: "form_started", guestId: "guest_1" },
       { type: "form_submitted", guestId: "guest_1" },
-      { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1" },
+      { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1", resultViewed: true },
       { type: "copy_activated", scenarioSessionId: "session_1", guestId: "guest_1" },
     ]);
   });

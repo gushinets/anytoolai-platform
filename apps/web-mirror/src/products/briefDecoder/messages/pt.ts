@@ -10,13 +10,10 @@ export const pt: Shape<typeof en> = {
     briefTextPlaceholder: "Cole o briefing, o pedido ou o anúncio do cliente.",
     briefTextHelp: "Cole o briefing como está. Um briefing mais longo gera perguntas mais precisas.",
   },
-  fieldNames: {
-    briefText: "Briefing do cliente",
-  },
   decode: {
     submit: "Decodificar briefing",
-    running: "Decodificando o seu briefing…",
-    runFailed: "Algo correu mal ao decodificar o seu briefing. Tente novamente.",
+    running: "Decodificando seu briefing…",
+    runFailed: "Algo deu errado ao decodificar seu briefing. Tente novamente.",
     startAnother: "Decodificar outro briefing",
   },
   result: {
@@ -24,10 +21,10 @@ export const pt: Shape<typeof en> = {
     notProvided: "Não informado",
     issues: "Problemas",
     noIssues: "Nenhum problema encontrado.",
-    evidence: "Evidência",
+    evidence: "Evidência: {text}",
     questions: "{count, plural, one {# pergunta de esclarecimento} many {# de perguntas de esclarecimento} other {# perguntas de esclarecimento}}",
     noQuestions: "Nenhuma pergunta de esclarecimento foi gerada.",
-    rationale: "Por que perguntar",
+    rationale: "Por que perguntar: {text}",
     document: "Documento-resumo",
   },
   briefFields: {
@@ -49,7 +46,7 @@ export const pt: Shape<typeof en> = {
     high: "Prioridade alta",
   },
   categories: {
-    missing_information: "Informação em falta",
+    missing_information: "Informação ausente",
     ambiguity: "Ambiguidade",
     scope_risk: "Risco de escopo",
     timeline_risk: "Risco de prazo",

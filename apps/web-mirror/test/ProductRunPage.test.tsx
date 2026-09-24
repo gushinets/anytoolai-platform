@@ -694,7 +694,7 @@ describe("ProductRunPage", () => {
       { type: "product_viewed", guestId: "guest_1" },
       { type: "form_started", guestId: "guest_1" },
       { type: "form_submitted", guestId: "guest_1" },
-      { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1" },
+      { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1", resultViewed: true },
       { type: "copy_activated", scenarioSessionId: "session_1", guestId: "guest_1" },
     ]);
     const serialized = JSON.stringify(events);
@@ -703,10 +703,17 @@ describe("ProductRunPage", () => {
   });
 
   it.each([
-    ["is left unset", undefined, 1],
-    ["returns true", () => true, 1],
-    ["returns false", () => false, 0],
-  ])("emits scenario_completed per emitsResultViewed when it %s, and still renders the result", async (_name, hook, expected) => {
+    ["is left unset", undefined, true],
+    ["returns true", () => true, true],
+    ["returns false", () => false, false],
+    [
+      "throws",
+      () => {
+        throw new Error("boom");
+      },
+      false,
+    ],
+  ])("reports resultViewed per emitsResultViewed when it %s, still completing and rendering the result", async (_name, hook, expected) => {
     const events: ProductRunEvent[] = [];
     const { client } = makeClient(happyPathRoutes());
     const definition = { ...testProductDefinition, emitsResultViewed: hook };
@@ -717,7 +724,9 @@ describe("ProductRunPage", () => {
     submit();
     await waitForResult();
 
-    expect(events.filter((event) => event.type === "scenario_completed")).toHaveLength(expected);
+    expect(events.filter((event) => event.type === "scenario_completed")).toEqual([
+      { type: "scenario_completed", scenarioSessionId: "session_1", guestId: "guest_1", resultViewed: expected },
+    ]);
     expect(screen.getByText(RESULT_TEXT)).toBeTruthy();
   });
 

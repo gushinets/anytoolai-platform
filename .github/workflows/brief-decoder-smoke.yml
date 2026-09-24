@@ -20,13 +20,14 @@ on:
       - "tests/fixtures/provider/fake_provider_outputs/brief_decoder.*"
       - "infra/compose/**"
       - "infra/docker/**"
+      - "migrations/**"
       - "tests/e2e/brief-decoder-smoke/**"
       - "scripts/agent/runner.py"
       - ".github/workflows/brief-decoder-smoke.yml"
   workflow_dispatch:
   schedule:
     # Weekly baseline run against main, independent of any particular PR's paths.
-    - cron: "0 9 * * 1"
+    - cron: "30 9 * * 1"
 permissions:
   contents: read
 jobs:

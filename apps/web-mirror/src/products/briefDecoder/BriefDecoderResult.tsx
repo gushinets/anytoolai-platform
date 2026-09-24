@@ -5,7 +5,7 @@ import { ResultView } from "../../components/ResultView";
 import { useProductT } from "../../i18n";
 import type { ProductResultProps } from "../runtime/productDefinition";
 import styles from "./BriefDecoderProduct.module.css";
-import { BRIEF_FIELDS, composeCopyText, type BriefDecoderResult } from "./briefDecoderResult";
+import { BRIEF_FIELDS, composeCopyText, type BriefDecoderResult } from "./parseBriefDecoder";
 
 /** The four contract parts in `renderer_contract.yaml` order. Severity and priority are text
  * labels, never colour alone; `brief.confidence` is deliberately not shown. */
@@ -58,7 +58,7 @@ export function BriefDecoderResultView({ result, onCopy }: ProductResultProps<Br
                   <div>{issue.description}</div>
                   {issue.evidence ? (
                     <div className={styles.meta}>
-                      {t("result.evidence")}: {issue.evidence}
+                      {t("result.evidence", { text: issue.evidence })}
                     </div>
                   ) : null}
                 </li>
@@ -79,7 +79,8 @@ export function BriefDecoderResultView({ result, onCopy }: ProductResultProps<Br
                 <li key={index}>
                   <div className={styles.label}>{question.question}</div>
                   <div className={styles.meta}>
-                    {t("result.rationale")}: {question.rationale} · {t(`priority.${question.priority}`)}
+                    {t("result.rationale", { text: question.rationale })} · {t(`categories.${question.category}`)} ·{" "}
+                    {t(`priority.${question.priority}`)}
                   </div>
                 </li>
               ))}

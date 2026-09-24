@@ -10,9 +10,6 @@ export const fr: Shape<typeof en> = {
     briefTextPlaceholder: "Collez le brief, la demande ou l’annonce du client.",
     briefTextHelp: "Collez le brief tel quel. Un brief plus long donne des questions plus précises.",
   },
-  fieldNames: {
-    briefText: "Brief du client",
-  },
   decode: {
     submit: "Décoder le brief",
     running: "Décodage de votre brief…",
@@ -24,10 +21,10 @@ export const fr: Shape<typeof en> = {
     notProvided: "Non indiqué",
     issues: "Problèmes",
     noIssues: "Aucun problème détecté.",
-    evidence: "Preuve",
+    evidence: "Preuve : {text}",
     questions: "{count, plural, one {# question de clarification} many {# de questions de clarification} other {# questions de clarification}}",
     noQuestions: "Aucune question de clarification n’a été générée.",
-    rationale: "Pourquoi la poser",
+    rationale: "Pourquoi la poser : {text}",
     document: "Document de synthèse",
   },
   briefFields: {

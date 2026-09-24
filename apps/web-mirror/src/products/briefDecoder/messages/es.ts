@@ -3,20 +3,17 @@ import type { en } from "./en";
 
 export const es: Shape<typeof en> = {
   title: "Brief Decoder",
-  description: "Convierte el brief de un cliente en detalles estructurados, riesgos, preguntas por hacer y un resumen que puedes copiar.",
+  description: "Convierta el brief de un cliente en detalles estructurados, riesgos, preguntas por hacer y un resumen que puede copiar.",
   quotaRemaining: "Quedan {remaining} de {limit, plural, one {# análisis} many {# de análisis} other {# análisis}}.",
   fields: {
     briefText: "Brief del cliente",
-    briefTextPlaceholder: "Pega el brief, la solicitud o la oferta del cliente.",
-    briefTextHelp: "Pega el brief tal cual. Un brief más largo genera preguntas más precisas.",
-  },
-  fieldNames: {
-    briefText: "Brief del cliente",
+    briefTextPlaceholder: "Pegue el brief, la solicitud o la oferta del cliente.",
+    briefTextHelp: "Pegue el brief tal cual. Un brief más largo genera preguntas más precisas.",
   },
   decode: {
     submit: "Analizar brief",
-    running: "Analizando tu brief…",
-    runFailed: "Algo salió mal al analizar tu brief. Inténtalo de nuevo.",
+    running: "Analizando su brief…",
+    runFailed: "Algo salió mal al analizar su brief. Inténtelo de nuevo.",
     startAnother: "Analizar otro brief",
   },
   result: {
@@ -24,10 +21,10 @@ export const es: Shape<typeof en> = {
     notProvided: "No indicado",
     issues: "Problemas",
     noIssues: "No se encontraron problemas.",
-    evidence: "Evidencia",
+    evidence: "Evidencia: {text}",
     questions: "{count, plural, one {# pregunta de aclaración} many {# de preguntas de aclaración} other {# preguntas de aclaración}}",
     noQuestions: "No se generaron preguntas de aclaración.",
-    rationale: "Por qué preguntar",
+    rationale: "Por qué preguntar: {text}",
     document: "Documento resumen",
   },
   briefFields: {
