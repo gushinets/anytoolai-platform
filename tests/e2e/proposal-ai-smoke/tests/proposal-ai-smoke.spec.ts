@@ -275,12 +275,15 @@ test.describe("ProposalAI web product", () => {
   });
 
   test("route titles: the product page and both kinds of 404 name themselves in the document title", async ({ page }) => {
-    await page.goto(PRODUCT_URL);
+    // Waits for the network to settle before checking: Next re-applies each route's metadata after
+    // hydration, so a title that is right in the server HTML but dropped by the client (what a
+    // check made at first paint would miss) must fail here.
+    await page.goto(PRODUCT_URL, { waitUntil: "networkidle" });
     await expect(page).toHaveTitle("ProposalAI · AnytoolAI");
 
     // An unmatched route and a registered route with an unknown product both render Next's 404.
     for (const path of ["/no-such-page", "/products/no_such_product"]) {
-      const response = await page.goto(`${WEB_MIRROR_BASE_URL}${path}`);
+      const response = await page.goto(`${WEB_MIRROR_BASE_URL}${path}`, { waitUntil: "networkidle" });
       expect(response?.status(), path).toBe(404);
       await expect(page, path).toHaveTitle("Page not found · AnytoolAI");
     }

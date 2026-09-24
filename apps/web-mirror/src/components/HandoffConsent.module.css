@@ -12,8 +12,8 @@
 }
 
 .title {
+  /* Size comes from the global h1 rule: Bundle 3's Display role pairs it with the 900 weight. */
   margin: 0;
-  font-size: 32px;
 }
 
 .details {

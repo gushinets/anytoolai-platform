@@ -9,7 +9,9 @@ type ProductLayoutProps = { children: ReactNode; params: Promise<{ productId: st
 export async function generateMetadata({ params }: Pick<ProductLayoutProps, "params">): Promise<Metadata> {
   const { productId } = await params;
   const product = getRegisteredProduct(productId);
-  return product ? { title: product.messages.en.title } : {};
+  // Unknown product: the page renders notFound(), but Next re-applies the segment's own metadata
+  // after hydration and would drop the not-found title, so it is stated here too.
+  return { title: product ? product.messages.en.title : "Page not found" };
 }
 
 export default function ProductLayout({ children }: Pick<ProductLayoutProps, "children">) {

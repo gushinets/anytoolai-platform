@@ -79,8 +79,27 @@ function AllToolsLink({ busy }: { busy: boolean }) {
       setRevealed(false);
     }
   }, [busy]);
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  // Once revealed on touch, tapping anywhere else means "stay here": hide the warning again.
+  useEffect(() => {
+    if (!revealed) {
+      return;
+    }
+    function dismissOutside(event: Event) {
+      if (!wrapRef.current?.contains(event.target as Node)) {
+        setRevealed(false);
+      }
+    }
+    document.addEventListener("pointerdown", dismissOutside);
+    document.addEventListener("touchstart", dismissOutside);
+    return () => {
+      document.removeEventListener("pointerdown", dismissOutside);
+      document.removeEventListener("touchstart", dismissOutside);
+    };
+  }, [revealed]);
   return (
     <span
+      ref={wrapRef}
       className={styles.linkWrap}
       data-dismissed={dismissed || undefined}
       data-revealed={revealed || undefined}

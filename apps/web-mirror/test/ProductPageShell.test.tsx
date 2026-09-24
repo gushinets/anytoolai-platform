@@ -544,6 +544,29 @@ describe("All tools link", () => {
     expect(wrap.hasAttribute("data-revealed")).toBe(true);
   });
 
+  it("hides the touch-revealed warning again when the user taps elsewhere, and reveals it on the next tap", async () => {
+    renderProposal();
+    fireEvent.change(await screen.findByLabelText(en.fields.taskText), { target: { value: "Redesign our landing page" } });
+    fireEvent.change(screen.getByLabelText(en.fields.freelancerPositioning), { target: { value: "Product designer" } });
+    fireEvent.click(screen.getByRole("button", { name: en.generate.submit }));
+    const link = await screen.findByRole("link", { name: /All tools/ });
+    const wrap = link.parentElement as HTMLElement;
+
+    fireEvent.touchStart(link);
+    fireEvent.click(link);
+    expect(wrap.hasAttribute("data-revealed")).toBe(true);
+
+    // A tap on the warning itself keeps it; a tap anywhere else means "stay on this page".
+    fireEvent.touchStart(screen.getByRole("tooltip"));
+    expect(wrap.hasAttribute("data-revealed")).toBe(true);
+    fireEvent.touchStart(document.body);
+    expect(wrap.hasAttribute("data-revealed")).toBe(false);
+
+    fireEvent.touchStart(link);
+    fireEvent.click(link);
+    expect(wrap.hasAttribute("data-revealed")).toBe(true);
+  });
+
   it("does not treat a keyboard activation as touch after an earlier touch tap", async () => {
     renderProposal();
     const link = await screen.findByRole("link", { name: /All tools/ });

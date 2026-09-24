@@ -23,11 +23,11 @@ describe("route titles", () => {
     ]);
   });
 
-  it("titles a product page with the product's name and leaves an unknown product on the default", async () => {
+  it("titles a product page with the product's name and gives an unknown product the 404 title", async () => {
     expect(await productMetadata({ params: Promise.resolve({ productId: "proposal_ai" }) })).toEqual({ title: "ProposalAI" });
     expect(await productMetadata({ params: Promise.resolve({ productId: "client_update_writer" }) })).toEqual({
       title: "Client Update Writer",
     });
-    expect(await productMetadata({ params: Promise.resolve({ productId: "nope" }) })).toEqual({});
+    expect(await productMetadata({ params: Promise.resolve({ productId: "nope" }) })).toEqual({ title: "Page not found" });
   });
 });
