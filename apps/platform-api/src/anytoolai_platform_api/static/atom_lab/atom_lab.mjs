@@ -1768,7 +1768,9 @@ export function bootstrapAtomLab({
       prompt: source?.prompt ?? session.prompt,
       [PROMPT_REFERENCE_FIELD]: source?.[PROMPT_REFERENCE_FIELD] ?? atom[PROMPT_REFERENCE_FIELD],
       model_id: source?.modelId ?? addressedModelId(nodes["model-select"].value),
-      reasoning_effort: source?.reasoningEffort ?? (nodes["reasoning-effort"].value || null),
+      reasoning_effort: source
+        ? (source.reasoningEffort ?? null)
+        : (nodes["reasoning-effort"].value || null),
       fixed_fields: selectedFixedFields(),
       example_input: cloneJson(source?.input ?? getDraftPayload(session)),
       source_run_id: source?.sourceRunId ?? session.sourceRunId,
@@ -2002,7 +2004,7 @@ export function bootstrapAtomLab({
 
   const openPreset = async (
     preset,
-    preferredVersion = preset.latest_version,
+    preferredVersion = null,
     {force = false, refreshVersions = true, versionsPageOverride = null} = {},
   ) => {
     if (presetSaveInFlight && !force) return false;
@@ -2016,15 +2018,36 @@ export function bootstrapAtomLab({
     nodes["preset-error"].textContent = "";
     nodes["preset-state"].textContent = "Загрузка версии пресета…";
     try {
-      const [versionsPage, version] = await Promise.all([
-        refreshVersions
-          ? fetchPresetVersions(preset.preset_id)
-          : Promise.resolve(versionsPageOverride),
-        fetchPresetVersion(preset.preset_id, preferredVersion),
-      ]);
+      let versionsPage;
+      let version;
+      if (preferredVersion === null) {
+        versionsPage = refreshVersions
+          ? await fetchPresetVersions(preset.preset_id)
+          : versionsPageOverride;
+        const latest = versionsPage?.items[0];
+        if (!latest) throw new Error("Сервер не вернул актуальную версию пресета.");
+        version = await fetchPresetVersion(preset.preset_id, latest.version);
+      } else {
+        [versionsPage, version] = await Promise.all([
+          refreshVersions
+            ? fetchPresetVersions(preset.preset_id)
+            : Promise.resolve(versionsPageOverride),
+          fetchPresetVersion(preset.preset_id, preferredVersion),
+        ]);
+      }
       if (generation !== presetOpenGeneration) return false;
       if (versionsPage) commitPresetVersions(versionsPage);
-      selectedPresetSummary = preset;
+      const latest = preferredVersion === null ? versionsPage.items[0] : null;
+      const summary = latest ? {
+        ...preset,
+        latest_version: latest.version,
+        name: latest.name,
+        description: latest.description,
+        atom_id: latest.atom_id,
+        updated_at: latest.created_at,
+      } : preset;
+      presetItems = presetItems.map((item) => item.preset_id === summary.preset_id ? summary : item);
+      selectedPresetSummary = summary;
       commitPresetVersion(version);
       renderPresetList();
       return true;

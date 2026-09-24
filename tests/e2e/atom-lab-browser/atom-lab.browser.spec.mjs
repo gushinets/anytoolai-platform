@@ -74,7 +74,12 @@ const MODEL_CATALOG = {
   error: null,
 };
 
-function historyDetail({runId = "run-library", input = A06.example_input, prompt = "Промпт запуска"} = {}) {
+function historyDetail({
+  runId = "run-library",
+  input = A06.example_input,
+  prompt = "Промпт запуска",
+  reasoningEffort = "high",
+} = {}) {
   return {
     run_id: runId,
     status: "succeeded",
@@ -89,7 +94,7 @@ function historyDetail({runId = "run-library", input = A06.example_input, prompt
         output: {ref: A06.schema_refs.output.schema_ref, version: 1, content: A06.output_schema},
       },
       input,
-      provider: {policy_ref: "policy", policy: {}, model_id: "openai/gpt-supported", reasoning_effort: "high", capability_snapshot_id: "models-1", capability_provenance: {}},
+      provider: {policy_ref: "policy", policy: {}, model_id: "openai/gpt-supported", reasoning_effort: reasoningEffort, capability_snapshot_id: "models-1", capability_provenance: {}},
       preset: {id: null, version: null},
       execution_definition_hash: "hash",
     },
@@ -1707,6 +1712,65 @@ test("preset selection commits atomically across stale responses and failed read
   await expect.poll(() => savePath).toBe("/v1/atom-lab/presets/preset-b/versions");
 });
 
+test("preset identity opens the fresh latest version while explicit version selection stays exact", async ({page}) => {
+  const stale = {
+    name: "Устаревшая версия", description: "v1", atom_id: "A06",
+    base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
+    prompt: "Промпт v1", prompt_ref: A06.prompt_ref,
+    model_id: "openai/gpt-supported", reasoning_effort: "high", fixed_fields: [],
+    example_input: A06.example_input, source_run_id: null,
+    preset_id: "preset-fresh-latest", version: 1, created_at: "2026-09-24T06:10:00Z",
+  };
+  const latest = {
+    ...stale, name: "Свежая версия", description: "v2", prompt: "Промпт v2",
+    version: 2, created_at: "2026-09-24T06:11:00Z",
+  };
+  const detailReads = [];
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const request = route.request();
+    const {pathname} = new URL(request.url());
+    if (pathname === "/v1/atom-lab/presets") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: stale.preset_id, latest_version: stale.version, name: stale.name,
+        description: stale.description, atom_id: stale.atom_id,
+        created_at: stale.created_at, updated_at: stale.created_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${stale.preset_id}/versions`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [
+        {preset_id: latest.preset_id, version: latest.version, name: latest.name, description: latest.description, atom_id: latest.atom_id, created_at: latest.created_at},
+        {preset_id: stale.preset_id, version: stale.version, name: stale.name, description: stale.description, atom_id: stale.atom_id, created_at: stale.created_at},
+      ], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${stale.preset_id}/versions/1`) {
+      detailReads.push(1);
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(stale)});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${stale.preset_id}/versions/2`) {
+      detailReads.push(2);
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(latest)});
+      return;
+    }
+    await route.fallback();
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#presets-button").click();
+  await page.locator("#preset-list button").click();
+  await expect(page.locator("#preset-name")).toHaveValue(latest.name);
+  await expect(page.locator("#preset-version-select")).toHaveValue("2");
+  await expect(page.getByRole("button", {name: /Свежая версия/})).toContainText("v2");
+  expect(detailReads).toEqual([2]);
+
+  await page.locator("#preset-version-select").selectOption("1");
+  await expect(page.locator("#preset-name")).toHaveValue(stale.name);
+  await expect(page.locator("#preset-version-select")).toHaveValue("1");
+  expect(detailReads).toEqual([2, 1]);
+});
+
 test("stalled preset reads release the locked workspace at the browser deadline", async ({page}) => {
   const stored = {
     name: "Deadline preset", description: "Read timeout", atom_id: "A06",
@@ -2344,7 +2408,11 @@ test("history keeps running and crash-failed snapshots readable without silent m
 
 test("saving from history uses the selected snapshot instead of the unrelated editor draft", async ({page}) => {
   page.on("dialog", (dialog) => dialog.accept());
-  const detail = historyDetail({runId: "run-history-source", prompt: "Промпт выбранной истории"});
+  const detail = historyDetail({
+    runId: "run-history-source",
+    prompt: "Промпт выбранной истории",
+    reasoningEffort: null,
+  });
   const editorPreset = {
     name: "Текущий A05", description: "Связанный runtime draft", atom_id: "A05",
     base_action_config_id: A05.base_action_config_id, schema_refs: A05.schema_refs,

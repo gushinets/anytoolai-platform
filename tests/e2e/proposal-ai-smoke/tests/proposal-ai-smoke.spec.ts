@@ -265,6 +265,7 @@ test.describe("ProposalAI web product", () => {
   test("guest identity persists across reload instead of minting a new one", async ({ page }) => {
     await page.goto(PRODUCT_URL);
     await expect(page.locator("h1")).toHaveText("ProposalAI");
+    await expect.poll(() => page.evaluate(() => window.localStorage.getItem("anytoolai.guest_id"))).toBeTruthy();
     const firstGuestId = await page.evaluate(() => window.localStorage.getItem("anytoolai.guest_id"));
     expect(firstGuestId).toBeTruthy();
 
