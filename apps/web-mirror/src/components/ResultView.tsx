@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Card } from "@anytoolai/shared-ui";
+import { Button, Card, Toast } from "@anytoolai/shared-ui";
 import { GeneratedTextRenderer } from "@anytoolai/web-result-kit";
 import { useHostT } from "../i18n";
+import styles from "./cardStack.module.css";
 
 export type ResultViewProps = {
   text: string;
@@ -36,13 +37,13 @@ export function ResultView({ text, onCopy }: ResultViewProps) {
   }
 
   return (
-    <Card>
+    <Card className={styles.stack}>
       <GeneratedTextRenderer text={text} />
       <Button variant="secondary" onClick={handleCopy} disabled={copyState === "copying"}>
         {copyState === "copied" ? t("result.copied") : copyState === "copying" ? t("result.copying") : t("result.copy")}
       </Button>
       {copyState === "error" ? (
-        <p role="alert">{t("result.copyFailed")}</p>
+        <Toast variant="error">{t("result.copyFailed")}</Toast>
       ) : null}
     </Card>
   );

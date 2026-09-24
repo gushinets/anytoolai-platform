@@ -263,16 +263,34 @@ test.describe("ProposalAI web product", () => {
   });
 
   test("guest identity persists across reload instead of minting a new one", async ({ page }) => {
+    // The <h1> is server-rendered and says nothing about the identity bootstrap; the form only
+    // appears once the guest identity and runtime config have loaded, so that is the readiness signal.
+    const submit = page.getByRole("button", { name: "Generate proposal" });
+    const readGuestId = () => page.evaluate(() => window.localStorage.getItem("anytoolai.guest_id"));
+
     await page.goto(PRODUCT_URL);
-    await expect(page.locator("h1")).toHaveText("ProposalAI");
-    await expect.poll(() => page.evaluate(() => window.localStorage.getItem("anytoolai.guest_id"))).toBeTruthy();
-    const firstGuestId = await page.evaluate(() => window.localStorage.getItem("anytoolai.guest_id"));
-    expect(firstGuestId).toBeTruthy();
+    await expect(submit).toBeVisible();
+    await expect.poll(readGuestId).toBeTruthy();
+    const firstGuestId = await readGuestId();
 
     await page.reload();
-    await expect(page.locator("h1")).toHaveText("ProposalAI");
-    const secondGuestId = await page.evaluate(() => window.localStorage.getItem("anytoolai.guest_id"));
-    expect(secondGuestId).toBe(firstGuestId);
+    await expect(submit).toBeVisible();
+    expect(await readGuestId()).toBe(firstGuestId);
+  });
+
+  test("route titles: the product page and both kinds of 404 name themselves in the document title", async ({ page }) => {
+    // Waits for the network to settle before checking: Next re-applies each route's metadata after
+    // hydration, so a title that is right in the server HTML but dropped by the client (what a
+    // check made at first paint would miss) must fail here.
+    await page.goto(PRODUCT_URL, { waitUntil: "networkidle" });
+    await expect(page).toHaveTitle("ProposalAI · AnytoolAI");
+
+    // An unmatched route and a registered route with an unknown product both render Next's 404.
+    for (const path of ["/no-such-page", "/products/no_such_product"]) {
+      const response = await page.goto(`${WEB_MIRROR_BASE_URL}${path}`, { waitUntil: "networkidle" });
+      expect(response?.status(), path).toBe(404);
+      await expect(page, path).toHaveTitle("Page not found · AnytoolAI");
+    }
   });
 
   test("language switch: the UI changes and persists across reload, entered values and tone stay", async ({

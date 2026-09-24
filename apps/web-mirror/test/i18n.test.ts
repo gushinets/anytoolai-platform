@@ -13,6 +13,7 @@ import {
   resetUnpersistedLocaleForTests,
   writeStoredLocale,
 } from "../src/i18n/localeStorage";
+import { HOME_MESSAGES } from "../src/app/homeMessages";
 import { HOST_MESSAGES } from "../src/i18n/messages";
 import { mergeMessages, type MessageTree } from "../src/i18n/messageTypes";
 import { resolveLocale } from "../src/i18n/resolveLocale";
@@ -153,6 +154,7 @@ type Bundle = { name: string; byLocale: Record<Locale, MessageTree>; namespace: 
 function bundles(): Bundle[] {
   return [
     { name: "host", byLocale: HOST_MESSAGES, namespace: "host" },
+    { name: "home", byLocale: HOME_MESSAGES, namespace: "product" },
     ...listRegisteredProducts().map((product) => ({
       name: product.productId,
       byLocale: product.messages,

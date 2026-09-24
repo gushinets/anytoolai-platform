@@ -1,0 +1,60 @@
+.page {
+  display: grid;
+  justify-items: center;
+}
+
+.card {
+  display: grid;
+  gap: 20px;
+  box-sizing: border-box;
+  width: min(100%, 560px);
+  padding: 24px;
+}
+
+.title {
+  /* Size comes from the global h1 rule: Bundle 3's Display role pairs it with the 900 weight. */
+  margin: 0;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: fit-content(40%) minmax(0, 1fr);
+  gap: 10px 20px;
+  margin: 0;
+}
+
+.details dt {
+  overflow-wrap: anywhere;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.entry {
+  display: contents;
+}
+
+.status {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@media (max-width: 520px) {
+  .card {
+    padding: 20px;
+  }
+
+  .actions > * {
+    flex: 1 1 100%;
+  }
+}
