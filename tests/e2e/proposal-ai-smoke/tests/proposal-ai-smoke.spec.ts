@@ -89,11 +89,11 @@ test.describe("ProposalAI web product", () => {
     await expect(page.getByText("10 of 10 proposals remaining.")).toBeVisible();
     await expect(page.getByRole("radiogroup", { name: "Proposal style" })).toBeVisible();
     await expect(page.getByRole("radio", { name: "Warm & personable" })).toBeChecked();
-    // Scoped to <main>: the UI language switcher (outside <main>, above ProductRunPage) is itself
-    // an accessibly-named "Language" combobox, so an unscoped query would match it, not prove the
-    // removed output-language field's absence.
-    await expect(page.locator("main").getByRole("textbox", { name: /Language/i })).toHaveCount(0);
-    await expect(page.locator("main").getByRole("combobox", { name: /Language/i })).toHaveCount(0);
+    const form = page.getByRole("form", { name: "ProposalAI form" });
+    await expect(page.locator("header").getByRole("combobox", { name: "Language" })).toBeVisible();
+    // The UI selector is in the header; the form still has no output-language field.
+    await expect(form.getByRole("textbox", { name: /Language/i })).toHaveCount(0);
+    await expect(form.getByRole("combobox", { name: /Language/i })).toHaveCount(0);
 
     const nextActionRequests: string[] = [];
     page.on("request", (request) => {
