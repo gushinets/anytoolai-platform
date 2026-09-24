@@ -544,6 +544,26 @@ describe("All tools link", () => {
     expect(wrap.hasAttribute("data-revealed")).toBe(true);
   });
 
+  it("does not treat a keyboard activation as touch after an earlier touch tap", async () => {
+    renderProposal();
+    const link = await screen.findByRole("link", { name: /All tools/ });
+    const wrap = link.parentElement as HTMLElement;
+
+    // An earlier touch tap while idle (it just navigates); its pointer type must not linger.
+    fireEvent.touchStart(link);
+    fireEvent.click(link);
+
+    fireEvent.change(await screen.findByLabelText(en.fields.taskText), { target: { value: "Redesign our landing page" } });
+    fireEvent.change(screen.getByLabelText(en.fields.freelancerPositioning), { target: { value: "Product designer" } });
+    fireEvent.click(screen.getByRole("button", { name: en.generate.submit }));
+    await screen.findByRole("tooltip");
+
+    // Enter on the focused link: a keydown, then a synthetic click with no pointer event of its own.
+    fireEvent.keyDown(link, { key: "Enter" });
+    fireEvent.click(link);
+    expect(wrap.hasAttribute("data-revealed")).toBe(false);
+  });
+
   it("has translated copy in every locale", () => {
     for (const locale of LOCALES) {
       expect(HOST_MESSAGES[locale].nav.allTools.trim(), locale).not.toBe("");

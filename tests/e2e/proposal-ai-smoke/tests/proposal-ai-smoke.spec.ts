@@ -274,6 +274,18 @@ test.describe("ProposalAI web product", () => {
     expect(secondGuestId).toBe(firstGuestId);
   });
 
+  test("route titles: the product page and both kinds of 404 name themselves in the document title", async ({ page }) => {
+    await page.goto(PRODUCT_URL);
+    await expect(page).toHaveTitle("ProposalAI · AnytoolAI");
+
+    // An unmatched route and a registered route with an unknown product both render Next's 404.
+    for (const path of ["/no-such-page", "/products/no_such_product"]) {
+      const response = await page.goto(`${WEB_MIRROR_BASE_URL}${path}`);
+      expect(response?.status(), path).toBe(404);
+      await expect(page, path).toHaveTitle("Page not found · AnytoolAI");
+    }
+  });
+
   test("language switch: the UI changes and persists across reload, entered values and tone stay", async ({
     page,
   }) => {

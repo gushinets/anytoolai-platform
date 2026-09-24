@@ -87,6 +87,7 @@ function AllToolsLink({ busy }: { busy: boolean }) {
       onMouseLeave={() => setDismissed(false)}
       onBlur={() => setDismissed(false)}
       onKeyDown={(event) => {
+        lastPointerType.current = "";
         if (event.key === "Escape") {
           setDismissed(true);
         }
@@ -104,7 +105,11 @@ function AllToolsLink({ busy }: { busy: boolean }) {
           lastPointerType.current = "touch";
         }}
         onClick={(event) => {
-          if (busy && lastPointerType.current === "touch" && !revealed) {
+          // Consumed by this click, so a later keyboard activation (no pointer event of its own)
+          // can never be mistaken for the touch that came before it.
+          const touched = lastPointerType.current === "touch";
+          lastPointerType.current = "";
+          if (busy && touched && !revealed) {
             event.preventDefault();
             setRevealed(true);
           }
