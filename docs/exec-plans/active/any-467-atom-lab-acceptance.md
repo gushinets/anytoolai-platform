@@ -67,7 +67,7 @@ one supported reasoning combination.
 | 4 | `apps/platform-worker/tests/test_atom_lab_execution.py::test_parallel_lab_runs_do_not_leak_settings_into_an_ordinary_job`, `::test_lab_null_reasoning_reaches_adapter_without_inheriting_policy_default`, retry assertions in `::test_lab_retry_success_keeps_separate_physical_calls_after_restart`; live reasoning cases | Automated; live pending |
 | 5 | worker retry/ledger tests above and `apps/platform-api/tests/test_atom_lab_run_execution.py::test_http_worker_terminal_history_and_idempotent_replay`; the live mode reuses `atoms_proof._check_ledger` | Automated; live pending |
 | 6 | `packages/backend/platform-core/tests/unit/test_model_catalog_storage.py` initial/TTL/manual/lease/failure tests; `apps/platform-api/tests/test_atom_lab_models_api.py`; browser catalog state tests | Automated |
-| 7 | `apps/platform-api/tests/test_atom_lab_presets.py::test_create_read_list_version_and_export_preserves_immutable_payload`, `::test_new_version_is_append_only_and_rejects_stale_base`; PostgreSQL atomic version test; browser conflict/recovery journeys | Automated; PostgreSQL gate pending |
+| 7 | `apps/platform-api/tests/test_atom_lab_presets.py::test_create_read_list_version_and_export_preserves_immutable_payload`, `::test_new_version_is_append_only_and_rejects_stale_base`; PostgreSQL atomic version test; browser conflict/recovery journeys | Automated; PostgreSQL gate passed |
 | 8 | `apps/platform-api/tests/test_atom_lab_history.py` lifecycle/snapshot/retry/failure coverage; browser running/crash-failed and restore journeys | Automated |
 | 9 | `apps/platform-api/tests/test_atom_lab_run_execution.py::test_http_worker_terminal_history_and_idempotent_replay`; worker pending/running/terminal restart coverage; live replay in `_run_atom_lab_case` | Automated; live pending |
 | 10 | preset export round-trip API test and protected browser export journey; evidence serializer omits payload/prompt/result/secrets | Automated |
@@ -94,7 +94,7 @@ one supported reasoning combination.
 
 ## Verification record
 
-- 2026-09-24 final `python3 scripts/agent/runner.py quick-check`: 1906 passed, 480 deselected.
+- 2026-09-24 final `python3 scripts/agent/runner.py quick-check`: 1908 passed, 480 deselected.
 - 2026-09-24 focused live-canary/atoms-proof/runner tests: passed.
 - 2026-09-24 focused worker retry and explicit-null reasoning tests: passed.
 - 2026-09-24 `uv run python scripts/agent/runner.py postgresql-check`: passed against a disposable

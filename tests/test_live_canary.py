@@ -452,7 +452,7 @@ def test_atom_lab_success_requires_actual_model_and_completion_date(
     assert result.input_valid is True
 
 
-@pytest.mark.parametrize("replay_outcome", ["mismatch", "response_lost"])
+@pytest.mark.parametrize("replay_outcome", ["mismatch", "response_lost", "non_object"])
 def test_atom_lab_idempotency_mismatch_fails_cost_closed(monkeypatch, replay_outcome) -> None:
     """ANY-467: an unproven replay may have launched a second paid execution."""
     module = load_live_canary_module()
@@ -496,6 +496,8 @@ def test_atom_lab_idempotency_mismatch_fails_cost_closed(monkeypatch, replay_out
         call_count += 1
         if call_count == 3 and replay_outcome == "response_lost":
             raise OSError("replay response lost after write")
+        if call_count == 3 and replay_outcome == "non_object":
+            return []
         return next(responses)
 
     monkeypatch.setattr(module.atoms_proof.smoke, "_http_json_request", fake_request)
@@ -518,7 +520,7 @@ def test_atom_lab_idempotency_mismatch_fails_cost_closed(monkeypatch, replay_out
     assert result.cost_unknown is True
 
 
-@pytest.mark.parametrize("poll_outcome", ["read_error", "deadline"])
+@pytest.mark.parametrize("poll_outcome", ["read_error", "deadline", "non_object"])
 def test_atom_lab_nonterminal_poll_loss_fails_cost_closed(monkeypatch, poll_outcome) -> None:
     """ANY-467: an admitted job can start billing after an empty point-in-time ledger read."""
     module = load_live_canary_module()
@@ -530,6 +532,8 @@ def test_atom_lab_nonterminal_poll_loss_fails_cost_closed(monkeypatch, poll_outc
     def fake_request(url, *, method="GET", **kwargs):
         if method == "POST":
             return accepted
+        if poll_outcome == "non_object":
+            return []
         raise OSError("poll response lost")
 
     monkeypatch.setattr(module.atoms_proof.smoke, "_http_json_request", fake_request)

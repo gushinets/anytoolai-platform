@@ -275,6 +275,8 @@ def _run_atom_lab_case(
             )
         except (OSError, KeyError, ValueError, TypeError, AttributeError):
             return failure("LIVE021", ambiguous_cost=True)
+        if not isinstance(detail, dict):
+            return failure("LIVE021", ambiguous_cost=True)
         status = detail.get("status")
         if status == "succeeded":
             break
@@ -333,7 +335,8 @@ def _run_atom_lab_case(
     except (OSError, KeyError, ValueError, TypeError, AttributeError):
         return failure("LIVE028", ambiguous_cost=True)
     if (
-        replay.get("run_id") != run_id
+        not isinstance(replay, dict)
+        or replay.get("run_id") != run_id
         or replay.get("scenario_session_id") != session_id
         or replay.get("job_id") != job_id
     ):
