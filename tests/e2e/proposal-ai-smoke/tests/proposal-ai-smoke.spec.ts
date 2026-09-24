@@ -271,6 +271,7 @@ test.describe("ProposalAI web product", () => {
     await page.goto(PRODUCT_URL);
     await expect(submit).toBeVisible();
     await expect.poll(readGuestId).toBeTruthy();
+    await expect.poll(() => page.evaluate(() => window.localStorage.getItem("anytoolai.guest_id"))).toBeTruthy();
     const firstGuestId = await readGuestId();
 
     await page.reload();

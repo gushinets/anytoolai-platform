@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ast
 import json
+import re
 from pathlib import Path
 
 import yaml
@@ -8,6 +10,19 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_PATH = ROOT / "infra" / "compose" / "docker-compose.yml"
 ATOM_LAB_BROWSER_PACKAGE_PATH = ROOT / "tests" / "e2e" / "atom-lab-browser" / "package.json"
+ATOM_LAB_MODULE_PATH = (
+    ROOT
+    / "apps"
+    / "platform-api"
+    / "src"
+    / "anytoolai_platform_api"
+    / "static"
+    / "atom_lab"
+    / "atom_lab.mjs"
+)
+ATOM_LAB_SCHEMAS_PATH = (
+    ROOT / "apps" / "platform-api" / "src" / "anytoolai_platform_api" / "schemas.py"
+)
 FRONTEND_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "frontend.yml"
 BACKEND_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "backend.yml"
 PUBLIC_FRONTEND_ROOTS = (
@@ -95,7 +110,29 @@ def test_atom_lab_shell_contains_no_embedded_registry_values() -> None:
     )
     assert "kernel.schemas." not in source
     assert "kernel_demo." not in source
-    assert "prompt_ref" not in source
+
+
+def test_atom_lab_browser_atom_ids_match_backend_enum() -> None:
+    browser_source = ATOM_LAB_MODULE_PATH.read_text(encoding="utf-8")
+    browser_match = re.search(r"const ATOM_IDS = new Set\((\[[^\n]+\])\);", browser_source)
+    assert browser_match is not None
+    browser_atom_ids = json.loads(browser_match.group(1))
+
+    schemas_module = ast.parse(ATOM_LAB_SCHEMAS_PATH.read_text(encoding="utf-8"))
+    enum_class = next(
+        node
+        for node in schemas_module.body
+        if isinstance(node, ast.ClassDef) and node.name == "AtomLabAtomId"
+    )
+    backend_atom_ids = [
+        statement.value.value
+        for statement in enum_class.body
+        if isinstance(statement, ast.Assign)
+        and isinstance(statement.value, ast.Constant)
+        and isinstance(statement.value.value, str)
+    ]
+
+    assert browser_atom_ids == backend_atom_ids
 
 
 def test_atom_lab_canonical_package_test_runs_state_and_chromium_suites() -> None:
