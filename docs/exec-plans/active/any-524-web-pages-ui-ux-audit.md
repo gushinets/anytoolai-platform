@@ -23,7 +23,7 @@ spawning follow-up tasks.
 - `/products/proposal_ai`, `/products/client_update_writer`, the shared product shell and
   `@anytoolai/shared-ui`.
 - `/handoff/[handoffToken]` (`HandoffConsent`).
-- Host pages `/`, `/paywall/[productId]`, `/onboarding/[productId]`, `/r/[artifactId]` and the 404
+- Home page `/`, plus host pages `/paywall/[productId]`, `/onboarding/[productId]`, `/r/[artifactId]` and the 404
   page: given a heading and a `<main>` landmark only. Their real content belongs to the tickets
   that replace them.
 
@@ -76,7 +76,8 @@ Anything that would need a new token is recorded below as an accepted deviation.
 | Handoff: layout | frontend-design | Unstyled raw buttons and lists, loading/error states outside `<main>`, no `<h1>` | Fixed: shared `Button`/`Card`/`Toast`, every state inside `<main>` with a heading |
 | Handoff: small screens | ui-ux-pro-max (layout) | Card wider than a 375px viewport; a long preview key widened the page | Fixed: `border-box`, label column capped at 40%, labels wrap |
 | Handoff: values | frontend-design (copy) | Raw status enum and ISO timestamp | Fixed: status copy map (exhaustive over `HandoffStatus`), expiry in `<time>` with a locale-formatted date |
-| `/`, `/paywall`, `/onboarding`, `/r`, 404 | frontend-design, ui-ux-pro-max | One-line placeholders without a heading; default Next 404 | Fixed: heading and `<main>`; home lists the registered products; themed 404. Real content stays with the tickets that replace them |
+| `/` | frontend-design, ui-ux-pro-max | Bare list of links; English only | Fixed: hero with the Bundle 3 headline gradient, bento cards with a sample of each tool's output, one tab stop per card with a 2px focus ring, language selector and copy in all 7 locales (`homeMessages`, covered by the i18n parity tests) |
+| `/paywall`, `/onboarding`, `/r`, 404 | frontend-design, ui-ux-pro-max | One-line placeholders without a heading; default Next 404 | Fixed: heading and `<main>`; themed 404. English only; real content stays with the tickets that replace them |
 | Shared: disabled text | ui-ux-pro-max (colour) | `--color-text-disabled` is a 30% alpha token | Accepted: disabled controls are exempt from contrast and the token is fixed by Bundle 3 |
 | Shared: headings | frontend-design | `h2`/`h3` have no size, Cabinet Grotesk is loaded at weight 900 only | Accepted: no `h2`/`h3` is rendered; the weight follows the Fontshare licence decision in ANY-503 |
 | Shared: toast | ui-ux-pro-max | No warning variant, error border reuses the generic border | Accepted: Bundle 3 has no warning/error border tokens |

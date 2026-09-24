@@ -1,0 +1,167 @@
+.page {
+  padding-top: 72px;
+  padding-bottom: 72px;
+}
+
+.top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-bottom: 48px;
+}
+
+.hero {
+  max-width: 720px;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(44px, 8vw, 72px);
+  line-height: 1.02;
+  /* Bundle 3's gradientHeadline token; the plain colour is the fallback if clipping is unsupported. */
+  color: var(--color-accent);
+  background: var(--gradient-headline);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.lead {
+  max-width: 46ch;
+  margin: 20px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 19px;
+  line-height: 1.55;
+}
+
+.grid {
+  display: grid;
+  gap: var(--layout-grid-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 28px;
+  border-radius: var(--radius-panel);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.card:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+}
+
+.name {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+/* The heading's link stretches over the whole card, so the card is one target and one tab stop. */
+.link {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.link::after {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-panel);
+  content: "";
+}
+
+.link:focus-visible {
+  outline: none;
+}
+
+.link:focus-visible::after {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.blurb {
+  max-width: 44ch;
+  text-wrap: pretty;
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag {
+  padding: 6px 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sample {
+  align-self: stretch;
+  margin: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: rgba(15, 12, 41, 0.45);
+  color: var(--color-text);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.cta {
+  display: inline-flex;
+  margin-top: auto;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.card:hover .cta {
+  color: var(--color-teal);
+}
+
+@media (min-width: 860px) {
+  .grid {
+    grid-template-columns: 3fr 2fr;
+  }
+
+  .card {
+    padding: 32px;
+  }
+}
+
+@media (max-width: 520px) {
+  .page {
+    padding-top: 40px;
+    padding-bottom: 40px;
+  }
+
+  .card {
+    padding: 22px;
+  }
+}
