@@ -66,7 +66,9 @@ describe("ProposalAI product definition", () => {
     ).toBeTruthy();
     expect(screen.getByRole("radiogroup", { name: "Proposal style" })).toBeTruthy();
     expect((screen.getByRole("radio", { name: "Warm & personable" }) as HTMLInputElement).checked).toBe(true);
-    expect(screen.queryByLabelText(/Language/)).toBeNull();
+    const language = screen.getByLabelText("Language");
+    expect(screen.getByRole("heading", { name: "ProposalAI" }).parentElement?.contains(language)).toBe(true);
+    expect(screen.getByRole("form", { name: "ProposalAI form" }).contains(language)).toBe(false);
   });
 
   it("validates its own fields client-side, mirroring generate_input.schema.json", async () => {

@@ -41,10 +41,11 @@
   --radius-pill: 999px;
 }
 
-/* --font-body/--font-mono are set by next/font/google on <html> in layout.tsx (DM Sans/DM Mono);
+/* --font-body/--font-mono are set by next/font/google on <html> in layout.tsx (DM Sans with
+ * Noto Sans for Cyrillic / DM Mono);
  * the var() fallback here only covers a consumer that never wires next/font at all. */
 body {
-  font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  font-family: var(--font-body, ui-sans-serif), var(--font-cyrillic, system-ui), sans-serif;
   /* The browser's UA stylesheet default (8px) would otherwise sit outside .page-background's
    * full-bleed gradient/min-height:100vh, leaving an unstyled gap and risking overflow. */
   margin: 0;
@@ -56,7 +57,7 @@ body {
 h1,
 h2,
 h3 {
-  font-family: "Cabinet Grotesk", var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  font-family: "Cabinet Grotesk", var(--font-body, ui-sans-serif), var(--font-cyrillic, system-ui), sans-serif;
   /* SKILL.md's "Display" role (900 weight, 44-56px) -- Fontshare's CSS API intermittently bundles
    * unrelated extra @font-face declarations for this font at the "Section" role's 800 weight
    * (verified non-deterministic), but is reliably clean at 900; see layout.tsx's own comment.
@@ -74,7 +75,7 @@ h1 {
  * were rendering as unstyled browser-default text (same as body), which both looks wrong and
  * technically falls under Bundle 3's "unapproved system-font replacement" prohibition. */
 label {
-  font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  font-family: var(--font-body, ui-sans-serif), var(--font-cyrillic, system-ui), sans-serif;
   font-weight: 600;
   font-size: 11px;
 }

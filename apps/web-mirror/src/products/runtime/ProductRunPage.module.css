@@ -11,6 +11,19 @@
   margin: 0;
 }
 
+.titleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.utilityRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 24px;
+}
+
 .description {
   max-width: 62ch;
   margin: 10px 0 0;

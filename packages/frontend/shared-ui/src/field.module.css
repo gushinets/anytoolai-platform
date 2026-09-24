@@ -27,3 +27,12 @@
 .field[aria-invalid="true"] {
   border-color: var(--color-error);
 }
+
+select.field {
+  color-scheme: dark;
+}
+
+select.field option {
+  background: var(--color-background-secondary);
+  color: var(--color-text);
+}
