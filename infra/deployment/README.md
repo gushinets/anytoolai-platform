@@ -232,8 +232,10 @@ Each deployment uses a new immutable profile directory. A failed redeploy leaves
 container bind source intact for restarts; old profiles are removed only after readiness passes.
 `prod-ready` repeats the live readiness check, including a runtime-config request through the
 web server's same-origin `/v1/*` route. `prod-fake-up` is reserved for the credential-free
-`kernel_demo` smoke in CI and checks API, web, and web-to-API routing; `prod-smoke` tests that smoke stack,
-not OpenAI.
+`kernel_demo` smoke in CI and uses the separate `anytoolai-prod-fake` Compose project, so it
+cannot reconcile or replace the live `anytoolai-prod` services. It checks API, web, and web-to-API
+routing; failed startup/readiness tears the smoke project down, and `prod-fake-down` is the explicit
+cleanup command. `prod-smoke` tests that smoke stack, not OpenAI.
 
 The operator-owned Nginx/Caddy instance terminates HTTPS and forwards the product domain to
 `127.0.0.1:${ANYTOOLAI_PROD_WEB_PORT:-3000}`. Before its catch-all forward, deny `/atom-lab`,
