@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { IntlProvider, useTranslations } from "use-intl";
+import { useIsomorphicLayoutEffect } from "../lib/useIsomorphicLayoutEffect";
 import { DEFAULT_LOCALE, type Locale } from "./locales";
 import { acceptStoredLocaleFromEvent, LOCALE_STORAGE_KEY, readStoredLocale, writeStoredLocale } from "./localeStorage";
 import { HOST_MESSAGES } from "./messages";
@@ -14,9 +15,6 @@ export type ProductMessagesByLocale = Record<Locale, MessageTree>;
 type LocaleContextValue = { locale: Locale; setLocale: (locale: Locale) => void };
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
-// SSR has no DOM: `useLayoutEffect` only upgrades to pre-paint timing in a browser (same pattern as
-// `ProductRunPage`).
-const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 // Fails loudly in tests / dev; in production a missing key is logged and the key path is shown
 // rather than crashing the page.
