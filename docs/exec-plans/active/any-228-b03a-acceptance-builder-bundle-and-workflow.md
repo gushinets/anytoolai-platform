@@ -77,9 +77,15 @@ endpoints; a live-provider action-config variant.
    extract fixture serves both scenarios.
 6. **Product schemas are the only control over A10 output.** Each output schema pins the document
    sections (ids, titles, order, list metadata), the A01 "present XOR missing" invariant, one
-   delta per criterion id in workflow order, and `meets_expectations` => no `mismatch`.
+   delta per criterion id in workflow order, `meets_expectations` => no `mismatch` and
+   `does_not_meet` => at least one `mismatch` (A11's cross-validator relates neither).
 7. **Handoff readiness**: `draft_input.brief_text` is a plain string so ANY-26 can fill it from
-   Brief Decoder's `document.summary`; no `handoffs.yaml` here.
+   Brief Decoder's `document.summary`; no `handoffs.yaml` here. To make that hold for every valid
+   Brief Decoder artifact (not just today's fixtures), `brief_decoder.decode_output_v1`'s
+   `document.summary` now carries the same `maxLength` (8000) and trimmed-text `pattern` as
+   `brief_text`, and a test compares the two schemas. This tightens the ANY-232 schema: a summary
+   over 8000 characters or with surrounding whitespace now fails that run instead of failing the
+   later handoff.
 
 ## Implementation steps
 

@@ -306,31 +306,60 @@
         "rationale"
       ],
       "additionalProperties": false,
-      "if": {
-        "properties": {
-          "verdict": {
-            "const": "meets_expectations"
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "const": "meets_expectations"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "deltas": {
+                "not": {
+                  "contains": {
+                    "required": [
+                      "status"
+                    ],
+                    "properties": {
+                      "status": {
+                        "const": "mismatch"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
-        }
-      },
-      "then": {
-        "properties": {
-          "deltas": {
-            "not": {
-              "contains": {
-                "required": [
-                  "status"
-                ],
-                "properties": {
-                  "status": {
-                    "const": "mismatch"
+        },
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "const": "does_not_meet"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "deltas": {
+                "contains": {
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "const": "mismatch"
+                    }
                   }
                 }
               }
             }
           }
         }
-      }
+      ]
     },
     "document": {
       "type": "object",

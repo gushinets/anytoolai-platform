@@ -384,22 +384,19 @@ def test_renderer_contract_agrees_with_workflows_and_scenarios() -> None:
     assert "not item by item" in " ".join(parts["comparison_verdict"]["description"].split()).lower()
 
 
-def test_brief_decoder_summary_fits_the_draft_input_for_the_future_handoff() -> None:
+def test_brief_decoder_summary_schema_is_no_looser_than_the_draft_input() -> None:
     """ANY-28 requires Brief Decoder -> Acceptance Builder handoff (ANY-26): the target input is a
     string filled from Brief Decoder's `document.summary`. The real context_mapping lands in
-    ANY-26; this pins that the target schema can accept what the source can produce."""
+    ANY-26; this pins, at schema level, that every valid summary is a valid `brief_text` (fixture
+    lengths would not prove that)."""
     target = _load_schema("acceptance_builder.draft_input_v1")["properties"]["brief_text"]
     source = _load_schema("brief_decoder.decode_output_v1", product_dir=BRIEF_DECODER_DIR)
-    summary_schema = source["properties"]["document"]["properties"]["summary"]
+    summary = source["properties"]["document"]["properties"]["summary"]
 
-    assert target["type"] == summary_schema["type"] == "string"
-    assert target["minLength"] <= summary_schema["minLength"]
-    # Brief Decoder's summary has no maxLength, so its fixtures are the largest known producers.
-    pattern = re.compile(target["pattern"])
-    for path in sorted(FIXTURE_ROOT.glob("brief_decoder.generate_summary_v1*.json")):
-        summary = json.loads(path.read_text(encoding="utf-8"))["response_json"]["summary"]
-        assert len(summary) <= target["maxLength"], path.name
-        assert pattern.fullmatch(summary), path.name
+    assert target["type"] == summary["type"] == "string"
+    assert summary["minLength"] >= target["minLength"]
+    assert summary["maxLength"] <= target["maxLength"]
+    assert summary["pattern"] == target["pattern"]  # trimmed-text rule must match exactly
 
 
 @pytest.mark.parametrize(

@@ -281,6 +281,20 @@ def _comparison_mutations(valid: dict[str, Any]) -> dict[str, dict[str, Any]]:
             valid, lambda o: o["comparison"]["deltas"][0].update(evidence=" ")
         ),
         # A11's cross-validator does not relate verdict to deltas; the product schema does.
+        "does_not_meet_without_a_mismatch": _mutated(
+            valid,
+            lambda o: (
+                o["comparison"].update(verdict="does_not_meet"),
+                [d.update(status="match") for d in o["comparison"]["deltas"]],
+            ),
+        ),
+        "does_not_meet_with_only_partial_deltas": _mutated(
+            valid,
+            lambda o: (
+                o["comparison"].update(verdict="does_not_meet"),
+                [d.update(status="partial") for d in o["comparison"]["deltas"]],
+            ),
+        ),
         "meets_expectations_with_a_mismatch": _mutated(
             valid,
             lambda o: (
@@ -289,6 +303,15 @@ def _comparison_mutations(valid: dict[str, Any]) -> dict[str, dict[str, Any]]:
             ),
         ),
     }
+
+
+def test_does_not_meet_with_a_mismatch_is_valid() -> None:
+    schema = _schema(OUTPUT_SCHEMA_REFS[CHECK])
+    output = _expected_output(CHECK, ".weak_input")
+    assert output["comparison"]["verdict"] == "does_not_meet"
+    output["comparison"]["deltas"][1]["status"] = "partial"  # one mismatch left is enough
+
+    jsonschema.validate(output, schema)
 
 
 def test_meets_expectations_without_mismatch_is_valid() -> None:
