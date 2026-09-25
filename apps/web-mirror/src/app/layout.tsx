@@ -18,6 +18,9 @@ const dmMono = DM_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "
 // specific font (700/800) -- verified 900 returns only Cabinet Grotesk across repeated requests.
 const CABINET_GROTESK_CSS_URL = "https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@900&display=swap";
 
+// Routes add their own segment (`Paywall · AnytoolAI`); the home page shows the default.
+export const metadata = { title: { default: "AnytoolAI", template: "%s · AnytoolAI" } };
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${dmSans.variable} ${cyrillic.variable} ${dmMono.variable}`}>

@@ -1,7 +1,7 @@
 // The host-level locale behavior a user sees on `/products/{productId}`: one selector for every
 // registered product, locale resolution/persistence, and -- the point of the ticket -- UI locale
 // staying independent of scenario input (incl. the output-language field) and of form/run state.
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LOCALES, type Locale } from "../src/i18n";
 import { LOCALE_STORAGE_KEY, resetUnpersistedLocaleForTests } from "../src/i18n/localeStorage";
@@ -16,6 +16,7 @@ import {
   type CapturedCall,
   guestIdentityResponse,
   makeClientCapturingRequests,
+  makeClientWithDeferredRoute,
   quotaResponse,
   resultResponse,
   routesFor,
@@ -385,6 +386,16 @@ describe("UI locale is independent of scenario input and state", () => {
     expect(startInput(calls).tone).toBe("firm");
   });
 
+  it("puts the heading and Client Update Writer's mode selector inside the one main landmark", async () => {
+    renderShell(registered("client_update_writer"), bootRoutes(CUW_IDS));
+    await screen.findByLabelText(CLIENT_UPDATE_WRITER_MESSAGES.en.fields.progressNotes);
+
+    const main = screen.getByRole("main");
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(within(main).getByRole("heading", { level: 1 })).toBeTruthy();
+    expect(within(main).getAllByRole("radio")).toHaveLength(3);
+  });
+
   it("keeps Client Update Writer's selected mode, its values and the mode wire values across a switch", async () => {
     renderShell(registered("client_update_writer"), bootRoutes(CUW_IDS));
     const en = CLIENT_UPDATE_WRITER_MESSAGES.en;
@@ -475,5 +486,111 @@ describe("a newly registered product gets the language selector without implemen
     expect(screen.getByText(HOST_MESSAGES.it.validation.required.replace("{field}", "Text"))).toBeTruthy();
     expect(document.documentElement.lang).toBe("it");
     expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("it");
+  });
+});
+
+describe("All tools link", () => {
+  const en = PROPOSAL_AI_MESSAGES.en;
+  const host = HOST_MESSAGES.en.nav;
+
+  function renderProposal() {
+    const routes = routesFor(PROPOSAL_IDS);
+    const { client, resolveDeferred } = makeClientWithDeferredRoute(bootRoutes(PROPOSAL_IDS), routes.START);
+    render(<ProductPageShell product={registered("proposal_ai")} client={client} />);
+    return { resolveDeferred };
+  }
+
+  it("links back to the tool list from a navigation landmark, with no warning while idle", async () => {
+    renderProposal();
+    await screen.findByRole("button", { name: en.generate.submit });
+
+    const link = within(screen.getByRole("navigation", { name: host.label })).getByRole("link", { name: /All tools/ });
+    expect(link.getAttribute("href")).toBe("/");
+    expect(link.getAttribute("aria-describedby")).toBeNull();
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("warns that leaving loses the result while a run is in flight, dismissable with Escape", async () => {
+    renderProposal();
+    fireEvent.change(await screen.findByLabelText(en.fields.taskText), { target: { value: "Redesign our landing page" } });
+    fireEvent.change(screen.getByLabelText(en.fields.freelancerPositioning), { target: { value: "Product designer" } });
+    fireEvent.click(screen.getByRole("button", { name: en.generate.submit }));
+
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip.textContent).toBe(host.runInProgress);
+    const link = screen.getByRole("link", { name: /All tools/ });
+    expect(link.getAttribute("aria-describedby")).toBe(tooltip.id);
+
+    fireEvent.keyDown(link, { key: "Escape" });
+    expect(link.parentElement?.hasAttribute("data-dismissed")).toBe(true);
+    fireEvent.blur(link);
+    expect(link.parentElement?.hasAttribute("data-dismissed")).toBe(false);
+  });
+
+  it("reveals the warning on the first touch tap while a run is in flight, instead of leaving in that tap", async () => {
+    renderProposal();
+    fireEvent.change(await screen.findByLabelText(en.fields.taskText), { target: { value: "Redesign our landing page" } });
+    fireEvent.change(screen.getByLabelText(en.fields.freelancerPositioning), { target: { value: "Product designer" } });
+    fireEvent.click(screen.getByRole("button", { name: en.generate.submit }));
+    const link = await screen.findByRole("link", { name: /All tools/ });
+    const wrap = link.parentElement as HTMLElement;
+
+    // A mouse click does not need the reveal: hovering already showed the warning.
+    fireEvent.click(link);
+    expect(wrap.hasAttribute("data-revealed")).toBe(false);
+
+    fireEvent.touchStart(link);
+    fireEvent.click(link);
+    expect(wrap.hasAttribute("data-revealed")).toBe(true);
+  });
+
+  it("hides the touch-revealed warning again when the user taps elsewhere, and reveals it on the next tap", async () => {
+    renderProposal();
+    fireEvent.change(await screen.findByLabelText(en.fields.taskText), { target: { value: "Redesign our landing page" } });
+    fireEvent.change(screen.getByLabelText(en.fields.freelancerPositioning), { target: { value: "Product designer" } });
+    fireEvent.click(screen.getByRole("button", { name: en.generate.submit }));
+    const link = await screen.findByRole("link", { name: /All tools/ });
+    const wrap = link.parentElement as HTMLElement;
+
+    fireEvent.touchStart(link);
+    fireEvent.click(link);
+    expect(wrap.hasAttribute("data-revealed")).toBe(true);
+
+    // A tap on the warning itself keeps it; a tap anywhere else means "stay on this page".
+    fireEvent.touchStart(screen.getByRole("tooltip"));
+    expect(wrap.hasAttribute("data-revealed")).toBe(true);
+    fireEvent.touchStart(document.body);
+    expect(wrap.hasAttribute("data-revealed")).toBe(false);
+
+    fireEvent.touchStart(link);
+    fireEvent.click(link);
+    expect(wrap.hasAttribute("data-revealed")).toBe(true);
+  });
+
+  it("does not treat a keyboard activation as touch after an earlier touch tap", async () => {
+    renderProposal();
+    const link = await screen.findByRole("link", { name: /All tools/ });
+    const wrap = link.parentElement as HTMLElement;
+
+    // An earlier touch tap while idle (it just navigates); its pointer type must not linger.
+    fireEvent.touchStart(link);
+    fireEvent.click(link);
+
+    fireEvent.change(await screen.findByLabelText(en.fields.taskText), { target: { value: "Redesign our landing page" } });
+    fireEvent.change(screen.getByLabelText(en.fields.freelancerPositioning), { target: { value: "Product designer" } });
+    fireEvent.click(screen.getByRole("button", { name: en.generate.submit }));
+    await screen.findByRole("tooltip");
+
+    // Enter on the focused link: a keydown, then a synthetic click with no pointer event of its own.
+    fireEvent.keyDown(link, { key: "Enter" });
+    fireEvent.click(link);
+    expect(wrap.hasAttribute("data-revealed")).toBe(false);
+  });
+
+  it("has translated copy in every locale", () => {
+    for (const locale of LOCALES) {
+      expect(HOST_MESSAGES[locale].nav.allTools.trim(), locale).not.toBe("");
+      expect(HOST_MESSAGES[locale].nav.runInProgress.trim(), locale).not.toBe("");
+    }
   });
 });

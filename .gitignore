@@ -50,3 +50,7 @@ temp/
 .pytest-tmp
 .agent/
 plans/
+/.agents/
+/.claude/
+/skills-lock.json
+/CLAUDE.md

@@ -4,6 +4,76 @@
   padding: 40px 20px;
 }
 
+@media (max-width: 520px) {
+  .shell {
+    padding: 24px 16px;
+  }
+}
+
+.nav {
+  width: min(100%, 820px);
+  margin: 0 auto 8px;
+}
+
+.linkWrap {
+  position: relative;
+  display: inline-block;
+}
+
+.allTools {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.allTools:hover {
+  color: var(--color-text);
+}
+
+.allTools:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-input);
+}
+
+/* Inside .linkWrap, so moving the pointer onto the tip keeps it open; Escape dismisses it. */
+.tooltip {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-input);
+  background: var(--color-background-secondary);
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.45;
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    visibility 0.15s ease;
+}
+
+.linkWrap:hover .tooltip,
+.linkWrap:focus-within .tooltip,
+.linkWrap[data-revealed] .tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
+.linkWrap[data-dismissed] .tooltip {
+  visibility: hidden;
+  opacity: 0;
+}
+
 .titleRow {
   width: min(100%, 820px);
   margin: 0 auto;
