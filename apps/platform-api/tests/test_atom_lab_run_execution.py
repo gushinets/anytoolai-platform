@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from http import HTTPStatus
+from pathlib import Path
 
 import pytest
 from anytoolai_platform_actions.structured_llm.executor import StructuredLlmActionExecutor
@@ -15,6 +16,13 @@ from anytoolai_platform_worker.composition import build_worker
 from test_atom_lab_history import _get
 from test_atom_lab_runs import INPUTS, _factory, _payload, _post
 from test_atom_lab_runs import app as app  # noqa: PLC0414 -- shared fixture
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+ACCEPTANCE_CASES = json.loads(
+    (REPO_ROOT / "tests" / "fixtures" / "atom_lab_acceptance_cases.json").read_text(
+        encoding="utf-8"
+    )
+)
 
 
 @pytest.mark.parametrize("atom_id", INPUTS)
@@ -50,6 +58,48 @@ def test_submitted_payload_equals_snapshot_and_action_runner_input(app, monkeypa
     with transaction_boundary(factory) as session:
         stored = AtomLabRunRepository(session).get(run_id)
         assert stored is not None and stored.input_payload == submitted["input"]
+
+
+@pytest.mark.parametrize("acceptance_case", ACCEPTANCE_CASES, ids=lambda case: case["atom_id"])
+def test_browser_acceptance_payload_equals_snapshot_and_action_runner_input(
+    app, monkeypatch, acceptance_case,
+):
+    """Bridges the shared browser Form-mode payloads through durable execution unchanged."""
+    submitted = {
+        **_payload(acceptance_case["atom_id"]),
+        "input": acceptance_case["input"],
+    }
+    response = _post(app, submitted)
+    assert response.status_code == HTTPStatus.ACCEPTED, response.text
+    run_id = response.json()["run_id"]
+    factory = _factory(app)
+    with transaction_boundary(factory) as session:
+        record = AtomLabRunRepository(session).get(run_id)
+        assert record is not None
+        assert record.input_payload == acceptance_case["input"]
+
+    observed = []
+
+    async def stop_before_external_provider(_executor, request, *, session):
+        observed.append(dict(request.input_payload))
+        raise RuntimeError("test stops after real ActionRunner input validation")
+
+    monkeypatch.setattr(StructuredLlmActionExecutor, "execute", stop_before_external_provider)
+    worker = build_worker(
+        session_factory=factory,
+        config_registry=app.state.runtime.config_registry,
+    )
+    try:
+        processed = asyncio.run(worker.process_next_job())
+    finally:
+        worker.dispose()
+
+    assert processed is not None and processed.id == response.json()["job_id"]
+    assert observed == [acceptance_case["input"]]
+    with transaction_boundary(factory) as session:
+        stored = AtomLabRunRepository(session).get(run_id)
+        assert stored is not None
+        assert stored.input_payload == acceptance_case["input"]
 
 
 class _FinalAnswerAdapter:
