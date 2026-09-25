@@ -1,0 +1,48 @@
+{
+  "response_json": {
+    "sections": [
+      {
+        "id": "verdict",
+        "title": "Verdict",
+        "content": "The deliverable partially meets expectations. It is judged on four general review criteria (scope coverage, requirement fit, completeness, clarity), not item by item on the acceptance criteria below. Scope coverage is partial: the brief requires every existing course, but the delivery covers 12 courses and leaves 5 legacy courses unconnected. Requirement fit is a match: students receive a PDF certificate by email right after finishing a course. Completeness is a match: the template, the PDF generation and the email delivery are all described as delivered. Clarity is a match: the delivery text says plainly what works and which courses are not connected yet."
+      },
+      {
+        "id": "acceptance-criteria",
+        "title": "Acceptance criteria",
+        "content": "- A student who finishes a course automatically receives a PDF certificate\n- The certificate is issued for every existing course\n- The certificate uses the brand colors",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "assumptions",
+        "title": "Assumptions",
+        "content": "- Course completion data already exists in the database",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "deliverables",
+        "title": "Deliverables",
+        "content": "- Certificate template in brand colors\n- Automated PDF generation service\n- Email that delivers the certificate",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "open-gaps",
+        "title": "Open gaps",
+        "content": "The brief states acceptance criteria, assumptions and deliverables, so nothing is missing from these three lists."
+      }
+    ],
+    "summary": "The delivery partially meets expectations. Connect the five legacy courses first, because the brief requires certificates for every existing course."
+  },
+  "input_tokens": 520,
+  "output_tokens": 300,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "acceptance_builder.check_document_v1"
+  }
+}

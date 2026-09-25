@@ -1,0 +1,435 @@
+{
+  "type": "object",
+  "properties": {
+    "extracted": {
+      "type": "object",
+      "properties": {
+        "values": {
+          "type": "object",
+          "properties": {
+            "acceptance_criteria": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            },
+            "assumptions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            },
+            "deliverables": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "missing_fields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "acceptance_criteria",
+              "assumptions",
+              "deliverables"
+            ]
+          }
+        },
+        "confidence": {
+          "type": "object",
+          "properties": {
+            "acceptance_criteria": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "assumptions": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "deliverables": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "values",
+        "missing_fields"
+      ],
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "acceptance_criteria"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "acceptance_criteria"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "acceptance_criteria"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "acceptance_criteria"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "assumptions"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "assumptions"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "assumptions"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "assumptions"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "values": {
+                  "required": [
+                    "deliverables"
+                  ]
+                },
+                "missing_fields": {
+                  "not": {
+                    "contains": {
+                      "const": "deliverables"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "values": {
+                  "not": {
+                    "required": [
+                      "deliverables"
+                    ]
+                  }
+                },
+                "missing_fields": {
+                  "contains": {
+                    "const": "deliverables"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "acceptance_criteria"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "acceptance_criteria"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "assumptions"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "assumptions"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "required": [
+                  "deliverables"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "required": [
+                  "deliverables"
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "document": {
+      "type": "object",
+      "properties": {
+        "sections": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/section_acceptance-criteria"
+            },
+            {
+              "$ref": "#/$defs/section_assumptions"
+            },
+            {
+              "$ref": "#/$defs/section_deliverables"
+            },
+            {
+              "$ref": "#/$defs/section_open-gaps"
+            }
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "sections",
+        "summary"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "extracted",
+    "document"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "section_acceptance-criteria": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "const": "acceptance-criteria"
+        },
+        "title": {
+          "const": "Acceptance criteria"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "metadata": {
+          "$ref": "#/$defs/listSectionMetadata"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "content",
+        "metadata"
+      ],
+      "additionalProperties": false
+    },
+    "section_assumptions": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "const": "assumptions"
+        },
+        "title": {
+          "const": "Assumptions"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "metadata": {
+          "$ref": "#/$defs/listSectionMetadata"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "content",
+        "metadata"
+      ],
+      "additionalProperties": false
+    },
+    "section_deliverables": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "const": "deliverables"
+        },
+        "title": {
+          "const": "Deliverables"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "metadata": {
+          "$ref": "#/$defs/listSectionMetadata"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "content",
+        "metadata"
+      ],
+      "additionalProperties": false
+    },
+    "section_open-gaps": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "const": "open-gaps"
+        },
+        "title": {
+          "const": "Open gaps"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "metadata": {
+          "$ref": "#/$defs/sectionMetadata"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "content"
+      ],
+      "additionalProperties": false
+    },
+    "sectionMetadata": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "heading",
+            "paragraph",
+            "list",
+            "table",
+            "note"
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "listSectionMetadata": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "list"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,8 @@
+# Two to three provider calls per run (A01, A10, plus A11 for `check_v1`). The limit is a
+# starting value, not a validated one.
+quota_policies:
+  - quota_policy_id: acceptance_builder.guest_quota_v1
+    unit: scenario_run
+    limit_count: 3
+    period: lifetime
+    dimension: product

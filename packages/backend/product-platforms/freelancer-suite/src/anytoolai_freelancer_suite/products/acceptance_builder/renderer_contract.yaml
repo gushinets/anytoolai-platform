@@ -1,0 +1,50 @@
+renderer_contract:
+  # One contract per scenario output shape: both scenarios render `extracted` and `document`;
+  # only check_v1 has a `comparison`. apps/web-mirror (ANY-244) is built against this file; this
+  # file pins the contract, not the renderer.
+  scenarios:
+    - scenario_id: acceptance_builder.draft_v1
+      output_schema_ref: acceptance_builder.draft_output_v1
+      parts: [acceptance_criteria, assumptions, deliverables, copy_document]
+    - scenario_id: acceptance_builder.check_v1
+      output_schema_ref: acceptance_builder.check_output_v1
+      parts: [comparison_verdict, acceptance_criteria, assumptions, deliverables, copy_document]
+  parts:
+    - part_id: comparison_verdict
+      field: comparison
+      description: >-
+        `verdict` (meets_expectations | partially_meets | does_not_meet), `confidence`, and one
+        `delta` per general review criterion (scope_coverage, requirement_fit, completeness,
+        clarity) with `status` and `evidence`. The verdict is judged on those four general
+        criteria only, NOT item by item on the extracted acceptance criteria; the renderer must
+        not label it a check of the extracted list.
+    - part_id: acceptance_criteria
+      field: extracted.values.acceptance_criteria
+      description: >-
+        Conditions the brief imposes on the finished work. When absent (listed in
+        `extracted.missing_fields`) it renders as "not specified in the brief" -- never as a claim
+        that the brief is complete.
+    - part_id: assumptions
+      field: extracted.values.assumptions
+      description: Same absent-list rule as `acceptance_criteria`.
+    - part_id: deliverables
+      field: extracted.values.deliverables
+      description: Same absent-list rule as `acceptance_criteria`.
+    - part_id: copy_document
+      field: document
+      description: >-
+        Ordered `sections` (id, title, content) followed by `summary`. This is the copy-ready
+        part.
+  canonical_field: document
+  # `document` is an object ({sections[], summary}), not a single string: copying it needs a
+  # serialization rule, not verbatim use.
+  canonical_field_composition: >-
+    For each entry in `document.sections`, in array order, emit the section's `title` as a
+    heading line followed by its `content`; separate sections by one blank line. After the last
+    section, emit one more blank line followed by `document.summary` as the closing paragraph.
+    `metadata.kind` (when present) is a rendering hint only and never changes which fields are
+    included.
+  next_action: copy_result
+  excluded_fields: []
+  # Open (ANY-244): the spec activation rule (first successful display of verdict and criteria,
+  # web-first-product-framework-design.md) has no verdict in draft_v1; ANY-244 decides it.

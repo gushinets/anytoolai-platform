@@ -1,0 +1,23 @@
+{
+  "response_json": {
+    "values": {
+      "deliverables": [
+        "A certificate"
+      ]
+    },
+    "missing_fields": [
+      "acceptance_criteria",
+      "assumptions"
+    ],
+    "confidence": {
+      "deliverables": 0.4
+    }
+  },
+  "input_tokens": 60,
+  "output_tokens": 40,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "acceptance_builder.extract_v1.weak_input"
+  }
+}
