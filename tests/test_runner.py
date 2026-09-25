@@ -1988,6 +1988,41 @@ def test_live_canary_fails_without_live_canary_token(monkeypatch, capsys) -> Non
     assert "LIVE011" in capsys.readouterr().err
 
 
+def test_atom_lab_live_canary_fails_without_atom_lab_access_code(monkeypatch, capsys) -> None:
+    """ANY-467: protected Lab acceptance must fail before Docker/DB without its access code."""
+    runner = load_runner_module()
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_TOKEN", "server-token")
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_SURFACE", "atom-lab")
+    monkeypatch.delenv("ANYTOOLAI_ATOM_LAB_ACCESS_CODE", raising=False)
+    monkeypatch.setattr(
+        runner,
+        "runtime_identity",
+        lambda: pytest.fail("live_canary must not touch Docker/DB without the Lab access code"),
+    )
+
+    assert runner.live_canary() == 2
+    assert "LIVE013" in capsys.readouterr().err
+
+
+def test_atom_lab_live_canary_does_not_require_server_side_provider_secrets(monkeypatch) -> None:
+    """The Lab client authenticates with its access code; provider secrets stay on the stack."""
+    runner = load_runner_module()
+    monkeypatch.setenv("ANYTOOLAI_LIVE_CANARY_SURFACE", "atom-lab")
+    monkeypatch.setenv("ANYTOOLAI_ATOM_LAB_ACCESS_CODE", "lab-secret")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANYTOOLAI_LIVE_CANARY_TOKEN", raising=False)
+    calls = []
+    monkeypatch.setattr(
+        runner,
+        "_run_proof_script",
+        lambda *args: calls.append(args) or 0,
+    )
+
+    assert runner.live_canary() == 0
+    assert calls == [("scripts/agent/live_canary.py", "ANYTOOLAI_LIVE_CANARY_DATABASE_URL")]
+
+
 def test_live_canary_reports_dev001_for_invalid_port_override(
     monkeypatch, tmp_path, capsys
 ) -> None:
