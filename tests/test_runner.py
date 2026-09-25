@@ -2147,6 +2147,16 @@ def test_live_env_file_supports_quotes_blank_comments_and_shell_precedence(monke
     )
     monkeypatch.setenv("OPENAI_API_KEY", "shell key")
     monkeypatch.setenv("ANYTOOLAI_LLM_HTTPS_PROXY", "")
+    monkeypatch.setattr(
+        runner.subprocess, "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0,
+            json.dumps({"services": {"env-probe": {"environment": {
+                "OPENAI_API_KEY": "shell key", "ANYTOOLAI_LLM_HTTPS_PROXY": "",
+                "OTHER": "quoted value",
+            }}}}), "",
+        ),
+    )
 
     env = runner._resolved_env_file(env_file)
 
@@ -2160,6 +2170,14 @@ def test_live_env_file_accepts_export_prefix(monkeypatch, tmp_path):
     env_file = tmp_path / ".env.live"
     env_file.write_text("export REVIEW_PROBE=value\n", encoding="utf-8")
     monkeypatch.delenv("REVIEW_PROBE", raising=False)
+    monkeypatch.setattr(
+        runner.subprocess, "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0, json.dumps({"services": {"env-probe": {"environment": {
+                "REVIEW_PROBE": "value",
+            }}}}), "",
+        ),
+    )
 
     assert runner._resolved_env_file(env_file)["REVIEW_PROBE"] == "value"
 
@@ -2173,10 +2191,36 @@ def test_live_env_file_strips_unquoted_inline_comment(monkeypatch, tmp_path):
     )
     monkeypatch.delenv("REVIEW_PROBE", raising=False)
     monkeypatch.delenv("QUOTED_PROBE", raising=False)
+    monkeypatch.setattr(
+        runner.subprocess, "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0, json.dumps({"services": {"env-probe": {"environment": {
+                "REVIEW_PROBE": "sample", "QUOTED_PROBE": "sample # literal",
+            }}}}), ""
+        ),
+    )
 
     env = runner._resolved_env_file(env_file)
     assert env["REVIEW_PROBE"] == "sample"
     assert env["QUOTED_PROBE"] == "sample # literal"
+
+
+def test_env_file_uses_compose_interpolation_without_promoting_literals(monkeypatch, tmp_path):
+    runner = load_runner_module()
+    env_file = tmp_path / ".env.prod"
+    env_file.write_text("DB_PASSWORD=secret\nANYTOOLAI_POSTGRES_PASSWORD=${DB_PASSWORD}\n")
+    monkeypatch.delenv("ANYTOOLAI_POSTGRES_PASSWORD", raising=False)
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0, json.dumps({"services": {"env-probe": {"environment": {
+                "DB_PASSWORD": "secret", "ANYTOOLAI_POSTGRES_PASSWORD": "secret",
+            }}}}), ""
+        ),
+    )
+
+    assert runner._resolved_env_file(env_file)["ANYTOOLAI_POSTGRES_PASSWORD"] == "secret"
 
 
 def test_profile_check_uses_identical_expectations_for_api_and_worker(monkeypatch):

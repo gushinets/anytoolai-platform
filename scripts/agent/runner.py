@@ -709,24 +709,36 @@ def _dev_live_compose_command(identity: RuntimeIdentity, *args: str) -> list[str
 def _resolved_env_file(path: Path) -> dict[str, str]:
     env = runner_env()
     if path.is_file():
-        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        names = set()
+        for line in path.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            if stripped.startswith("export "):
-                stripped = stripped[len("export ") :].lstrip()
-            key, separator, value = stripped.partition("=")
-            key = key.strip()
-            if not separator or not key.isidentifier():
-                raise ValueError(f"{path}:{line_number}: expected KEY=value")
-            value = value.strip()
-            if value.startswith(("'", '"')):
-                if len(value) < 2 or value[-1] != value[0]:
-                    raise ValueError(f"{path}:{line_number}: unmatched quote")
-                value = value[1:-1]
-            elif " #" in value:
-                value = value.split(" #", 1)[0].rstrip()
-            env.setdefault(key, value)
+            if stripped and not stripped.startswith("#"):
+                name = stripped.removeprefix("export ").partition("=")[0].strip()
+                if name.isidentifier():
+                    names.add(name)
+        with tempfile.TemporaryDirectory() as directory:
+            probe = Path(directory) / "compose.json"
+            probe.write_text(json.dumps({"services": {"env-probe": {
+                "image": "busybox",
+                "environment": {name: "${" + name + "}" for name in names},
+            }}}), encoding="utf-8")
+            command = _docker_compose_command(
+                "anytoolai-env-resolve", (probe,),
+                "config", "--format", "json", env_file=path,
+            )
+            try:
+                result = subprocess.run(
+                    command, cwd=ROOT, env=env, capture_output=True,
+                    text=True, check=False, timeout=10,
+                )
+            except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+                raise ValueError("Docker Compose could not resolve the env file") from exc
+        if result.returncode != 0:
+            raise ValueError("Docker Compose could not resolve the env file")
+        try:
+            env.update(json.loads(result.stdout)["services"]["env-probe"]["environment"])
+        except (ValueError, KeyError, TypeError) as exc:
+            raise ValueError("Docker Compose returned an invalid environment") from exc
     return env
 
 
