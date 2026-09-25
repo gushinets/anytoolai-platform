@@ -1556,6 +1556,48 @@ def test_prod_up_builds_profile_before_live_compose_and_ready(monkeypatch) -> No
     assert "ANYTOOLAI_UNMETERED_PRODUCT_IDS" not in commands[0]
 
 
+def test_prod_up_does_not_teardown_after_activation_if_announcement_fails(
+    monkeypatch,
+) -> None:
+    runner = load_runner_module()
+    inputs = runner.DeploymentInputs(
+        ("proposal_ai",), frozenset({"proposal_ai"}), PROD_LIVE_VALUES.copy()
+    )
+    manifest = {
+        "generated_products_root": "C:/generated/products",
+        "profile_fingerprint": "f" * 64,
+    }
+    events: list[str] = []
+    monkeypatch.setattr(runner, "_deployment_inputs", lambda: inputs)
+    monkeypatch.setattr(runner, "_build_deployment_profile", lambda *args: (0, manifest))
+    monkeypatch.setattr(runner, "_prod_stack_running", lambda: True)
+    monkeypatch.setattr(runner, "run_with_env", lambda command, env: events.append("up") or 0)
+    monkeypatch.setattr(
+        runner, "prod_ready", lambda **kwargs: events.append("ready") or 0
+    )
+    monkeypatch.setattr(
+        runner,
+        "_activate_deployment_profile",
+        lambda *args: events.append("activate"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_prod_down_locked",
+        lambda: events.append("down") or pytest.fail("activated deployment must stay running"),
+    )
+
+    def fail_announcement(*args) -> None:
+        events.append("announce")
+        raise BrokenPipeError("closed output")
+
+    monkeypatch.setattr(runner, "_announce_production_ready", fail_announcement)
+
+    with pytest.raises(BrokenPipeError, match="closed output"):
+        runner.prod_up()
+
+    assert events == ["up", "ready", "activate", "announce"]
+
+
 def test_live_compose_gates_api_mutations_and_worker_on_activation_marker():
     runner = load_runner_module()
     live = yaml.safe_load(runner.COMPOSE_LIVE_FILE.read_text(encoding="utf-8"))

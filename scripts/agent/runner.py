@@ -1863,8 +1863,8 @@ def _prod_up_locked() -> int:
         return 127
     except subprocess.TimeoutExpired:
         print(
-            f"PROD003: docker compose ps did not respond within {COMPOSE_QUERY_TIMEOUT_SECONDS:g}s — "
-            "is the Docker daemon running and responsive?",
+            "PROD003: docker compose ps did not respond within "
+            f"{COMPOSE_QUERY_TIMEOUT_SECONDS:g}s — is the Docker daemon running and responsive?",
             file=sys.stderr,
         )
         return 1
@@ -1893,15 +1893,14 @@ def _prod_up_locked() -> int:
         exit_code = prod_ready(inputs=inputs, manifest=manifest, announce=False)
         if exit_code == 0:
             _activate_deployment_profile(PROD_COMPOSE_PROJECT, manifest)
-            print(f"API: http://127.0.0.1:{api_port}")
-            print(f"Web: http://127.0.0.1:{web_port}")
-            print("Production environment is ready")
-            return 0
     except Exception:
         _stop_failed_prod_candidate()
         raise
-    _stop_failed_prod_candidate()
-    return exit_code
+    if exit_code != 0:
+        _stop_failed_prod_candidate()
+        return exit_code
+    _announce_production_ready(api_port, web_port)
+    return 0
 
 
 def _stop_failed_prod_candidate() -> None:
@@ -1995,6 +1994,12 @@ def _prod_fake_ready(*, env: dict[str, str] | None = None) -> int:
     return 0
 
 
+def _announce_production_ready(api_port: int, web_port: int) -> None:
+    print(f"API: http://127.0.0.1:{api_port}")
+    print(f"Web: http://127.0.0.1:{web_port}")
+    print("Production environment is ready")
+
+
 def prod_ready(
     *,
     inputs: DeploymentInputs | None = None,
@@ -2049,9 +2054,7 @@ def prod_ready(
     if exit_code != 0:
         return exit_code
     if announce:
-        print(f"API: http://127.0.0.1:{api_port}")
-        print(f"Web: http://127.0.0.1:{web_port}")
-        print("Production environment is ready")
+        _announce_production_ready(api_port, web_port)
     return 0
 
 

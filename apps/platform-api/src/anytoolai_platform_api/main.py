@@ -45,7 +45,8 @@ from starlette.responses import Response
 CORS_ORIGINS_ENV = "ANYTOOLAI_API_CORS_ORIGINS"
 CHROME_EXTENSION_ORIGIN_REGEX = r"^chrome-extension://[a-p]{32}$"
 logger = logging.getLogger(__name__)
-SAFE_PREACTIVATION_HTTP_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+PREACTIVATION_READ_METHODS = frozenset({"GET", "HEAD"})
+PREACTIVATION_RUNTIME_CONFIG_PATH = re.compile(r"^/v1/products/[^/]+/runtime-config$")
 
 
 def create_app(
@@ -101,12 +102,21 @@ def _configured_cors_origins() -> list[str]:
     return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 
 
-def _deployment_mutation_is_blocked(request: Request) -> bool:
-    if request.method in SAFE_PREACTIVATION_HTTP_METHODS:
+def _is_preactivation_readiness_request(request: Request) -> bool:
+    if request.method == "OPTIONS":
+        return True
+    if request.method not in PREACTIVATION_READ_METHODS:
         return False
+    path = request.url.path
+    return path == "/health" or PREACTIVATION_RUNTIME_CONFIG_PATH.fullmatch(path) is not None
+
+
+def _deployment_request_is_blocked(request: Request) -> bool:
     settings: Settings = request.app.state.settings
     activation_name = settings.deployment_activation_name
     if activation_name is None:
+        return False
+    if _is_preactivation_readiness_request(request):
         return False
     activation_marker = settings.deployment_activation_marker
     if activation_marker is None:
@@ -129,7 +139,7 @@ def _install_request_context(app: FastAPI) -> None:
         token = bind_log_context(request_id=request_id)
         started = perf_counter()
         try:
-            if _deployment_mutation_is_blocked(request):
+            if _deployment_request_is_blocked(request):
                 response = await api_error_handler(
                     request,
                     ApiError(

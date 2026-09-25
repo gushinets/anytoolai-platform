@@ -236,8 +236,9 @@ Each deployment uses a new immutable profile directory. A failed redeploy leaves
 container bind source intact for restarts; old profiles are removed only after readiness passes.
 The candidate worker verifies its profile but waits for `active-profile` to name its generation
 before polling the production queue. The candidate API mounts the same activation state and returns
-`503 deployment_not_active` for unsafe HTTP methods until that marker selects its generation; GET
-health/runtime-config checks remain available to deployment readiness. A failed candidate therefore
+`503 deployment_not_active` for every pre-activation request except OPTIONS and the read-only
+GET/HEAD health and product runtime-config endpoints needed by deployment readiness. A failed
+candidate therefore
 cannot accept durable workflow mutations or terminalize queued jobs
 under an allowlist that never became active.
 `prod-ready` repeats the live readiness check, including a runtime-config request through the

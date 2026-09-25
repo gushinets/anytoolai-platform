@@ -176,25 +176,29 @@ def test_live_candidate_blocks_mutations_until_activation(monkeypatch, tmp_path)
         "inactive deployment must reject mutation before storage access"
     )
 
-    async def request_all() -> tuple[httpx.Response, httpx.Response, httpx.Response]:
+    async def request_all() -> tuple[
+        httpx.Response, httpx.Response, httpx.Response, httpx.Response
+    ]:
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
             runtime = await client.get("/v1/products/proposal_ai/runtime-config")
-            blocked = await client.post(
+            blocked_start = await client.post(
                 "/v1/products/proposal_ai/scenarios/proposal_ai.generate_v1/start",
                 json={"frontend_id": "proposal_ai_web", "input": {}},
             )
+            blocked_handoff = await client.get("/v1/handoffs/hnd_candidate")
             marker.write_text("freelancer-suite.candidate\n", encoding="utf-8")
             enabled = await client.post(
                 "/v1/products/client_update_writer/scenarios/client_update_writer.update_v1/start",
                 json={"frontend_id": "client_update_writer_web", "input": {}},
             )
-            return runtime, blocked, enabled
+            return runtime, blocked_start, blocked_handoff, enabled
 
-    runtime, blocked, enabled = asyncio.run(request_all())
+    runtime, blocked_start, blocked_handoff, enabled = asyncio.run(request_all())
     assert runtime.status_code == HTTPStatus.OK
-    assert blocked.status_code == HTTPStatus.SERVICE_UNAVAILABLE
-    assert blocked.json()["error"]["code"] == "deployment_not_active"
+    for blocked in (blocked_start, blocked_handoff):
+        assert blocked.status_code == HTTPStatus.SERVICE_UNAVAILABLE
+        assert blocked.json()["error"]["code"] == "deployment_not_active"
     assert enabled.status_code == HTTPStatus.NOT_FOUND
     assert enabled.json()["error"]["code"] == "product_not_found"
 
