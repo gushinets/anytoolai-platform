@@ -226,8 +226,11 @@ Inspect the printed `Enabled products: proposal_ai` and `Quota modes:
 proposal_ai=unmetered` before Compose starts. `prod-up` generates an ignored deployment profile,
 then force-recreates base + prod + live Compose, waits for API and web HTTP, and checks the
 same mounted profile fingerprint and policy references inside API and worker. It never falls
-back to fake. If Compose startup or readiness fails, `prod-up` stops the candidate project
-without deleting its PostgreSQL volume; investigate before restarting production.
+back to fake. A host-level deployment lock covers profile generation through readiness,
+activation, and failure cleanup; a concurrent `prod-up` exits with `PROD007` before touching
+the production project or active profile. If Compose startup or readiness fails, `prod-up` stops
+the candidate project without deleting its PostgreSQL volume; investigate before restarting
+production.
 Each deployment uses a new immutable profile directory. A failed redeploy leaves the previous
 container bind source intact for restarts; old profiles are removed only after readiness passes.
 `prod-ready` repeats the live readiness check, including a runtime-config request through the
