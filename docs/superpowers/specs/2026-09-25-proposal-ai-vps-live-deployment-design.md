@@ -45,6 +45,8 @@ For each profile-generation run it:
 5. verifies the requested provider and quota modes;
 6. writes a small machine-readable manifest containing the source directory, container target, live product ids, expected provider policy references, expected quota-policy reference or absence for each product, a source fingerprint for host-side staleness detection, and a profile fingerprint of the generated tree for container verification.
 
+Both fingerprints use the same platform-independent SHA-256 input: files ordered by normalized relative path; for each file, a length-prefixed UTF-8 path using `/` separators followed by the length-prefixed exact file bytes. Absolute roots and filesystem metadata are excluded. The Windows host and Linux containers must therefore compute the same profile fingerprint for the same mounted tree.
+
 Copying the tree at execution time prevents drift: prompt, schema, workflow, frontend, and product changes are present in the generated profile immediately. The profile is regenerated before every `dev-live-up` and `prod-up`.
 
 ### 3.2 Provider transform
@@ -170,7 +172,9 @@ ANYTOOLAI_UNMETERED_PRODUCT_IDS=proposal_ai
 ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT
 ```
 
-`ANYTOOLAI_UNMETERED_PRODUCT_IDS` is required but may be explicitly empty when every enabled product should use its canonical anonymous quota.
+`ANYTOOLAI_UNMETERED_PRODUCT_IDS` is required but may be explicitly empty when every enabled product should use its canonical anonymous quota. Runner, not `${VAR:?...}` Compose interpolation, enforces that the variable is present: the latter rejects the valid empty value. An exported shell value takes precedence over `.env.prod` even when it is empty.
+
+Before profile generation or Compose startup, `prod-up` prints the resolved enabled-product list and the resolved quota mode for each enabled product, for example `proposal_ai=unmetered` or `proposal_ai=canonical`. This output contains no secret values and makes an accidental empty shell override visible before deployment proceeds.
 
 `infra/compose/docker-compose.prod.yml` requires `ANYTOOLAI_ENABLED_PRODUCT_IDS` with `${ANYTOOLAI_ENABLED_PRODUCT_IDS:?...}` wherever it supplies the API setting or web build argument. A production Compose render therefore fails even if runner preflight is bypassed. The web build also rejects a missing or empty public allowlist before `next build`.
 
@@ -254,7 +258,7 @@ After containers start, runner executes a read-only config check inside both Pla
 - every product has the host-validated expected quota-policy reference or has none, as specified;
 - API and worker report the same profile fingerprint.
 
-`prod-up` does not report ready if either container sees canonical fake configuration, a stale profile, or a different fingerprint. Provider/model information remains internal and is not added to frontend-safe runtime-config APIs.
+`prod-up` does not report ready if an enabled product still resolves any action to `default_fake_provider_v1`, the resolved bundle path is not the mounted generated tree, the profile fingerprints differ, or an expected provider/quota reference does not match. Canonical fake policies belonging only to disabled products are valid and do not fail readiness. Provider/model information remains internal and is not added to frontend-safe runtime-config APIs.
 
 ## 8. Resource limit
 
@@ -285,7 +289,7 @@ The target-VPS acceptance run records peak worker memory and verifies that the c
 
 - `scripts/agent/validate_configs.py` — keep the default canonical validation read-only; add an explicit profile-generation/check entrypoint, profile-aware registry loading, fingerprints, and provider/quota assertions.
 - `scripts/agent/runner.py` — `dev-live-up`, `dev-web`, production profile generation, `.env.live`, preflight, Compose file selection, effective-config checks, and web readiness/status output.
-- `tests/test_runner.py` and config-validation tests — default validation remains canonical and does not write `.agent/`; explicit generation, strict transforms, quota modes, unset-versus-empty environment handling, paths, and identical read-only container-check commands.
+- `tests/test_runner.py` and config-validation tests — default validation remains canonical and does not write `.agent/`; explicit generation, strict transforms, quota modes, unset-versus-empty environment handling and resolved-mode output, cross-platform fingerprints, paths, disabled-product fake-policy acceptance, and identical read-only container-check commands.
 - `infra/compose/docker-compose.yml` — retain existing OpenAI-key wiring for live canary; do not add proxy environment to normal development.
 - `infra/compose/docker-compose.prod.yml` — product-neutral web service, loopback ports, required memory and product-allowlist interpolation, restart/resource/health configuration, and required web build arguments.
 - `infra/compose/.env.example` — documented product allowlist, quota selection, proxy, and worker memory inputs.
@@ -311,7 +315,7 @@ The target-VPS acceptance run records peak worker memory and verifies that the c
 
 1. Run `python scripts/agent/runner.py doctor` before implementation.
 2. Add failing focused tests before behavior changes.
-3. Run the explicit profile command to generate and validate Proposal AI profiles in both `canonical` and `unmetered` quota modes.
+3. Run the explicit profile command to generate and validate Proposal AI profiles in both `canonical` and `unmetered` quota modes; verify identical fingerprints when the same fixture tree is addressed with Windows and POSIX path separators.
 4. Generate live profiles for the other current standard-fake products to prove reuse without committed overlays.
 5. Run `python scripts/agent/runner.py validate-configs` and verify that this canonical check creates no deployment profile or other `.agent/` output.
 6. Run `python scripts/agent/runner.py validate-architecture`.
@@ -319,7 +323,7 @@ The target-VPS acceptance run records peak worker memory and verifies that the c
 8. Run `python scripts/agent/runner.py quick-check`.
 9. Run `python scripts/agent/runner.py frontend-check`.
 10. Run `python scripts/agent/runner.py full-check`.
-11. Render `docker compose config` for local live and production combinations; verify production rendering fails without `ANYTOOLAI_ENABLED_PRODUCT_IDS`, and the web image build fails without its public allowlist build argument.
+11. Render `docker compose config` for local live and production combinations; verify production rendering fails without `ANYTOOLAI_ENABLED_PRODUCT_IDS` and the web image build fails without its public allowlist build argument. Separately verify runner rejects a missing `ANYTOOLAI_UNMETERED_PRODUCT_IDS` but accepts an explicitly empty value as canonical mode for every enabled product.
 12. Keep existing credential-free Proposal AI and kernel smokes on canonical fake configuration.
 
 ### Local live smoke
