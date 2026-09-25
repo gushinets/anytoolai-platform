@@ -61,9 +61,9 @@ h3 {
   /* SKILL.md's "Display" role (900 weight, 44-56px) -- Fontshare's CSS API intermittently bundles
    * unrelated extra @font-face declarations for this font at the "Section" role's 800 weight
    * (verified non-deterministic), but is reliably clean at 900; see layout.tsx's own comment.
-   * Weight and size must stay paired as one Bundle 3 role, not mixed across roles -- no <h2>/<h3>
-   * exists anywhere in apps/web-mirror yet, so only <h1> also gets an explicit size, rather than
-   * guessing sizes for heading levels nothing renders. */
+   * Weight and size must stay paired as one Bundle 3 role, not mixed across roles -- only <h1>
+   * and Brief Decoder's result <h2>s render today, so only <h1> gets an explicit size, rather
+   * than guessing sizes for heading levels nothing needs. */
   font-weight: 900;
 }
 

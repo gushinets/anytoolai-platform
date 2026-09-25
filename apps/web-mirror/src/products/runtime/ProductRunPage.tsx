@@ -298,6 +298,29 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
   const [values, setValues] = useState<V>(definition.emptyValues);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, FieldError>>>({});
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
+  // Emits `scenario_completed` once per scenario session, after the `result` phase has actually
+  // committed (ANY-17/ANY-248: `web.result_viewed` is the first *successful rendering*). The ref
+  // dedupes across re-renders, StrictMode's effect replay and `guestId`/`definition` identity changes.
+  const resultEventSessionRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (phase.kind !== "result" || resultEventSessionRef.current === phase.scenarioSessionId) {
+      return;
+    }
+    resultEventSessionRef.current = phase.scenarioSessionId;
+    let resultViewed: boolean;
+    try {
+      resultViewed = definition.emitsResultViewed?.(phase.result) ?? true;
+    } catch {
+      // A product hook must not break the page (ANY-453: analytics failure is non-blocking).
+      resultViewed = false;
+    }
+    emitEvent(onEventRef.current, {
+      type: "scenario_completed",
+      scenarioSessionId: phase.scenarioSessionId,
+      guestId,
+      resultViewed,
+    });
+  }, [phase, guestId, definition]);
   // Holds the one Idempotency-Key-bound handle for the current logical submission (ANY-150): a
   // "Try again" after a retryable failure reuses `.execute()` on this same handle so the backend
   // can collapse a duplicate submit into the original session instead of spending quota twice.
@@ -612,8 +635,10 @@ export function ProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     resultFetchSettledRef.current = true;
+    // `scenario_completed` is emitted by the commit-time effect on `phase` below, not here:
+    // `setPhase` only queues the update, so emitting here would report a result that never
+    // rendered (unmount, navigation, a renderer that throws).
     setPhase({ kind: "result", scenarioSessionId, checkpointId, result: extracted });
-    emitEvent(onEventRef.current, { type: "scenario_completed", scenarioSessionId, guestId });
   }
 
   // Shared by handleSubmit/handleRetry: both begin a (new or reused) prepared start the same way.

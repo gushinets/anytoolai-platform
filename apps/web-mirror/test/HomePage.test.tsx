@@ -17,16 +17,19 @@ describe("HomePage", () => {
     expect(screen.getByRole("link", { name: "Client Update Writer" }).getAttribute("href")).toBe(
       "/products/client_update_writer",
     );
+    expect(screen.getByRole("link", { name: "Brief Decoder" }).getAttribute("href")).toBe("/products/brief_decoder");
     expect(screen.getByText(HOME_MESSAGES.en.lead)).toBeTruthy();
   });
 
   it("keeps each tool's sample output available to screen readers, hiding only the duplicate call to action", () => {
     render(<HomePage />);
-    for (const card of [HOME_MESSAGES.en.cards.proposal_ai, HOME_MESSAGES.en.cards.client_update_writer]) {
+    const cards = Object.values(HOME_MESSAGES.en.cards);
+    expect(cards).toHaveLength(3);
+    for (const card of cards) {
       expect(screen.getByText(card.sample).closest('[aria-hidden="true"]')).toBeNull();
     }
     const cta = screen.getAllByText(HOME_MESSAGES.en.open);
-    expect(cta).toHaveLength(2);
+    expect(cta).toHaveLength(cards.length);
     for (const element of cta) {
       expect(element.closest('[aria-hidden="true"]')).not.toBeNull();
     }

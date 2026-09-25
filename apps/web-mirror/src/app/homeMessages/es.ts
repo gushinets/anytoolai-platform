@@ -19,5 +19,9 @@ export const es: Shape<typeof en> = {
         prepaidRequest: "Solicitud de anticipo",
       },
     },
+    brief_decoder: {
+      blurb: "Convierta el brief de un cliente en detalles estructurados, riesgos y las preguntas que conviene hacer antes de empezar.",
+      sample: "Falta: fecha límite y presupuesto. Pregunte al cliente: ¿cuál es la fecha exacta de lanzamiento y quién aprueba el diseño?",
+    },
   },
 };
