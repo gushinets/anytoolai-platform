@@ -1035,8 +1035,11 @@ def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
         _activate_deployment_profile(identity.compose_project, manifest)
         activated = True
     finally:
-        if not activated and run_with_env([*compose, "down", "--remove-orphans"], env) != 0:
-            print("LIVE004: failed local-live candidate could not be stopped", file=sys.stderr)
+        if not activated:
+            if run_with_env([*compose, "down", "--remove-orphans"], env) == 0:
+                _deactivate_deployment_profile(identity.compose_project)
+            else:
+                print("LIVE004: failed local-live candidate could not be stopped", file=sys.stderr)
     print(f"Compose project: {identity.compose_project}")
     print(f"API: {identity.api_url}")
     print(f"PostgreSQL: 127.0.0.1:{identity.postgres_port}")

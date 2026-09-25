@@ -2544,6 +2544,7 @@ def test_dev_live_up_worker_profile_failure_never_reports_ready(monkeypatch, tmp
     runner = load_runner_module()
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
     monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(runner, "_deployment_profile_dir", lambda project: tmp_path / "profile")
     monkeypatch.setattr(runner, "LIVE_ENV_FILE", tmp_path / "missing.env")
     monkeypatch.setenv("OPENAI_API_KEY", "hidden-key")
     monkeypatch.setattr(runner, "_compose_stack_running", lambda command, env: False)
@@ -2575,7 +2576,10 @@ def test_dev_live_up_worker_profile_failure_never_reports_ready(monkeypatch, tmp
 def test_dev_live_up_stops_failed_candidate(monkeypatch, tmp_path, failed_step):
     runner = load_runner_module()
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    marker = tmp_path / "active-profile"
+    marker.write_text("previous-live-profile\n")
     monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(runner, "_deployment_profile_dir", lambda project: tmp_path / "profile")
     monkeypatch.setattr(runner, "LIVE_ENV_FILE", tmp_path / "missing.env")
     monkeypatch.setenv("OPENAI_API_KEY", "hidden-key")
     monkeypatch.setattr(runner, "_compose_stack_running", lambda command, env: False)
@@ -2603,6 +2607,7 @@ def test_dev_live_up_stops_failed_candidate(monkeypatch, tmp_path, failed_step):
 
     assert runner.dev_live_up("proposal_ai", "unmetered") != 0
     assert calls[-1][-2:] == ["down", "--remove-orphans"]
+    assert not marker.exists()
 
 
 def test_dev_web_uses_derived_api_url(monkeypatch):
