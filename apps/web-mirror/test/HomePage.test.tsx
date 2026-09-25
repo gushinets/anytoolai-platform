@@ -1,14 +1,18 @@
 // The home page is the one host page with its own copy: it must follow the language selector like
 // the product pages do, and list every enabled product.
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import HomePage from "../src/app/page";
 import { HOME_MESSAGES } from "../src/app/homeMessages";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
 
 describe("HomePage", () => {
   beforeEach(() => window.localStorage.clear());
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
 
   it("links every enabled product in English by default", () => {
     render(<HomePage />);
@@ -18,6 +22,15 @@ describe("HomePage", () => {
       "/products/client_update_writer",
     );
     expect(screen.getByText(HOME_MESSAGES.en.lead)).toBeTruthy();
+  });
+
+  it("hides products outside the web allowlist", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS", "proposal_ai");
+    vi.resetModules();
+    const { default: AllowlistedHomePage } = await import("../src/app/page");
+    render(<AllowlistedHomePage />);
+    expect(screen.getByRole("link", { name: "ProposalAI" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Client Update Writer" })).toBeNull();
   });
 
   it("keeps each tool's sample output available to screen readers, hiding only the duplicate call to action", () => {

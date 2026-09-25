@@ -124,6 +124,17 @@ describe("ProductRunPage", () => {
     expect(new URL(quotaCall!.url).searchParams.get("scenario_id")).toBe(TEST_PRODUCT_IDS.scenarioId);
   });
 
+  it("shows an unmetered form without requesting quota", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(TEST_PRODUCT_IDS, { quota_summary: null })],
+      [ROUTES.GUEST_IDENTITY]: [guestIdentityResponse()],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    expect(calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(0);
+  });
+
   it("treats a runtime config with no enabled web frontend as unavailable, never falling back to an arbitrary frontend", async () => {
     const { client } = makeClient({
       [ROUTES.RUNTIME_CONFIG]: [
@@ -448,6 +459,25 @@ describe("ProductRunPage", () => {
     expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("");
     await waitFor(() => expect(screen.getByText("2 of 3 runs remaining.")).toBeTruthy());
     expect(calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(2);
+  });
+
+  it("starts another unmetered run without requesting quota", async () => {
+    const { client, calls } = makeClientCapturingRequests({
+      ...happyPathRoutes(),
+      [ROUTES.RUNTIME_CONFIG]: [runtimeConfigResponse(TEST_PRODUCT_IDS, { quota_summary: null })],
+      [ROUTES.QUOTA]: [],
+    });
+
+    renderPage({ client });
+    await waitForForm();
+    fillValidForm();
+    submit();
+    await waitForResult();
+    fireEvent.click(screen.getByRole("button", { name: "Start another run" }));
+
+    await waitForForm();
+    expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("");
+    expect(calls.filter((call) => call.key === ROUTES.QUOTA)).toHaveLength(0);
   });
 
   it("does not add a repeat action to products that do not define one", async () => {

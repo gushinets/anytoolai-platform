@@ -25,15 +25,22 @@ export type RegisteredProduct = {
 /** Static product registry for `/products/{productId}`. This is the composition layer
  * (`docs/architecture/frontend-boundaries.md`): the one place allowed to import both the shared
  * runtime and individual products. The shared runtime itself never imports a product. */
-const PRODUCTS: readonly RegisteredProduct[] = [
-  { productId: "proposal_ai", enabled: true, messages: PROPOSAL_AI_MESSAGES, Component: ProposalAIProduct },
+const configuredIds = process.env.NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS;
+const enabledIds = configuredIds === undefined ? null : new Set(configuredIds.split(",").map((id) => id.trim()).filter(Boolean));
+
+const PRODUCT_DEFINITIONS: readonly Omit<RegisteredProduct, "enabled">[] = [
+  { productId: "proposal_ai", messages: PROPOSAL_AI_MESSAGES, Component: ProposalAIProduct },
   {
     productId: "client_update_writer",
-    enabled: true,
     messages: CLIENT_UPDATE_WRITER_MESSAGES,
     Component: ClientUpdateWriterProduct,
   },
 ];
+
+const PRODUCTS: readonly RegisteredProduct[] = PRODUCT_DEFINITIONS.map((product) => ({
+  ...product,
+  enabled: enabledIds === null || enabledIds.has(product.productId),
+}));
 
 export function getRegisteredProduct(productId: string): RegisteredProduct | null {
   const product = PRODUCTS.find((candidate) => candidate.productId === productId);
