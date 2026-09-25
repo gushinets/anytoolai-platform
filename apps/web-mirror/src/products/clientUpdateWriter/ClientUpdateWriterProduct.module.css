@@ -91,7 +91,7 @@
   border: 0;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 860px) {
   .modeOptions {
     grid-template-columns: 1fr;
   }

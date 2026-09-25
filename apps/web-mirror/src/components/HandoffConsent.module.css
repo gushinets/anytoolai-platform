@@ -11,6 +11,14 @@
   padding: 24px;
 }
 
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
 .title {
   /* Size comes from the global h1 rule: Bundle 3's Display role pairs it with the 900 weight. */
   margin: 0;
