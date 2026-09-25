@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import errno
 import hashlib
 import importlib.util
 import json
@@ -1692,7 +1693,76 @@ def _prod_fake_stack_running(env: dict[str, str]) -> bool:
     return _compose_stack_running(_prod_fake_compose_command(), env)
 
 
+class ProductionDeploymentLockError(RuntimeError):
+    """Raised when the fixed production Compose project cannot be exclusively deployed."""
+
+
+class _ProductionDeploymentLock:
+    """Cross-process host lock guarding the fixed production Compose project."""
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._handle = None
+
+    def __enter__(self) -> "_ProductionDeploymentLock":
+        handle = None
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            handle = self._path.open("a+b")
+            if os.name == "nt":
+                import msvcrt
+
+                handle.seek(0, os.SEEK_END)
+                if handle.tell() == 0:
+                    handle.write(b"\0")
+                    handle.flush()
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (BlockingIOError, OSError, ImportError) as exc:
+            if handle is not None:
+                handle.close()
+            if getattr(exc, "errno", None) in {errno.EACCES, errno.EAGAIN}:
+                raise ProductionDeploymentLockError(
+                    f"another prod-up is already running (lock: {self._path})"
+                ) from exc
+            raise ProductionDeploymentLockError(
+                f"could not acquire production deployment lock {self._path}: {exc}"
+            ) from exc
+        self._handle = handle
+        return self
+
+    def __exit__(self, _exc_type, _exc, _traceback) -> None:
+        if self._handle is not None:
+            # Both flock() and msvcrt byte-range locks are released when the descriptor closes.
+            # Keep the lock file itself so a crashed process cannot leave stale ownership state.
+            self._handle.close()
+            self._handle = None
+
+
+def _prod_deployment_lock_path() -> Path:
+    # The Compose project name is host-global, so the lock must not live under ROOT/.agent:
+    # separate worktrees/clones could otherwise mutate the same anytoolai-prod project concurrently.
+    return Path(tempfile.gettempdir()) / f"{PROD_COMPOSE_PROJECT}.deployment.lock"
+
+
+def _prod_deployment_lock() -> _ProductionDeploymentLock:
+    return _ProductionDeploymentLock(_prod_deployment_lock_path())
+
+
 def prod_up() -> int:
+    try:
+        with _prod_deployment_lock():
+            return _prod_up_locked()
+    except ProductionDeploymentLockError as exc:
+        print(f"PROD007: {exc}", file=sys.stderr)
+        return 1
+
+
+def _prod_up_locked() -> int:
     try:
         inputs = _deployment_inputs()
         api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000, inputs.compose_env)
