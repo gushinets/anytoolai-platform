@@ -1194,6 +1194,22 @@ def test_prod_up_builds_and_removes_orphans(monkeypatch) -> None:
     assert timeouts == [None]
 
 
+def test_prod_fake_up_uses_only_base_and_prod_compose(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
+    monkeypatch.setattr(runner, "port_available", lambda port: True)
+    monkeypatch.setattr(runner, "prod_ready", lambda: 0)
+    commands: list[list[str]] = []
+    monkeypatch.setattr(runner, "run_with_env", lambda command, env: commands.append(list(command)) or 0)
+
+    assert runner.COMMANDS["prod-fake-up"]() == 0
+    assert len(commands) == 1
+    assert str(runner.COMPOSE_FILE) in commands[0]
+    assert str(runner.COMPOSE_PROD_FILE) in commands[0]
+    assert str(runner.COMPOSE_LIVE_FILE) not in commands[0]
+    assert commands[0][-4:] == ["up", "-d", "--build", "--remove-orphans"]
+
+
 def test_prod_up_calls_prod_ready_after_successful_up(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)

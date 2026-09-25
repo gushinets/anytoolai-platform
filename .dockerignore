@@ -22,6 +22,7 @@ venv/
 **/*.egg-info/
 
 # Local runtime/test temp data
+.agent/
 .pytest-tmp/
 .tmp/
 tmp/

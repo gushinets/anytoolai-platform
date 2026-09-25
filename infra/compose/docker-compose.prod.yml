@@ -43,12 +43,16 @@ services:
   platform-api:
     environment:
       <<: *postgres-credentials
+      ANYTOOLAI_ENABLED_PRODUCT_IDS: ${ANYTOOLAI_ENABLED_PRODUCT_IDS:?enabled products are required}
+      ANYTOOLAI_DEMO_ACCESS_CODE: ""
+      ANYTOOLAI_ATOM_LAB_ACCESS_CODE: ""
+      ANYTOOLAI_LIVE_CANARY_TOKEN: ""
     # Own port variable (not ANYTOOLAI_API_PORT, which dev uses for per-worktree derived
     # ports) — a leftover dev override in the operator's shell must not silently redirect
     # which host port prod binds to. `!override` replaces the base file's ports list rather
     # than appending to it.
     ports: !override
-      - "${ANYTOOLAI_PROD_API_PORT:-8000}:8000"
+      - "127.0.0.1:${ANYTOOLAI_PROD_API_PORT:-8000}:8000"
     restart: unless-stopped
     deploy:
       # A safety ceiling while the stakeholder /demo surface is enabled: its busy/daily gate
@@ -67,7 +71,7 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 512M
+          memory: ${ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT:?worker memory limit is required}
   migrate:
     environment:
       <<: *postgres-credentials
@@ -76,6 +80,25 @@ services:
         limits:
           cpus: "1.0"
           memory: 512M
+  web-mirror:
+    build:
+      context: ../..
+      dockerfile: infra/docker/web-mirror.Dockerfile
+      args:
+        PLATFORM_API_BASE_URL: http://platform-api:8000
+        NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS: ${ANYTOOLAI_ENABLED_PRODUCT_IDS:?enabled products are required}
+    depends_on:
+      platform-api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${ANYTOOLAI_PROD_WEB_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
 
 volumes:
   postgres-data:

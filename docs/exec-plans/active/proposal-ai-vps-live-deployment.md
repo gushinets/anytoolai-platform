@@ -1135,6 +1135,7 @@ git commit -m "docs: add Proposal AI live deployment runbook"
 | 2026-09-25 | Task 2: `dev-live-up`, `dev-web`, shared live overlay, env resolution, and identical API/worker effective-profile checks implemented; runner/profile tests and Compose render passed. | Task 3: Platform API release allowlist. |
 | 2026-09-25 | Task 3: server allowlist parses once at startup, rejects unknown ids, and gates runtime config, quota, and scenario start before storage; focused API tests and architecture validation passed. | Task 4: web allowlist and unmetered runtime behavior. |
 | 2026-09-25 | Task 4: web registry build-time allowlist and both unmetered quota guards implemented after four failing tests; 249 frontend tests and typecheck passed. | Task 5: production Compose and web image. |
+| 2026-09-25 | Task 5: web image and production Compose enforce a nonempty allowlist, loopback API/web ports, unpublished PostgreSQL, blank public access codes, and explicit worker memory; separate `prod-fake-up` powers credential-free CI. Runner tests, Compose contract, image build, and missing-allowlist rejection passed. | Task 6: fail-closed live `prod-up` and effective-profile readiness. |
 
 ## Open Questions
 

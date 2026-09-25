@@ -1461,6 +1461,31 @@ def prod_up() -> int:
     return prod_ready() if exit_code == 0 else exit_code
 
 
+def prod_fake_up() -> int:
+    """Credential-free production-image smoke path; never selects the live overlay."""
+    try:
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
+    except ValueError as exc:
+        print(f"PROD001: {exc}", file=sys.stderr)
+        return 2
+    try:
+        stack_running = _prod_stack_running()
+    except FileNotFoundError as exc:
+        print(f"Command not found: {exc.filename}", file=sys.stderr)
+        return 127
+    except subprocess.TimeoutExpired:
+        print("PROD003: docker compose ps did not respond within 10s", file=sys.stderr)
+        return 1
+    if not stack_running and not _check_ports_available(
+        "PROD002", [("API", api_port, "ANYTOOLAI_PROD_API_PORT", None)]
+    ):
+        return 1
+    exit_code = run_with_env(
+        _prod_compose_command("up", "-d", "--build", "--remove-orphans"), runner_env()
+    )
+    return prod_ready() if exit_code == 0 else exit_code
+
+
 def prod_ready() -> int:
     try:
         api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
@@ -1529,6 +1554,7 @@ COMMANDS = {
     "proposal-ai-smoke": proposal_ai_smoke,
     "client-update-writer-smoke": client_update_writer_smoke,
     "prod-up": prod_up,
+    "prod-fake-up": prod_fake_up,
     "prod-ready": prod_ready,
     "prod-status": prod_status,
     "prod-down": prod_down,
