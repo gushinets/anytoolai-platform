@@ -35,6 +35,7 @@ export type ProductRunEvent =
   | { type: "product_viewed"; guestId: string | undefined }
   | { type: "form_started"; guestId: string | undefined }
   | { type: "form_submitted"; guestId: string | undefined }
+  // Emitted once per session, after the result has committed (not when it is fetched).
   // `resultViewed` is false only when the product's `emitsResultViewed` says this completed result
   // does not count as a "viewed" activation; the run itself still completed.
   | { type: "scenario_completed"; scenarioSessionId: string; guestId: string | undefined; resultViewed: boolean }

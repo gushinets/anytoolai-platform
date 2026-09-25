@@ -55,7 +55,8 @@ browser run, a shared e2e helper package.
    runtime emitted `web.result_viewed` for every completed result and the client-event property
    allowlist has no question-count property (adding one is a Platform Core change, forbidden here).
    An optional `emitsResultViewed(result)` (default true) is reported on `scenario_completed` as
-   `resultViewed`; only the client-events tracker skips `web.result_viewed` when it is false, and a
+   `resultViewed` from an effect after the result phase commits (a result that never renders emits
+   nothing); only the client-events tracker skips `web.result_viewed` when it is false, and a
    throwing hook counts as false. Rejected: a `mode` vocabulary in
    a new `analytics.yaml` (misuses `mode`, adds backend config). Consequence: zero-question runs are
    absent from the `web.result_viewed` funnel; the backend still records completion.

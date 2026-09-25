@@ -124,7 +124,8 @@ A15 ownership and delivery slices:
 `ProductDefinition.emitsResultViewed?(result)` is the one optional hook for a product whose
 `web.result_viewed` is narrower than "any completed result". Default is true (ProposalAI and Client
 Update Writer are unchanged, they activate on `copy_result`). The run still completes and renders
-and `scenario_completed` still fires, carrying `resultViewed: false`; only the client-events
+and `scenario_completed` still fires (once per session, from an effect after the result phase has
+committed, never while the result is merely fetched), carrying `resultViewed: false`; only the client-events
 tracker skips `web.result_viewed`. A throwing hook counts as false. It exists because the
 client-event property allowlist has no question-count property and Platform Core is not changed
 for a product. Brief Decoder's `R` is a composite

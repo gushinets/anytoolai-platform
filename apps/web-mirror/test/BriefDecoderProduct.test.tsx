@@ -161,6 +161,8 @@ describe("Brief Decoder definition", () => {
     expect(extractBriefDecoderResult({ ...good, issues: [{ category: "ambiguity", severity: "low", description: "d", evidence: 3 }] })).toBeNull();
     expect(extractBriefDecoderResult({ ...good, questions: [{ question: "q", rationale: "r", priority: "low" }] })).toBeNull();
     expect(extractBriefDecoderResult({ ...good, brief: { values: { budget: 5 } } })).toBeNull();
+    // brief.values is closed: an unknown key is rejected, not silently dropped.
+    expect(extractBriefDecoderResult({ ...good, brief: { values: { project_goal: "x", invented: "y" } } })).toBeNull();
     // missing_fields is not rendered, so its absence must not discard an otherwise usable result.
     expect(extractBriefDecoderResult({ ...good, brief: { values: { project_goal: "g" } } })).not.toBeNull();
     expect(extractBriefDecoderResult({})).toBeNull();

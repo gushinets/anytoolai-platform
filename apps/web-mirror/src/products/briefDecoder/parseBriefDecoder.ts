@@ -92,6 +92,11 @@ export function extractBriefDecoderResult(output: Record<string, unknown>): Brie
   if (!isRecord(brief) || !isRecord(brief.values) || !isRecord(document) || typeof document.summary !== "string") {
     return null;
   }
+  // `brief.values` is a closed object in the schema (`additionalProperties: false`): an unknown key
+  // is a contract violation to reject, not something to drop silently.
+  if (!Object.keys(brief.values).every((key) => isOneOf(BRIEF_FIELDS, key))) {
+    return null;
+  }
   const values: BriefDecoderResult["brief"]["values"] = {};
   for (const field of BRIEF_FIELDS) {
     const value = brief.values[field];
