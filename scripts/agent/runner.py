@@ -1043,7 +1043,11 @@ def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
         exit_code = _run_effective_profile_checks(compose, manifest, env)
         if exit_code != 0:
             return exit_code
-        _activate_deployment_profile(identity.compose_project, manifest)
+        try:
+            _activate_deployment_profile(identity.compose_project, manifest)
+        except (OSError, ValueError) as exc:
+            print(f"LIVE005: could not activate local-live profile: {exc}", file=sys.stderr)
+            return 1
         activated = True
     finally:
         if not activated:

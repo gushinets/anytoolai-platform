@@ -1226,31 +1226,39 @@ def test_prod_status_and_down_work_without_deployment_inputs(monkeypatch, tmp_pa
 
 def test_prod_fake_up_builds_and_removes_orphans(monkeypatch) -> None:
     runner = load_runner_module()
-    monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
-    monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
+    resolved_env = {"ANYTOOLAI_PROD_API_PORT": "18000", "ANYTOOLAI_PROD_WEB_PORT": "13000"}
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: resolved_env)
+    monkeypatch.setattr(runner, "_prod_fake_stack_running", lambda env: False)
     monkeypatch.setattr(runner, "port_available", lambda port: True)
-    monkeypatch.setattr(runner, "_prod_fake_ready", lambda: 0)
+    ready_environments = []
+    monkeypatch.setattr(
+        runner, "_prod_fake_ready", lambda *, env: ready_environments.append(env) or 0
+    )
     commands: list[list[str]] = []
+    environments: list[dict[str, str]] = []
     timeouts: list[float | None] = []
     monkeypatch.setattr(
         runner,
         "run_with_env",
         lambda command, env, timeout=None: (
-            commands.append(list(command)) or timeouts.append(timeout) or 0
+            commands.append(list(command)) or environments.append(env) or timeouts.append(timeout) or 0
         ),
     )
 
     assert runner.prod_fake_up() == 0
     assert commands[0][-4:] == ["up", "-d", "--build", "--remove-orphans"]
+    assert environments == [resolved_env]
+    assert ready_environments == [resolved_env]
     # Deliberately unbounded: --build can legitimately take minutes on a cold build.
     assert timeouts == [None]
 
 
 def test_prod_fake_up_uses_only_base_and_prod_compose(monkeypatch) -> None:
     runner = load_runner_module()
-    monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: {})
+    monkeypatch.setattr(runner, "_prod_fake_stack_running", lambda env: False)
     monkeypatch.setattr(runner, "port_available", lambda port: True)
-    monkeypatch.setattr(runner, "_prod_fake_ready", lambda: 0)
+    monkeypatch.setattr(runner, "_prod_fake_ready", lambda *, env: 0)
     commands: list[list[str]] = []
     monkeypatch.setattr(runner, "run_with_env", lambda command, env: commands.append(list(command)) or 0)
 
@@ -2695,6 +2703,41 @@ def test_dev_live_up_stops_failed_candidate(monkeypatch, tmp_path, failed_step):
     assert runner.dev_live_up("proposal_ai", "unmetered") != 0
     assert calls[-1][-2:] == ["down", "--remove-orphans"]
     assert not marker.exists()
+
+
+@pytest.mark.parametrize("failure", [OSError("marker write failed"), ValueError("invalid profile")])
+def test_dev_live_up_reports_activation_failure_and_stops_candidate(
+    monkeypatch, tmp_path, capsys, failure
+):
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(runner, "_deployment_profile_dir", lambda project: tmp_path / "profile")
+    monkeypatch.setattr(runner, "LIVE_ENV_FILE", tmp_path / "missing.env")
+    monkeypatch.setenv("OPENAI_API_KEY", "hidden-key")
+    monkeypatch.setattr(runner, "_compose_stack_running", lambda command, env: False)
+    monkeypatch.setattr(runner, "port_available", lambda port: True)
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
+    monkeypatch.setattr(
+        runner,
+        "_build_deployment_profile",
+        lambda *args: (0, {"generated_products_root": str(tmp_path / "products"), "profile_fingerprint": "a" * 64}),
+    )
+    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
+    monkeypatch.setattr(runner, "_run_effective_profile_checks", lambda *args: 0)
+    monkeypatch.setattr(
+        runner, "_activate_deployment_profile", lambda *args: (_ for _ in ()).throw(failure)
+    )
+    calls = []
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: calls.append(list(command)) or 0
+    )
+
+    assert runner.dev_live_up("proposal_ai", "unmetered") == 1
+    assert calls[-1][-2:] == ["down", "--remove-orphans"]
+    output = capsys.readouterr()
+    assert "LIVE005" in output.err
+    assert "ready" not in output.out
 
 
 def test_dev_web_uses_derived_api_url(monkeypatch):
