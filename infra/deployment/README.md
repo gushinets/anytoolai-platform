@@ -43,10 +43,10 @@ for the same key:
      before running `make prod-up` — best for CI or a one-off run.
   2. Copy `infra/compose/.env.example` to `infra/compose/.env.prod` and fill in real values.
      `.env.prod` is gitignored (`.gitignore`'s `.env.*` rule) and picked up automatically by
-     `prod-up`/`prod-fake-up`/`prod-status`/`prod-down` (`scripts/agent/runner.py` passes it to `docker compose`
-     via `--env-file` — only for prod commands, never for dev, so it can never leak into a dev
-     stack even if both happen to be running). Best for a persistent local/server setup where
-     re-exporting every shell session is annoying.
+     `prod-up`/`prod-fake-up` via `--env-file`; dev commands never read it. `prod-status` and
+     `prod-down` use safe render-only values so they still work if `.env.prod` is missing or
+     damaged. Best for a persistent local/server setup where re-exporting every shell session
+     is annoying.
 
 `ANYTOOLAI_POSTGRES_PORT` / `ANYTOOLAI_API_PORT` override dev's host ports; they default to a
 value derived per git worktree (see `docs/agent/worktree-runtime.md`). **Prod uses a separate
@@ -224,7 +224,8 @@ then force-recreates base + prod + live Compose, waits for API and web HTTP, and
 same mounted profile fingerprint and policy references inside API and worker. It never falls
 back to fake.
 `prod-ready` repeats the live readiness check. `prod-fake-up` is reserved for the credential-free
-`kernel_demo` smoke in CI; `prod-smoke` tests that smoke stack, not OpenAI.
+`kernel_demo` smoke in CI and waits for both API and web; `prod-smoke` tests that smoke stack,
+not OpenAI.
 
 The operator-owned Nginx/Caddy instance terminates HTTPS and forwards the product domain to
 `127.0.0.1:${ANYTOOLAI_PROD_WEB_PORT:-3000}`. Before its catch-all forward, deny `/atom-lab`,

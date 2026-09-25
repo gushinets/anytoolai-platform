@@ -1608,6 +1608,19 @@ def test_prod_fake_ready_waits_for_health(monkeypatch) -> None:
     assert requested_urls == ["http://127.0.0.1:8000/health", "http://127.0.0.1:3000/"]
 
 
+def test_prod_fake_ready_rejects_unhealthy_web(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    monkeypatch.delenv("ANYTOOLAI_READY_TIMEOUT", raising=False)
+    monkeypatch.setattr(
+        runner,
+        "_wait_for_http_ok",
+        lambda url, timeout: url != "http://127.0.0.1:3000/",
+    )
+
+    assert runner._prod_fake_ready() == 1
+    assert "web readiness timed out" in capsys.readouterr().err
+
+
 def test_prod_fake_ready_uses_prod_port_variable_not_dev_port(monkeypatch) -> None:
     runner = load_runner_module()
     # A leftover ANYTOOLAI_API_PORT from dev work in the same shell must not redirect
