@@ -1282,6 +1282,43 @@ PROD_LIVE_VALUES = {
 }
 
 
+def test_prod_deployment_lock_rejects_second_holder_and_releases(
+    monkeypatch, tmp_path
+) -> None:
+    runner = load_runner_module()
+    lock_path = tmp_path / "prod-deployment.lock"
+    monkeypatch.setattr(runner, "_prod_deployment_lock_path", lambda: lock_path)
+
+    with runner._prod_deployment_lock():
+        with pytest.raises(runner.ProductionDeploymentLockError, match="another prod-up"):
+            with runner._prod_deployment_lock():
+                pytest.fail("second production deploy acquired the host lock")
+
+    # A completed/aborted process leaves only an unlocked marker file, never stale ownership.
+    with runner._prod_deployment_lock():
+        pass
+
+
+def test_prod_up_refuses_concurrent_deploy_before_preflight(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    runner = load_runner_module()
+    lock_path = tmp_path / "prod-deployment.lock"
+    monkeypatch.setattr(runner, "_prod_deployment_lock_path", lambda: lock_path)
+    monkeypatch.setattr(
+        runner,
+        "_deployment_inputs",
+        lambda: pytest.fail("concurrent deploy reached production preflight"),
+    )
+
+    with runner._prod_deployment_lock():
+        assert runner.prod_up() == 1
+
+    output = capsys.readouterr()
+    assert "PROD007" in output.err
+    assert "another prod-up is already running" in output.err
+
+
 @pytest.mark.parametrize("missing_name", list(PROD_LIVE_VALUES))
 def test_prod_up_rejects_missing_required_value_before_compose(
     monkeypatch, missing_name, capsys
