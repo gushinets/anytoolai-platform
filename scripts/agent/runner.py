@@ -865,9 +865,12 @@ def _deployment_profile_env(
     manifest: dict[str, object], enabled_products: Sequence[str], unmetered_products: Sequence[str]
 ) -> dict[str, str]:
     products_root = str(manifest["generated_products_root"])
+    profile_dir = Path(products_root).parent
     return {
         "ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT": products_root,
-        "ANYTOOLAI_DEPLOYMENT_MANIFEST_PATH": str(Path(products_root).parent / "manifest.json"),
+        "ANYTOOLAI_DEPLOYMENT_MANIFEST_PATH": str(profile_dir / "manifest.json"),
+        "ANYTOOLAI_DEPLOYMENT_STATE_ROOT": str(profile_dir.parent),
+        "ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME": profile_dir.name,
         "ANYTOOLAI_DEPLOYMENT_PROFILE_FINGERPRINT": str(manifest["profile_fingerprint"]),
         "ANYTOOLAI_ENABLED_PRODUCT_IDS": ",".join(enabled_products),
         "ANYTOOLAI_UNMETERED_PRODUCT_IDS": ",".join(unmetered_products),

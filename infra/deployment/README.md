@@ -234,6 +234,9 @@ the candidate project without deleting its PostgreSQL volume; investigate before
 production.
 Each deployment uses a new immutable profile directory. A failed redeploy leaves the previous
 container bind source intact for restarts; old profiles are removed only after readiness passes.
+The candidate worker verifies its profile but waits for `active-profile` to name its generation
+before polling the production queue. A failed candidate therefore cannot terminalize queued jobs
+under an allowlist that never became active.
 `prod-ready` repeats the live readiness check, including a runtime-config request through the
 web server's same-origin `/v1/*` route. `prod-fake-up` is reserved for the credential-free
 `kernel_demo` smoke in CI and uses the separate `anytoolai-prod-fake` Compose project, so it

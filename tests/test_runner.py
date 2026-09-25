@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
+import time
 import urllib.parse
 from pathlib import Path
 
@@ -1540,9 +1542,74 @@ def test_prod_up_builds_profile_before_live_compose_and_ready(monkeypatch) -> No
     assert environments[0]["ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT"] == "C:/generated/products"
     assert environments[0]["ANYTOOLAI_DEPLOYMENT_MANIFEST_PATH"].endswith("manifest.json")
     assert environments[0]["ANYTOOLAI_DEPLOYMENT_PROFILE_FINGERPRINT"] == "fingerprint"
+    assert environments[0]["ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME"] == "generated"
+    assert environments[0]["ANYTOOLAI_DEPLOYMENT_STATE_ROOT"] == str(
+        Path("C:/generated/products").parent.parent
+    )
     assert "--force-recreate" in commands[0]
     assert environments[0]["ANYTOOLAI_ENABLED_PRODUCT_IDS"] == "proposal_ai"
     assert "ANYTOOLAI_UNMETERED_PRODUCT_IDS" not in commands[0]
+
+
+def test_live_compose_gates_worker_on_activation_marker():
+    runner = load_runner_module()
+    live = yaml.safe_load(runner.COMPOSE_LIVE_FILE.read_text(encoding="utf-8"))
+    worker = live["services"]["platform-worker"]
+    assert worker["environment"]["ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME"]
+    state_root = "${ANYTOOLAI_DEPLOYMENT_STATE_ROOT:?deployment state root is required}"
+    assert any(
+        volume.get("source") == state_root
+        and volume.get("target") == "/app/live-profile-state"
+        for volume in worker["volumes"]
+    )
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX worker entrypoint")
+def test_live_worker_entrypoint_waits_for_committed_profile(tmp_path):
+    script = Path(__file__).resolve().parents[1] / "infra/docker/platform-worker-entrypoint.sh"
+    binary_dir = tmp_path / "bin"
+    binary_dir.mkdir()
+    uv = binary_dir / "uv"
+    uv.write_text(
+        '#!/bin/sh\ncase "$*" in\n'
+        '  *check-deployment-profile-from-manifest*) touch "$PREFLIGHT_DONE";;\n'
+        '  *anytoolai-platform-worker*) touch "$WORKER_STARTED";;\n'
+        'esac\n',
+        encoding="utf-8",
+    )
+    uv.chmod(0o755)
+    marker = tmp_path / "active-profile"
+    preflight = tmp_path / "preflight-done"
+    started = tmp_path / "worker-started"
+    env = os.environ | {
+        "PATH": str(binary_dir) + os.pathsep + os.environ["PATH"],
+        "PREFLIGHT_DONE": str(preflight),
+        "WORKER_STARTED": str(started),
+        "ANYTOOLAI_DEPLOYMENT_PROFILE_FINGERPRINT": "test-fingerprint",
+        "ANYTOOLAI_ENABLED_PRODUCT_IDS": "proposal_ai",
+        "ANYTOOLAI_UNMETERED_PRODUCT_IDS": "",
+        "ANYTOOLAI_DEPLOYMENT_ACTIVATION_NAME": "freelancer-suite.expected",
+        "ANYTOOLAI_DEPLOYMENT_ACTIVATION_MARKER": str(marker),
+    }
+    process = subprocess.Popen(["sh", str(script)], env=env, cwd=tmp_path)
+    try:
+        for _ in range(50):
+            if preflight.exists() or process.poll() is not None:
+                break
+            time.sleep(0.05)
+        assert preflight.exists()
+        assert process.poll() is None
+        assert not started.exists()
+        marker.write_text("freelancer-suite.previous\n", encoding="utf-8")
+        time.sleep(0.2)
+        assert not started.exists()
+        marker.write_text("freelancer-suite.expected\n", encoding="utf-8")
+        assert process.wait(timeout=5) == 0
+        assert started.exists()
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)
 
 
 @pytest.mark.parametrize("up_exit,ready_exit", [(1, None), (0, 1)])
