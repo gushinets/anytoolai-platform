@@ -182,6 +182,51 @@ def test_build_profile_manifest_is_readable_under_restrictive_umask(tmp_path):
     assert mode == 0o644
 
 
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file modes and umask")
+def test_build_profile_products_are_readable_under_restrictive_modes(monkeypatch, tmp_path):
+    fixture_package = tmp_path / "fixture_package"
+    fixture_products = fixture_package / "products"
+    shutil.copytree(PRODUCTS_ROOT, fixture_products)
+    monkeypatch.setattr(
+        validate_configs.FreelancerSuiteBundle, "_package_dir", lambda self: fixture_package
+    )
+    monkeypatch.setattr(
+        validate_configs.FreelancerSuiteBundle,
+        "config_roots",
+        lambda self: sorted(path for path in fixture_products.iterdir() if path.is_dir()),
+    )
+    for path in fixture_products.rglob("*"):
+        path.chmod(0o700 if path.is_dir() else 0o600)
+    fixture_products.chmod(0o700)
+    previous_umask = os.umask(0o077)
+    try:
+        output_dir = tmp_path / "freelancer-suite"
+        validate_configs.build_deployment_profile(output_dir, ["proposal_ai"], {"proposal_ai"})
+    finally:
+        os.umask(previous_umask)
+
+    generated = output_dir / "products"
+    assert stat.S_IMODE(generated.stat().st_mode) == 0o755
+    for path in generated.rglob("*"):
+        assert stat.S_IMODE(path.stat().st_mode) == (0o755 if path.is_dir() else 0o644)
+
+
+def test_build_profile_normalizes_product_tree_permissions(monkeypatch, tmp_path):
+    chmod = Path.chmod
+    normalized = []
+
+    def record_chmod(path, mode, **kwargs):
+        if "products" in path.parts:
+            normalized.append((path.name, mode))
+        return chmod(path, mode, **kwargs)
+
+    monkeypatch.setattr(Path, "chmod", record_chmod)
+    validate_configs.build_deployment_profile(tmp_path / "freelancer-suite", ["proposal_ai"], set())
+    assert ("products", 0o755) in normalized
+    assert ("proposal_ai", 0o755) in normalized
+    assert ("product.yaml", 0o644) in normalized
+
+
 def test_build_profile_canonical_mode_preserves_quota_files(tmp_path):
     output_dir = tmp_path / "freelancer-suite"
 

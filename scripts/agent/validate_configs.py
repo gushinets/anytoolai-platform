@@ -211,6 +211,9 @@ def build_deployment_profile(
             ROOT / "configs" / "kernel", extra_product_roots=generated_roots
         ).load()
         _assert_product_expectations(registry, expectations)
+        staged_products.chmod(0o755)
+        for path in staged_products.rglob("*"):
+            path.chmod(0o755 if path.is_dir() else 0o644)
         manifest = DeploymentProfileManifest(
             source_products_root=str(source_root.resolve()),
             generated_products_root=str((output_dir / "products").resolve()),
