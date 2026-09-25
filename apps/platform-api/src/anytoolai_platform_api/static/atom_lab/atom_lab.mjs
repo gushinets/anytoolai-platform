@@ -33,6 +33,18 @@ function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(
+    Object.keys(value).sort().map((key) => [key, canonicalJson(value[key])]),
+  );
+}
+
+function sameJsonSemantically(left, right) {
+  return JSON.stringify(canonicalJson(left)) === JSON.stringify(canonicalJson(right));
+}
+
 function retryAfterDelayMs(value, nowMs) {
   if (typeof value !== "string") return null;
   const normalized = value.trim();
@@ -1468,6 +1480,18 @@ export function bootstrapAtomLab({
     renderValidation(document, nodes["validation-errors"], session, admissionErrors);
   };
 
+  const renderSelectedHistoryWarning = () => {
+    if (!selectedHistoryDetail) return;
+    const modelId = selectedHistoryDetail.snapshot.provider?.model_id;
+    const rawModelId = modelId?.startsWith("openai/") ? modelId.slice("openai/".length) : modelId;
+    const modelAvailable = modelOptions.some((item) => item.modelId === rawModelId && item.selectable);
+    nodes["history-warning"].textContent = !selectedHistoryCompatible
+      ? "Исторический контракт недоступен. Снимок доступен только для чтения; восстановление требует явной адаптации к текущему контракту."
+      : !modelAvailable
+        ? "Историческая модель недоступна. Снимок можно восстановить, но перед запуском нужно явно выбрать модель."
+        : "";
+  };
+
   const renderReasoning = (preferredEffort = "") => {
     const option = selectedModelOption();
     nodes["reasoning-effort"].replaceChildren();
@@ -1532,6 +1556,7 @@ export function bootstrapAtomLab({
     nodes["model-select"].disabled = !first;
     renderModelCatalogWarning(selectionInvalidated);
     renderReasoning(previousModelId && selectedModelId === previousModelId ? previousReasoningEffort : "");
+    renderSelectedHistoryWarning();
   };
 
   const loadModels = async ({timeoutMs = catalogLoadTimeoutMs} = {}) => {
@@ -1585,6 +1610,7 @@ export function bootstrapAtomLab({
       nodes["reasoning-effort"].disabled = true;
       nodes["run-button"].disabled = true;
       nodes["model-catalog-warning"].textContent = message;
+      renderSelectedHistoryWarning();
       return readTimedOut ? "timed_out" : false;
     } finally {
       if (timeoutId !== null) cancelScheduleImpl(timeoutId);
@@ -1786,6 +1812,21 @@ export function bootstrapAtomLab({
     };
   };
 
+  const presetPayloadFromVersion = (version) => ({
+    name: version.name,
+    description: version.description,
+    atom_id: version.atom_id,
+    base_action_config_id: version.base_action_config_id,
+    schema_refs: cloneJson(version.schema_refs),
+    prompt: version.prompt,
+    prompt_ref: version.prompt_ref,
+    model_id: version.model_id,
+    reasoning_effort: version.reasoning_effort,
+    fixed_fields: cloneJson(version.fixed_fields),
+    example_input: cloneJson(version.example_input),
+    source_run_id: version.source_run_id,
+  });
+
   const presetFingerprint = (payload) => JSON.stringify(payload);
 
   const renderPresetState = () => {
@@ -1913,7 +1954,9 @@ export function bootstrapAtomLab({
 
   const updatePresetEditorDisabled = () => {
     const operationLocked = presetLibraryLoading || presetOpenInFlight || presetSaveInFlight;
-    const versionControlsLocked = operationLocked || presetVersionPageInFlight;
+    const versionControlsLocked = operationLocked
+      || presetVersionPageInFlight
+      || presetSaveOutcomeUnknown !== null;
     const editorLocked = operationLocked || presetReadOnly || !presetEditorActive;
     const draftLocked = presetOpenInFlight || presetSaveInFlight;
     nodes.workspace.inert = draftLocked;
@@ -2001,6 +2044,23 @@ export function bootstrapAtomLab({
     renderPresetState();
   };
 
+  const reconcileCommittedPresetVersion = (parsed, recovery) => {
+    selectedPresetVersion = cloneJson(parsed);
+    presetEditorActive = true;
+    nodes["preset-version-select"].value = String(parsed.version);
+    conflictLatestPreset = null;
+    nodes["preset-conflict"].hidden = true;
+    clearPresetExport();
+    setPresetReadOnly(false);
+    if (!recovery.preserveEditor && session === recovery.ownerSession) {
+      session.baselinePayload = cloneJson(recovery.payload.example_input);
+      session.baselinePrompt = recovery.payload.prompt;
+      session.presetRef = {preset_id: parsed.preset_id, version: parsed.version};
+    }
+    presetDraftBaseline = presetFingerprint(recovery.payload);
+    renderPresetState();
+  };
+
   const fetchPresetVersions = async (presetId, {cursor = null} = {}) => {
     const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
     const parsed = parsePresetVersionList(await protectedJson(
@@ -2052,7 +2112,15 @@ export function bootstrapAtomLab({
     {force = false, refreshVersions = true, versionsPageOverride = null, applyToEditor = true} = {},
   ) => {
     if (presetSaveInFlight && !force) return false;
-    if (!force && hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return false;
+    const unknownUpdateRecovery = !force
+      && preferredVersion === null
+      && presetSaveOutcomeUnknown?.kind === "update"
+      && presetSaveOutcomeUnknown.presetId === preset.preset_id
+      ? presetSaveOutcomeUnknown
+      : null;
+    const preservesRecoveryDraft = unknownUpdateRecovery
+      && (unknownUpdateRecovery.preserveEditor || session === unknownUpdateRecovery.ownerSession);
+    if (!preservesRecoveryDraft && !force && hasUnsavedDraft() && !confirmImpl(DIRTY_WARNING)) return false;
     const generation = ++presetOpenGeneration;
     presetVersionPageGeneration += 1;
     presetVersionPageInFlight = false;
@@ -2092,11 +2160,41 @@ export function bootstrapAtomLab({
       } : preset;
       presetItems = presetItems.map((item) => item.preset_id === summary.preset_id ? summary : item);
       selectedPresetSummary = summary;
-      if (preferredVersion === null
-        && presetSaveOutcomeUnknown?.kind === "update"
-        && presetSaveOutcomeUnknown.presetId === preset.preset_id) {
+      if (unknownUpdateRecovery) {
+        if (latest.version < unknownUpdateRecovery.baseVersion) {
+          throw new Error("Список версий не содержит базовую версию неизвестного сохранения.");
+        }
+        if (latest.version === unknownUpdateRecovery.baseVersion) {
+          presetSaveOutcomeUnknown = null;
+          setPresetError("Новая версия не найдена. Локальный черновик сохранён; можно повторить Save.");
+          renderPresetList();
+          renderPresetState();
+          return true;
+        }
+        const expectedVersion = latest.version === unknownUpdateRecovery.expectedVersion
+          ? version
+          : await fetchPresetVersion(preset.preset_id, unknownUpdateRecovery.expectedVersion);
+        if (generation !== presetOpenGeneration) return false;
         presetSaveOutcomeUnknown = null;
-        setPresetError();
+        if (sameJsonSemantically(
+          presetPayloadFromVersion(expectedVersion),
+          unknownUpdateRecovery.payload,
+        )) {
+          if (preservesRecoveryDraft) {
+            reconcileCommittedPresetVersion(expectedVersion, unknownUpdateRecovery);
+          } else {
+            commitPresetVersion(expectedVersion, {applyToEditor: true});
+          }
+          renderPresetList();
+          setPresetError();
+          return true;
+        }
+        conflictLatestPreset = {summary, version: latest.version};
+        nodes["preset-conflict"].hidden = false;
+        setPresetError("Конфликт сохранения: актуальная версия отличается от локального черновика. Значения черновика сохранены.");
+        renderPresetList();
+        renderPresetState();
+        return true;
       }
       commitPresetVersion(version, {applyToEditor});
       renderPresetList();
@@ -2223,6 +2321,13 @@ export function bootstrapAtomLab({
         presetSaveOutcomeUnknown = {
           kind: updating ? "update" : "create",
           presetId: expectedPresetId,
+          ...(updating ? {
+            baseVersion: selectedPresetVersion.version,
+            expectedVersion,
+            payload: cloneJson(payload),
+            ownerSession: session,
+            preserveEditor,
+          } : {}),
         };
         conflictLatestPreset = null;
         nodes["preset-conflict"].hidden = true;
@@ -2280,7 +2385,7 @@ export function bootstrapAtomLab({
     for (const run of historyItems) {
       const item = button(document, `${run.atom_id} · ${run.status}`, () => openHistoryRun(run.run_id));
       const metadata = document.createElement("small");
-      metadata.textContent = `${run.created_at} · ${run.model_id}${run.preset_id ? ` · preset v${run.preset_version}` : ""}`;
+      metadata.textContent = `${run.created_at} · ${run.model_id}${run.preset_id ? ` · ${run.preset_id} · v${run.preset_version}` : ""}`;
       item.append(metadata);
       item.setAttribute("aria-current", String(run.run_id === selectedHistoryDetail?.run_id));
       nodes["history-list"].append(item);
@@ -2352,14 +2457,7 @@ export function bootstrapAtomLab({
       const compatible = currentContractMatchesHistory(parsed);
       selectedHistoryCompatible = compatible;
       renderHistoryList();
-      const modelId = parsed.snapshot.provider?.model_id;
-      const rawModelId = modelId?.startsWith("openai/") ? modelId.slice("openai/".length) : modelId;
-      const modelAvailable = modelOptions.some((item) => item.modelId === rawModelId && item.selectable);
-      nodes["history-warning"].textContent = !compatible
-        ? "Исторический контракт недоступен. Снимок доступен только для чтения; восстановление требует явной адаптации к текущему контракту."
-        : !modelAvailable
-          ? "Историческая модель недоступна. Снимок можно восстановить, но перед запуском нужно явно выбрать модель."
-          : "";
+      renderSelectedHistoryWarning();
       nodes["restore-history"].textContent = compatible ? "Восстановить настройки" : "Адаптировать к текущему контракту";
     } catch (error) {
       if (generation !== historyOpenGeneration) return;
