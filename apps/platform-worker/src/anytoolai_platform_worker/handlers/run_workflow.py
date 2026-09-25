@@ -224,6 +224,16 @@ class RunWorkflowHandler:
                 if job is None or job.status is not JobStatus.created:
                     return None
 
+                # The queue may hand the same created row to multiple workers. Take
+                # the same lease for disabled jobs as for normal claims, then reread
+                # after acquiring it so a stale created row cannot emit twice.
+                if not self._lease.acquire(job_id):
+                    return None
+                lease_acquired = True
+                job = repository.get(job_id)
+                if job is None or job.status is not JobStatus.created:
+                    return None
+
                 if (
                     self._enabled_product_ids is not None
                     and job.product_id not in self._enabled_product_ids
@@ -242,16 +252,14 @@ class RunWorkflowHandler:
                         ),
                         error_code="product_disabled",
                     )
-                    scenario_service.mark_failed(scenario, error_code="product_disabled")
+                    scenario_service.mark_failed(
+                        scenario,
+                        error_code="product_disabled",
+                        context=self._execution_context(job, scenario),
+                    )
                     return None
 
-                # Held until handle()'s finally releases it after the terminal-state
-                # commit. A failed acquire means another worker already owns this
-                # job -- not an error, just skip it.
-                if not self._lease.acquire(job_id):
-                    return None
-                lease_acquired = True
-
+                # Held until handle()'s finally releases it after execution.
                 scenario = self._load_scenario(session, job)
                 metadata = enrich_job_metadata_with_scenario_identity(
                     job.metadata,
@@ -262,14 +270,15 @@ class RunWorkflowHandler:
                     metadata=metadata,
                 )
                 if claimed is None:
-                    self._lease.release(job_id)
-                    lease_acquired = False
                     return None
                 scenario_service.mark_running(scenario)
                 return claimed
 
         try:
-            return _claim_in_transaction()
+            claimed = _claim_in_transaction()
+            if claimed is None and lease_acquired:
+                self._lease.release(job_id)
+            return claimed
         except BaseException:
             if lease_acquired:
                 self._lease.release(job_id)

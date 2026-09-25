@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, replace
 from datetime import timedelta
 from pathlib import Path
-from threading import Barrier
+from threading import Barrier, local
 from typing import Any
 
 import pytest
@@ -41,6 +41,7 @@ from anytoolai_platform_core.storage.db import (
 )
 from anytoolai_platform_core.storage.transactions import (
     build_session_factory,
+    engine_from_session_factory,
     transaction_boundary,
 )
 from anytoolai_platform_core.workflows.models import JobRecord, JobStatus
@@ -51,6 +52,7 @@ from anytoolai_platform_worker.handlers.run_workflow import (
     JobScenarioSessionInvalidError,
     RunWorkflowHandler,
 )
+from anytoolai_platform_worker.lease import build_job_lease
 from anytoolai_platform_worker.queues import DatabaseJobQueue, WorkflowJobMessage
 from anytoolai_platform_worker.reconciliation import OrphanedRunningJobReconciler
 from anytoolai_platform_worker.worker import Worker
@@ -2010,6 +2012,47 @@ def test_disabled_product_job_is_terminal_without_running_provider(
         )
         assert scenario is not None
         assert scenario.status is ScenarioSessionStatus.failed
+
+
+def test_two_workers_terminalize_disabled_job_once(
+    session_factory: sa.orm.sessionmaker[sa.orm.Session], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    job = _seed_job(session_factory, input_payload={"source_text": "queued before deploy"})
+    barrier = Barrier(2)
+    seen = local()
+    original_get = JobRepository.get
+
+    def synchronized_get(repository: JobRepository, job_id: str) -> JobRecord | None:
+        record = original_get(repository, job_id)
+        if record is not None and record.status is JobStatus.created and not getattr(seen, "waited", False):
+            seen.waited = True
+            barrier.wait(timeout=10)
+        return record
+
+    monkeypatch.setattr(JobRepository, "get", synchronized_get)
+    engine = engine_from_session_factory(session_factory)
+    workers = [Worker(RunWorkflowHandler(
+        session_factory=session_factory,
+        runner_factory=lambda session: pytest.fail("disabled job reached runner"),
+        lease=build_job_lease(engine),
+        enabled_product_ids=frozenset({"proposal_ai"}),
+    )) for _ in range(2)]
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda worker: asyncio.run(worker.process_job(job.id)), workers))
+    finally:
+        for worker in workers:
+            worker.dispose()
+
+    assert all(result is not None for result in results)
+    with transaction_boundary(session_factory) as session:
+        terminal_job = JobRepository(session).get(job.id)
+        events = _event_rows_for_job(session, job.id)
+    assert terminal_job is not None and terminal_job.status is JobStatus.failed
+    assert sum(event["event_type"] == "workflow.failed" for event in events) == 1
+    assert sum(event["event_type"] == "scenario.failed" for event in events) == 1
+    scenario_failed = next(event for event in events if event["event_type"] == "scenario.failed")
+    assert scenario_failed["workflow_id"] == job.workflow_id
 
 
 def test_lease_is_released_after_handler_failure(
