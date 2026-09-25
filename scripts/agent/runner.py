@@ -43,11 +43,10 @@ DEV_DEFAULT_POSTGRES_USER = "anytoolai"
 DEV_DEFAULT_POSTGRES_PASSWORD = "anytoolai"
 DEV_DEFAULT_POSTGRES_DB = "anytoolai"
 
-# Bounds `docker compose ps`/`down` calls, which should never legitimately take this long, so a
-# wedged Docker daemon fails fast instead of hanging. Deliberately NOT applied to `up`/`--build`
-# calls (dev_up/prod_up) -- those legitimately take minutes on a cold image build, and a short
-# timeout there would turn a slow-but-healthy build into a false failure.
+# Bounds `docker compose ps` calls when the Docker daemon is unresponsive. `down` needs longer
+# than the worker's 60s stop grace period; `up`/`--build` can take minutes on a cold build.
 COMPOSE_QUERY_TIMEOUT_SECONDS = 60
+COMPOSE_TEARDOWN_TIMEOUT_SECONDS = 180
 # `doctor`'s tool probes are a one-off diagnostic, not a hot path, so this is generous on purpose:
 # a cold `windows-latest` CI runner has been observed timing out a bare `npm --version` at 10s
 # (round 55's stdin=DEVNULL fix closed the Node/Windows stdin-hang case, nodejs/node#10836, but a
@@ -1141,7 +1140,7 @@ def dev_down() -> int:
     exit_code = run_with_env(
         _compose_command(identity, "down", "--remove-orphans"),
         _compose_env(identity),
-        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
     )
     if exit_code == 0:
         _deactivate_deployment_profile(identity.compose_project)
@@ -1591,13 +1590,11 @@ def _prod_compose_command(*args: str, include_env_file: bool = True) -> list[str
     )
 
 
-def _prod_fake_compose_command(*args: str, include_env_file: bool = True) -> list[str]:
-    env_file = PROD_ENV_FILE if include_env_file and PROD_ENV_FILE.is_file() else None
+def _prod_fake_compose_command(*args: str) -> list[str]:
     return _docker_compose_command(
         PROD_FAKE_COMPOSE_PROJECT,
         (COMPOSE_FILE, COMPOSE_PROD_FILE),
         *args,
-        env_file=env_file,
     )
 
 
@@ -1855,6 +1852,15 @@ def prod_fake_up() -> int:
     except (ValueError, OSError) as exc:
         print(f"PROD001: {exc}", file=sys.stderr)
         return 2
+    env.update({
+        "ANYTOOLAI_POSTGRES_USER": "smoke-only",
+        "ANYTOOLAI_POSTGRES_PASSWORD": "smoke-only",
+        "ANYTOOLAI_POSTGRES_DB": "smoke-only",
+        "ANYTOOLAI_ENABLED_PRODUCT_IDS": "kernel_demo",
+        "ANYTOOLAI_UNMETERED_PRODUCT_IDS": "",
+        "ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT": "512M",
+        "OPENAI_API_KEY": "",
+    })
     try:
         stack_running = _prod_fake_stack_running(env)
     except FileNotFoundError as exc:
@@ -1987,15 +1993,15 @@ def prod_down() -> int:
     return run_with_env(
         _prod_compose_command("down", "--remove-orphans", include_env_file=False),
         _prod_control_env(),
-        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
     )
 
 
 def prod_fake_down() -> int:
     return run_with_env(
-        _prod_fake_compose_command("down", "--remove-orphans", include_env_file=False),
+        _prod_fake_compose_command("down", "--remove-orphans"),
         _prod_control_env(),
-        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+        timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
     )
 
 

@@ -42,8 +42,9 @@ for the same key:
   1. `export ANYTOOLAI_POSTGRES_USER=... ANYTOOLAI_POSTGRES_PASSWORD=... ANYTOOLAI_POSTGRES_DB=...`
      before running `make prod-up` — best for CI or a one-off run.
   2. Copy `infra/compose/.env.example` to `infra/compose/.env.prod` and fill in real values.
-     `.env.prod` is gitignored (`.gitignore`'s `.env.*` rule) and picked up automatically by
-     `prod-up`/`prod-fake-up` via `--env-file`; dev commands never read it. `prod-status` and
+     `.env.prod` is gitignored (`.gitignore`'s `.env.*` rule) and picked up by `prod-up` via
+     `--env-file`; `prod-fake-up` reads port overrides but replaces credentials and product selection
+     with disposable fake-smoke values before Compose. Dev commands never read it. `prod-status` and
      `prod-down` use safe render-only values so they still work if `.env.prod` is missing or
      damaged. Best for a persistent local/server setup where re-exporting every shell session
      is annoying.
@@ -238,7 +239,8 @@ web server's same-origin `/v1/*` route. `prod-fake-up` is reserved for the crede
 `kernel_demo` smoke in CI and uses the separate `anytoolai-prod-fake` Compose project, so it
 cannot reconcile or replace the live `anytoolai-prod` services. It checks API, web, and web-to-API
 routing; failed startup/readiness tears the smoke project down, and `prod-fake-down` is the explicit
-cleanup command. `prod-smoke` tests that smoke stack, not OpenAI.
+cleanup command. It never passes `.env.prod` or an OpenAI key to the smoke containers. `prod-smoke`
+tests that smoke stack, not OpenAI.
 
 The operator-owned Nginx/Caddy instance terminates HTTPS and forwards the product domain to
 `127.0.0.1:${ANYTOOLAI_PROD_WEB_PORT:-3000}`. Before its catch-all forward, deny `/atom-lab`,

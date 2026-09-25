@@ -870,7 +870,7 @@ def test_dev_status_and_down_are_scoped_to_worktree_project(monkeypatch, tmp_pat
     assert all(identity.compose_project in command for command in commands)
     assert commands[0][-1] == "ps"
     assert commands[1][-2:] == ["down", "--remove-orphans"]
-    assert timeouts == [runner.COMPOSE_QUERY_TIMEOUT_SECONDS, runner.COMPOSE_QUERY_TIMEOUT_SECONDS]
+    assert timeouts == [runner.COMPOSE_QUERY_TIMEOUT_SECONDS, runner.COMPOSE_TEARDOWN_TIMEOUT_SECONDS]
 
 
 def test_compose_command_passes_base_and_override_files_explicitly(monkeypatch) -> None:
@@ -1221,7 +1221,7 @@ def test_prod_status_and_down_work_without_deployment_inputs(monkeypatch, tmp_pa
     assert all(env["ANYTOOLAI_ENABLED_PRODUCT_IDS"] == "kernel_demo" for env in environments)
     assert all(env["ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT"] == "512M" for env in environments)
     assert all(env["ANYTOOLAI_POSTGRES_PASSWORD"] == "control-only" for env in environments)
-    assert timeouts == [runner.COMPOSE_QUERY_TIMEOUT_SECONDS, runner.COMPOSE_QUERY_TIMEOUT_SECONDS]
+    assert timeouts == [runner.COMPOSE_QUERY_TIMEOUT_SECONDS, runner.COMPOSE_TEARDOWN_TIMEOUT_SECONDS]
 
 
 def test_prod_fake_up_builds_and_removes_orphans(monkeypatch) -> None:
@@ -1268,6 +1268,53 @@ def test_prod_fake_up_uses_only_base_and_prod_compose(monkeypatch) -> None:
     assert str(runner.COMPOSE_PROD_FILE) in commands[0]
     assert str(runner.COMPOSE_LIVE_FILE) not in commands[0]
     assert commands[0][-4:] == ["up", "-d", "--build", "--remove-orphans"]
+
+
+def test_prod_fake_up_does_not_pass_live_secrets_to_compose(monkeypatch, tmp_path):
+    runner = load_runner_module()
+    env_file = tmp_path / ".env.prod"
+    env_file.write_text("OPENAI_API_KEY=real-key-must-not-reach-fake-worker\n", encoding="utf-8")
+    monkeypatch.setattr(runner, "PROD_ENV_FILE", env_file)
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: {
+            "ANYTOOLAI_PROD_API_PORT": "18000",
+            "ANYTOOLAI_PROD_WEB_PORT": "13000",
+            "ANYTOOLAI_POSTGRES_USER": "prod-user",
+            "ANYTOOLAI_POSTGRES_PASSWORD": "prod-password",
+            "ANYTOOLAI_POSTGRES_DB": "prod-db",
+            "ANYTOOLAI_ENABLED_PRODUCT_IDS": "proposal_ai",
+            "OPENAI_API_KEY": "real-key-must-not-reach-fake-worker",
+        },
+    )
+    monkeypatch.setattr(runner, "_prod_fake_stack_running", lambda env: False)
+    monkeypatch.setattr(runner, "port_available", lambda port: True)
+    monkeypatch.setattr(runner, "_prod_fake_ready", lambda *, env: 0)
+    captured = []
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: captured.append((list(command), dict(env))) or 0
+    )
+
+    assert runner.prod_fake_up() == 0
+    command, env = captured[0]
+    assert "--env-file" not in command
+    assert env["OPENAI_API_KEY"] == ""
+    assert env["ANYTOOLAI_ENABLED_PRODUCT_IDS"] == "kernel_demo"
+    assert env["ANYTOOLAI_POSTGRES_PASSWORD"] == "smoke-only"
+
+
+def test_prod_fake_down_allows_worker_stop_grace(monkeypatch):
+    runner = load_runner_module()
+    timeouts = []
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env, timeout=None: timeouts.append(timeout) or 0,
+    )
+
+    assert runner.prod_fake_down() == 0
+    assert timeouts == [runner.COMPOSE_TEARDOWN_TIMEOUT_SECONDS]
 
 
 PROD_LIVE_VALUES = {
