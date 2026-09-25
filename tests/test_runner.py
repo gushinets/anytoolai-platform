@@ -1084,10 +1084,10 @@ def test_prod_fake_up_fails_fast_when_docker_daemon_is_wedged(monkeypatch, capsy
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
 
-    def fake_prod_stack_running():
+    def fake_prod_stack_running(_env):
         raise runner.subprocess.TimeoutExpired(cmd="docker compose ps -q", timeout=10)
 
-    monkeypatch.setattr(runner, "_prod_stack_running", fake_prod_stack_running)
+    monkeypatch.setattr(runner, "_prod_fake_stack_running", fake_prod_stack_running)
     monkeypatch.setattr(
         runner,
         "run_with_env",
@@ -1101,7 +1101,7 @@ def test_prod_fake_up_fails_fast_when_docker_daemon_is_wedged(monkeypatch, capsy
 def test_prod_fake_up_fails_before_compose_when_port_is_occupied(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
-    monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
+    monkeypatch.setattr(runner, "_prod_fake_stack_running", lambda env: False)
     monkeypatch.setattr(runner, "port_available", lambda port: port != 8000)
     monkeypatch.setattr(
         runner,
@@ -1112,14 +1112,44 @@ def test_prod_fake_up_fails_before_compose_when_port_is_occupied(monkeypatch) ->
     assert runner.prod_fake_up() == 1
 
 
+def test_prod_fake_up_resolves_and_checks_both_ports(monkeypatch) -> None:
+    runner = load_runner_module()
+    resolved_env = runner.runner_env() | {
+        "ANYTOOLAI_PROD_API_PORT": "18900",
+        "ANYTOOLAI_PROD_WEB_PORT": "19300",
+    }
+    monkeypatch.setattr(runner, "_resolved_env_file", lambda path: resolved_env)
+    monkeypatch.setattr(runner, "_prod_fake_stack_running", lambda env: False)
+    monkeypatch.setattr(runner, "_prod_fake_ready", lambda **kwargs: 0)
+    checked_ports: list[int] = []
+    commands: list[list[str]] = []
+    monkeypatch.setattr(
+        runner,
+        "port_available",
+        lambda port: checked_ports.append(port) or True,
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_with_env",
+        lambda command, env: commands.append(list(command)) or 0,
+    )
+
+    assert runner.prod_fake_up() == 0
+    assert checked_ports == [18900, 19300]
+    project_index = commands[0].index("--project-name")
+    assert commands[0][project_index + 1] == runner.PROD_FAKE_COMPOSE_PROJECT
+    assert runner.PROD_FAKE_COMPOSE_PROJECT != runner.PROD_COMPOSE_PROJECT
+
+
 def test_prod_fake_up_ignores_leftover_dev_port_override(monkeypatch) -> None:
     runner = load_runner_module()
     # A leftover ANYTOOLAI_API_PORT from an earlier `dev-up` in the same shell must not
-    # change which port prod checks/binds — prod has its own ANYTOOLAI_PROD_API_PORT.
+    # change which ports prod checks/binds — prod has its own production port variables.
     monkeypatch.setenv("ANYTOOLAI_API_PORT", "18123")
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
-    monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
-    monkeypatch.setattr(runner, "_prod_fake_ready", lambda: 0)
+    monkeypatch.delenv("ANYTOOLAI_PROD_WEB_PORT", raising=False)
+    monkeypatch.setattr(runner, "_prod_fake_stack_running", lambda env: False)
+    monkeypatch.setattr(runner, "_prod_fake_ready", lambda **kwargs: 0)
     checked_ports: list[int] = []
     monkeypatch.setattr(
         runner,
@@ -1129,14 +1159,14 @@ def test_prod_fake_up_ignores_leftover_dev_port_override(monkeypatch) -> None:
     monkeypatch.setattr(runner, "run_with_env", lambda command, env: 0)
 
     assert runner.prod_fake_up() == 0
-    assert checked_ports == [8000]
+    assert checked_ports == [8000, 3000]
 
 
-def test_prod_fake_up_skips_port_check_when_stack_already_running(monkeypatch) -> None:
+def test_prod_fake_up_skips_port_check_when_fake_stack_already_running(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
-    monkeypatch.setattr(runner, "_prod_stack_running", lambda: True)
-    monkeypatch.setattr(runner, "_prod_fake_ready", lambda: 0)
+    monkeypatch.setattr(runner, "_prod_fake_stack_running", lambda env: True)
+    monkeypatch.setattr(runner, "_prod_fake_ready", lambda **kwargs: 0)
     monkeypatch.setattr(
         runner,
         "port_available",
@@ -1151,6 +1181,8 @@ def test_prod_fake_up_skips_port_check_when_stack_already_running(monkeypatch) -
 
     assert runner.prod_fake_up() == 0
     assert commands[0][-4:] == ["up", "-d", "--build", "--remove-orphans"]
+    project_index = commands[0].index("--project-name")
+    assert commands[0][project_index + 1] == runner.PROD_FAKE_COMPOSE_PROJECT
 
 
 def test_prod_status_and_down_work_without_deployment_inputs(monkeypatch, tmp_path) -> None:
@@ -1599,29 +1631,53 @@ def test_prod_ready_rejects_changed_canonical_source(monkeypatch) -> None:
 def test_prod_fake_up_calls_ready_after_successful_up(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
-    monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
+    monkeypatch.setattr(runner, "_prod_fake_stack_running", lambda env: False)
     monkeypatch.setattr(runner, "port_available", lambda port: True)
     monkeypatch.setattr(runner, "run_with_env", lambda command, env: 0)
     calls: list[str] = []
-    monkeypatch.setattr(runner, "_prod_fake_ready", lambda: calls.append("prod_ready") or 42)
+    monkeypatch.setattr(
+        runner, "_prod_fake_ready", lambda **kwargs: calls.append("prod_ready") or 0
+    )
 
-    assert runner.prod_fake_up() == 42
+    assert runner.prod_fake_up() == 0
     assert calls == ["prod_ready"]
 
 
-def test_prod_fake_up_skips_ready_check_when_compose_up_fails(monkeypatch) -> None:
+def test_prod_fake_up_cleans_up_after_failed_readiness(monkeypatch) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(runner, "_prod_fake_stack_running", lambda env: False)
+    monkeypatch.setattr(runner, "port_available", lambda port: True)
+    monkeypatch.setattr(runner, "run_with_env", lambda command, env: 0)
+    monkeypatch.setattr(runner, "_prod_fake_ready", lambda **kwargs: 42)
+    cleanup: list[str] = []
+    monkeypatch.setattr(
+        runner, "prod_fake_down", lambda: cleanup.append("prod-fake-down") or 0
+    )
+
+    assert runner.prod_fake_up() == 42
+    assert cleanup == ["prod-fake-down"]
+
+
+def test_prod_fake_up_skips_ready_check_and_cleans_up_when_compose_up_fails(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
-    monkeypatch.setattr(runner, "_prod_stack_running", lambda: False)
+    monkeypatch.setattr(runner, "_prod_fake_stack_running", lambda env: False)
     monkeypatch.setattr(runner, "port_available", lambda port: True)
     monkeypatch.setattr(runner, "run_with_env", lambda command, env: 1)
+    cleanup: list[str] = []
+    monkeypatch.setattr(
+        runner, "prod_fake_down", lambda: cleanup.append("prod-fake-down") or 0
+    )
     monkeypatch.setattr(
         runner,
         "_prod_fake_ready",
-        lambda: (_ for _ in ()).throw(AssertionError("must not poll readiness after failed up")),
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("must not poll readiness after failed up")
+        ),
     )
 
     assert runner.prod_fake_up() == 1
+    assert cleanup == ["prod-fake-down"]
 
 
 def test_prod_fake_ready_waits_for_health(monkeypatch) -> None:
@@ -2292,6 +2348,37 @@ def test_live_env_file_strips_unquoted_inline_comment(monkeypatch, tmp_path):
     env = runner._resolved_env_file(env_file)
     assert env["REVIEW_PROBE"] == "sample"
     assert env["QUOTED_PROBE"] == "sample # literal"
+
+
+def test_env_file_accepts_compose_colon_delimiter(monkeypatch, tmp_path):
+    runner = load_runner_module()
+    env_file = tmp_path / ".env.prod"
+    env_file.write_text("ANYTOOLAI_POSTGRES_USER: produser\n", encoding="utf-8")
+
+    def fake_run(command, **kwargs):
+        probe = Path(command[command.index("-f") + 1])
+        environment = json.loads(probe.read_text(encoding="utf-8"))["services"]["env-probe"][
+            "environment"
+        ]
+        assert "ANYTOOLAI_POSTGRES_USER" in environment
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            json.dumps(
+                {
+                    "services": {
+                        "env-probe": {
+                            "environment": {"ANYTOOLAI_POSTGRES_USER": "produser"}
+                        }
+                    }
+                }
+            ),
+            "",
+        )
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    assert runner._resolved_env_file(env_file)["ANYTOOLAI_POSTGRES_USER"] == "produser"
 
 
 def test_env_file_uses_compose_interpolation_without_promoting_literals(monkeypatch, tmp_path):
