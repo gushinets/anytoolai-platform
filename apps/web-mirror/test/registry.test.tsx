@@ -50,9 +50,9 @@ describe("getRegisteredProduct", () => {
   });
 
   it("rejects a live product without a web page", async () => {
-    vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS", "brief_decoder");
+    vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS", "unregistered_product");
     vi.resetModules();
-    await expect(import("../src/products/registry")).rejects.toThrow("brief_decoder");
+    await expect(import("../src/products/registry")).rejects.toThrow("unregistered_product");
   });
 
   it("allows the backend-only kernel demo used by credential-free production smoke", async () => {

@@ -37,7 +37,7 @@ const PRODUCT_DEFINITIONS: readonly Omit<RegisteredProduct, "enabled">[] = [
     messages: CLIENT_UPDATE_WRITER_MESSAGES,
     Component: ClientUpdateWriterProduct,
   },
-  { productId: "brief_decoder", enabled: true, messages: BRIEF_DECODER_MESSAGES, Component: BriefDecoderProduct },
+  { productId: "brief_decoder", messages: BRIEF_DECODER_MESSAGES, Component: BriefDecoderProduct },
 ];
 
 for (const productId of enabledIds ?? []) {
