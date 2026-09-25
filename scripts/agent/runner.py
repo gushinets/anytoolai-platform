@@ -1632,22 +1632,28 @@ def prod_fake_up() -> int:
 
 def _prod_fake_ready() -> int:
     try:
-        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000)
-        timeout = float(os.environ.get("ANYTOOLAI_READY_TIMEOUT", "90"))
-    except ValueError as exc:
+        env = _resolved_env_file(PROD_ENV_FILE)
+        api_port = _port_override("ANYTOOLAI_PROD_API_PORT", 8000, env)
+        web_port = _port_override("ANYTOOLAI_PROD_WEB_PORT", 3000, env)
+        timeout = float(env.get("ANYTOOLAI_READY_TIMEOUT", "90"))
+    except (ValueError, OSError) as exc:
         print(f"PROD001: {exc}", file=sys.stderr)
         return 2
-    health_url = f"http://127.0.0.1:{api_port}/health"
-    if _wait_for_http_ok(health_url, timeout):
-        print(f"API: http://127.0.0.1:{api_port}")
-        print("Credential-free production smoke environment is ready")
-        return 0
-    print(
-        f"PROD004: readiness timed out after {timeout:g}s for {health_url}. "
-        "Rerun: python scripts/agent/runner.py prod-status",
-        file=sys.stderr,
-    )
-    return 1
+    for name, url in (
+        ("API", f"http://127.0.0.1:{api_port}/health"),
+        ("web", f"http://127.0.0.1:{web_port}/"),
+    ):
+        if not _wait_for_http_ok(url, timeout):
+            print(
+                f"PROD004: {name} readiness timed out after {timeout:g}s for {url}. "
+                "Rerun: python scripts/agent/runner.py prod-status",
+                file=sys.stderr,
+            )
+            return 1
+    print(f"API: http://127.0.0.1:{api_port}")
+    print(f"Web: http://127.0.0.1:{web_port}")
+    print("Credential-free production smoke environment is ready")
+    return 0
 
 
 def prod_ready(

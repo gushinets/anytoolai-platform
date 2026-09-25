@@ -1586,7 +1586,7 @@ def test_prod_fake_ready_waits_for_health(monkeypatch) -> None:
     monkeypatch.setattr(runner.urllib.request, "urlopen", fake_urlopen)
 
     assert runner._prod_fake_ready() == 0
-    assert requested_urls == ["http://127.0.0.1:8000/health"]
+    assert requested_urls == ["http://127.0.0.1:8000/health", "http://127.0.0.1:3000/"]
 
 
 def test_prod_fake_ready_uses_prod_port_variable_not_dev_port(monkeypatch) -> None:
@@ -1595,6 +1595,7 @@ def test_prod_fake_ready_uses_prod_port_variable_not_dev_port(monkeypatch) -> No
     # which port prod-ready polls — prod has its own ANYTOOLAI_PROD_API_PORT.
     monkeypatch.setenv("ANYTOOLAI_API_PORT", "18123")
     monkeypatch.setenv("ANYTOOLAI_PROD_API_PORT", "18900")
+    monkeypatch.setenv("ANYTOOLAI_PROD_WEB_PORT", "19300")
     monkeypatch.delenv("ANYTOOLAI_READY_TIMEOUT", raising=False)
 
     class Response:
@@ -1614,7 +1615,7 @@ def test_prod_fake_ready_uses_prod_port_variable_not_dev_port(monkeypatch) -> No
     )
 
     assert runner._prod_fake_ready() == 0
-    assert requested_urls == ["http://127.0.0.1:18900/health"]
+    assert requested_urls == ["http://127.0.0.1:18900/health", "http://127.0.0.1:19300/"]
 
 
 def test_prod_fake_ready_times_out_with_prod004(monkeypatch, capsys) -> None:
