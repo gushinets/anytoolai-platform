@@ -730,6 +730,35 @@ def _deployment_profile_dir(compose_project: str) -> Path:
     return ROOT / ".agent" / "deployment-profiles" / compose_project / "freelancer-suite"
 
 
+def _remove_previous_profiles(compose_project: str) -> None:
+    profile_dir = _deployment_profile_dir(compose_project)
+    parent = profile_dir.parent.resolve()
+    for previous in profile_dir.parent.glob(f"{profile_dir.name}.previous-*"):
+        if previous.is_symlink() or previous.resolve().parent != parent:
+            raise ValueError(f"unsafe previous deployment profile: {previous}")
+        if previous.is_dir():
+            shutil.rmtree(previous)
+
+
+def _check_source_fingerprint(manifest: dict[str, object], env: dict[str, str]) -> int:
+    managed_python = quick_check_venv_python()
+    if not quick_check_venv_ready(managed_python):
+        print("LIVE001: run python scripts/agent/runner.py quick-check first", file=sys.stderr)
+        return 1
+    return run_with_env(
+        [
+            str(managed_python),
+            "scripts/agent/validate_configs.py",
+            "check-source-fingerprint",
+            "--products-root",
+            str(manifest["source_products_root"]),
+            "--expected-fingerprint",
+            str(manifest["source_fingerprint"]),
+        ],
+        env,
+    )
+
+
 def _profile_check_args(manifest: dict[str, object]) -> list[str]:
     args = [
         "scripts/agent/validate_configs.py",
@@ -791,8 +820,12 @@ def _build_deployment_profile(
     env: dict[str, str],
 ) -> tuple[int, dict[str, object] | None]:
     profile_dir = _deployment_profile_dir(compose_project)
+    managed_python = quick_check_venv_python()
+    if not quick_check_venv_ready(managed_python):
+        print("LIVE001: run python scripts/agent/runner.py quick-check first", file=sys.stderr)
+        return 1, None
     command = [
-        sys.executable,
+        str(managed_python),
         "scripts/agent/validate_configs.py",
         "build-deployment-profile",
         "--output-dir",
@@ -876,7 +909,15 @@ def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
     if not env.get("OPENAI_API_KEY", "").strip():
         print("LIVE001: OPENAI_API_KEY is required", file=sys.stderr)
         return 2
-    if not _check_ports_available(
+    try:
+        stack_running = _compose_stack_running(_compose_command(identity), _compose_env(identity))
+    except FileNotFoundError as exc:
+        print(f"Command not found: {exc.filename}", file=sys.stderr)
+        return 127
+    except subprocess.TimeoutExpired:
+        print("LIVE001: docker compose ps did not respond within 10s", file=sys.stderr)
+        return 1
+    if not stack_running and not _check_ports_available(
         "DEV002",
         [
             ("API", identity.api_port, "ANYTOOLAI_API_PORT", "--api-port"),
@@ -895,7 +936,10 @@ def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
         return exit_code
     env["ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT"] = str(manifest["generated_products_root"])
     compose = _dev_live_compose_command(identity)
-    exit_code = run_with_env([*compose, "up", "-d", "--remove-orphans"], env)
+    exit_code = run_with_env([*compose, "up", "-d", "--force-recreate", "--remove-orphans"], env)
+    if exit_code != 0:
+        return exit_code
+    exit_code = _check_source_fingerprint(manifest, env)
     if exit_code != 0:
         return exit_code
     if not _wait_for_http_ok(f"{identity.api_url}/health", timeout):
@@ -904,6 +948,7 @@ def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
     exit_code = _run_effective_profile_checks(compose, manifest, env)
     if exit_code != 0:
         return exit_code
+    _remove_previous_profiles(identity.compose_project)
     print(f"Compose project: {identity.compose_project}")
     print(f"API: {identity.api_url}")
     print(f"PostgreSQL: 127.0.0.1:{identity.postgres_port}")
@@ -1477,19 +1522,22 @@ def _deployment_inputs() -> DeploymentInputs:
     return DeploymentInputs(enabled, unmetered, env)
 
 
-def _prod_stack_running() -> bool:
-    # Bounded so a wedged Docker daemon fails this preflight check quickly instead of
-    # hanging prod_up() indefinitely before it ever reaches the normal error path.
+def _compose_stack_running(compose_command: Sequence[str], env: dict[str, str]) -> bool:
+    # Bound the preflight so a wedged Docker daemon cannot hang live redeployment.
     result = subprocess.run(
-        _prod_compose_command("ps", "-q"),
+        [*compose_command, "ps", "-q"],
         cwd=ROOT,
-        env=runner_env(),
+        env=env,
         capture_output=True,
         text=True,
         check=False,
         timeout=10,
     )
     return bool(result.stdout.strip())
+
+
+def _prod_stack_running() -> bool:
+    return _compose_stack_running(_prod_compose_command(), runner_env())
 
 
 def prod_up() -> int:
@@ -1546,10 +1594,15 @@ def prod_up() -> int:
         return 1
     # No timeout: `--build` can legitimately take minutes on a cold image build.
     exit_code = run_with_env(
-        _prod_live_compose_command("up", "-d", "--build", "--remove-orphans"),
+        _prod_live_compose_command("up", "-d", "--build", "--force-recreate", "--remove-orphans"),
         env,
     )
-    return prod_ready(inputs=inputs, manifest=manifest) if exit_code == 0 else exit_code
+    if exit_code != 0:
+        return exit_code
+    exit_code = prod_ready(inputs=inputs, manifest=manifest)
+    if exit_code == 0:
+        _remove_previous_profiles(PROD_COMPOSE_PROJECT)
+    return exit_code
 
 
 def prod_fake_up() -> int:
@@ -1615,14 +1668,21 @@ def prod_ready(
         expectations = manifest["enabled_products"]
         if set(expectations) != set(inputs.enabled_product_ids):
             raise ValueError("profile manifest enabled products differ from production selection")
-        if any(
-            expectations[product_id]["quota_policy_ref"] is not None
-            for product_id in inputs.unmetered_product_ids
-        ):
+        if set(manifest["unmetered_product_ids"]) != inputs.unmetered_product_ids:
             raise ValueError("profile manifest quota modes differ from production selection")
+        if not isinstance(manifest["source_products_root"], str) or not isinstance(
+            manifest["source_fingerprint"], str
+        ):
+            raise ValueError("profile manifest has invalid source fingerprint")
     except (ValueError, OSError, KeyError, TypeError) as exc:
         print(f"PROD001: {exc}", file=sys.stderr)
         return 2
+    env = inputs.compose_env | {
+        "ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT": str(manifest["generated_products_root"])
+    }
+    exit_code = _check_source_fingerprint(manifest, env)
+    if exit_code != 0:
+        return exit_code
     for name, url in (
         ("API", f"http://127.0.0.1:{api_port}/health"),
         ("web", f"http://127.0.0.1:{web_port}/"),
@@ -1632,9 +1692,6 @@ def prod_ready(
                 f"PROD004: {name} readiness timed out after {timeout:g}s for {url}", file=sys.stderr
             )
             return 1
-    env = inputs.compose_env | {
-        "ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT": str(manifest["generated_products_root"])
-    }
     exit_code = _run_effective_profile_checks(_prod_live_compose_command(), manifest, env)
     if exit_code != 0:
         return exit_code
@@ -1757,11 +1814,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command != "dev-live-up":
             print("--product and --quota-mode are only valid with dev-live-up", file=sys.stderr)
             return 2
-    if args.command == "dev-live-up":
-        if not args.product:
-            print("dev-live-up requires --product", file=sys.stderr)
-            return 2
-        return dev_live_up(args.product, args.quota_mode)
     if args.check:
         if args.command != "generate-docs":
             print("--check is only valid with generate-docs", file=sys.stderr)
@@ -1793,6 +1845,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("--bootstrap-only is only valid with quick-check", file=sys.stderr)
             return 2
         return quick_check(bootstrap_only=True)
+    if args.command == "dev-live-up":
+        if not args.product:
+            print("dev-live-up requires --product", file=sys.stderr)
+            return 2
+        return dev_live_up(args.product, args.quota_mode)
     return COMMANDS[args.command]()
 
 

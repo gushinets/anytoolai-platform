@@ -198,6 +198,34 @@ def test_failed_profile_rebuild_keeps_previous_valid_profile(monkeypatch, tmp_pa
     assert validate_configs.tree_fingerprint(output_dir / "products") == first.profile_fingerprint
 
 
+def test_profile_manifest_records_selected_quota_mode(tmp_path):
+    manifest = validate_configs.build_deployment_profile(
+        tmp_path / "freelancer-suite", ["proposal_ai"], {"proposal_ai"}
+    )
+    assert manifest.unmetered_product_ids == ("proposal_ai",)
+
+
+def test_profile_rebuild_preserves_previous_directory_until_redeployment(tmp_path):
+    output_dir = tmp_path / "freelancer-suite"
+    first = validate_configs.build_deployment_profile(output_dir, ["proposal_ai"], {"proposal_ai"})
+    second = validate_configs.build_deployment_profile(output_dir, ["proposal_ai"], set())
+    previous = list(tmp_path.glob("freelancer-suite.previous-*"))
+    assert len(previous) == 1
+    assert validate_configs.tree_fingerprint(previous[0] / "products") == first.profile_fingerprint
+    assert validate_configs.tree_fingerprint(output_dir / "products") == second.profile_fingerprint
+
+
+def test_source_fingerprint_check_rejects_changed_tree(tmp_path):
+    source = tmp_path / "products"
+    source.mkdir()
+    (source / "product.yaml").write_text("product_id: proposal_ai\n", encoding="utf-8")
+    expected = validate_configs.tree_fingerprint(source)
+    validate_configs.check_source_fingerprint(source, expected)
+    (source / "product.yaml").write_text("product_id: changed\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="source fingerprint mismatch"):
+        validate_configs.check_source_fingerprint(source, expected)
+
+
 def test_check_deployment_profile_reads_resolved_bundle_and_ignores_disabled_fake(
     monkeypatch, tmp_path
 ):

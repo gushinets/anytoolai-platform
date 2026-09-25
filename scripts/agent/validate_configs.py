@@ -5,6 +5,7 @@ import json
 import shutil
 import sys
 import tempfile
+import uuid
 from collections.abc import Iterable, Sequence, Set
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -67,6 +68,7 @@ class DeploymentProfileManifest:
     generated_products_root: str
     container_products_root: str
     enabled_products: dict[str, ProductProfileExpectation]
+    unmetered_product_ids: tuple[str, ...]
     source_fingerprint: str
     profile_fingerprint: str
 
@@ -86,6 +88,13 @@ def tree_fingerprint(root: Path) -> str:
             digest.update(len(part).to_bytes(8, "big"))
             digest.update(part)
     return digest.hexdigest()
+
+
+def check_source_fingerprint(source_root: Path, expected_fingerprint: str) -> None:
+    if not source_root.is_dir():
+        raise ValueError(f"source products root does not exist: {source_root}")
+    if tree_fingerprint(source_root) != expected_fingerprint:
+        raise ValueError("source fingerprint mismatch")
 
 
 def common_products_root(roots: Sequence[Path] | None = None) -> Path:
@@ -203,6 +212,7 @@ def build_deployment_profile(
             generated_products_root=str((output_dir / "products").resolve()),
             container_products_root=CONTAINER_PRODUCTS_ROOT.as_posix(),
             enabled_products=expectations,
+            unmetered_product_ids=tuple(sorted(unmetered_product_ids)),
             source_fingerprint=tree_fingerprint(source_root),
             profile_fingerprint=tree_fingerprint(staged_products),
         )
@@ -210,7 +220,7 @@ def build_deployment_profile(
             json.dumps(asdict(manifest), sort_keys=True, indent=2) + "\n", encoding="utf-8"
         )
         if output_dir.exists():
-            previous = temporary_root / "previous"
+            previous = output_dir.parent / f"{output_dir.name}.previous-{uuid.uuid4().hex}"
             output_dir.rename(previous)
             try:
                 staged.rename(output_dir)
@@ -294,6 +304,9 @@ def main(argv: Sequence[str] = ()) -> int:
             check.add_argument("--products-root", type=Path, required=True)
             check.add_argument("--expected-fingerprint", required=True)
             check.add_argument("--expect-product", action="append", required=True)
+            source_check = commands.add_parser("check-source-fingerprint")
+            source_check.add_argument("--products-root", type=Path, required=True)
+            source_check.add_argument("--expected-fingerprint", required=True)
             try:
                 parsed = parser.parse_args(arguments)
             except SystemExit as error:
@@ -305,13 +318,16 @@ def main(argv: Sequence[str] = ()) -> int:
                     set(parsed.unmetered_product),
                 )
                 print(f"Deployment profile built: {manifest.profile_fingerprint}")
-            else:
+            elif parsed.command == "check-deployment-profile":
                 check_deployment_profile(
                     parsed.products_root,
                     parsed.expected_fingerprint,
                     _parse_expectations(parsed.expect_product),
                 )
                 print(f"Deployment profile verified: {parsed.expected_fingerprint}")
+            else:
+                check_source_fingerprint(parsed.products_root, parsed.expected_fingerprint)
+                print("Canonical source fingerprint verified")
             return 0
         load_registry()
         load_model_capability_overrides(default_model_capability_overrides_path())

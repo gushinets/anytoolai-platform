@@ -1351,14 +1351,16 @@ def test_prod_up_builds_profile_before_live_compose_and_ready(monkeypatch) -> No
         ),
     )
     monkeypatch.setattr(runner, "prod_ready", lambda **kwargs: events.append("ready") or 0)
+    monkeypatch.setattr(runner, "_remove_previous_profiles", lambda project: events.append("prune"))
 
     assert runner.prod_up() == 0
-    assert events == ["profile", "ps", "up", "ready"]
+    assert events == ["profile", "ps", "up", "ready", "prune"]
     assert all(
         str(path) in commands[0]
         for path in (runner.COMPOSE_FILE, runner.COMPOSE_PROD_FILE, runner.COMPOSE_LIVE_FILE)
     )
     assert environments[0]["ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT"] == "C:/generated/products"
+    assert "--force-recreate" in commands[0]
     assert environments[0]["ANYTOOLAI_ENABLED_PRODUCT_IDS"] == "proposal_ai"
     assert "ANYTOOLAI_UNMETERED_PRODUCT_IDS" not in commands[0]
 
@@ -1372,6 +1374,9 @@ def test_prod_ready_checks_web_and_identical_container_profiles(monkeypatch, cap
         "generated_products_root": "C:/generated/products",
         "container_products_root": "/app/products",
         "profile_fingerprint": "fingerprint",
+        "unmetered_product_ids": [],
+        "source_products_root": "C:/source/products",
+        "source_fingerprint": "source-fingerprint",
         "enabled_products": {
             "proposal_ai": {
                 "provider_policy_ref": "default_text_generation_v1",
@@ -1382,6 +1387,7 @@ def test_prod_ready_checks_web_and_identical_container_profiles(monkeypatch, cap
     urls: list[str] = []
     commands: list[list[str]] = []
     monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: urls.append(url) or True)
+    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
     monkeypatch.setattr(
         runner, "run_with_env", lambda command, env: commands.append(list(command)) or 0
     )
@@ -1411,6 +1417,9 @@ def test_prod_ready_rejects_failed_container_check_without_ready_output(
         "generated_products_root": "C:/generated/products",
         "container_products_root": "/app/products",
         "profile_fingerprint": "fingerprint",
+        "unmetered_product_ids": [],
+        "source_products_root": "C:/source/products",
+        "source_fingerprint": "source-fingerprint",
         "enabled_products": {
             "proposal_ai": {
                 "provider_policy_ref": "default_text_generation_v1",
@@ -1419,6 +1428,7 @@ def test_prod_ready_rejects_failed_container_check_without_ready_output(
         },
     }
     monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
+    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
     monkeypatch.setattr(runner, "run_with_env", lambda command, env: 1)
 
     assert runner.prod_ready(inputs=inputs, manifest=manifest) == 1
@@ -1470,6 +1480,59 @@ def test_prod_ready_rejects_stale_profile_selection(monkeypatch, enabled, unmete
         lambda url, timeout: pytest.fail("stale profile reached health"),
     )
     assert runner.prod_ready(inputs=inputs, manifest=manifest) == 2
+
+
+def test_prod_ready_rejects_old_unmetered_manifest_after_canonical_switch(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.DeploymentInputs(
+        ("proposal_ai",), frozenset(), PROD_LIVE_VALUES | {"ANYTOOLAI_UNMETERED_PRODUCT_IDS": ""}
+    )
+    manifest = {
+        "generated_products_root": "C:/generated/products",
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "fingerprint",
+        "source_products_root": "C:/source/products",
+        "source_fingerprint": "source-fingerprint",
+        "enabled_products": {
+            "proposal_ai": {
+                "provider_policy_ref": "default_text_generation_v1",
+                "quota_policy_ref": None,
+            }
+        },
+        "unmetered_product_ids": ["proposal_ai"],
+    }
+    monkeypatch.setattr(
+        runner,
+        "_wait_for_http_ok",
+        lambda url, timeout: pytest.fail("stale profile reached health"),
+    )
+    assert runner.prod_ready(inputs=inputs, manifest=manifest) == 2
+
+
+def test_prod_ready_rejects_changed_canonical_source(monkeypatch) -> None:
+    runner = load_runner_module()
+    inputs = runner.DeploymentInputs(("proposal_ai",), frozenset(), PROD_LIVE_VALUES.copy())
+    manifest = {
+        "generated_products_root": "C:/generated/products",
+        "container_products_root": "/app/products",
+        "profile_fingerprint": "fingerprint",
+        "source_products_root": "C:/source/products",
+        "source_fingerprint": "source-fingerprint",
+        "enabled_products": {
+            "proposal_ai": {
+                "provider_policy_ref": "default_text_generation_v1",
+                "quota_policy_ref": "proposal_ai.guest_quota_v1",
+            }
+        },
+        "unmetered_product_ids": [],
+    }
+    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 1)
+    monkeypatch.setattr(
+        runner,
+        "_wait_for_http_ok",
+        lambda url, timeout: pytest.fail("changed source reached health"),
+    )
+    assert runner.prod_ready(inputs=inputs, manifest=manifest) == 1
 
 
 def test_prod_fake_up_calls_ready_after_successful_up(monkeypatch) -> None:
@@ -1993,6 +2056,40 @@ def test_dev_live_up_defaults_to_unmetered_and_other_commands_reject_live_option
     assert runner.main(["dev-up", "--quota-mode", "canonical"]) == 2
 
 
+def test_dev_live_cli_applies_port_and_timeout_overrides_before_dispatch(monkeypatch) -> None:
+    runner = load_runner_module()
+    seen: dict[str, str] = {}
+
+    def fake_live(product, quota):
+        seen.update(
+            {
+                name: runner.os.environ.get(name, "")
+                for name in (
+                    "ANYTOOLAI_API_PORT",
+                    "ANYTOOLAI_POSTGRES_PORT",
+                    "ANYTOOLAI_READY_TIMEOUT",
+                )
+            }
+        )
+        return 0
+
+    monkeypatch.setattr(runner, "dev_live_up", fake_live)
+    assert (
+        runner.main(
+            [
+                "dev-live-up", "--product", "proposal_ai", "--api-port", "18801",
+                "--postgres-port", "15440", "--ready-timeout", "120",
+            ]
+        )
+        == 0
+    )
+    assert seen == {
+        "ANYTOOLAI_API_PORT": "18801",
+        "ANYTOOLAI_POSTGRES_PORT": "15440",
+        "ANYTOOLAI_READY_TIMEOUT": "120.0",
+    }
+
+
 def test_dev_live_compose_uses_base_dev_and_live_overlays() -> None:
     runner = load_runner_module()
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
@@ -2086,10 +2183,25 @@ def test_dev_live_up_rejects_missing_key_before_profile_or_compose(monkeypatch, 
     assert "OPENAI_API_KEY" in capsys.readouterr().err
 
 
+def test_dev_live_redeploy_skips_own_occupied_ports(monkeypatch, tmp_path):
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(runner, "LIVE_ENV_FILE", tmp_path / "missing.env")
+    monkeypatch.setenv("OPENAI_API_KEY", "hidden-key")
+    monkeypatch.setattr(runner, "_compose_stack_running", lambda command, env: True)
+    monkeypatch.setattr(
+        runner, "port_available", lambda port: pytest.fail("own occupied port blocked redeploy")
+    )
+    monkeypatch.setattr(runner, "_build_deployment_profile", lambda *args: (1, None))
+    assert runner.dev_live_up("proposal_ai", "canonical") == 1
+
+
 def test_dev_live_up_aborts_on_profile_failure_before_compose(monkeypatch, tmp_path, capsys):
     runner = load_runner_module()
     monkeypatch.setattr(runner, "LIVE_ENV_FILE", tmp_path / "missing.env")
     monkeypatch.setenv("OPENAI_API_KEY", "test-only")
+    monkeypatch.setattr(runner, "_compose_stack_running", lambda command, env: False)
     calls = []
     monkeypatch.setattr(
         runner, "run_with_env", lambda command, env: calls.append(list(command)) or 9
@@ -2101,12 +2213,39 @@ def test_dev_live_up_aborts_on_profile_failure_before_compose(monkeypatch, tmp_p
     assert "ready" not in capsys.readouterr().out
 
 
+def test_profile_generation_uses_bootstrapped_managed_python(monkeypatch):
+    runner = load_runner_module()
+    managed = runner.quick_check_venv_python()
+    monkeypatch.setattr(runner.sys, "executable", "C:/plain/python.exe")
+    monkeypatch.setattr(runner, "quick_check_venv_ready", lambda candidate: candidate == managed)
+    commands = []
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: commands.append(list(command)) or 9
+    )
+    assert runner._build_deployment_profile("test-project", ["proposal_ai"], [], {}) == (9, None)
+    assert commands[0][0] == str(managed)
+
+
+def test_remove_previous_profiles_keeps_current_profile(monkeypatch, tmp_path):
+    runner = load_runner_module()
+    profile = tmp_path / "freelancer-suite"
+    profile.mkdir()
+    previous = tmp_path / "freelancer-suite.previous-test"
+    previous.mkdir()
+    (previous / "manifest.json").write_text("old", encoding="utf-8")
+    monkeypatch.setattr(runner, "_deployment_profile_dir", lambda project: profile)
+    runner._remove_previous_profiles("test-project")
+    assert not previous.exists()
+    assert profile.exists()
+
+
 def test_dev_live_up_checks_both_mounted_profiles_before_ready(monkeypatch, tmp_path, capsys):
     runner = load_runner_module()
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
     monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
     monkeypatch.setattr(runner, "LIVE_ENV_FILE", tmp_path / "missing.env")
     monkeypatch.setenv("OPENAI_API_KEY", "hidden-key")
+    monkeypatch.setattr(runner, "_compose_stack_running", lambda command, env: False)
     monkeypatch.delenv("ANYTOOLAI_LLM_HTTPS_PROXY", raising=False)
     monkeypatch.setattr(runner, "port_available", lambda port: True)
     monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
@@ -2122,6 +2261,8 @@ def test_dev_live_up_checks_both_mounted_profiles_before_ready(monkeypatch, tmp_
         },
     }
     monkeypatch.setattr(runner, "_build_deployment_profile", lambda *args: (0, manifest))
+    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
+    monkeypatch.setattr(runner, "_remove_previous_profiles", lambda project: None)
     calls = []
     monkeypatch.setattr(
         runner,
@@ -2132,6 +2273,7 @@ def test_dev_live_up_checks_both_mounted_profiles_before_ready(monkeypatch, tmp_
     assert runner.dev_live_up("proposal_ai", "unmetered") == 0
 
     assert len(calls) == 3  # compose up, API check, worker check
+    assert "--force-recreate" in calls[0][0]
     assert calls[0][1]["ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT"] == str(tmp_path / "products")
     assert calls[0][1]["ANYTOOLAI_LLM_HTTPS_PROXY"] == ""
     assert "platform-api" in calls[1][0]
@@ -2148,6 +2290,7 @@ def test_dev_live_up_worker_profile_failure_never_reports_ready(monkeypatch, tmp
     monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
     monkeypatch.setattr(runner, "LIVE_ENV_FILE", tmp_path / "missing.env")
     monkeypatch.setenv("OPENAI_API_KEY", "hidden-key")
+    monkeypatch.setattr(runner, "_compose_stack_running", lambda command, env: False)
     monkeypatch.setattr(runner, "port_available", lambda port: True)
     monkeypatch.setattr(runner, "_wait_for_http_ok", lambda url, timeout: True)
     manifest = {
@@ -2157,6 +2300,7 @@ def test_dev_live_up_worker_profile_failure_never_reports_ready(monkeypatch, tmp
         "enabled_products": {},
     }
     monkeypatch.setattr(runner, "_build_deployment_profile", lambda *args: (0, manifest))
+    monkeypatch.setattr(runner, "_check_source_fingerprint", lambda manifest, env: 0)
     calls = []
 
     def run(command, env):

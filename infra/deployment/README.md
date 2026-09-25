@@ -171,8 +171,10 @@ make dev-down    # tear down
 
 ### Local Proposal AI live check
 
-With a real `OPENAI_API_KEY` and working `ANYTOOLAI_LLM_HTTPS_PROXY` supplied only through the
-shell or gitignored `infra/compose/.env.live`, run:
+Run `python scripts/agent/runner.py quick-check` once first to bootstrap the managed Python
+environment used to build and verify live profiles. With a real `OPENAI_API_KEY` and working
+`ANYTOOLAI_LLM_HTTPS_PROXY` supplied only through the shell or gitignored
+`infra/compose/.env.live`, run:
 
 ```bash
 python scripts/agent/runner.py dev-live-up --product proposal_ai
@@ -190,10 +192,11 @@ of an OpenAI call without the ledger and Squid evidence.
 
 ## Prod
 
-Install Docker Engine with the Compose plugin, Python 3.12, and `uv` on the VPS. Clone this
-repository at the reviewed deployment commit. Run `python scripts/agent/runner.py doctor`,
-`python scripts/agent/runner.py quick-check`, and `uv sync --frozen --group dev` once before
-deployment. Use `python3` wherever the host exposes Python 3 under that name.
+Install Docker Engine with the Compose plugin, Python 3.12, `uv`, Node.js, and npm on the VPS.
+Clone this repository at the reviewed deployment commit. Run
+`python scripts/agent/runner.py quick-check` once to bootstrap its managed Python environment,
+then `.quick-check-venv/bin/python scripts/agent/runner.py doctor`. The live profile generator
+uses that managed environment. Use `python3` wherever the host exposes Python 3 under that name.
 
 Copy `infra/compose/.env.example` to gitignored `infra/compose/.env.prod`. Fill the PostgreSQL
 user/password/database, a real `OPENAI_API_KEY`, the Squid URL in
@@ -217,8 +220,9 @@ python scripts/agent/runner.py prod-status
 
 Inspect the printed `Enabled products: proposal_ai` and `Quota modes:
 proposal_ai=unmetered` before Compose starts. `prod-up` generates an ignored deployment profile,
-then starts base + prod + live Compose, waits for API and web HTTP, and checks the same mounted
-profile fingerprint and policy references inside API and worker. It never falls back to fake.
+then force-recreates base + prod + live Compose, waits for API and web HTTP, and checks the
+same mounted profile fingerprint and policy references inside API and worker. It never falls
+back to fake.
 `prod-ready` repeats the live readiness check. `prod-fake-up` is reserved for the credential-free
 `kernel_demo` smoke in CI; `prod-smoke` tests that smoke stack, not OpenAI.
 
