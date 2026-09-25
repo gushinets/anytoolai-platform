@@ -1193,6 +1193,9 @@ def test_prod_status_and_down_work_without_deployment_inputs(monkeypatch, tmp_pa
     env_file = tmp_path / ".env.prod"
     env_file.write_text("malformed production env file\n", encoding="utf-8")
     monkeypatch.setattr(runner, "PROD_ENV_FILE", env_file)
+    monkeypatch.setattr(
+        runner, "_prod_deployment_lock_path", lambda: tmp_path / "prod-deployment.lock"
+    )
     for name in (
         "ANYTOOLAI_POSTGRES_USER",
         "ANYTOOLAI_POSTGRES_PASSWORD",
@@ -1352,6 +1355,26 @@ def test_prod_deployment_lock_rejects_second_holder_and_releases(
     # A completed/aborted process leaves only an unlocked marker file, never stale ownership.
     with runner._prod_deployment_lock():
         pass
+
+
+def test_prod_down_refuses_concurrent_deploy_before_compose(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    runner = load_runner_module()
+    lock_path = tmp_path / "prod-deployment.lock"
+    monkeypatch.setattr(runner, "_prod_deployment_lock_path", lambda: lock_path)
+    monkeypatch.setattr(
+        runner,
+        "_prod_down_locked",
+        lambda: pytest.fail("concurrent prod-down reached Compose teardown"),
+    )
+
+    with runner._prod_deployment_lock():
+        assert runner.prod_down() == 1
+
+    output = capsys.readouterr()
+    assert "PROD007" in output.err
+    assert "another prod-up is already running" in output.err
 
 
 def test_prod_up_refuses_concurrent_deploy_before_preflight(
@@ -1544,7 +1567,7 @@ def test_prod_up_stops_candidate_after_start_or_readiness_failure(
     monkeypatch.setattr(
         runner, "prod_ready", lambda **kwargs: events.append("ready") or ready_exit
     )
-    monkeypatch.setattr(runner, "prod_down", lambda: events.append("down") or 0)
+    monkeypatch.setattr(runner, "_prod_down_locked", lambda: events.append("down") or 0)
     monkeypatch.setattr(
         runner, "_activate_deployment_profile",
         lambda *args: pytest.fail("failed candidate must not become active"),
