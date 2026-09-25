@@ -120,6 +120,41 @@ def test_build_profile_transforms_only_enabled_product_and_preserves_full_tree(t
     }
 
 
+def test_build_profile_rejects_source_change_during_snapshot(monkeypatch, tmp_path):
+    fixture_package = tmp_path / "fixture_package"
+    fixture_products = fixture_package / "products"
+    shutil.copytree(PRODUCTS_ROOT, fixture_products)
+    monkeypatch.setattr(
+        validate_configs.FreelancerSuiteBundle, "_package_dir", lambda self: fixture_package
+    )
+    monkeypatch.setattr(
+        validate_configs.FreelancerSuiteBundle,
+        "config_roots",
+        lambda self: sorted(path for path in fixture_products.iterdir() if path.is_dir()),
+    )
+    original_copytree = shutil.copytree
+
+    def copy_then_change_source(source, destination, *args, **kwargs):
+        copied = original_copytree(source, destination, *args, **kwargs)
+        product_path = fixture_products / "proposal_ai" / "product.yaml"
+        product_path.write_text(
+            product_path.read_text(encoding="utf-8") + "\n# changed during snapshot\n",
+            encoding="utf-8",
+        )
+        return copied
+
+    monkeypatch.setattr(validate_configs.shutil, "copytree", copy_then_change_source)
+
+    with pytest.raises(
+        ValueError, match="source products changed while deployment profile was copied"
+    ):
+        validate_configs.build_deployment_profile(
+            tmp_path / "freelancer-suite", ["proposal_ai"], set()
+        )
+
+    assert not (tmp_path / "freelancer-suite").exists()
+
+
 def test_build_profile_sets_container_readable_manifest_mode(monkeypatch, tmp_path):
     chmod = Path.chmod
     modes = []
