@@ -560,9 +560,12 @@ describe("HandoffConsent", () => {
       expect(expiry?.textContent).toBe(
         new Date("2026-01-01T00:10:00Z").toLocaleString("ru", { dateStyle: "medium", timeStyle: "short" }),
       );
+      // The tab title follows the language too, not just the page body.
+      expect(document.title).toBe(`${ru.title} · AnytoolAI`);
       // The language selector is on the page and follows a switch without reloading.
       fireEvent.change(screen.getByRole("combobox"), { target: { value: "de" } });
       expect(screen.getByRole("button", { name: HANDOFF_MESSAGES.de.accept })).toBeTruthy();
+      expect(document.title).toBe(`${HANDOFF_MESSAGES.de.title} · AnytoolAI`);
     } finally {
       window.localStorage.removeItem(LOCALE_STORAGE_KEY);
     }

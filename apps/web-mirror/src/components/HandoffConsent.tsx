@@ -310,11 +310,28 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
 
 function HandoffShell({ children }: { children: ReactNode }) {
   const t = useProductT();
+  const title = t("title");
+  // The server layout can only give the English fallback title (it does not know the user's
+  // language), so the tab title follows the active locale here, like the page itself. Next streams
+  // the route's own title in after hydration, which would replace one set only once, so the title
+  // is re-applied whenever <head> changes it back.
+  useEffect(() => {
+    const full = `${title} · AnytoolAI`;
+    const apply = () => {
+      if (document.title !== full) {
+        document.title = full;
+      }
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [title]);
   return (
     <main className={`page-container ${styles.page}`}>
       <Card className={styles.card}>
         <header className={styles.header}>
-          <h1 className={styles.title}>{t("title")}</h1>
+          <h1 className={styles.title}>{title}</h1>
           <LanguageSwitcher />
         </header>
         {children}

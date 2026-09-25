@@ -122,6 +122,15 @@ test.describe("ANY-224 client handoff integration smoke", () => {
       const handoffToken = handoffTokenFromUrl(consentPage);
       expect(handoffToken).toBeTruthy();
 
+      // The tab title follows the chosen language after hydration and reload. Next streams the
+      // route's own English title in after hydration, so this is checked once the network settles.
+      await consentPage.evaluate(() => window.localStorage.setItem("anytoolai.ui_locale", "ru"));
+      await consentPage.reload({ waitUntil: "networkidle" });
+      await expect(consentPage).toHaveTitle("Проверьте передачу · AnytoolAI");
+      await consentPage.evaluate(() => window.localStorage.setItem("anytoolai.ui_locale", "en"));
+      await consentPage.reload({ waitUntil: "networkidle" });
+      await expect(consentPage).toHaveTitle("Review handoff · AnytoolAI");
+
       await consentPage.getByRole("button", { name: "Accept" }).click();
       await expect(consentPage.getByText(/consumed|accepted/i)).toBeVisible();
       await expect(consentPage.getByRole("button", { name: "Accept" })).toHaveCount(0);
