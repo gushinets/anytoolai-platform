@@ -37,6 +37,12 @@ const PRODUCT_DEFINITIONS: readonly Omit<RegisteredProduct, "enabled">[] = [
   },
 ];
 
+for (const productId of enabledIds ?? []) {
+  if (!PRODUCT_DEFINITIONS.some((product) => product.productId === productId)) {
+    throw new Error(`Web product is not registered: ${productId}`);
+  }
+}
+
 const PRODUCTS: readonly RegisteredProduct[] = PRODUCT_DEFINITIONS.map((product) => ({
   ...product,
   enabled: enabledIds === null || enabledIds.has(product.productId),

@@ -44,6 +44,12 @@ describe("getRegisteredProduct", () => {
     expect(registry.getRegisteredProduct("proposal_ai")?.enabled).toBe(true);
     expect(registry.getRegisteredProduct("client_update_writer")).toBeNull();
   });
+
+  it("rejects a live product without a web page", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS", "brief_decoder");
+    vi.resetModules();
+    await expect(import("../src/products/registry")).rejects.toThrow("brief_decoder");
+  });
 });
 
 describe("shared runtime boundary", () => {
