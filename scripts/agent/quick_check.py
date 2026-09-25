@@ -31,6 +31,7 @@ PYTEST_TARGETS = [
     "tests/architecture",
     "tests/test_quick_check.py",
     "tests/test_runner.py",
+    "tests/test_validate_configs.py",
     "tests/test_docs_generation.py",
     "tests/test_validate_docs.py",
     "tests/test_validate_pr_metadata.py",
