@@ -768,6 +768,10 @@ def _active_deployment_profile_dir(compose_project: str) -> Path:
     return selected
 
 
+def _deactivate_deployment_profile(compose_project: str) -> None:
+    (_deployment_profile_dir(compose_project).parent / "active-profile").unlink(missing_ok=True)
+
+
 def _activate_deployment_profile(compose_project: str, manifest: dict[str, object]) -> None:
     profile_dir = _deployment_profile_dir(compose_project)
     selected = Path(str(manifest["generated_products_root"])).parent
@@ -969,7 +973,11 @@ def dev_up() -> int:
         _compose_command(identity, "up", "-d", "--remove-orphans"),
         _compose_env(identity),
     )
-    return dev_ready() if exit_code == 0 else exit_code
+    if exit_code == 0:
+        exit_code = dev_ready()
+        if exit_code == 0:
+            _deactivate_deployment_profile(identity.compose_project)
+    return exit_code
 
 
 def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
@@ -1045,6 +1053,23 @@ def dev_web() -> int:
         return 2
     env = runner_env()
     env["PLATFORM_API_BASE_URL"] = identity.api_url
+    marker = _deployment_profile_dir(identity.compose_project).parent / "active-profile"
+    if marker.is_file():
+        try:
+            manifest = json.loads(
+                (_active_deployment_profile_dir(identity.compose_project) / "manifest.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            enabled = manifest["enabled_products"]
+            if not isinstance(enabled, dict) or not enabled:
+                raise ValueError("active profile has no enabled products")
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            print(f"DEV004: invalid active live profile: {exc}", file=sys.stderr)
+            return 2
+        env["NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS"] = ",".join(enabled)
+    else:
+        env.pop("NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS", None)
     return run_with_env(["pnpm", "--filter", "@anytoolai/web-mirror", "dev"], env)
 
 
@@ -1094,11 +1119,14 @@ def dev_status() -> int:
 def dev_down() -> int:
     identity = runtime_identity()
     print_runtime_endpoints(identity)
-    return run_with_env(
+    exit_code = run_with_env(
         _compose_command(identity, "down", "--remove-orphans"),
         _compose_env(identity),
         timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
     )
+    if exit_code == 0:
+        _deactivate_deployment_profile(identity.compose_project)
+    return exit_code
 
 
 def dev_smoke() -> int:

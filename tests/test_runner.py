@@ -850,12 +850,13 @@ def test_terminate_process_group_ignores_a_group_that_exits_between_timeout_and_
     runner._terminate_process_group(process)  # must not raise
 
 
-def test_dev_status_and_down_are_scoped_to_worktree_project(monkeypatch) -> None:
+def test_dev_status_and_down_are_scoped_to_worktree_project(monkeypatch, tmp_path) -> None:
     runner = load_runner_module()
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
     commands: list[list[str]] = []
     timeouts: list[float | None] = []
     monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(runner, "_deployment_profile_dir", lambda project: tmp_path / "profile")
     monkeypatch.setattr(
         runner,
         "run_with_env",
@@ -2108,10 +2109,13 @@ def test_prod_smoke_reports_prod001_for_invalid_port_override(monkeypatch, capsy
     assert "PROD001" in capsys.readouterr().err
 
 
-def test_dev_up_does_not_bound_the_build(monkeypatch) -> None:
+def test_dev_up_does_not_bound_the_build(monkeypatch, tmp_path) -> None:
     runner = load_runner_module()
     identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
     monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(runner, "_deployment_profile_dir", lambda project: tmp_path / "profile")
+    marker = tmp_path / "active-profile"
+    marker.write_text("previous-live-profile\n")
     monkeypatch.setattr(runner, "port_available", lambda port: True)
     monkeypatch.setattr(runner, "dev_ready", lambda: 0)
     timeouts: list[float | None] = []
@@ -2122,6 +2126,7 @@ def test_dev_up_does_not_bound_the_build(monkeypatch) -> None:
     )
 
     assert runner.dev_up() == 0
+    assert not marker.exists()
     # Deliberately unbounded: a cold image build can legitimately take minutes.
     assert timeouts == [None]
 
@@ -2614,3 +2619,38 @@ def test_dev_web_uses_derived_api_url(monkeypatch):
     assert runner.dev_web() == 0
     assert captured[0][0] == ["pnpm", "--filter", "@anytoolai/web-mirror", "dev"]
     assert captured[0][1]["PLATFORM_API_BASE_URL"] == identity.api_url
+
+
+def test_dev_web_uses_active_live_product_selection(monkeypatch, tmp_path):
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    profile = tmp_path / "freelancer-suite"
+    selected = tmp_path / (profile.name + "." + "a" * 32)
+    selected.mkdir()
+    (tmp_path / "active-profile").write_text(selected.name + "\n")
+    (selected / "manifest.json").write_text(
+        json.dumps({"enabled_products": {"proposal_ai": {}}}), encoding="utf-8"
+    )
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(runner, "_deployment_profile_dir", lambda project: profile)
+    captured = []
+    monkeypatch.setattr(
+        runner, "run_with_env", lambda command, env: captured.append(dict(env)) or 0
+    )
+
+    assert runner.dev_web() == 0
+    assert captured[0]["NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS"] == "proposal_ai"
+
+
+def test_dev_down_clears_active_live_selection(monkeypatch, tmp_path):
+    runner = load_runner_module()
+    identity = runner.RuntimeIdentity("12345678", "anytoolai-12345678", 15555, 18123)
+    profile = tmp_path / "freelancer-suite"
+    marker = tmp_path / "active-profile"
+    marker.write_text("previous-live-profile\n")
+    monkeypatch.setattr(runner, "runtime_identity", lambda: identity)
+    monkeypatch.setattr(runner, "_deployment_profile_dir", lambda project: profile)
+    monkeypatch.setattr(runner, "run_with_env", lambda command, env, **kwargs: 0)
+
+    assert runner.dev_down() == 0
+    assert not marker.exists()
