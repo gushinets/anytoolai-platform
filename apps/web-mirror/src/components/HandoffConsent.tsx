@@ -19,6 +19,7 @@ import {
   type PlatformApiError,
   type PlatformApiResult,
 } from "@anytoolai/ce-kit";
+import { useIsomorphicLayoutEffect } from "../lib/useIsomorphicLayoutEffect";
 import { LanguageSwitcher, useHostT, useLocale, useProductT, type Locale } from "../i18n";
 import styles from "./HandoffConsent.module.css";
 
@@ -314,8 +315,9 @@ function HandoffShell({ children }: { children: ReactNode }) {
   // The server layout can only give the English fallback title (it does not know the user's
   // language), so the tab title follows the active locale here, like the page itself. Next streams
   // the route's own title in after hydration, which would replace one set only once, so the title
-  // is re-applied whenever <head> changes it back.
-  useEffect(() => {
+  // is re-applied whenever <head> changes it back. Layout-effect timing, like `<html lang>` in
+  // LocaleProvider, so a language switch changes the page, `lang` and the tab title together.
+  useIsomorphicLayoutEffect(() => {
     const full = `${title} · AnytoolAI`;
     const apply = () => {
       if (document.title !== full) {
