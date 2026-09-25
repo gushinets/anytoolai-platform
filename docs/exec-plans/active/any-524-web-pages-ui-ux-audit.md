@@ -30,7 +30,6 @@ spawning follow-up tasks.
 ### Out of scope
 
 - Palette, fonts, radii and tokens of Bundle 3 (`docs/exec-plans/active/any-503-adopt-bundle3-design-system.md`).
-- Localization of `HandoffConsent` (English only, as before).
 - Brief Decoder: its web page is not on `main` yet (it lands with ANY-248) and must be audited
   against this matrix when it does.
 - Products that have no bundle or page yet (Client Message Decoder, Scope Creep Guard, Send-Ready).
@@ -49,7 +48,8 @@ spawning follow-up tasks.
 - Events: none.
 - Frontend: `ProductPageShell` owns the single `<main>` when a product runs inside it;
   `ProductRunPage` renders a `<div>` there and stays its own `<main>` standalone. `HandoffConsent`
-  renders user-facing status copy and a localized expiry date instead of wire values.
+  renders localized, user-facing status copy and an expiry date formatted for the active locale
+  instead of wire values; it must be rendered inside a `LocaleProvider` (the handoff route provides one).
 
 ## Reconciling the skills with Bundle 3
 
@@ -81,12 +81,13 @@ Anything that would need a new token is recorded below as an accepted deviation.
 | Handoff: values | frontend-design (copy) | Raw status enum and ISO timestamp | Fixed: status copy map (exhaustive over `HandoffStatus`), expiry in `<time>` with a locale-formatted date |
 | `/` | frontend-design, ui-ux-pro-max | Bare list of links; English only | Fixed: hero with the Bundle 3 headline gradient, bento cards with a sample of each tool's output, one tab stop per card with a 2px focus ring, the sample output readable by screen readers (only the duplicate "Open tool" is hidden), language selector and copy in all 7 locales (`homeMessages`, covered by the i18n parity tests) |
 | `/paywall`, `/onboarding`, `/r`, 404 | frontend-design, ui-ux-pro-max | One-line placeholders without a heading; default Next 404 | Fixed: heading and `<main>`; themed 404. English only; real content stays with the tickets that replace them |
-| Shared: disabled text | ui-ux-pro-max (colour) | `--color-text-disabled` is a 30% alpha token | Accepted: disabled controls are exempt from contrast and the token is fixed by Bundle 3 |
-| Shared: headings | frontend-design | Cabinet Grotesk is loaded at weight 900 only, so Display (900, 44-56px) is the one heading role available; Section (800, 26-36px) is not | Accepted: the weight follows the Fontshare decision in ANY-503; `h1` stays Display everywhere, including the home hero (capped at 56px) |
+| Shared: disabled text | ui-ux-pro-max (colour) | `--color-text-disabled` is a 30% alpha token | Rejected, not a defect: WCAG exempts disabled controls from the contrast requirement and the value is a fixed Bundle 3 token |
+| Shared: headings | frontend-design | Cabinet Grotesk is loaded at weight 900 only, so Display (900, 44-56px) is the one heading role available; Section (800, 26-36px) is not | Rejected, contradicts Bundle 3: the roles are fixed and ANY-503's Fontshare decision limits delivery to weight 900; `h1` stays Display everywhere, including the home hero (capped at 56px) |
 | `/`: card titles | frontend-design, ui-ux-pro-max (typography) | Card titles are `h2`; Cabinet 900 at a card-title size would pair the Display weight with a Section size | Fixed: `h2` card titles use the approved body face (DM Sans 700, 24px) instead of a mismatched heading role; `layout.test.ts` pins the hero and card-title rules |
-| Shared: toast | ui-ux-pro-max | No warning variant, error border reuses the generic border | Accepted: Bundle 3 has no warning/error border tokens |
-| ProposalAI: chip grid | ui-ux-pro-max (layout) | Collapses at 640px, Bundle 3 names 860px | Accepted: three chips still fit the 820px column; unchanged |
-| Handoff: copy | frontend-design | Text is English only | Accepted: out of scope, see above |
+| Shared: toast | ui-ux-pro-max | No warning variant, error border reuses the generic border | Rejected, contradicts Bundle 3 and has no caller: nothing in the app renders a warning message, so a warning variant would be dead code, and the error border uses the generic Bundle 3 border token by ANY-503's decision |
+| Chip grids (ProposalAI tone, Client Update Writer modes) | ui-ux-pro-max (layout) | Collapsed at 640px, Bundle 3 names 860px | Fixed: both collapse to one column at 860px |
+| Handoff: copy | frontend-design | Text is English only | Fixed: `HandoffConsent` is localized in all 7 locales (`handoffMessages`, covered by the i18n parity tests) with the language selector in its header, the expiry formatted for the active locale and the identity message reused from the host messages. The tab title follows the language too: the server layout gives the English fallback, and the component re-applies the localized title whenever `<head>` changes it back (Next streams the route's own title in after hydration and would overwrite a one-time assignment); it runs with layout-effect timing like `<html lang>`, and `client-handoff-smoke` asserts it in a real browser after a reload and through the language selector (page heading, `lang` and title already match in the first frame) |
+| Handoff: outcome announcement | ui-ux-pro-max (accessibility) | The pending line vanished when the action settled, the terminal status was a plain `<dd>` and the focused button unmounted, so the outcome was never announced | Fixed: the status `<dd>`, present in both the consent and the terminal view, is a polite live region; test for accept and decline |
 
 ## Implementation steps
 
@@ -111,6 +112,7 @@ Anything that would need a new token is recorded below as an accepted deviation.
 | Date | Decision | Why |
 |---|---|---|
 | 2026-09-24 | Fix findings in this change instead of filing follow-up tasks | Requested by the ticket owner |
+| 2026-09-25 | Close every remaining "Accepted" row as fixed (chip breakpoint, Handoff copy) or rejected with a recorded reason (disabled text, heading weights, toast variants) | The ticket wants findings fixed or tracked; rejected-by-Bundle-3 items are not defects and the owner asked for no other tasks |
 | 2026-09-24 | Duplicate the chip styles in the Client Update Writer CSS module | Two consumers only; move into shared-ui when a third appears |
 | 2026-09-24 | Show the handoff expiry with the browser locale | The consent page is not inside the product locale provider and has no translations yet |
 
@@ -128,4 +130,4 @@ Anything that would need a new token is recorded below as an accepted deviation.
 ## Follow-up debt
 
 - Audit Brief Decoder against the matrix when ANY-248 lands.
-- Localize `HandoffConsent` and give it real target details once a product-to-product handoff exists.
+- Give `HandoffConsent` real target details once a product-to-product handoff exists (today both ends of the only handoff are Kernel Demo).
