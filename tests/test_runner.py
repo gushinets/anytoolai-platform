@@ -1076,8 +1076,11 @@ def test_prod_stack_running_propagates_timeout(monkeypatch) -> None:
     runner = load_runner_module()
 
     def fake_run(*args, **kwargs):
-        assert kwargs["timeout"] == 10
-        raise runner.subprocess.TimeoutExpired(cmd="docker compose ps -q", timeout=10)
+        assert kwargs["timeout"] == runner.COMPOSE_STACK_QUERY_TIMEOUT_SECONDS
+        raise runner.subprocess.TimeoutExpired(
+            cmd="docker compose ps -q",
+            timeout=runner.COMPOSE_STACK_QUERY_TIMEOUT_SECONDS,
+        )
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
@@ -1090,7 +1093,10 @@ def test_prod_fake_up_fails_fast_when_docker_daemon_is_wedged(monkeypatch, capsy
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)
 
     def fake_prod_stack_running(_env):
-        raise runner.subprocess.TimeoutExpired(cmd="docker compose ps -q", timeout=10)
+        raise runner.subprocess.TimeoutExpired(
+            cmd="docker compose ps -q",
+            timeout=runner.COMPOSE_STACK_QUERY_TIMEOUT_SECONDS,
+        )
 
     monkeypatch.setattr(runner, "_prod_fake_stack_running", fake_prod_stack_running)
     monkeypatch.setattr(
@@ -1100,7 +1106,9 @@ def test_prod_fake_up_fails_fast_when_docker_daemon_is_wedged(monkeypatch, capsy
     )
 
     assert runner.prod_fake_up() == 1
-    assert "PROD003" in capsys.readouterr().err
+    error = capsys.readouterr().err
+    assert "PROD003" in error
+    assert f"{runner.COMPOSE_STACK_QUERY_TIMEOUT_SECONDS:g}s" in error
 
 
 def test_prod_fake_up_fails_before_compose_when_port_is_occupied(monkeypatch) -> None:

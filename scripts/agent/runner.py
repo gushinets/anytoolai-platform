@@ -46,6 +46,7 @@ DEV_DEFAULT_POSTGRES_DB = "anytoolai"
 # Bounds `docker compose ps` calls when the Docker daemon is unresponsive. `down` needs longer
 # than the worker's 60s stop grace period; `up`/`--build` can take minutes on a cold build.
 COMPOSE_QUERY_TIMEOUT_SECONDS = 60
+COMPOSE_STACK_QUERY_TIMEOUT_SECONDS = 10
 COMPOSE_TEARDOWN_TIMEOUT_SECONDS = 180
 # `doctor`'s tool probes are a one-off diagnostic, not a hot path, so this is generous on purpose:
 # a cold `windows-latest` CI runner has been observed timing out a bare `npm --version` at 10s
@@ -1011,7 +1012,11 @@ def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
         print(f"Command not found: {exc.filename}", file=sys.stderr)
         return 127
     except subprocess.TimeoutExpired:
-        print("LIVE001: docker compose ps did not respond within 10s", file=sys.stderr)
+        print(
+            "LIVE001: docker compose ps did not respond within "
+            f"{COMPOSE_STACK_QUERY_TIMEOUT_SECONDS:g}s",
+            file=sys.stderr,
+        )
         return 1
     if not stack_running and not _check_ports_available(
         "DEV002",
@@ -1744,7 +1749,7 @@ def _compose_stack_running(compose_command: Sequence[str], env: dict[str, str]) 
         capture_output=True,
         text=True,
         check=False,
-        timeout=10,
+        timeout=COMPOSE_STACK_QUERY_TIMEOUT_SECONDS,
     )
     return bool(result.stdout.strip())
 
@@ -1864,7 +1869,8 @@ def _prod_up_locked() -> int:
     except subprocess.TimeoutExpired:
         print(
             "PROD003: docker compose ps did not respond within "
-            f"{COMPOSE_QUERY_TIMEOUT_SECONDS:g}s — is the Docker daemon running and responsive?",
+            f"{COMPOSE_STACK_QUERY_TIMEOUT_SECONDS:g}s — "
+            "is the Docker daemon running and responsive?",
             file=sys.stderr,
         )
         return 1
@@ -1936,7 +1942,11 @@ def prod_fake_up() -> int:
         print(f"Command not found: {exc.filename}", file=sys.stderr)
         return 127
     except subprocess.TimeoutExpired:
-        print("PROD003: docker compose ps did not respond within 10s", file=sys.stderr)
+        print(
+            "PROD003: docker compose ps did not respond within "
+            f"{COMPOSE_STACK_QUERY_TIMEOUT_SECONDS:g}s",
+            file=sys.stderr,
+        )
         return 1
     if not stack_running and not _check_ports_available(
         "PROD002",
