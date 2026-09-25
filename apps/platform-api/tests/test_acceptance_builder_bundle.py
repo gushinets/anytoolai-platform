@@ -2,7 +2,8 @@
 
 1. The product loads through anytoolai_platform_api.bootstrap.build_runtime()'s real default
    bundle set, with exact per-scenario action-type sequences (A01 -> A10 for draft_v1,
-   A01 -> A11 -> A10 for check_v1).
+   A01 -> A11 -> A10 for check_v1, A10 alone for draft_from_brief_v1, the Brief Decoder handoff
+   target).
 2. Its input and composed-output schemas are non-permissive.
 3. A real scenario start + one worker pass runs every step against the fake provider and the
    composed artifact equals the deterministic fixtures -- happy path and weak input, per scenario
@@ -42,13 +43,17 @@ GUEST_ID = "guest_acceptance_builder"
 
 DRAFT = "acceptance_builder.draft_v1"
 CHECK = "acceptance_builder.check_v1"
+FROM_BRIEF = "acceptance_builder.draft_from_brief_v1"
 EXTRACT = "acceptance_builder.extract_v1"
 COMPARE = "acceptance_builder.compare_v1"
 DRAFT_DOCUMENT = "acceptance_builder.draft_document_v1"
 CHECK_DOCUMENT = "acceptance_builder.check_document_v1"
+FROM_BRIEF_DOCUMENT = "acceptance_builder.draft_from_brief_document_v1"
+BRIEF_DECODER_EXTRACT = "brief_decoder.extract_brief_v1"
 STEPS = {
     DRAFT: (EXTRACT, DRAFT_DOCUMENT),
     CHECK: (EXTRACT, COMPARE, CHECK_DOCUMENT),
+    FROM_BRIEF: (FROM_BRIEF_DOCUMENT,),
 }
 ACTION_TYPES = {
     DRAFT: ("text.extract_structured_fields", "document.generate_from_template"),
@@ -57,14 +62,17 @@ ACTION_TYPES = {
         "text.compare_and_classify",
         "document.generate_from_template",
     ),
+    FROM_BRIEF: ("document.generate_from_template",),
 }
 INPUT_SCHEMA_REFS = {
     DRAFT: "acceptance_builder.draft_input_v1",
     CHECK: "acceptance_builder.check_input_v1",
+    FROM_BRIEF: "acceptance_builder.draft_from_brief_input_v1",
 }
 OUTPUT_SCHEMA_REFS = {
     DRAFT: "acceptance_builder.draft_output_v1",
     CHECK: "acceptance_builder.check_output_v1",
+    FROM_BRIEF: "acceptance_builder.draft_from_brief_output_v1",
 }
 
 BRIEF_TEXT = (
@@ -90,6 +98,8 @@ def _fixture(key: str) -> dict[str, Any]:
 def _expected_output(scenario_id: str, suffix: str = "") -> dict[str, Any]:
     """The composed workflow output the fixtures must produce: extracted = A01 output whole,
     comparison = A11 output whole (check_v1 only), document = A10."""
+    if scenario_id == FROM_BRIEF:
+        return {"document": _fixture(FROM_BRIEF_DOCUMENT + suffix)}
     output: dict[str, Any] = {"extracted": _fixture(EXTRACT + suffix)}
     if scenario_id == CHECK:
         output["comparison"] = _fixture(COMPARE + suffix)
@@ -110,9 +120,9 @@ def test_acceptance_builder_loads_through_the_real_default_bundle_set() -> None:
 
     assert "freelancer_suite" in result.loaded_bundles
     product = result.config_registry.products["acceptance_builder"]
-    assert set(product.scenarios) == {DRAFT, CHECK}
+    assert set(product.scenarios) == {DRAFT, CHECK, FROM_BRIEF}
 
-    for scenario_id in (DRAFT, CHECK):
+    for scenario_id in (DRAFT, CHECK, FROM_BRIEF):
         scenario = result.config_registry.get_scenario(scenario_id)
         assert scenario is not None
         assert scenario.workflow_id == scenario_id
@@ -157,6 +167,41 @@ def test_input_schemas_are_non_permissive(scenario_id: str, invalid_input: dict[
     jsonschema.validate(valid, schema)
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(invalid_input, schema)
+
+
+def _brief_decoder_brief(suffix: str = "") -> dict[str, Any]:
+    """Brief Decoder's real `brief` output part (its A01 fixture is that part whole)."""
+    return _fixture(BRIEF_DECODER_EXTRACT + suffix)
+
+
+@pytest.mark.parametrize(
+    "invalid_input",
+    [
+        {},
+        {"brief_text": BRIEF_TEXT},
+        {"brief": {}},
+        {"brief": {"values": {}}},
+        {"brief": {"values": {"budget": ""}, "missing_fields": []}},
+        {"brief": {"values": {"deliverables": []}, "missing_fields": []}},
+        {"brief": {"values": {"invented": "x"}, "missing_fields": []}},
+        {"brief": {"values": {}, "missing_fields": ["invented"]}},
+        {"brief": {"values": {}, "missing_fields": []}},  # every field in neither values nor missing
+        {"brief": _brief_decoder_brief(), "extra": 1},
+    ],
+)
+def test_draft_from_brief_input_schema_is_non_permissive(invalid_input: dict[str, Any]) -> None:
+    schema = _schema(INPUT_SCHEMA_REFS[FROM_BRIEF])
+
+    jsonschema.validate({"brief": _brief_decoder_brief()}, schema)
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(invalid_input, schema)
+
+
+@pytest.mark.parametrize("suffix", ["", ".weak_input", ".no_issues"])
+def test_draft_from_brief_accepts_every_real_brief_decoder_brief(suffix: str) -> None:
+    jsonschema.validate(
+        {"brief": _brief_decoder_brief(suffix)}, _schema(INPUT_SCHEMA_REFS[FROM_BRIEF])
+    )
 
 
 def test_input_schemas_accept_legitimate_edge_cases() -> None:
@@ -226,6 +271,39 @@ def _shared_invalid_outputs(valid: dict[str, Any]) -> dict[str, dict[str, Any]]:
         "document_sections_reordered": _mutated(valid, swap_first_two_sections),
         "empty_summary": _mutated(valid, lambda o: o["document"].update(summary=" ")),
     }
+
+
+def test_draft_from_brief_output_schema_rejects_open_shapes() -> None:
+    schema = _schema(OUTPUT_SCHEMA_REFS[FROM_BRIEF])
+    validator = jsonschema.validators.validator_for(schema)(schema)
+    valid = _expected_output(FROM_BRIEF)
+    for suffix in ("", ".weak_input"):
+        jsonschema.validate(_expected_output(FROM_BRIEF, suffix), schema)
+
+    invalid = {
+        "unknown_top_level_key": _mutated(valid, lambda o: o.update(extra=1)),
+        "missing_document": _mutated(valid, lambda o: o.pop("document")),
+        "extracted_is_not_part_of_this_output": _mutated(valid, lambda o: o.update(extracted={})),
+        "document_missing_a_section": _mutated(valid, lambda o: o["document"]["sections"].pop()),
+        "document_extra_section": _mutated(
+            valid, lambda o: o["document"]["sections"].append(o["document"]["sections"][0])
+        ),
+        "document_section_with_arbitrary_id": _mutated(
+            valid, lambda o: o["document"]["sections"][0].update(id="random", title="Random")
+        ),
+        "list_section_missing_metadata": _mutated(
+            valid, lambda o: o["document"]["sections"][0].pop("metadata")
+        ),
+        "list_section_wrong_kind": _mutated(
+            valid, lambda o: o["document"]["sections"][1].update(metadata={"kind": "table"})
+        ),
+        "blank_section_content": _mutated(
+            valid, lambda o: o["document"]["sections"][2].update(content=" ")
+        ),
+        "empty_summary": _mutated(valid, lambda o: o["document"].update(summary=" ")),
+    }
+    for name, candidate in invalid.items():
+        assert not validator.is_valid(candidate), name
 
 
 @pytest.mark.parametrize("scenario_id", [DRAFT, CHECK])
@@ -330,7 +408,7 @@ def app(platform_api_app_factory):
 
 
 def _start(
-    app: Any, request_platform_api, scenario_id: str, input_payload: dict[str, str]
+    app: Any, request_platform_api, scenario_id: str, input_payload: dict[str, Any]
 ) -> httpx.Response:
     return asyncio.run(
         request_platform_api(
@@ -368,7 +446,7 @@ def _run_to_result(
     request_platform_api,
     session_factory: SessionFactory,
     scenario_id: str,
-    input_payload: dict[str, str],
+    input_payload: dict[str, Any],
     adapter: FakeProviderAdapter,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     started = _start(app, request_platform_api, scenario_id, input_payload).json()
@@ -546,7 +624,7 @@ def test_invalid_input_fails_the_job_before_any_provider_call(
     request_platform_api,
     session_factory: SessionFactory,
     scenario_id: str,
-    input_payload: dict[str, str],
+    input_payload: dict[str, Any],
 ) -> None:
     started = _start(app, request_platform_api, scenario_id, input_payload).json()
 
@@ -557,5 +635,52 @@ def test_invalid_input_fails_the_job_before_any_provider_call(
     assert processed.status is JobStatus.failed
     assert processed.error_code == "workflow_input_validation_failed"
     assert processed.result_artifact_id is None
+    assert adapter.calls == []
+    assert _provider_call_count(session_factory, job_id=started["job_id"]) == 0
+
+
+@pytest.mark.parametrize(
+    ("suffix", "adapter_variants"),
+    [("", {}), (".weak_input", {FROM_BRIEF_DOCUMENT: ".weak_input"})],
+)
+def test_draft_from_brief_runs_on_a_real_brief_decoder_brief(
+    app: Any,
+    request_platform_api,
+    session_factory: SessionFactory,
+    suffix: str,
+    adapter_variants: dict[str, str],
+) -> None:
+    """The handoff target consumes Brief Decoder's own `brief` output: the payload the provider
+    sees carries that brief unchanged, and the document is the fixture grounded in it."""
+    brief = _brief_decoder_brief(suffix)
+    adapter = RecordingProviderAdapter(FIXTURE_ROOT, variants=adapter_variants)
+    _, output = _run_to_result(
+        app, request_platform_api, session_factory, FROM_BRIEF, {"brief": brief}, adapter
+    )
+
+    assert tuple(call.action_config_id for call in adapter.calls) == STEPS[FROM_BRIEF]
+    assert adapter.calls[0].step_id == "generate_document"
+    document_input = adapter.input_payload(0)
+    assert document_input["template_ref"] == FROM_BRIEF
+    assert document_input["data"] == {"brief": brief}
+    assert output == _expected_output(FROM_BRIEF, suffix)
+
+
+@pytest.mark.parametrize(
+    "input_payload",
+    [{"brief_text": BRIEF_TEXT}, {"brief": {"values": {}, "missing_fields": []}}],
+    ids=["text_input_for_structured_scenario", "brief_with_field_in_neither_list"],
+)
+def test_invalid_draft_from_brief_input_fails_before_any_provider_call(
+    app: Any, request_platform_api, session_factory: SessionFactory, input_payload: dict[str, Any]
+) -> None:
+    started = _start(app, request_platform_api, FROM_BRIEF, input_payload).json()
+
+    adapter = RecordingProviderAdapter(FIXTURE_ROOT)
+    processed = _run_worker(session_factory, adapter)
+
+    assert processed is not None
+    assert processed.status is JobStatus.failed
+    assert processed.error_code == "workflow_input_validation_failed"
     assert adapter.calls == []
     assert _provider_call_count(session_factory, job_id=started["job_id"]) == 0

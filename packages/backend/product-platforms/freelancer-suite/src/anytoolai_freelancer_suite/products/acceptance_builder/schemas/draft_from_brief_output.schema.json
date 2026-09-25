@@ -1,0 +1,150 @@
+{
+  "type": "object",
+  "properties": {
+    "document": {
+      "type": "object",
+      "properties": {
+        "sections": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/section_acceptance-criteria"
+            },
+            {
+              "$ref": "#/$defs/section_deliverables"
+            },
+            {
+              "$ref": "#/$defs/section_open-gaps"
+            }
+          ],
+          "items": false
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "sections",
+        "summary"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "document"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "section_acceptance-criteria": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "const": "acceptance-criteria"
+        },
+        "title": {
+          "const": "Acceptance criteria"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "metadata": {
+          "$ref": "#/$defs/listSectionMetadata"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "content",
+        "metadata"
+      ],
+      "additionalProperties": false
+    },
+    "section_deliverables": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "const": "deliverables"
+        },
+        "title": {
+          "const": "Deliverables"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "metadata": {
+          "$ref": "#/$defs/listSectionMetadata"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "content",
+        "metadata"
+      ],
+      "additionalProperties": false
+    },
+    "section_open-gaps": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "const": "open-gaps"
+        },
+        "title": {
+          "const": "Open gaps"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "metadata": {
+          "$ref": "#/$defs/sectionMetadata"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "content"
+      ],
+      "additionalProperties": false
+    },
+    "sectionMetadata": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "heading",
+            "paragraph",
+            "list",
+            "table",
+            "note"
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "listSectionMetadata": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "list"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

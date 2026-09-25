@@ -259,13 +259,6 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
         "whitespace_question_rationale": mutated(
             lambda o: o["questions"][0].update(rationale=" ")
         ),
-        # ANY-228: `document.summary` feeds Acceptance Builder's `brief_text` through the
-        # Brief Decoder handoff, so its schema must be no looser than that input schema.
-        "summary_too_long": mutated(lambda o: o["document"].update(summary="x" * 8001)),
-        "summary_trailing_newline": mutated(
-            lambda o: o["document"].update(summary="Ready to start.\n")
-        ),
-        "summary_leading_space": mutated(lambda o: o["document"].update(summary=" Ready.")),
         "key_details_missing_metadata": mutated(
             lambda o: o["document"]["sections"][1].pop("metadata")
         ),

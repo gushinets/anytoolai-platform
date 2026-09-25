@@ -1,0 +1,35 @@
+{
+  "response_json": {
+    "sections": [
+      {
+        "id": "acceptance-criteria",
+        "title": "Acceptance criteria",
+        "content": "Not specified in the brief.",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "deliverables",
+        "title": "Deliverables",
+        "content": "Not specified in the brief.",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "open-gaps",
+        "title": "Open gaps",
+        "content": "The brief does not state the deliverables, deadline, budget, target audience or constraints; the client should confirm each of them."
+      }
+    ],
+    "summary": "No acceptance criteria could be drafted because the brief states only a goal. Ask the client for deliverables, deadline, budget and constraints first."
+  },
+  "input_tokens": 120,
+  "output_tokens": 90,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "acceptance_builder.draft_from_brief_document_v1.weak_input"
+  }
+}

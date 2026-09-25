@@ -25,7 +25,7 @@ only generic atoms -- no Platform Core changes, no product Python code.
   renderer-contract config.
 - `FreelancerSuiteBundle.config_roots()` wiring; README, `add-product-recipe.md` and
   `mvp-b-handoff-note.md` root counts.
-- Eight deterministic fake-provider fixtures: happy path and weak input for each of the four
+- Ten deterministic fake-provider fixtures: happy path and weak input for each of the five
   action configs.
 - Tests in `apps/platform-api/tests` (quick-check) and `freelancer-suite/tests` (full-check).
 
@@ -55,7 +55,8 @@ endpoints; a live-provider action-config variant.
 
 ## Design decisions
 
-1. **Two scenarios, one product** (confirmed by the owner): `acceptance_builder.draft_v1`
+1. **Two scenarios, one product** (confirmed by the owner; a third handoff-target scenario was
+   added in decision 7): `acceptance_builder.draft_v1`
    (brief -> acceptance criteria; input `brief_text`) and `acceptance_builder.check_v1` (check a
    deliverable against the brief; input `brief_text`, `deliverable_text`). Each is one workflow
    run, so the "second run receives an explicit user-selected string" criterion is met by having
@@ -79,20 +80,28 @@ endpoints; a live-provider action-config variant.
    sections (ids, titles, order, list metadata), the A01 "present XOR missing" invariant, one
    delta per criterion id in workflow order, `meets_expectations` => no `mismatch` and
    `does_not_meet` => at least one `mismatch` (A11's cross-validator relates neither).
-7. **Handoff readiness**: `draft_input.brief_text` is a plain string so ANY-26 can fill it from
-   Brief Decoder's `document.summary`; no `handoffs.yaml` here. To make that hold for every valid
-   Brief Decoder artifact (not just today's fixtures), `brief_decoder.decode_output_v1`'s
-   `document.summary` now carries the same `maxLength` (8000) and trimmed-text `pattern` as
-   `brief_text`, and a test compares the two schemas. This tightens the ANY-232 schema: a summary
-   over 8000 characters or with surrounding whitespace now fails that run instead of failing the
-   later handoff.
+7. **Handoff target is structured, not text** (review #2). Brief Decoder's `document.summary` is a
+   readiness note, so mapping it to `brief_text` would start a run that extracts almost nothing,
+   and `output_mapping` cannot echo `scenario.input`, so the artifact cannot carry the original
+   brief without a Platform Core change (out of scope) or an unverifiable LLM copy. Instead a
+   third scenario, `acceptance_builder.draft_from_brief_v1`, takes Brief Decoder's always-present
+   `brief` object (values + missing_fields) and runs one A10 step that drafts the document from
+   those facts. Its input schema is a verbatim copy of Brief Decoder's `brief` schema and a test
+   asserts equality, so every valid Brief Decoder brief is valid input; tests also run the real
+   Brief Decoder brief fixtures through it. Direct users keep `draft_v1` (brief text). The
+   mapping itself (`brief` -> `brief`) and `handoffs.yaml` remain ANY-26. The earlier
+   `document.summary` bound on the Brief Decoder schema was reverted; ANY-232 is untouched.
+   Trade-off: criteria here are drafted from structured facts (deliverables, constraints,
+   deadline, budget) rather than extracted by A01, so `draft_from_brief` has no `extracted`
+   lists and no assumptions section.
 
 ## Implementation steps
 
 1. Product, scenario, frontend, quota, schema, action-config, prompt and workflow config.
-2. Four closed schemas (generated once from a shared shape so the `extracted` block cannot drift).
+2. Six closed schemas (generated once from a shared shape so the `extracted` block cannot drift;
+   the structured input reuses Brief Decoder's `brief` schema verbatim).
 3. Four prompts; `renderer_contract.yaml` with a per-scenario `scenarios:` list.
-4. Eight fixtures.
+4. Ten fixtures.
 5. Bundle wiring and root-count docs.
 6. Tests: `apps/platform-api/tests/test_acceptance_builder_bundle.py`,
    `freelancer-suite/tests/test_acceptance_builder_product.py`, `test_bundle_loads.py`.
@@ -111,6 +120,8 @@ python scripts/agent/runner.py full-check
 ## Decision log
 
 - 2026-09-25: decisions 1-5 fixed; owner confirmed the two-scenario shape.
+- 2026-09-26: review #2 found the summary-based handoff source unusable; owner chose a
+  structured target scenario (decision 7).
 
 ## Open questions
 

@@ -1,0 +1,35 @@
+{
+  "response_json": {
+    "sections": [
+      {
+        "id": "acceptance-criteria",
+        "title": "Acceptance criteria",
+        "content": "- The site includes a menu page\n- The site includes an order form\n- The site includes a contact page\n- The look is modern but also traditional\n- The site is delivered before the holiday season\n- The work fits a budget of around $3,000",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "deliverables",
+        "title": "Deliverables",
+        "content": "- menu page\n- order form\n- contact page",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "open-gaps",
+        "title": "Open gaps",
+        "content": "The target audience is not stated; the client should confirm it."
+      }
+    ],
+    "summary": "Six acceptance criteria were drafted from the brief. Confirm the target audience with the client first."
+  },
+  "input_tokens": 260,
+  "output_tokens": 150,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "acceptance_builder.draft_from_brief_document_v1"
+  }
+}

@@ -9,6 +9,10 @@ renderer_contract:
     - scenario_id: acceptance_builder.check_v1
       output_schema_ref: acceptance_builder.check_output_v1
       parts: [comparison_verdict, acceptance_criteria, assumptions, deliverables, copy_document]
+    # Handoff target: its result is the `document` alone (no extracted lists, no verdict).
+    - scenario_id: acceptance_builder.draft_from_brief_v1
+      output_schema_ref: acceptance_builder.draft_from_brief_output_v1
+      parts: [copy_document]
   parts:
     - part_id: comparison_verdict
       field: comparison

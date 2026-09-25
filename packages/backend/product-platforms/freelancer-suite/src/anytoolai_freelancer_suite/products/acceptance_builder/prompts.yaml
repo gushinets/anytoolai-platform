@@ -19,3 +19,8 @@ prompts:
     template_path: prompts/check_document.v1.md
     input_variables: []
     output_schema_ref: kernel.schemas.generate_document_output_v1
+  - prompt_ref: acceptance_builder.draft_from_brief_document.v1
+    version: 1
+    template_path: prompts/draft_from_brief_document.v1.md
+    input_variables: []
+    output_schema_ref: kernel.schemas.generate_document_output_v1

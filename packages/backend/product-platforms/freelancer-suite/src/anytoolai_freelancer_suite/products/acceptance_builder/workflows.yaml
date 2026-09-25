@@ -58,3 +58,18 @@ workflows:
           data.comparison: steps.compare.output
         output_mapping:
           context.workflow_output.document: steps.generate_document.output
+
+  - workflow_id: acceptance_builder.draft_from_brief_v1
+    version: 1
+    input_schema_ref: acceptance_builder.draft_from_brief_input_v1
+    output_schema_ref: acceptance_builder.draft_from_brief_output_v1
+    # A10 only: the input is already structured (a Brief Decoder `brief`), so there is nothing for
+    # A01 to extract. The workflow output is {document}.
+    steps:
+      - step_id: generate_document
+        action_config_id: acceptance_builder.draft_from_brief_document_v1
+        input_mapping:
+          template_ref: 'literal:"acceptance_builder.draft_from_brief_v1"'
+          data.brief: scenario.input.brief
+        output_mapping:
+          context.workflow_output.document: steps.generate_document.output
