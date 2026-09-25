@@ -1835,7 +1835,7 @@ def _prod_up_locked() -> int:
 
 
 def _stop_failed_prod_candidate() -> None:
-    if prod_down() != 0:
+    if _prod_down_locked() != 0:
         print(
             "PROD005: failed production candidate could not be stopped; "
             "run python scripts/agent/runner.py prod-down immediately",
@@ -1989,12 +1989,21 @@ def prod_status() -> int:
     )
 
 
-def prod_down() -> int:
+def _prod_down_locked() -> int:
     return run_with_env(
         _prod_compose_command("down", "--remove-orphans", include_env_file=False),
         _prod_control_env(),
         timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
     )
+
+
+def prod_down() -> int:
+    try:
+        with _prod_deployment_lock():
+            return _prod_down_locked()
+    except ProductionDeploymentLockError as exc:
+        print(f"PROD007: {exc}", file=sys.stderr)
+        return 1
 
 
 def prod_fake_down() -> int:
