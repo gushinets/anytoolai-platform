@@ -19,6 +19,8 @@ import {
   type PlatformApiError,
   type PlatformApiResult,
 } from "@anytoolai/ce-kit";
+import { useIsomorphicLayoutEffect } from "../lib/useIsomorphicLayoutEffect";
+import { LanguageSwitcher, useHostT, useLocale, useProductT, type Locale } from "../i18n";
 import styles from "./HandoffConsent.module.css";
 
 export type HandoffConsentProps = {
@@ -40,22 +42,22 @@ const HANDOFF_STATUS_IS_TERMINAL: Record<HandoffStatus, boolean> = {
   failed: true,
 };
 
-// User-facing copy for the wire enum. Exhaustive over HandoffStatus so a new status fails typecheck
-// here instead of leaking its raw value into the UI. `consumed` means the accepted handoff already
-// created its target session, which is one "Accepted" outcome from the user's side.
-const HANDOFF_STATUS_LABEL: Record<HandoffStatus, string> = {
-  created: "Waiting for your decision",
-  viewed: "Waiting for your decision",
-  accepted: "Accepted",
-  consumed: "Accepted",
-  declined: "Declined",
-  expired: "Expired",
-  failed: "Failed",
+// Message key (`status.*`) for the wire enum. Exhaustive over HandoffStatus so a new status fails
+// typecheck here instead of leaking its raw value into the UI. `consumed` means the accepted handoff
+// already created its target session, which is one "Accepted" outcome from the user's side.
+const HANDOFF_STATUS_KEY: Record<HandoffStatus, "waiting" | "accepted" | "declined" | "expired" | "failed"> = {
+  created: "waiting",
+  viewed: "waiting",
+  accepted: "accepted",
+  consumed: "accepted",
+  declined: "declined",
+  expired: "expired",
+  failed: "failed",
 };
 
-function formatExpiry(iso: string): string {
+function formatExpiry(iso: string, locale: Locale): string {
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function isTerminalHandoffStatus(status: HandoffStatus): boolean {
@@ -66,13 +68,13 @@ type ViewState =
   | { kind: "loading" }
   | { kind: "not-found" }
   | { kind: "safe-error" }
-  | { kind: "consent"; preview: HandoffPreview; pending: "accept" | "decline" | null; actionError: string | null }
+  | { kind: "consent"; preview: HandoffPreview; pending: "accept" | "decline" | null; actionFailed: boolean }
   | { kind: "terminal"; preview: HandoffPreview };
 
 function stateForPreview(preview: HandoffPreview): ViewState {
   return isTerminalHandoffStatus(preview.status)
     ? { kind: "terminal", preview }
-    : { kind: "consent", preview, pending: null, actionError: null };
+    : { kind: "consent", preview, pending: null, actionFailed: false };
 }
 
 function viewStateFromResult(result: PlatformApiResult<HandoffPreview>): ViewState {
@@ -89,6 +91,9 @@ function viewStateFromResult(result: PlatformApiResult<HandoffPreview>): ViewSta
  * always rendered as opaque key/value pairs, never by assuming specific keys.
  */
 export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
+  const t = useProductT();
+  const th = useHostT();
+  const { locale } = useLocale();
   const [state, setState] = useState<ViewState>({ kind: "loading" });
   // `guestId === undefined` doubles as "identity resolution failed": by the time the consent view
   // can render at all, resolution has already settled (below), so there's no separate "still
@@ -154,7 +159,7 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
   // consumed token unreplayable from the client's side: the backend's current state always wins.
   function showRetryableActionError(): void {
     setState((prev) =>
-      prev.kind === "consent" ? { ...prev, pending: null, actionError: "That action could not be completed. Please try again." } : prev,
+      prev.kind === "consent" ? { ...prev, pending: null, actionFailed: true } : prev,
     );
   }
 
@@ -187,7 +192,7 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
     kind: "accept" | "decline",
     mutate: () => Promise<PlatformApiResult<HandoffPreview>>,
   ) {
-    setState((prev) => (prev.kind === "consent" ? { ...prev, pending: kind, actionError: null } : prev));
+    setState((prev) => (prev.kind === "consent" ? { ...prev, pending: kind, actionFailed: false } : prev));
     try {
       const result = await mutate();
       if (result.ok) {
@@ -222,23 +227,23 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
   if (state.kind === "loading") {
     return (
       <HandoffShell>
-        <p role="status">Loading handoff…</p>
+        <p role="status">{t("loading")}</p>
       </HandoffShell>
     );
   }
   if (state.kind === "not-found") {
     return (
       <HandoffShell>
-        <Toast variant="error">This handoff link is not valid.</Toast>
+        <Toast variant="error">{t("notFound")}</Toast>
       </HandoffShell>
     );
   }
   if (state.kind === "safe-error") {
     return (
       <HandoffShell>
-        <Toast variant="error">Something went wrong loading this handoff. Please try again.</Toast>
+        <Toast variant="error">{t("loadFailed")}</Toast>
         <Button variant="secondary" onClick={retryAfterSafeError}>
-          Try again
+          {t("retry")}
         </Button>
       </HandoffShell>
     );
@@ -248,16 +253,19 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
   return (
     <HandoffShell>
       <dl className={styles.details}>
-        <dt>From</dt>
+        <dt>{t("fields.from")}</dt>
         <dd>{preview.sourceProductDisplayName}</dd>
-        <dt>To</dt>
+        <dt>{t("fields.to")}</dt>
         <dd>{preview.targetProductDisplayName}</dd>
-        <dt>Expires</dt>
+        <dt>{t("fields.expires")}</dt>
         <dd>
-          <time dateTime={preview.expiresAt}>{formatExpiry(preview.expiresAt)}</time>
+          <time dateTime={preview.expiresAt}>{formatExpiry(preview.expiresAt, locale)}</time>
         </dd>
-        <dt>Status</dt>
-        <dd>{HANDOFF_STATUS_LABEL[preview.status]}</dd>
+        <dt>{t("fields.status")}</dt>
+        {/* One element in both the consent and the terminal view, so when an action settles its text
+            change is announced: the pending line below disappears with the consent controls and the
+            focused button unmounts, which would otherwise leave no sign that the outcome arrived. */}
+        <dd aria-live="polite">{t(`status.${HANDOFF_STATUS_KEY[preview.status]}`)}</dd>
         {Object.entries(preview.preview).map(([key, value]) => (
           <div key={key} className={styles.entry}>
             <dt>{key}</dt>
@@ -273,7 +281,7 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
               loading={state.pending === "accept"}
               disabled={state.pending !== null || guestId === undefined}
             >
-              Accept
+              {t("accept")}
             </Button>
             <Button
               variant="secondary"
@@ -281,20 +289,20 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
               loading={state.pending === "decline"}
               disabled={state.pending !== null}
             >
-              Decline
+              {t("decline")}
             </Button>
           </div>
           {/* The spinner is decorative (see Spinner), so the in-flight state is also announced. */}
           {state.pending ? (
             <p role="status" className={styles.status}>
-              {state.pending === "accept" ? "Accepting…" : "Declining…"}
+              {state.pending === "accept" ? t("accepting") : t("declining")}
             </p>
           ) : null}
           {/* Decline stays available: it needs no guest attribution, unlike Accept. */}
           {guestId === undefined ? (
-            <Toast variant="error">We couldn't verify your identity. Please reload the page and try again.</Toast>
+            <Toast variant="error">{th("identityUnavailable")}</Toast>
           ) : null}
-          {state.actionError ? <Toast variant="error">{state.actionError}</Toast> : null}
+          {state.actionFailed ? <Toast variant="error">{t("actionFailed")}</Toast> : null}
         </>
       ) : null}
     </HandoffShell>
@@ -302,10 +310,32 @@ export function HandoffConsent({ client, handoffToken }: HandoffConsentProps) {
 }
 
 function HandoffShell({ children }: { children: ReactNode }) {
+  const t = useProductT();
+  const title = t("title");
+  // The server layout can only give the English fallback title (it does not know the user's
+  // language), so the tab title follows the active locale here, like the page itself. Next streams
+  // the route's own title in after hydration, which would replace one set only once, so the title
+  // is re-applied whenever <head> changes it back. Layout-effect timing, like `<html lang>` in
+  // LocaleProvider, so a language switch changes the page, `lang` and the tab title together.
+  useIsomorphicLayoutEffect(() => {
+    const full = `${title} · AnytoolAI`;
+    const apply = () => {
+      if (document.title !== full) {
+        document.title = full;
+      }
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [title]);
   return (
     <main className={`page-container ${styles.page}`}>
       <Card className={styles.card}>
-        <h1 className={styles.title}>Review handoff</h1>
+        <header className={styles.header}>
+          <h1 className={styles.title}>{title}</h1>
+          <LanguageSwitcher />
+        </header>
         {children}
       </Card>
     </main>
