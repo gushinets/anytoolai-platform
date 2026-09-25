@@ -2,12 +2,12 @@
 
 ## Status
 
-- State: active
+- State: completed
 - Owner: agent
 - Created: 2026-09-23
 - Last updated: 2026-09-25
 - Review date: 2026-09-30
-- Next action: push and open the PR; ANY-232 (PR #141) is already merged into main.
+- Next action: none (merged: #147; ANY-232 in #141).
 - Blocker: none
 
 ## Goal
@@ -20,7 +20,7 @@ multi-product web host, reusing the ANY-453 shared runtime. Page, renderer and b
 ### In scope
 
 - `apps/web-mirror/src/products/briefDecoder/`: product definition, four-part renderer, pure
-  `briefDecoderResult.ts`, messages for all 7 locales; registry entry.
+  `parseBriefDecoder.ts`, messages for all 7 locales; registry entry.
 - Shared runtime: optional `ProductDefinition.emitsResultViewed` gating `web.result_viewed`.
 - Vitest: `BriefDecoderProduct.test.tsx`, shared hook tests in `ProductRunPage.test.tsx`.
 - `tests/e2e/brief-decoder-smoke` Playwright package, `brief-decoder-smoke` runner command and a
