@@ -264,6 +264,34 @@ def _parse_expectations(values: Sequence[str]) -> dict[str, ProductProfileExpect
     return expectations
 
 
+def check_deployment_profile_from_manifest(
+    manifest_path: Path,
+    expected_fingerprint: str,
+    enabled_products: str,
+    unmetered_products: str,
+) -> None:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest["container_products_root"] != CONTAINER_PRODUCTS_ROOT.as_posix():
+        raise ValueError("profile manifest has unexpected container products root")
+    if manifest["profile_fingerprint"] != expected_fingerprint:
+        raise ValueError("profile manifest fingerprint differs from deployment selection")
+    selected = set(enabled_products.split(","))
+    unmetered = set(unmetered_products.split(",")) if unmetered_products else set()
+    products = manifest["enabled_products"]
+    if not selected or "" in selected or set(products) != selected:
+        raise ValueError("profile manifest enabled products differ from deployment selection")
+    if set(manifest["unmetered_product_ids"]) != unmetered:
+        raise ValueError("profile manifest quota modes differ from deployment selection")
+    expectations = {}
+    for product_id, refs in products.items():
+        if refs["provider_policy_ref"] != LIVE_PROVIDER_POLICY_REF:
+            raise ValueError(f"{product_id}: profile manifest has non-live provider policy")
+        expectations[product_id] = ProductProfileExpectation(
+            refs["provider_policy_ref"], refs["quota_policy_ref"]
+        )
+    check_deployment_profile(CONTAINER_PRODUCTS_ROOT, expected_fingerprint, expectations)
+
+
 def load_registry(bundles: Iterable[ProductBundle] | None = None) -> ConfigRegistry:
     """Split out from main() so a test can inspect the loaded registry directly (e.g. assert a
     fixture bundle's product actually landed in it) instead of only observing main()'s exit
@@ -296,6 +324,11 @@ def main(argv: Sequence[str] = ()) -> int:
             check.add_argument("--products-root", type=Path, required=True)
             check.add_argument("--expected-fingerprint", required=True)
             check.add_argument("--expect-product", action="append", required=True)
+            startup_check = commands.add_parser("check-deployment-profile-from-manifest")
+            startup_check.add_argument("--manifest", type=Path, required=True)
+            startup_check.add_argument("--expected-fingerprint", required=True)
+            startup_check.add_argument("--enabled-products", required=True)
+            startup_check.add_argument("--unmetered-products", default="")
             source_check = commands.add_parser("check-source-fingerprint")
             source_check.add_argument("--products-root", type=Path, required=True)
             source_check.add_argument("--expected-fingerprint", required=True)
@@ -317,13 +350,29 @@ def main(argv: Sequence[str] = ()) -> int:
                     _parse_expectations(parsed.expect_product),
                 )
                 print(f"Deployment profile verified: {parsed.expected_fingerprint}")
+            elif parsed.command == "check-deployment-profile-from-manifest":
+                check_deployment_profile_from_manifest(
+                    parsed.manifest,
+                    parsed.expected_fingerprint,
+                    parsed.enabled_products,
+                    parsed.unmetered_products,
+                )
+                print(f"Deployment profile verified: {parsed.expected_fingerprint}")
             else:
                 check_source_fingerprint(parsed.products_root, parsed.expected_fingerprint)
                 print("Canonical source fingerprint verified")
             return 0
         load_registry()
         load_model_capability_overrides(default_model_capability_overrides_path())
-    except (RegistryLoadError, ConfigError, ValueError, OSError, yaml.YAMLError) as error:
+    except (
+        RegistryLoadError,
+        ConfigError,
+        ValueError,
+        OSError,
+        KeyError,
+        TypeError,
+        yaml.YAMLError,
+    ) as error:
         print(str(error), file=sys.stderr)
         return 1
 

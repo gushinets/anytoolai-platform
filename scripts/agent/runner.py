@@ -843,6 +843,19 @@ def _profile_check_args(manifest: dict[str, object]) -> list[str]:
     return args
 
 
+def _deployment_profile_env(
+    manifest: dict[str, object], enabled_products: Sequence[str], unmetered_products: Sequence[str]
+) -> dict[str, str]:
+    products_root = str(manifest["generated_products_root"])
+    return {
+        "ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT": products_root,
+        "ANYTOOLAI_DEPLOYMENT_MANIFEST_PATH": str(Path(products_root).parent / "manifest.json"),
+        "ANYTOOLAI_DEPLOYMENT_PROFILE_FINGERPRINT": str(manifest["profile_fingerprint"]),
+        "ANYTOOLAI_ENABLED_PRODUCT_IDS": ",".join(enabled_products),
+        "ANYTOOLAI_UNMETERED_PRODUCT_IDS": ",".join(unmetered_products),
+    }
+
+
 def _run_effective_profile_checks(
     compose_command: Sequence[str], manifest: dict[str, object], env: dict[str, str]
 ) -> int:
@@ -992,7 +1005,7 @@ def dev_live_up(product_id: str, quota_mode: str = "unmetered") -> int:
     )
     if exit_code != 0 or manifest is None:
         return exit_code
-    env["ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT"] = str(manifest["generated_products_root"])
+    env.update(_deployment_profile_env(manifest, [product_id], unmetered))
     compose = _dev_live_compose_command(identity)
     exit_code = run_with_env([*compose, "up", "-d", "--force-recreate", "--remove-orphans"], env)
     if exit_code != 0:
@@ -1622,9 +1635,9 @@ def prod_up() -> int:
     )
     if exit_code != 0 or manifest is None:
         return exit_code or 1
-    env = inputs.compose_env | {
-        "ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT": str(manifest["generated_products_root"])
-    }
+    env = inputs.compose_env | _deployment_profile_env(
+        manifest, inputs.enabled_product_ids, sorted(inputs.unmetered_product_ids)
+    )
     try:
         stack_running = _prod_stack_running()
     except FileNotFoundError as exc:
@@ -1758,9 +1771,9 @@ def prod_ready(
     except (ValueError, OSError, KeyError, TypeError) as exc:
         print(f"PROD001: {exc}", file=sys.stderr)
         return 2
-    env = inputs.compose_env | {
-        "ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT": str(manifest["generated_products_root"])
-    }
+    env = inputs.compose_env | _deployment_profile_env(
+        manifest, inputs.enabled_product_ids, sorted(inputs.unmetered_product_ids)
+    )
     exit_code = _check_source_fingerprint(manifest, env)
     if exit_code != 0:
         return exit_code

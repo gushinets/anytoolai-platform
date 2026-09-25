@@ -277,6 +277,45 @@ def test_check_deployment_profile_rejects_wrong_bundle_root(tmp_path):
         )
 
 
+def test_startup_profile_check_rejects_stale_mount_and_selection(monkeypatch, tmp_path):
+    output_dir = tmp_path / "freelancer-suite"
+    manifest = validate_configs.build_deployment_profile(
+        output_dir, ["proposal_ai"], {"proposal_ai"}
+    )
+    products_root = output_dir / "products"
+    monkeypatch.setattr(
+        validate_configs.FreelancerSuiteBundle, "_package_dir", lambda self: output_dir
+    )
+    monkeypatch.setattr(
+        validate_configs.FreelancerSuiteBundle,
+        "config_roots",
+        lambda self: [
+            products_root / name
+            for name in ("proposal_ai", "client_update_writer", "brief_decoder")
+        ],
+    )
+    monkeypatch.setattr(validate_configs, "CONTAINER_PRODUCTS_ROOT", products_root)
+    check = [
+        "check-deployment-profile-from-manifest",
+        "--manifest",
+        str(output_dir / "manifest.json"),
+        "--expected-fingerprint",
+        manifest.profile_fingerprint,
+        "--enabled-products",
+        "proposal_ai",
+        "--unmetered-products",
+        "proposal_ai",
+    ]
+    saved = json.loads((output_dir / "manifest.json").read_text())
+    saved["container_products_root"] = products_root.as_posix()
+    (output_dir / "manifest.json").write_text(json.dumps(saved))
+    assert validate_configs.main(check) == 0
+    assert validate_configs.main([*check[:4], "0" * 64, *check[5:]]) == 1
+    assert validate_configs.main([*check[:-1], ""]) == 1
+    (products_root / "proposal_ai" / "action_configs.yaml").write_text("action_configs: []\n")
+    assert validate_configs.main(check) == 1
+
+
 def test_profile_cli_build_and_check_fail_closed(monkeypatch, tmp_path, capsys):
     output_dir = tmp_path / "freelancer-suite"
     assert (

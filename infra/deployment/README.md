@@ -181,8 +181,9 @@ python scripts/agent/runner.py dev-live-up --product proposal_ai
 python scripts/agent/runner.py dev-web
 ```
 
-The first command generates an unmetered live profile, starts the development Compose stack,
-and checks the mounted profile in API and worker. The second starts the local web host in a
+The first command generates an unmetered live profile. API and worker verify their mounted
+profile against the selected manifest before either process starts; readiness checks both again.
+The second command starts the local web host in a
 separate terminal. Run more than ten Proposal AI submissions, check successful live provider
 rows in `platform.provider_calls` and Squid CONNECT records, and confirm there is no quota GET
 or `429`. Repeat with `dev-live-up --product proposal_ai --quota-mode canonical` and verify

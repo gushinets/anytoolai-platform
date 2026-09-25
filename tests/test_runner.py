@@ -1382,6 +1382,8 @@ def test_prod_up_builds_profile_before_live_compose_and_ready(monkeypatch) -> No
         for path in (runner.COMPOSE_FILE, runner.COMPOSE_PROD_FILE, runner.COMPOSE_LIVE_FILE)
     )
     assert environments[0]["ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT"] == "C:/generated/products"
+    assert environments[0]["ANYTOOLAI_DEPLOYMENT_MANIFEST_PATH"].endswith("manifest.json")
+    assert environments[0]["ANYTOOLAI_DEPLOYMENT_PROFILE_FINGERPRINT"] == "fingerprint"
     assert "--force-recreate" in commands[0]
     assert environments[0]["ANYTOOLAI_ENABLED_PRODUCT_IDS"] == "proposal_ai"
     assert "ANYTOOLAI_UNMETERED_PRODUCT_IDS" not in commands[0]
@@ -1399,7 +1401,10 @@ def test_prod_up_stops_candidate_after_start_or_readiness_failure(
     monkeypatch.setattr(runner, "_deployment_inputs", lambda: inputs)
     monkeypatch.setattr(
         runner, "_build_deployment_profile",
-        lambda *args: (0, {"generated_products_root": "C:/generated/products"}),
+        lambda *args: (
+            0,
+            {"generated_products_root": "C:/generated/products", "profile_fingerprint": "f" * 64},
+        ),
     )
     monkeypatch.setattr(runner, "_prod_stack_running", lambda: True)
     monkeypatch.setattr(runner, "run_with_env", lambda command, env: events.append("up") or up_exit)
@@ -2464,6 +2469,9 @@ def test_dev_live_up_checks_both_mounted_profiles_before_ready(monkeypatch, tmp_
     assert len(calls) == 3  # compose up, API check, worker check
     assert "--force-recreate" in calls[0][0]
     assert calls[0][1]["ANYTOOLAI_DEPLOYMENT_PRODUCTS_ROOT"] == str(tmp_path / "products")
+    assert calls[0][1]["ANYTOOLAI_DEPLOYMENT_PROFILE_FINGERPRINT"] == "a" * 64
+    assert calls[0][1]["ANYTOOLAI_ENABLED_PRODUCT_IDS"] == "proposal_ai"
+    assert calls[0][1]["ANYTOOLAI_UNMETERED_PRODUCT_IDS"] == "proposal_ai"
     assert calls[0][1]["ANYTOOLAI_LLM_HTTPS_PROXY"] == ""
     assert "platform-api" in calls[1][0]
     assert "platform-worker" in calls[2][0]
