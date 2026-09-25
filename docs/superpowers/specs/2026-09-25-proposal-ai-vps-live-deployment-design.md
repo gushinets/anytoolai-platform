@@ -1,134 +1,149 @@
 # Proposal AI VPS Live Deployment Design
 
 **Date:** 2026-09-25
-**Status:** Proposed
-**Scope:** Deploy Proposal AI as the first public product on the existing AnytoolAI platform, call OpenAI through an operator-owned Squid forward proxy, remove the Proposal AI guest quota in production, and leave a reusable path for later products and local live-provider runs.
+**Status:** Proposed, revised after external review
+**Scope:** Deploy Proposal AI as the first public product on the existing AnytoolAI platform, call OpenAI through an operator-owned Squid forward proxy, launch initially without a guest quota, retain a configuration switch for later anonymous quotas, and provide a reusable local/live path for subsequent Freelancer Suite products.
 
 ## 1. Outcome
 
-The repository will support two deliberately different operating modes without editing canonical product files by hand:
+The repository supports two modes without hand-editing canonical product files:
 
-- deterministic development and CI continue to use the checked-in fake-provider configuration;
-- a selected product can use a checked-in live-provider overlay in local development or production.
+- normal development and CI load the checked-in fake-provider configuration;
+- local live and production deployments generate a validated deployment profile from the current canonical product tree.
 
-The first production deployment selects `proposal_ai`, uses the existing `default_text_generation_v1` provider policy and OpenAI model alias, applies no Proposal AI quota, routes worker HTTP traffic through Squid, and serves the product through the shared `web-mirror` host.
+The first production profile enables only `proposal_ai`, changes its standard fake provider policy to the existing OpenAI-backed policy, makes its guest usage unmetered, routes worker HTTP traffic through Squid, and serves it through the shared `web-mirror` host.
 
-Later products reuse the same worker, proxy, web host, Compose overlay, and runner command. Each product adds only its explicit live action configuration and, if required, its own production quota override.
+The same mechanism can start any current Freelancer Suite product locally when its actions use `default_fake_provider_v1`. Later production releases reuse the generator, Compose overlay, worker, proxy, API, and web host.
 
-## 2. Constraints and invariants
+## 2. Decisions and invariants
 
+- Canonical product YAML remains the only committed product definition.
+- Generated deployment profiles are gitignored runtime artifacts under `.agent/`.
+- No committed full copies of `action_configs.yaml`, `product.yaml`, or `quotas.yaml` are maintained.
 - Product code and frontends never select an LLM provider or model.
 - OpenAI calls continue through Provider Gateway and the existing LiteLLM adapter.
 - Only `platform-worker` receives `OPENAI_API_KEY` and outbound proxy settings.
-- Platform API and worker load the same effective product definitions.
-- Tests and normal `dev-up` remain credential-free and deterministic.
-- No database migration is introduced for the unmetered product.
-- No implicit global rewrite from fake policies to live policies is introduced.
-- No new provider abstraction, deployment framework, or generic configuration merge engine is introduced.
+- Platform API and worker mount and validate the same generated product tree.
+- Normal `dev-up`, CI, and existing smoke tests remain credential-free and fake-backed.
+- Quota selection is independent of provider selection.
+- No database migration is required to enable or disable a quota.
+- No generic YAML merge engine, provider abstraction, or deployment framework is introduced.
 - Secrets and proxy credentials are never committed.
 
-## 3. Configuration layers
+## 3. Generated deployment profile
 
-The deployment separates three concerns which must remain independently selectable.
+### 3.1 Source and output
 
-### 3.1 Live provider
+Extend `scripts/agent/validate_configs.py`, one of the three approved Freelancer Suite composition boundaries, so it can build and validate a deployment profile.
 
-Add a deployment-owned live `action_configs.yaml` for Proposal AI under:
+For each run it:
 
-`infra/deployment/products/proposal_ai/live/action_configs.yaml`
+1. resolves the canonical product roots through `FreelancerSuiteBundle`;
+2. copies the complete current `products/` tree to `.agent/deployment-profiles/<compose-project>/freelancer-suite/products`;
+3. transforms only the requested live products;
+4. loads kernel config plus the generated product roots through the real `ConfigLoader`;
+5. verifies the requested provider and quota modes;
+6. writes a small machine-readable manifest containing the source directory, container target, live product ids, quota modes, and a fingerprint of the canonical inputs.
 
-It contains the same Proposal AI action definition as the canonical product file, except that `provider_policy_ref` is `default_text_generation_v1` instead of `default_fake_provider_v1`.
+Copying the tree at execution time prevents drift: prompt, schema, workflow, frontend, and product changes are present in the generated profile immediately. The profile is regenerated before every `dev-live-up` and `prod-up`.
 
-The file is a complete loader input, not a partial YAML merge. Docker Compose mounts it read-only over the canonical `action_configs.yaml` path in both Platform API and worker containers. This preserves the repository rule that definitions are explicit and avoids adding hidden merge behavior to `ConfigLoader`.
+### 3.2 Provider transform
 
-The existing provider policy and LiteLLM router remain the source of truth for retries, model alias, and the concrete OpenAI model. A later product may reuse this policy or supply a different named policy when its model or retry requirements differ.
-
-### 3.2 Production quota
-
-Add full production replacements under:
-
-- `infra/deployment/products/proposal_ai/unmetered/product.yaml`
-- `infra/deployment/products/proposal_ai/unmetered/quotas.yaml`
-
-The production `product.yaml` omits `quota_policy_ref`. The production `quotas.yaml` contains `quota_policies: []` so the loader does not see an unused local quota definition.
-
-These files are mounted read-only into Platform API and worker in production only. Local live-provider mode changes the provider but retains the canonical development quota unless a future explicit unmetered local mode is requested.
-
-Absence of `quota_policy_ref` is the platform's existing representation of an unmetered product. It avoids fake large limits, quota writes, quota exhaustion responses, and a database migration.
-
-### 3.3 Outbound network
-
-The worker receives:
+For every selected live product, the generator replaces exact action-config references from:
 
 ```text
-OPENAI_API_KEY
-HTTPS_PROXY
-AIOHTTP_TRUST_ENV=true
+default_fake_provider_v1
 ```
 
-The operator-facing proxy variable is named `ANYTOOLAI_LLM_HTTPS_PROXY`; Compose maps it to `HTTPS_PROXY` only inside the worker. The API and web containers do not receive the OpenAI key or Squid credentials.
-
-The proxy value uses the usual Squid URL form:
+to:
 
 ```text
-http://[user:password@]proxy-host:3128
+default_text_generation_v1
 ```
 
-Squid must allow CONNECT traffic to `api.openai.com`. The current model-catalog refresh can also reach `raw.githubusercontent.com`; the Squid allowlist must permit that host while catalog refresh is enabled.
+It fails closed when:
 
-If Squid performs TLS interception, its CA certificate is mounted read-only and exposed through `SSL_CERT_FILE`. A normal CONNECT tunnel requires no custom CA.
+- the product id is unknown;
+- the product has no action config using the standard fake policy;
+- a requested transform would leave a standard fake policy in that product;
+- the generated registry does not resolve every changed action to the requested live policy.
 
-Proxy environment variables route normal application traffic but do not enforce network isolation. If direct egress must be impossible, the VPS firewall permits the worker host to reach only the Squid address and required infrastructure endpoints.
+The existing provider policy and LiteLLM router remain authoritative for retry behavior, model alias, and the concrete OpenAI model. This deliberately covers the current product family. If a future product needs different live policies per action, add a small explicit action-to-policy mapping then; do not guess that requirement now.
 
-Docker image pulls and image builds use Docker daemon/build proxy configuration, not the worker's runtime proxy environment. This remains an operator concern and is documented separately from application runtime configuration.
+### 3.3 Quota modes
+
+Each live product independently uses one of two quota modes:
+
+- `canonical`: copy `product.yaml` and `quotas.yaml` unchanged, preserving the product's checked-in anonymous quota;
+- `unmetered`: remove `quota_policy_ref` from the generated `product.yaml` and write `quota_policies: []` to the generated `quotas.yaml`.
+
+The initial Proposal AI production profile uses `unmetered`.
+
+Production selection uses:
+
+```text
+ANYTOOLAI_ENABLED_PRODUCT_IDS=proposal_ai
+ANYTOOLAI_UNMETERED_PRODUCT_IDS=proposal_ai
+```
+
+`ANYTOOLAI_UNMETERED_PRODUCT_IDS` must be a subset of enabled product ids. To restore Proposal AI's anonymous quota later, remove `proposal_ai` from that variable and redeploy. The generator then uses its canonical quota policy without code changes or a database migration.
+
+New quota limits, periods, or dimensions remain product definitions and are changed in the canonical product YAML with normal tests and review. Deployment configuration only chooses whether that defined anonymous quota is active; it does not encode business policy in environment variables.
+
+Local live mode defaults to `unmetered` so a persisted guest identity cannot exhaust a lifetime test quota. An explicit `--quota-mode canonical` option allows a real-provider quota test when needed.
+
+### 3.4 Compose mount
+
+Add one shared `infra/compose/docker-compose.live.yml` overlay. It read-only bind-mounts the generated Freelancer Suite `products/` directory over the editable package's container path in both Platform API and worker:
+
+```text
+/app/packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products
+```
+
+The source path comes from the validated profile manifest. The target is fixed because both current Docker images install the local Freelancer Suite dependency as editable from the repository copied to `/app`.
+
+Mounting the generated directory once supports several enabled products without per-product Compose files or a dynamic YAML list.
 
 ## 4. Reusable local live mode
-
-Add a product-owned Compose overlay:
-
-`infra/deployment/products/proposal_ai/docker-compose.live.yml`
-
-It defines Proposal AI's live action configuration as a Compose `config` and mounts it into both Platform API and worker. The repository runner resolves the selected product to this checked-in overlay rather than accepting unchecked shell paths.
 
 Extend `scripts/agent/runner.py` with:
 
 ```text
 python scripts/agent/runner.py dev-live-up --product proposal_ai
+python scripts/agent/runner.py dev-live-up --product proposal_ai --quota-mode canonical
 ```
 
-The command:
+`dev-live-up`:
 
-1. validates the product id against the composed product bundle;
-2. resolves `infra/deployment/products/<product>/live/action_configs.yaml` inside the repository;
-3. fails before Compose if the live file or `OPENAI_API_KEY` is missing;
-4. optionally loads the gitignored `infra/compose/.env.live` file;
-5. starts the normal base and development Compose files plus the selected product's `docker-compose.live.yml`;
-6. prints the existing per-worktree API endpoint;
-7. reuses `dev-ready` for readiness.
+1. resolves the per-worktree runtime identity;
+2. optionally loads the gitignored `infra/compose/.env.live`;
+3. requires `OPENAI_API_KEY`;
+4. generates and validates the profile;
+5. starts base Compose, the existing development overlay, and `docker-compose.live.yml`;
+6. runs the in-container effective-config verification described below;
+7. reuses `dev-ready` and prints endpoints plus the selected provider/quota modes.
 
-The existing `dev-down` command stops the stack. No source YAML is modified, so the next normal `dev-up` returns to the fake provider automatically.
+The existing `dev-down` stops the stack. A subsequent normal `dev-up` omits the live overlay and returns to canonical fake behavior.
 
-The local web host remains the existing native command:
+Add a foreground command for the shared web host:
 
 ```text
-pnpm --filter @anytoolai/web-mirror dev
+python scripts/agent/runner.py dev-web
 ```
 
-This intentionally avoids adding a second process supervisor to `runner.py`. A one-command backend-plus-frontend launcher can be added only if repeated local use proves that two terminals are a material problem.
+It derives the same worktree API URL, sets `PLATFORM_API_BASE_URL` before `next dev`, and invokes the existing `pnpm --filter @anytoolai/web-mirror dev`. This avoids the current incorrect fixed-port fallback without adding a process supervisor.
 
-For every later product, a live action config and its tiny product-owned Compose overlay become release-checklist items. The generic command then works without changes to runner or central Compose files.
+## 5. Production composition
 
-## 5. Production Compose and web delivery
+### 5.1 Production input
 
-### 5.1 Compose inputs
+`prod-up` continues to load the gitignored `infra/compose/.env.prod`. Runner resolves the required deployment values with the existing precedence (exported shell value over `.env.prod`), validates the enabled and unmetered product lists, generates the profile, and starts:
 
-`prod-up` continues to load the gitignored `infra/compose/.env.prod`. It reads `ANYTOOLAI_ENABLED_PRODUCT_IDS`, validates each id, and includes that product's checked-in live overlay plus its optional production overlay. Proposal AI's production overlay is:
+- `infra/compose/docker-compose.yml`;
+- `infra/compose/docker-compose.prod.yml`;
+- `infra/compose/docker-compose.live.yml`.
 
-`infra/deployment/products/proposal_ai/docker-compose.prod.yml`
-
-It mounts the two unmetered files into both API and worker. The central production Compose file remains product-neutral. When another product is released, its own overlay is added and its id is appended to the allowlist; runner and central Compose code do not change.
-
-Required production values are:
+Required values are:
 
 ```text
 ANYTOOLAI_POSTGRES_USER
@@ -137,135 +152,205 @@ ANYTOOLAI_POSTGRES_DB
 OPENAI_API_KEY
 ANYTOOLAI_LLM_HTTPS_PROXY
 ANYTOOLAI_ENABLED_PRODUCT_IDS=proposal_ai
+ANYTOOLAI_UNMETERED_PRODUCT_IDS=proposal_ai
+ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT
 ```
 
-Proxy credentials should preferably be avoided by allowing the VPS egress IP in Squid. If credentials are required, their presence in container environment metadata is documented as an operator-visible secret-handling limitation.
+`ANYTOOLAI_UNMETERED_PRODUCT_IDS` is required but may be explicitly empty when every enabled product should use its canonical anonymous quota.
 
-### 5.2 Web container
+Every enabled product must successfully transform to the live provider before Compose starts. Disabled products remain in the generated bundle tree with canonical configuration, but API admission and the web registry do not expose them.
 
-Add `infra/docker/web-mirror.Dockerfile` and a production `web-mirror` service. The image builds the existing pnpm workspace and runs the existing Next.js application; no new frontend package or server is introduced.
+### 5.2 Outbound Squid proxy
 
-At build time, `PLATFORM_API_BASE_URL` is set to `http://platform-api:8000`, matching the existing Next.js `/v1` rewrite. The browser therefore uses same-origin `/v1` requests while the Next server forwards them over the private Compose network.
+Compose maps the operator-facing `ANYTOOLAI_LLM_HTTPS_PROXY` to the worker only:
 
-The production web port binds to loopback by default. An operator-owned Nginx or Caddy instance terminates public HTTPS and forwards the product domain to that loopback port. Squid is outbound infrastructure and is not used as the inbound reverse proxy.
+```text
+HTTPS_PROXY
+AIOHTTP_TRUST_ENV=true
+```
 
-The API port also binds to loopback rather than all host interfaces. PostgreSQL remains unpublished.
+The API and web containers receive neither the OpenAI key nor proxy credentials.
 
-### 5.3 Released product visibility and admission
+The Squid URL uses:
 
-The shared web host and backend bundle currently contain more than one product. Add one deployment allowlist, `ANYTOOLAI_ENABLED_PRODUCT_IDS`, configured in production as `proposal_ai`.
+```text
+http://[user:password@]proxy-host:3128
+```
 
-`apps/web-mirror/src/products/registry.ts` uses it so unreleased product pages return the existing not-found state. Platform API uses the same value to reject runtime-config, quota, and scenario-start requests for disabled products before they reach product services. This prevents direct API callers from running a composed but unreleased product, including one that still points at deterministic fake output.
+Squid must permit CONNECT traffic to `api.openai.com`. Current best-effort model-catalog refresh also reaches `raw.githubusercontent.com`; failure to refresh the catalog does not stop Proposal AI execution.
 
-The variable's absence preserves the current development and test behavior with every registered product available. Its values must resolve to known product ids at startup; an unknown id fails startup instead of silently hiding a typo. Adding the next public product is an allowlist change plus that product's live configuration, not a new web service.
+If Squid performs TLS interception, its CA is mounted read-only and exposed through `SSL_CERT_FILE`. A normal CONNECT tunnel requires no custom CA.
 
-The backend still composes the complete default bundle set, preserving the API/worker/validation invariant. The allowlist is an API admission concern, not a product-definition filter, and the worker remains capable of completing already-accepted jobs during a rolling configuration change.
+Runtime proxy environment variables route application traffic but do not prevent direct egress. If bypass must be impossible, the VPS firewall restricts outbound worker traffic to the Squid address and required infrastructure endpoints.
+
+Docker pulls and builds use Docker daemon/build proxy configuration, not the worker runtime variables. This remains an operator concern documented in the deployment runbook.
+
+### 5.3 Released-product allowlist
+
+Platform API reads `ANYTOOLAI_ENABLED_PRODUCT_IDS`. Unknown ids fail startup. Runtime-config, quota, and scenario-start routes reject disabled products before they reach product services.
+
+The web pages are client components, so they cannot read that server-only variable at runtime. The web image build maps the same operator value to:
+
+```text
+NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS
+```
+
+Next.js bakes it into the browser bundle. `apps/web-mirror/src/products/registry.ts` filters against that public build-time value. Its absence preserves current development/test behavior with all registered products visible.
+
+A production browser smoke verifies both sides: Proposal AI loads, while another registered but disabled product returns the existing not-found state and cannot start through direct API calls.
+
+### 5.4 Web container and inbound proxy
+
+Add `infra/docker/web-mirror.Dockerfile` and a production `web-mirror` service. The image builds the existing pnpm workspace and runs the existing Next.js application.
+
+The Docker build sets `PLATFORM_API_BASE_URL=http://platform-api:8000`, preserving the existing same-origin `/v1` rewrite over the private Compose network.
+
+Web and API host ports bind to loopback. PostgreSQL remains unpublished. An operator-owned Nginx or Caddy instance terminates public HTTPS and forwards the product domain to web-mirror. Squid is outbound infrastructure and is not used for inbound traffic.
+
+Because Next currently forwards all `/v1`, the inbound reverse proxy explicitly denies:
+
+- `/atom-lab` and its static assets;
+- `/v1/atom-lab/*`;
+- `/v1/demo/*`.
+
+Production preflight also requires `ANYTOOLAI_DEMO_ACCESS_CODE`, `ANYTOOLAI_ATOM_LAB_ACCESS_CODE`, and `ANYTOOLAI_LIVE_CANARY_TOKEN` to be absent or blank for this public deployment. Existing application-level fail-closed checks remain defense in depth.
 
 ## 6. Unmetered frontend behavior
 
-The backend already represents an unmetered product with `quota_summary: null`. Update the shared product runtime in:
+The backend already represents an unmetered product with `quota_summary: null`. Update `apps/web-mirror/src/products/runtime/ProductRunPage.tsx` so it does not call the quota endpoint when runtime configuration contains no quota policy.
 
-`apps/web-mirror/src/products/runtime/ProductRunPage.tsx`
+The same guard applies at initial load and after “start another”. Canonical-quota mode continues to fetch and render quota state normally, so switching Proposal AI back to anonymous quota requires no frontend change.
 
-When runtime configuration reports no quota policy, the page does not call the quota endpoint and does not render quota state. The same guard applies after a completed run and after “start another”. This is shared behavior, not a Proposal AI special case, so later unmetered products inherit it.
+## 7. Effective-config verification
 
-## 7. Failure behavior
+Profile validation happens twice.
 
-- Missing `OPENAI_API_KEY`: `dev-live-up` and production preflight fail before starting a live stack.
-- Missing or unknown product live config: the runner fails with the expected path and no Compose mutation.
-- Invalid live/product/quota YAML: startup and `validate-configs` fail closed.
-- Unreachable or rejecting Squid: Provider Gateway records failed physical attempts using its existing ledger and retry policy; no direct fallback is added.
-- OpenAI validation failure: existing PydanticAI validation attempts remain authoritative.
-- Web cannot reach API: container health/readiness fails and `prod-ready` reports the failing surface.
-- Quota endpoint accidentally called for an unmetered product: frontend tests fail; runtime remains safe because quota absence does not deny execution.
+Before Compose, the generator loads the generated roots with the real `ConfigLoader` and asserts requested provider/quota modes.
 
-## 8. Change map
+After containers start, runner executes the config validator inside both Platform API and worker containers. It asserts:
+
+- the generated product tree is the root actually resolved by the editable bundle;
+- every enabled action uses the requested live provider policy;
+- every unmetered product has no quota policy;
+- every canonical-quota product matches its canonical quota definition;
+- API and worker report the same profile fingerprint.
+
+`prod-up` does not report ready if either container sees canonical fake configuration, a stale profile, or a different fingerprint. Provider/model information remains internal and is not added to frontend-safe runtime-config APIs.
+
+## 8. Resource limit
+
+The existing worker limit of 512 MB has not been proven with a cold LiteLLM/OpenAI run and model-catalog refresh. Production therefore requires an explicit `ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT` rather than silently retaining an unverified value.
+
+The target-VPS acceptance run records peak worker memory and verifies that the container was not restarted or marked `OOMKilled`. The operator chooses the initial value from available VPS RAM; after measurement it should retain practical headroom rather than match the observed peak exactly.
+
+## 9. Failure behavior
+
+- Missing OpenAI key, proxy, product allowlist, quota selection, or memory limit: production preflight fails before Compose mutation.
+- Unknown product or unmetered id outside the enabled set: profile generation fails.
+- Product without the standard fake policy: generic live transform fails and names the unsupported actions.
+- Invalid generated YAML or cross-reference: `ConfigLoader` fails before containers start.
+- Wrong or ineffective container mount: in-container effective-config verification fails readiness.
+- Unreachable or rejecting Squid: Provider Gateway records failed physical attempts through its existing ledger and retries; no direct fallback is added.
+- OpenAI validation failure: existing PydanticAI validation retries remain authoritative.
+- Web cannot reach API: web health/readiness fails.
+- Unmetered frontend accidentally requests quota: focused frontend tests fail; backend execution remains unmetered.
+
+## 10. Change map
 
 ### New files
 
-- `infra/deployment/products/proposal_ai/live/action_configs.yaml`
-- `infra/deployment/products/proposal_ai/unmetered/product.yaml`
-- `infra/deployment/products/proposal_ai/unmetered/quotas.yaml`
-- `infra/deployment/products/proposal_ai/docker-compose.live.yml`
-- `infra/deployment/products/proposal_ai/docker-compose.prod.yml`
-- `infra/docker/web-mirror.Dockerfile`
+- `infra/compose/docker-compose.live.yml` — one read-only generated-product-tree mount for API and worker.
+- `infra/docker/web-mirror.Dockerfile` — production Next.js image.
 
-### Modified runtime and deployment files
+### Modified backend, runner, and deployment files
 
-- `infra/compose/docker-compose.yml` — worker proxy mapping shared by local and production live mode.
-- `infra/compose/docker-compose.prod.yml` — product-neutral web service, loopback ports, restart/resource/health settings.
-- `scripts/agent/runner.py` — validated `dev-live-up --product`, enabled-product overlay composition, production web readiness/status output, and required production preflight.
-- `apps/platform-api/src/anytoolai_platform_api/settings.py` and product-scoped route dependencies — parse and validate the deployment product allowlist and reject disabled product admission.
-- `apps/web-mirror/src/products/runtime/ProductRunPage.tsx` — no quota request when runtime configuration is unmetered.
-- `apps/web-mirror/src/products/registry.ts` — deployment product allowlist while preserving current defaults.
+- `scripts/agent/validate_configs.py` — profile generation, profile-aware registry loading, fingerprints, and provider/quota assertions.
+- `scripts/agent/runner.py` — `dev-live-up`, `dev-web`, production profile generation, `.env.live`, preflight, Compose file selection, effective-config checks, and web readiness/status output.
+- `tests/test_runner.py` and config-validation tests — generation, strict transforms, quota modes, paths, environment validation, and identical container-check commands.
+- `infra/compose/docker-compose.yml` — worker OpenAI/proxy mapping shared by local and production live modes.
+- `infra/compose/docker-compose.prod.yml` — product-neutral web service, loopback ports, required memory setting, restart/resource/health configuration, and web build arguments.
+- `infra/compose/.env.example` — documented product allowlist, quota selection, proxy, and worker memory inputs.
+- `apps/platform-api/src/anytoolai_platform_api/settings.py` and product-scoped route dependencies — parse/validate the server allowlist and reject disabled product admission.
+- Platform API tests — unknown allowlist ids fail startup and disabled products cannot load runtime config, read quota, or start scenarios.
 
-### Tests and documentation
+### Modified web files
 
-- `tests/test_runner.py` — product-id/path validation, missing-key failure, local live overlay selection, multiple production overlay composition, and unchanged normal dev mode.
-- Platform API route/settings tests — unknown allowlist entries fail startup and disabled products cannot load runtime config, read quota, or start scenarios.
-- `apps/web-mirror/test/ProductRunPage.test.tsx` — unmetered initial and repeat-run behavior.
-- `apps/web-mirror/test/registry.test.tsx` — production allowlist and default registry behavior.
-- Proposal AI/config-loader tests — effective live policy and unmetered product configuration load successfully together.
-- `infra/deployment/README.md` — VPS prerequisites, `.env.prod`, Squid destinations, TLS, reverse proxy, deploy, rollback, and smoke procedure.
-- `docs/product-specs/add-product-recipe.md` — live action config as a release requirement for products that call a real provider.
+- `apps/web-mirror/src/products/registry.ts` — filter the client registry by `NEXT_PUBLIC_ANYTOOLAI_ENABLED_PRODUCT_IDS`.
+- `apps/web-mirror/src/products/runtime/ProductRunPage.tsx` — skip quota calls only when runtime config is unmetered.
+- `apps/web-mirror/test/registry.test.tsx` — public build-time allowlist and default behavior.
+- `apps/web-mirror/test/ProductRunPage.test.tsx` — both canonical-quota and unmetered flows.
 
-## 9. Verification
+### Documentation
+
+- `infra/deployment/README.md` — VPS prerequisites, `.env.prod`, quota-mode switch, Squid, TLS, reverse-proxy denies, resource selection, deploy, smoke, and rollback.
+- `docs/product-specs/add-product-recipe.md` — standard fake policy requirement for automatic live transformation and the explicit-mapping escape hatch for future products.
+
+## 11. Verification
 
 ### Repository checks
 
 1. Run `python scripts/agent/runner.py doctor` before implementation.
-2. Add failing focused tests before each behavior change.
-3. Validate the canonical fake configuration and the assembled Proposal AI live/unmetered configuration.
-4. Run `python scripts/agent/runner.py validate-configs`.
-5. Run `python scripts/agent/runner.py validate-architecture`.
-6. Run focused backend, runner, and web-mirror tests.
-7. Run `python scripts/agent/runner.py quick-check`.
-8. Run `python scripts/agent/runner.py frontend-check`.
-9. Run `python scripts/agent/runner.py full-check`.
-10. Render `docker compose config` for development live and production combinations and inspect config targets, ports, and environment ownership.
-11. Keep the existing credential-free Proposal AI and production kernel smoke tests on fake-provider paths.
+2. Add failing focused tests before behavior changes.
+3. Generate and validate Proposal AI profiles in both `canonical` and `unmetered` quota modes.
+4. Generate live profiles for the other current standard-fake products to prove reuse without committed overlays.
+5. Run `python scripts/agent/runner.py validate-configs`.
+6. Run `python scripts/agent/runner.py validate-architecture`.
+7. Run focused config, runner, API, and web tests.
+8. Run `python scripts/agent/runner.py quick-check`.
+9. Run `python scripts/agent/runner.py frontend-check`.
+10. Run `python scripts/agent/runner.py full-check`.
+11. Render `docker compose config` for local live and production combinations.
+12. Keep existing credential-free Proposal AI and kernel smokes on canonical fake configuration.
 
 ### Local live smoke
 
-1. Put the OpenAI key and optional proxy URL in `.env.live` or the shell.
-2. Run `dev-live-up --product proposal_ai`.
-3. Start `web-mirror` with its existing pnpm command.
-4. Submit one Proposal AI request.
-5. Confirm the provider-call ledger records OpenAI and the configured model.
-6. Stop with `dev-down`, start normal `dev-up`, and confirm Proposal AI is fake-backed again.
+1. Put the key and optional proxy in `.env.live` or the shell.
+2. Run `dev-live-up --product proposal_ai`; confirm the effective profile is OpenAI-backed and unmetered.
+3. Run `dev-web`; confirm it targets the derived worktree API port.
+4. Submit more than ten Proposal AI requests without quota exhaustion.
+5. Repeat with `--quota-mode canonical`; confirm the canonical anonymous quota applies.
+6. Stop with `dev-down`, start normal `dev-up`, and confirm fake-backed behavior returns.
 
 ### VPS acceptance
 
-1. Build and start the production stack from `.env.prod`.
-2. Confirm PostgreSQL is not host-published and API/web bind only to loopback.
-3. Confirm public HTTPS serves `/products/proposal_ai` through the inbound reverse proxy.
-4. Confirm another registered but unreleased product route returns not found.
-5. Submit a real Proposal AI request and confirm successful OpenAI/provider ledger entries.
-6. Confirm the Squid access log contains the OpenAI CONNECT request.
-7. Repeat Proposal AI runs beyond the old limit and confirm there is no quota decrement or `429`.
-8. If direct-egress enforcement is required, verify firewall logs show no bypass path.
+1. Generate the production profile and inspect its manifest before starting containers.
+2. Start the stack and pass effective-config verification in both API and worker.
+3. Confirm PostgreSQL is unpublished and API/web bind only to loopback.
+4. Confirm public HTTPS serves Proposal AI and hides/rejects disabled products.
+5. Confirm public Demo and Atom Lab paths are denied and their credentials are blank.
+6. Submit a real Proposal AI request and confirm successful OpenAI/provider ledger entries.
+7. Confirm the Squid access log contains the OpenAI CONNECT request.
+8. Repeat runs beyond the canonical limit and confirm the initial unmetered profile does not decrement quota or return `429`.
+9. Deploy a canonical-quota profile in staging or a bounded acceptance window and confirm quota state and exhaustion behavior return without code changes.
+10. Record worker peak memory during a cold catalog refresh plus real run; confirm no restart or OOM kill.
+11. If direct-egress enforcement is required, confirm firewall logs show no bypass path.
 
-## 10. Rollback
+## 12. Rollback
 
-Rollback uses the previous application image and Compose revision. Database rollback is unnecessary because this design introduces no schema change. Removing the live and unmetered config mounts restores the canonical fake-provider and limited-quota definitions on the next container recreation.
+Rollback uses the previous application image and Compose revision. Removing `docker-compose.live.yml` restores canonical fake/provider quota definitions on the next container recreation. No schema rollback is required.
+
+Switching only the quota mode is also reversible: add or remove a product id from `ANYTOOLAI_UNMETERED_PRODUCT_IDS`, regenerate the profile, and recreate API/worker containers. Existing quota usage rows remain durable and become effective again when canonical quota mode is restored.
 
 The OpenAI key and Squid access can be revoked independently. Provider failures remain visible in the existing provider-call ledger.
 
-## 11. Explicit non-goals
+## 13. Explicit non-goals
 
-- Deploying a repository-owned Nginx, Caddy, Squid, DNS, or TLS automation stack.
+- Deploying repository-owned Nginx, Caddy, Squid, DNS, or TLS automation.
 - Replacing LiteLLM or PydanticAI.
 - Selecting provider/model from the frontend.
-- Automatically translating every fake policy to one live policy.
-- Preparing live manifests for products that are not being released yet.
-- Adding billing, authentication, rate limiting, or abuse protection beyond the requested unmetered guest behavior.
+- Encoding quota counts/periods/dimensions in environment variables.
+- Supporting arbitrary per-action live-policy mappings before a product needs them.
+- Adding billing, authentication, or abuse protection beyond the selected anonymous quota mode.
 - Optimizing the first web image beyond a correct production multi-stage build.
 
-## 12. Success criteria
+## 14. Success criteria
 
 - Normal development and CI remain fake-backed and credential-free.
-- `dev-live-up --product proposal_ai` runs Proposal AI locally against OpenAI without source edits.
-- Production Proposal AI calls OpenAI only from the worker and through the configured Squid route.
-- Proposal AI production runs are unmetered and do not call the quota endpoint from the web runtime.
-- The public web deployment exposes Proposal AI while unreleased registered products stay hidden.
-- A later product needs only an explicit live action config, optional quota override, web registration/enablement, and product tests; core provider, proxy, Compose, and runner infrastructure remain unchanged.
+- No committed deployment copy can drift from canonical product YAML.
+- `dev-live-up --product <current-product>` runs any current standard-fake Freelancer Suite product against OpenAI without source edits.
+- Local live defaults to unmetered and can explicitly test canonical anonymous quota.
+- Production can switch Proposal AI between unmetered and its canonical anonymous quota through deployment configuration and container recreation.
+- Production Proposal AI calls OpenAI only from the worker and through Squid.
+- API and worker prove that they loaded the same generated profile before readiness succeeds.
+- Public web/API admission exposes only enabled products and blocks Demo/Atom Lab surfaces.
+- A later standard-fake product requires only its normal canonical config and tests plus an allowlist change; provider, proxy, Compose, runner, and web-host infrastructure remain unchanged.
