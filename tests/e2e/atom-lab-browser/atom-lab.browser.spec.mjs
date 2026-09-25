@@ -2599,6 +2599,108 @@ test("history-derived ambiguous recovery does not preserve a replaced owner sess
   await expect(page.locator("#preset-error")).toHaveText("");
 });
 
+test("successful preset readback materializes its version outside the latest page", async ({page}) => {
+  const first = {
+    name: "Пресет successful readback", description: "До обновления", atom_id: "A06",
+    base_action_config_id: A06.base_action_config_id, schema_refs: A06.schema_refs,
+    prompt: A06.prompt, prompt_ref: A06.prompt_ref,
+    model_id: "openai/gpt-supported", reasoning_effort: "high", fixed_fields: [],
+    example_input: A06.example_input, source_run_id: null,
+    preset_id: "preset-success-readback", version: 1, created_at: "2026-09-25T07:00:00Z",
+  };
+  const competingVersion = (version) => ({
+    ...first,
+    description: `Конкурентная версия ${version}`,
+    version,
+    created_at: `2026-09-25T07:${String(version).padStart(2, "0")}:00Z`,
+  });
+  const newerVersions = Array.from({length: 20}, (_, index) => competingVersion(22 - index));
+  const versionWriteBodies = [];
+  let savedVersion = null;
+  await page.route("http://atom-lab.test/v1/atom-lab/**", async (route) => {
+    const request = route.request();
+    const {pathname, searchParams} = new URL(request.url());
+    if (pathname === "/v1/atom-lab/presets") {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: [{
+        preset_id: first.preset_id, latest_version: 1, name: first.name,
+        description: first.description, atom_id: first.atom_id,
+        created_at: first.created_at, updated_at: first.created_at,
+      }], next_cursor: null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions`
+      && request.method() === "POST") {
+      const body = request.postDataJSON();
+      versionWriteBodies.push(body);
+      if (versionWriteBodies.length === 1) {
+        savedVersion = {
+          ...body, preset_id: first.preset_id, version: 2, created_at: "2026-09-25T07:02:00Z",
+        };
+        delete savedVersion.base_version;
+        await route.fulfill({status: 201, contentType: "application/json", body: JSON.stringify({
+          preset_id: first.preset_id, version: 2, created_at: savedVersion.created_at,
+        })});
+      } else {
+        await route.fulfill({status: 409, contentType: "application/json", body: JSON.stringify({
+          error: {code: "preset_version_conflict", message: "Конкурентное обновление", field_errors: []},
+        })});
+      }
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions`) {
+      const loadingOlder = searchParams.get("cursor") === "older";
+      const items = savedVersion
+        ? (loadingOlder ? [savedVersion, first] : newerVersions)
+        : [first];
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({items: items.map((item) => ({
+        preset_id: item.preset_id, version: item.version, name: item.name,
+        description: item.description, atom_id: item.atom_id, created_at: item.created_at,
+      })), next_cursor: savedVersion && !loadingOlder ? "older" : null})});
+      return;
+    }
+    if (pathname === `/v1/atom-lab/presets/${first.preset_id}/versions/2/export`) {
+      await route.fulfill({contentType: "application/json", body: JSON.stringify({
+        format_version: 1,
+        preset_id: first.preset_id,
+        version: 2,
+        configuration: Object.fromEntries(Object.entries(savedVersion).filter(
+          ([key]) => !["preset_id", "version", "created_at"].includes(key),
+        )),
+      })});
+      return;
+    }
+    const requestedVersion = Number(pathname.split("/").at(-1));
+    if (Number.isInteger(requestedVersion)) {
+      const version = requestedVersion === 1
+        ? first
+        : requestedVersion === 2
+          ? savedVersion
+          : competingVersion(requestedVersion);
+      await route.fulfill({contentType: "application/json", body: JSON.stringify(version)});
+      return;
+    }
+    await route.fallback();
+  });
+
+  await unlockAtom(page, "A06");
+  await page.locator("#presets-button").click();
+  await page.getByRole("button", {name: /Пресет successful readback/}).click();
+  await page.locator("#preset-description").fill("Успешно сохранённая v2");
+  await page.locator("#save-preset").click();
+
+  await expect(page.locator("#preset-version-select")).toHaveValue("2");
+  await expect(page.locator('#preset-version-select option[value="2"]')).toHaveCount(1);
+  await page.locator("#export-preset").click();
+  await expect(page.locator("#preset-export")).toContainText('"version": 2');
+  await page.locator("#load-more-versions").click();
+  await expect(page.locator("#preset-version-select")).toHaveValue("2");
+  await expect(page.locator('#preset-version-select option[value="2"]')).toHaveCount(1);
+  await page.locator("#preset-description").fill("Следующий черновик");
+  await page.locator("#save-preset").click();
+  await expect.poll(() => versionWriteBodies).toHaveLength(2);
+  expect(versionWriteBodies[1].base_version).toBe(2);
+});
+
 test("ambiguous version write reconciles an exact committed version without discarding the draft", async ({page}) => {
   const first = {
     name: "Пресет exact recovery", description: "До обновления", atom_id: "A06",

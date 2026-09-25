@@ -2173,6 +2173,7 @@ export function bootstrapAtomLab({
       }
       if (generation !== presetOpenGeneration) return false;
       if (versionsPage) commitPresetVersions(versionsPage);
+      if (preferredVersion !== null) materializePresetVersion(version);
       const latest = preferredVersion === null ? versionsPage.items[0] : null;
       const summary = latest ? {
         ...preset,
